@@ -23,6 +23,12 @@ class AppDateUtils {
     return _dateTimeFormat.format(date);
   }
 
+  /// Formata data e hora no formato brasileiro com 'às' (DD/MM/AAAA às HH:mm)
+  static String formatDateTimeWithAt(DateTime? date) {
+    if (date == null) return '';
+    return '${formatDate(date)} às ${formatTime(date)}';
+  }
+
   /// Converte string DD/MM/AAAA para DateTime
   static DateTime? parseDate(String text) {
     try {

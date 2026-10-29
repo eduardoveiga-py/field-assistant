@@ -42,3 +42,30 @@ final activitiesStreamProvider = StreamProvider<List<ActivityRecordEntry>>((ref)
   final repo = ref.watch(repositoryProvider);
   return repo.watchActivities();
 });
+
+final studyParticipantsStreamProvider = StreamProvider<List<StudyParticipantEntry>>((ref) {
+  final repo = ref.watch(repositoryProvider);
+  return (repo.db.select(repo.db.studyParticipants)..where((t) => t.deletedAt.isNull())).watch();
+});
+
+final studySessionsStreamProvider = StreamProvider<List<StudySessionEntry>>((ref) {
+  final repo = ref.watch(repositoryProvider);
+  return (repo.db.select(repo.db.studySessions)..where((t) => t.deletedAt.isNull())).watch();
+});
+
+/// Notifier e Provider do Modo Sol Intenso & Alto Contraste
+class SunModeNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  @override
+  set state(bool value) => super.state = value;
+  @override
+  bool get state => super.state;
+
+  void toggle() => state = !state;
+}
+
+final sunModeProvider = NotifierProvider<SunModeNotifier, bool>(SunModeNotifier.new);
+
+

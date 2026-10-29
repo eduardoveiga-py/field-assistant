@@ -59,17 +59,51 @@ class AppRepository {
     if (lower.isEmpty) return getAllPeople();
 
     final all = await getAllPeople();
+    final studies = await getAllStudies();
+    final participants = await (db.select(db.studyParticipants)..where((tbl) => tbl.deletedAt.isNull())).get();
+
+    // Cria mapa de personId -> estudos vinculados
+    final Map<String, List<BibleStudyEntry>> personStudies = {};
+    for (final p in participants) {
+      final study = studies.where((s) => s.id == p.studyId).firstOrNull;
+      if (study != null) {
+        personStudies.putIfAbsent(p.personId, () => []).add(study);
+      }
+    }
+
     return all.where((p) {
       final name = p.name.toLowerCase();
       final phone = (p.phone ?? '').toLowerCase();
       final address = (p.address ?? '').toLowerCase();
       final notes = (p.generalNotes ?? '').toLowerCase();
+      final nextAction = (p.nextActionNote ?? '').toLowerCase();
+      final restrictions = (p.contactRestrictions ?? '').toLowerCase();
       final tags = p.tags.toLowerCase();
-      return name.contains(lower) ||
+      final schedule = (p.preferredSchedule ?? '').toLowerCase();
+
+      final matchesDirect = name.contains(lower) ||
           phone.contains(lower) ||
           address.contains(lower) ||
           notes.contains(lower) ||
-          tags.contains(lower);
+          nextAction.contains(lower) ||
+          restrictions.contains(lower) ||
+          tags.contains(lower) ||
+          schedule.contains(lower);
+
+      if (matchesDirect) return true;
+
+      // Verifica estudos bíblicos vinculados (título, publicação, lição e parágrafo)
+      final linked = personStudies[p.id] ?? [];
+      for (final s in linked) {
+        if (s.title.toLowerCase().contains(lower) ||
+            s.publicationId.toLowerCase().contains(lower) ||
+            (s.currentLesson != null && 'lição ${s.currentLesson}'.contains(lower)) ||
+            (s.currentParagraph != null && 'parágrafo ${s.currentParagraph}'.contains(lower))) {
+          return true;
+        }
+      }
+
+      return false;
     }).toList();
   }
 
@@ -221,6 +255,10 @@ class AppRepository {
     return (db.select(db.visits)..where((tbl) => tbl.deletedAt.isNull())).get();
   }
 
+  Future<VisitEntry?> getVisitById(String id) {
+    return (db.select(db.visits)..where((tbl) => tbl.id.equals(id) & tbl.deletedAt.isNull())).getSingleOrNull();
+  }
+
   Future<VisitEntry> createVisit({
     String? id,
     required String personId,
@@ -298,6 +336,51 @@ class AppRepository {
     return entry;
   }
 
+  Future<void> updateVisit(VisitEntry visit) async {
+    final now = DateTime.now();
+    final updated = visit.copyWith(
+      updatedAt: now,
+      revision: visit.revision + 1,
+    );
+    await db.transaction(() async {
+      await db.update(db.visits).replace(updated);
+      await _recordSyncOperation(
+        entityType: 'visits',
+        entityId: updated.id,
+        operation: 'UPDATE',
+        payload: {
+          'id': updated.id,
+          'notes': updated.notes,
+          'topicsDiscussed': updated.topicsDiscussed,
+          'result': updated.result,
+          'nextStep': updated.nextStep,
+          'suggestedReturnDate': updated.suggestedReturnDate?.toIso8601String(),
+          'revision': updated.revision,
+        },
+      );
+    });
+  }
+
+  Future<void> deleteVisit(String id) async {
+    final visit = await (db.select(db.visits)..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
+    if (visit == null) return;
+    final now = DateTime.now();
+    final updated = visit.copyWith(
+      deletedAt: Value(now),
+      updatedAt: now,
+      revision: visit.revision + 1,
+    );
+    await db.transaction(() async {
+      await db.update(db.visits).replace(updated);
+      await _recordSyncOperation(
+        entityType: 'visits',
+        entityId: id,
+        operation: 'DELETE',
+        payload: {'id': id, 'deletedAt': now.toIso8601String()},
+      );
+    });
+  }
+
   // --------------------------------------------------------------------------
   // MÓDULO: ESTUDOS BÍBLICOS, PARTICIPANTES E SESSÕES
   // --------------------------------------------------------------------------
@@ -333,6 +416,7 @@ class AppRepository {
     String? learningGoals,
     String? pendingDoubts,
     String? nextTopic,
+    String? pauseOrCloseReason,
     required List<String> participantPersonIds,
     String? primaryParticipantId,
   }) async {
@@ -354,7 +438,7 @@ class AppRepository {
       learningGoals: learningGoals,
       pendingDoubts: pendingDoubts,
       nextTopic: nextTopic,
-      pauseOrCloseReason: null,
+      pauseOrCloseReason: pauseOrCloseReason,
       lastSessionAt: null,
       nextPlannedAt: null,
       createdAt: now,
@@ -406,6 +490,52 @@ class AppRepository {
     return entry;
   }
 
+  Future<void> updateStudy(BibleStudyEntry study) async {
+    final now = DateTime.now();
+    final updated = study.copyWith(
+      updatedAt: now,
+      revision: study.revision + 1,
+    );
+    await db.transaction(() async {
+      await db.update(db.bibleStudies).replace(updated);
+      await _recordSyncOperation(
+        entityType: 'bible_studies',
+        entityId: updated.id,
+        operation: 'UPDATE',
+        payload: {
+          'id': updated.id,
+          'title': updated.title,
+          'status': updated.status,
+          'currentLesson': updated.currentLesson,
+          'currentParagraph': updated.currentParagraph,
+          'nextTopic': updated.nextTopic,
+          'pauseOrCloseReason': updated.pauseOrCloseReason,
+          'revision': updated.revision,
+        },
+      );
+    });
+  }
+
+  Future<void> deleteStudy(String id) async {
+    final study = await getStudyById(id);
+    if (study == null) return;
+    final now = DateTime.now();
+    final updated = study.copyWith(
+      deletedAt: Value(now),
+      updatedAt: now,
+      revision: study.revision + 1,
+    );
+    await db.transaction(() async {
+      await db.update(db.bibleStudies).replace(updated);
+      await _recordSyncOperation(
+        entityType: 'bible_studies',
+        entityId: id,
+        operation: 'DELETE',
+        payload: {'id': id, 'deletedAt': now.toIso8601String()},
+      );
+    });
+  }
+
   Future<List<StudyParticipantEntry>> getParticipantsForStudy(String studyId) {
     return (db.select(db.studyParticipants)
           ..where((tbl) => tbl.studyId.equals(studyId) & tbl.deletedAt.isNull()))
@@ -452,14 +582,33 @@ class AppRepository {
       if (status == 'realizada') {
         final study = await getStudyById(studyId);
         if (study != null) {
+          final parsedPara = paragraphsCovered != null
+              ? (int.tryParse(paragraphsCovered) ?? int.tryParse(paragraphsCovered.split(RegExp(r'[-–,]')).last.trim()))
+              : null;
           final updatedStudy = study.copyWith(
             lastSessionAt: Value(dateTime),
             currentLesson: lessonCovered != null ? Value(lessonCovered) : study.currentLesson != null ? Value(study.currentLesson) : const Value.absent(),
+            currentParagraph: parsedPara != null ? Value(parsedPara) : study.currentParagraph != null ? Value(study.currentParagraph) : const Value.absent(),
             nextTopic: nextStep != null ? Value(nextStep) : study.nextTopic != null ? Value(study.nextTopic) : const Value.absent(),
             updatedAt: now,
             revision: study.revision + 1,
           );
           await db.update(db.bibleStudies).replace(updatedStudy);
+
+          await _recordSyncOperation(
+            entityType: 'bible_studies',
+            entityId: study.id,
+            operation: 'UPDATE',
+            payload: {
+              'id': updatedStudy.id,
+              'currentLesson': updatedStudy.currentLesson,
+              'currentParagraph': updatedStudy.currentParagraph,
+              'lastSessionAt': updatedStudy.lastSessionAt?.toIso8601String(),
+              'nextTopic': updatedStudy.nextTopic,
+              'revision': updatedStudy.revision,
+              'updatedAt': now.toIso8601String(),
+            },
+          );
         }
       }
 
@@ -471,11 +620,17 @@ class AppRepository {
           'id': entry.id,
           'studyId': entry.studyId,
           'dateTimeField': entry.dateTimeField.toIso8601String(),
+          'publicationCode': entry.publicationCode,
           'lessonCovered': entry.lessonCovered,
           'paragraphsCovered': entry.paragraphsCovered,
+          'sessionNotes': entry.sessionNotes,
+          'pendingQuestions': entry.pendingQuestions,
+          'nextStep': entry.nextStep,
           'status': entry.status,
           'participantIds': entry.participantIds,
           'revision': entry.revision,
+          'createdAt': now.toIso8601String(),
+          'updatedAt': now.toIso8601String(),
         },
       );
     });
@@ -509,6 +664,10 @@ class AppRepository {
           ..where((tbl) => tbl.deletedAt.isNull())
           ..orderBy([(t) => OrderingTerm(expression: t.startTime, mode: OrderingMode.asc)]))
         .get();
+  }
+
+  Future<AppointmentEntry?> getAppointmentById(String id) {
+    return (db.select(db.appointments)..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
   }
 
   Future<AppointmentEntry> createAppointment({
@@ -598,6 +757,99 @@ class AppRepository {
     });
   }
 
+  /// Reagenda um compromisso preservando o histórico do anterior e associando o novo (Seção 5.4)
+  Future<AppointmentEntry> rescheduleAppointment({
+    required AppointmentEntry oldAppointment,
+    required DateTime newStartTime,
+    required DateTime newEndTime,
+    int? durationMinutes,
+    String? locationNotes,
+  }) async {
+    final now = DateTime.now();
+    final newId = _uuid.v4();
+    final dur = durationMinutes ?? oldAppointment.durationMinutes;
+
+    final updatedOld = oldAppointment.copyWith(
+      status: 'reagendado',
+      updatedAt: now,
+      revision: oldAppointment.revision + 1,
+    );
+
+    final newAppt = AppointmentEntry(
+      id: newId,
+      personId: oldAppointment.personId,
+      studyId: oldAppointment.studyId,
+      title: oldAppointment.title,
+      startTime: newStartTime,
+      endTime: newEndTime,
+      durationMinutes: dur,
+      status: 'confirmado',
+      previousAppointmentId: oldAppointment.id,
+      locationNotes: locationNotes ?? oldAppointment.locationNotes,
+      reminderMinutesBefore: oldAppointment.reminderMinutesBefore,
+      secondReminderMinutesBefore: oldAppointment.secondReminderMinutesBefore,
+      isProvisional: false,
+      createdAt: now,
+      updatedAt: now,
+      deletedAt: null,
+      revision: 1,
+    );
+
+    await db.transaction(() async {
+      await db.update(db.appointments).replace(updatedOld);
+      await db.into(db.appointments).insert(newAppt);
+
+      await _recordSyncOperation(
+        entityType: 'appointments',
+        entityId: oldAppointment.id,
+        operation: 'UPDATE',
+        payload: {
+          'id': oldAppointment.id,
+          'status': 'reagendado',
+          'revision': updatedOld.revision,
+        },
+      );
+
+      await _recordSyncOperation(
+        entityType: 'appointments',
+        entityId: newId,
+        operation: 'INSERT',
+        payload: {
+          'id': newAppt.id,
+          'personId': newAppt.personId,
+          'title': newAppt.title,
+          'startTime': newAppt.startTime.toIso8601String(),
+          'endTime': newAppt.endTime.toIso8601String(),
+          'previousAppointmentId': oldAppointment.id,
+          'status': 'confirmado',
+          'revision': newAppt.revision,
+        },
+      );
+    });
+
+    return newAppt;
+  }
+
+  Future<void> deleteAppointment(String id) async {
+    final appt = await (db.select(db.appointments)..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
+    if (appt == null) return;
+    final now = DateTime.now();
+    final updated = appt.copyWith(
+      deletedAt: Value(now),
+      updatedAt: now,
+      revision: appt.revision + 1,
+    );
+    await db.transaction(() async {
+      await db.update(db.appointments).replace(updated);
+      await _recordSyncOperation(
+        entityType: 'appointments',
+        entityId: id,
+        operation: 'DELETE',
+        payload: {'id': id, 'deletedAt': now.toIso8601String()},
+      );
+    });
+  }
+
   // --------------------------------------------------------------------------
   // MÓDULO: ATIVIDADES PESSOAIS
   // --------------------------------------------------------------------------
@@ -655,6 +907,140 @@ class AppRepository {
     });
 
     return entry;
+  }
+
+  Future<void> updateActivityRecord(ActivityRecordEntry activity) async {
+    final now = DateTime.now();
+    final updated = activity.copyWith(
+      updatedAt: now,
+      revision: activity.revision + 1,
+    );
+    await db.transaction(() async {
+      await db.update(db.activityRecords).replace(updated);
+      await _recordSyncOperation(
+        entityType: 'activity_records',
+        entityId: updated.id,
+        operation: 'UPDATE',
+        payload: {
+          'id': updated.id,
+          'durationSeconds': updated.durationSeconds,
+          'modality': updated.modality,
+          'notes': updated.notes,
+          'revision': updated.revision,
+        },
+      );
+    });
+  }
+
+  Future<void> deleteActivityRecord(String id) async {
+    final act = await (db.select(db.activityRecords)..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
+    if (act == null) return;
+    final now = DateTime.now();
+    final updated = act.copyWith(
+      deletedAt: Value(now),
+      updatedAt: now,
+      revision: act.revision + 1,
+    );
+    await db.transaction(() async {
+      await db.update(db.activityRecords).replace(updated);
+      await _recordSyncOperation(
+        entityType: 'activity_records',
+        entityId: id,
+        operation: 'DELETE',
+        payload: {'id': id, 'deletedAt': now.toIso8601String()},
+      );
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // MÓDULO: RECUPERAÇÃO DE EXCLUSÕES (LIXEIRA) - SEÇÃO 8.4
+  // --------------------------------------------------------------------------
+  Future<List<Map<String, dynamic>>> getDeletedItems() async {
+    final List<Map<String, dynamic>> result = [];
+    final people = await (db.select(db.people)..where((tbl) => tbl.deletedAt.isNotNull())).get();
+    for (final p in people) {
+      result.add({'type': 'people', 'id': p.id, 'title': p.name, 'subtitle': 'Contato', 'deletedAt': p.deletedAt});
+    }
+    final visits = await (db.select(db.visits)..where((tbl) => tbl.deletedAt.isNotNull())).get();
+    for (final v in visits) {
+      result.add({'type': 'visits', 'id': v.id, 'title': 'Visita (${v.contactType})', 'subtitle': v.topicsDiscussed ?? 'Sem assunto', 'deletedAt': v.deletedAt});
+    }
+    final studies = await (db.select(db.bibleStudies)..where((tbl) => tbl.deletedAt.isNotNull())).get();
+    for (final s in studies) {
+      result.add({'type': 'bible_studies', 'id': s.id, 'title': s.title, 'subtitle': 'Estudo Bíblico', 'deletedAt': s.deletedAt});
+    }
+    final appts = await (db.select(db.appointments)..where((tbl) => tbl.deletedAt.isNotNull())).get();
+    for (final a in appts) {
+      result.add({'type': 'appointments', 'id': a.id, 'title': a.title, 'subtitle': 'Compromisso', 'deletedAt': a.deletedAt});
+    }
+    final acts = await (db.select(db.activityRecords)..where((tbl) => tbl.deletedAt.isNotNull())).get();
+    for (final act in acts) {
+      result.add({'type': 'activity_records', 'id': act.id, 'title': 'Atividade (${act.modality})', 'subtitle': '${(act.durationSeconds / 60).round()} min', 'deletedAt': act.deletedAt});
+    }
+    result.sort((a, b) => (b['deletedAt'] as DateTime).compareTo(a['deletedAt'] as DateTime));
+    return result;
+  }
+
+  Future<void> restoreDeletedItem(String entityType, String id) async {
+    final now = DateTime.now();
+    await db.transaction(() async {
+      if (entityType == 'people') {
+        final item = await (db.select(db.people)..where((t) => t.id.equals(id))).getSingleOrNull();
+        if (item != null) {
+          await db.update(db.people).replace(item.copyWith(deletedAt: const Value(null), updatedAt: now, revision: item.revision + 1));
+        }
+      } else if (entityType == 'visits') {
+        final item = await (db.select(db.visits)..where((t) => t.id.equals(id))).getSingleOrNull();
+        if (item != null) {
+          await db.update(db.visits).replace(item.copyWith(deletedAt: const Value(null), updatedAt: now, revision: item.revision + 1));
+        }
+      } else if (entityType == 'bible_studies') {
+        final item = await (db.select(db.bibleStudies)..where((t) => t.id.equals(id))).getSingleOrNull();
+        if (item != null) {
+          await db.update(db.bibleStudies).replace(item.copyWith(deletedAt: const Value(null), updatedAt: now, revision: item.revision + 1));
+        }
+      } else if (entityType == 'appointments') {
+        final item = await (db.select(db.appointments)..where((t) => t.id.equals(id))).getSingleOrNull();
+        if (item != null) {
+          await db.update(db.appointments).replace(item.copyWith(deletedAt: const Value(null), updatedAt: now, revision: item.revision + 1));
+        }
+      } else if (entityType == 'activity_records') {
+        final item = await (db.select(db.activityRecords)..where((t) => t.id.equals(id))).getSingleOrNull();
+        if (item != null) {
+          await db.update(db.activityRecords).replace(item.copyWith(deletedAt: const Value(null), updatedAt: now, revision: item.revision + 1));
+        }
+      }
+      await _recordSyncOperation(
+        entityType: entityType,
+        entityId: id,
+        operation: 'UPDATE',
+        payload: {'id': id, 'restored': true, 'updatedAt': now.toIso8601String()},
+      );
+    });
+  }
+
+  Future<void> permanentlyDeleteItem(String entityType, String id) async {
+    await db.transaction(() async {
+      if (entityType == 'people') {
+        await (db.delete(db.people)..where((t) => t.id.equals(id))).go();
+      } else if (entityType == 'visits') {
+        await (db.delete(db.visits)..where((t) => t.id.equals(id))).go();
+      } else if (entityType == 'bible_studies') {
+        await (db.delete(db.studyParticipants)..where((t) => t.studyId.equals(id))).go();
+        await (db.delete(db.studySessions)..where((t) => t.studyId.equals(id))).go();
+        await (db.delete(db.bibleStudies)..where((t) => t.id.equals(id))).go();
+      } else if (entityType == 'appointments') {
+        await (db.delete(db.appointments)..where((t) => t.id.equals(id))).go();
+      } else if (entityType == 'activity_records') {
+        await (db.delete(db.activityRecords)..where((t) => t.id.equals(id))).go();
+      }
+      await _recordSyncOperation(
+        entityType: entityType,
+        entityId: id,
+        operation: 'HARD_DELETE',
+        payload: {'id': id, 'hardDelete': true},
+      );
+    });
   }
 
   // --------------------------------------------------------------------------

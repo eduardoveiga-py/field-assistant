@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:encrypt/encrypt.dart' as enc;
+import 'package:drift/drift.dart' show Variable;
 import '../database/app_database.dart';
 import '../database/repository.dart';
 
@@ -159,21 +160,61 @@ class BackupService {
     }
 
     final importedVisits = (data['visits'] as List<dynamic>?) ?? [];
+    final existingVisits = await repository.getAllVisits();
+    final existingVisitsIds = {for (var v in existingVisits) v.id};
+    int vAdd = 0;
+    int vUpdate = 0;
+    for (final item in importedVisits) {
+      final id = item['id'] as String;
+      if (!existingVisitsIds.contains(id)) {
+        vAdd++;
+      } else {
+        vUpdate++;
+      }
+    }
+
     final importedStudies = (data['bibleStudies'] as List<dynamic>?) ?? [];
+    final existingStudies = await repository.getAllStudies();
+    final existingStudiesIds = {for (var s in existingStudies) s.id};
+    int sAdd = 0;
+    for (final item in importedStudies) {
+      if (!existingStudiesIds.contains(item['id'] as String)) sAdd++;
+    }
+
     final importedSessions = (data['studySessions'] as List<dynamic>?) ?? [];
+    final existingSessions = await repository.getAllSessions();
+    final existingSessionsIds = {for (var s in existingSessions) s.id};
+    int sessAdd = 0;
+    for (final item in importedSessions) {
+      if (!existingSessionsIds.contains(item['id'] as String)) sessAdd++;
+    }
+
     final importedAppointments = (data['appointments'] as List<dynamic>?) ?? [];
+    final existingAppts = await repository.getAllAppointments();
+    final existingApptsIds = {for (var a in existingAppts) a.id};
+    int aAdd = 0;
+    for (final item in importedAppointments) {
+      if (!existingApptsIds.contains(item['id'] as String)) aAdd++;
+    }
+
     final importedActivities = (data['activityRecords'] as List<dynamic>?) ?? [];
+    final existingActivities = await repository.getAllActivities();
+    final existingActivitiesIds = {for (var act in existingActivities) act.id};
+    int actAdd = 0;
+    for (final item in importedActivities) {
+      if (!existingActivitiesIds.contains(item['id'] as String)) actAdd++;
+    }
 
     return RestorePreview(
       peopleToAdd: pAdd,
       peopleToUpdate: pUpdate,
       peopleUnchanged: pUnchanged,
-      visitsToAdd: importedVisits.length,
-      visitsToUpdate: 0,
-      studiesToAdd: importedStudies.length,
-      sessionsToAdd: importedSessions.length,
-      appointmentsToAdd: importedAppointments.length,
-      activitiesToAdd: importedActivities.length,
+      visitsToAdd: vAdd,
+      visitsToUpdate: vUpdate,
+      studiesToAdd: sAdd,
+      sessionsToAdd: sessAdd,
+      appointmentsToAdd: aAdd,
+      activitiesToAdd: actAdd,
       rawDecryptedData: data,
     );
   }
@@ -233,5 +274,75 @@ class BackupService {
         await db.into(db.activityRecords).insertOnConflictUpdate(entry);
       }
     });
+  }
+
+  static const String _silentBackupKey = 'last_silent_backup_timestamp';
+  static const String _silentBackupDataKey = 'last_silent_backup_payload';
+
+  /// Realiza backup silencioso se o último foi há mais de 24 horas (ou se force = true)
+  Future<bool> performSilentBackupIfNeeded({bool force = false}) async {
+    final db = repository.db;
+    try {
+      await db.customStatement('''
+        CREATE TABLE IF NOT EXISTS app_kv_store (
+          key TEXT PRIMARY KEY,
+          value TEXT NOT NULL
+        );
+      ''');
+
+      if (!force) {
+        final row = await db.customSelect(
+          'SELECT value FROM app_kv_store WHERE key = ?',
+          variables: [Variable.withString(_silentBackupKey)],
+        ).getSingleOrNull();
+
+        if (row != null) {
+          final lastBackupTime = DateTime.tryParse(row.read<String>('value'));
+          if (lastBackupTime != null && DateTime.now().difference(lastBackupTime).inHours < 24) {
+            return false; // Já realizado nas últimas 24h
+          }
+        }
+      }
+
+      final backupJson = await exportEncryptedBackup('silent_auto_backup_key_v1');
+      final nowStr = DateTime.now().toIso8601String();
+
+      await db.customInsert(
+        'INSERT OR REPLACE INTO app_kv_store (key, value) VALUES (?, ?)',
+        variables: [Variable.withString(_silentBackupKey), Variable.withString(nowStr)],
+      );
+      await db.customInsert(
+        'INSERT OR REPLACE INTO app_kv_store (key, value) VALUES (?, ?)',
+        variables: [Variable.withString(_silentBackupDataKey), Variable.withString(backupJson)],
+      );
+
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Retorna a data do último backup silencioso realizado
+  Future<DateTime?> getLastSilentBackupDate() async {
+    final db = repository.db;
+    try {
+      await db.customStatement('''
+        CREATE TABLE IF NOT EXISTS app_kv_store (
+          key TEXT PRIMARY KEY,
+          value TEXT NOT NULL
+        );
+      ''');
+      final row = await db.customSelect(
+        'SELECT value FROM app_kv_store WHERE key = ?',
+        variables: [Variable.withString(_silentBackupKey)],
+      ).getSingleOrNull();
+
+      if (row != null) {
+        return DateTime.tryParse(row.read<String>('value'));
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
   }
 }

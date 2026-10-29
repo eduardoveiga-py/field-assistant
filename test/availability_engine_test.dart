@@ -163,5 +163,98 @@ void main() {
 
       expect(result.isAvailable, isTrue);
     });
+
+    test('TC-SCHED-06: Ignora compromissos com soft delete (deletedAt != null)', () {
+      final existing = [
+        AppointmentEntry(
+          id: 'appt-deleted',
+          title: 'Visita Excluída',
+          startTime: DateTime(2026, 10, 26, 14, 0),
+          endTime: DateTime(2026, 10, 26, 14, 30),
+          durationMinutes: 30,
+          status: 'confirmado',
+          isProvisional: false,
+          createdAt: now,
+          updatedAt: now,
+          deletedAt: now,
+          revision: 2,
+        ),
+      ];
+
+      final result = AvailabilityEngine.checkAvailability(
+        startTime: DateTime(2026, 10, 26, 14, 0),
+        durationMinutes: 30,
+        bufferMinutes: 0,
+        existingAppointments: existing,
+      );
+
+      expect(result.isAvailable, isTrue);
+      expect(result.conflictingAppointments, isEmpty);
+    });
+
+    test('TC-SCHED-07: Sugestões de horários alternativos são validadas contra todos os compromissos existentes e nunca colidem', () {
+      // Cria agenda densa: 14h00-14h30, 14h30-15h00, 15h00-15h30
+      final existing = [
+        AppointmentEntry(
+          id: 'appt-1',
+          title: 'Visita 1',
+          startTime: DateTime(2026, 10, 26, 14, 0),
+          endTime: DateTime(2026, 10, 26, 14, 30),
+          durationMinutes: 30,
+          status: 'confirmado',
+          isProvisional: false,
+          createdAt: now,
+          updatedAt: now,
+          revision: 1,
+        ),
+        AppointmentEntry(
+          id: 'appt-2',
+          title: 'Visita 2',
+          startTime: DateTime(2026, 10, 26, 14, 30),
+          endTime: DateTime(2026, 10, 26, 15, 0),
+          durationMinutes: 30,
+          status: 'confirmado',
+          isProvisional: false,
+          createdAt: now,
+          updatedAt: now,
+          revision: 1,
+        ),
+        AppointmentEntry(
+          id: 'appt-3',
+          title: 'Visita 3',
+          startTime: DateTime(2026, 10, 26, 15, 0),
+          endTime: DateTime(2026, 10, 26, 15, 30),
+          durationMinutes: 30,
+          status: 'confirmado',
+          isProvisional: false,
+          createdAt: now,
+          updatedAt: now,
+          revision: 1,
+        ),
+      ];
+
+      // Tenta agendar para 14h15 com 30min (termina 14h45)
+      final result = AvailabilityEngine.checkAvailability(
+        startTime: DateTime(2026, 10, 26, 14, 15),
+        durationMinutes: 30,
+        bufferMinutes: 0,
+        existingAppointments: existing,
+      );
+
+      expect(result.isAvailable, isFalse);
+      expect(result.suggestedAlternativeSlots.isNotEmpty, isTrue);
+
+      // Todas as sugestões devem ser livres de colisão com existing
+      for (final slot in result.suggestedAlternativeSlots) {
+        final slotEnd = slot.add(const Duration(minutes: 30));
+        final collides = AvailabilityEngine.hasCollision(
+          start: slot,
+          end: slotEnd,
+          bufferMinutes: 0,
+          existingAppointments: existing,
+        );
+        expect(collides, isFalse, reason: 'Slot sugerido $slot colide com compromisso existente');
+      }
+    });
   });
 }

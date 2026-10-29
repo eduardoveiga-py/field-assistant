@@ -198,5 +198,219 @@ void main() {
 
       expect(metrics.heldVisitsCount, equals(1));
     });
+
+    test('TC-COUNT-06: Contagem de Ações Pendentes e Contatos sem Contato Recente (> 30 dias)', () {
+      final people = [
+        PersonEntry(
+          id: 'p-pending-action',
+          name: 'João Ação Pendente',
+          firstContactAt: now.subtract(const Duration(days: 40)),
+          status: 'interessado',
+          tags: '[]',
+          nextActionAt: now.subtract(const Duration(hours: 2)), // Ação vencida há 2 horas
+          lastContactAt: now.subtract(const Duration(days: 5)),
+          createdAt: now,
+          updatedAt: now,
+          revision: 1,
+        ),
+        PersonEntry(
+          id: 'p-no-recent-contact',
+          name: 'Maria Sem Contato Recente',
+          firstContactAt: now.subtract(const Duration(days: 60)),
+          status: 'revisita',
+          tags: '[]',
+          lastContactAt: now.subtract(const Duration(days: 35)), // 35 dias sem contato
+          nextActionAt: now.add(const Duration(days: 5)),
+          createdAt: now,
+          updatedAt: now,
+          revision: 1,
+        ),
+        PersonEntry(
+          id: 'p-up-to-date',
+          name: 'Pedro Em Dia',
+          firstContactAt: now.subtract(const Duration(days: 10)),
+          status: 'revisita',
+          tags: '[]',
+          lastContactAt: now.subtract(const Duration(days: 3)), // 3 dias atrás
+          nextActionAt: now.add(const Duration(days: 2)),
+          createdAt: now,
+          updatedAt: now,
+          revision: 1,
+        ),
+      ];
+
+      final metrics = DashboardCalculator.calculate(
+        studies: [],
+        sessions: [],
+        visits: [],
+        appointments: [],
+        activities: [],
+        people: people,
+        periodStart: periodStart,
+        periodEnd: periodEnd,
+        nowOverride: now,
+      );
+
+      expect(metrics.pendingNextActionCount, equals(1));
+      expect(metrics.noRecentContactCount, equals(1));
+    });
+
+    test('TC-COUNT-07: Contagem de assistência em sessões de estudo com notas [Assistência: X]', () {
+      final sessions = [
+        StudySessionEntry(
+          id: 'sess-1',
+          studyId: 'study-1',
+          dateTimeField: DateTime(2026, 10, 5, 14, 0),
+          status: 'realizada',
+          sessionNotes: '[Assistência: 3]\nConsiderado Lição 02',
+          participantIds: '["p1"]',
+          createdAt: now,
+          updatedAt: now,
+          revision: 1,
+        ),
+        StudySessionEntry(
+          id: 'sess-2',
+          studyId: 'study-2',
+          dateTimeField: DateTime(2026, 10, 12, 14, 0),
+          status: 'realizada',
+          sessionNotes: '[Assistência: 5]\nFamília inteira presente',
+          participantIds: '["p2"]',
+          createdAt: now,
+          updatedAt: now,
+          revision: 1,
+        ),
+      ];
+
+      final metrics = DashboardCalculator.calculate(
+        studies: [],
+        sessions: sessions,
+        visits: [],
+        appointments: [],
+        activities: [],
+        periodStart: periodStart,
+        periodEnd: periodEnd,
+        nowOverride: now,
+      );
+
+      // Total de assistência: 3 + 5 = 8
+      expect(metrics.totalStudyAttendance, equals(8));
+      // Média por estudo: 8 / 2 = 4.0
+      expect(metrics.averageAttendancePerStudy, equals(4.0));
+    });
+
+    test('TC-COUNT-08: Sessões canceladas NÃO somam na assistência nem na média de estudos', () {
+      final sessions = [
+        StudySessionEntry(
+          id: 'sess-1',
+          studyId: 'study-1',
+          dateTimeField: DateTime(2026, 10, 5, 14, 0),
+          status: 'realizada',
+          sessionNotes: '[Assistência: 4]',
+          participantIds: '["p1"]',
+          createdAt: now,
+          updatedAt: now,
+          revision: 1,
+        ),
+        StudySessionEntry(
+          id: 'sess-cancelled',
+          studyId: 'study-1',
+          dateTimeField: DateTime(2026, 10, 12, 14, 0),
+          status: 'cancelada',
+          sessionNotes: '[Assistência: 10]', // Não deve ser computado!
+          participantIds: '["p1"]',
+          createdAt: now,
+          updatedAt: now,
+          revision: 1,
+        ),
+      ];
+
+      final metrics = DashboardCalculator.calculate(
+        studies: [],
+        sessions: sessions,
+        visits: [],
+        appointments: [],
+        activities: [],
+        periodStart: periodStart,
+        periodEnd: periodEnd,
+        nowOverride: now,
+      );
+
+      expect(metrics.heldSessionsCount, equals(1));
+      expect(metrics.totalStudyAttendance, equals(4));
+      expect(metrics.averageAttendancePerStudy, equals(4.0));
+    });
+
+    test('TC-COUNT-09: Fallback de assistência quando não especificada usa participantes ou padrão 1', () {
+      final sessions = [
+        StudySessionEntry(
+          id: 'sess-no-tag',
+          studyId: 'study-1',
+          dateTimeField: DateTime(2026, 10, 5, 14, 0),
+          status: 'realizada',
+          sessionNotes: 'Sessão sem tag de assistência',
+          participantIds: '["p1", "p2"]', // 2 participantes cadastrados
+          createdAt: now,
+          updatedAt: now,
+          revision: 1,
+        ),
+      ];
+
+      final metrics = DashboardCalculator.calculate(
+        studies: [],
+        sessions: sessions,
+        visits: [],
+        appointments: [],
+        activities: [],
+        periodStart: periodStart,
+        periodEnd: periodEnd,
+        nowOverride: now,
+      );
+
+      expect(metrics.totalStudyAttendance, equals(2));
+      expect(metrics.averageAttendancePerStudy, equals(2.0));
+    });
+
+    test('TC-COUNT-10: Contagem de publicações e vídeos do relatório de ministério', () {
+      final activities = [
+        ActivityRecordEntry(
+          id: 'act-1',
+          date: DateTime(2026, 10, 10),
+          durationSeconds: 7200,
+          modality: 'campo',
+          notes: '[Publicações: 3] [Vídeos: 2] Manhã de pregação',
+          createdAt: now,
+          updatedAt: now,
+          revision: 1,
+        ),
+      ];
+
+      final visits = [
+        VisitEntry(
+          id: 'vis-1',
+          personId: 'p1',
+          dateTimeField: DateTime(2026, 10, 11),
+          contactType: 'revisita',
+          result: 'Boa conversa',
+          scriptureOrPub: 'Brochura Seja Feliz',
+          createdAt: now,
+          updatedAt: now,
+          revision: 1,
+        ),
+      ];
+
+      final metrics = DashboardCalculator.calculate(
+        studies: [],
+        sessions: [],
+        visits: visits,
+        appointments: [],
+        activities: activities,
+        periodStart: periodStart,
+        periodEnd: periodEnd,
+        nowOverride: now,
+      );
+
+      expect(metrics.totalPlacements, equals(4)); // 3 de atividades + 1 de visita
+      expect(metrics.totalVideos, equals(2));
+    });
   });
 }

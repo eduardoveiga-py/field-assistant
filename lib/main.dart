@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/app_theme.dart';
 import 'ui/main_navigation_shell.dart';
+import 'ui/providers.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -13,17 +14,20 @@ void main() {
   );
 }
 
-class MinisterioPessoalApp extends StatelessWidget {
+
+class MinisterioPessoalApp extends ConsumerWidget {
   const MinisterioPessoalApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isSunMode = ref.watch(sunModeProvider);
+
     return MaterialApp(
       title: 'Ministério Pessoal',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.system,
+      theme: isSunMode ? AppTheme.sunModeTheme : AppTheme.lightTheme,
+      darkTheme: isSunMode ? AppTheme.sunModeTheme : AppTheme.darkTheme,
+      themeMode: isSunMode ? ThemeMode.light : ThemeMode.system,
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
@@ -36,3 +40,4 @@ class MinisterioPessoalApp extends StatelessWidget {
     );
   }
 }
+

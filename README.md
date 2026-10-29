@@ -62,15 +62,28 @@ lib/
   ├── publications/             # Catálogo de publicações e resolvedor de links
   ├── settings/                 # Backup criptografado e exportação/importação
   ├── sync/                     # Motor de merge e detecção de conflitos
-  └── ui/                       # Telas (Hoje, Pessoas, Agenda, Estudos, Dashboard, Ajustes)
-test/                           # Suíte automatizada com 25 testes cobrindo todos os módulos
+  └── ui/                       # Telas (Hoje, Pessoas, Agenda, Estudos, Dashboard, Atividades, Lixeira, Ajustes)
+scripts/                        # Scripts para inicialização web e execução de testes no Windows
+supabase/                       # Migrações PostgreSQL e políticas RLS para sincronização
+test/                           # Suíte automatizada com 32 testes cobrindo todos os módulos
 ```
 
 ---
 
 ## 🚀 Como Executar o Projeto Localmente
 
-### Pré-requisitos
+### Atalhos Prontos para Windows (PowerShell / Prompt)
+- Para rodar a versão Web no Chrome:
+  ```powershell
+  .\scripts\run_web.ps1
+  ```
+  *(ou execute `scripts\run_web.bat` via duplo-clique no Explorer)*
+- Para rodar a análise estática e todos os testes:
+  ```powershell
+  .\scripts\run_tests.ps1
+  ```
+
+### Pré-requisitos Manuais
 - **Flutter SDK**: Versão 3.27+ (estável) instalado.
 - **Dart SDK**: 3.5+ incluído no Flutter.
 - **Google Chrome** ou **Microsoft Edge** para testes em Web.
@@ -105,7 +118,7 @@ flutter build web --release
 
 ## 🧪 Suíte de Testes Automatizados
 
-Para executar todos os 25 testes de aceitação unitários e de interface:
+Para executar todos os 32 testes de aceitação unitários, transacionais e de interface:
 ```bash
 flutter test
 ```
@@ -115,14 +128,14 @@ Para validar a integridade estática do código (zero erros e zero warnings):
 dart analyze lib test
 ```
 
-### Cobertura de Testes
-- `test/counting_rules_test.dart` (TC-COUNT-01 a 05): Regras de contagem de estudos, sessões e contatos.
-- `test/availability_engine_test.dart` (TC-SCHED-01 a 05): Detecção de sobreposição, contenção e intervalos.
-- `test/publication_link_resolver_test.dart` (TC-PUB-01 a 03): Resolução de links em Português, Libras e fallback.
-- `test/repository_database_test.dart`: Transações atômicas com `SyncQueue`, busca offline e soft-delete.
-- `test/sync_engine_test.dart` (TC-SYNC-01 a 03): Mesclagem em campos distintos, conflitos e idempotência.
-- `test/backup_service_test.dart` (TC-BAK-01 a 03): AES-256 GCM, senha incorreta e idempotência de restauração.
-- `test/widget_test.dart`: Navegação responsiva iPad (`NavigationRail`) e iPhone XR (`NavigationBar`), sem vazamentos de layout.
+### Cobertura de Testes (32 Testes Aprovados)
+- `test/counting_rules_test.dart` (TC-COUNT-01 a 07): Regras de contagem de estudos com múltiplos participantes, sessões, visitas, ações pendentes e contatos recentes.
+- `test/availability_engine_test.dart` (TC-SCHED-01 a 05): Detecção de sobreposição, contenção, horários consecutivos, buffers e sugestões inteligentes de horários livres.
+- `test/publication_link_resolver_test.dart` (TC-PUB-01 a 03): Resolução de links em Português, Libras e fallback seguro.
+- `test/repository_database_test.dart` (7 testes): Transações atômicas com `SyncQueue`, busca offline, reagendamento com histórico (`previousAppointmentId`), atualização de visitas e lixeira com restauração.
+- `test/sync_engine_test.dart` (TC-SYNC-01 a 03): Mesclagem em campos distintos, conflitos sem sobrescrita cega e idempotência.
+- `test/backup_service_test.dart` (TC-BAK-01 a 04): AES-256 GCM, senha incorreta, idempotência de restauração e prévia precisa de registros novos vs existentes.
+- `test/widget_test.dart` (2 testes): Navegação responsiva iPad (`NavigationRail`) e iPhone XR (`NavigationBar`), sem vazamentos de layout.
 
 ---
 
