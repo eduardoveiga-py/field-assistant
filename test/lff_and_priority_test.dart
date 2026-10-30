@@ -33,11 +33,19 @@ void main() {
       expect(l1, isNotNull);
       expect(l1!.title, contains('Bíblia pode ajudar'));
       expect(l1.section, equals(1));
-      expect(l1.pointTitles.length, equals(3)); // Lições 1 a 3 possuem 3 pontos
+      expect(l1.pointTitles.length, equals(6)); // No livro completo, Lição 1 tem 6 pontos
 
       final l5 = LffBookCatalog.getLesson(5);
       expect(l5, isNotNull);
-      expect(l5!.pointTitles.length, equals(6)); // Lições 4 a 60 possuem 6 pontos
+      expect(l5!.pointTitles.length, equals(6));
+
+      // Lição 7 possui 7 pontos reais e fiéis ao livro
+      final l7 = LffBookCatalog.getLesson(7);
+      expect(l7, isNotNull);
+      expect(l7!.pointTitles.length, equals(7));
+      expect(l7.pointTitles[0], equals('1. Por que não conseguimos ver a Deus?'));
+      expect(l7.pointTitles[1], equals('2. Que qualidades Jeová tem?'));
+      expect(l7.pointTitles[6], equals('7. A natureza nos ensina sobre as qualidades de Jeová'));
 
       // Seção 4: Lições 48 a 60
       final l60 = LffBookCatalog.getLesson(60);
@@ -447,12 +455,31 @@ void main() {
       expect(paragraphs, contains(7));
     });
 
-    test('LffBookCatalog possui 3 pontos para Lições 1 a 3 e 6 pontos para Lições 4 a 60', () {
-      for (int i = 1; i <= 3; i++) {
-        expect(LffBookCatalog.getLesson(i)!.pointTitles.length, equals(3), reason: 'Lição $i deve ter 3 pontos');
+    test('LffBookCatalog possui contagens reais variadas e não-padronizadas (4 a 7 pontos)', () {
+      final pointCounts = LffBookCatalog.lessons.map((l) => l.totalPoints).toList();
+      final distinctCounts = pointCounts.toSet();
+
+      // Contagens reais variam entre 4 e 7 pontos (nunca padronizadas artificialmente)
+      expect(distinctCounts, containsAll([4, 5, 6, 7]));
+      expect(LffBookCatalog.getLesson(45)!.totalPoints, equals(4)); // Lição 45 tem 4 pontos
+      expect(LffBookCatalog.getLesson(4)!.totalPoints, equals(5));  // Lição 4 tem 5 pontos
+      expect(LffBookCatalog.getLesson(1)!.totalPoints, equals(6));  // Lição 1 tem 6 pontos
+      expect(LffBookCatalog.getLesson(7)!.totalPoints, equals(7));  // Lição 7 tem 7 pontos
+      expect(LffBookCatalog.getLesson(50)!.totalPoints, equals(7)); // Lição 50 tem 7 pontos
+
+      for (final l in LffBookCatalog.lessons) {
+        expect(l.totalPoints, inInclusiveRange(4, 7),
+            reason: 'Lição ${l.number} possui ${l.totalPoints} pontos fora da faixa esperada 4-7');
+        expect(l.title.isNotEmpty, isTrue);
+        expect(l.summary, isNotNull);
+        expect(l.reviewQuestions.isNotEmpty, isTrue);
       }
-      for (int i = 4; i <= 60; i++) {
-        expect(LffBookCatalog.getLesson(i)!.pointTitles.length, equals(6), reason: 'Lição $i deve ter 6 pontos');
+    });
+
+    test('Brochura introdutória LffiBrochureCatalog possui exatamente 3 lições com 3 pontos cada', () {
+      expect(LffiBrochureCatalog.lessons.length, equals(3));
+      for (final l in LffiBrochureCatalog.lessons) {
+        expect(l.totalPoints, equals(3));
       }
     });
   });
