@@ -26,6 +26,7 @@ import '../../publications/lff_book_catalog.dart';
 import '../../territory/geolocation_helper.dart';
 import '../../territory/geocoding_service.dart';
 import '../widgets/map_location_picker_dialog.dart';
+import '../../territory/sector_manager.dart';
 import 'contacts_map_screen.dart';
 
 class PersonDetailScreen extends ConsumerStatefulWidget {
@@ -682,13 +683,49 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
   }
 
   void _showEditPersonDialog(BuildContext context, AppRepository repo, PersonEntry person) {
+    String initialStreet = '';
+    String initialNeighborhood = '';
+    String initialRef = '';
+    final rawAddr = person.address ?? '';
+    if (rawAddr.contains('Bairro:') || rawAddr.contains('Ref:')) {
+      final parts = rawAddr.split(' - ');
+      final streetParts = <String>[];
+      for (final p in parts) {
+        final t = p.trim();
+        if (t.toLowerCase().startsWith('bairro:')) {
+          initialNeighborhood = t.substring(7).trim();
+        } else if (t.toLowerCase().startsWith('ref:')) {
+          initialRef = t.substring(4).trim();
+        } else {
+          streetParts.add(t);
+        }
+      }
+      initialStreet = streetParts.join(' - ');
+    } else if (rawAddr.contains(' - ')) {
+      final parts = rawAddr.split(' - ');
+      if (parts.length >= 2 && parts[1].trim().toLowerCase().startsWith('bairro ')) {
+        initialStreet = parts[0].trim();
+        initialNeighborhood = parts[1].trim().substring(7).trim();
+        if (parts.length >= 3) {
+          initialRef = parts.sublist(2).join(' - ').trim();
+        }
+      } else {
+        initialStreet = rawAddr;
+      }
+    } else {
+      initialStreet = rawAddr;
+    }
+
     final nameCtrl = TextEditingController(text: person.name);
     final phoneCtrl = TextEditingController(text: person.phone ?? '');
-    final addrCtrl = TextEditingController(text: person.address ?? '');
-    final latCtrl = TextEditingController(text: person.latitude?.toStringAsFixed(6) ?? '');
-    final lngCtrl = TextEditingController(text: person.longitude?.toStringAsFixed(6) ?? '');
+    final addrCtrl = TextEditingController(text: initialStreet);
+    final neighborhoodCtrl = TextEditingController(text: initialNeighborhood);
+    final refCtrl = TextEditingController(text: initialRef);
+    final latCtrl = TextEditingController(text: person.latitude != null && person.latitude != 0.0 ? person.latitude!.toStringAsFixed(6) : '');
+    final lngCtrl = TextEditingController(text: person.longitude != null && person.longitude != 0.0 ? person.longitude!.toStringAsFixed(6) : '');
     final scheduleCtrl = TextEditingController(text: person.preferredSchedule ?? '');
     String currentStatus = person.status;
+    final sectors = ref.read(sectorsStreamProvider).value ?? [];
 
     showDialog(
       context: context,
@@ -750,11 +787,67 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                                 if (val != null) setDialogState(() => currentStatus = val);
                               },
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'Localização & Bairro / Setor',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.primaryBlue),
+                            ),
+                            const SizedBox(height: 8),
                             TextField(
                               controller: addrCtrl,
-                              decoration: const InputDecoration(labelText: 'Endereço Completo', hintText: 'Rua, Número - Bairro'),
+                              decoration: const InputDecoration(
+                                labelText: 'Endereço (Rua, Número, Bloco/Apto)',
+                                hintText: 'Ex: Rua das Flores, 120, Apto 42',
+                              ),
                             ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: neighborhoodCtrl,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Bairro / Setor',
+                                      hintText: 'Ex: Betânia, Lago Grande...',
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: TextField(
+                                    controller: refCtrl,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Ponto de Referência',
+                                      hintText: 'Ex: Próximo à padaria',
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (sectors.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  children: sectors.map((sec) {
+                                    final isChosen = neighborhoodCtrl.text.trim().toLowerCase() == sec.name.toLowerCase();
+                                    return Padding(
+                                      padding: const EdgeInsets.only(right: 6),
+                                      child: ActionChip(
+                                        avatar: Icon(Icons.location_city, size: 14, color: isChosen ? Colors.white : AppTheme.primaryBlue),
+                                        label: Text(sec.name, style: TextStyle(fontSize: 11, color: isChosen ? Colors.white : null)),
+                                        backgroundColor: isChosen ? AppTheme.primaryBlue : null,
+                                        onPressed: () {
+                                          setDialogState(() {
+                                            neighborhoodCtrl.text = sec.name;
+                                          });
+                                        },
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ),
+                            ],
                             const SizedBox(height: 10),
                             Row(
                               children: [
@@ -790,6 +883,17 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                                         latCtrl.text = pos.latitude.toStringAsFixed(6);
                                         lngCtrl.text = pos.longitude.toStringAsFixed(6);
                                       });
+                                      final geo = await GeocodingService.reverseGeocode(pos.latitude, pos.longitude);
+                                      if (geo != null) {
+                                        setDialogState(() {
+                                          if (addrCtrl.text.trim().isEmpty && geo.streetAndNumber.isNotEmpty) {
+                                            addrCtrl.text = geo.streetAndNumber;
+                                          }
+                                          if (neighborhoodCtrl.text.trim().isEmpty && geo.neighborhood != null) {
+                                            neighborhoodCtrl.text = geo.neighborhood!;
+                                          }
+                                        });
+                                      }
                                     }
                                   },
                                 ),
@@ -812,6 +916,9 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                                         lngCtrl.text = res.longitude.toStringAsFixed(6);
                                         if (res.streetAndNumber.isNotEmpty && addrCtrl.text.trim().isEmpty) {
                                           addrCtrl.text = res.streetAndNumber;
+                                        }
+                                        if (res.neighborhood != null && res.neighborhood!.isNotEmpty && neighborhoodCtrl.text.trim().isEmpty) {
+                                          neighborhoodCtrl.text = res.neighborhood!;
                                         }
                                       });
                                     }
@@ -846,7 +953,12 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                               return;
                             }
                             final phone = phoneCtrl.text.trim();
-                            final addr = addrCtrl.text.trim();
+                            final addrParts = <String>[];
+                            if (addrCtrl.text.trim().isNotEmpty) addrParts.add(addrCtrl.text.trim());
+                            if (neighborhoodCtrl.text.trim().isNotEmpty) addrParts.add('Bairro: ${neighborhoodCtrl.text.trim()}');
+                            if (refCtrl.text.trim().isNotEmpty) addrParts.add('Ref: ${refCtrl.text.trim()}');
+                            final fullAddress = addrParts.isNotEmpty ? addrParts.join(' - ') : null;
+
                             final lat = double.tryParse(latCtrl.text.trim());
                             final lng = double.tryParse(lngCtrl.text.trim());
                             final sched = scheduleCtrl.text.trim();
@@ -854,11 +966,12 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                             await repo.updatePerson(person.copyWith(
                               name: name,
                               phone: Value(phone.isNotEmpty ? phone : null),
-                              address: Value(addr.isNotEmpty ? addr : null),
+                              address: Value(fullAddress),
                               latitude: Value(lat),
                               longitude: Value(lng),
                               preferredSchedule: Value(sched.isNotEmpty ? sched : null),
                               status: currentStatus,
+                              updatedAt: DateTime.now(),
                             ));
 
                             if (ctx.mounted) Navigator.pop(ctx);
@@ -1213,6 +1326,25 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                         );
                       }),
                     ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: paragraphsController,
+                      decoration: const InputDecoration(
+                        labelText: 'Parágrafos / Pontos Estudados (livre para editar)',
+                        hintText: 'Ex: 1, 2-3, 1-6 ou anotação personalizada',
+                      ),
+                      onChanged: (text) {
+                        final parsed = int.tryParse(text.trim());
+                        if (parsed != null && parsed >= 1 && parsed <= currentUnitMaxPoints) {
+                          setDialogState(() {
+                            selectedStartPoint = parsed;
+                            selectedEndPoint = parsed;
+                            final nextProg = LffBookCatalog.getNextProgression(currentLesson: selectedLesson, currentPoint: parsed);
+                            nextStepController.text = nextProg.label;
+                          });
+                        }
+                      },
+                    ),
                     const SizedBox(height: 14),
 
                     // Seletor de Contagem de Presentes / Assistência
@@ -1371,7 +1503,7 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                     await repo.updateStudy(
                       study.copyWith(
                         currentLesson: Value(lesson),
-                        currentParagraph: Value(selectedEndPoint),
+                        currentParagraph: Value(int.tryParse(paragraphsController.text.trim()) ?? selectedEndPoint),
                         nextTopic: Value(nextStepController.text.trim().isEmpty ? null : nextStepController.text.trim()),
                         lastSessionAt: Value(DateTime.now()),
                       ),
@@ -3382,9 +3514,18 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Parágrafo', style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
                           Text(
-                            linkedStudy.currentParagraph != null ? 'Parágrafo ${linkedStudy.currentParagraph}' : 'Início',
+                            linkedStudy.publicationId == 'lff-book' || linkedStudy.publicationId == 'lff-brochure'
+                                ? 'Ponto Atual'
+                                : 'Parágrafo',
+                            style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                          ),
+                          Text(
+                            linkedStudy.currentParagraph != null
+                                ? (linkedStudy.publicationId == 'lff-book' || linkedStudy.publicationId == 'lff-brochure'
+                                    ? 'Ponto ${linkedStudy.currentParagraph}'
+                                    : 'Parágrafo ${linkedStudy.currentParagraph}')
+                                : 'Início',
                             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                           ),
                         ],

@@ -23,39 +23,52 @@ class PeriodicalItem {
 }
 
 class PeriodicalsCatalog {
-  /// Lista oficial de Folhetos Atualizados das Testemunhas de Jeová
+  /// Lista oficial de Folhetos Atualizados das Testemunhas de Jeová (Edição Atual)
   static const List<PeriodicalItem> folhetos = [
     PeriodicalItem(
-      title: 'Folheto T-30: O que você acha da Bíblia?',
+      title: 'Folheto: Futuro',
       category: 'folheto',
+      coverTheme: 'Como você vê o futuro?',
     ),
     PeriodicalItem(
-      title: 'Folheto T-31: O que você espera do futuro?',
+      title: 'Folheto: Família',
       category: 'folheto',
+      coverTheme: 'O que pode ajudar sua família a ser feliz?',
     ),
     PeriodicalItem(
-      title: 'Folheto T-32: O que é preciso para ter uma família feliz?',
+      title: 'Folheto: Deus',
       category: 'folheto',
+      coverTheme: 'Quem é Deus?',
     ),
     PeriodicalItem(
-      title: 'Folheto T-33: Quem realmente controla o mundo?',
+      title: 'Folheto: Oração',
       category: 'folheto',
+      coverTheme: 'Vale a pena orar?',
     ),
     PeriodicalItem(
-      title: 'Folheto T-34: O sofrimento vai acabar algum dia?',
+      title: 'Folheto: Jesus',
       category: 'folheto',
+      coverTheme: 'Quem é Jesus?',
     ),
     PeriodicalItem(
-      title: 'Folheto T-35: Será que os mortos podem voltar a viver?',
+      title: 'Folheto: Reino de Deus',
       category: 'folheto',
+      coverTheme: 'O que é o Reino de Deus?',
     ),
     PeriodicalItem(
-      title: 'Folheto T-36: O que é o Reino de Deus?',
+      title: 'Folheto: Sofrimento',
       category: 'folheto',
+      coverTheme: 'O sofrimento vai acabar algum dia?',
     ),
     PeriodicalItem(
-      title: 'Folheto T-37: Onde encontrar as respostas para as grandes perguntas da vida?',
+      title: 'Folheto: Morte',
       category: 'folheto',
+      coverTheme: 'Será que os mortos podem voltar a viver?',
+    ),
+    PeriodicalItem(
+      title: 'Folheto: Religião',
+      category: 'folheto',
+      coverTheme: 'O que você acha da religião?',
     ),
     PeriodicalItem(
       title: 'Convite: Reuniões das Testemunhas de Jeová',

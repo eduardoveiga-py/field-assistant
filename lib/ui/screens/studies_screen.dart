@@ -591,6 +591,25 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                           );
                         }),
                       ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: paragraphsController,
+                        decoration: const InputDecoration(
+                          labelText: 'Pontos Estudados (livre para editar)',
+                          hintText: 'Ex: 1, 2-3, 1-6 ou anotação personalizada',
+                        ),
+                        onChanged: (text) {
+                          final parsed = int.tryParse(text.trim());
+                          if (parsed != null && parsed >= 1 && parsed <= currentUnitMaxPoints) {
+                            setDialogState(() {
+                              selectedStartPoint = parsed;
+                              selectedEndPoint = parsed;
+                              final nextProg = LffBookCatalog.getNextProgression(currentLesson: selectedLesson, currentPoint: parsed);
+                              nextStepController.text = nextProg.label;
+                            });
+                          }
+                        },
+                      ),
                       const SizedBox(height: 14),
                     ] else ...[
                       Row(
@@ -770,7 +789,7 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                     await repo.updateStudy(
                       study.copyWith(
                         currentLesson: Value(lesson),
-                        currentParagraph: Value(isLff ? selectedEndPoint : int.tryParse(paragraphsController.text.trim())),
+                        currentParagraph: Value(int.tryParse(paragraphsController.text.trim()) ?? (isLff ? selectedEndPoint : null)),
                         nextTopic: Value(nextStepController.text.trim().isEmpty ? null : nextStepController.text.trim()),
                         lastSessionAt: Value(DateTime.now()),
                       ),
@@ -1499,9 +1518,16 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                                         ),
                                         Column(
                                           children: [
-                                            Text('Parágrafo', style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted)),
                                             Text(
-                                              study.currentParagraph != null ? '§ ${study.currentParagraph}' : '—',
+                                              study.publicationId == 'lff-book' || study.publicationId == 'lff-brochure' ? 'Ponto Atual' : 'Parágrafo',
+                                              style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted),
+                                            ),
+                                            Text(
+                                              study.currentParagraph != null
+                                                  ? (study.publicationId == 'lff-book' || study.publicationId == 'lff-brochure'
+                                                      ? 'Ponto ${study.currentParagraph}'
+                                                      : '§ ${study.currentParagraph}')
+                                                  : '—',
                                               style: const TextStyle(fontWeight: FontWeight.bold),
                                             ),
                                           ],
