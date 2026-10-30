@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:collection/collection.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -46,6 +47,7 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
     String selectedReason = 'Falta de interesse / tempo';
     final notesController = TextEditingController();
 
+    if (!context.mounted) return;
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -165,6 +167,7 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
       manualReference: study.manualReference,
     );
 
+    if (!context.mounted) return;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -243,7 +246,27 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
   }
 
   // Modal para registrar ocorrência de sessão de estudo com contagem de assistência e agendamento
-  void _showRecordSessionDialog(BuildContext context, BibleStudyEntry study) {
+  void _showRecordSessionDialog(BuildContext context, BibleStudyEntry study) async {
+    final participants = await ref.read(repositoryProvider).getParticipantsForStudy(study.id);
+    final primaryPersonId = participants.isNotEmpty ? participants.first.personId : null;
+    final allAppts = ref.read(appointmentsStreamProvider).value ?? [];
+
+    // Busca agendamento futuro existente para este estudante para evitar duplicatas
+    AppointmentEntry? existingUpcomingAppt;
+    if (primaryPersonId != null) {
+      final upcoming = allAppts
+          .where((a) =>
+              a.personId == primaryPersonId &&
+              a.startTime.isAfter(DateTime.now().subtract(const Duration(hours: 1))) &&
+              a.status != 'cancelado' &&
+              a.deletedAt == null)
+          .toList()
+        ..sort((a, b) => a.startTime.compareTo(b.startTime));
+      if (upcoming.isNotEmpty) {
+        existingUpcomingAppt = upcoming.first;
+      }
+    }
+
     final isLff = study.publicationId == 'lff-book';
     int selectedLesson = (study.currentLesson ?? 1).clamp(1, 60);
     int selectedStartPoint = (study.currentParagraph ?? 1).clamp(1, 6);
@@ -267,16 +290,39 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
     final nextStepController = TextEditingController(text: study.nextTopic ?? (initialNext?.label ?? ''));
     int attendanceCount = 1;
     bool scheduleNextStudy = true;
-    DateTime nextStudyDateTime = DateTime.now().add(const Duration(days: 7));
-    nextStudyDateTime = DateTime(
-      nextStudyDateTime.year,
-      nextStudyDateTime.month,
-      nextStudyDateTime.day,
-      10,
-      0,
-    );
-    int nextStudyDuration = 60;
 
+    // Frequência do estudo
+    final freq = study.frequency.toLowerCase();
+    String freqLabel = 'Semanal';
+    int daysToAdd = 7;
+    if (freq.contains('2x') || freq.contains('duas')) {
+      freqLabel = '2x por semana';
+      daysToAdd = 3;
+    } else if (freq.contains('quinzenal')) {
+      freqLabel = 'Quinzenal';
+      daysToAdd = 14;
+    } else if (freq.contains('mensal')) {
+      freqLabel = 'Mensal';
+      daysToAdd = 28;
+    }
+
+    DateTime nextStudyDateTime;
+    int nextStudyDuration = existingUpcomingAppt?.durationMinutes ?? 60;
+
+    if (existingUpcomingAppt != null) {
+      nextStudyDateTime = existingUpcomingAppt.startTime;
+    } else {
+      final target = DateTime.now().add(Duration(days: daysToAdd));
+      nextStudyDateTime = DateTime(
+        target.year,
+        target.month,
+        target.day,
+        10,
+        0,
+      );
+    }
+
+    if (!context.mounted) return;
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -648,6 +694,8 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                     durationMinutes: nextStudyDuration,
                     onDurationChanged: (d) => setDialogState(() => nextStudyDuration = d),
                     existingAppointments: allAppts,
+                    existingPersonAppointment: existingUpcomingAppt,
+                    frequencyText: freqLabel,
                   ),
                 ],
               ),
@@ -730,15 +778,38 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                   }
 
                   if (scheduleNextStudy) {
-                    await repo.createAppointment(
-                      personId: primaryPersonId,
-                      studyId: study.id,
-                      title: 'Estudo Bíblico: ${study.title}',
-                      startTime: nextStudyDateTime,
-                      endTime: nextStudyDateTime.add(Duration(minutes: nextStudyDuration)),
-                      durationMinutes: nextStudyDuration,
-                      status: 'confirmado',
-                    );
+                    // Prevenção de duplicidade: atualiza compromisso existente na mesma data ou cria novo
+                    final existingAppts = ref.read(appointmentsStreamProvider).value ?? [];
+                    final existingOnDate = existingAppts.firstWhereOrNull((a) =>
+                        a.deletedAt == null &&
+                        a.status != 'cancelado' &&
+                        ((primaryPersonId != null && a.personId == primaryPersonId) || (a.studyId != null && a.studyId == study.id)) &&
+                        a.startTime.year == nextStudyDateTime.year &&
+                        a.startTime.month == nextStudyDateTime.month &&
+                        a.startTime.day == nextStudyDateTime.day);
+
+                    if (existingOnDate != null) {
+                      await repo.updateAppointment(
+                        existingOnDate.copyWith(
+                          studyId: Value(study.id),
+                          personId: Value(primaryPersonId),
+                          startTime: nextStudyDateTime,
+                          endTime: nextStudyDateTime.add(Duration(minutes: nextStudyDuration)),
+                          durationMinutes: nextStudyDuration,
+                          status: 'confirmado',
+                        ),
+                      );
+                    } else {
+                      await repo.createAppointment(
+                        personId: primaryPersonId,
+                        studyId: study.id,
+                        title: 'Estudo Bíblico: ${study.title}',
+                        startTime: nextStudyDateTime,
+                        endTime: nextStudyDateTime.add(Duration(minutes: nextStudyDuration)),
+                        durationMinutes: nextStudyDuration,
+                        status: 'confirmado',
+                      );
+                    }
                   }
 
                   if (ctx.mounted) Navigator.pop(ctx);
@@ -765,6 +836,7 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
     String selectedFrequency = 'semanal';
     final List<String> selectedPeopleIds = [];
 
+    if (!context.mounted) return;
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -1313,6 +1385,22 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                                           style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
                                         ),
                                       ),
+                                      IconButton(
+                                        icon: const Icon(Icons.account_box_outlined, color: AppTheme.primaryBlue, size: 22),
+                                        tooltip: 'Ver Cadastro e Opções da Pessoa',
+                                        onPressed: () async {
+                                          final parts = await ref.read(repositoryProvider).getParticipantsForStudy(study.id);
+                                          if (parts.isNotEmpty && context.mounted) {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (_) => PersonDetailScreen(personId: parts.first.personId),
+                                              ),
+                                            );
+                                          }
+                                        },
+                                      ),
+                                      const SizedBox(width: 4),
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                         decoration: BoxDecoration(
@@ -1350,28 +1438,43 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                                       final people = ref.watch(peopleStreamProvider).value ?? [];
                                       final peopleMap = {for (var p in people) p.id: p.name};
                                       final names = parts.map((p) => peopleMap[p.personId] ?? 'Participante').join(', ');
-                                      return Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                        margin: const EdgeInsets.only(bottom: 8),
-                                        decoration: BoxDecoration(
-                                          color: AppTheme.primaryBlue.withValues(alpha: 0.08),
-                                          borderRadius: BorderRadius.circular(6),
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            const Icon(Icons.people_alt_outlined, size: 16, color: AppTheme.primaryBlue),
-                                            const SizedBox(width: 6),
-                                            Expanded(
-                                              child: Text(
-                                                'Participam: $names',
-                                                style: const TextStyle(
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: AppTheme.primaryBlue,
+                                      return InkWell(
+                                        onTap: () {
+                                          if (parts.isNotEmpty) {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (_) => PersonDetailScreen(personId: parts.first.personId),
+                                              ),
+                                            );
+                                          }
+                                        },
+                                        borderRadius: BorderRadius.circular(6),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                                          margin: const EdgeInsets.only(bottom: 8),
+                                          decoration: BoxDecoration(
+                                            color: AppTheme.primaryBlue.withValues(alpha: 0.08),
+                                            borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(color: AppTheme.primaryBlue.withValues(alpha: 0.2)),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              const Icon(Icons.people_alt_outlined, size: 16, color: AppTheme.primaryBlue),
+                                              const SizedBox(width: 6),
+                                              Expanded(
+                                                child: Text(
+                                                  'Participam: $names',
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: AppTheme.primaryBlue,
+                                                  ),
                                                 ),
                                               ),
-                                            ),
-                                          ],
+                                              const Icon(Icons.arrow_forward_ios, size: 11, color: AppTheme.primaryBlue),
+                                            ],
+                                          ),
                                         ),
                                       );
                                     },
@@ -1438,6 +1541,36 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                                     ),
                                   ],
                                   const SizedBox(height: 12),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: OutlinedButton.icon(
+                                          style: OutlinedButton.styleFrom(
+                                            foregroundColor: AppTheme.primaryBlue,
+                                            side: const BorderSide(color: AppTheme.primaryBlue),
+                                          ),
+                                          icon: const Icon(Icons.person_outline, size: 16),
+                                          label: const Text('Ver Cadastro & Opções'),
+                                          onPressed: () async {
+                                            final parts = await ref.read(repositoryProvider).getParticipantsForStudy(study.id);
+                                            if (parts.isNotEmpty && context.mounted) {
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (_) => PersonDetailScreen(personId: parts.first.personId),
+                                                ),
+                                              );
+                                            } else if (context.mounted) {
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                const SnackBar(content: Text('Nenhum contato vinculado diretamente a este estudo.')),
+                                              );
+                                            }
+                                          },
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
                                   Row(
                                     children: [
                                       Expanded(

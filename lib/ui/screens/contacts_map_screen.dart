@@ -42,7 +42,6 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
   final Set<String> _geocodedPersonIds = {};
   bool _hasCenteredHighlightPerson = false;
   int _zoom = 15;
-  double _trackpadScale = 1.0;
   static const double _tileSize = 256.0;
   DateTime? _lastZoomChangeTime;
 
@@ -1075,7 +1074,7 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                 onPointerSignal: (pointerSignal) {
                   if (pointerSignal is PointerScrollEvent) {
                     final now = DateTime.now();
-                    if (_lastZoomChangeTime == null || now.difference(_lastZoomChangeTime!).inMilliseconds > 120) {
+                    if (_lastZoomChangeTime == null || now.difference(_lastZoomChangeTime!).inMilliseconds > 150) {
                       if (pointerSignal.scrollDelta.dy < -2 && _zoom < 18) {
                         _lastZoomChangeTime = now;
                         _changeZoom(_zoom + 1, constraints, originPx, originPy, centerLng, centerLat);
@@ -1085,27 +1084,6 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                       }
                     }
                   }
-                },
-                onPointerPanZoomStart: (event) {
-                  _trackpadScale = 1.0;
-                },
-                onPointerPanZoomUpdate: (event) {
-                  _trackpadScale *= event.scale;
-                  final now = DateTime.now();
-                  if (_lastZoomChangeTime == null || now.difference(_lastZoomChangeTime!).inMilliseconds > 180) {
-                    if (_trackpadScale > 1.18 && _zoom < 18) {
-                      _lastZoomChangeTime = now;
-                      _trackpadScale = 1.0;
-                      _changeZoom(_zoom + 1, constraints, originPx, originPy, centerLng, centerLat);
-                    } else if (_trackpadScale < 0.82 && _zoom > 10) {
-                      _lastZoomChangeTime = now;
-                      _trackpadScale = 1.0;
-                      _changeZoom(_zoom - 1, constraints, originPx, originPy, centerLng, centerLat);
-                    }
-                  }
-                },
-                onPointerPanZoomEnd: (event) {
-                  _trackpadScale = 1.0;
                 },
                 child: GestureDetector(
                   behavior: HitTestBehavior.translucent,
@@ -1117,12 +1095,12 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                   child: InteractiveViewer(
                     transformationController: _transformationController,
                     constrained: false, // Permite que o mapa ocupe 100% da área sem distorção ou cortes pretos
-                    boundaryMargin: EdgeInsets.zero, // Impede que o usuário arraste o mapa além dos limites
+                    boundaryMargin: const EdgeInsets.all(250), // Margem segura para zoom fluido sem travamento
                     panEnabled: true,
                     scaleEnabled: true, // Habilita zoom fluido por gesto de pinça na tela e trackpad
-                    trackpadScrollCausesScale: false,
-                    minScale: 0.5,
-                    maxScale: 2.2,
+                    trackpadScrollCausesScale: true, // Garante que pinça de trackpad aplique ZOOM em vez de deslizar para os lados
+                    minScale: 0.6,
+                    maxScale: 2.0,
                     onInteractionEnd: (details) {
                       final m = _transformationController.value;
                       final currentScale = m.getMaxScaleOnAxis();

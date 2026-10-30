@@ -38,7 +38,7 @@ class PublicationCatalog {
   static const PublicationInfo bookLff = PublicationInfo(
     id: 'lff-book',
     code: 'lff',
-    title: 'Seja Feliz para Sempre! — Você Pode Desfrutar de Uma Vida Feliz para Sempre',
+    title: 'Livro: Seja Feliz para Sempre!',
     type: 'livro',
     totalLessons: 60,
     languages: {
@@ -70,7 +70,7 @@ class PublicationCatalog {
   static const PublicationInfo brochureLff = PublicationInfo(
     id: 'lff-brochure',
     code: 'lffi',
-    title: 'Seja Feliz para Sempre! — Introdução às Lições da Bíblia',
+    title: 'Brochura: Seja Feliz para Sempre!',
     type: 'brochura',
     totalLessons: 3,
     languages: {
@@ -99,11 +99,44 @@ class PublicationCatalog {
     },
   );
 
-  static List<PublicationInfo> get allPublications => [bookLff, brochureLff];
+  static const PublicationInfo brochureListenToGod = PublicationInfo(
+    id: 'll-brochure',
+    code: 'll',
+    title: 'Brochura: Escute a Deus e Viva para Sempre',
+    type: 'brochura',
+    totalLessons: 14,
+    languages: {
+      'pt': LanguageAvailability(
+        languageCode: 'pt',
+        languageName: 'Português',
+        wtlocale: 'T',
+        isVerified: true,
+        officialWebUrl: 'https://www.jw.org/pt/biblioteca/livros/escute-a-deus/',
+      ),
+      'tca': LanguageAvailability(
+        languageCode: 'tca',
+        languageName: 'Ticuna',
+        wtlocale: 'TCA',
+        isVerified: true,
+        officialWebUrl: 'https://www.jw.org/tca/biblioteca/livros/',
+      ),
+      'bzs': LanguageAvailability(
+        languageCode: 'bzs',
+        languageName: 'Língua Brasileira de Sinais (Libras)',
+        wtlocale: 'BZS',
+        isVerified: true,
+        isSignLanguage: true,
+        officialWebUrl: 'https://www.jw.org/bzs/biblioteca/livros/',
+      ),
+    },
+  );
+
+  static List<PublicationInfo> get allPublications => [bookLff, brochureLff, brochureListenToGod];
 
   static PublicationInfo? getById(String id) {
-    if (id == 'lff-book') return bookLff;
-    if (id == 'lff-brochure') return brochureLff;
+    if (id == 'lff-book' || id == 'lff') return bookLff;
+    if (id == 'lff-brochure' || id == 'lffi') return brochureLff;
+    if (id == 'll-brochure' || id == 'll') return brochureListenToGod;
     return null;
   }
 }

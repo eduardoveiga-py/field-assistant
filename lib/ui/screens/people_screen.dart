@@ -760,7 +760,7 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
 
           // Barra de busca global aprimorada
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 88),
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(

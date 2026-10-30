@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:js_interop';
 import 'package:web/web.dart' as web;
 
 Future<String?> pickIcsFileFromBrowser() async {
@@ -17,7 +18,11 @@ Future<String?> pickIcsFileFromBrowser() async {
           reader.onLoadEnd.listen((e) {
             final result = reader.result;
             if (result != null) {
-              completer.complete(result.toString());
+              if (result.isA<JSString>()) {
+                completer.complete((result as JSString).toDart);
+              } else {
+                completer.complete(result.toString());
+              }
             } else {
               completer.complete(null);
             }

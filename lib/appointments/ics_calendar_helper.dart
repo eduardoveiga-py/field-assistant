@@ -63,33 +63,58 @@ class IcsCalendarHelper {
     final events = <ParsedIcsEvent>[];
     if (rawIcs.trim().isEmpty) return events;
 
-    final eventMatches = RegExp(r'BEGIN:VEVENT([\s\S]*?)END:VEVENT').allMatches(rawIcs);
+    // Desdobra linhas dobradas segundo a RFC 5545 (quebras seguidas de espaço ou tab)
+    final unfolded = rawIcs.replaceAll(RegExp(r'\r?\n[ \t]'), '').replaceAll('\r\n', '\n');
+
+    final eventMatches = RegExp(r'BEGIN:VEVENT([\s\S]*?)END:VEVENT', caseSensitive: false).allMatches(unfolded);
 
     for (final match in eventMatches) {
       final block = match.group(1)!;
 
       // Extrai Summary
-      final summaryMatch = RegExp(r'SUMMARY:(.*)').firstMatch(block);
-      final summary = summaryMatch?.group(1)?.trim() ?? 'Compromisso Importado';
+      final summaryMatch = RegExp(r'^SUMMARY(?:;[^:\r\n]+)?:(.*)$', multiLine: true, caseSensitive: false).firstMatch(block);
+      var summary = summaryMatch?.group(1)?.trim() ?? 'Compromisso Importado';
+      // Desescapa caracteres iCal
+      summary = summary
+          .replaceAll(r'\,', ',')
+          .replaceAll(r'\;', ';')
+          .replaceAll(r'\\', r'\')
+          .replaceAll(r'\n', ' ')
+          .replaceAll(r'\N', ' ')
+          .trim();
+      if (summary.isEmpty) summary = 'Compromisso Importado';
 
       // Extrai Location
-      final locMatch = RegExp(r'LOCATION:(.*)').firstMatch(block);
-      final loc = locMatch?.group(1)?.trim();
-
-      // Extrai UID (se originado do app ou externo)
-      final uidMatch = RegExp(r'UID:(.*)').firstMatch(block);
-      final rawUid = uidMatch?.group(1)?.trim();
-      String? apptId;
-      if (rawUid != null && rawUid.endsWith('@territorio.app')) {
-        apptId = rawUid.replaceAll('@territorio.app', '').trim();
+      final locMatch = RegExp(r'^LOCATION(?:;[^:\r\n]+)?:(.*)$', multiLine: true, caseSensitive: false).firstMatch(block);
+      var loc = locMatch?.group(1)?.trim();
+      if (loc != null) {
+        loc = loc
+            .replaceAll(r'\,', ',')
+            .replaceAll(r'\;', ';')
+            .replaceAll(r'\\', r'\')
+            .replaceAll(r'\n', ' ')
+            .replaceAll(r'\N', ' ')
+            .trim();
+        if (loc.isEmpty) loc = null;
       }
 
-      // Extrai DTSTART (com suporte a parâmetros como ;TZID=...)
-      final startMatch = RegExp(r'DTSTART(?:;[^:\r\n]+)?:(\d{8}(?:T\d{6}Z?)?)').firstMatch(block);
+      // Extrai UID (se originado do app ou externo)
+      final uidMatch = RegExp(r'^UID(?:;[^:\r\n]+)?:(.*)$', multiLine: true, caseSensitive: false).firstMatch(block);
+      final rawUid = uidMatch?.group(1)?.trim();
+      String? apptId;
+      if (rawUid != null && (rawUid.endsWith('@territorio.app') || rawUid.endsWith('@ministeriopessoal.app'))) {
+        apptId = rawUid
+            .replaceAll('@territorio.app', '')
+            .replaceAll('@ministeriopessoal.app', '')
+            .trim();
+      }
+
+      // Extrai DTSTART (com suporte a parâmetros como ;TZID=..., ;VALUE=DATE)
+      final startMatch = RegExp(r'^DTSTART(?:;[^:\r\n]+)?:(\d{8}(?:T\d{6}Z?)?)', multiLine: true, caseSensitive: false).firstMatch(block);
       final startTime = (startMatch != null) ? parseIcsDateTime(startMatch.group(1)!) ?? DateTime.now() : DateTime.now();
 
-      // Extrai DTEND (com suporte a parâmetros como ;TZID=...)
-      final endMatch = RegExp(r'DTEND(?:;[^:\r\n]+)?:(\d{8}(?:T\d{6}Z?)?)').firstMatch(block);
+      // Extrai DTEND (com suporte a parâmetros como ;TZID=..., ;VALUE=DATE)
+      final endMatch = RegExp(r'^DTEND(?:;[^:\r\n]+)?:(\d{8}(?:T\d{6}Z?)?)', multiLine: true, caseSensitive: false).firstMatch(block);
       DateTime endTime = (endMatch != null)
           ? parseIcsDateTime(endMatch.group(1)!) ?? startTime.add(const Duration(minutes: 30))
           : startTime.add(const Duration(minutes: 30));
@@ -101,7 +126,7 @@ class IcsCalendarHelper {
       }
 
       // Extrai STATUS
-      final statusMatch = RegExp(r'STATUS:(.*)').firstMatch(block);
+      final statusMatch = RegExp(r'^STATUS(?:;[^:\r\n]+)?:(.*)$', multiLine: true, caseSensitive: false).firstMatch(block);
       final rawStatus = statusMatch?.group(1)?.trim().toUpperCase();
       final status = rawStatus == 'CANCELLED' ? 'cancelado' : 'confirmado';
 

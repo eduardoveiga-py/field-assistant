@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -881,6 +882,22 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
   }
 
   void _showRecordStudySessionDialog(BuildContext context, BibleStudyEntry study, PersonEntry person) {
+    final allAppts = ref.read(appointmentsStreamProvider).value ?? [];
+
+    // Busca agendamento futuro existente para este estudante para evitar duplicatas
+    AppointmentEntry? existingUpcomingAppt;
+    final upcoming = allAppts
+        .where((a) =>
+            a.personId == person.id &&
+            a.startTime.isAfter(DateTime.now().subtract(const Duration(hours: 1))) &&
+            a.status != 'cancelado' &&
+            a.deletedAt == null)
+        .toList()
+      ..sort((a, b) => a.startTime.compareTo(b.startTime));
+    if (upcoming.isNotEmpty) {
+      existingUpcomingAppt = upcoming.first;
+    }
+
     int selectedLesson = (study.currentLesson ?? 1).clamp(1, 60);
     int selectedStartPoint = (study.currentParagraph ?? 1).clamp(1, 6);
     int selectedEndPoint = selectedStartPoint;
@@ -896,15 +913,37 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
     final nextStepController = TextEditingController(text: study.nextTopic ?? initialNext.label);
     int attendanceCount = 1;
     bool scheduleNextStudy = true;
-    DateTime nextStudyDateTime = DateTime.now().add(const Duration(days: 7));
-    nextStudyDateTime = DateTime(
-      nextStudyDateTime.year,
-      nextStudyDateTime.month,
-      nextStudyDateTime.day,
-      10,
-      0,
-    );
-    int nextStudyDuration = 60;
+
+    // Frequência do estudo
+    final freq = study.frequency.toLowerCase();
+    String freqLabel = 'Semanal';
+    int daysToAdd = 7;
+    if (freq.contains('2x') || freq.contains('duas')) {
+      freqLabel = '2x por semana';
+      daysToAdd = 3;
+    } else if (freq.contains('quinzenal')) {
+      freqLabel = 'Quinzenal';
+      daysToAdd = 14;
+    } else if (freq.contains('mensal')) {
+      freqLabel = 'Mensal';
+      daysToAdd = 28;
+    }
+
+    DateTime nextStudyDateTime;
+    int nextStudyDuration = existingUpcomingAppt?.durationMinutes ?? 60;
+
+    if (existingUpcomingAppt != null) {
+      nextStudyDateTime = existingUpcomingAppt.startTime;
+    } else {
+      final target = DateTime.now().add(Duration(days: daysToAdd));
+      nextStudyDateTime = DateTime(
+        target.year,
+        target.month,
+        target.day,
+        10,
+        0,
+      );
+    }
 
     showDialog(
       context: context,
@@ -1258,6 +1297,8 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                     durationMinutes: nextStudyDuration,
                     onDurationChanged: (d) => setDialogState(() => nextStudyDuration = d),
                     existingAppointments: ref.read(appointmentsStreamProvider).value ?? [],
+                    existingPersonAppointment: existingUpcomingAppt,
+                    frequencyText: freqLabel,
                   ),
                 ],
               ),
@@ -1338,15 +1379,38 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                   }
 
                   if (scheduleNextStudy) {
-                    await repo.createAppointment(
-                      personId: person.id,
-                      title: 'Estudo Bíblico: ${person.name}',
-                      startTime: nextStudyDateTime,
-                      endTime: nextStudyDateTime.add(Duration(minutes: nextStudyDuration)),
-                      durationMinutes: nextStudyDuration,
-                      status: 'confirmado',
-                      locationNotes: person.address != null ? 'Local: ${person.address}' : null,
-                    );
+                    // Prevenção de duplicidade: atualiza compromisso existente na mesma data ou cria novo
+                    final existingAppts = ref.read(appointmentsStreamProvider).value ?? [];
+                    final existingOnDate = existingAppts.firstWhereOrNull((a) =>
+                        a.deletedAt == null &&
+                        a.status != 'cancelado' &&
+                        a.personId == person.id &&
+                        a.startTime.year == nextStudyDateTime.year &&
+                        a.startTime.month == nextStudyDateTime.month &&
+                        a.startTime.day == nextStudyDateTime.day);
+
+                    if (existingOnDate != null) {
+                      await repo.updateAppointment(
+                        existingOnDate.copyWith(
+                          studyId: Value(study.id),
+                          startTime: nextStudyDateTime,
+                          endTime: nextStudyDateTime.add(Duration(minutes: nextStudyDuration)),
+                          durationMinutes: nextStudyDuration,
+                          status: 'confirmado',
+                        ),
+                      );
+                    } else {
+                      await repo.createAppointment(
+                        personId: person.id,
+                        studyId: study.id,
+                        title: 'Estudo Bíblico: ${person.name}',
+                        startTime: nextStudyDateTime,
+                        endTime: nextStudyDateTime.add(Duration(minutes: nextStudyDuration)),
+                        durationMinutes: nextStudyDuration,
+                        status: 'confirmado',
+                        locationNotes: person.address != null ? 'Local: ${person.address}' : null,
+                      );
+                    }
                   }
 
                   if (ctx.mounted) Navigator.pop(ctx);
@@ -1389,15 +1453,49 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
 
     // Campos de Agendamento Global com AvailabilityEngine
     bool scheduleReturn = true;
-    DateTime returnDateTime = DateTime.now().add(const Duration(days: 7));
-    returnDateTime = DateTime(
-      returnDateTime.year,
-      returnDateTime.month,
-      returnDateTime.day,
-      10,
-      0,
-    );
-    int returnDuration = (selectedType == 'estudo' || recordStudy) ? 60 : 30;
+    final allApptsList = ref.read(appointmentsStreamProvider).value ?? [];
+    AppointmentEntry? existingUpcomingAppt;
+    final upcomingList = allApptsList
+        .where((a) =>
+            a.personId == person.id &&
+            a.startTime.isAfter(DateTime.now().subtract(const Duration(hours: 1))) &&
+            a.status != 'cancelado' &&
+            a.deletedAt == null)
+        .toList()
+      ..sort((a, b) => a.startTime.compareTo(b.startTime));
+    if (upcomingList.isNotEmpty) {
+      existingUpcomingAppt = upcomingList.first;
+    }
+
+    final freq = (existingStudy?.frequency ?? 'semanal').toLowerCase();
+    String freqLabel = 'Semanal';
+    int daysToAdd = 7;
+    if (freq.contains('2x') || freq.contains('duas')) {
+      freqLabel = '2x por semana';
+      daysToAdd = 3;
+    } else if (freq.contains('quinzenal')) {
+      freqLabel = 'Quinzenal';
+      daysToAdd = 14;
+    } else if (freq.contains('mensal')) {
+      freqLabel = 'Mensal';
+      daysToAdd = 28;
+    }
+
+    DateTime returnDateTime;
+    int returnDuration = existingUpcomingAppt?.durationMinutes ?? ((selectedType == 'estudo' || recordStudy) ? 60 : 30);
+
+    if (existingUpcomingAppt != null) {
+      returnDateTime = existingUpcomingAppt.startTime;
+    } else {
+      final target = DateTime.now().add(Duration(days: daysToAdd));
+      returnDateTime = DateTime(
+        target.year,
+        target.month,
+        target.day,
+        10,
+        0,
+      );
+    }
 
     showModalBottomSheet(
       context: context,
@@ -1629,6 +1727,8 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                     durationMinutes: returnDuration,
                     onDurationChanged: (dur) => setSheetState(() => returnDuration = dur),
                     existingAppointments: allAppts,
+                    existingPersonAppointment: existingUpcomingAppt,
+                    frequencyText: freqLabel,
                   ),
                   const SizedBox(height: 16),
 
@@ -1664,16 +1764,40 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                               ? 'Estudo Bíblico: ${person.name}'
                               : 'Revisita: ${person.name}';
 
-                          final appt = await repo.createAppointment(
-                            personId: person.id,
-                            title: apptTitle,
-                            startTime: returnDateTime,
-                            endTime: returnDateTime.add(Duration(minutes: returnDuration)),
-                            durationMinutes: returnDuration,
-                            status: 'confirmado',
-                            locationNotes: person.address != null ? 'Local: ${person.address}' : null,
-                          );
-                          appointmentId = appt.id;
+                          // Prevenção de duplicidade: atualiza compromisso existente na mesma data ou cria novo
+                          final existingAppts = ref.read(appointmentsStreamProvider).value ?? [];
+                          final existingOnDate = existingAppts.firstWhereOrNull((a) =>
+                              a.deletedAt == null &&
+                              a.status != 'cancelado' &&
+                              a.personId == person.id &&
+                              a.startTime.year == returnDateTime.year &&
+                              a.startTime.month == returnDateTime.month &&
+                              a.startTime.day == returnDateTime.day);
+
+                          if (existingOnDate != null) {
+                            await repo.updateAppointment(
+                              existingOnDate.copyWith(
+                                studyId: existingStudy != null ? Value(existingStudy.id) : const Value.absent(),
+                                startTime: returnDateTime,
+                                endTime: returnDateTime.add(Duration(minutes: returnDuration)),
+                                durationMinutes: returnDuration,
+                                status: 'confirmado',
+                              ),
+                            );
+                            appointmentId = existingOnDate.id;
+                          } else {
+                            final appt = await repo.createAppointment(
+                              personId: person.id,
+                              studyId: existingStudy?.id,
+                              title: apptTitle,
+                              startTime: returnDateTime,
+                              endTime: returnDateTime.add(Duration(minutes: returnDuration)),
+                              durationMinutes: returnDuration,
+                              status: 'confirmado',
+                              locationNotes: person.address != null ? 'Local: ${person.address}' : null,
+                            );
+                            appointmentId = appt.id;
+                          }
                         }
 
                         // 2. Registro da Visita (Atômico)
@@ -4377,12 +4501,36 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
             ),
 
             _TimelineStep(
+              icon: Icons.menu_book,
+              iconColor: currentLesson >= 1 ? const Color(0xFF0284C7) : Colors.grey,
+              title: 'Brochura Inicial (Lições 01 a 03)',
+              date: currentLesson > 3
+                  ? 'Concluída'
+                  : (currentLesson >= 1 ? 'Em andamento (Lição $currentLesson)' : 'Início'),
+              subtitle: 'Brochura "Seja Feliz para Sempre!": 3 lições introdutórias da Bíblia',
+              isCompleted: currentLesson >= 3,
+            ),
+
+            _TimelineStep(
+              icon: Icons.handshake_outlined,
+              iconColor: currentLesson >= 4 ? AppTheme.successGreen : (currentLesson == 3 ? AppTheme.alertAmber : Colors.grey),
+              title: 'Aceitou Continuar com o Livro Completo',
+              date: currentLesson >= 4
+                  ? 'Recebeu o livro (Lição 4+)'
+                  : (currentLesson == 3 ? 'Consideração da Lição 3' : 'Pendente'),
+              subtitle: currentLesson >= 4
+                  ? 'Estudante aceitou o curso completo e recebeu o livro "Seja Feliz para Sempre!"'
+                  : 'No final da lição 3: Consideração sobre continuar no livro a partir da Lição 4',
+              isCompleted: currentLesson >= 4,
+            ),
+
+            _TimelineStep(
               icon: Icons.auto_stories,
               iconColor: const Color(0xFF7C3AED),
-              title: 'Início do Estudo Bíblico',
-              date: AppDateUtils.formatDate(study.startedAt),
-              subtitle: 'Publicação: Livro "Seja Feliz Para Sempre!"',
-              isCompleted: true,
+              title: 'Curso Completo no Livro',
+              date: currentLesson >= 4 ? 'Em andamento' : 'Aguardando Lição 4',
+              subtitle: 'Publicação: Livro "Seja Feliz para Sempre!" (60 lições)',
+              isCompleted: currentLesson >= 4,
             ),
 
             _TimelineStep(

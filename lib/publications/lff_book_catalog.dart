@@ -4,12 +4,20 @@ class LffLessonInfo {
   final String title;
   final int section;
   final List<String> pointTitles;
+  final String? somePeopleSay;
+  final String? summary;
+  final List<String> reviewQuestions;
+  final String? tryThis;
 
   const LffLessonInfo({
     required this.number,
     required this.title,
     required this.section,
     required this.pointTitles,
+    this.somePeopleSay,
+    this.summary,
+    this.reviewQuestions = const [],
+    this.tryThis,
   });
 
   int get totalPoints => pointTitles.length;
@@ -132,11 +140,21 @@ class LffBookCatalog {
       title: 'Quem é Deus?',
       section: 1,
       pointTitles: [
-        '1. Deus tem um nome e quer que você o use',
-        '2. Jeová quer ser seu Amigo',
-        '3. Jeová tem sentimentos',
-        'Resumo, Revisão e Tente o Seguinte',
+        '1. Qual é o nome de Deus?',
+        '2. O que a Bíblia diz sobre Jeová?',
+        '3. Deus tem muitos títulos, mas apenas um nome',
+        '4. Jeová quer que você conheça e use o nome dele',
+        '5. Jeová quer que você se aproxime mais dele',
+        '6. Como conhecer melhor a Jeová',
       ],
+      somePeopleSay: 'Deus é um só. Então, não faz diferença o jeito que você chama a ele.',
+      summary: 'Jeová é o nome do único Deus verdadeiro. Ele quer que a gente se aproxime mais dele conhecendo e usando o seu nome.',
+      reviewQuestions: [
+        'Por que Jeová é diferente de todos os outros deuses?',
+        'Por que é importante usar o nome de Deus?',
+        'O que prova que Jeová quer que você se aproxime mais dele?',
+      ],
+      tryThis: 'Quando falar sobre Deus, use o nome dele, Jeová.',
     ),
     LffLessonInfo(
       number: 5,
@@ -887,5 +905,99 @@ class LffBookCatalog {
     }
 
     return list;
+  }
+}
+
+/// Catálogo Oficial da Brochura Introdutória "Seja Feliz para Sempre! — Comece a Aprender sobre a Bíblia"
+class LffiBrochureCatalog {
+  static const int totalLessons = 3;
+
+  static const List<LffLessonInfo> lessons = [
+    LffLessonInfo(
+      number: 1,
+      title: 'Como a Bíblia pode ajudar você?',
+      section: 1,
+      pointTitles: [
+        '1. A Bíblia pode nos guiar',
+        '2. A Bíblia pode responder às nossas perguntas',
+        '3. A leitura da Bíblia pode ser agradável',
+        'Resumo, Revisão e Tente o Seguinte',
+      ],
+      summary: 'A Bíblia nos dá conselhos práticos para o dia a dia, responde a perguntas importantes e nos dá esperança e consolo.',
+      reviewQuestions: [
+        'Que tipo de conselhos encontramos na Bíblia?',
+        'Quais são algumas perguntas que a Bíblia responde?',
+        'O que você gostaria de aprender na Bíblia?',
+      ],
+      tryThis: 'Leia a primeira parte do programa de leitura da Bíblia desta lição.',
+    ),
+    LffLessonInfo(
+      number: 2,
+      title: 'A Bíblia nos dá esperança',
+      section: 1,
+      pointTitles: [
+        '1. A Bíblia promete que teremos um futuro maravilhoso',
+        '2. A esperança da Bíblia pode fazer a diferença na nossa vida hoje',
+        '3. A esperança da Bíblia nos dá forças para perseverar',
+        'Resumo, Revisão e Tente o Seguinte',
+      ],
+      summary: 'A Bíblia promete que teremos um futuro maravilhoso. Essa esperança nos ajuda a lidar com os problemas hoje.',
+      reviewQuestions: [
+        'Que promessas da Bíblia para o futuro você mais gostou?',
+        'Como a esperança da Bíblia pode ajudar você hoje?',
+      ],
+      tryThis: 'Leia os textos bíblicos citados nesta lição e pense em como eles se aplicam a você.',
+    ),
+    LffLessonInfo(
+      number: 3,
+      title: 'Será que você pode acreditar na Bíblia?',
+      section: 1,
+      pointTitles: [
+        '1. A Bíblia está de acordo com a ciência',
+        '2. A Bíblia relata acontecimentos históricos com exatidão',
+        '3. As profecias da Bíblia se cumprem',
+        'Resumo, Revisão e Tente o Seguinte',
+        'Decisão: Aceitar continuar o curso completo no livro "Seja Feliz para Sempre!"',
+      ],
+      summary: 'A ciência, a história e as profecias cumpridas provam que podemos confiar na Bíblia.',
+      reviewQuestions: [
+        'A Bíblia é um livro de mitos ou relata a verdade?',
+        'Quais são alguns exemplos de harmonia entre a Bíblia e a ciência?',
+        'Você acha que pode confiar na Bíblia?',
+      ],
+      tryThis: 'No final desta lição 3: Perguntar se o estudante aceita continuar com o livro completo a partir da Lição 4.',
+    ),
+  ];
+
+  static LffLessonInfo? getLesson(int number) {
+    if (number < 1 || number > lessons.length) return null;
+    return lessons[number - 1];
+  }
+}
+
+/// Catálogo Oficial da Brochura "Escute a Deus e Viva para Sempre"
+class ListenToGodCatalog {
+  static const int totalLessons = 14;
+
+  static const List<({int number, String title, int paragraphs})> lessons = [
+    (number: 1, title: 'Como Deus fala com a gente?', paragraphs: 4),
+    (number: 2, title: 'Quem é Deus?', paragraphs: 4),
+    (number: 3, title: 'Como era a vida no começo?', paragraphs: 4),
+    (number: 4, title: 'O que aconteceu quando Adão e Eva escutaram Satanás?', paragraphs: 4),
+    (number: 5, title: 'Como as pessoas eram nos dias de Noé?', paragraphs: 4),
+    (number: 6, title: 'O que você pode aprender do Dilúvio?', paragraphs: 4),
+    (number: 7, title: 'Quem era Jesus?', paragraphs: 4),
+    (number: 8, title: 'O que a morte de Jesus tem a ver com você?', paragraphs: 4),
+    (number: 9, title: 'Quando a Terra vai se tornar um paraíso?', paragraphs: 4),
+    (number: 10, title: 'Se você escutar a Deus, que bênçãos você vai ter?', paragraphs: 4),
+    (number: 11, title: 'Será que Jeová nos escuta?', paragraphs: 4),
+    (number: 12, title: 'Como sua família pode ser feliz?', paragraphs: 4),
+    (number: 13, title: 'O que você precisa fazer para deixar Jeová feliz?', paragraphs: 4),
+    (number: 14, title: 'Como você mostra que é fiel a Jeová?', paragraphs: 4),
+  ];
+
+  static ({int number, String title, int paragraphs})? getLesson(int number) {
+    if (number < 1 || number > lessons.length) return null;
+    return lessons[number - 1];
   }
 }
