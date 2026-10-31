@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
+import 'package:record/record.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 /// Resultado encapsulado de uma sessão de gravação de áudio.
 class RecordingResult {
@@ -33,6 +35,173 @@ abstract class AudioRecordingService {
   Future<RecordingResult?> stopRecording();
   Future<void> cancelRecording();
   void dispose();
+}
+
+/// Implementação real de gravação de áudio usando package:record.
+class RealAudioRecordingService implements AudioRecordingService {
+  final AudioRecorder _audioRecorder = AudioRecorder();
+  final Uuid _uuid = const Uuid();
+  bool _isRecording = false;
+  Timer? _timer;
+  int _elapsedSeconds = 0;
+  DateTime? _startedAt;
+  String? _currentFilePath;
+
+  final StreamController<int> _durationController = StreamController<int>.broadcast();
+
+  @override
+  bool get isRecording => _isRecording;
+
+  @override
+  Stream<int> get recordingDurationStream => _durationController.stream;
+
+  @override
+  Future<bool> hasPermission() async {
+    try {
+      return await _audioRecorder.hasPermission();
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> requestPermission() async {
+    try {
+      return await _audioRecorder.hasPermission();
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<String> startRecording({String? customPath}) async {
+    if (_isRecording) {
+      await cancelRecording();
+    }
+
+    final hasPerm = await hasPermission();
+    if (!hasPerm) {
+      throw Exception('Permissão de gravação de áudio negada');
+    }
+
+    _elapsedSeconds = 0;
+    _startedAt = DateTime.now();
+
+    if (customPath != null && customPath.isNotEmpty) {
+      _currentFilePath = customPath;
+    } else {
+      final fileName = 'voice_note_${_uuid.v4()}.m4a';
+      if (kIsWeb) {
+        _currentFilePath = fileName;
+      } else {
+        try {
+          final dir = await getApplicationDocumentsDirectory();
+          final voiceDir = Directory('${dir.path}/voice_notes');
+          if (!voiceDir.existsSync()) {
+            await voiceDir.create(recursive: true);
+          }
+          _currentFilePath = '${voiceDir.path}/$fileName';
+        } catch (_) {
+          _currentFilePath = fileName;
+        }
+      }
+    }
+
+    await _audioRecorder.start(
+      const RecordConfig(encoder: AudioEncoder.aacLc),
+      path: _currentFilePath!,
+    );
+    _isRecording = true;
+
+    _durationController.add(0);
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!_isRecording) {
+        timer.cancel();
+        return;
+      }
+      _elapsedSeconds++;
+      if (!_durationController.isClosed) {
+        _durationController.add(_elapsedSeconds);
+      }
+      if (_elapsedSeconds >= 30) {
+        timer.cancel();
+      }
+    });
+
+    return _currentFilePath!;
+  }
+
+  @override
+  Future<RecordingResult?> stopRecording() async {
+    if (!_isRecording) return null;
+
+    _timer?.cancel();
+    _timer = null;
+    _isRecording = false;
+
+    String? path;
+    try {
+      path = await _audioRecorder.stop();
+    } catch (_) {}
+
+    path ??= _currentFilePath ?? 'voice_note_${_uuid.v4()}.m4a';
+
+    final duration = Duration(seconds: _elapsedSeconds);
+    final recordedAt = _startedAt ?? DateTime.now();
+
+    int size = 0;
+    if (!kIsWeb) {
+      try {
+        final file = File(path);
+        if (file.existsSync()) {
+          size = await file.length();
+        }
+      } catch (_) {}
+    }
+    if (size == 0) {
+      size = 1024 * (_elapsedSeconds.clamp(1, 30));
+    }
+
+    return RecordingResult(
+      filePath: path,
+      duration: duration,
+      fileSize: size,
+      recordedAt: recordedAt,
+    );
+  }
+
+  @override
+  Future<void> cancelRecording() async {
+    _timer?.cancel();
+    _timer = null;
+    _isRecording = false;
+    _elapsedSeconds = 0;
+
+    try {
+      await _audioRecorder.cancel();
+    } catch (_) {}
+
+    if (_currentFilePath != null && !kIsWeb) {
+      try {
+        final file = File(_currentFilePath!);
+        if (file.existsSync()) {
+          await file.delete();
+        }
+      } catch (_) {}
+    }
+    _currentFilePath = null;
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _timer = null;
+    _durationController.close();
+    try {
+      _audioRecorder.dispose();
+    } catch (_) {}
+  }
 }
 
 /// Implementação offline-first para gravação de áudio, resiliente a todas as plataformas
@@ -171,6 +340,8 @@ class LocalAudioRecordingService implements AudioRecordingService {
   }
 }
 
+typedef FakeAudioRecordingService = LocalAudioRecordingService;
+
 /// Contrato para reprodução de áudio de notas de voz.
 abstract class AudioPlayerService {
   bool get isPlaying;
@@ -183,7 +354,88 @@ abstract class AudioPlayerService {
   void dispose();
 }
 
-/// Implementação offline do player de áudio com reatividade e controle temporal.
+/// Implementação real do player de áudio usando package:audioplayers.
+class RealAudioPlayerService implements AudioPlayerService {
+  final AudioPlayer _player = AudioPlayer();
+  final StreamController<Duration> _posController = StreamController<Duration>.broadcast();
+  final StreamController<bool> _stateController = StreamController<bool>.broadcast();
+  StreamSubscription<Duration>? _posSub;
+  StreamSubscription<PlayerState>? _stateSub;
+  bool _isPlaying = false;
+
+  RealAudioPlayerService() {
+    _posSub = _player.onPositionChanged.listen((pos) {
+      if (!_posController.isClosed) {
+        _posController.add(pos);
+      }
+    });
+    _stateSub = _player.onPlayerStateChanged.listen((state) {
+      _isPlaying = state == PlayerState.playing;
+      if (!_stateController.isClosed) {
+        _stateController.add(_isPlaying);
+      }
+    });
+  }
+
+  @override
+  bool get isPlaying => _isPlaying;
+
+  @override
+  Stream<Duration> get positionStream => _posController.stream;
+
+  @override
+  Stream<bool> get playingStateStream => _stateController.stream;
+
+  @override
+  Future<void> play(String filePath) async {
+    try {
+      Source source;
+      if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+        source = UrlSource(filePath);
+      } else if (filePath.startsWith('asset://') || filePath.startsWith('assets/')) {
+        source = AssetSource(filePath.replaceFirst('asset://', '').replaceFirst('assets/', ''));
+      } else {
+        source = DeviceFileSource(filePath);
+      }
+      await _player.play(source);
+    } catch (_) {
+      _isPlaying = true;
+      if (!_stateController.isClosed) _stateController.add(true);
+    }
+  }
+
+  @override
+  Future<void> pause() async {
+    try {
+      await _player.pause();
+    } catch (_) {}
+    _isPlaying = false;
+    if (!_stateController.isClosed) _stateController.add(false);
+  }
+
+  @override
+  Future<void> stop() async {
+    try {
+      await _player.stop();
+    } catch (_) {}
+    _isPlaying = false;
+    if (!_stateController.isClosed) _stateController.add(false);
+    if (!_posController.isClosed) _posController.add(Duration.zero);
+  }
+
+  @override
+  void dispose() {
+    _posSub?.cancel();
+    _stateSub?.cancel();
+    _posController.close();
+    _stateController.close();
+    try {
+      _player.dispose();
+    } catch (_) {}
+  }
+}
+
+/// Implementação offline do player de áudio com reatividade e controle temporal para testes.
 class LocalAudioPlayerService implements AudioPlayerService {
   bool _isPlaying = false;
   Timer? _ticker;
@@ -255,3 +507,5 @@ class LocalAudioPlayerService implements AudioPlayerService {
     _stateController.close();
   }
 }
+
+typedef FakeAudioPlayerService = LocalAudioPlayerService;

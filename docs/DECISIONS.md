@@ -37,3 +37,27 @@
 - **Consequências:**
   - Impossibilidade de sobreposição involuntária de visitas.
   - Suporte a agendamentos provisórios quando criado offline.
+
+## ADR-006: Envelope Criptográfico de Backup v2 com PBKDF2-HMAC-SHA256 e AES-256-GCM
+- **Contexto:** Garantir integridade e confidencialidade máxima das exportações de dados confidenciais do ministério, com chave mestra do dispositivo e compatibilidade retroativa com arquivos v1.
+- **Decisão:** Adotar envelope criptográfico versão 2 contendo salt de 16 bytes gerado via `Random.secure()`, derivação de chave por PBKDF2-HMAC-SHA256 com 100.000 iterações, cifra autenticada AES-256-GCM com tag de 128 bits e IV aleatório de 16 bytes. Backups silenciosos utilizam segredo de dispositivo gerado e persistido no `app_kv_store` local em vez de senha estática.
+- **Consequências:**
+  - Impossibilidade matemática de adulteração silenciosa do arquivo de backup (autenticação de integridade integrada no GCM).
+  - Proteção robusta contra força bruta por meio das 100.000 iterações de derivação de chave.
+  - Compatibilidade com restauração de arquivos v1 legados (AES-CBC + checksum SHA-256).
+
+## ADR-007: Serviços Reais de Áudio e Ditado com Degradação Graciosa
+- **Contexto:** Necessidade de gravação de notas rápidas pós-visita no ministério de campo utilizando o hardware real do dispositivo (microfone e reconhecimento de voz).
+- **Decisão:** Implementação de `RealAudioRecordingService` (`package:record`), `RealAudioPlayerService` (`package:audioplayers`) e `RealVoiceDictationService` (`package:speech_to_text`), mantendo fakes completos para testes automatizados sem dependência de hardware nativo.
+- **Consequências:**
+  - Suporte a gravação m4a/aac nativa no diretório de documentos do app.
+  - Tratamento de negação de permissão de microfone com feedback explícito em tela e fallback para entrada manual digitada.
+  - Ditado contínuo em pt-BR com `SpeechListenOptions`.
+
+## ADR-008: Evolução do Esquema Drift v2 com Tabelas Fortemente Tipadas
+- **Contexto:** Módulos de notas de voz, importação de contatos da agenda, marcos territoriais e armazenamento chave-valor utilizavam consultas SQL cruas ou criação manual de tabelas.
+- **Decisão:** Evoluir o esquema Drift para versão 2 com as tabelas tipadas `VoiceNotes`, `PhoneContacts`, `TerritoryLandmarks` e `AppKvStore`, integradas ao repositório transacional e ao mecanismo de migração segura.
+- **Consequências:**
+  - Tipagem estrita de colunas no Dart com DAOs nativos.
+  - Suporte a transações atômicas multi-entidade (ex: `saveQuickVisitFromVoiceNote` grava visita, nota e atualiza estudante/participante em uma única transação).
+  - Reconstituição fiel de entidades adicionais no backup e no sync remoto.

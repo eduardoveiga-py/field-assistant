@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
@@ -26,6 +27,15 @@ class TerritoryLandmark {
     this.notes,
     required this.createdAt,
   });
+
+  /// Validador de coordenadas geográficas
+  static bool isValidCoordinate(double? lat, double? lng) {
+    if (lat == null || lng == null) return false;
+    return lat >= -90.0 && lat <= 90.0 && lng >= -180.0 && lng <= 180.0;
+  }
+
+  /// Retorna true apenas se o ponto possuir coordenadas geográficas reais e válidas
+  bool get hasValidCoordinates => isValidCoordinate(latitude, longitude);
 
   IconData get icon {
     switch (category.toLowerCase()) {
@@ -141,77 +151,55 @@ class TerritoryLandmark {
 class LandmarkManager {
   final AppDatabase db;
   final Uuid _uuid = const Uuid();
-  final StreamController<List<TerritoryLandmark>> _landmarksController = StreamController<List<TerritoryLandmark>>.broadcast();
+  final StreamController<List<TerritoryLandmark>> _landmarksController =
+      StreamController<List<TerritoryLandmark>>.broadcast();
   Future<void>? _initFuture;
 
   LandmarkManager(this.db) {
-    _initTable();
+    _initSeeding();
   }
 
-  Future<void> _initTable() {
-    _initFuture ??= _doInitTable();
+  Future<void> _initSeeding() {
+    _initFuture ??= _seedDefaultsIfEmpty();
     return _initFuture!;
   }
 
-  Future<void> _doInitTable() async {
+  Future<void> _seedDefaultsIfEmpty() async {
     try {
-      await db.customStatement('''
-        CREATE TABLE IF NOT EXISTS territory_landmarks (
-          id TEXT PRIMARY KEY,
-          name TEXT NOT NULL,
-          category TEXT NOT NULL,
-          address TEXT,
-          latitude REAL,
-          longitude REAL,
-          notes TEXT,
-          created_at TEXT NOT NULL
-        );
-      ''');
-
-      // Se não houver marcos, cadastra pontos de referência iniciais úteis
-      final existing = await db.customSelect('SELECT COUNT(*) AS count FROM territory_landmarks').getSingle();
-      final count = existing.read<int>('count');
-      if (count == 0) {
+      final existing = await (db.select(db.territoryLandmarks)..limit(1)).get();
+      if (existing.isEmpty) {
         final now = DateTime.now();
-        await db.customInsert(
-          'INSERT INTO territory_landmarks (id, name, category, address, latitude, longitude, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-          variables: [
-            Variable.withString(_uuid.v4()),
-            Variable.withString('Padaria Central Betânia'),
-            Variable.withString('padaria'),
-            Variable.withString('Rua Principal, 50 - Betânia'),
-            Variable.withReal(-23.551200),
-            Variable.withReal(-46.634100),
-            Variable.withString('Ponto de encontro da saída de campo no setor Betânia'),
-            Variable.withString(now.toIso8601String()),
-          ],
-        );
-        await db.customInsert(
-          'INSERT INTO territory_landmarks (id, name, category, address, latitude, longitude, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-          variables: [
-            Variable.withString(_uuid.v4()),
-            Variable.withString('Posto de Saúde Lago Grande'),
-            Variable.withString('saude'),
-            Variable.withString('Av. das Águas, 300 - Lago Grande'),
-            Variable.withReal(-23.558500),
-            Variable.withReal(-46.645000),
-            Variable.withString('Referência para as revisitas próximas à represa'),
-            Variable.withString(now.add(const Duration(seconds: 1)).toIso8601String()),
-          ],
-        );
-        await db.customInsert(
-          'INSERT INTO territory_landmarks (id, name, category, address, latitude, longitude, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-          variables: [
-            Variable.withString(_uuid.v4()),
-            Variable.withString('Escola Municipal Cidade'),
-            Variable.withString('escola'),
-            Variable.withString('Praça Central, s/n - Cidade'),
-            Variable.withReal(-23.562000),
-            Variable.withReal(-46.656000),
-            Variable.withString('Referência excelente para encontrar os endereços do centro'),
-            Variable.withString(now.add(const Duration(seconds: 2)).toIso8601String()),
-          ],
-        );
+        await db.batch((batch) {
+          batch.insertAll(db.territoryLandmarks, [
+            TerritoryLandmarksCompanion.insert(
+              id: _uuid.v4(),
+              name: 'Padaria Central Betânia',
+              category: 'padaria',
+              address: const Value('Rua Principal, 50 - Betânia'),
+              notes: const Value('Ponto de encontro da saída de campo no setor Betânia'),
+              createdAt: now,
+              updatedAt: now,
+            ),
+            TerritoryLandmarksCompanion.insert(
+              id: _uuid.v4(),
+              name: 'Posto de Saúde Lago Grande',
+              category: 'saude',
+              address: const Value('Av. das Águas, 300 - Lago Grande'),
+              notes: const Value('Referência para as revisitas próximas à represa'),
+              createdAt: now.add(const Duration(seconds: 1)),
+              updatedAt: now.add(const Duration(seconds: 1)),
+            ),
+            TerritoryLandmarksCompanion.insert(
+              id: _uuid.v4(),
+              name: 'Escola Municipal Cidade',
+              category: 'escola',
+              address: const Value('Praça Central, s/n - Cidade'),
+              notes: const Value('Referência excelente para encontrar os endereços do centro'),
+              createdAt: now.add(const Duration(seconds: 2)),
+              updatedAt: now.add(const Duration(seconds: 2)),
+            ),
+          ]);
+        });
       }
       _refresh();
     } catch (_) {}
@@ -227,10 +215,24 @@ class LandmarkManager {
   }
 
   Future<List<TerritoryLandmark>> getLandmarks() async {
-    await _initTable();
+    await _initSeeding();
     try {
-      final rows = await db.customSelect('SELECT * FROM territory_landmarks ORDER BY name ASC').get();
-      return rows.map((r) => TerritoryLandmark.fromMap(r.data)).toList();
+      final rows = await (db.select(db.territoryLandmarks)
+            ..where((t) => t.deletedAt.isNull())
+            ..orderBy([(t) => OrderingTerm(expression: t.name, mode: OrderingMode.asc)]))
+          .get();
+      return rows
+          .map((r) => TerritoryLandmark(
+                id: r.id,
+                name: r.name,
+                category: r.category,
+                address: r.address,
+                latitude: r.latitude,
+                longitude: r.longitude,
+                notes: r.notes,
+                createdAt: r.createdAt,
+              ))
+          .toList();
     } catch (_) {
       return [];
     }
@@ -249,61 +251,117 @@ class LandmarkManager {
     double? longitude,
     String? notes,
   }) async {
-    await _initTable();
+    await _initSeeding();
     final id = _uuid.v4();
     final now = DateTime.now();
 
-    await db.customInsert(
-      'INSERT INTO territory_landmarks (id, name, category, address, latitude, longitude, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      variables: [
-        Variable.withString(id),
-        Variable.withString(name.trim()),
-        Variable.withString(category),
-        Variable.withString(address ?? ''),
-        Variable.withReal(latitude ?? 0.0),
-        Variable.withReal(longitude ?? 0.0),
-        Variable.withString(notes ?? ''),
-        Variable.withString(now.toIso8601String()),
-      ],
-    );
+    final validCoords = TerritoryLandmark.isValidCoordinate(latitude, longitude);
+    final cleanLat = validCoords ? latitude : null;
+    final cleanLng = validCoords ? longitude : null;
+
+    await db.into(db.territoryLandmarks).insert(
+          TerritoryLandmarksCompanion.insert(
+            id: id,
+            name: name.trim(),
+            category: category,
+            address: Value(address),
+            latitude: Value(cleanLat),
+            longitude: Value(cleanLng),
+            notes: Value(notes),
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
 
     final landmark = TerritoryLandmark(
       id: id,
       name: name.trim(),
       category: category,
       address: address,
-      latitude: latitude,
-      longitude: longitude,
+      latitude: cleanLat,
+      longitude: cleanLng,
       notes: notes,
       createdAt: now,
     );
+
+    try {
+      await db.into(db.syncQueue).insert(
+        SyncQueueCompanion.insert(
+          id: _uuid.v4(),
+          entityType: 'territory_landmarks',
+          entityId: id,
+          operation: 'INSERT',
+          payload: jsonEncode(landmark.toMap()),
+          createdAt: now,
+          status: const Value('pending'),
+        ),
+      );
+    } catch (_) {}
+
     await _refresh();
     return landmark;
   }
 
   Future<void> updateLandmark(TerritoryLandmark landmark) async {
-    await _initTable();
-    await db.customUpdate(
-      'UPDATE territory_landmarks SET name = ?, category = ?, address = ?, latitude = ?, longitude = ?, notes = ? WHERE id = ?',
-      variables: [
-        Variable.withString(landmark.name.trim()),
-        Variable.withString(landmark.category),
-        Variable.withString(landmark.address ?? ''),
-        Variable.withReal(landmark.latitude ?? 0.0),
-        Variable.withReal(landmark.longitude ?? 0.0),
-        Variable.withString(landmark.notes ?? ''),
-        Variable.withString(landmark.id),
-      ],
+    await _initSeeding();
+    final validCoords = TerritoryLandmark.isValidCoordinate(landmark.latitude, landmark.longitude);
+    final cleanLat = validCoords ? landmark.latitude : null;
+    final cleanLng = validCoords ? landmark.longitude : null;
+    final now = DateTime.now();
+
+    await (db.update(db.territoryLandmarks)..where((t) => t.id.equals(landmark.id))).write(
+      TerritoryLandmarksCompanion(
+        name: Value(landmark.name.trim()),
+        category: Value(landmark.category),
+        address: Value(landmark.address),
+        latitude: Value(cleanLat),
+        longitude: Value(cleanLng),
+        notes: Value(landmark.notes),
+        updatedAt: Value(now),
+      ),
     );
+
+    try {
+      await db.into(db.syncQueue).insert(
+        SyncQueueCompanion.insert(
+          id: _uuid.v4(),
+          entityType: 'territory_landmarks',
+          entityId: landmark.id,
+          operation: 'UPDATE',
+          payload: jsonEncode(landmark.toMap()),
+          createdAt: now,
+          status: const Value('pending'),
+        ),
+      );
+    } catch (_) {}
+
     await _refresh();
   }
 
   Future<void> deleteLandmark(String id) async {
-    await _initTable();
-    await db.customUpdate(
-      'DELETE FROM territory_landmarks WHERE id = ?',
-      variables: [Variable.withString(id)],
+    await _initSeeding();
+    final now = DateTime.now();
+    await (db.update(db.territoryLandmarks)..where((t) => t.id.equals(id))).write(
+      TerritoryLandmarksCompanion(
+        deletedAt: Value(now),
+        updatedAt: Value(now),
+      ),
     );
+
+    try {
+      await db.into(db.syncQueue).insert(
+        SyncQueueCompanion.insert(
+          id: _uuid.v4(),
+          entityType: 'territory_landmarks',
+          entityId: id,
+          operation: 'DELETE',
+          payload: jsonEncode({'id': id, 'deleted_at': now.toIso8601String()}),
+          createdAt: now,
+          status: const Value('pending'),
+        ),
+      );
+    } catch (_) {}
+
     await _refresh();
   }
 }

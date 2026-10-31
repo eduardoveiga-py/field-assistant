@@ -185,3 +185,83 @@ class SyncQueue extends Table {
   @override
   Set<Column> get primaryKey => {id};
 }
+
+@DataClassName('VoiceNoteEntry')
+class VoiceNotes extends Table {
+  TextColumn get id => text()(); // UUID v4
+  TextColumn get personId => text().references(People, #id)();
+  TextColumn get visitId => text().nullable().references(Visits, #id)();
+  TextColumn get studyId => text().nullable().references(BibleStudies, #id)();
+  TextColumn get audioFilePath => text().nullable()();
+  IntColumn get audioDurationSeconds => integer().withDefault(const Constant(0))();
+  TextColumn get transcription => text()();
+  IntColumn get detectedLesson => integer().nullable()();
+  IntColumn get detectedPoint => integer().nullable()();
+  TextColumn get extractedPendingDoubt => text().nullable()();
+  TextColumn get extractedEmpathyNote => text().nullable()();
+
+  // Auditoria e sincronização
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime()();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
+  IntColumn get revision => integer().withDefault(const Constant(1))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DataClassName('PhoneContactEntry')
+class PhoneContacts extends Table {
+  TextColumn get id => text()(); // UUID v4
+  TextColumn get name => text()();
+  TextColumn get phone => text()();
+  TextColumn get secondaryPhone => text().nullable()();
+  BoolColumn get hasWhatsapp => boolean().withDefault(const Constant(false))();
+  TextColumn get whatsappInfo => text().nullable()();
+  BoolColumn get hasSocial => boolean().withDefault(const Constant(false))();
+  TextColumn get socialPlatform => text().nullable()();
+  TextColumn get socialHandle => text().nullable()();
+  TextColumn get notes => text().nullable()();
+  TextColumn get tags => text().withDefault(const Constant('[]'))();
+  TextColumn get origin => text().withDefault(const Constant('Informal'))();
+  TextColumn get convertedPersonId => text().nullable().references(People, #id)();
+
+  // Auditoria e sincronização
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime()();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
+  IntColumn get revision => integer().withDefault(const Constant(1))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DataClassName('TerritoryLandmarkEntry')
+class TerritoryLandmarks extends Table {
+  TextColumn get id => text()(); // UUID v4
+  TextColumn get name => text()();
+  TextColumn get category => text()();
+  TextColumn get address => text().nullable()();
+  RealColumn get latitude => real().nullable()();
+  RealColumn get longitude => real().nullable()();
+  TextColumn get notes => text().nullable()();
+
+  // Auditoria e sincronização
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime()();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
+  IntColumn get revision => integer().withDefault(const Constant(1))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DataClassName('AppKvEntry')
+class AppKvStore extends Table {
+  TextColumn get key => text()();
+  TextColumn get value => text()();
+  DateTimeColumn get updatedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {key};
+}

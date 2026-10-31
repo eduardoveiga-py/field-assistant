@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:clock/clock.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -1073,8 +1074,8 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                 behavior: HitTestBehavior.translucent,
                 onPointerSignal: (pointerSignal) {
                   if (pointerSignal is PointerScrollEvent) {
-                    final now = DateTime.now();
-                    if (_lastZoomChangeTime == null || now.difference(_lastZoomChangeTime!).inMilliseconds > 150) {
+                    final now = clock.now();
+                    if (_lastZoomChangeTime == null || now.difference(_lastZoomChangeTime!).inMilliseconds >= 100) {
                       if (pointerSignal.scrollDelta.dy < -2 && _zoom < 18) {
                         _lastZoomChangeTime = now;
                         _changeZoom(_zoom + 1, constraints, originPx, originPy, centerLng, centerLat);

@@ -1,8 +1,13 @@
 import 'dart:convert';
+import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:path_provider/path_provider.dart';
 import 'package:crypto/crypto.dart';
 import 'package:encrypt/encrypt.dart' as enc;
-import 'package:drift/drift.dart' show Variable;
+import 'package:drift/drift.dart' show Value;
+import 'package:uuid/uuid.dart';
 import '../database/app_database.dart';
 import '../database/repository.dart';
 
@@ -16,6 +21,9 @@ class RestorePreview {
   final int sessionsToAdd;
   final int appointmentsToAdd;
   final int activitiesToAdd;
+  final int voiceNotesToAdd;
+  final int phoneContactsToAdd;
+  final int landmarksToAdd;
   final Map<String, dynamic> rawDecryptedData;
 
   RestorePreview({
@@ -28,24 +36,54 @@ class RestorePreview {
     required this.sessionsToAdd,
     required this.appointmentsToAdd,
     required this.activitiesToAdd,
+    this.voiceNotesToAdd = 0,
+    this.phoneContactsToAdd = 0,
+    this.landmarksToAdd = 0,
     required this.rawDecryptedData,
   });
 }
 
 class BackupService {
   final AppRepository repository;
+  final Uuid _uuid = const Uuid();
 
   BackupService(this.repository);
 
-  /// Cria chave de 32 bytes (256 bits) derivada da senha
-  static enc.Key _deriveKey(String password, String salt) {
+  static Uint8List _generateSecureRandom(int length) {
+    final rnd = Random.secure();
+    return Uint8List.fromList(List<int>.generate(length, (_) => rnd.nextInt(256)));
+  }
+
+  /// Derivação de chave PBKDF2-HMAC-SHA256 padrão (100.000 iterações por padrão)
+  static Uint8List _deriveKeyPbkdf2(String password, Uint8List salt, {int iterations = 100000}) {
+    final hmac = Hmac(sha256, utf8.encode(password));
+    // Bloco 1 (32 bytes): salt || [0, 0, 0, 1]
+    final saltAndBlock = Uint8List(salt.length + 4);
+    saltAndBlock.setRange(0, salt.length, salt);
+    saltAndBlock[salt.length + 3] = 1;
+
+    Uint8List u = Uint8List.fromList(hmac.convert(saltAndBlock).bytes);
+    final blockResult = Uint8List.fromList(u);
+
+    for (int iter = 1; iter < iterations; iter++) {
+      u = Uint8List.fromList(hmac.convert(u).bytes);
+      for (int i = 0; i < 32; i++) {
+        blockResult[i] ^= u[i];
+      }
+    }
+
+    return blockResult;
+  }
+
+  /// Chave de 32 bytes legada v1 (SHA-256 de senha + salt fixo)
+  static enc.Key _deriveKeyV1(String password, String salt) {
     final bytes = utf8.encode(password + salt);
     final digest = sha256.convert(bytes);
     return enc.Key(Uint8List.fromList(digest.bytes));
   }
 
-  /// Exporta todos os registros em JSON criptografado com verificação de integridade
-  Future<String> exportEncryptedBackup(String password) async {
+  /// Exporta todos os registros em JSON criptografado com PBKDF2-HMAC-SHA256 e AES-256-GCM (Versão 2)
+  Future<String> exportEncryptedBackup(String password, {int iterations = 100000}) async {
     final db = repository.db;
 
     final people = await db.select(db.people).get();
@@ -55,6 +93,9 @@ class BackupService {
     final sessions = await db.select(db.studySessions).get();
     final appointments = await db.select(db.appointments).get();
     final activities = await db.select(db.activityRecords).get();
+    final voiceNotes = await db.select(db.voiceNotes).get();
+    final phoneContacts = await db.select(db.phoneContacts).get();
+    final landmarks = await db.select(db.territoryLandmarks).get();
 
     final payload = {
       'people': people.map((p) => p.toJson()).toList(),
@@ -64,31 +105,43 @@ class BackupService {
       'studySessions': sessions.map((s) => s.toJson()).toList(),
       'appointments': appointments.map((a) => a.toJson()).toList(),
       'activityRecords': activities.map((a) => a.toJson()).toList(),
+      'voiceNotes': voiceNotes.map((v) => v.toJson()).toList(),
+      'phoneContacts': phoneContacts.map((c) => c.toJson()).toList(),
+      'territoryLandmarks': landmarks.map((l) => l.toJson()).toList(),
     };
 
     final rawJson = jsonEncode(payload);
     final checksum = sha256.convert(utf8.encode(rawJson)).toString();
 
+    // Salt criptograficamente seguro aleatório de 16 bytes
+    final saltBytes = _generateSecureRandom(16);
+    final saltBase64 = base64Encode(saltBytes);
+
+    // Derivação de chave AES-256 via PBKDF2-HMAC-SHA256
+    final keyBytes = _deriveKeyPbkdf2(password, saltBytes, iterations: iterations);
+    final key = enc.Key(keyBytes);
+
+    // IV aleatório seguro de 16 bytes
+    final iv = enc.IV.fromSecureRandom(16);
+
     final backupEnvelope = {
-      'version': 1,
+      'version': 2,
       'exported_at': DateTime.now().toIso8601String(),
       'checksum': checksum,
-      'salt': 'ministerio_pessoal_salt_v1',
+      'iterations': iterations,
       'data': rawJson,
     };
 
     final envelopeJson = jsonEncode(backupEnvelope);
 
-    // Criptografia AES
-    final salt = backupEnvelope['salt'] as String;
-    final key = _deriveKey(password, salt);
-    final iv = enc.IV.fromLength(16);
-    final encrypter = enc.Encrypter(enc.AES(key));
-
+    // Criptografia autenticada AES-256-GCM com tag de integridade de 128 bits
+    final encrypter = enc.Encrypter(enc.AES(key, mode: enc.AESMode.gcm));
     final encrypted = encrypter.encrypt(envelopeJson, iv: iv);
 
-    // Retorna payload codificado em base64 com IV prefixado
     final result = {
+      'version': 2,
+      'salt': saltBase64,
+      'iterations': iterations,
       'iv': iv.base64,
       'ciphertext': encrypted.base64,
     };
@@ -102,24 +155,40 @@ class BackupService {
     required String password,
   }) async {
     final Map<String, dynamic> container = jsonDecode(encryptedDataString);
-    final iv = enc.IV.fromBase64(container['iv'] as String);
-    final ciphertext = container['ciphertext'] as String;
-
-    // Chave padrão inicial
-    final key = _deriveKey(password, 'ministerio_pessoal_salt_v1');
-    final encrypter = enc.Encrypter(enc.AES(key));
+    final int containerVersion = container['version'] as int? ?? 1;
 
     String decryptedEnvelopeJson;
+
     try {
-      decryptedEnvelopeJson = encrypter.decrypt64(ciphertext, iv: iv);
-    } catch (e) {
-      throw FormatException('Senha incorreta ou arquivo de backup corrompido.');
+      if (containerVersion == 2) {
+        final saltBase64 = container['salt'] as String;
+        final saltBytes = base64Decode(saltBase64);
+        final iterations = (container['iterations'] as num?)?.toInt() ?? 100000;
+        final iv = enc.IV.fromBase64(container['iv'] as String);
+        final ciphertext = container['ciphertext'] as String;
+
+        final keyBytes = _deriveKeyPbkdf2(password, saltBytes, iterations: iterations);
+        final key = enc.Key(keyBytes);
+        final encrypter = enc.Encrypter(enc.AES(key, mode: enc.AESMode.gcm));
+
+        decryptedEnvelopeJson = encrypter.decrypt64(ciphertext, iv: iv);
+      } else {
+        // Compatibilidade reversa: Versão 1 legada
+        final iv = enc.IV.fromBase64(container['iv'] as String);
+        final ciphertext = container['ciphertext'] as String;
+        final key = _deriveKeyV1(password, 'ministerio_pessoal_salt_v1');
+        final encrypter = enc.Encrypter(enc.AES(key));
+
+        decryptedEnvelopeJson = encrypter.decrypt64(ciphertext, iv: iv);
+      }
+    } catch (_) {
+      throw const FormatException('Senha incorreta ou arquivo de backup corrompido.');
     }
 
     final envelope = jsonDecode(decryptedEnvelopeJson) as Map<String, dynamic>;
     final version = envelope['version'] as int;
-    if (version > 1) {
-      throw FormatException('Versão de backup ($version) mais recente que a versão suportada pelo app (1).');
+    if (version > 2) {
+      throw FormatException('Versão de backup ($version) mais recente que a versão suportada pelo app (2).');
     }
 
     final rawDataJson = envelope['data'] as String;
@@ -132,14 +201,18 @@ class BackupService {
 
     final data = jsonDecode(rawDataJson) as Map<String, dynamic>;
 
-    // Calcula prévia comparando UUIDs com os existentes
+    DateTime parseDate(dynamic raw) {
+      if (raw is int) return DateTime.fromMillisecondsSinceEpoch(raw);
+      if (raw is String) return DateTime.parse(raw);
+      if (raw is DateTime) return raw;
+      return DateTime.now();
+    }
+
+    // Prévia: People
     final existingPeople = await repository.getAllPeople();
     final existingPeopleMap = {for (var p in existingPeople) p.id: p};
-
     final importedPeople = (data['people'] as List<dynamic>?) ?? [];
-    int pAdd = 0;
-    int pUpdate = 0;
-    int pUnchanged = 0;
+    int pAdd = 0, pUpdate = 0, pUnchanged = 0;
 
     for (final item in importedPeople) {
       final id = item['id'] as String;
@@ -147,11 +220,9 @@ class BackupService {
         pAdd++;
       } else {
         final existing = existingPeopleMap[id]!;
-        final dynamic impUpdatedRaw = item['updatedAt'];
-        final DateTime impUpdated = impUpdatedRaw is int
-            ? DateTime.fromMillisecondsSinceEpoch(impUpdatedRaw)
-            : DateTime.parse(impUpdatedRaw.toString());
-        if (impUpdated.isAfter(existing.updatedAt)) {
+        final impUpdated = parseDate(item['updatedAt']);
+        final impRev = (item['revision'] as num?)?.toInt() ?? 1;
+        if (impUpdated.isAfter(existing.updatedAt) || impRev > existing.revision) {
           pUpdate++;
         } else {
           pUnchanged++;
@@ -159,11 +230,11 @@ class BackupService {
       }
     }
 
+    // Prévia: Visits
     final importedVisits = (data['visits'] as List<dynamic>?) ?? [];
     final existingVisits = await repository.getAllVisits();
     final existingVisitsIds = {for (var v in existingVisits) v.id};
-    int vAdd = 0;
-    int vUpdate = 0;
+    int vAdd = 0, vUpdate = 0;
     for (final item in importedVisits) {
       final id = item['id'] as String;
       if (!existingVisitsIds.contains(id)) {
@@ -173,6 +244,7 @@ class BackupService {
       }
     }
 
+    // Prévia: Studies
     final importedStudies = (data['bibleStudies'] as List<dynamic>?) ?? [];
     final existingStudies = await repository.getAllStudies();
     final existingStudiesIds = {for (var s in existingStudies) s.id};
@@ -181,6 +253,7 @@ class BackupService {
       if (!existingStudiesIds.contains(item['id'] as String)) sAdd++;
     }
 
+    // Prévia: Sessions
     final importedSessions = (data['studySessions'] as List<dynamic>?) ?? [];
     final existingSessions = await repository.getAllSessions();
     final existingSessionsIds = {for (var s in existingSessions) s.id};
@@ -189,6 +262,7 @@ class BackupService {
       if (!existingSessionsIds.contains(item['id'] as String)) sessAdd++;
     }
 
+    // Prévia: Appointments
     final importedAppointments = (data['appointments'] as List<dynamic>?) ?? [];
     final existingAppts = await repository.getAllAppointments();
     final existingApptsIds = {for (var a in existingAppts) a.id};
@@ -197,12 +271,41 @@ class BackupService {
       if (!existingApptsIds.contains(item['id'] as String)) aAdd++;
     }
 
+    // Prévia: Activities
     final importedActivities = (data['activityRecords'] as List<dynamic>?) ?? [];
     final existingActivities = await repository.getAllActivities();
     final existingActivitiesIds = {for (var act in existingActivities) act.id};
     int actAdd = 0;
     for (final item in importedActivities) {
       if (!existingActivitiesIds.contains(item['id'] as String)) actAdd++;
+    }
+
+    // Prévia: VoiceNotes
+    final db = repository.db;
+    final importedVoiceNotes = (data['voiceNotes'] as List<dynamic>?) ?? [];
+    final existingVoiceNotes = await db.select(db.voiceNotes).get();
+    final existingVnIds = {for (var vn in existingVoiceNotes) vn.id};
+    int vnAdd = 0;
+    for (final item in importedVoiceNotes) {
+      if (!existingVnIds.contains(item['id'] as String)) vnAdd++;
+    }
+
+    // Prévia: PhoneContacts
+    final importedContacts = (data['phoneContacts'] as List<dynamic>?) ?? [];
+    final existingContacts = await db.select(db.phoneContacts).get();
+    final existingContactIds = {for (var c in existingContacts) c.id};
+    int phoneAdd = 0;
+    for (final item in importedContacts) {
+      if (!existingContactIds.contains(item['id'] as String)) phoneAdd++;
+    }
+
+    // Prévia: Landmarks
+    final importedLandmarks = (data['territoryLandmarks'] as List<dynamic>?) ?? [];
+    final existingLandmarks = await db.select(db.territoryLandmarks).get();
+    final existingLandmarkIds = {for (var l in existingLandmarks) l.id};
+    int landAdd = 0;
+    for (final item in importedLandmarks) {
+      if (!existingLandmarkIds.contains(item['id'] as String)) landAdd++;
     }
 
     return RestorePreview(
@@ -215,105 +318,241 @@ class BackupService {
       sessionsToAdd: sessAdd,
       appointmentsToAdd: aAdd,
       activitiesToAdd: actAdd,
+      voiceNotesToAdd: vnAdd,
+      phoneContactsToAdd: phoneAdd,
+      landmarksToAdd: landAdd,
       rawDecryptedData: data,
     );
   }
 
-  /// Aplica a restauração de forma transacional e idempotente
+  Future<void> _reconstituteSyncQueue(
+    String entityType,
+    String entityId,
+    String operation,
+    Map<String, dynamic> payload,
+  ) async {
+    try {
+      await repository.db.into(repository.db.syncQueue).insert(
+        SyncQueueCompanion.insert(
+          id: _uuid.v4(),
+          entityType: entityType,
+          entityId: entityId,
+          operation: operation,
+          payload: jsonEncode(payload),
+          createdAt: DateTime.now(),
+          status: const Value('pending'),
+        ),
+      );
+    } catch (_) {}
+  }
+
+  /// Aplica a restauração de forma transacional e idempotente,
+  /// garantindo que registros locais mais recentes nunca sejam sobrescritos por backups obsoletos.
   Future<void> commitRestore(RestorePreview preview) async {
     final db = repository.db;
     final data = preview.rawDecryptedData;
 
     await db.transaction(() async {
-      // Pessoas
+      // 1. Pessoas
       final people = (data['people'] as List<dynamic>?) ?? [];
       for (final item in people) {
         final entry = PersonEntry.fromJson(item as Map<String, dynamic>);
-        await db.into(db.people).insertOnConflictUpdate(entry);
+        final existing = await (db.select(db.people)..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+        if (existing == null) {
+          await db.into(db.people).insert(entry);
+          await _reconstituteSyncQueue('people', entry.id, 'INSERT', item);
+        } else if (entry.updatedAt.isAfter(existing.updatedAt) || entry.revision > existing.revision) {
+          await db.update(db.people).replace(entry);
+          await _reconstituteSyncQueue('people', entry.id, 'UPDATE', item);
+        }
       }
 
-      // Visitas
+      // 2. Visitas
       final visits = (data['visits'] as List<dynamic>?) ?? [];
       for (final item in visits) {
         final entry = VisitEntry.fromJson(item as Map<String, dynamic>);
-        await db.into(db.visits).insertOnConflictUpdate(entry);
+        final existing = await (db.select(db.visits)..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+        if (existing == null) {
+          await db.into(db.visits).insert(entry);
+          await _reconstituteSyncQueue('visits', entry.id, 'INSERT', item);
+        } else if (entry.updatedAt.isAfter(existing.updatedAt) || entry.revision > existing.revision) {
+          await db.update(db.visits).replace(entry);
+          await _reconstituteSyncQueue('visits', entry.id, 'UPDATE', item);
+        }
       }
 
-      // Estudos
+      // 3. Estudos
       final studies = (data['bibleStudies'] as List<dynamic>?) ?? [];
       for (final item in studies) {
         final entry = BibleStudyEntry.fromJson(item as Map<String, dynamic>);
-        await db.into(db.bibleStudies).insertOnConflictUpdate(entry);
+        final existing = await (db.select(db.bibleStudies)..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+        if (existing == null) {
+          await db.into(db.bibleStudies).insert(entry);
+          await _reconstituteSyncQueue('bible_studies', entry.id, 'INSERT', item);
+        } else if (entry.updatedAt.isAfter(existing.updatedAt) || entry.revision > existing.revision) {
+          await db.update(db.bibleStudies).replace(entry);
+          await _reconstituteSyncQueue('bible_studies', entry.id, 'UPDATE', item);
+        }
       }
 
-      // Participantes
+      // 4. Participantes
       final participants = (data['studyParticipants'] as List<dynamic>?) ?? [];
       for (final item in participants) {
         final entry = StudyParticipantEntry.fromJson(item as Map<String, dynamic>);
-        await db.into(db.studyParticipants).insertOnConflictUpdate(entry);
+        final existing = await (db.select(db.studyParticipants)..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+        if (existing == null) {
+          await db.into(db.studyParticipants).insert(entry);
+          await _reconstituteSyncQueue('study_participants', entry.id, 'INSERT', item);
+        } else if (entry.updatedAt.isAfter(existing.updatedAt) || entry.revision > existing.revision) {
+          await db.update(db.studyParticipants).replace(entry);
+          await _reconstituteSyncQueue('study_participants', entry.id, 'UPDATE', item);
+        }
       }
 
-      // Sessões
+      // 5. Sessões
       final sessions = (data['studySessions'] as List<dynamic>?) ?? [];
       for (final item in sessions) {
         final entry = StudySessionEntry.fromJson(item as Map<String, dynamic>);
-        await db.into(db.studySessions).insertOnConflictUpdate(entry);
+        final existing = await (db.select(db.studySessions)..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+        if (existing == null) {
+          await db.into(db.studySessions).insert(entry);
+          await _reconstituteSyncQueue('study_sessions', entry.id, 'INSERT', item);
+        } else if (entry.updatedAt.isAfter(existing.updatedAt) || entry.revision > existing.revision) {
+          await db.update(db.studySessions).replace(entry);
+          await _reconstituteSyncQueue('study_sessions', entry.id, 'UPDATE', item);
+        }
       }
 
-      // Compromissos
+      // 6. Compromissos
       final appointments = (data['appointments'] as List<dynamic>?) ?? [];
       for (final item in appointments) {
         final entry = AppointmentEntry.fromJson(item as Map<String, dynamic>);
-        await db.into(db.appointments).insertOnConflictUpdate(entry);
+        final existing = await (db.select(db.appointments)..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+        if (existing == null) {
+          await db.into(db.appointments).insert(entry);
+          await _reconstituteSyncQueue('appointments', entry.id, 'INSERT', item);
+        } else if (entry.updatedAt.isAfter(existing.updatedAt) || entry.revision > existing.revision) {
+          await db.update(db.appointments).replace(entry);
+          await _reconstituteSyncQueue('appointments', entry.id, 'UPDATE', item);
+        }
       }
 
-      // Atividades
+      // 7. Atividades
       final activities = (data['activityRecords'] as List<dynamic>?) ?? [];
       for (final item in activities) {
         final entry = ActivityRecordEntry.fromJson(item as Map<String, dynamic>);
-        await db.into(db.activityRecords).insertOnConflictUpdate(entry);
+        final existing = await (db.select(db.activityRecords)..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+        if (existing == null) {
+          await db.into(db.activityRecords).insert(entry);
+          await _reconstituteSyncQueue('activity_records', entry.id, 'INSERT', item);
+        } else if (entry.updatedAt.isAfter(existing.updatedAt) || entry.revision > existing.revision) {
+          await db.update(db.activityRecords).replace(entry);
+          await _reconstituteSyncQueue('activity_records', entry.id, 'UPDATE', item);
+        }
+      }
+
+      // 8. Notas de Voz
+      final voiceNotes = (data['voiceNotes'] as List<dynamic>?) ?? [];
+      for (final item in voiceNotes) {
+        final entry = VoiceNoteEntry.fromJson(item as Map<String, dynamic>);
+        final existing = await (db.select(db.voiceNotes)..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+        if (existing == null) {
+          await db.into(db.voiceNotes).insert(entry);
+          await _reconstituteSyncQueue('voice_notes', entry.id, 'INSERT', item);
+        } else if (entry.updatedAt.isAfter(existing.updatedAt) || entry.revision > existing.revision) {
+          await db.update(db.voiceNotes).replace(entry);
+          await _reconstituteSyncQueue('voice_notes', entry.id, 'UPDATE', item);
+        }
+      }
+
+      // 9. Contatos Telefônicos
+      final contacts = (data['phoneContacts'] as List<dynamic>?) ?? [];
+      for (final item in contacts) {
+        final entry = PhoneContactEntry.fromJson(item as Map<String, dynamic>);
+        final existing = await (db.select(db.phoneContacts)..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+        if (existing == null) {
+          await db.into(db.phoneContacts).insert(entry);
+          await _reconstituteSyncQueue('phone_contacts', entry.id, 'INSERT', item);
+        } else if (entry.updatedAt.isAfter(existing.updatedAt) || entry.revision > existing.revision) {
+          await db.update(db.phoneContacts).replace(entry);
+          await _reconstituteSyncQueue('phone_contacts', entry.id, 'UPDATE', item);
+        }
+      }
+
+      // 10. Marcos do Território
+      final landmarks = (data['territoryLandmarks'] as List<dynamic>?) ?? [];
+      for (final item in landmarks) {
+        final entry = TerritoryLandmarkEntry.fromJson(item as Map<String, dynamic>);
+        final existing = await (db.select(db.territoryLandmarks)..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+        if (existing == null) {
+          await db.into(db.territoryLandmarks).insert(entry);
+          await _reconstituteSyncQueue('territory_landmarks', entry.id, 'INSERT', item);
+        } else if (entry.updatedAt.isAfter(existing.updatedAt) || entry.revision > existing.revision) {
+          await db.update(db.territoryLandmarks).replace(entry);
+          await _reconstituteSyncQueue('territory_landmarks', entry.id, 'UPDATE', item);
+        }
       }
     });
   }
 
   static const String _silentBackupKey = 'last_silent_backup_timestamp';
-  static const String _silentBackupDataKey = 'last_silent_backup_payload';
+  static const String _silentBackupKeySecret = 'device_silent_backup_secret';
 
-  /// Realiza backup silencioso se o último foi há mais de 24 horas (ou se force = true)
+  Future<String> _getOrCreateSilentBackupKey() async {
+    final db = repository.db;
+    final row = await (db.select(db.appKvStore)..where((tbl) => tbl.key.equals(_silentBackupKeySecret))).getSingleOrNull();
+    if (row != null && row.value.isNotEmpty) {
+      return row.value;
+    }
+    final generatedSecret = base64Encode(_generateSecureRandom(32));
+    await db.into(db.appKvStore).insertOnConflictUpdate(
+      AppKvStoreCompanion.insert(
+        key: _silentBackupKeySecret,
+        value: generatedSecret,
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+    return generatedSecret;
+  }
+
+  /// Realiza backup silencioso se o último foi há mais de 24 horas (ou se force = true).
+  /// Utiliza chave segura vinculada ao dispositivo e grava arquivo local no sistema de arquivos.
   Future<bool> performSilentBackupIfNeeded({bool force = false}) async {
     final db = repository.db;
     try {
-      await db.customStatement('''
-        CREATE TABLE IF NOT EXISTS app_kv_store (
-          key TEXT PRIMARY KEY,
-          value TEXT NOT NULL
-        );
-      ''');
-
       if (!force) {
-        final row = await db.customSelect(
-          'SELECT value FROM app_kv_store WHERE key = ?',
-          variables: [Variable.withString(_silentBackupKey)],
-        ).getSingleOrNull();
-
+        final row = await (db.select(db.appKvStore)..where((tbl) => tbl.key.equals(_silentBackupKey))).getSingleOrNull();
         if (row != null) {
-          final lastBackupTime = DateTime.tryParse(row.read<String>('value'));
+          final lastBackupTime = DateTime.tryParse(row.value);
           if (lastBackupTime != null && DateTime.now().difference(lastBackupTime).inHours < 24) {
-            return false; // Já realizado nas últimas 24h
+            return false;
           }
         }
       }
 
-      final backupJson = await exportEncryptedBackup('silent_auto_backup_key_v1');
+      final deviceSecret = await _getOrCreateSilentBackupKey();
+      final backupJson = await exportEncryptedBackup(deviceSecret, iterations: 1000);
       final nowStr = DateTime.now().toIso8601String();
 
-      await db.customInsert(
-        'INSERT OR REPLACE INTO app_kv_store (key, value) VALUES (?, ?)',
-        variables: [Variable.withString(_silentBackupKey), Variable.withString(nowStr)],
-      );
-      await db.customInsert(
-        'INSERT OR REPLACE INTO app_kv_store (key, value) VALUES (?, ?)',
-        variables: [Variable.withString(_silentBackupDataKey), Variable.withString(backupJson)],
+      // Salva em arquivo físico no diretório de documentos quando disponível
+      if (!kIsWeb) {
+        try {
+          final dir = await getApplicationDocumentsDirectory();
+          final backupDir = Directory('${dir.path}/backups');
+          if (!backupDir.existsSync()) {
+            await backupDir.create(recursive: true);
+          }
+          final backupFile = File('${backupDir.path}/silent_backup.bak');
+          await backupFile.writeAsString(backupJson, flush: true);
+        } catch (_) {}
+      }
+
+      await db.into(db.appKvStore).insertOnConflictUpdate(
+        AppKvStoreCompanion.insert(
+          key: _silentBackupKey,
+          value: nowStr,
+          updatedAt: Value(DateTime.now()),
+        ),
       );
 
       return true;
@@ -326,19 +565,9 @@ class BackupService {
   Future<DateTime?> getLastSilentBackupDate() async {
     final db = repository.db;
     try {
-      await db.customStatement('''
-        CREATE TABLE IF NOT EXISTS app_kv_store (
-          key TEXT PRIMARY KEY,
-          value TEXT NOT NULL
-        );
-      ''');
-      final row = await db.customSelect(
-        'SELECT value FROM app_kv_store WHERE key = ?',
-        variables: [Variable.withString(_silentBackupKey)],
-      ).getSingleOrNull();
-
+      final row = await (db.select(db.appKvStore)..where((tbl) => tbl.key.equals(_silentBackupKey))).getSingleOrNull();
       if (row != null) {
-        return DateTime.tryParse(row.read<String>('value'));
+        return DateTime.tryParse(row.value);
       }
       return null;
     } catch (_) {

@@ -280,6 +280,30 @@ class VoiceNoteParser {
     'próximo tema',
     'proximo assunto',
     'próximo assunto',
+    'vamos ler',
+    'vou ler',
+    'vou levar',
+    'vamos levar',
+    'vou mostrar',
+    'vamos mostrar',
+    'vou passar',
+    'vamos passar',
+    'vou enviar',
+    'vamos enviar',
+    'vou mandar',
+    'vamos mandar',
+    'proxima conversa',
+    'próxima conversa',
+    'voltar para',
+    'voltar na',
+    'voltar no',
+    'ficamos para',
+    'marcado de',
+    'marcado para',
+    'agendado para',
+    'pergunta pendente',
+    'pergunta para a próxima',
+    'pergunta para a proxima',
   ];
 
   static const List<String> _empathyTriggers = [
@@ -323,6 +347,8 @@ class VoiceNoteParser {
     'hospital',
     'internado',
     'internada',
+    'internação',
+    'internacao',
     'recuperacao',
     'recuperação',
     'doente',
@@ -357,6 +383,32 @@ class VoiceNoteParser {
     'consulta',
     'exame',
     'tratamento',
+    'dor',
+    'dores',
+    'coluna',
+    'pressão alta',
+    'pressao alta',
+    'pressão',
+    'pressao',
+    'gravidez',
+    'grávida',
+    'gravida',
+    'parto',
+    'bebê',
+    'bebe',
+    'separado',
+    'separada',
+    'separação',
+    'separacao',
+    'entrevista de emprego',
+    'perdeu o emprego',
+    'estresse',
+    'estressado',
+    'estressada',
+    'idoso',
+    'idosa',
+    'cuidador',
+    'cuidadora',
   ];
 
   static const Set<String> _nameStopWords = {
@@ -367,18 +419,46 @@ class VoiceNoteParser {
     'bíblia', 'texto', 'video', 'vídeo', 'estudo', 'visita', 'revisita',
     'que', 'para', 'com', 'sem', 'foi', 'estava', 'sobre', 'na', 'no', 'da', 'do',
     'segunda', 'terça', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'sábado', 'domingo',
+    'dona', 'seu', 'senhor', 'senhora', 'sr', 'sra', 'irmão', 'irmao', 'irmã', 'irma',
+    'morador', 'moradora', 'estudante', 'campo', 'territorio', 'território',
+    'publicador', 'pioneiro', 'pioneira',
+  };
+
+  static const Set<String> _bibleBooks = {
+    'gênesis', 'genesis', 'êxodo', 'exodo', 'levítico', 'levitico', 'números', 'numeros',
+    'deuteronômio', 'deuteronomio', 'josué', 'josue', 'juízes', 'juizes', 'rute',
+    '1 samuel', '2 samuel', '1 reis', '2 reis', '1 crônicas', '2 crônicas',
+    '1 cronicas', '2 cronicas', 'esdras', 'neemias', 'ester', 'jó', 'jo',
+    'salmos', 'salmo', 'provérbios', 'proverbios', 'eclesiastes', 'cântico de salomão',
+    'cantico de salomao', 'isaías', 'isaias', 'jeremias', 'lamentações', 'lamentacoes',
+    'ezequiel', 'daniel', 'oseias', 'oséias', 'joel', 'amós', 'amos', 'obadias',
+    'jonas', 'miqueias', 'miquéias', 'naum', 'habacuque', 'sofonias', 'ageu',
+    'zacarias', 'malaquias', 'mateus', 'marcos', 'lucas', 'joão', 'joao',
+    'atos', 'romanos', '1 coríntios', '2 coríntios', '1 corintios', '2 corintios',
+    'gálatas', 'galatas', 'efésios', 'efesios', 'filipenses', 'colossenses',
+    '1 tessalonicenses', '2 tessalonicenses', '1 timóteo', '2 timóteo',
+    '1 timoteo', '2 timoteo', 'tito', 'filemom', 'hebreus', 'tiago',
+    '1 pedro', '2 pedro', '1 joão', '2 joão', '3 joão', '1 joao', '2 joao', '3 joao',
+    'judas', 'apocalipse', 'revelação', 'revelacao',
   };
 
   /// Analisa um texto ditado ou transcrito e retorna a estrutura extraída determinística.
-  static ParsedVoiceNote parse(String? rawText) {
+  static ParsedVoiceNote parse(
+    String? rawText, {
+    String? publicationId,
+    int? maxLessons,
+    int? maxPoints,
+  }) {
     if (rawText == null || rawText.trim().isEmpty) {
       return const ParsedVoiceNote(rawText: '');
     }
 
     final text = rawText.trim();
     final studentName = _extractStudentName(text);
-    final lesson = _extractLesson(text);
-    final point = _extractPoint(text);
+    final rawLesson = _extractLesson(text);
+    final rawPoint = _extractPoint(text);
+    final lesson = _validateLesson(rawLesson, publicationId: publicationId, maxLessons: maxLessons);
+    final point = _validatePoint(rawPoint, maxPoints: maxPoints ?? 50);
     final pendingDoubt = _extractPendingDoubt(text);
     final empathyNote = _extractEmpathyNote(text, pendingDoubt);
 
@@ -390,6 +470,88 @@ class VoiceNoteParser {
       studentName: studentName,
       rawText: text,
     );
+  }
+
+  static int? _validateLesson(int? lesson, {String? publicationId, int? maxLessons}) {
+    if (lesson == null) return null;
+    final int limit;
+    if (maxLessons != null) {
+      limit = maxLessons;
+    } else if (publicationId == 'lff-brochure') {
+      limit = 3;
+    } else {
+      limit = 60; // Padrão do livro LFF (Seja Feliz para Sempre!)
+    }
+    if (lesson < 1 || lesson > limit) {
+      return null;
+    }
+    return lesson;
+  }
+
+  static int? _validatePoint(int? point, {int maxPoints = 50}) {
+    if (point == null) return null;
+    if (point < 1 || point > maxPoints) {
+      return null;
+    }
+    return point;
+  }
+
+  static bool _isScriptureReference(String text, Match match) {
+    final matchedText = match.group(0)?.toLowerCase() ?? '';
+    final before = text.substring(0, match.start).toLowerCase();
+    final after = text.substring(match.end).toLowerCase();
+
+    // 1. Se após o número tiver versículo: "capítulo 3 versículo 16", "capítulo 3:16", "v. 5"
+    if (RegExp(r'^\s*(?:vers[ií]culo|v\.|:\s*\d+)').hasMatch(after)) {
+      return true;
+    }
+
+    // 2. Se antes de "capítulo" houver um livro da Bíblia
+    for (final book in _bibleBooks) {
+      if (before.trimRight().endsWith(book) ||
+          RegExp(r'\b' + RegExp.escape(book) + r'\s*(?:do\s+livro\s+de\s+)?$').hasMatch(before.trim())) {
+        return true;
+      }
+    }
+
+    // 3. Se a expressão combinou "capítulo" mas o contexto anterior indica texto bíblico sem lição/estudo
+    if (matchedText.contains('cap') &&
+        RegExp(r'\b(?:lemos|lendo|leu|abrimos|texto\s+de|livro\s+de|carta\s+de|evangelho\s+de)\b').hasMatch(before) &&
+        !before.contains('lição') &&
+        !before.contains('licao') &&
+        !before.contains('estudo')) {
+      return true;
+    }
+
+    return false;
+  }
+
+  static bool _isFalsePositivePoint(String text, Match match) {
+    final after = text.substring(match.end).toLowerCase();
+
+    final windowStart = (match.start - 25).clamp(0, text.length);
+    final windowEnd = (match.end + 25).clamp(0, text.length);
+    final localWindow = text.substring(windowStart, windowEnd).toLowerCase();
+
+    if (localWindow.contains('ponto de ônibus') ||
+        localWindow.contains('ponto de onibus') ||
+        localWindow.contains('ponto de encontro') ||
+        localWindow.contains('ponto turístico') ||
+        localWindow.contains('ponto turistico') ||
+        localWindow.contains('ponto comercial') ||
+        localWindow.contains('ponto facultativo') ||
+        localWindow.contains('ponto de apoio') ||
+        localWindow.contains('ponto de partida') ||
+        localWindow.contains('ponto final') ||
+        localWindow.contains('bater ponto')) {
+      return true;
+    }
+
+    if (RegExp(r'^\s*(?:pessoas|horas|minutos|dias|vezes|visitas|casas|moradores|revisitas)\b').hasMatch(after)) {
+      return true;
+    }
+
+    return false;
   }
 
   /// Converte uma representação textual de número em inteiro (ex: "18", "dezoito", "vinte e um", "vigésimo primeiro").
@@ -440,29 +602,43 @@ class VoiceNoteParser {
     return null;
   }
 
+  static const Set<String> _titleWords = {
+    'dona', 'seu', 'senhor', 'senhora', 'sr', 'sr.', 'sra', 'sra.',
+    'irmão', 'irmao', 'irmã', 'irma',
+  };
+
   static String? _cleanExtractedName(String? raw) {
     if (raw == null) return null;
     final words = raw.trim().split(RegExp(r'\s+'));
     if (words.isEmpty) return null;
 
-    // Se a primeira palavra for stopword, descarta
-    if (_nameStopWords.contains(words.first.toLowerCase())) {
+    // Remove eventuais títulos no início (ex.: "senhora Lúcia", "dona Maria", "irmão Carlos")
+    var remainingWords = words.toList();
+    while (remainingWords.isNotEmpty &&
+        _titleWords.contains(remainingWords.first.toLowerCase().replaceAll('.', ''))) {
+      remainingWords.removeAt(0);
+    }
+    if (remainingWords.isEmpty) return null;
+
+    // Se a primeira palavra resultante for stopword, descarta
+    if (_nameStopWords.contains(remainingWords.first.toLowerCase())) {
       return null;
     }
 
-    // Se a segunda palavra for stopword (ex: "Marcos paramos"), preserva apenas o primeiro nome
-    if (words.length > 1 && _nameStopWords.contains(words[1].toLowerCase())) {
-      return _capitalizeWords(words.first);
+    // Se a segunda palavra for stopword (ex: "Marcos paramos", "José da"), preserva apenas o primeiro nome
+    if (remainingWords.length > 1 &&
+        _nameStopWords.contains(remainingWords[1].toLowerCase())) {
+      return _capitalizeWords(remainingWords.first);
     }
 
-    final cleanedWords = words.take(2).join(' ');
+    final cleanedWords = remainingWords.take(2).join(' ');
     return _capitalizeWords(cleanedWords);
   }
 
   static String? _extractStudentName(String text) {
-    // 1. Procura "com o/a [Nome]" ou "com [Nome]"
+    // 1. Procura "com o/a [Nome]" ou "falamos com [Nome]" ou "conversamos com [Nome]"
     final comPattern = RegExp(
-      r'(?:estudo|visita|conversa|revisita)?\s*\bcom\s+(?:o\s+|a\s+|o\s+irm[aã]o\s+|a\s+irm[aã]\s+|dona\s+|seu\s+)?([A-ZÀ-Úa-zà-ú]+(?:\s+[A-ZÀ-Úa-zà-ú]+)?)',
+      r'(?:estudo|visita|conversa|revisita|falamos|falou|conversamos|conversou|estivemos)?\s*\bcom\s+(?:o\s+|a\s+|o\s+irm[aã]o\s+|a\s+irm[aã]\s+|dona\s+|seu\s+|sr\.\s+|sra\.\s+|senhor\s+|senhora\s+)?([A-ZÀ-Úa-zà-ú]+(?:\s+[A-ZÀ-Úa-zà-ú]+)?)',
       caseSensitive: false,
     );
     final matchCom = comPattern.firstMatch(text);
@@ -471,7 +647,18 @@ class VoiceNoteParser {
       if (name != null) return name;
     }
 
-    // 2. Procura "na casa do/da [Nome]"
+    // 2. Procura "visita ao sr/senhor [Nome]" ou "visita à dona/sra [Nome]"
+    final aoPattern = RegExp(
+      r'(?:estudo|visita|conversa)\s+a[oà]\s+(?:senhor|senhora|sr\.|sra\.|dona|seu|irm[aã]|irm[aã]o)\s+([A-ZÀ-Úa-zà-ú]+(?:\s+[A-ZÀ-Úa-zà-ú]+)?)',
+      caseSensitive: false,
+    );
+    final matchAo = aoPattern.firstMatch(text);
+    if (matchAo != null) {
+      final name = _cleanExtractedName(matchAo.group(1));
+      if (name != null) return name;
+    }
+
+    // 3. Procura "na casa do/da [Nome]"
     final casaPattern = RegExp(
       r'na\s+casa\s+d[oa]\s+(?:dona\s+|seu\s+)?([A-ZÀ-Úa-zà-ú]+(?:\s+[A-ZÀ-Úa-zà-ú]+)?)',
       caseSensitive: false,
@@ -482,7 +669,7 @@ class VoiceNoteParser {
       if (name != null) return name;
     }
 
-    // 3. Procura "visita na dona [Nome]" ou "visita no seu [Nome]"
+    // 4. Procura "visita na dona [Nome]" ou "visita no seu [Nome]"
     final titlePattern = RegExp(
       r'(?:estudo|visita)\s+n[oa]\s+(?:dona|seu|irm[aã]|irm[aã]o)\s+([A-ZÀ-Úa-zà-ú]+(?:\s+[A-ZÀ-Úa-zà-ú]+)?)',
       caseSensitive: false,
@@ -503,6 +690,7 @@ class VoiceNoteParser {
       caseSensitive: false,
     );
     for (final m in primaryDigitsPattern.allMatches(text)) {
+      if (_isScriptureReference(text, m)) continue;
       final val = int.tryParse(m.group(1)!);
       if (val != null) return val;
     }
@@ -512,6 +700,7 @@ class VoiceNoteParser {
       caseSensitive: false,
     );
     for (final m in primaryWordPattern.allMatches(text)) {
+      if (_isScriptureReference(text, m)) continue;
       final word = m.group(1);
       if (word != null) {
         final parsed = parsePortugueseNumber(word);
@@ -525,6 +714,7 @@ class VoiceNoteParser {
       caseSensitive: false,
     );
     for (final m in reverseDigitsPattern.allMatches(text)) {
+      if (_isScriptureReference(text, m)) continue;
       final val = int.tryParse(m.group(1)!);
       if (val != null) return val;
     }
@@ -534,6 +724,7 @@ class VoiceNoteParser {
       caseSensitive: false,
     );
     for (final m in reverseWordPattern.allMatches(text)) {
+      if (_isScriptureReference(text, m)) continue;
       final word = m.group(1);
       if (word != null) {
         final parsed = parsePortugueseNumber(word);
@@ -547,6 +738,7 @@ class VoiceNoteParser {
       caseSensitive: false,
     );
     for (final m in secondaryDigitsPattern.allMatches(text)) {
+      if (_isScriptureReference(text, m)) continue;
       final val = int.tryParse(m.group(1)!);
       if (val != null) return val;
     }
@@ -556,6 +748,7 @@ class VoiceNoteParser {
       caseSensitive: false,
     );
     for (final m in secondaryWordPattern.allMatches(text)) {
+      if (_isScriptureReference(text, m)) continue;
       final word = m.group(1);
       if (word != null) {
         final parsed = parsePortugueseNumber(word);
@@ -573,6 +766,7 @@ class VoiceNoteParser {
       caseSensitive: false,
     );
     for (final m in digitsPattern.allMatches(text)) {
+      if (_isFalsePositivePoint(text, m)) continue;
       final val = int.tryParse(m.group(1)!);
       if (val != null) return val;
     }
@@ -582,6 +776,7 @@ class VoiceNoteParser {
       caseSensitive: false,
     );
     for (final m in wordPattern.allMatches(text)) {
+      if (_isFalsePositivePoint(text, m)) continue;
       final word = m.group(1);
       if (word != null) {
         final parsed = parsePortugueseNumber(word);
@@ -595,6 +790,7 @@ class VoiceNoteParser {
       caseSensitive: false,
     );
     for (final m in reverseDigitsPattern.allMatches(text)) {
+      if (_isFalsePositivePoint(text, m)) continue;
       final val = int.tryParse(m.group(1)!);
       if (val != null) return val;
     }
@@ -604,6 +800,7 @@ class VoiceNoteParser {
       caseSensitive: false,
     );
     for (final m in reverseWordPattern.allMatches(text)) {
+      if (_isFalsePositivePoint(text, m)) continue;
       final word = m.group(1);
       if (word != null) {
         final parsed = parsePortugueseNumber(word);

@@ -44,7 +44,8 @@ class AvailabilityEngine {
       final status = appt.status.toLowerCase();
       if (status == 'cancelado' ||
           status == 'nao_realizado' ||
-          status == 'reagendado') {
+          status == 'reagendado' ||
+          status == 'realizado') {
         continue;
       }
 
@@ -89,7 +90,8 @@ class AvailabilityEngine {
       final status = appt.status.toLowerCase();
       if (status == 'cancelado' ||
           status == 'nao_realizado' ||
-          status == 'reagendado') {
+          status == 'reagendado' ||
+          status == 'realizado') {
         continue;
       }
 

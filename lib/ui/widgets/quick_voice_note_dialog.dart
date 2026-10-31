@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/app_theme.dart';
@@ -81,12 +82,20 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
   RecordingResult? _recordingResult;
   ParsedVoiceNote _parsedNote = const ParsedVoiceNote(rawText: '');
 
+  String _selectedContactType = 'revisita';
+  String _selectedResult = 'revisita_feita';
+  bool _updateStudyProgress = true;
+  String? _dictationError;
+
   @override
   void initState() {
     super.initState();
-    _recordingService = widget.recordingService ?? LocalAudioRecordingService();
-    _dictationService = widget.dictationService ?? LocalVoiceDictationService();
-    _playerService = widget.playerService ?? LocalAudioPlayerService();
+    _recordingService = widget.recordingService ?? (kIsWeb ? LocalAudioRecordingService() : RealAudioRecordingService());
+    _dictationService = widget.dictationService ?? (kIsWeb ? LocalVoiceDictationService() : RealVoiceDictationService());
+    _playerService = widget.playerService ?? (kIsWeb ? LocalAudioPlayerService() : RealAudioPlayerService());
+    // Inicia explicitamente como revisita por padrão seguro, exigindo confirmação do usuário para estudo
+    _selectedContactType = 'revisita';
+    _selectedResult = 'revisita_feita';
 
     final initial = widget.initialTranscription ?? '';
     _transcriptionController = TextEditingController(text: initial);
@@ -141,9 +150,29 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
   }
 
   Future<void> _startRecording() async {
+    final hasPerm = await _recordingService.hasPermission();
+    if (!hasPerm) {
+      final granted = await _recordingService.requestPermission();
+      if (!granted) {
+        if (mounted) {
+          setState(() {
+            _dictationError = 'Permissão de microfone negada. Você pode digitar os dados diretamente abaixo.';
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Permissão de microfone negada. Digite o resumo manualmente.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+    }
+
     setState(() {
       _isRecording = true;
       _seconds = 0;
+      _dictationError = null;
     });
 
     final dictationFuture = _dictationService.startListening(
@@ -151,6 +180,13 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
         if (mounted) {
           _transcriptionController.text = text;
           _processTranscription(text);
+        }
+      },
+      onError: (err) {
+        if (mounted) {
+          setState(() {
+            _dictationError = err;
+          });
         }
       },
     );
@@ -226,6 +262,9 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
         parsedNote: finalParsed,
         audioFilePath: _recordingResult?.filePath,
         audioDurationSeconds: _recordingResult?.durationSeconds ?? (_seconds > 0 ? _seconds : 15),
+        contactType: _selectedContactType,
+        result: _selectedResult,
+        updateStudyProgress: _updateStudyProgress,
       );
 
       if (mounted) {
@@ -303,6 +342,15 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
                 _buildStructuredPreview(isSunMode, isDark),
                 const SizedBox(height: 16),
 
+                if (_dictationError != null) ...[
+                  _buildDictationError(isSunMode, isDark),
+                  const SizedBox(height: 16),
+                ],
+
+                // Opções da Visita e Confirmação de Estudo
+                _buildVisitSettings(isSunMode, isDark),
+                const SizedBox(height: 16),
+
                 // Campo de Ajuste Manual da Transcrição
                 _buildTranscriptionField(isSunMode, isDark),
                 const SizedBox(height: 20),
@@ -313,6 +361,222 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildDictationError(bool isSunMode, bool isDark) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isSunMode ? Colors.white : Colors.amber.shade50,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isSunMode ? Colors.black : Colors.amber.shade600,
+          width: isSunMode ? 2.0 : 1.2,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.info_outline, color: isSunMode ? Colors.black : Colors.amber.shade900, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              _dictationError!,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSunMode ? FontWeight.bold : FontWeight.w500,
+                color: isSunMode ? Colors.black : Colors.amber.shade900,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVisitSettings(bool isSunMode, bool isDark) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isSunMode ? Colors.white : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC)),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isSunMode ? Colors.black : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+          width: isSunMode ? 2.0 : 1.0,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.tune, size: 16, color: isSunMode ? Colors.black : AppTheme.primaryBlue),
+              const SizedBox(width: 6),
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'OPÇÕES DA VISITA',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5,
+                      color: isSunMode ? Colors.black : AppTheme.primaryBlue,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 360;
+
+              final contactDropdown = DropdownButtonFormField<String>(
+                isExpanded: true,
+                initialValue: _selectedContactType,
+                decoration: InputDecoration(
+                  labelText: 'Tipo de Contato',
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                items: const [
+                  DropdownMenuItem(
+                    value: 'revisita',
+                    child: FittedBox(fit: BoxFit.scaleDown, child: Text('Revisita')),
+                  ),
+                  DropdownMenuItem(
+                    value: 'estudo',
+                    child: FittedBox(fit: BoxFit.scaleDown, child: Text('Estudo Bíblico')),
+                  ),
+                  DropdownMenuItem(
+                    value: 'conversa_inicial',
+                    child: FittedBox(fit: BoxFit.scaleDown, child: Text('Conversa Inicial')),
+                  ),
+                  DropdownMenuItem(
+                    value: 'outro',
+                    child: FittedBox(fit: BoxFit.scaleDown, child: Text('Outro')),
+                  ),
+                ],
+                onChanged: (val) {
+                  if (val != null) {
+                    setState(() {
+                      _selectedContactType = val;
+                      if (val == 'estudo') {
+                        _selectedResult = 'estudo_realizado';
+                      } else if (_selectedResult == 'estudo_realizado') {
+                        _selectedResult = 'revisita_feita';
+                      }
+                    });
+                  }
+                },
+              );
+
+              final resultDropdown = DropdownButtonFormField<String>(
+                isExpanded: true,
+                initialValue: _selectedResult,
+                decoration: InputDecoration(
+                  labelText: 'Resultado',
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                items: const [
+                  DropdownMenuItem(
+                    value: 'revisita_feita',
+                    child: FittedBox(fit: BoxFit.scaleDown, child: Text('Visita Feita')),
+                  ),
+                  DropdownMenuItem(
+                    value: 'estudo_realizado',
+                    child: FittedBox(fit: BoxFit.scaleDown, child: Text('Estudo Realizado')),
+                  ),
+                  DropdownMenuItem(
+                    value: 'ocupado',
+                    child: FittedBox(fit: BoxFit.scaleDown, child: Text('Ocupado')),
+                  ),
+                  DropdownMenuItem(
+                    value: 'nao_em_casa',
+                    child: FittedBox(fit: BoxFit.scaleDown, child: Text('Não em Casa')),
+                  ),
+                  DropdownMenuItem(
+                    value: 'outro',
+                    child: FittedBox(fit: BoxFit.scaleDown, child: Text('Outro')),
+                  ),
+                ],
+                onChanged: (val) {
+                  if (val != null) {
+                    setState(() {
+                      _selectedResult = val;
+                    });
+                  }
+                },
+              );
+
+              if (isNarrow) {
+                return Column(
+                  children: [
+                    contactDropdown,
+                    const SizedBox(height: 8),
+                    resultDropdown,
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  Expanded(child: contactDropdown),
+                  const SizedBox(width: 8),
+                  Expanded(child: resultDropdown),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 8),
+          InkWell(
+            onTap: () {
+              setState(() {
+                _updateStudyProgress = !_updateStudyProgress;
+              });
+            },
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                SizedBox(
+                  height: 24,
+                  width: 24,
+                  child: Checkbox(
+                    value: _updateStudyProgress,
+                    onChanged: (val) {
+                      setState(() {
+                        _updateStudyProgress = val ?? false;
+                      });
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Avançar lição no estudo bíblico vinculado',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isSunMode ? Colors.black : null,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

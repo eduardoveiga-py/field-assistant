@@ -256,5 +256,39 @@ void main() {
         expect(collides, isFalse, reason: 'Slot sugerido $slot colide com compromisso existente');
       }
     });
+
+    test('TC-SCHED-08: Ignora compromissos com status "realizado" para fins de colisão', () {
+      final existing = [
+        AppointmentEntry(
+          id: 'appt-completed',
+          title: 'Visita Concluída Anteriormente',
+          startTime: DateTime(2026, 10, 26, 14, 0),
+          endTime: DateTime(2026, 10, 26, 14, 30),
+          durationMinutes: 30,
+          status: 'realizado',
+          isProvisional: false,
+          createdAt: now,
+          updatedAt: now,
+          revision: 1,
+        ),
+      ];
+
+      final result = AvailabilityEngine.checkAvailability(
+        startTime: DateTime(2026, 10, 26, 14, 0),
+        durationMinutes: 30,
+        bufferMinutes: 0,
+        existingAppointments: existing,
+      );
+
+      expect(result.isAvailable, isTrue);
+      expect(result.conflictingAppointments, isEmpty);
+
+      final hasCollision = AvailabilityEngine.hasCollision(
+        start: DateTime(2026, 10, 26, 14, 0),
+        end: DateTime(2026, 10, 26, 14, 30),
+        existingAppointments: existing,
+      );
+      expect(hasCollision, isFalse);
+    });
   });
 }

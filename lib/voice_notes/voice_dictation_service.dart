@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 /// Contrato desacoplado para serviço de reconhecimento e ditado de voz.
 abstract class VoiceDictationService {
@@ -11,6 +12,80 @@ abstract class VoiceDictationService {
   });
   Future<void> stopListening();
   void dispose();
+}
+
+/// Implementação real de reconhecimento e ditado de voz usando speech_to_text (pt-BR, offline-first).
+class RealVoiceDictationService implements VoiceDictationService {
+  final stt.SpeechToText _speech = stt.SpeechToText();
+  bool _isInitialized = false;
+  bool _isListening = false;
+
+  @override
+  bool get isListening => _isListening;
+
+  @override
+  Future<bool> isAvailable() async {
+    try {
+      if (!_isInitialized) {
+        _isInitialized = await _speech.initialize(
+          onError: (error) {
+            _isListening = false;
+          },
+          onStatus: (status) {
+            _isListening = status == 'listening';
+          },
+        );
+      }
+      return _isInitialized && _speech.isAvailable;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<void> startListening({
+    required ValueChanged<String> onResult,
+    ValueChanged<String>? onError,
+  }) async {
+    try {
+      final available = await isAvailable();
+      if (!available) {
+        onError?.call('Reconhecimento de fala indisponível no dispositivo. Digite o resumo manualmente.');
+        return;
+      }
+
+      _isListening = true;
+      await _speech.listen(
+        onResult: (result) {
+          onResult(result.recognizedWords);
+        },
+        listenOptions: stt.SpeechListenOptions(
+          partialResults: true,
+          listenMode: stt.ListenMode.dictation,
+          localeId: 'pt_BR',
+        ),
+      );
+    } catch (e) {
+      _isListening = false;
+      onError?.call('Erro ao iniciar reconhecimento de voz: $e');
+    }
+  }
+
+  @override
+  Future<void> stopListening() async {
+    _isListening = false;
+    try {
+      await _speech.stop();
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _isListening = false;
+    try {
+      _speech.cancel();
+    } catch (_) {}
+  }
 }
 
 /// Implementação offline do serviço de ditado, permitindo transcrição simulada ou
@@ -65,3 +140,5 @@ class LocalVoiceDictationService implements VoiceDictationService {
     _pendingEmissions.clear();
   }
 }
+
+typedef FakeVoiceDictationService = LocalVoiceDictationService;

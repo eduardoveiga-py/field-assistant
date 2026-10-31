@@ -118,24 +118,28 @@ flutter build web --release
 
 ## 🧪 Suíte de Testes Automatizados
 
-Para executar todos os 32 testes de aceitação unitários, transacionais e de interface:
+Para executar todos os 412 testes automatizados unitários, transacionais, adversariais e de interface:
 ```bash
 flutter test
 ```
 
-Para validar a integridade estática do código (zero erros e zero warnings):
+Para validar a integridade estática do código (zero erros, zero warnings, zero infos):
 ```bash
 dart analyze lib test
 ```
 
-### Cobertura de Testes (32 Testes Aprovados)
-- `test/counting_rules_test.dart` (TC-COUNT-01 a 07): Regras de contagem de estudos com múltiplos participantes, sessões, visitas, ações pendentes e contatos recentes.
-- `test/availability_engine_test.dart` (TC-SCHED-01 a 05): Detecção de sobreposição, contenção, horários consecutivos, buffers e sugestões inteligentes de horários livres.
-- `test/publication_link_resolver_test.dart` (TC-PUB-01 a 03): Resolução de links em Português, Libras e fallback seguro.
-- `test/repository_database_test.dart` (7 testes): Transações atômicas com `SyncQueue`, busca offline, reagendamento com histórico (`previousAppointmentId`), atualização de visitas e lixeira com restauração.
-- `test/sync_engine_test.dart` (TC-SYNC-01 a 03): Mesclagem em campos distintos, conflitos sem sobrescrita cega e idempotência.
-- `test/backup_service_test.dart` (TC-BAK-01 a 04): AES-256 GCM, senha incorreta, idempotência de restauração e prévia precisa de registros novos vs existentes.
-- `test/widget_test.dart` (2 testes): Navegação responsiva iPad (`NavigationRail`) e iPhone XR (`NavigationBar`), sem vazamentos de layout.
+### Cobertura de Testes (412 Testes Aprovados)
+- `test/counting_rules_test.dart`: Regras de contagem de estudos com múltiplos participantes, sessões, visitas, ações pendentes e contatos recentes.
+- `test/availability_engine_test.dart`: Detecção de sobreposição, contenção, horários consecutivos, buffers, sugestões inteligentes e status realizado.
+- `test/publication_link_resolver_test.dart`: Resolução de links em Português, Libras e fallback seguro.
+- `test/repository_database_test.dart`: Transações atômicas com `SyncQueue`, busca offline, reagendamento com histórico (`previousAppointmentId`), atualização de visitas e lixeira com restauração.
+- `test/sync_engine_test.dart`: Mesclagem em campos distintos, conflitos sem sobrescrita cega e idempotência.
+- `test/supabase_sync_service_test.dart`: Despachante da fila de sincronização, backoff exponencial, status honesto offline/online e mapeamento de tabelas.
+- `test/backup_service_test.dart` & `test/lff_and_priority_test.dart`: Envelope PBKDF2-HMAC-SHA256 (100k iter.) + AES-256 GCM, detecção de adulteração, compatibilidade v1/v2, chave de dispositivo e 10 tabelas sincronizáveis.
+- `test/voice_notes_test.dart`: Parser determinístico puro Dart (ordinais, números, nomes, empatia), persistência Drift tipada, transação atômica multi-tabela e alvos ergonômicos >= 48dp.
+- `test/pioneer_pace_adversarial_test.dart` & `test/pioneer_pace_card_adversarial_test.dart`: Desafios adversariais de calendário, anos bissextos, metas extremas, estresse de renderização 320px com TextScaler 2.0x e persistência concorrente.
+- `test/doorstep_briefing_adversarial_test.dart`: Briefing na porta, sementes recentes, textos ultra-longos e acessibilidade sob sol.
+- `test/widget_test.dart`: Navegação responsiva iPad (`NavigationRail`) e iPhone XR (`NavigationBar`), sem vazamentos de layout.
 
 ---
 

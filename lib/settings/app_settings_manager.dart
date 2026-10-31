@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:drift/drift.dart' show Variable;
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../database/app_database.dart';
 import '../ui/providers.dart';
@@ -10,23 +10,15 @@ class AppSettingsManager {
   final Map<String, String> _memoryCache = {};
 
   AppSettingsManager(this.db) {
-    _initTable();
+    _initStore();
   }
 
-  Future<void> _initTable() async {
+  Future<void> _initStore() async {
     _initFuture ??= () async {
       try {
-        await db.customStatement('''
-          CREATE TABLE IF NOT EXISTS app_settings_kv (
-            key TEXT PRIMARY KEY,
-            value TEXT NOT NULL
-          );
-        ''');
-        final rows = await db.customSelect('SELECT key, value FROM app_settings_kv').get();
+        final rows = await db.select(db.appKvStore).get();
         for (final r in rows) {
-          final k = r.read<String>('key');
-          final v = r.read<String>('value');
-          _memoryCache[k] = v;
+          _memoryCache[r.key] = r.value;
         }
       } catch (_) {}
     }();
@@ -37,20 +29,15 @@ class AppSettingsManager {
     if (_memoryCache.containsKey(key)) {
       return _memoryCache[key];
     }
-    await _initTable();
+    await _initStore();
     if (_memoryCache.containsKey(key)) {
       return _memoryCache[key];
     }
     try {
-      final results = await db.customSelect(
-        'SELECT value FROM app_settings_kv WHERE key = ? LIMIT 1;',
-        variables: [Variable.withString(key)],
-      ).get();
-
-      if (results.isEmpty) return null;
-      final val = results.first.read<String>('value');
-      _memoryCache[key] = val;
-      return val;
+      final entry = await (db.select(db.appKvStore)..where((t) => t.key.equals(key))).getSingleOrNull();
+      if (entry == null) return null;
+      _memoryCache[key] = entry.value;
+      return entry.value;
     } catch (_) {
       return null;
     }
@@ -60,10 +47,13 @@ class AppSettingsManager {
     _memoryCache[key] = value;
     unawaited(() async {
       try {
-        await _initTable();
-        await db.customInsert(
-          'INSERT OR REPLACE INTO app_settings_kv (key, value) VALUES (?, ?);',
-          variables: [Variable.withString(key), Variable.withString(value)],
+        await _initStore();
+        await db.into(db.appKvStore).insertOnConflictUpdate(
+          AppKvStoreCompanion.insert(
+            key: key,
+            value: value,
+            updatedAt: Value(DateTime.now()),
+          ),
         );
       } catch (_) {}
     }());
@@ -73,11 +63,8 @@ class AppSettingsManager {
     _memoryCache.remove(key);
     unawaited(() async {
       try {
-        await _initTable();
-        await db.customUpdate(
-          'DELETE FROM app_settings_kv WHERE key = ?;',
-          variables: [Variable.withString(key)],
-        );
+        await _initStore();
+        await (db.delete(db.appKvStore)..where((t) => t.key.equals(key))).go();
       } catch (_) {}
     }());
   }

@@ -43,3 +43,22 @@ O projeto adota uma pirâmide de testes com três camadas:
 - [x] **TC-PUB-01:** Resolução de Lição válida para o livro *Seja Feliz para Sempre!* em Português gera link oficial JW.org válido.
 - [x] **TC-PUB-02:** Resolução para idioma Libras indica suporte a vídeo da lição e não gera referências a parágrafos inválidos.
 - [x] **TC-PUB-03:** Fallback para navegador web e cópia de referência quando deep link direto não estiver disponível.
+
+### 2.6 Notas de Voz, Ditado e Transação Atômica (`VoiceNotesManager`)
+- [x] **TC-VN-01:** Gravação de áudio e recuperação rápida vinculada a `personId`.
+- [x] **TC-VN-02:** Exclusão lógica (`deletedAt != null`) mantendo rastreabilidade.
+- [x] **TC-VN-03:** Fluxo unificado atômico `saveQuickVisitFromVoiceNote` grava visita, nota e atualiza estudo/briefing sob transação única.
+- [x] **TC-VN-04:** Prevenção de sobrescrita obsoleta de `lastContactAt` e `revision` com concorrência.
+- [x] **TC-VN-05:** Diálogo responsivo em telas estreitas (320px) e escala extrema de texto (TextScaler 2.0x) sem estouro de RenderFlex.
+
+### 2.7 Sincronização Supabase Offline-First (`SupabaseSyncService`)
+- [x] **TC-SYNC-SUPA-01:** Status honesto: relata `waitingConnection` / `savedLocally` quando não configurado ou desconectado, sem falsificação de sucesso.
+- [x] **TC-SYNC-SUPA-02:** Fila de sincronização despacha mutações pendentes com backoff exponencial (`min(2^attempts, 300)s`) e teto de 5 tentativas.
+- [x] **TC-SYNC-SUPA-03:** Sanitização de payload para entidades sensíveis (ex: caminhos locais de áudio não vazam para a nuvem).
+- [x] **TC-SYNC-SUPA-04:** Mapeamento bidirecional consistente entre tabelas locais Drift e tabelas PostgreSQL remotas com RLS.
+
+### 2.8 Ritmo de Campo e Metas de Pioneiro (`PioneerPaceCalculator` & `PioneerPaceCard`)
+- [x] **TC-PACE-01:** Cálculo exato de saídas restantes no mês e ritmo por saída para metas de 50h, 30h e 15h.
+- [x] **TC-PACE-02:** Invariantes de calendário para anos bissextos e fins de semana.
+- [x] **TC-PACE-03:** Diálogo de configuração rápida com alvos de toque ergonômicos >= 48x48 dp.
+- [x] **TC-PACE-04:** Reatividade imediata sob alternância de temas (Claro, Escuro, Modo Sol) e persistência dual-write.

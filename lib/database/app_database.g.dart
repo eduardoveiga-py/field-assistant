@@ -6791,6 +6791,2826 @@ class SyncQueueCompanion extends UpdateCompanion<SyncQueueEntry> {
   }
 }
 
+class $VoiceNotesTable extends VoiceNotes
+    with TableInfo<$VoiceNotesTable, VoiceNoteEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $VoiceNotesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _personIdMeta = const VerificationMeta(
+    'personId',
+  );
+  @override
+  late final GeneratedColumn<String> personId = GeneratedColumn<String>(
+    'person_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES people (id)',
+    ),
+  );
+  static const VerificationMeta _visitIdMeta = const VerificationMeta(
+    'visitId',
+  );
+  @override
+  late final GeneratedColumn<String> visitId = GeneratedColumn<String>(
+    'visit_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES visits (id)',
+    ),
+  );
+  static const VerificationMeta _studyIdMeta = const VerificationMeta(
+    'studyId',
+  );
+  @override
+  late final GeneratedColumn<String> studyId = GeneratedColumn<String>(
+    'study_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES bible_studies (id)',
+    ),
+  );
+  static const VerificationMeta _audioFilePathMeta = const VerificationMeta(
+    'audioFilePath',
+  );
+  @override
+  late final GeneratedColumn<String> audioFilePath = GeneratedColumn<String>(
+    'audio_file_path',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _audioDurationSecondsMeta =
+      const VerificationMeta('audioDurationSeconds');
+  @override
+  late final GeneratedColumn<int> audioDurationSeconds = GeneratedColumn<int>(
+    'audio_duration_seconds',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _transcriptionMeta = const VerificationMeta(
+    'transcription',
+  );
+  @override
+  late final GeneratedColumn<String> transcription = GeneratedColumn<String>(
+    'transcription',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _detectedLessonMeta = const VerificationMeta(
+    'detectedLesson',
+  );
+  @override
+  late final GeneratedColumn<int> detectedLesson = GeneratedColumn<int>(
+    'detected_lesson',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _detectedPointMeta = const VerificationMeta(
+    'detectedPoint',
+  );
+  @override
+  late final GeneratedColumn<int> detectedPoint = GeneratedColumn<int>(
+    'detected_point',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _extractedPendingDoubtMeta =
+      const VerificationMeta('extractedPendingDoubt');
+  @override
+  late final GeneratedColumn<String> extractedPendingDoubt =
+      GeneratedColumn<String>(
+        'extracted_pending_doubt',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _extractedEmpathyNoteMeta =
+      const VerificationMeta('extractedEmpathyNote');
+  @override
+  late final GeneratedColumn<String> extractedEmpathyNote =
+      GeneratedColumn<String>(
+        'extracted_empathy_note',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _revisionMeta = const VerificationMeta(
+    'revision',
+  );
+  @override
+  late final GeneratedColumn<int> revision = GeneratedColumn<int>(
+    'revision',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    personId,
+    visitId,
+    studyId,
+    audioFilePath,
+    audioDurationSeconds,
+    transcription,
+    detectedLesson,
+    detectedPoint,
+    extractedPendingDoubt,
+    extractedEmpathyNote,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'voice_notes';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<VoiceNoteEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('person_id')) {
+      context.handle(
+        _personIdMeta,
+        personId.isAcceptableOrUnknown(data['person_id']!, _personIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_personIdMeta);
+    }
+    if (data.containsKey('visit_id')) {
+      context.handle(
+        _visitIdMeta,
+        visitId.isAcceptableOrUnknown(data['visit_id']!, _visitIdMeta),
+      );
+    }
+    if (data.containsKey('study_id')) {
+      context.handle(
+        _studyIdMeta,
+        studyId.isAcceptableOrUnknown(data['study_id']!, _studyIdMeta),
+      );
+    }
+    if (data.containsKey('audio_file_path')) {
+      context.handle(
+        _audioFilePathMeta,
+        audioFilePath.isAcceptableOrUnknown(
+          data['audio_file_path']!,
+          _audioFilePathMeta,
+        ),
+      );
+    }
+    if (data.containsKey('audio_duration_seconds')) {
+      context.handle(
+        _audioDurationSecondsMeta,
+        audioDurationSeconds.isAcceptableOrUnknown(
+          data['audio_duration_seconds']!,
+          _audioDurationSecondsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('transcription')) {
+      context.handle(
+        _transcriptionMeta,
+        transcription.isAcceptableOrUnknown(
+          data['transcription']!,
+          _transcriptionMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_transcriptionMeta);
+    }
+    if (data.containsKey('detected_lesson')) {
+      context.handle(
+        _detectedLessonMeta,
+        detectedLesson.isAcceptableOrUnknown(
+          data['detected_lesson']!,
+          _detectedLessonMeta,
+        ),
+      );
+    }
+    if (data.containsKey('detected_point')) {
+      context.handle(
+        _detectedPointMeta,
+        detectedPoint.isAcceptableOrUnknown(
+          data['detected_point']!,
+          _detectedPointMeta,
+        ),
+      );
+    }
+    if (data.containsKey('extracted_pending_doubt')) {
+      context.handle(
+        _extractedPendingDoubtMeta,
+        extractedPendingDoubt.isAcceptableOrUnknown(
+          data['extracted_pending_doubt']!,
+          _extractedPendingDoubtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('extracted_empathy_note')) {
+      context.handle(
+        _extractedEmpathyNoteMeta,
+        extractedEmpathyNote.isAcceptableOrUnknown(
+          data['extracted_empathy_note']!,
+          _extractedEmpathyNoteMeta,
+        ),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    if (data.containsKey('revision')) {
+      context.handle(
+        _revisionMeta,
+        revision.isAcceptableOrUnknown(data['revision']!, _revisionMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  VoiceNoteEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return VoiceNoteEntry(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      personId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}person_id'],
+      )!,
+      visitId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}visit_id'],
+      ),
+      studyId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}study_id'],
+      ),
+      audioFilePath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}audio_file_path'],
+      ),
+      audioDurationSeconds: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}audio_duration_seconds'],
+      )!,
+      transcription: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}transcription'],
+      )!,
+      detectedLesson: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}detected_lesson'],
+      ),
+      detectedPoint: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}detected_point'],
+      ),
+      extractedPendingDoubt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}extracted_pending_doubt'],
+      ),
+      extractedEmpathyNote: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}extracted_empathy_note'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+      revision: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}revision'],
+      )!,
+    );
+  }
+
+  @override
+  $VoiceNotesTable createAlias(String alias) {
+    return $VoiceNotesTable(attachedDatabase, alias);
+  }
+}
+
+class VoiceNoteEntry extends DataClass implements Insertable<VoiceNoteEntry> {
+  final String id;
+  final String personId;
+  final String? visitId;
+  final String? studyId;
+  final String? audioFilePath;
+  final int audioDurationSeconds;
+  final String transcription;
+  final int? detectedLesson;
+  final int? detectedPoint;
+  final String? extractedPendingDoubt;
+  final String? extractedEmpathyNote;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime? deletedAt;
+  final int revision;
+  const VoiceNoteEntry({
+    required this.id,
+    required this.personId,
+    this.visitId,
+    this.studyId,
+    this.audioFilePath,
+    required this.audioDurationSeconds,
+    required this.transcription,
+    this.detectedLesson,
+    this.detectedPoint,
+    this.extractedPendingDoubt,
+    this.extractedEmpathyNote,
+    required this.createdAt,
+    required this.updatedAt,
+    this.deletedAt,
+    required this.revision,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['person_id'] = Variable<String>(personId);
+    if (!nullToAbsent || visitId != null) {
+      map['visit_id'] = Variable<String>(visitId);
+    }
+    if (!nullToAbsent || studyId != null) {
+      map['study_id'] = Variable<String>(studyId);
+    }
+    if (!nullToAbsent || audioFilePath != null) {
+      map['audio_file_path'] = Variable<String>(audioFilePath);
+    }
+    map['audio_duration_seconds'] = Variable<int>(audioDurationSeconds);
+    map['transcription'] = Variable<String>(transcription);
+    if (!nullToAbsent || detectedLesson != null) {
+      map['detected_lesson'] = Variable<int>(detectedLesson);
+    }
+    if (!nullToAbsent || detectedPoint != null) {
+      map['detected_point'] = Variable<int>(detectedPoint);
+    }
+    if (!nullToAbsent || extractedPendingDoubt != null) {
+      map['extracted_pending_doubt'] = Variable<String>(extractedPendingDoubt);
+    }
+    if (!nullToAbsent || extractedEmpathyNote != null) {
+      map['extracted_empathy_note'] = Variable<String>(extractedEmpathyNote);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    map['revision'] = Variable<int>(revision);
+    return map;
+  }
+
+  VoiceNotesCompanion toCompanion(bool nullToAbsent) {
+    return VoiceNotesCompanion(
+      id: Value(id),
+      personId: Value(personId),
+      visitId: visitId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(visitId),
+      studyId: studyId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(studyId),
+      audioFilePath: audioFilePath == null && nullToAbsent
+          ? const Value.absent()
+          : Value(audioFilePath),
+      audioDurationSeconds: Value(audioDurationSeconds),
+      transcription: Value(transcription),
+      detectedLesson: detectedLesson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(detectedLesson),
+      detectedPoint: detectedPoint == null && nullToAbsent
+          ? const Value.absent()
+          : Value(detectedPoint),
+      extractedPendingDoubt: extractedPendingDoubt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(extractedPendingDoubt),
+      extractedEmpathyNote: extractedEmpathyNote == null && nullToAbsent
+          ? const Value.absent()
+          : Value(extractedEmpathyNote),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      revision: Value(revision),
+    );
+  }
+
+  factory VoiceNoteEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return VoiceNoteEntry(
+      id: serializer.fromJson<String>(json['id']),
+      personId: serializer.fromJson<String>(json['personId']),
+      visitId: serializer.fromJson<String?>(json['visitId']),
+      studyId: serializer.fromJson<String?>(json['studyId']),
+      audioFilePath: serializer.fromJson<String?>(json['audioFilePath']),
+      audioDurationSeconds: serializer.fromJson<int>(
+        json['audioDurationSeconds'],
+      ),
+      transcription: serializer.fromJson<String>(json['transcription']),
+      detectedLesson: serializer.fromJson<int?>(json['detectedLesson']),
+      detectedPoint: serializer.fromJson<int?>(json['detectedPoint']),
+      extractedPendingDoubt: serializer.fromJson<String?>(
+        json['extractedPendingDoubt'],
+      ),
+      extractedEmpathyNote: serializer.fromJson<String?>(
+        json['extractedEmpathyNote'],
+      ),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      revision: serializer.fromJson<int>(json['revision']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'personId': serializer.toJson<String>(personId),
+      'visitId': serializer.toJson<String?>(visitId),
+      'studyId': serializer.toJson<String?>(studyId),
+      'audioFilePath': serializer.toJson<String?>(audioFilePath),
+      'audioDurationSeconds': serializer.toJson<int>(audioDurationSeconds),
+      'transcription': serializer.toJson<String>(transcription),
+      'detectedLesson': serializer.toJson<int?>(detectedLesson),
+      'detectedPoint': serializer.toJson<int?>(detectedPoint),
+      'extractedPendingDoubt': serializer.toJson<String?>(
+        extractedPendingDoubt,
+      ),
+      'extractedEmpathyNote': serializer.toJson<String?>(extractedEmpathyNote),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'revision': serializer.toJson<int>(revision),
+    };
+  }
+
+  VoiceNoteEntry copyWith({
+    String? id,
+    String? personId,
+    Value<String?> visitId = const Value.absent(),
+    Value<String?> studyId = const Value.absent(),
+    Value<String?> audioFilePath = const Value.absent(),
+    int? audioDurationSeconds,
+    String? transcription,
+    Value<int?> detectedLesson = const Value.absent(),
+    Value<int?> detectedPoint = const Value.absent(),
+    Value<String?> extractedPendingDoubt = const Value.absent(),
+    Value<String?> extractedEmpathyNote = const Value.absent(),
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    Value<DateTime?> deletedAt = const Value.absent(),
+    int? revision,
+  }) => VoiceNoteEntry(
+    id: id ?? this.id,
+    personId: personId ?? this.personId,
+    visitId: visitId.present ? visitId.value : this.visitId,
+    studyId: studyId.present ? studyId.value : this.studyId,
+    audioFilePath: audioFilePath.present
+        ? audioFilePath.value
+        : this.audioFilePath,
+    audioDurationSeconds: audioDurationSeconds ?? this.audioDurationSeconds,
+    transcription: transcription ?? this.transcription,
+    detectedLesson: detectedLesson.present
+        ? detectedLesson.value
+        : this.detectedLesson,
+    detectedPoint: detectedPoint.present
+        ? detectedPoint.value
+        : this.detectedPoint,
+    extractedPendingDoubt: extractedPendingDoubt.present
+        ? extractedPendingDoubt.value
+        : this.extractedPendingDoubt,
+    extractedEmpathyNote: extractedEmpathyNote.present
+        ? extractedEmpathyNote.value
+        : this.extractedEmpathyNote,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    revision: revision ?? this.revision,
+  );
+  VoiceNoteEntry copyWithCompanion(VoiceNotesCompanion data) {
+    return VoiceNoteEntry(
+      id: data.id.present ? data.id.value : this.id,
+      personId: data.personId.present ? data.personId.value : this.personId,
+      visitId: data.visitId.present ? data.visitId.value : this.visitId,
+      studyId: data.studyId.present ? data.studyId.value : this.studyId,
+      audioFilePath: data.audioFilePath.present
+          ? data.audioFilePath.value
+          : this.audioFilePath,
+      audioDurationSeconds: data.audioDurationSeconds.present
+          ? data.audioDurationSeconds.value
+          : this.audioDurationSeconds,
+      transcription: data.transcription.present
+          ? data.transcription.value
+          : this.transcription,
+      detectedLesson: data.detectedLesson.present
+          ? data.detectedLesson.value
+          : this.detectedLesson,
+      detectedPoint: data.detectedPoint.present
+          ? data.detectedPoint.value
+          : this.detectedPoint,
+      extractedPendingDoubt: data.extractedPendingDoubt.present
+          ? data.extractedPendingDoubt.value
+          : this.extractedPendingDoubt,
+      extractedEmpathyNote: data.extractedEmpathyNote.present
+          ? data.extractedEmpathyNote.value
+          : this.extractedEmpathyNote,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      revision: data.revision.present ? data.revision.value : this.revision,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('VoiceNoteEntry(')
+          ..write('id: $id, ')
+          ..write('personId: $personId, ')
+          ..write('visitId: $visitId, ')
+          ..write('studyId: $studyId, ')
+          ..write('audioFilePath: $audioFilePath, ')
+          ..write('audioDurationSeconds: $audioDurationSeconds, ')
+          ..write('transcription: $transcription, ')
+          ..write('detectedLesson: $detectedLesson, ')
+          ..write('detectedPoint: $detectedPoint, ')
+          ..write('extractedPendingDoubt: $extractedPendingDoubt, ')
+          ..write('extractedEmpathyNote: $extractedEmpathyNote, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    personId,
+    visitId,
+    studyId,
+    audioFilePath,
+    audioDurationSeconds,
+    transcription,
+    detectedLesson,
+    detectedPoint,
+    extractedPendingDoubt,
+    extractedEmpathyNote,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is VoiceNoteEntry &&
+          other.id == this.id &&
+          other.personId == this.personId &&
+          other.visitId == this.visitId &&
+          other.studyId == this.studyId &&
+          other.audioFilePath == this.audioFilePath &&
+          other.audioDurationSeconds == this.audioDurationSeconds &&
+          other.transcription == this.transcription &&
+          other.detectedLesson == this.detectedLesson &&
+          other.detectedPoint == this.detectedPoint &&
+          other.extractedPendingDoubt == this.extractedPendingDoubt &&
+          other.extractedEmpathyNote == this.extractedEmpathyNote &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt &&
+          other.revision == this.revision);
+}
+
+class VoiceNotesCompanion extends UpdateCompanion<VoiceNoteEntry> {
+  final Value<String> id;
+  final Value<String> personId;
+  final Value<String?> visitId;
+  final Value<String?> studyId;
+  final Value<String?> audioFilePath;
+  final Value<int> audioDurationSeconds;
+  final Value<String> transcription;
+  final Value<int?> detectedLesson;
+  final Value<int?> detectedPoint;
+  final Value<String?> extractedPendingDoubt;
+  final Value<String?> extractedEmpathyNote;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> revision;
+  final Value<int> rowid;
+  const VoiceNotesCompanion({
+    this.id = const Value.absent(),
+    this.personId = const Value.absent(),
+    this.visitId = const Value.absent(),
+    this.studyId = const Value.absent(),
+    this.audioFilePath = const Value.absent(),
+    this.audioDurationSeconds = const Value.absent(),
+    this.transcription = const Value.absent(),
+    this.detectedLesson = const Value.absent(),
+    this.detectedPoint = const Value.absent(),
+    this.extractedPendingDoubt = const Value.absent(),
+    this.extractedEmpathyNote = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  VoiceNotesCompanion.insert({
+    required String id,
+    required String personId,
+    this.visitId = const Value.absent(),
+    this.studyId = const Value.absent(),
+    this.audioFilePath = const Value.absent(),
+    this.audioDurationSeconds = const Value.absent(),
+    required String transcription,
+    this.detectedLesson = const Value.absent(),
+    this.detectedPoint = const Value.absent(),
+    this.extractedPendingDoubt = const Value.absent(),
+    this.extractedEmpathyNote = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       personId = Value(personId),
+       transcription = Value(transcription),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<VoiceNoteEntry> custom({
+    Expression<String>? id,
+    Expression<String>? personId,
+    Expression<String>? visitId,
+    Expression<String>? studyId,
+    Expression<String>? audioFilePath,
+    Expression<int>? audioDurationSeconds,
+    Expression<String>? transcription,
+    Expression<int>? detectedLesson,
+    Expression<int>? detectedPoint,
+    Expression<String>? extractedPendingDoubt,
+    Expression<String>? extractedEmpathyNote,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? revision,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (personId != null) 'person_id': personId,
+      if (visitId != null) 'visit_id': visitId,
+      if (studyId != null) 'study_id': studyId,
+      if (audioFilePath != null) 'audio_file_path': audioFilePath,
+      if (audioDurationSeconds != null)
+        'audio_duration_seconds': audioDurationSeconds,
+      if (transcription != null) 'transcription': transcription,
+      if (detectedLesson != null) 'detected_lesson': detectedLesson,
+      if (detectedPoint != null) 'detected_point': detectedPoint,
+      if (extractedPendingDoubt != null)
+        'extracted_pending_doubt': extractedPendingDoubt,
+      if (extractedEmpathyNote != null)
+        'extracted_empathy_note': extractedEmpathyNote,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (revision != null) 'revision': revision,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  VoiceNotesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? personId,
+    Value<String?>? visitId,
+    Value<String?>? studyId,
+    Value<String?>? audioFilePath,
+    Value<int>? audioDurationSeconds,
+    Value<String>? transcription,
+    Value<int?>? detectedLesson,
+    Value<int?>? detectedPoint,
+    Value<String?>? extractedPendingDoubt,
+    Value<String?>? extractedEmpathyNote,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? revision,
+    Value<int>? rowid,
+  }) {
+    return VoiceNotesCompanion(
+      id: id ?? this.id,
+      personId: personId ?? this.personId,
+      visitId: visitId ?? this.visitId,
+      studyId: studyId ?? this.studyId,
+      audioFilePath: audioFilePath ?? this.audioFilePath,
+      audioDurationSeconds: audioDurationSeconds ?? this.audioDurationSeconds,
+      transcription: transcription ?? this.transcription,
+      detectedLesson: detectedLesson ?? this.detectedLesson,
+      detectedPoint: detectedPoint ?? this.detectedPoint,
+      extractedPendingDoubt:
+          extractedPendingDoubt ?? this.extractedPendingDoubt,
+      extractedEmpathyNote: extractedEmpathyNote ?? this.extractedEmpathyNote,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      revision: revision ?? this.revision,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (personId.present) {
+      map['person_id'] = Variable<String>(personId.value);
+    }
+    if (visitId.present) {
+      map['visit_id'] = Variable<String>(visitId.value);
+    }
+    if (studyId.present) {
+      map['study_id'] = Variable<String>(studyId.value);
+    }
+    if (audioFilePath.present) {
+      map['audio_file_path'] = Variable<String>(audioFilePath.value);
+    }
+    if (audioDurationSeconds.present) {
+      map['audio_duration_seconds'] = Variable<int>(audioDurationSeconds.value);
+    }
+    if (transcription.present) {
+      map['transcription'] = Variable<String>(transcription.value);
+    }
+    if (detectedLesson.present) {
+      map['detected_lesson'] = Variable<int>(detectedLesson.value);
+    }
+    if (detectedPoint.present) {
+      map['detected_point'] = Variable<int>(detectedPoint.value);
+    }
+    if (extractedPendingDoubt.present) {
+      map['extracted_pending_doubt'] = Variable<String>(
+        extractedPendingDoubt.value,
+      );
+    }
+    if (extractedEmpathyNote.present) {
+      map['extracted_empathy_note'] = Variable<String>(
+        extractedEmpathyNote.value,
+      );
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (revision.present) {
+      map['revision'] = Variable<int>(revision.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('VoiceNotesCompanion(')
+          ..write('id: $id, ')
+          ..write('personId: $personId, ')
+          ..write('visitId: $visitId, ')
+          ..write('studyId: $studyId, ')
+          ..write('audioFilePath: $audioFilePath, ')
+          ..write('audioDurationSeconds: $audioDurationSeconds, ')
+          ..write('transcription: $transcription, ')
+          ..write('detectedLesson: $detectedLesson, ')
+          ..write('detectedPoint: $detectedPoint, ')
+          ..write('extractedPendingDoubt: $extractedPendingDoubt, ')
+          ..write('extractedEmpathyNote: $extractedEmpathyNote, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $PhoneContactsTable extends PhoneContacts
+    with TableInfo<$PhoneContactsTable, PhoneContactEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PhoneContactsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _phoneMeta = const VerificationMeta('phone');
+  @override
+  late final GeneratedColumn<String> phone = GeneratedColumn<String>(
+    'phone',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _secondaryPhoneMeta = const VerificationMeta(
+    'secondaryPhone',
+  );
+  @override
+  late final GeneratedColumn<String> secondaryPhone = GeneratedColumn<String>(
+    'secondary_phone',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _hasWhatsappMeta = const VerificationMeta(
+    'hasWhatsapp',
+  );
+  @override
+  late final GeneratedColumn<bool> hasWhatsapp = GeneratedColumn<bool>(
+    'has_whatsapp',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("has_whatsapp" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _whatsappInfoMeta = const VerificationMeta(
+    'whatsappInfo',
+  );
+  @override
+  late final GeneratedColumn<String> whatsappInfo = GeneratedColumn<String>(
+    'whatsapp_info',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _hasSocialMeta = const VerificationMeta(
+    'hasSocial',
+  );
+  @override
+  late final GeneratedColumn<bool> hasSocial = GeneratedColumn<bool>(
+    'has_social',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("has_social" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _socialPlatformMeta = const VerificationMeta(
+    'socialPlatform',
+  );
+  @override
+  late final GeneratedColumn<String> socialPlatform = GeneratedColumn<String>(
+    'social_platform',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _socialHandleMeta = const VerificationMeta(
+    'socialHandle',
+  );
+  @override
+  late final GeneratedColumn<String> socialHandle = GeneratedColumn<String>(
+    'social_handle',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _notesMeta = const VerificationMeta('notes');
+  @override
+  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
+    'notes',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _tagsMeta = const VerificationMeta('tags');
+  @override
+  late final GeneratedColumn<String> tags = GeneratedColumn<String>(
+    'tags',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  );
+  static const VerificationMeta _originMeta = const VerificationMeta('origin');
+  @override
+  late final GeneratedColumn<String> origin = GeneratedColumn<String>(
+    'origin',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('Informal'),
+  );
+  static const VerificationMeta _convertedPersonIdMeta = const VerificationMeta(
+    'convertedPersonId',
+  );
+  @override
+  late final GeneratedColumn<String> convertedPersonId =
+      GeneratedColumn<String>(
+        'converted_person_id',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'REFERENCES people (id)',
+        ),
+      );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _revisionMeta = const VerificationMeta(
+    'revision',
+  );
+  @override
+  late final GeneratedColumn<int> revision = GeneratedColumn<int>(
+    'revision',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    name,
+    phone,
+    secondaryPhone,
+    hasWhatsapp,
+    whatsappInfo,
+    hasSocial,
+    socialPlatform,
+    socialHandle,
+    notes,
+    tags,
+    origin,
+    convertedPersonId,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'phone_contacts';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PhoneContactEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('phone')) {
+      context.handle(
+        _phoneMeta,
+        phone.isAcceptableOrUnknown(data['phone']!, _phoneMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_phoneMeta);
+    }
+    if (data.containsKey('secondary_phone')) {
+      context.handle(
+        _secondaryPhoneMeta,
+        secondaryPhone.isAcceptableOrUnknown(
+          data['secondary_phone']!,
+          _secondaryPhoneMeta,
+        ),
+      );
+    }
+    if (data.containsKey('has_whatsapp')) {
+      context.handle(
+        _hasWhatsappMeta,
+        hasWhatsapp.isAcceptableOrUnknown(
+          data['has_whatsapp']!,
+          _hasWhatsappMeta,
+        ),
+      );
+    }
+    if (data.containsKey('whatsapp_info')) {
+      context.handle(
+        _whatsappInfoMeta,
+        whatsappInfo.isAcceptableOrUnknown(
+          data['whatsapp_info']!,
+          _whatsappInfoMeta,
+        ),
+      );
+    }
+    if (data.containsKey('has_social')) {
+      context.handle(
+        _hasSocialMeta,
+        hasSocial.isAcceptableOrUnknown(data['has_social']!, _hasSocialMeta),
+      );
+    }
+    if (data.containsKey('social_platform')) {
+      context.handle(
+        _socialPlatformMeta,
+        socialPlatform.isAcceptableOrUnknown(
+          data['social_platform']!,
+          _socialPlatformMeta,
+        ),
+      );
+    }
+    if (data.containsKey('social_handle')) {
+      context.handle(
+        _socialHandleMeta,
+        socialHandle.isAcceptableOrUnknown(
+          data['social_handle']!,
+          _socialHandleMeta,
+        ),
+      );
+    }
+    if (data.containsKey('notes')) {
+      context.handle(
+        _notesMeta,
+        notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
+      );
+    }
+    if (data.containsKey('tags')) {
+      context.handle(
+        _tagsMeta,
+        tags.isAcceptableOrUnknown(data['tags']!, _tagsMeta),
+      );
+    }
+    if (data.containsKey('origin')) {
+      context.handle(
+        _originMeta,
+        origin.isAcceptableOrUnknown(data['origin']!, _originMeta),
+      );
+    }
+    if (data.containsKey('converted_person_id')) {
+      context.handle(
+        _convertedPersonIdMeta,
+        convertedPersonId.isAcceptableOrUnknown(
+          data['converted_person_id']!,
+          _convertedPersonIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    if (data.containsKey('revision')) {
+      context.handle(
+        _revisionMeta,
+        revision.isAcceptableOrUnknown(data['revision']!, _revisionMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  PhoneContactEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PhoneContactEntry(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      phone: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}phone'],
+      )!,
+      secondaryPhone: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}secondary_phone'],
+      ),
+      hasWhatsapp: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}has_whatsapp'],
+      )!,
+      whatsappInfo: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}whatsapp_info'],
+      ),
+      hasSocial: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}has_social'],
+      )!,
+      socialPlatform: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}social_platform'],
+      ),
+      socialHandle: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}social_handle'],
+      ),
+      notes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}notes'],
+      ),
+      tags: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}tags'],
+      )!,
+      origin: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}origin'],
+      )!,
+      convertedPersonId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}converted_person_id'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+      revision: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}revision'],
+      )!,
+    );
+  }
+
+  @override
+  $PhoneContactsTable createAlias(String alias) {
+    return $PhoneContactsTable(attachedDatabase, alias);
+  }
+}
+
+class PhoneContactEntry extends DataClass
+    implements Insertable<PhoneContactEntry> {
+  final String id;
+  final String name;
+  final String phone;
+  final String? secondaryPhone;
+  final bool hasWhatsapp;
+  final String? whatsappInfo;
+  final bool hasSocial;
+  final String? socialPlatform;
+  final String? socialHandle;
+  final String? notes;
+  final String tags;
+  final String origin;
+  final String? convertedPersonId;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime? deletedAt;
+  final int revision;
+  const PhoneContactEntry({
+    required this.id,
+    required this.name,
+    required this.phone,
+    this.secondaryPhone,
+    required this.hasWhatsapp,
+    this.whatsappInfo,
+    required this.hasSocial,
+    this.socialPlatform,
+    this.socialHandle,
+    this.notes,
+    required this.tags,
+    required this.origin,
+    this.convertedPersonId,
+    required this.createdAt,
+    required this.updatedAt,
+    this.deletedAt,
+    required this.revision,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    map['phone'] = Variable<String>(phone);
+    if (!nullToAbsent || secondaryPhone != null) {
+      map['secondary_phone'] = Variable<String>(secondaryPhone);
+    }
+    map['has_whatsapp'] = Variable<bool>(hasWhatsapp);
+    if (!nullToAbsent || whatsappInfo != null) {
+      map['whatsapp_info'] = Variable<String>(whatsappInfo);
+    }
+    map['has_social'] = Variable<bool>(hasSocial);
+    if (!nullToAbsent || socialPlatform != null) {
+      map['social_platform'] = Variable<String>(socialPlatform);
+    }
+    if (!nullToAbsent || socialHandle != null) {
+      map['social_handle'] = Variable<String>(socialHandle);
+    }
+    if (!nullToAbsent || notes != null) {
+      map['notes'] = Variable<String>(notes);
+    }
+    map['tags'] = Variable<String>(tags);
+    map['origin'] = Variable<String>(origin);
+    if (!nullToAbsent || convertedPersonId != null) {
+      map['converted_person_id'] = Variable<String>(convertedPersonId);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    map['revision'] = Variable<int>(revision);
+    return map;
+  }
+
+  PhoneContactsCompanion toCompanion(bool nullToAbsent) {
+    return PhoneContactsCompanion(
+      id: Value(id),
+      name: Value(name),
+      phone: Value(phone),
+      secondaryPhone: secondaryPhone == null && nullToAbsent
+          ? const Value.absent()
+          : Value(secondaryPhone),
+      hasWhatsapp: Value(hasWhatsapp),
+      whatsappInfo: whatsappInfo == null && nullToAbsent
+          ? const Value.absent()
+          : Value(whatsappInfo),
+      hasSocial: Value(hasSocial),
+      socialPlatform: socialPlatform == null && nullToAbsent
+          ? const Value.absent()
+          : Value(socialPlatform),
+      socialHandle: socialHandle == null && nullToAbsent
+          ? const Value.absent()
+          : Value(socialHandle),
+      notes: notes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(notes),
+      tags: Value(tags),
+      origin: Value(origin),
+      convertedPersonId: convertedPersonId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(convertedPersonId),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      revision: Value(revision),
+    );
+  }
+
+  factory PhoneContactEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PhoneContactEntry(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      phone: serializer.fromJson<String>(json['phone']),
+      secondaryPhone: serializer.fromJson<String?>(json['secondaryPhone']),
+      hasWhatsapp: serializer.fromJson<bool>(json['hasWhatsapp']),
+      whatsappInfo: serializer.fromJson<String?>(json['whatsappInfo']),
+      hasSocial: serializer.fromJson<bool>(json['hasSocial']),
+      socialPlatform: serializer.fromJson<String?>(json['socialPlatform']),
+      socialHandle: serializer.fromJson<String?>(json['socialHandle']),
+      notes: serializer.fromJson<String?>(json['notes']),
+      tags: serializer.fromJson<String>(json['tags']),
+      origin: serializer.fromJson<String>(json['origin']),
+      convertedPersonId: serializer.fromJson<String?>(
+        json['convertedPersonId'],
+      ),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      revision: serializer.fromJson<int>(json['revision']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'phone': serializer.toJson<String>(phone),
+      'secondaryPhone': serializer.toJson<String?>(secondaryPhone),
+      'hasWhatsapp': serializer.toJson<bool>(hasWhatsapp),
+      'whatsappInfo': serializer.toJson<String?>(whatsappInfo),
+      'hasSocial': serializer.toJson<bool>(hasSocial),
+      'socialPlatform': serializer.toJson<String?>(socialPlatform),
+      'socialHandle': serializer.toJson<String?>(socialHandle),
+      'notes': serializer.toJson<String?>(notes),
+      'tags': serializer.toJson<String>(tags),
+      'origin': serializer.toJson<String>(origin),
+      'convertedPersonId': serializer.toJson<String?>(convertedPersonId),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'revision': serializer.toJson<int>(revision),
+    };
+  }
+
+  PhoneContactEntry copyWith({
+    String? id,
+    String? name,
+    String? phone,
+    Value<String?> secondaryPhone = const Value.absent(),
+    bool? hasWhatsapp,
+    Value<String?> whatsappInfo = const Value.absent(),
+    bool? hasSocial,
+    Value<String?> socialPlatform = const Value.absent(),
+    Value<String?> socialHandle = const Value.absent(),
+    Value<String?> notes = const Value.absent(),
+    String? tags,
+    String? origin,
+    Value<String?> convertedPersonId = const Value.absent(),
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    Value<DateTime?> deletedAt = const Value.absent(),
+    int? revision,
+  }) => PhoneContactEntry(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    phone: phone ?? this.phone,
+    secondaryPhone: secondaryPhone.present
+        ? secondaryPhone.value
+        : this.secondaryPhone,
+    hasWhatsapp: hasWhatsapp ?? this.hasWhatsapp,
+    whatsappInfo: whatsappInfo.present ? whatsappInfo.value : this.whatsappInfo,
+    hasSocial: hasSocial ?? this.hasSocial,
+    socialPlatform: socialPlatform.present
+        ? socialPlatform.value
+        : this.socialPlatform,
+    socialHandle: socialHandle.present ? socialHandle.value : this.socialHandle,
+    notes: notes.present ? notes.value : this.notes,
+    tags: tags ?? this.tags,
+    origin: origin ?? this.origin,
+    convertedPersonId: convertedPersonId.present
+        ? convertedPersonId.value
+        : this.convertedPersonId,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    revision: revision ?? this.revision,
+  );
+  PhoneContactEntry copyWithCompanion(PhoneContactsCompanion data) {
+    return PhoneContactEntry(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      phone: data.phone.present ? data.phone.value : this.phone,
+      secondaryPhone: data.secondaryPhone.present
+          ? data.secondaryPhone.value
+          : this.secondaryPhone,
+      hasWhatsapp: data.hasWhatsapp.present
+          ? data.hasWhatsapp.value
+          : this.hasWhatsapp,
+      whatsappInfo: data.whatsappInfo.present
+          ? data.whatsappInfo.value
+          : this.whatsappInfo,
+      hasSocial: data.hasSocial.present ? data.hasSocial.value : this.hasSocial,
+      socialPlatform: data.socialPlatform.present
+          ? data.socialPlatform.value
+          : this.socialPlatform,
+      socialHandle: data.socialHandle.present
+          ? data.socialHandle.value
+          : this.socialHandle,
+      notes: data.notes.present ? data.notes.value : this.notes,
+      tags: data.tags.present ? data.tags.value : this.tags,
+      origin: data.origin.present ? data.origin.value : this.origin,
+      convertedPersonId: data.convertedPersonId.present
+          ? data.convertedPersonId.value
+          : this.convertedPersonId,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      revision: data.revision.present ? data.revision.value : this.revision,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PhoneContactEntry(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('phone: $phone, ')
+          ..write('secondaryPhone: $secondaryPhone, ')
+          ..write('hasWhatsapp: $hasWhatsapp, ')
+          ..write('whatsappInfo: $whatsappInfo, ')
+          ..write('hasSocial: $hasSocial, ')
+          ..write('socialPlatform: $socialPlatform, ')
+          ..write('socialHandle: $socialHandle, ')
+          ..write('notes: $notes, ')
+          ..write('tags: $tags, ')
+          ..write('origin: $origin, ')
+          ..write('convertedPersonId: $convertedPersonId, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    name,
+    phone,
+    secondaryPhone,
+    hasWhatsapp,
+    whatsappInfo,
+    hasSocial,
+    socialPlatform,
+    socialHandle,
+    notes,
+    tags,
+    origin,
+    convertedPersonId,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PhoneContactEntry &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.phone == this.phone &&
+          other.secondaryPhone == this.secondaryPhone &&
+          other.hasWhatsapp == this.hasWhatsapp &&
+          other.whatsappInfo == this.whatsappInfo &&
+          other.hasSocial == this.hasSocial &&
+          other.socialPlatform == this.socialPlatform &&
+          other.socialHandle == this.socialHandle &&
+          other.notes == this.notes &&
+          other.tags == this.tags &&
+          other.origin == this.origin &&
+          other.convertedPersonId == this.convertedPersonId &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt &&
+          other.revision == this.revision);
+}
+
+class PhoneContactsCompanion extends UpdateCompanion<PhoneContactEntry> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<String> phone;
+  final Value<String?> secondaryPhone;
+  final Value<bool> hasWhatsapp;
+  final Value<String?> whatsappInfo;
+  final Value<bool> hasSocial;
+  final Value<String?> socialPlatform;
+  final Value<String?> socialHandle;
+  final Value<String?> notes;
+  final Value<String> tags;
+  final Value<String> origin;
+  final Value<String?> convertedPersonId;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> revision;
+  final Value<int> rowid;
+  const PhoneContactsCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.phone = const Value.absent(),
+    this.secondaryPhone = const Value.absent(),
+    this.hasWhatsapp = const Value.absent(),
+    this.whatsappInfo = const Value.absent(),
+    this.hasSocial = const Value.absent(),
+    this.socialPlatform = const Value.absent(),
+    this.socialHandle = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.tags = const Value.absent(),
+    this.origin = const Value.absent(),
+    this.convertedPersonId = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  PhoneContactsCompanion.insert({
+    required String id,
+    required String name,
+    required String phone,
+    this.secondaryPhone = const Value.absent(),
+    this.hasWhatsapp = const Value.absent(),
+    this.whatsappInfo = const Value.absent(),
+    this.hasSocial = const Value.absent(),
+    this.socialPlatform = const Value.absent(),
+    this.socialHandle = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.tags = const Value.absent(),
+    this.origin = const Value.absent(),
+    this.convertedPersonId = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name),
+       phone = Value(phone),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<PhoneContactEntry> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<String>? phone,
+    Expression<String>? secondaryPhone,
+    Expression<bool>? hasWhatsapp,
+    Expression<String>? whatsappInfo,
+    Expression<bool>? hasSocial,
+    Expression<String>? socialPlatform,
+    Expression<String>? socialHandle,
+    Expression<String>? notes,
+    Expression<String>? tags,
+    Expression<String>? origin,
+    Expression<String>? convertedPersonId,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? revision,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (phone != null) 'phone': phone,
+      if (secondaryPhone != null) 'secondary_phone': secondaryPhone,
+      if (hasWhatsapp != null) 'has_whatsapp': hasWhatsapp,
+      if (whatsappInfo != null) 'whatsapp_info': whatsappInfo,
+      if (hasSocial != null) 'has_social': hasSocial,
+      if (socialPlatform != null) 'social_platform': socialPlatform,
+      if (socialHandle != null) 'social_handle': socialHandle,
+      if (notes != null) 'notes': notes,
+      if (tags != null) 'tags': tags,
+      if (origin != null) 'origin': origin,
+      if (convertedPersonId != null) 'converted_person_id': convertedPersonId,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (revision != null) 'revision': revision,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  PhoneContactsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<String>? phone,
+    Value<String?>? secondaryPhone,
+    Value<bool>? hasWhatsapp,
+    Value<String?>? whatsappInfo,
+    Value<bool>? hasSocial,
+    Value<String?>? socialPlatform,
+    Value<String?>? socialHandle,
+    Value<String?>? notes,
+    Value<String>? tags,
+    Value<String>? origin,
+    Value<String?>? convertedPersonId,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? revision,
+    Value<int>? rowid,
+  }) {
+    return PhoneContactsCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      phone: phone ?? this.phone,
+      secondaryPhone: secondaryPhone ?? this.secondaryPhone,
+      hasWhatsapp: hasWhatsapp ?? this.hasWhatsapp,
+      whatsappInfo: whatsappInfo ?? this.whatsappInfo,
+      hasSocial: hasSocial ?? this.hasSocial,
+      socialPlatform: socialPlatform ?? this.socialPlatform,
+      socialHandle: socialHandle ?? this.socialHandle,
+      notes: notes ?? this.notes,
+      tags: tags ?? this.tags,
+      origin: origin ?? this.origin,
+      convertedPersonId: convertedPersonId ?? this.convertedPersonId,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      revision: revision ?? this.revision,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (phone.present) {
+      map['phone'] = Variable<String>(phone.value);
+    }
+    if (secondaryPhone.present) {
+      map['secondary_phone'] = Variable<String>(secondaryPhone.value);
+    }
+    if (hasWhatsapp.present) {
+      map['has_whatsapp'] = Variable<bool>(hasWhatsapp.value);
+    }
+    if (whatsappInfo.present) {
+      map['whatsapp_info'] = Variable<String>(whatsappInfo.value);
+    }
+    if (hasSocial.present) {
+      map['has_social'] = Variable<bool>(hasSocial.value);
+    }
+    if (socialPlatform.present) {
+      map['social_platform'] = Variable<String>(socialPlatform.value);
+    }
+    if (socialHandle.present) {
+      map['social_handle'] = Variable<String>(socialHandle.value);
+    }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
+    if (tags.present) {
+      map['tags'] = Variable<String>(tags.value);
+    }
+    if (origin.present) {
+      map['origin'] = Variable<String>(origin.value);
+    }
+    if (convertedPersonId.present) {
+      map['converted_person_id'] = Variable<String>(convertedPersonId.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (revision.present) {
+      map['revision'] = Variable<int>(revision.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PhoneContactsCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('phone: $phone, ')
+          ..write('secondaryPhone: $secondaryPhone, ')
+          ..write('hasWhatsapp: $hasWhatsapp, ')
+          ..write('whatsappInfo: $whatsappInfo, ')
+          ..write('hasSocial: $hasSocial, ')
+          ..write('socialPlatform: $socialPlatform, ')
+          ..write('socialHandle: $socialHandle, ')
+          ..write('notes: $notes, ')
+          ..write('tags: $tags, ')
+          ..write('origin: $origin, ')
+          ..write('convertedPersonId: $convertedPersonId, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $TerritoryLandmarksTable extends TerritoryLandmarks
+    with TableInfo<$TerritoryLandmarksTable, TerritoryLandmarkEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $TerritoryLandmarksTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _categoryMeta = const VerificationMeta(
+    'category',
+  );
+  @override
+  late final GeneratedColumn<String> category = GeneratedColumn<String>(
+    'category',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _addressMeta = const VerificationMeta(
+    'address',
+  );
+  @override
+  late final GeneratedColumn<String> address = GeneratedColumn<String>(
+    'address',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _latitudeMeta = const VerificationMeta(
+    'latitude',
+  );
+  @override
+  late final GeneratedColumn<double> latitude = GeneratedColumn<double>(
+    'latitude',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _longitudeMeta = const VerificationMeta(
+    'longitude',
+  );
+  @override
+  late final GeneratedColumn<double> longitude = GeneratedColumn<double>(
+    'longitude',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _notesMeta = const VerificationMeta('notes');
+  @override
+  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
+    'notes',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _revisionMeta = const VerificationMeta(
+    'revision',
+  );
+  @override
+  late final GeneratedColumn<int> revision = GeneratedColumn<int>(
+    'revision',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    name,
+    category,
+    address,
+    latitude,
+    longitude,
+    notes,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'territory_landmarks';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<TerritoryLandmarkEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('category')) {
+      context.handle(
+        _categoryMeta,
+        category.isAcceptableOrUnknown(data['category']!, _categoryMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_categoryMeta);
+    }
+    if (data.containsKey('address')) {
+      context.handle(
+        _addressMeta,
+        address.isAcceptableOrUnknown(data['address']!, _addressMeta),
+      );
+    }
+    if (data.containsKey('latitude')) {
+      context.handle(
+        _latitudeMeta,
+        latitude.isAcceptableOrUnknown(data['latitude']!, _latitudeMeta),
+      );
+    }
+    if (data.containsKey('longitude')) {
+      context.handle(
+        _longitudeMeta,
+        longitude.isAcceptableOrUnknown(data['longitude']!, _longitudeMeta),
+      );
+    }
+    if (data.containsKey('notes')) {
+      context.handle(
+        _notesMeta,
+        notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    if (data.containsKey('revision')) {
+      context.handle(
+        _revisionMeta,
+        revision.isAcceptableOrUnknown(data['revision']!, _revisionMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  TerritoryLandmarkEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return TerritoryLandmarkEntry(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      category: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}category'],
+      )!,
+      address: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}address'],
+      ),
+      latitude: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}latitude'],
+      ),
+      longitude: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}longitude'],
+      ),
+      notes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}notes'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+      revision: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}revision'],
+      )!,
+    );
+  }
+
+  @override
+  $TerritoryLandmarksTable createAlias(String alias) {
+    return $TerritoryLandmarksTable(attachedDatabase, alias);
+  }
+}
+
+class TerritoryLandmarkEntry extends DataClass
+    implements Insertable<TerritoryLandmarkEntry> {
+  final String id;
+  final String name;
+  final String category;
+  final String? address;
+  final double? latitude;
+  final double? longitude;
+  final String? notes;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime? deletedAt;
+  final int revision;
+  const TerritoryLandmarkEntry({
+    required this.id,
+    required this.name,
+    required this.category,
+    this.address,
+    this.latitude,
+    this.longitude,
+    this.notes,
+    required this.createdAt,
+    required this.updatedAt,
+    this.deletedAt,
+    required this.revision,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    map['category'] = Variable<String>(category);
+    if (!nullToAbsent || address != null) {
+      map['address'] = Variable<String>(address);
+    }
+    if (!nullToAbsent || latitude != null) {
+      map['latitude'] = Variable<double>(latitude);
+    }
+    if (!nullToAbsent || longitude != null) {
+      map['longitude'] = Variable<double>(longitude);
+    }
+    if (!nullToAbsent || notes != null) {
+      map['notes'] = Variable<String>(notes);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    map['revision'] = Variable<int>(revision);
+    return map;
+  }
+
+  TerritoryLandmarksCompanion toCompanion(bool nullToAbsent) {
+    return TerritoryLandmarksCompanion(
+      id: Value(id),
+      name: Value(name),
+      category: Value(category),
+      address: address == null && nullToAbsent
+          ? const Value.absent()
+          : Value(address),
+      latitude: latitude == null && nullToAbsent
+          ? const Value.absent()
+          : Value(latitude),
+      longitude: longitude == null && nullToAbsent
+          ? const Value.absent()
+          : Value(longitude),
+      notes: notes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(notes),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      revision: Value(revision),
+    );
+  }
+
+  factory TerritoryLandmarkEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return TerritoryLandmarkEntry(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      category: serializer.fromJson<String>(json['category']),
+      address: serializer.fromJson<String?>(json['address']),
+      latitude: serializer.fromJson<double?>(json['latitude']),
+      longitude: serializer.fromJson<double?>(json['longitude']),
+      notes: serializer.fromJson<String?>(json['notes']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      revision: serializer.fromJson<int>(json['revision']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'category': serializer.toJson<String>(category),
+      'address': serializer.toJson<String?>(address),
+      'latitude': serializer.toJson<double?>(latitude),
+      'longitude': serializer.toJson<double?>(longitude),
+      'notes': serializer.toJson<String?>(notes),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'revision': serializer.toJson<int>(revision),
+    };
+  }
+
+  TerritoryLandmarkEntry copyWith({
+    String? id,
+    String? name,
+    String? category,
+    Value<String?> address = const Value.absent(),
+    Value<double?> latitude = const Value.absent(),
+    Value<double?> longitude = const Value.absent(),
+    Value<String?> notes = const Value.absent(),
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    Value<DateTime?> deletedAt = const Value.absent(),
+    int? revision,
+  }) => TerritoryLandmarkEntry(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    category: category ?? this.category,
+    address: address.present ? address.value : this.address,
+    latitude: latitude.present ? latitude.value : this.latitude,
+    longitude: longitude.present ? longitude.value : this.longitude,
+    notes: notes.present ? notes.value : this.notes,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    revision: revision ?? this.revision,
+  );
+  TerritoryLandmarkEntry copyWithCompanion(TerritoryLandmarksCompanion data) {
+    return TerritoryLandmarkEntry(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      category: data.category.present ? data.category.value : this.category,
+      address: data.address.present ? data.address.value : this.address,
+      latitude: data.latitude.present ? data.latitude.value : this.latitude,
+      longitude: data.longitude.present ? data.longitude.value : this.longitude,
+      notes: data.notes.present ? data.notes.value : this.notes,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      revision: data.revision.present ? data.revision.value : this.revision,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TerritoryLandmarkEntry(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('category: $category, ')
+          ..write('address: $address, ')
+          ..write('latitude: $latitude, ')
+          ..write('longitude: $longitude, ')
+          ..write('notes: $notes, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    name,
+    category,
+    address,
+    latitude,
+    longitude,
+    notes,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is TerritoryLandmarkEntry &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.category == this.category &&
+          other.address == this.address &&
+          other.latitude == this.latitude &&
+          other.longitude == this.longitude &&
+          other.notes == this.notes &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt &&
+          other.revision == this.revision);
+}
+
+class TerritoryLandmarksCompanion
+    extends UpdateCompanion<TerritoryLandmarkEntry> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<String> category;
+  final Value<String?> address;
+  final Value<double?> latitude;
+  final Value<double?> longitude;
+  final Value<String?> notes;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> revision;
+  final Value<int> rowid;
+  const TerritoryLandmarksCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.category = const Value.absent(),
+    this.address = const Value.absent(),
+    this.latitude = const Value.absent(),
+    this.longitude = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  TerritoryLandmarksCompanion.insert({
+    required String id,
+    required String name,
+    required String category,
+    this.address = const Value.absent(),
+    this.latitude = const Value.absent(),
+    this.longitude = const Value.absent(),
+    this.notes = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name),
+       category = Value(category),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<TerritoryLandmarkEntry> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<String>? category,
+    Expression<String>? address,
+    Expression<double>? latitude,
+    Expression<double>? longitude,
+    Expression<String>? notes,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? revision,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (category != null) 'category': category,
+      if (address != null) 'address': address,
+      if (latitude != null) 'latitude': latitude,
+      if (longitude != null) 'longitude': longitude,
+      if (notes != null) 'notes': notes,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (revision != null) 'revision': revision,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  TerritoryLandmarksCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<String>? category,
+    Value<String?>? address,
+    Value<double?>? latitude,
+    Value<double?>? longitude,
+    Value<String?>? notes,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? revision,
+    Value<int>? rowid,
+  }) {
+    return TerritoryLandmarksCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      category: category ?? this.category,
+      address: address ?? this.address,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      notes: notes ?? this.notes,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      revision: revision ?? this.revision,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (category.present) {
+      map['category'] = Variable<String>(category.value);
+    }
+    if (address.present) {
+      map['address'] = Variable<String>(address.value);
+    }
+    if (latitude.present) {
+      map['latitude'] = Variable<double>(latitude.value);
+    }
+    if (longitude.present) {
+      map['longitude'] = Variable<double>(longitude.value);
+    }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (revision.present) {
+      map['revision'] = Variable<int>(revision.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TerritoryLandmarksCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('category: $category, ')
+          ..write('address: $address, ')
+          ..write('latitude: $latitude, ')
+          ..write('longitude: $longitude, ')
+          ..write('notes: $notes, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $AppKvStoreTable extends AppKvStore
+    with TableInfo<$AppKvStoreTable, AppKvEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $AppKvStoreTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _keyMeta = const VerificationMeta('key');
+  @override
+  late final GeneratedColumn<String> key = GeneratedColumn<String>(
+    'key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _valueMeta = const VerificationMeta('value');
+  @override
+  late final GeneratedColumn<String> value = GeneratedColumn<String>(
+    'value',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [key, value, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'app_kv_store';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<AppKvEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('key')) {
+      context.handle(
+        _keyMeta,
+        key.isAcceptableOrUnknown(data['key']!, _keyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_keyMeta);
+    }
+    if (data.containsKey('value')) {
+      context.handle(
+        _valueMeta,
+        value.isAcceptableOrUnknown(data['value']!, _valueMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_valueMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {key};
+  @override
+  AppKvEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return AppKvEntry(
+      key: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}key'],
+      )!,
+      value: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}value'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      ),
+    );
+  }
+
+  @override
+  $AppKvStoreTable createAlias(String alias) {
+    return $AppKvStoreTable(attachedDatabase, alias);
+  }
+}
+
+class AppKvEntry extends DataClass implements Insertable<AppKvEntry> {
+  final String key;
+  final String value;
+  final DateTime? updatedAt;
+  const AppKvEntry({required this.key, required this.value, this.updatedAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['key'] = Variable<String>(key);
+    map['value'] = Variable<String>(value);
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
+    return map;
+  }
+
+  AppKvStoreCompanion toCompanion(bool nullToAbsent) {
+    return AppKvStoreCompanion(
+      key: Value(key),
+      value: Value(value),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
+    );
+  }
+
+  factory AppKvEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return AppKvEntry(
+      key: serializer.fromJson<String>(json['key']),
+      value: serializer.fromJson<String>(json['value']),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'key': serializer.toJson<String>(key),
+      'value': serializer.toJson<String>(value),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
+    };
+  }
+
+  AppKvEntry copyWith({
+    String? key,
+    String? value,
+    Value<DateTime?> updatedAt = const Value.absent(),
+  }) => AppKvEntry(
+    key: key ?? this.key,
+    value: value ?? this.value,
+    updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+  );
+  AppKvEntry copyWithCompanion(AppKvStoreCompanion data) {
+    return AppKvEntry(
+      key: data.key.present ? data.key.value : this.key,
+      value: data.value.present ? data.value.value : this.value,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AppKvEntry(')
+          ..write('key: $key, ')
+          ..write('value: $value, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(key, value, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is AppKvEntry &&
+          other.key == this.key &&
+          other.value == this.value &&
+          other.updatedAt == this.updatedAt);
+}
+
+class AppKvStoreCompanion extends UpdateCompanion<AppKvEntry> {
+  final Value<String> key;
+  final Value<String> value;
+  final Value<DateTime?> updatedAt;
+  final Value<int> rowid;
+  const AppKvStoreCompanion({
+    this.key = const Value.absent(),
+    this.value = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  AppKvStoreCompanion.insert({
+    required String key,
+    required String value,
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : key = Value(key),
+       value = Value(value);
+  static Insertable<AppKvEntry> custom({
+    Expression<String>? key,
+    Expression<String>? value,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (key != null) 'key': key,
+      if (value != null) 'value': value,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  AppKvStoreCompanion copyWith({
+    Value<String>? key,
+    Value<String>? value,
+    Value<DateTime?>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return AppKvStoreCompanion(
+      key: key ?? this.key,
+      value: value ?? this.value,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (key.present) {
+      map['key'] = Variable<String>(key.value);
+    }
+    if (value.present) {
+      map['value'] = Variable<String>(value.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AppKvStoreCompanion(')
+          ..write('key: $key, ')
+          ..write('value: $value, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -6805,6 +9625,11 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     this,
   );
   late final $SyncQueueTable syncQueue = $SyncQueueTable(this);
+  late final $VoiceNotesTable voiceNotes = $VoiceNotesTable(this);
+  late final $PhoneContactsTable phoneContacts = $PhoneContactsTable(this);
+  late final $TerritoryLandmarksTable territoryLandmarks =
+      $TerritoryLandmarksTable(this);
+  late final $AppKvStoreTable appKvStore = $AppKvStoreTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -6818,6 +9643,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     appointments,
     activityRecords,
     syncQueue,
+    voiceNotes,
+    phoneContacts,
+    territoryLandmarks,
+    appKvStore,
   ];
 }
 
@@ -6926,6 +9755,42 @@ final class $$PeopleTableReferences
     ).filter((f) => f.personId.id.sqlEquals($_itemColumn<String>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_appointmentsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$VoiceNotesTable, List<VoiceNoteEntry>>
+  _voiceNotesRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.voiceNotes,
+    aliasName: 'people__id__voice_notes__person_id',
+  );
+
+  $$VoiceNotesTableProcessedTableManager get voiceNotesRefs {
+    final manager = $$VoiceNotesTableTableManager(
+      $_db,
+      $_db.voiceNotes,
+    ).filter((f) => f.personId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_voiceNotesRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$PhoneContactsTable, List<PhoneContactEntry>>
+  _phoneContactsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.phoneContacts,
+    aliasName: 'people__id__phone_contacts__converted_person_id',
+  );
+
+  $$PhoneContactsTableProcessedTableManager get phoneContactsRefs {
+    final manager = $$PhoneContactsTableTableManager($_db, $_db.phoneContacts)
+        .filter(
+          (f) => f.convertedPersonId.id.sqlEquals($_itemColumn<String>('id')!),
+        );
+
+    final cache = $_typedResult.readTableOrNull(_phoneContactsRefsTable($_db));
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -7102,6 +9967,56 @@ class $$PeopleTableFilterComposer
           }) => $$AppointmentsTableFilterComposer(
             $db: $db,
             $table: $db.appointments,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> voiceNotesRefs(
+    Expression<bool> Function($$VoiceNotesTableFilterComposer f) f,
+  ) {
+    final $$VoiceNotesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.voiceNotes,
+      getReferencedColumn: (t) => t.personId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$VoiceNotesTableFilterComposer(
+            $db: $db,
+            $table: $db.voiceNotes,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> phoneContactsRefs(
+    Expression<bool> Function($$PhoneContactsTableFilterComposer f) f,
+  ) {
+    final $$PhoneContactsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.phoneContacts,
+      getReferencedColumn: (t) => t.convertedPersonId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PhoneContactsTableFilterComposer(
+            $db: $db,
+            $table: $db.phoneContacts,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -7372,6 +10287,56 @@ class $$PeopleTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> voiceNotesRefs<T extends Object>(
+    Expression<T> Function($$VoiceNotesTableAnnotationComposer a) f,
+  ) {
+    final $$VoiceNotesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.voiceNotes,
+      getReferencedColumn: (t) => t.personId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$VoiceNotesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.voiceNotes,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<T> phoneContactsRefs<T extends Object>(
+    Expression<T> Function($$PhoneContactsTableAnnotationComposer a) f,
+  ) {
+    final $$PhoneContactsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.phoneContacts,
+      getReferencedColumn: (t) => t.convertedPersonId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PhoneContactsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.phoneContacts,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$PeopleTableTableManager
@@ -7391,6 +10356,8 @@ class $$PeopleTableTableManager
             bool visitsRefs,
             bool studyParticipantsRefs,
             bool appointmentsRefs,
+            bool voiceNotesRefs,
+            bool phoneContactsRefs,
           })
         > {
   $$PeopleTableTableManager(_$AppDatabase db, $PeopleTable table)
@@ -7505,6 +10472,8 @@ class $$PeopleTableTableManager
                 visitsRefs = false,
                 studyParticipantsRefs = false,
                 appointmentsRefs = false,
+                voiceNotesRefs = false,
+                phoneContactsRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
@@ -7512,6 +10481,8 @@ class $$PeopleTableTableManager
                     if (visitsRefs) db.visits,
                     if (studyParticipantsRefs) db.studyParticipants,
                     if (appointmentsRefs) db.appointments,
+                    if (voiceNotesRefs) db.voiceNotes,
+                    if (phoneContactsRefs) db.phoneContacts,
                   ],
                   addJoins: null,
                   getPrefetchedDataCallback: (items) async {
@@ -7572,6 +10543,46 @@ class $$PeopleTableTableManager
                           referencedColumn: 'person_id',
                           typedResults: items,
                         ),
+                      if (voiceNotesRefs)
+                        await $_getPrefetchedDataByColumns<
+                          PersonEntry,
+                          $PeopleTable,
+                          VoiceNoteEntry,
+                          $VoiceNotesTable
+                        >(
+                          currentTable: table,
+                          referencedTable: $$PeopleTableReferences
+                              ._voiceNotesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$PeopleTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).voiceNotesRefs,
+                          currentColumn: 'id',
+                          referencedColumn: 'person_id',
+                          typedResults: items,
+                        ),
+                      if (phoneContactsRefs)
+                        await $_getPrefetchedDataByColumns<
+                          PersonEntry,
+                          $PeopleTable,
+                          PhoneContactEntry,
+                          $PhoneContactsTable
+                        >(
+                          currentTable: table,
+                          referencedTable: $$PeopleTableReferences
+                              ._phoneContactsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$PeopleTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).phoneContactsRefs,
+                          currentColumn: 'id',
+                          referencedColumn: 'converted_person_id',
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -7596,6 +10607,8 @@ typedef $$PeopleTableProcessedTableManager =
         bool visitsRefs,
         bool studyParticipantsRefs,
         bool appointmentsRefs,
+        bool voiceNotesRefs,
+        bool phoneContactsRefs,
       })
     >;
 typedef $$VisitsTableCreateCompanionBuilder = VisitsCompanion Function({
@@ -7655,6 +10668,24 @@ final class $$VisitsTableReferences
     if (item == null) return manager;
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static MultiTypedResultKey<$VoiceNotesTable, List<VoiceNoteEntry>>
+  _voiceNotesRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.voiceNotes,
+    aliasName: 'visits__id__voice_notes__visit_id',
+  );
+
+  $$VoiceNotesTableProcessedTableManager get voiceNotesRefs {
+    final manager = $$VoiceNotesTableTableManager(
+      $_db,
+      $_db.voiceNotes,
+    ).filter((f) => f.visitId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_voiceNotesRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
     );
   }
 }
@@ -7764,6 +10795,31 @@ class $$VisitsTableFilterComposer
           ),
     );
     return composer;
+  }
+
+  Expression<bool> voiceNotesRefs(
+    Expression<bool> Function($$VoiceNotesTableFilterComposer f) f,
+  ) {
+    final $$VoiceNotesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.voiceNotes,
+      getReferencedColumn: (t) => t.visitId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$VoiceNotesTableFilterComposer(
+            $db: $db,
+            $table: $db.voiceNotes,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
   }
 }
 
@@ -7965,6 +11021,31 @@ class $$VisitsTableAnnotationComposer
     );
     return composer;
   }
+
+  Expression<T> voiceNotesRefs<T extends Object>(
+    Expression<T> Function($$VoiceNotesTableAnnotationComposer a) f,
+  ) {
+    final $$VoiceNotesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.voiceNotes,
+      getReferencedColumn: (t) => t.visitId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$VoiceNotesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.voiceNotes,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$VisitsTableTableManager
@@ -7980,7 +11061,7 @@ class $$VisitsTableTableManager
           $$VisitsTableUpdateCompanionBuilder,
           (VisitEntry, $$VisitsTableReferences),
           VisitEntry,
-          PrefetchHooks Function({bool personId})
+          PrefetchHooks Function({bool personId, bool voiceNotesRefs})
         > {
   $$VisitsTableTableManager(_$AppDatabase db, $VisitsTable table)
     : super(
@@ -8077,10 +11158,10 @@ class $$VisitsTableTableManager
                 ),
               )
               .toList(),
-          prefetchHooksCallback: ({personId = false}) {
+          prefetchHooksCallback: ({personId = false, voiceNotesRefs = false}) {
             return PrefetchHooks(
               db: db,
-              explicitlyWatchedTables: [],
+              explicitlyWatchedTables: [if (voiceNotesRefs) db.voiceNotes],
               addJoins:
                   <
                     T extends TableManagerState<
@@ -8113,7 +11194,24 @@ class $$VisitsTableTableManager
                     return state;
                   },
               getPrefetchedDataCallback: (items) async {
-                return [];
+                return [
+                  if (voiceNotesRefs)
+                    await $_getPrefetchedDataByColumns<
+                      VisitEntry,
+                      $VisitsTable,
+                      VoiceNoteEntry,
+                      $VoiceNotesTable
+                    >(
+                      currentTable: table,
+                      referencedTable: $$VisitsTableReferences
+                          ._voiceNotesRefsTable(db),
+                      managerFromTypedResult: (p0) =>
+                          $$VisitsTableReferences(db, table, p0).voiceNotesRefs,
+                      currentColumn: 'id',
+                      referencedColumn: 'visit_id',
+                      typedResults: items,
+                    ),
+                ];
               },
             );
           },
@@ -8133,7 +11231,7 @@ typedef $$VisitsTableProcessedTableManager =
       $$VisitsTableUpdateCompanionBuilder,
       (VisitEntry, $$VisitsTableReferences),
       VisitEntry,
-      PrefetchHooks Function({bool personId})
+      PrefetchHooks Function({bool personId, bool voiceNotesRefs})
     >;
 typedef $$BibleStudiesTableCreateCompanionBuilder =
     BibleStudiesCompanion Function({
@@ -8245,6 +11343,24 @@ final class $$BibleStudiesTableReferences
     ).filter((f) => f.studyId.id.sqlEquals($_itemColumn<String>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_appointmentsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$VoiceNotesTable, List<VoiceNoteEntry>>
+  _voiceNotesRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.voiceNotes,
+    aliasName: 'bible_studies__id__voice_notes__study_id',
+  );
+
+  $$VoiceNotesTableProcessedTableManager get voiceNotesRefs {
+    final manager = $$VoiceNotesTableTableManager(
+      $_db,
+      $_db.voiceNotes,
+    ).filter((f) => f.studyId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_voiceNotesRefsTable($_db));
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -8431,6 +11547,31 @@ class $$BibleStudiesTableFilterComposer
           }) => $$AppointmentsTableFilterComposer(
             $db: $db,
             $table: $db.appointments,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> voiceNotesRefs(
+    Expression<bool> Function($$VoiceNotesTableFilterComposer f) f,
+  ) {
+    final $$VoiceNotesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.voiceNotes,
+      getReferencedColumn: (t) => t.studyId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$VoiceNotesTableFilterComposer(
+            $db: $db,
+            $table: $db.voiceNotes,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -8721,6 +11862,31 @@ class $$BibleStudiesTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> voiceNotesRefs<T extends Object>(
+    Expression<T> Function($$VoiceNotesTableAnnotationComposer a) f,
+  ) {
+    final $$VoiceNotesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.voiceNotes,
+      getReferencedColumn: (t) => t.studyId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$VoiceNotesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.voiceNotes,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$BibleStudiesTableTableManager
@@ -8740,6 +11906,7 @@ class $$BibleStudiesTableTableManager
             bool studyParticipantsRefs,
             bool studySessionsRefs,
             bool appointmentsRefs,
+            bool voiceNotesRefs,
           })
         > {
   $$BibleStudiesTableTableManager(_$AppDatabase db, $BibleStudiesTable table)
@@ -8862,6 +12029,7 @@ class $$BibleStudiesTableTableManager
                 studyParticipantsRefs = false,
                 studySessionsRefs = false,
                 appointmentsRefs = false,
+                voiceNotesRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
@@ -8869,6 +12037,7 @@ class $$BibleStudiesTableTableManager
                     if (studyParticipantsRefs) db.studyParticipants,
                     if (studySessionsRefs) db.studySessions,
                     if (appointmentsRefs) db.appointments,
+                    if (voiceNotesRefs) db.voiceNotes,
                   ],
                   addJoins: null,
                   getPrefetchedDataCallback: (items) async {
@@ -8933,6 +12102,26 @@ class $$BibleStudiesTableTableManager
                           referencedColumn: 'study_id',
                           typedResults: items,
                         ),
+                      if (voiceNotesRefs)
+                        await $_getPrefetchedDataByColumns<
+                          BibleStudyEntry,
+                          $BibleStudiesTable,
+                          VoiceNoteEntry,
+                          $VoiceNotesTable
+                        >(
+                          currentTable: table,
+                          referencedTable: $$BibleStudiesTableReferences
+                              ._voiceNotesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$BibleStudiesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).voiceNotesRefs,
+                          currentColumn: 'id',
+                          referencedColumn: 'study_id',
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -8957,6 +12146,7 @@ typedef $$BibleStudiesTableProcessedTableManager =
         bool studyParticipantsRefs,
         bool studySessionsRefs,
         bool appointmentsRefs,
+        bool voiceNotesRefs,
       })
     >;
 typedef $$StudyParticipantsTableCreateCompanionBuilder =
@@ -11179,6 +14369,1754 @@ typedef $$SyncQueueTableProcessedTableManager =
       SyncQueueEntry,
       PrefetchHooks Function()
     >;
+typedef $$VoiceNotesTableCreateCompanionBuilder = VoiceNotesCompanion Function({
+  required String id,
+  required String personId,
+  Value<String?> visitId,
+  Value<String?> studyId,
+  Value<String?> audioFilePath,
+  Value<int> audioDurationSeconds,
+  required String transcription,
+  Value<int?> detectedLesson,
+  Value<int?> detectedPoint,
+  Value<String?> extractedPendingDoubt,
+  Value<String?> extractedEmpathyNote,
+  required DateTime createdAt,
+  required DateTime updatedAt,
+  Value<DateTime?> deletedAt,
+  Value<int> revision,
+  Value<int> rowid,
+});
+typedef $$VoiceNotesTableUpdateCompanionBuilder = VoiceNotesCompanion Function({
+  Value<String> id,
+  Value<String> personId,
+  Value<String?> visitId,
+  Value<String?> studyId,
+  Value<String?> audioFilePath,
+  Value<int> audioDurationSeconds,
+  Value<String> transcription,
+  Value<int?> detectedLesson,
+  Value<int?> detectedPoint,
+  Value<String?> extractedPendingDoubt,
+  Value<String?> extractedEmpathyNote,
+  Value<DateTime> createdAt,
+  Value<DateTime> updatedAt,
+  Value<DateTime?> deletedAt,
+  Value<int> revision,
+  Value<int> rowid,
+});
+
+final class $$VoiceNotesTableReferences
+    extends BaseReferences<_$AppDatabase, $VoiceNotesTable, VoiceNoteEntry> {
+  $$VoiceNotesTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $PeopleTable _personIdTable(_$AppDatabase db) =>
+      db.people.createAlias('voice_notes__person_id__people__id');
+
+  $$PeopleTableProcessedTableManager get personId {
+    final $_column = $_itemColumn<String>('person_id')!;
+
+    final manager = $$PeopleTableTableManager(
+      $_db,
+      $_db.people,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_personIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $VisitsTable _visitIdTable(_$AppDatabase db) =>
+      db.visits.createAlias('voice_notes__visit_id__visits__id');
+
+  $$VisitsTableProcessedTableManager? get visitId {
+    final $_column = $_itemColumn<String>('visit_id');
+    if ($_column == null) return null;
+    final manager = $$VisitsTableTableManager(
+      $_db,
+      $_db.visits,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_visitIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $BibleStudiesTable _studyIdTable(_$AppDatabase db) =>
+      db.bibleStudies.createAlias('voice_notes__study_id__bible_studies__id');
+
+  $$BibleStudiesTableProcessedTableManager? get studyId {
+    final $_column = $_itemColumn<String>('study_id');
+    if ($_column == null) return null;
+    final manager = $$BibleStudiesTableTableManager(
+      $_db,
+      $_db.bibleStudies,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_studyIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$VoiceNotesTableFilterComposer
+    extends Composer<_$AppDatabase, $VoiceNotesTable> {
+  $$VoiceNotesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get audioFilePath => $composableBuilder(
+    column: $table.audioFilePath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get audioDurationSeconds => $composableBuilder(
+    column: $table.audioDurationSeconds,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get transcription => $composableBuilder(
+    column: $table.transcription,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get detectedLesson => $composableBuilder(
+    column: $table.detectedLesson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get detectedPoint => $composableBuilder(
+    column: $table.detectedPoint,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get extractedPendingDoubt => $composableBuilder(
+    column: $table.extractedPendingDoubt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get extractedEmpathyNote => $composableBuilder(
+    column: $table.extractedEmpathyNote,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$PeopleTableFilterComposer get personId {
+    final $$PeopleTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.personId,
+      referencedTable: $db.people,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PeopleTableFilterComposer(
+            $db: $db,
+            $table: $db.people,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$VisitsTableFilterComposer get visitId {
+    final $$VisitsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.visitId,
+      referencedTable: $db.visits,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$VisitsTableFilterComposer(
+            $db: $db,
+            $table: $db.visits,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$BibleStudiesTableFilterComposer get studyId {
+    final $$BibleStudiesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.studyId,
+      referencedTable: $db.bibleStudies,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BibleStudiesTableFilterComposer(
+            $db: $db,
+            $table: $db.bibleStudies,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$VoiceNotesTableOrderingComposer
+    extends Composer<_$AppDatabase, $VoiceNotesTable> {
+  $$VoiceNotesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get audioFilePath => $composableBuilder(
+    column: $table.audioFilePath,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get audioDurationSeconds => $composableBuilder(
+    column: $table.audioDurationSeconds,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get transcription => $composableBuilder(
+    column: $table.transcription,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get detectedLesson => $composableBuilder(
+    column: $table.detectedLesson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get detectedPoint => $composableBuilder(
+    column: $table.detectedPoint,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get extractedPendingDoubt => $composableBuilder(
+    column: $table.extractedPendingDoubt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get extractedEmpathyNote => $composableBuilder(
+    column: $table.extractedEmpathyNote,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$PeopleTableOrderingComposer get personId {
+    final $$PeopleTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.personId,
+      referencedTable: $db.people,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PeopleTableOrderingComposer(
+            $db: $db,
+            $table: $db.people,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$VisitsTableOrderingComposer get visitId {
+    final $$VisitsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.visitId,
+      referencedTable: $db.visits,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$VisitsTableOrderingComposer(
+            $db: $db,
+            $table: $db.visits,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$BibleStudiesTableOrderingComposer get studyId {
+    final $$BibleStudiesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.studyId,
+      referencedTable: $db.bibleStudies,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BibleStudiesTableOrderingComposer(
+            $db: $db,
+            $table: $db.bibleStudies,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$VoiceNotesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $VoiceNotesTable> {
+  $$VoiceNotesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get audioFilePath => $composableBuilder(
+    column: $table.audioFilePath,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get audioDurationSeconds => $composableBuilder(
+    column: $table.audioDurationSeconds,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get transcription => $composableBuilder(
+    column: $table.transcription,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get detectedLesson => $composableBuilder(
+    column: $table.detectedLesson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get detectedPoint => $composableBuilder(
+    column: $table.detectedPoint,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get extractedPendingDoubt => $composableBuilder(
+    column: $table.extractedPendingDoubt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get extractedEmpathyNote => $composableBuilder(
+    column: $table.extractedEmpathyNote,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get revision =>
+      $composableBuilder(column: $table.revision, builder: (column) => column);
+
+  $$PeopleTableAnnotationComposer get personId {
+    final $$PeopleTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.personId,
+      referencedTable: $db.people,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PeopleTableAnnotationComposer(
+            $db: $db,
+            $table: $db.people,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$VisitsTableAnnotationComposer get visitId {
+    final $$VisitsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.visitId,
+      referencedTable: $db.visits,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$VisitsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.visits,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$BibleStudiesTableAnnotationComposer get studyId {
+    final $$BibleStudiesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.studyId,
+      referencedTable: $db.bibleStudies,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BibleStudiesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.bibleStudies,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$VoiceNotesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $VoiceNotesTable,
+          VoiceNoteEntry,
+          $$VoiceNotesTableFilterComposer,
+          $$VoiceNotesTableOrderingComposer,
+          $$VoiceNotesTableAnnotationComposer,
+          $$VoiceNotesTableCreateCompanionBuilder,
+          $$VoiceNotesTableUpdateCompanionBuilder,
+          (VoiceNoteEntry, $$VoiceNotesTableReferences),
+          VoiceNoteEntry,
+          PrefetchHooks Function({bool personId, bool visitId, bool studyId})
+        > {
+  $$VoiceNotesTableTableManager(_$AppDatabase db, $VoiceNotesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$VoiceNotesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$VoiceNotesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$VoiceNotesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> personId = const Value.absent(),
+                Value<String?> visitId = const Value.absent(),
+                Value<String?> studyId = const Value.absent(),
+                Value<String?> audioFilePath = const Value.absent(),
+                Value<int> audioDurationSeconds = const Value.absent(),
+                Value<String> transcription = const Value.absent(),
+                Value<int?> detectedLesson = const Value.absent(),
+                Value<int?> detectedPoint = const Value.absent(),
+                Value<String?> extractedPendingDoubt = const Value.absent(),
+                Value<String?> extractedEmpathyNote = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => VoiceNotesCompanion(
+                id: id,
+                personId: personId,
+                visitId: visitId,
+                studyId: studyId,
+                audioFilePath: audioFilePath,
+                audioDurationSeconds: audioDurationSeconds,
+                transcription: transcription,
+                detectedLesson: detectedLesson,
+                detectedPoint: detectedPoint,
+                extractedPendingDoubt: extractedPendingDoubt,
+                extractedEmpathyNote: extractedEmpathyNote,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String personId,
+                Value<String?> visitId = const Value.absent(),
+                Value<String?> studyId = const Value.absent(),
+                Value<String?> audioFilePath = const Value.absent(),
+                Value<int> audioDurationSeconds = const Value.absent(),
+                required String transcription,
+                Value<int?> detectedLesson = const Value.absent(),
+                Value<int?> detectedPoint = const Value.absent(),
+                Value<String?> extractedPendingDoubt = const Value.absent(),
+                Value<String?> extractedEmpathyNote = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => VoiceNotesCompanion.insert(
+                id: id,
+                personId: personId,
+                visitId: visitId,
+                studyId: studyId,
+                audioFilePath: audioFilePath,
+                audioDurationSeconds: audioDurationSeconds,
+                transcription: transcription,
+                detectedLesson: detectedLesson,
+                detectedPoint: detectedPoint,
+                extractedPendingDoubt: extractedPendingDoubt,
+                extractedEmpathyNote: extractedEmpathyNote,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$VoiceNotesTable, VoiceNoteEntry>(table),
+                  $$VoiceNotesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback:
+              ({personId = false, visitId = false, studyId = false}) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (personId) {
+                          state = state.withJoin(
+                            currentTable: table,
+                            currentColumn: table.personId,
+                            referencedTable: $$VoiceNotesTableReferences
+                                ._personIdTable(db),
+                            referencedColumn: $$VoiceNotesTableReferences
+                                ._personIdTable(db)
+                                .id,
+                          ) as T;
+                        }
+                        if (visitId) {
+                          state = state.withJoin(
+                            currentTable: table,
+                            currentColumn: table.visitId,
+                            referencedTable: $$VoiceNotesTableReferences
+                                ._visitIdTable(db),
+                            referencedColumn: $$VoiceNotesTableReferences
+                                ._visitIdTable(db)
+                                .id,
+                          ) as T;
+                        }
+                        if (studyId) {
+                          state = state.withJoin(
+                            currentTable: table,
+                            currentColumn: table.studyId,
+                            referencedTable: $$VoiceNotesTableReferences
+                                ._studyIdTable(db),
+                            referencedColumn: $$VoiceNotesTableReferences
+                                ._studyIdTable(db)
+                                .id,
+                          ) as T;
+                        }
+
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [];
+                  },
+                );
+              },
+        ),
+      );
+}
+
+typedef $$VoiceNotesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $VoiceNotesTable,
+      VoiceNoteEntry,
+      $$VoiceNotesTableFilterComposer,
+      $$VoiceNotesTableOrderingComposer,
+      $$VoiceNotesTableAnnotationComposer,
+      $$VoiceNotesTableCreateCompanionBuilder,
+      $$VoiceNotesTableUpdateCompanionBuilder,
+      (VoiceNoteEntry, $$VoiceNotesTableReferences),
+      VoiceNoteEntry,
+      PrefetchHooks Function({bool personId, bool visitId, bool studyId})
+    >;
+typedef $$PhoneContactsTableCreateCompanionBuilder =
+    PhoneContactsCompanion Function({
+      required String id,
+      required String name,
+      required String phone,
+      Value<String?> secondaryPhone,
+      Value<bool> hasWhatsapp,
+      Value<String?> whatsappInfo,
+      Value<bool> hasSocial,
+      Value<String?> socialPlatform,
+      Value<String?> socialHandle,
+      Value<String?> notes,
+      Value<String> tags,
+      Value<String> origin,
+      Value<String?> convertedPersonId,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> revision,
+      Value<int> rowid,
+    });
+typedef $$PhoneContactsTableUpdateCompanionBuilder =
+    PhoneContactsCompanion Function({
+      Value<String> id,
+      Value<String> name,
+      Value<String> phone,
+      Value<String?> secondaryPhone,
+      Value<bool> hasWhatsapp,
+      Value<String?> whatsappInfo,
+      Value<bool> hasSocial,
+      Value<String?> socialPlatform,
+      Value<String?> socialHandle,
+      Value<String?> notes,
+      Value<String> tags,
+      Value<String> origin,
+      Value<String?> convertedPersonId,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> revision,
+      Value<int> rowid,
+    });
+
+final class $$PhoneContactsTableReferences
+    extends
+        BaseReferences<_$AppDatabase, $PhoneContactsTable, PhoneContactEntry> {
+  $$PhoneContactsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $PeopleTable _convertedPersonIdTable(_$AppDatabase db) =>
+      db.people.createAlias('phone_contacts__converted_person_id__people__id');
+
+  $$PeopleTableProcessedTableManager? get convertedPersonId {
+    final $_column = $_itemColumn<String>('converted_person_id');
+    if ($_column == null) return null;
+    final manager = $$PeopleTableTableManager(
+      $_db,
+      $_db.people,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_convertedPersonIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$PhoneContactsTableFilterComposer
+    extends Composer<_$AppDatabase, $PhoneContactsTable> {
+  $$PhoneContactsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get phone => $composableBuilder(
+    column: $table.phone,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get secondaryPhone => $composableBuilder(
+    column: $table.secondaryPhone,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get hasWhatsapp => $composableBuilder(
+    column: $table.hasWhatsapp,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get whatsappInfo => $composableBuilder(
+    column: $table.whatsappInfo,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get hasSocial => $composableBuilder(
+    column: $table.hasSocial,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get socialPlatform => $composableBuilder(
+    column: $table.socialPlatform,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get socialHandle => $composableBuilder(
+    column: $table.socialHandle,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get tags => $composableBuilder(
+    column: $table.tags,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get origin => $composableBuilder(
+    column: $table.origin,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$PeopleTableFilterComposer get convertedPersonId {
+    final $$PeopleTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.convertedPersonId,
+      referencedTable: $db.people,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PeopleTableFilterComposer(
+            $db: $db,
+            $table: $db.people,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$PhoneContactsTableOrderingComposer
+    extends Composer<_$AppDatabase, $PhoneContactsTable> {
+  $$PhoneContactsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get phone => $composableBuilder(
+    column: $table.phone,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get secondaryPhone => $composableBuilder(
+    column: $table.secondaryPhone,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get hasWhatsapp => $composableBuilder(
+    column: $table.hasWhatsapp,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get whatsappInfo => $composableBuilder(
+    column: $table.whatsappInfo,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get hasSocial => $composableBuilder(
+    column: $table.hasSocial,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get socialPlatform => $composableBuilder(
+    column: $table.socialPlatform,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get socialHandle => $composableBuilder(
+    column: $table.socialHandle,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get tags => $composableBuilder(
+    column: $table.tags,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get origin => $composableBuilder(
+    column: $table.origin,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$PeopleTableOrderingComposer get convertedPersonId {
+    final $$PeopleTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.convertedPersonId,
+      referencedTable: $db.people,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PeopleTableOrderingComposer(
+            $db: $db,
+            $table: $db.people,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$PhoneContactsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $PhoneContactsTable> {
+  $$PhoneContactsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get phone =>
+      $composableBuilder(column: $table.phone, builder: (column) => column);
+
+  GeneratedColumn<String> get secondaryPhone => $composableBuilder(
+    column: $table.secondaryPhone,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get hasWhatsapp => $composableBuilder(
+    column: $table.hasWhatsapp,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get whatsappInfo => $composableBuilder(
+    column: $table.whatsappInfo,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get hasSocial =>
+      $composableBuilder(column: $table.hasSocial, builder: (column) => column);
+
+  GeneratedColumn<String> get socialPlatform => $composableBuilder(
+    column: $table.socialPlatform,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get socialHandle => $composableBuilder(
+    column: $table.socialHandle,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get notes =>
+      $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  GeneratedColumn<String> get tags =>
+      $composableBuilder(column: $table.tags, builder: (column) => column);
+
+  GeneratedColumn<String> get origin =>
+      $composableBuilder(column: $table.origin, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get revision =>
+      $composableBuilder(column: $table.revision, builder: (column) => column);
+
+  $$PeopleTableAnnotationComposer get convertedPersonId {
+    final $$PeopleTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.convertedPersonId,
+      referencedTable: $db.people,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PeopleTableAnnotationComposer(
+            $db: $db,
+            $table: $db.people,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$PhoneContactsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $PhoneContactsTable,
+          PhoneContactEntry,
+          $$PhoneContactsTableFilterComposer,
+          $$PhoneContactsTableOrderingComposer,
+          $$PhoneContactsTableAnnotationComposer,
+          $$PhoneContactsTableCreateCompanionBuilder,
+          $$PhoneContactsTableUpdateCompanionBuilder,
+          (PhoneContactEntry, $$PhoneContactsTableReferences),
+          PhoneContactEntry,
+          PrefetchHooks Function({bool convertedPersonId})
+        > {
+  $$PhoneContactsTableTableManager(_$AppDatabase db, $PhoneContactsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PhoneContactsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$PhoneContactsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$PhoneContactsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String> phone = const Value.absent(),
+                Value<String?> secondaryPhone = const Value.absent(),
+                Value<bool> hasWhatsapp = const Value.absent(),
+                Value<String?> whatsappInfo = const Value.absent(),
+                Value<bool> hasSocial = const Value.absent(),
+                Value<String?> socialPlatform = const Value.absent(),
+                Value<String?> socialHandle = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
+                Value<String> tags = const Value.absent(),
+                Value<String> origin = const Value.absent(),
+                Value<String?> convertedPersonId = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PhoneContactsCompanion(
+                id: id,
+                name: name,
+                phone: phone,
+                secondaryPhone: secondaryPhone,
+                hasWhatsapp: hasWhatsapp,
+                whatsappInfo: whatsappInfo,
+                hasSocial: hasSocial,
+                socialPlatform: socialPlatform,
+                socialHandle: socialHandle,
+                notes: notes,
+                tags: tags,
+                origin: origin,
+                convertedPersonId: convertedPersonId,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String name,
+                required String phone,
+                Value<String?> secondaryPhone = const Value.absent(),
+                Value<bool> hasWhatsapp = const Value.absent(),
+                Value<String?> whatsappInfo = const Value.absent(),
+                Value<bool> hasSocial = const Value.absent(),
+                Value<String?> socialPlatform = const Value.absent(),
+                Value<String?> socialHandle = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
+                Value<String> tags = const Value.absent(),
+                Value<String> origin = const Value.absent(),
+                Value<String?> convertedPersonId = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PhoneContactsCompanion.insert(
+                id: id,
+                name: name,
+                phone: phone,
+                secondaryPhone: secondaryPhone,
+                hasWhatsapp: hasWhatsapp,
+                whatsappInfo: whatsappInfo,
+                hasSocial: hasSocial,
+                socialPlatform: socialPlatform,
+                socialHandle: socialHandle,
+                notes: notes,
+                tags: tags,
+                origin: origin,
+                convertedPersonId: convertedPersonId,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$PhoneContactsTable, PhoneContactEntry>(table),
+                  $$PhoneContactsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({convertedPersonId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (convertedPersonId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.convertedPersonId,
+                        referencedTable: $$PhoneContactsTableReferences
+                            ._convertedPersonIdTable(db),
+                        referencedColumn: $$PhoneContactsTableReferences
+                            ._convertedPersonIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$PhoneContactsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $PhoneContactsTable,
+      PhoneContactEntry,
+      $$PhoneContactsTableFilterComposer,
+      $$PhoneContactsTableOrderingComposer,
+      $$PhoneContactsTableAnnotationComposer,
+      $$PhoneContactsTableCreateCompanionBuilder,
+      $$PhoneContactsTableUpdateCompanionBuilder,
+      (PhoneContactEntry, $$PhoneContactsTableReferences),
+      PhoneContactEntry,
+      PrefetchHooks Function({bool convertedPersonId})
+    >;
+typedef $$TerritoryLandmarksTableCreateCompanionBuilder =
+    TerritoryLandmarksCompanion Function({
+      required String id,
+      required String name,
+      required String category,
+      Value<String?> address,
+      Value<double?> latitude,
+      Value<double?> longitude,
+      Value<String?> notes,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> revision,
+      Value<int> rowid,
+    });
+typedef $$TerritoryLandmarksTableUpdateCompanionBuilder =
+    TerritoryLandmarksCompanion Function({
+      Value<String> id,
+      Value<String> name,
+      Value<String> category,
+      Value<String?> address,
+      Value<double?> latitude,
+      Value<double?> longitude,
+      Value<String?> notes,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> revision,
+      Value<int> rowid,
+    });
+
+class $$TerritoryLandmarksTableFilterComposer
+    extends Composer<_$AppDatabase, $TerritoryLandmarksTable> {
+  $$TerritoryLandmarksTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get address => $composableBuilder(
+    column: $table.address,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get latitude => $composableBuilder(
+    column: $table.latitude,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get longitude => $composableBuilder(
+    column: $table.longitude,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$TerritoryLandmarksTableOrderingComposer
+    extends Composer<_$AppDatabase, $TerritoryLandmarksTable> {
+  $$TerritoryLandmarksTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get address => $composableBuilder(
+    column: $table.address,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get latitude => $composableBuilder(
+    column: $table.latitude,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get longitude => $composableBuilder(
+    column: $table.longitude,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$TerritoryLandmarksTableAnnotationComposer
+    extends Composer<_$AppDatabase, $TerritoryLandmarksTable> {
+  $$TerritoryLandmarksTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get category =>
+      $composableBuilder(column: $table.category, builder: (column) => column);
+
+  GeneratedColumn<String> get address =>
+      $composableBuilder(column: $table.address, builder: (column) => column);
+
+  GeneratedColumn<double> get latitude =>
+      $composableBuilder(column: $table.latitude, builder: (column) => column);
+
+  GeneratedColumn<double> get longitude =>
+      $composableBuilder(column: $table.longitude, builder: (column) => column);
+
+  GeneratedColumn<String> get notes =>
+      $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get revision =>
+      $composableBuilder(column: $table.revision, builder: (column) => column);
+}
+
+class $$TerritoryLandmarksTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $TerritoryLandmarksTable,
+          TerritoryLandmarkEntry,
+          $$TerritoryLandmarksTableFilterComposer,
+          $$TerritoryLandmarksTableOrderingComposer,
+          $$TerritoryLandmarksTableAnnotationComposer,
+          $$TerritoryLandmarksTableCreateCompanionBuilder,
+          $$TerritoryLandmarksTableUpdateCompanionBuilder,
+          (
+            TerritoryLandmarkEntry,
+            BaseReferences<
+              _$AppDatabase,
+              $TerritoryLandmarksTable,
+              TerritoryLandmarkEntry
+            >,
+          ),
+          TerritoryLandmarkEntry,
+          PrefetchHooks Function()
+        > {
+  $$TerritoryLandmarksTableTableManager(
+    _$AppDatabase db,
+    $TerritoryLandmarksTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$TerritoryLandmarksTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$TerritoryLandmarksTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$TerritoryLandmarksTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String> category = const Value.absent(),
+                Value<String?> address = const Value.absent(),
+                Value<double?> latitude = const Value.absent(),
+                Value<double?> longitude = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TerritoryLandmarksCompanion(
+                id: id,
+                name: name,
+                category: category,
+                address: address,
+                latitude: latitude,
+                longitude: longitude,
+                notes: notes,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String name,
+                required String category,
+                Value<String?> address = const Value.absent(),
+                Value<double?> latitude = const Value.absent(),
+                Value<double?> longitude = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TerritoryLandmarksCompanion.insert(
+                id: id,
+                name: name,
+                category: category,
+                address: address,
+                latitude: latitude,
+                longitude: longitude,
+                notes: notes,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$TerritoryLandmarksTable, TerritoryLandmarkEntry>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $TerritoryLandmarksTable,
+                    TerritoryLandmarkEntry
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$TerritoryLandmarksTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $TerritoryLandmarksTable,
+      TerritoryLandmarkEntry,
+      $$TerritoryLandmarksTableFilterComposer,
+      $$TerritoryLandmarksTableOrderingComposer,
+      $$TerritoryLandmarksTableAnnotationComposer,
+      $$TerritoryLandmarksTableCreateCompanionBuilder,
+      $$TerritoryLandmarksTableUpdateCompanionBuilder,
+      (
+        TerritoryLandmarkEntry,
+        BaseReferences<
+          _$AppDatabase,
+          $TerritoryLandmarksTable,
+          TerritoryLandmarkEntry
+        >,
+      ),
+      TerritoryLandmarkEntry,
+      PrefetchHooks Function()
+    >;
+typedef $$AppKvStoreTableCreateCompanionBuilder = AppKvStoreCompanion Function({
+  required String key,
+  required String value,
+  Value<DateTime?> updatedAt,
+  Value<int> rowid,
+});
+typedef $$AppKvStoreTableUpdateCompanionBuilder = AppKvStoreCompanion Function({
+  Value<String> key,
+  Value<String> value,
+  Value<DateTime?> updatedAt,
+  Value<int> rowid,
+});
+
+class $$AppKvStoreTableFilterComposer
+    extends Composer<_$AppDatabase, $AppKvStoreTable> {
+  $$AppKvStoreTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get key => $composableBuilder(
+    column: $table.key,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get value => $composableBuilder(
+    column: $table.value,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$AppKvStoreTableOrderingComposer
+    extends Composer<_$AppDatabase, $AppKvStoreTable> {
+  $$AppKvStoreTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get key => $composableBuilder(
+    column: $table.key,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get value => $composableBuilder(
+    column: $table.value,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$AppKvStoreTableAnnotationComposer
+    extends Composer<_$AppDatabase, $AppKvStoreTable> {
+  $$AppKvStoreTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get key =>
+      $composableBuilder(column: $table.key, builder: (column) => column);
+
+  GeneratedColumn<String> get value =>
+      $composableBuilder(column: $table.value, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$AppKvStoreTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $AppKvStoreTable,
+          AppKvEntry,
+          $$AppKvStoreTableFilterComposer,
+          $$AppKvStoreTableOrderingComposer,
+          $$AppKvStoreTableAnnotationComposer,
+          $$AppKvStoreTableCreateCompanionBuilder,
+          $$AppKvStoreTableUpdateCompanionBuilder,
+          (
+            AppKvEntry,
+            BaseReferences<_$AppDatabase, $AppKvStoreTable, AppKvEntry>,
+          ),
+          AppKvEntry,
+          PrefetchHooks Function()
+        > {
+  $$AppKvStoreTableTableManager(_$AppDatabase db, $AppKvStoreTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$AppKvStoreTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$AppKvStoreTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$AppKvStoreTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> key = const Value.absent(),
+                Value<String> value = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => AppKvStoreCompanion(
+                key: key,
+                value: value,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String key,
+                required String value,
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => AppKvStoreCompanion.insert(
+                key: key,
+                value: value,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$AppKvStoreTable, AppKvEntry>(table),
+                  BaseReferences<_$AppDatabase, $AppKvStoreTable, AppKvEntry>(
+                    db,
+                    table,
+                    e,
+                  ),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$AppKvStoreTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $AppKvStoreTable,
+      AppKvEntry,
+      $$AppKvStoreTableFilterComposer,
+      $$AppKvStoreTableOrderingComposer,
+      $$AppKvStoreTableAnnotationComposer,
+      $$AppKvStoreTableCreateCompanionBuilder,
+      $$AppKvStoreTableUpdateCompanionBuilder,
+      (AppKvEntry, BaseReferences<_$AppDatabase, $AppKvStoreTable, AppKvEntry>),
+      AppKvEntry,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -11199,4 +16137,12 @@ class $AppDatabaseManager {
       $$ActivityRecordsTableTableManager(_db, _db.activityRecords);
   $$SyncQueueTableTableManager get syncQueue =>
       $$SyncQueueTableTableManager(_db, _db.syncQueue);
+  $$VoiceNotesTableTableManager get voiceNotes =>
+      $$VoiceNotesTableTableManager(_db, _db.voiceNotes);
+  $$PhoneContactsTableTableManager get phoneContacts =>
+      $$PhoneContactsTableTableManager(_db, _db.phoneContacts);
+  $$TerritoryLandmarksTableTableManager get territoryLandmarks =>
+      $$TerritoryLandmarksTableTableManager(_db, _db.territoryLandmarks);
+  $$AppKvStoreTableTableManager get appKvStore =>
+      $$AppKvStoreTableTableManager(_db, _db.appKvStore);
 }
