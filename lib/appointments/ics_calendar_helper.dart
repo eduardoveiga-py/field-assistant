@@ -9,6 +9,8 @@ class ParsedIcsEvent {
   final DateTime endTime;
   final int durationMinutes;
   final String status;
+  final bool isAllDay;
+  final String? recurrenceRule;
 
   ParsedIcsEvent({
     required this.summary,
@@ -19,11 +21,14 @@ class ParsedIcsEvent {
     required this.endTime,
     required this.durationMinutes,
     required this.status,
+    this.isAllDay = false,
+    this.recurrenceRule,
   });
 }
 
 class IcsCalendarHelper {
   /// Converte formato de data iCal (ex: 20261026T140000Z, 20261026T140000, 20261026) para DateTime
+  /// Retorna null se a string de data for inválida (nunca retorna DateTime.now() silenciosamente)
   static DateTime? parseIcsDateTime(String raw) {
     final clean = raw.trim();
     if (clean.length < 8) return null;
@@ -31,16 +36,27 @@ class IcsCalendarHelper {
       final y = int.parse(clean.substring(0, 4));
       final m = int.parse(clean.substring(4, 6));
       final d = int.parse(clean.substring(6, 8));
+      if (y < 1970 || y > 2100 || m < 1 || m > 12 || d < 1 || d > 31) {
+        return null;
+      }
+
       if (clean.contains('T')) {
         final tPart = clean.split('T')[1];
+        if (tPart.length < 4) return null;
         final h = int.parse(tPart.substring(0, 2));
         final min = int.parse(tPart.substring(2, 4));
         final sec = tPart.length >= 6 ? int.parse(tPart.substring(4, 6)) : 0;
+
+        if (h < 0 || h > 23 || min < 0 || min > 59 || sec < 0 || sec > 60) {
+          return null;
+        }
+
         if (clean.endsWith('Z')) {
           return DateTime.utc(y, m, d, h, min, sec).toLocal();
         }
         return DateTime(y, m, d, h, min, sec);
       }
+      // Evento de dia inteiro (YYYYMMDD)
       return DateTime(y, m, d);
     } catch (_) {
       return null;
@@ -59,6 +75,7 @@ class IcsCalendarHelper {
   }
 
   /// Faz o parse de múltiplos eventos VEVENT em um conteúdo iCalendar (.ics)
+  /// Rejeita eventos com datas inválidas ou ausentes (nunca inventa datas fictícias)
   static List<ParsedIcsEvent> parseIcsEvents(String rawIcs) {
     final events = <ParsedIcsEvent>[];
     if (rawIcs.trim().isEmpty) return events;
@@ -71,10 +88,46 @@ class IcsCalendarHelper {
     for (final match in eventMatches) {
       final block = match.group(1)!;
 
-      // Extrai Summary
+      // 1. Extrai e valida DTSTART obrigatório (rejeita evento se ausente ou inválido)
+      final startMatch = RegExp(r'^DTSTART(?:;[^:\r\n]+)?:([0-9TZ]+)', multiLine: true, caseSensitive: false).firstMatch(block);
+      if (startMatch == null) {
+        // Evento inválido segundo RFC 5545: DTSTART é obrigatório
+        continue;
+      }
+      final rawStart = startMatch.group(1)!;
+      final startTime = parseIcsDateTime(rawStart);
+      if (startTime == null) {
+        // Data inválida: rejeita evento
+        continue;
+      }
+
+      final isAllDay = !rawStart.contains('T');
+
+      // 2. Extrai DTEND ou calcula por duração
+      final endMatch = RegExp(r'^DTEND(?:;[^:\r\n]+)?:([0-9TZ]+)', multiLine: true, caseSensitive: false).firstMatch(block);
+      DateTime? parsedEnd;
+      if (endMatch != null) {
+        parsedEnd = parseIcsDateTime(endMatch.group(1)!);
+      }
+
+      // Se DTEND ausente ou anterior, calcula término coerente
+      DateTime endTime;
+      if (parsedEnd != null && parsedEnd.isAfter(startTime)) {
+        endTime = parsedEnd;
+      } else if (isAllDay) {
+        endTime = startTime.add(const Duration(days: 1));
+      } else {
+        endTime = startTime.add(const Duration(minutes: 30));
+      }
+
+      int duration = endTime.difference(startTime).inMinutes;
+      if (duration <= 0) {
+        duration = isAllDay ? 1440 : 30;
+      }
+
+      // 3. Extrai Summary
       final summaryMatch = RegExp(r'^SUMMARY(?:;[^:\r\n]+)?:(.*)$', multiLine: true, caseSensitive: false).firstMatch(block);
       var summary = summaryMatch?.group(1)?.trim() ?? 'Compromisso Importado';
-      // Desescapa caracteres iCal
       summary = summary
           .replaceAll(r'\,', ',')
           .replaceAll(r'\;', ';')
@@ -84,7 +137,7 @@ class IcsCalendarHelper {
           .trim();
       if (summary.isEmpty) summary = 'Compromisso Importado';
 
-      // Extrai Location
+      // 4. Extrai Location
       final locMatch = RegExp(r'^LOCATION(?:;[^:\r\n]+)?:(.*)$', multiLine: true, caseSensitive: false).firstMatch(block);
       var loc = locMatch?.group(1)?.trim();
       if (loc != null) {
@@ -98,7 +151,7 @@ class IcsCalendarHelper {
         if (loc.isEmpty) loc = null;
       }
 
-      // Extrai UID (se originado do app ou externo)
+      // 5. Extrai UID
       final uidMatch = RegExp(r'^UID(?:;[^:\r\n]+)?:(.*)$', multiLine: true, caseSensitive: false).firstMatch(block);
       final rawUid = uidMatch?.group(1)?.trim();
       String? apptId;
@@ -109,26 +162,14 @@ class IcsCalendarHelper {
             .trim();
       }
 
-      // Extrai DTSTART (com suporte a parâmetros como ;TZID=..., ;VALUE=DATE)
-      final startMatch = RegExp(r'^DTSTART(?:;[^:\r\n]+)?:(\d{8}(?:T\d{6}Z?)?)', multiLine: true, caseSensitive: false).firstMatch(block);
-      final startTime = (startMatch != null) ? parseIcsDateTime(startMatch.group(1)!) ?? DateTime.now() : DateTime.now();
-
-      // Extrai DTEND (com suporte a parâmetros como ;TZID=..., ;VALUE=DATE)
-      final endMatch = RegExp(r'^DTEND(?:;[^:\r\n]+)?:(\d{8}(?:T\d{6}Z?)?)', multiLine: true, caseSensitive: false).firstMatch(block);
-      DateTime endTime = (endMatch != null)
-          ? parseIcsDateTime(endMatch.group(1)!) ?? startTime.add(const Duration(minutes: 30))
-          : startTime.add(const Duration(minutes: 30));
-
-      int duration = endTime.difference(startTime).inMinutes;
-      if (duration <= 0) {
-        duration = 30;
-        endTime = startTime.add(const Duration(minutes: 30));
-      }
-
-      // Extrai STATUS
+      // 6. Extrai STATUS
       final statusMatch = RegExp(r'^STATUS(?:;[^:\r\n]+)?:(.*)$', multiLine: true, caseSensitive: false).firstMatch(block);
       final rawStatus = statusMatch?.group(1)?.trim().toUpperCase();
       final status = rawStatus == 'CANCELLED' ? 'cancelado' : 'confirmado';
+
+      // 7. Extrai RRULE (Regra de Recorrência)
+      final rruleMatch = RegExp(r'^RRULE(?:;[^:\r\n]+)?:(.*)$', multiLine: true, caseSensitive: false).firstMatch(block);
+      final rrule = rruleMatch?.group(1)?.trim();
 
       events.add(ParsedIcsEvent(
         summary: summary,
@@ -139,6 +180,8 @@ class IcsCalendarHelper {
         endTime: endTime,
         durationMinutes: duration,
         status: status,
+        isAllDay: isAllDay,
+        recurrenceRule: rrule,
       ));
     }
 

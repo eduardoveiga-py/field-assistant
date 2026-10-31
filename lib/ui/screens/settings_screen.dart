@@ -7,6 +7,9 @@ import '../../core/demo_data.dart';
 import '../providers.dart';
 import 'activities_screen.dart';
 import 'trash_screen.dart';
+import 'customize_features_screen.dart';
+import 'connected_calendars_screen.dart';
+
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -584,9 +587,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                   ),
                 ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.calendar_month, color: AppTheme.primaryBlue),
+                  title: const Text('Calendários Conectados'),
+                  subtitle: const Text('Google Agenda e Apple Calendário com sincronização bidirecional.'),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+                  onTap: () {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const ConnectedCalendarsScreen()));
+                  },
+                ),
               ],
             ),
           ),
+
           const SizedBox(height: 20),
 
           // Seção: Backup Criptografado
@@ -819,6 +833,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             child: Column(
               children: [
                 ListTile(
+                  leading: const Icon(Icons.dashboard_customize_outlined, color: Color(0xFF7C3AED)),
+                  title: const Text('Personalizar Aplicativo e Recursos'),
+                  subtitle: const Text('Ative ou oculte módulos (Estudos, Agenda, Pesquisa, etc.) com preservação total de dados.'),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+                  onTap: () {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomizeFeaturesScreen()));
+                  },
+                ),
+                const Divider(height: 1),
+                ListTile(
                   leading: const Icon(Icons.timer_outlined, color: AppTheme.primaryBlue),
                   title: const Text('Atividades e Metas de Serviço'),
                   subtitle: const Text('Registro de horas diárias, modalidades e metas anuais.'),
@@ -827,6 +851,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     Navigator.push(context, MaterialPageRoute(builder: (_) => const ActivitiesScreen()));
                   },
                 ),
+
                 const Divider(height: 1),
                 ListTile(
                   leading: const Icon(Icons.delete_outline, color: AppTheme.alertRed),

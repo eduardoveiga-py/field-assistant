@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -129,43 +128,10 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
         icsBody = resp.body;
       }
     } catch (e) {
-      if (kIsWeb) {
-        // Tenta proxies CORS alternativos
-        final proxies = [
-          'https://api.allorigins.win/raw?url=${Uri.encodeComponent(cleanUrl)}',
-          'https://corsproxy.io/?${Uri.encodeComponent(cleanUrl)}',
-          'https://api.codetabs.com/v1/proxy?quest=${Uri.encodeComponent(cleanUrl)}',
-        ];
-        for (final p in proxies) {
-          try {
-            final pResp = await http.get(Uri.parse(p)).timeout(const Duration(seconds: 10));
-            if (pResp.statusCode == 200 && pResp.body.contains('BEGIN:VCALENDAR')) {
-              icsBody = pResp.body;
-              break;
-            }
-          } catch (_) {}
-        }
-        if (icsBody == null) {
-          // Tenta allorigins formato JSON
-          try {
-            final jsonUri = Uri.parse('https://api.allorigins.win/get?url=${Uri.encodeComponent(cleanUrl)}');
-            final jsonResp = await http.get(jsonUri).timeout(const Duration(seconds: 10));
-            if (jsonResp.statusCode == 200) {
-              final map = jsonDecode(jsonResp.body);
-              if (map is Map && map['contents'] is String) {
-                final contents = map['contents'] as String;
-                if (contents.contains('BEGIN:VCALENDAR')) {
-                  icsBody = contents;
-                }
-              }
-            }
-          } catch (_) {}
-        }
-      }
       if (icsBody == null && !silent) {
         throw Exception(
-          'O navegador bloqueou a requisição direta por CORS.\n\n'
-          'Por favor, clique no botão "Baixar no Navegador" para baixar o arquivo .ics e depois use "Selecionar Arquivo .ics" ou "Colar Texto .ics" para importar instantaneamente.'
+          'Não foi possível acessar a URL diretamente por restrições de rede ou CORS.\n\n'
+          'Por favor, utilize a integração oficial em "Calendários Conectados", ou baixe o arquivo .ics e importe usando "Selecionar Arquivo .ics" para manter seus dados 100% privados.'
         );
       }
     }

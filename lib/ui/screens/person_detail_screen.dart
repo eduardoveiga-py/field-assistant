@@ -33,6 +33,7 @@ import '../widgets/doorstep_briefing_card.dart';
 import '../../voice_notes/voice_notes_manager.dart';
 import '../../voice_notes/voice_note_models.dart';
 import '../widgets/quick_voice_note_dialog.dart';
+import '../../core/feature_registry.dart';
 
 class PersonDetailScreen extends ConsumerStatefulWidget {
   final String personId;
@@ -44,6 +45,9 @@ class PersonDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
+  // Cache de rascunho de preenchimento para visita rápida da pessoa
+  static final Map<String, Map<String, dynamic>> _quickVisitDrafts = {};
+
   // Modal de Abertura de Publicação no JW Library / Site Oficial
   void _openPublicationLink(BuildContext context, BibleStudyEntry study) {
     final resolved = PublicationLinkResolver.resolve(
@@ -1572,13 +1576,32 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
 
   // Modal Unificado: Registro de Visita, Estudo Bíblico e Agendamento Global (Fluxo Rápido Atômico)
   void _showQuickVisitDialog(BuildContext context, PersonEntry person, BibleStudyEntry? existingStudy) {
-    final notesController = TextEditingController();
-    final topicsController = TextEditingController();
-    final nextStepController = TextEditingController(text: existingStudy?.nextTopic ?? '');
-    String selectedType = (existingStudy != null || person.status == 'estudo') ? 'estudo' : 'revisita';
-    bool recordStudy = existingStudy != null || person.status == 'estudo';
+    final isStudiesEnabled = ref.read(isFeatureEnabledProvider(AppFeature.studies));
+    final draft = _quickVisitDrafts[person.id];
+
+    final notesController = TextEditingController(text: draft?['notes'] as String? ?? '');
+    final topicsController = TextEditingController(text: draft?['topics'] as String? ?? '');
+    final nextStepController = TextEditingController(
+      text: draft?['nextStep'] as String? ?? existingStudy?.nextTopic ?? '',
+    );
+    String selectedType = draft?['type'] as String? ?? 'revisita';
+    bool recordStudy = isStudiesEnabled && (draft?['recordStudy'] as bool? ?? (selectedType == 'estudo'));
     String selectedResult = 'Conversa receptiva';
     DateTime selectedDate = DateTime.now();
+
+    void updateDraft() {
+      _quickVisitDrafts[person.id] = {
+        'notes': notesController.text,
+        'topics': topicsController.text,
+        'nextStep': nextStepController.text,
+        'type': selectedType,
+        'recordStudy': recordStudy,
+      };
+    }
+
+    notesController.addListener(updateDraft);
+    topicsController.addListener(updateDraft);
+    nextStepController.addListener(updateDraft);
 
     // Campos do Estudo Bíblico
     String selectedPublicationId = existingStudy?.publicationId ?? 'lff-book';
@@ -1633,6 +1656,7 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
         0,
       );
     }
+
 
     showModalBottomSheet(
       context: context,
@@ -1699,16 +1723,50 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
+                  if (draft != null) ...[
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppTheme.accentTeal.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.history_toggle_off, size: 16, color: AppTheme.accentTeal),
+                          const SizedBox(width: 8),
+                          const Expanded(
+                            child: Text(
+                              'Rascunho recuperado automaticamente.',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.accentTeal),
+                            ),
+                          ),
+                          TextButton(
+                            style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                            onPressed: () {
+                              _quickVisitDrafts.remove(person.id);
+                              setSheetState(() {
+                                notesController.clear();
+                                topicsController.clear();
+                                nextStepController.clear();
+                              });
+                            },
+                            child: const Text('Limpar', style: TextStyle(fontSize: 11)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   DropdownButtonFormField<String>(
                     initialValue: selectedType,
                     decoration: const InputDecoration(labelText: 'Tipo de Contato'),
-                    items: const [
-                      DropdownMenuItem(value: 'revisita', child: Text('Revisita Presencial')),
-                      DropdownMenuItem(value: 'estudo', child: Text('Estudo Bíblico')),
-                      DropdownMenuItem(value: 'conversa_inicial', child: Text('Conversa Inicial')),
-                      DropdownMenuItem(value: 'contato_telefonico', child: Text('Contato Telefônico / Carta')),
-                      DropdownMenuItem(value: 'tentativa_sem_contato', child: Text('Tentativa sem Contato (Não contou)')),
+                    items: [
+                      const DropdownMenuItem(value: 'revisita', child: Text('Revisita Presencial')),
+                      if (isStudiesEnabled)
+                        const DropdownMenuItem(value: 'estudo', child: Text('Estudo Bíblico')),
+                      const DropdownMenuItem(value: 'conversa_inicial', child: Text('Conversa Inicial')),
+                      const DropdownMenuItem(value: 'contato_telefonico', child: Text('Contato Telefônico / Carta')),
+                      const DropdownMenuItem(value: 'tentativa_sem_contato', child: Text('Tentativa sem Contato (Não contou)')),
                     ],
                     onChanged: (val) {
                       if (val != null) {
@@ -1720,18 +1778,20 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                           } else if (existingStudy == null && person.status != 'estudo') {
                             returnDuration = 30;
                           }
+                          updateDraft();
                         });
                       }
                     },
                   ),
                   const SizedBox(height: 10),
 
-                  if (selectedType != 'estudo') ...[
+                  if (isStudiesEnabled && selectedType != 'estudo') ...[
                     InkWell(
                       onTap: () {
                         setSheetState(() {
                           recordStudy = !recordStudy;
                           if (recordStudy) returnDuration = 60;
+                          updateDraft();
                         });
                       },
                       child: Row(
@@ -1743,6 +1803,7 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                               setSheetState(() {
                                 recordStudy = val ?? false;
                                 if (recordStudy) returnDuration = 60;
+                                updateDraft();
                               });
                             },
                           ),
@@ -1757,6 +1818,7 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                     ),
                     const SizedBox(height: 8),
                   ],
+
 
                   // Seção Especial de Estudo Bíblico (Unificação de fluxo)
                   if (selectedType == 'estudo' || recordStudy) ...[
@@ -2022,7 +2084,9 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                           }
                         }
 
+                        _quickVisitDrafts.remove(person.id);
                         if (ctx.mounted) Navigator.pop(ctx);
+
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
@@ -2561,9 +2625,46 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
         : null;
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isStudiesEnabled = ref.watch(isFeatureEnabledProvider(AppFeature.studies));
+    final isAgendaEnabled = ref.watch(isFeatureEnabledProvider(AppFeature.agenda));
+
+    final tabs = <Widget>[
+      const Tab(icon: Icon(Icons.history_edu), text: 'Visitas & Linha do Tempo'),
+      if (isStudiesEnabled)
+        const Tab(icon: Icon(Icons.school), text: 'Estudo Bíblico'),
+      const Tab(icon: Icon(Icons.photo_library), text: 'Fotos'),
+      const Tab(icon: Icon(Icons.auto_stories), text: 'Publicações & Pedidos'),
+      const Tab(icon: Icon(Icons.family_restroom), text: 'Família & Vínculos'),
+      const Tab(icon: Icon(Icons.note_alt_outlined), text: 'Necessidades & Obs.'),
+      const Tab(icon: Icon(Icons.track_changes), text: 'Alvos & Tarefas'),
+    ];
+
+    final tabViews = <Widget>[
+      // TAB 1: VISITAS & CONTATO
+      _buildVisitsAndContactTab(context, repo, person, isStudiesEnabled ? linkedStudy : null, isDark, isStudiesEnabled, isAgendaEnabled),
+
+      // TAB 2: ESTUDO BÍBLICO (Progresso, Publicações, JW Library e Sessões)
+      if (isStudiesEnabled)
+        _buildBibleStudyTab(context, repo, person, linkedStudy, isDark),
+
+      // TAB 3: FOTOS DA PESSOA / RESIDÊNCIA / ESTUDO
+      PersonPhotosTab(person: person),
+
+      // TAB 4: PUBLICAÇÕES & PEDIDOS (Checklist e Pedidos)
+      PersonPublicationsTab(person: person),
+
+      // TAB 5: FAMÍLIA & VÍNCULOS (Relacionamentos bidirecionais automáticos)
+      PersonFamilyTiesTab(person: person),
+
+      // TAB 6: NECESSIDADES & OBSERVAÇÕES
+      _buildNeedsAndNotesTab(context, repo, person, isDark),
+
+      // TAB 7: ALVOS & TAREFAS
+      _buildTargetsAndTasksTab(context, repo, person, isDark),
+    ];
 
     return DefaultTabController(
-      length: 7,
+      length: tabs.length,
       child: Scaffold(
         appBar: AppBar(
           title: Text(person.name),
@@ -2574,44 +2675,15 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
               onPressed: () => _showEditPersonDialog(context, repo, person),
             ),
           ],
-          bottom: const TabBar(
+          bottom: TabBar(
             isScrollable: true,
             tabAlignment: TabAlignment.start,
             indicatorColor: AppTheme.primaryBlue,
-            tabs: [
-              Tab(icon: Icon(Icons.history_edu), text: 'Visitas & Contato'),
-              Tab(icon: Icon(Icons.school), text: 'Estudo Bíblico'),
-              Tab(icon: Icon(Icons.photo_library), text: 'Fotos'),
-              Tab(icon: Icon(Icons.auto_stories), text: 'Publicações & Pedidos'),
-              Tab(icon: Icon(Icons.family_restroom), text: 'Família & Vínculos'),
-              Tab(icon: Icon(Icons.note_alt_outlined), text: 'Necessidades & Obs.'),
-              Tab(icon: Icon(Icons.track_changes), text: 'Alvos & Tarefas'),
-            ],
+            tabs: tabs,
           ),
         ),
         body: TabBarView(
-          children: [
-            // TAB 1: VISITAS & CONTATO
-            _buildVisitsAndContactTab(context, repo, person, linkedStudy, isDark),
-
-            // TAB 2: ESTUDO BÍBLICO (Progresso, Publicações, JW Library e Sessões)
-            _buildBibleStudyTab(context, repo, person, linkedStudy, isDark),
-
-            // TAB 3: FOTOS DA PESSOA / RESIDÊNCIA / ESTUDO
-            PersonPhotosTab(person: person),
-
-            // TAB 4: PUBLICAÇÕES & PEDIDOS (Checklist e Pedidos)
-            PersonPublicationsTab(person: person),
-
-            // TAB 5: FAMÍLIA & VÍNCULOS (Relacionamentos bidirecionais automáticos)
-            PersonFamilyTiesTab(person: person),
-
-            // TAB 6: NECESSIDADES & OBSERVAÇÕES
-            _buildNeedsAndNotesTab(context, repo, person, isDark),
-
-            // TAB 7: ALVOS & TAREFAS
-            _buildTargetsAndTasksTab(context, repo, person, isDark),
-          ],
+          children: tabViews,
         ),
       ),
     );
@@ -2623,7 +2695,10 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
     PersonEntry person,
     BibleStudyEntry? linkedStudy,
     bool isDark,
+    bool isStudiesEnabled,
+    bool isAgendaEnabled,
   ) {
+
     final isSunMode = ref.watch(sunModeProvider);
     final allPhotos = ref.watch(personPhotosStreamProvider).value ?? [];
     final personPhoto = allPhotos.where((p) => p.personId == person.id && p.photoType == 'person').firstOrNull;
@@ -3294,113 +3369,24 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
           _buildProximityAlertsSection(context, person, ref, isDark),
           const SizedBox(height: 20),
 
-          // Histórico Cronológico de Conversas e Revisitas
+          // Linha do Tempo Unificada do Contato (Visitas, Estudos, Telefones, Agenda e Áudios)
           const Text(
-            'Histórico de Visitas e Conversas',
+            'Linha do Tempo Unificada do Contato',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textDark),
           ),
           const SizedBox(height: 8),
 
-          StreamBuilder<List<VisitEntry>>(
-            stream: repo.watchVisitsForPerson(person.id),
-            builder: (context, visitSnapshot) {
-              final visits = visitSnapshot.data ?? [];
-              if (visits.isEmpty) {
-                return Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Center(
-                      child: Text(
-                        'Nenhuma visita registrada ainda para ${person.name}.\nToque em "Registrar Conversa" após falar com a pessoa.',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(color: AppTheme.textMuted),
-                      ),
-                    ),
-                  ),
-                );
-              }
-
-              return Column(
-                children: visits.map((v) {
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    child: Padding(
-                      padding: const EdgeInsets.all(14),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                AppDateUtils.formatDateTime(v.dateTimeField),
-                                style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryBlue),
-                              ),
-                              Row(
-                                children: [
-                                  Builder(
-                                    builder: (context) {
-                                      final attendance = DashboardCalculator.parseVisitAttendance(v);
-                                      if (attendance <= 0) return const SizedBox.shrink();
-                                      return Padding(
-                                        padding: const EdgeInsets.only(right: 6),
-                                        child: Chip(
-                                          avatar: const Icon(Icons.group, size: 14, color: AppTheme.primaryBlue),
-                                          label: Text(
-                                            '$attendance ${attendance == 1 ? "ouvinte" : "ouvintes"}',
-                                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-                                          ),
-                                          padding: EdgeInsets.zero,
-                                          visualDensity: VisualDensity.compact,
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                  Chip(
-                                    label: Text(v.contactType, style: const TextStyle(fontSize: 11)),
-                                    padding: EdgeInsets.zero,
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          if (v.topicsDiscussed != null) ...[
-                            const SizedBox(height: 6),
-                            Text(
-                              'Assunto: ${v.topicsDiscussed}',
-                              style: const TextStyle(fontWeight: FontWeight.w600),
-                            ),
-                          ],
-                          if (v.notes != null) ...[
-                            const SizedBox(height: 4),
-                            Text(v.notes!, style: const TextStyle(color: AppTheme.textMuted)),
-                          ],
-                          if (v.nextStep != null) ...[
-                            const SizedBox(height: 6),
-                            Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                color: Colors.blue.shade50,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                'Próximo passo: ${v.nextStep}',
-                                style: const TextStyle(fontSize: 12, color: AppTheme.primaryBlue),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  );
-                }).toList(),
-              );
-            },
+          PersonUnifiedTimelineSection(
+            person: person,
+            linkedStudy: linkedStudy,
+            isStudiesEnabled: isStudiesEnabled,
+            isAgendaEnabled: isAgendaEnabled,
           ),
         ],
       ),
     );
   }
+
 
   Widget _buildBibleStudyTab(
     BuildContext context,
@@ -4932,4 +4918,260 @@ class _MetricSmallCard extends StatelessWidget {
     );
   }
 }
+
+class PersonUnifiedTimelineSection extends ConsumerWidget {
+  final PersonEntry person;
+  final BibleStudyEntry? linkedStudy;
+  final bool isStudiesEnabled;
+  final bool isAgendaEnabled;
+
+  const PersonUnifiedTimelineSection({
+    super.key,
+    required this.person,
+    this.linkedStudy,
+    required this.isStudiesEnabled,
+    required this.isAgendaEnabled,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final repo = ref.watch(repositoryProvider);
+    final voiceNotesManager = ref.watch(voiceNotesManagerProvider);
+    final appointments = isAgendaEnabled
+        ? (ref.watch(appointmentsStreamProvider).value ?? [])
+            .where((a) => a.personId == person.id && a.deletedAt == null)
+            .toList()
+        : <AppointmentEntry>[];
+
+    return StreamBuilder<List<VisitEntry>>(
+      stream: repo.watchVisitsForPerson(person.id),
+      builder: (context, visitSnap) {
+        final visits = visitSnap.data ?? [];
+
+        return StreamBuilder<List<VoiceNoteItem>>(
+          stream: voiceNotesManager.watchVoiceNotesForPerson(person.id),
+          builder: (context, voiceSnap) {
+            final voiceNotes = voiceSnap.data ?? [];
+
+            final sessionsStream = (isStudiesEnabled && linkedStudy != null)
+                ? repo.watchSessionsForStudy(linkedStudy!.id)
+                : Stream.value(<StudySessionEntry>[]);
+
+            return StreamBuilder<List<StudySessionEntry>>(
+              stream: sessionsStream,
+              builder: (context, sessionSnap) {
+                final sessions = sessionSnap.data ?? [];
+
+                // Agregar todos os eventos cronologicamente
+                final items = <_UnifiedTimelineEvent>[];
+
+                for (final v in visits) {
+                  final isPhone = v.contactType.toLowerCase().contains('telefon') ||
+                      v.contactType.toLowerCase().contains('chamada') ||
+                      v.contactType.toLowerCase().contains('ligação');
+                  items.add(
+                    _UnifiedTimelineEvent(
+                      date: v.dateTimeField,
+                      title: v.topicsDiscussed ?? (isPhone ? 'Contato Telefônico' : 'Visita Presencial'),
+                      subtitle: 'Resultado: ${v.result}',
+                      notes: v.notes,
+                      nextStep: v.nextStep,
+                      tag: isPhone ? 'Telefone / Chamada' : (v.contactType == 'estudo' ? 'Estudo' : 'Visita'),
+                      icon: isPhone ? Icons.phone_in_talk : Icons.chat_bubble_outline,
+                      color: isPhone ? const Color(0xFF0D9488) : AppTheme.primaryBlue,
+                      attendance: DashboardCalculator.parseVisitAttendance(v),
+                    ),
+                  );
+                }
+
+                for (final s in sessions) {
+                  items.add(
+                    _UnifiedTimelineEvent(
+                      date: s.dateTimeField,
+                      title: 'Sessão de Estudo Bíblico • Lição ${s.lessonCovered ?? 1}',
+                      subtitle: s.paragraphsCovered != null
+                          ? 'Parágrafos: ${s.paragraphsCovered} • Status: ${s.status}'
+                          : 'Status: ${s.status}',
+                      notes: s.sessionNotes,
+                      nextStep: s.nextStep,
+                      tag: 'Estudo Bíblico',
+                      icon: Icons.school,
+                      color: const Color(0xFF7C3AED),
+                    ),
+                  );
+                }
+
+                for (final a in appointments) {
+                  items.add(
+                    _UnifiedTimelineEvent(
+                      date: a.startTime,
+                      title: a.title,
+                      subtitle: 'Compromisso agendado • Status: ${a.status}',
+                      notes: a.locationNotes,
+                      tag: 'Agenda',
+                      icon: Icons.event,
+                      color: const Color(0xFF2563EB),
+                    ),
+                  );
+                }
+
+                for (final vn in voiceNotes) {
+                  items.add(
+                    _UnifiedTimelineEvent(
+                      date: vn.createdAt,
+                      title: 'Nota de Áudio / Ditado (${vn.audioDurationSeconds}s)',
+                      subtitle: 'Gravação de voz',
+                      notes: vn.transcription,
+                      tag: 'Nota de Voz',
+                      icon: Icons.mic,
+                      color: const Color(0xFF10B981),
+                    ),
+                  );
+                }
+
+
+                items.sort((a, b) => b.date.compareTo(a.date));
+
+                if (items.isEmpty) {
+                  return Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Center(
+                        child: Text(
+                          'Nenhuma interação registrada ainda para ${person.name}.\nUtilize os botões acima para registrar conversas, notas ou compromissos.',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: AppTheme.textMuted),
+                        ),
+                      ),
+                    ),
+                  );
+                }
+
+                return Column(
+                  children: items.map((item) {
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      child: Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: item.color.withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Icon(item.icon, size: 16, color: item.color),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      AppDateUtils.formatDateTime(item.date),
+                                      style: TextStyle(fontWeight: FontWeight.bold, color: item.color, fontSize: 13),
+                                    ),
+                                  ],
+                                ),
+                                Row(
+                                  children: [
+                                    if (item.attendance != null && item.attendance! > 0)
+                                      Padding(
+                                        padding: const EdgeInsets.only(right: 6),
+                                        child: Chip(
+                                          avatar: const Icon(Icons.group, size: 14, color: AppTheme.primaryBlue),
+                                          label: Text(
+                                            '${item.attendance} ${item.attendance == 1 ? "ouvinte" : "ouvintes"}',
+                                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                                          ),
+                                          padding: EdgeInsets.zero,
+                                          visualDensity: VisualDensity.compact,
+                                        ),
+                                      ),
+                                    Chip(
+                                      label: Text(item.tag, style: const TextStyle(fontSize: 11)),
+                                      padding: EdgeInsets.zero,
+                                      visualDensity: VisualDensity.compact,
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              item.title,
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            ),
+                            if (item.subtitle != null) ...[
+                              const SizedBox(height: 2),
+                              Text(item.subtitle!, style: const TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+                            ],
+                            if (item.notes != null && item.notes!.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Text(item.notes!, style: const TextStyle(fontSize: 13)),
+                            ],
+                            if (item.nextStep != null && item.nextStep!.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue.shade50,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.arrow_forward, size: 14, color: AppTheme.primaryBlue),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        'Próximo passo: ${item.nextStep}',
+                                        style: const TextStyle(fontSize: 12, color: AppTheme.primaryBlue, fontWeight: FontWeight.w500),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _UnifiedTimelineEvent {
+  final DateTime date;
+  final String title;
+  final String? subtitle;
+  final String? notes;
+  final String? nextStep;
+  final String tag;
+  final IconData icon;
+  final Color color;
+  final int? attendance;
+
+  _UnifiedTimelineEvent({
+    required this.date,
+    required this.title,
+    this.subtitle,
+    this.notes,
+    this.nextStep,
+    required this.tag,
+    required this.icon,
+    required this.color,
+    this.attendance,
+  });
+}
+
 

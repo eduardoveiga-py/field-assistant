@@ -3,31 +3,30 @@ import '../database/app_database.dart';
 class AvailabilityResult {
   final bool isAvailable;
   final List<AppointmentEntry> conflictingAppointments;
+  final List<ExternalCalendarEventEntry> conflictingExternalEvents;
   final List<DateTime> suggestedAlternativeSlots;
   final String message;
 
   AvailabilityResult({
     required this.isAvailable,
     this.conflictingAppointments = const [],
+    this.conflictingExternalEvents = const [],
     this.suggestedAlternativeSlots = const [],
     required this.message,
   });
 }
 
 class AvailabilityEngine {
-  /// Verifica se o intervalo [startTime, startTime + durationMinutes] colide com compromissos existentes.
-  ///
-  /// Regras formais:
-  /// - Status ativos considerados para conflito: 'planejado', 'confirmado', 'provisorio'.
-  /// - Status ignorados: 'cancelado', 'nao_realizado', 'reagendado', 'realizado'.
-  /// - Sobreposição parcial e total constituem conflito.
-  /// - Compromissos estritamente consecutivos são permitidos quando bufferMinutes == 0.
-  /// Verifica se um determinado intervalo colide com algum compromisso ativo existente.
+  static const int defaultDayStartHour = 8;
+  static const int defaultDayEndHour = 20;
+
+  /// Verifica se um determinado intervalo colide com algum compromisso ativo ou evento externo
   static bool hasCollision({
     required DateTime start,
     required DateTime end,
     int bufferMinutes = 0,
     required List<AppointmentEntry> existingAppointments,
+    List<ExternalCalendarEventEntry> externalEvents = const [],
     String? excludeAppointmentId,
   }) {
     final effectiveStart = start.subtract(Duration(minutes: bufferMinutes));
@@ -42,6 +41,7 @@ class AvailabilityEngine {
       }
 
       final status = appt.status.toLowerCase();
+      // 'realizado' não bloqueia horários futuros
       if (status == 'cancelado' ||
           status == 'nao_realizado' ||
           status == 'reagendado' ||
@@ -61,6 +61,25 @@ class AvailabilityEngine {
 
       if (hasOverlap) return true;
     }
+
+    // Verifica colisão com eventos de calendários externos (sem convertê-los em compromissos ministeriais)
+    for (final ext in externalEvents) {
+      if (ext.deletedAt != null || ext.isDeletedExternal) continue;
+      if (ext.externalStatus == 'cancelled') continue;
+
+      final extStart = ext.startTime;
+      final extEnd = ext.endTime;
+
+      final bool hasOverlap;
+      if (bufferMinutes > 0) {
+        hasOverlap = effectiveStart.isBefore(extEnd) && effectiveEnd.isAfter(extStart);
+      } else {
+        hasOverlap = start.isBefore(extEnd) && end.isAfter(extStart);
+      }
+
+      if (hasOverlap) return true;
+    }
+
     return false;
   }
 
@@ -69,24 +88,26 @@ class AvailabilityEngine {
     required int durationMinutes,
     int bufferMinutes = 0,
     required List<AppointmentEntry> existingAppointments,
+    List<ExternalCalendarEventEntry> externalEvents = const [],
     String? excludeAppointmentId,
+    int dayStartHour = defaultDayStartHour,
+    int dayEndHour = defaultDayEndHour,
   }) {
     final endTime = startTime.add(Duration(minutes: durationMinutes));
     final effectiveStart = startTime.subtract(Duration(minutes: bufferMinutes));
     final effectiveEnd = endTime.add(Duration(minutes: bufferMinutes));
 
     final conflicts = <AppointmentEntry>[];
+    final extConflicts = <ExternalCalendarEventEntry>[];
 
     for (final appt in existingAppointments) {
       if (excludeAppointmentId != null && appt.id == excludeAppointmentId) {
         continue;
       }
-      // Ignora registros excluídos logicamente
       if (appt.deletedAt != null) {
         continue;
       }
 
-      // Filtra estados que não ocupam mais o horário na prática
       final status = appt.status.toLowerCase();
       if (status == 'cancelado' ||
           status == 'nao_realizado' ||
@@ -95,18 +116,13 @@ class AvailabilityEngine {
         continue;
       }
 
-      // Intervalo do compromisso existente
       final apptStart = appt.startTime;
       final apptEnd = appt.endTime;
 
-      // Condição rigorosa de sobreposição:
-      // Dois intervalos [A, B) e [C, D) sobrepõem-se se e somente se: A < D && B > C
-      // Com buffer: se buffer > 0, o intervalo é expandido
       final bool hasOverlap;
       if (bufferMinutes > 0) {
         hasOverlap = effectiveStart.isBefore(apptEnd) && effectiveEnd.isAfter(apptStart);
       } else {
-        // Estritamente consecutivos permitidos: startTime < apptEnd && endTime > apptStart
         hasOverlap = startTime.isBefore(apptEnd) && endTime.isAfter(apptStart);
       }
 
@@ -115,26 +131,51 @@ class AvailabilityEngine {
       }
     }
 
-    if (conflicts.isEmpty) {
+    for (final ext in externalEvents) {
+      if (ext.deletedAt != null || ext.isDeletedExternal) continue;
+      if (ext.externalStatus == 'cancelled') continue;
+
+      final extStart = ext.startTime;
+      final extEnd = ext.endTime;
+
+      final bool hasOverlap;
+      if (bufferMinutes > 0) {
+        hasOverlap = effectiveStart.isBefore(extEnd) && effectiveEnd.isAfter(extStart);
+      } else {
+        hasOverlap = startTime.isBefore(extEnd) && endTime.isAfter(extStart);
+      }
+
+      if (hasOverlap) {
+        extConflicts.add(ext);
+      }
+    }
+
+    if (conflicts.isEmpty && extConflicts.isEmpty) {
       return AvailabilityResult(
         isAvailable: true,
         message: 'Horário disponível.',
       );
     }
 
-    // Gerar horários alternativos sugeridos próximos, com garantia de disponibilidade real
+    // Gerar sugestões de horários alternativos garantindo disponibilidade e janela útil (08:00 às 20:00)
     final suggestions = <DateTime>[];
 
-    // Candidato 1: Logo após o término do bloco de conflito + buffer, avançando se houver colisão
-    conflicts.sort((a, b) => a.endTime.compareTo(b.endTime));
-    DateTime candidateAfter = conflicts.last.endTime.add(Duration(minutes: bufferMinutes));
+    // Candidato 1: Logo após o término do bloco de conflito + buffer
+    final allEndTimes = [
+      ...conflicts.map((c) => c.endTime),
+      ...extConflicts.map((c) => c.endTime),
+    ]..sort();
+
+    DateTime candidateAfter = allEndTimes.last.add(Duration(minutes: bufferMinutes));
     for (int i = 0; i < 5; i++) {
+      candidateAfter = _adjustToWorkingHours(candidateAfter, durationMinutes, dayStartHour, dayEndHour);
       final candEnd = candidateAfter.add(Duration(minutes: durationMinutes));
       if (!hasCollision(
         start: candidateAfter,
         end: candEnd,
         bufferMinutes: bufferMinutes,
         existingAppointments: existingAppointments,
+        externalEvents: externalEvents,
         excludeAppointmentId: excludeAppointmentId,
       )) {
         suggestions.add(candidateAfter);
@@ -145,13 +186,15 @@ class AvailabilityEngine {
 
     // Candidato 2: 1 hora ou 2 horas após o horário proposto
     for (int offsetHours in [1, 2, 3]) {
-      final cand = startTime.add(Duration(hours: offsetHours));
+      var cand = startTime.add(Duration(hours: offsetHours));
+      cand = _adjustToWorkingHours(cand, durationMinutes, dayStartHour, dayEndHour);
       final candEnd = cand.add(Duration(minutes: durationMinutes));
       if (!hasCollision(
         start: cand,
         end: candEnd,
         bufferMinutes: bufferMinutes,
         existingAppointments: existingAppointments,
+        externalEvents: externalEvents,
         excludeAppointmentId: excludeAppointmentId,
       )) {
         if (!suggestions.any((s) => s.isAtSameMomentAs(cand))) {
@@ -161,15 +204,17 @@ class AvailabilityEngine {
       }
     }
 
-    // Candidato 3: Mesmo horário no dia seguinte (ou dias subsequentes até achar livre)
+    // Candidato 3: Mesmo horário no dia seguinte
     for (int dayOffset in [1, 2, 3]) {
-      final nextDay = startTime.add(Duration(days: dayOffset));
+      var nextDay = startTime.add(Duration(days: dayOffset));
+      nextDay = _adjustToWorkingHours(nextDay, durationMinutes, dayStartHour, dayEndHour);
       final nextDayEnd = nextDay.add(Duration(minutes: durationMinutes));
       if (!hasCollision(
         start: nextDay,
         end: nextDayEnd,
         bufferMinutes: bufferMinutes,
         existingAppointments: existingAppointments,
+        externalEvents: externalEvents,
         excludeAppointmentId: excludeAppointmentId,
       )) {
         if (!suggestions.any((s) => s.isAtSameMomentAs(nextDay))) {
@@ -179,11 +224,31 @@ class AvailabilityEngine {
       }
     }
 
+    final totalConflicts = conflicts.length + extConflicts.length;
     return AvailabilityResult(
       isAvailable: false,
       conflictingAppointments: conflicts,
+      conflictingExternalEvents: extConflicts,
       suggestedAlternativeSlots: suggestions,
-      message: 'Conflito detectado com ${conflicts.length} compromisso(s) existente(s).',
+      message: 'Conflito detectado com $totalConflicts compromisso(s) ou evento(s) externo(s).',
     );
+  }
+
+  static DateTime _adjustToWorkingHours(
+    DateTime dt,
+    int durationMinutes,
+    int startHour,
+    int endHour,
+  ) {
+    if (dt.hour < startHour) {
+      return DateTime(dt.year, dt.month, dt.day, startHour, 0);
+    }
+    final endDt = dt.add(Duration(minutes: durationMinutes));
+    if (endDt.hour > endHour || (endDt.hour == endHour && endDt.minute > 0)) {
+      // Passa para o dia seguinte às startHour
+      final next = dt.add(const Duration(days: 1));
+      return DateTime(next.year, next.month, next.day, startHour, 0);
+    }
+    return dt;
   }
 }

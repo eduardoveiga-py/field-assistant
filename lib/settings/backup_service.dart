@@ -24,6 +24,14 @@ class RestorePreview {
   final int voiceNotesToAdd;
   final int phoneContactsToAdd;
   final int landmarksToAdd;
+  final int familyTiesToAdd;
+  final int experiencesToAdd;
+  final int photosToAdd;
+  final int publicationsToAdd;
+  final int articlesToAdd;
+  final int sectorsToAdd;
+  final int calendarEventsToAdd;
+  final int calendarLinksToAdd;
   final Map<String, dynamic> rawDecryptedData;
 
   RestorePreview({
@@ -39,6 +47,14 @@ class RestorePreview {
     this.voiceNotesToAdd = 0,
     this.phoneContactsToAdd = 0,
     this.landmarksToAdd = 0,
+    this.familyTiesToAdd = 0,
+    this.experiencesToAdd = 0,
+    this.photosToAdd = 0,
+    this.publicationsToAdd = 0,
+    this.articlesToAdd = 0,
+    this.sectorsToAdd = 0,
+    this.calendarEventsToAdd = 0,
+    this.calendarLinksToAdd = 0,
     required this.rawDecryptedData,
   });
 }
@@ -96,6 +112,35 @@ class BackupService {
     final voiceNotes = await db.select(db.voiceNotes).get();
     final phoneContacts = await db.select(db.phoneContacts).get();
     final landmarks = await db.select(db.territoryLandmarks).get();
+    final familyTies = await db.select(db.familyTies).get();
+    final experiences = await db.select(db.ministryExperiences).get();
+    final photos = await db.select(db.personPhotos).get();
+    final publications = await db.select(db.personPublications).get();
+    final articles = await db.select(db.researchArticles).get();
+    final tags = await db.select(db.researchTags).get();
+    final sectors = await db.select(db.territorySectors).get();
+    final manualOrders = await db.select(db.studentManualOrder).get();
+    final calendarEvents = await db.select(db.externalCalendarEvents).get();
+    final calendarLinks = await db.select(db.calendarEventLinks).get();
+    final kvStore = await (db.select(db.appKvStore)
+          ..where((t) => t.key.isNotValue(_silentBackupKeySecret)))
+        .get();
+
+    // Saneamento e portabilidade multimídia: serializa arquivos físicos de áudio em base64
+    final Map<String, String> voiceNoteAudios = {};
+    if (!kIsWeb) {
+      for (final vn in voiceNotes) {
+        if (vn.audioFilePath != null && vn.audioFilePath!.isNotEmpty) {
+          try {
+            final f = File(vn.audioFilePath!);
+            if (await f.exists()) {
+              final bytes = await f.readAsBytes();
+              voiceNoteAudios[vn.id] = base64Encode(bytes);
+            }
+          } catch (_) {}
+        }
+      }
+    }
 
     final payload = {
       'people': people.map((p) => p.toJson()).toList(),
@@ -106,12 +151,25 @@ class BackupService {
       'appointments': appointments.map((a) => a.toJson()).toList(),
       'activityRecords': activities.map((a) => a.toJson()).toList(),
       'voiceNotes': voiceNotes.map((v) => v.toJson()).toList(),
+      'voiceNoteAudios': voiceNoteAudios,
       'phoneContacts': phoneContacts.map((c) => c.toJson()).toList(),
       'territoryLandmarks': landmarks.map((l) => l.toJson()).toList(),
+      'familyTies': familyTies.map((f) => f.toJson()).toList(),
+      'ministryExperiences': experiences.map((e) => e.toJson()).toList(),
+      'personPhotos': photos.map((p) => p.toJson()).toList(),
+      'personPublications': publications.map((p) => p.toJson()).toList(),
+      'researchArticles': articles.map((a) => a.toJson()).toList(),
+      'researchTags': tags.map((t) => t.toJson()).toList(),
+      'territorySectors': sectors.map((s) => s.toJson()).toList(),
+      'studentManualOrder': manualOrders.map((m) => m.toJson()).toList(),
+      'externalCalendarEvents': calendarEvents.map((c) => c.toJson()).toList(),
+      'calendarEventLinks': calendarLinks.map((l) => l.toJson()).toList(),
+      'appKvStore': kvStore.map((k) => k.toJson()).toList(),
     };
 
     final rawJson = jsonEncode(payload);
     final checksum = sha256.convert(utf8.encode(rawJson)).toString();
+
 
     // Salt criptograficamente seguro aleatório de 16 bytes
     final saltBytes = _generateSecureRandom(16);
@@ -308,6 +366,78 @@ class BackupService {
       if (!existingLandmarkIds.contains(item['id'] as String)) landAdd++;
     }
 
+    // Prévia: FamilyTies
+    final importedFamilyTies = (data['familyTies'] as List<dynamic>?) ?? [];
+    final existingFamilyTies = await db.select(db.familyTies).get();
+    final existingFtIds = {for (var ft in existingFamilyTies) ft.id};
+    int ftAdd = 0;
+    for (final item in importedFamilyTies) {
+      if (!existingFtIds.contains(item['id'] as String)) ftAdd++;
+    }
+
+    // Prévia: Experiences
+    final importedExp = (data['ministryExperiences'] as List<dynamic>?) ?? [];
+    final existingExp = await db.select(db.ministryExperiences).get();
+    final existingExpIds = {for (var e in existingExp) e.id};
+    int expAdd = 0;
+    for (final item in importedExp) {
+      if (!existingExpIds.contains(item['id'] as String)) expAdd++;
+    }
+
+    // Prévia: Photos
+    final importedPhotos = (data['personPhotos'] as List<dynamic>?) ?? [];
+    final existingPhotos = await db.select(db.personPhotos).get();
+    final existingPhotoIds = {for (var p in existingPhotos) p.id};
+    int photoAdd = 0;
+    for (final item in importedPhotos) {
+      if (!existingPhotoIds.contains(item['id'] as String)) photoAdd++;
+    }
+
+    // Prévia: Publications
+    final importedPubs = (data['personPublications'] as List<dynamic>?) ?? [];
+    final existingPubs = await db.select(db.personPublications).get();
+    final existingPubIds = {for (var p in existingPubs) p.id};
+    int pubAdd = 0;
+    for (final item in importedPubs) {
+      if (!existingPubIds.contains(item['id'] as String)) pubAdd++;
+    }
+
+    // Prévia: Research Articles
+    final importedArticles = (data['researchArticles'] as List<dynamic>?) ?? [];
+    final existingArticles = await db.select(db.researchArticles).get();
+    final existingArticleIds = {for (var a in existingArticles) a.id};
+    int artAdd = 0;
+    for (final item in importedArticles) {
+      if (!existingArticleIds.contains(item['id'] as String)) artAdd++;
+    }
+
+    // Prévia: Territory Sectors
+    final importedSectors = (data['territorySectors'] as List<dynamic>?) ?? [];
+    final existingSectors = await db.select(db.territorySectors).get();
+    final existingSectorIds = {for (var s in existingSectors) s.id};
+    int secAdd = 0;
+    for (final item in importedSectors) {
+      if (!existingSectorIds.contains(item['id'] as String)) secAdd++;
+    }
+
+    // Prévia: External Calendar Events
+    final importedCalEvents = (data['externalCalendarEvents'] as List<dynamic>?) ?? [];
+    final existingCalEvents = await db.select(db.externalCalendarEvents).get();
+    final existingCalEventIds = {for (var c in existingCalEvents) c.id};
+    int calEventAdd = 0;
+    for (final item in importedCalEvents) {
+      if (!existingCalEventIds.contains(item['id'] as String)) calEventAdd++;
+    }
+
+    // Prévia: Calendar Links
+    final importedCalLinks = (data['calendarEventLinks'] as List<dynamic>?) ?? [];
+    final existingCalLinks = await db.select(db.calendarEventLinks).get();
+    final existingCalLinkIds = {for (var l in existingCalLinks) l.id};
+    int calLinkAdd = 0;
+    for (final item in importedCalLinks) {
+      if (!existingCalLinkIds.contains(item['id'] as String)) calLinkAdd++;
+    }
+
     return RestorePreview(
       peopleToAdd: pAdd,
       peopleToUpdate: pUpdate,
@@ -321,6 +451,14 @@ class BackupService {
       voiceNotesToAdd: vnAdd,
       phoneContactsToAdd: phoneAdd,
       landmarksToAdd: landAdd,
+      familyTiesToAdd: ftAdd,
+      experiencesToAdd: expAdd,
+      photosToAdd: photoAdd,
+      publicationsToAdd: pubAdd,
+      articlesToAdd: artAdd,
+      sectorsToAdd: secAdd,
+      calendarEventsToAdd: calEventAdd,
+      calendarLinksToAdd: calLinkAdd,
       rawDecryptedData: data,
     );
   }
@@ -451,10 +589,31 @@ class BackupService {
         }
       }
 
-      // 8. Notas de Voz
+      // 8. Notas de Voz & Áudios Binários
       final voiceNotes = (data['voiceNotes'] as List<dynamic>?) ?? [];
+      final voiceNoteAudios = (data['voiceNoteAudios'] as Map<String, dynamic>?) ?? {};
+      Directory? restoredAudioDir;
+      if (!kIsWeb && voiceNoteAudios.isNotEmpty) {
+        try {
+          final docsDir = await getApplicationDocumentsDirectory();
+          restoredAudioDir = Directory('${docsDir.path}/restored_audio');
+          if (!restoredAudioDir.existsSync()) {
+            await restoredAudioDir.create(recursive: true);
+          }
+        } catch (_) {}
+      }
+
       for (final item in voiceNotes) {
-        final entry = VoiceNoteEntry.fromJson(item as Map<String, dynamic>);
+        var entry = VoiceNoteEntry.fromJson(item as Map<String, dynamic>);
+        if (restoredAudioDir != null && voiceNoteAudios.containsKey(entry.id)) {
+          try {
+            final audioBytes = base64Decode(voiceNoteAudios[entry.id] as String);
+            final targetFile = File('${restoredAudioDir.path}/vn_${entry.id}.m4a');
+            await targetFile.writeAsBytes(audioBytes, flush: true);
+            entry = entry.copyWith(audioFilePath: Value(targetFile.path));
+          } catch (_) {}
+        }
+
         final existing = await (db.select(db.voiceNotes)..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
         if (existing == null) {
           await db.into(db.voiceNotes).insert(entry);
@@ -491,6 +650,138 @@ class BackupService {
           await db.update(db.territoryLandmarks).replace(entry);
           await _reconstituteSyncQueue('territory_landmarks', entry.id, 'UPDATE', item);
         }
+      }
+
+      // 11. Vínculos Familiares
+      final familyTies = (data['familyTies'] as List<dynamic>?) ?? [];
+      for (final item in familyTies) {
+        final entry = FamilyTieEntry.fromJson(item as Map<String, dynamic>);
+        final existing = await (db.select(db.familyTies)..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+        if (existing == null) {
+          await db.into(db.familyTies).insert(entry);
+        } else if ((entry.updatedAt ?? entry.createdAt).isAfter(existing.updatedAt ?? existing.createdAt) || entry.revision > existing.revision) {
+          await db.update(db.familyTies).replace(entry);
+        }
+      }
+
+      // 12. Experiências Ministeriais
+      final experiences = (data['ministryExperiences'] as List<dynamic>?) ?? [];
+      for (final item in experiences) {
+        final entry = MinistryExperienceEntry.fromJson(item as Map<String, dynamic>);
+        final existing = await (db.select(db.ministryExperiences)..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+        if (existing == null) {
+          await db.into(db.ministryExperiences).insert(entry);
+        } else if (entry.updatedAt.isAfter(existing.updatedAt) || entry.revision > existing.revision) {
+          await db.update(db.ministryExperiences).replace(entry);
+        }
+      }
+
+      // 13. Fotos de Pessoas e Residências
+      final photos = (data['personPhotos'] as List<dynamic>?) ?? [];
+      for (final item in photos) {
+        final entry = PersonPhotoEntry.fromJson(item as Map<String, dynamic>);
+        final existing = await (db.select(db.personPhotos)..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+        if (existing == null) {
+          await db.into(db.personPhotos).insert(entry);
+        } else if ((entry.updatedAt ?? entry.createdAt).isAfter(existing.updatedAt ?? existing.createdAt) || entry.revision > existing.revision) {
+          await db.update(db.personPhotos).replace(entry);
+        }
+      }
+
+      // 14. Publicações e Pedidos das Pessoas
+      final publications = (data['personPublications'] as List<dynamic>?) ?? [];
+      for (final item in publications) {
+        final entry = PersonPublicationEntry.fromJson(item as Map<String, dynamic>);
+        final existing = await (db.select(db.personPublications)..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+        if (existing == null) {
+          await db.into(db.personPublications).insert(entry);
+        } else if ((entry.updatedAt ?? entry.createdAt).isAfter(existing.updatedAt ?? existing.createdAt) || entry.revision > existing.revision) {
+          await db.update(db.personPublications).replace(entry);
+        }
+      }
+
+      // 15. Artigos de Pesquisa
+      final articles = (data['researchArticles'] as List<dynamic>?) ?? [];
+      for (final item in articles) {
+        final entry = ResearchArticleEntry.fromJson(item as Map<String, dynamic>);
+        final existing = await (db.select(db.researchArticles)..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+        if (existing == null) {
+          await db.into(db.researchArticles).insert(entry);
+        } else if (entry.updatedAt.isAfter(existing.updatedAt) || entry.revision > existing.revision) {
+          await db.update(db.researchArticles).replace(entry);
+        }
+      }
+
+      // 16. Tags de Pesquisa
+      final tags = (data['researchTags'] as List<dynamic>?) ?? [];
+      for (final item in tags) {
+        final entry = ResearchTagEntry.fromJson(item as Map<String, dynamic>);
+        final existing = await (db.select(db.researchTags)..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+        if (existing == null) {
+          await db.into(db.researchTags).insert(entry);
+        }
+      }
+
+      // 17. Setores de Território
+      final sectors = (data['territorySectors'] as List<dynamic>?) ?? [];
+      for (final item in sectors) {
+        final entry = TerritorySectorEntry.fromJson(item as Map<String, dynamic>);
+        final existing = await (db.select(db.territorySectors)..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+        if (existing == null) {
+          await db.into(db.territorySectors).insert(entry);
+        } else if ((entry.updatedAt ?? entry.createdAt).isAfter(existing.updatedAt ?? existing.createdAt) || entry.revision > existing.revision) {
+          await db.update(db.territorySectors).replace(entry);
+        }
+      }
+
+      // 18. Ordem do Manual de Estudante
+      final manualOrders = (data['studentManualOrder'] as List<dynamic>?) ?? [];
+      for (final item in manualOrders) {
+        final entry = StudentManualOrderEntry.fromJson(item as Map<String, dynamic>);
+        final existing = await (db.select(db.studentManualOrder)..where((tbl) => tbl.studyId.equals(entry.studyId))).getSingleOrNull();
+        if (existing == null) {
+          await db.into(db.studentManualOrder).insert(entry);
+        } else if (entry.revision > existing.revision || (entry.updatedAt != null && (existing.updatedAt == null || entry.updatedAt!.isAfter(existing.updatedAt!)))) {
+          await db.update(db.studentManualOrder).replace(entry);
+        }
+      }
+
+      // 19. Eventos de Calendário Externo
+      final calendarEvents = (data['externalCalendarEvents'] as List<dynamic>?) ?? [];
+      for (final item in calendarEvents) {
+        final entry = ExternalCalendarEventEntry.fromJson(item as Map<String, dynamic>);
+        final existing = await (db.select(db.externalCalendarEvents)..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+        if (existing == null) {
+          await db.into(db.externalCalendarEvents).insert(entry);
+        } else if (entry.updatedAt.isAfter(existing.updatedAt) || entry.revision > existing.revision) {
+          await db.update(db.externalCalendarEvents).replace(entry);
+        }
+      }
+
+      // 20. Links de Compromissos de Calendário
+      final calendarLinks = (data['calendarEventLinks'] as List<dynamic>?) ?? [];
+      for (final item in calendarLinks) {
+        final entry = CalendarEventLinkEntry.fromJson(item as Map<String, dynamic>);
+        final existing = await (db.select(db.calendarEventLinks)..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+        if (existing == null) {
+          await db.into(db.calendarEventLinks).insert(entry);
+        } else if (entry.updatedAt.isAfter(existing.updatedAt) || entry.revision > existing.revision) {
+          await db.update(db.calendarEventLinks).replace(entry);
+        }
+      }
+
+      // 21. Configurações da App (Key-Value Store)
+      final kvRows = (data['appKvStore'] as List<dynamic>?) ?? [];
+      for (final item in kvRows) {
+        final entry = AppKvEntry.fromJson(item as Map<String, dynamic>);
+        if (entry.key == _silentBackupKeySecret) continue;
+        await db.into(db.appKvStore).insertOnConflictUpdate(
+          AppKvStoreCompanion.insert(
+            key: entry.key,
+            value: entry.value,
+            updatedAt: Value(entry.updatedAt ?? DateTime.now()),
+          ),
+        );
       }
     });
   }

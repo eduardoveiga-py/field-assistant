@@ -17,6 +17,16 @@ part 'app_database.g.dart';
   PhoneContacts,
   TerritoryLandmarks,
   AppKvStore,
+  FamilyTies,
+  MinistryExperiences,
+  PersonPhotos,
+  PersonPublications,
+  ResearchArticles,
+  ResearchTags,
+  TerritorySectors,
+  StudentManualOrder,
+  ExternalCalendarEvents,
+  CalendarEventLinks,
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? e]) : super(e ?? impl.constructDb());
@@ -24,7 +34,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -34,17 +44,30 @@ class AppDatabase extends _$AppDatabase {
     onUpgrade: (Migrator m, int from, int to) async {
       if (from < 2) {
         // Migração incremental da versão 1 para a versão 2:
-        // Cria tabelas tipadas com segurança se ainda não existirem
         await _createTableIfNotExists(m, voiceNotes);
         await _createTableIfNotExists(m, phoneContacts);
         await _createTableIfNotExists(m, territoryLandmarks);
         await _createTableIfNotExists(m, appKvStore);
 
-        // Assegura integridade das colunas em bases migradas de versões antigas
         await _migrateLandmarksColumns();
-
-        // Migra dados de pares chave-valor legados para a tabela tipada app_kv_store
         await _migrateLegacyKvStore();
+      }
+      if (from < 3) {
+        // Migração incremental da versão 2 para a versão 3:
+        // Migra as 8 tabelas criadas fora do Drift para tabelas formais tipadas
+        // e cria as tabelas de integração externa de calendário
+        await _createTableIfNotExists(m, familyTies);
+        await _createTableIfNotExists(m, ministryExperiences);
+        await _createTableIfNotExists(m, personPhotos);
+        await _createTableIfNotExists(m, personPublications);
+        await _createTableIfNotExists(m, researchArticles);
+        await _createTableIfNotExists(m, researchTags);
+        await _createTableIfNotExists(m, territorySectors);
+        await _createTableIfNotExists(m, studentManualOrder);
+        await _createTableIfNotExists(m, externalCalendarEvents);
+        await _createTableIfNotExists(m, calendarEventLinks);
+
+        await _migrateCustomTablesColumns();
       }
     },
   );
@@ -65,6 +88,46 @@ class AppDatabase extends _$AppDatabase {
         await customStatement("UPDATE territory_landmarks SET revision = 1 WHERE revision IS NULL;");
       }
     } catch (_) {}
+  }
+
+  Future<void> _migrateCustomTablesColumns() async {
+    final tables = [
+      'family_ties',
+      'ministry_experiences',
+      'person_photos',
+      'person_publications',
+      'research_articles',
+      'research_tags',
+      'territory_sectors',
+      'student_manual_order',
+    ];
+
+    for (final tbl in tables) {
+      try {
+        final tableExists = await customSelect(
+          "SELECT count(*) as count FROM sqlite_master WHERE type='table' AND name=?",
+          variables: [Variable.withString(tbl)],
+        ).getSingle();
+        if (tableExists.read<int>('count') == 0) continue;
+
+        final columns = await customSelect("PRAGMA table_info($tbl)").get();
+        final colNames = columns.map((c) => c.read<String>('name')).toSet();
+
+        if (!colNames.contains('updated_at')) {
+          await customStatement("ALTER TABLE $tbl ADD COLUMN updated_at INTEGER;");
+          if (colNames.contains('created_at')) {
+            await customStatement("UPDATE $tbl SET updated_at = created_at WHERE updated_at IS NULL;");
+          }
+        }
+        if (!colNames.contains('deleted_at')) {
+          await customStatement("ALTER TABLE $tbl ADD COLUMN deleted_at INTEGER;");
+        }
+        if (!colNames.contains('revision')) {
+          await customStatement("ALTER TABLE $tbl ADD COLUMN revision INTEGER NOT NULL DEFAULT 1;");
+          await customStatement("UPDATE $tbl SET revision = 1 WHERE revision IS NULL;");
+        }
+      } catch (_) {}
+    }
   }
 
   Future<void> _migrateLegacyKvStore() async {

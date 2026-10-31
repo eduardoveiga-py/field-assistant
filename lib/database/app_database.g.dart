@@ -9611,6 +9611,6312 @@ class AppKvStoreCompanion extends UpdateCompanion<AppKvEntry> {
   }
 }
 
+class $FamilyTiesTable extends FamilyTies
+    with TableInfo<$FamilyTiesTable, FamilyTieEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $FamilyTiesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _personIdMeta = const VerificationMeta(
+    'personId',
+  );
+  @override
+  late final GeneratedColumn<String> personId = GeneratedColumn<String>(
+    'person_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _relatedPersonIdMeta = const VerificationMeta(
+    'relatedPersonId',
+  );
+  @override
+  late final GeneratedColumn<String> relatedPersonId = GeneratedColumn<String>(
+    'related_person_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _relatedPersonNameMeta = const VerificationMeta(
+    'relatedPersonName',
+  );
+  @override
+  late final GeneratedColumn<String> relatedPersonName =
+      GeneratedColumn<String>(
+        'related_person_name',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      );
+  static const VerificationMeta _relationshipTypeMeta = const VerificationMeta(
+    'relationshipType',
+  );
+  @override
+  late final GeneratedColumn<String> relationshipType = GeneratedColumn<String>(
+    'relationship_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _revisionMeta = const VerificationMeta(
+    'revision',
+  );
+  @override
+  late final GeneratedColumn<int> revision = GeneratedColumn<int>(
+    'revision',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    personId,
+    relatedPersonId,
+    relatedPersonName,
+    relationshipType,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'family_ties';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<FamilyTieEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('person_id')) {
+      context.handle(
+        _personIdMeta,
+        personId.isAcceptableOrUnknown(data['person_id']!, _personIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_personIdMeta);
+    }
+    if (data.containsKey('related_person_id')) {
+      context.handle(
+        _relatedPersonIdMeta,
+        relatedPersonId.isAcceptableOrUnknown(
+          data['related_person_id']!,
+          _relatedPersonIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('related_person_name')) {
+      context.handle(
+        _relatedPersonNameMeta,
+        relatedPersonName.isAcceptableOrUnknown(
+          data['related_person_name']!,
+          _relatedPersonNameMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_relatedPersonNameMeta);
+    }
+    if (data.containsKey('relationship_type')) {
+      context.handle(
+        _relationshipTypeMeta,
+        relationshipType.isAcceptableOrUnknown(
+          data['relationship_type']!,
+          _relationshipTypeMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_relationshipTypeMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    if (data.containsKey('revision')) {
+      context.handle(
+        _revisionMeta,
+        revision.isAcceptableOrUnknown(data['revision']!, _revisionMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  FamilyTieEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return FamilyTieEntry(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      personId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}person_id'],
+      )!,
+      relatedPersonId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}related_person_id'],
+      ),
+      relatedPersonName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}related_person_name'],
+      )!,
+      relationshipType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}relationship_type'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      ),
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+      revision: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}revision'],
+      )!,
+    );
+  }
+
+  @override
+  $FamilyTiesTable createAlias(String alias) {
+    return $FamilyTiesTable(attachedDatabase, alias);
+  }
+}
+
+class FamilyTieEntry extends DataClass implements Insertable<FamilyTieEntry> {
+  final String id;
+  final String personId;
+  final String? relatedPersonId;
+  final String relatedPersonName;
+  final String relationshipType;
+  final DateTime createdAt;
+  final DateTime? updatedAt;
+  final DateTime? deletedAt;
+  final int revision;
+  const FamilyTieEntry({
+    required this.id,
+    required this.personId,
+    this.relatedPersonId,
+    required this.relatedPersonName,
+    required this.relationshipType,
+    required this.createdAt,
+    this.updatedAt,
+    this.deletedAt,
+    required this.revision,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['person_id'] = Variable<String>(personId);
+    if (!nullToAbsent || relatedPersonId != null) {
+      map['related_person_id'] = Variable<String>(relatedPersonId);
+    }
+    map['related_person_name'] = Variable<String>(relatedPersonName);
+    map['relationship_type'] = Variable<String>(relationshipType);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    map['revision'] = Variable<int>(revision);
+    return map;
+  }
+
+  FamilyTiesCompanion toCompanion(bool nullToAbsent) {
+    return FamilyTiesCompanion(
+      id: Value(id),
+      personId: Value(personId),
+      relatedPersonId: relatedPersonId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(relatedPersonId),
+      relatedPersonName: Value(relatedPersonName),
+      relationshipType: Value(relationshipType),
+      createdAt: Value(createdAt),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      revision: Value(revision),
+    );
+  }
+
+  factory FamilyTieEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return FamilyTieEntry(
+      id: serializer.fromJson<String>(json['id']),
+      personId: serializer.fromJson<String>(json['personId']),
+      relatedPersonId: serializer.fromJson<String?>(json['relatedPersonId']),
+      relatedPersonName: serializer.fromJson<String>(json['relatedPersonName']),
+      relationshipType: serializer.fromJson<String>(json['relationshipType']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      revision: serializer.fromJson<int>(json['revision']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'personId': serializer.toJson<String>(personId),
+      'relatedPersonId': serializer.toJson<String?>(relatedPersonId),
+      'relatedPersonName': serializer.toJson<String>(relatedPersonName),
+      'relationshipType': serializer.toJson<String>(relationshipType),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'revision': serializer.toJson<int>(revision),
+    };
+  }
+
+  FamilyTieEntry copyWith({
+    String? id,
+    String? personId,
+    Value<String?> relatedPersonId = const Value.absent(),
+    String? relatedPersonName,
+    String? relationshipType,
+    DateTime? createdAt,
+    Value<DateTime?> updatedAt = const Value.absent(),
+    Value<DateTime?> deletedAt = const Value.absent(),
+    int? revision,
+  }) => FamilyTieEntry(
+    id: id ?? this.id,
+    personId: personId ?? this.personId,
+    relatedPersonId: relatedPersonId.present
+        ? relatedPersonId.value
+        : this.relatedPersonId,
+    relatedPersonName: relatedPersonName ?? this.relatedPersonName,
+    relationshipType: relationshipType ?? this.relationshipType,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    revision: revision ?? this.revision,
+  );
+  FamilyTieEntry copyWithCompanion(FamilyTiesCompanion data) {
+    return FamilyTieEntry(
+      id: data.id.present ? data.id.value : this.id,
+      personId: data.personId.present ? data.personId.value : this.personId,
+      relatedPersonId: data.relatedPersonId.present
+          ? data.relatedPersonId.value
+          : this.relatedPersonId,
+      relatedPersonName: data.relatedPersonName.present
+          ? data.relatedPersonName.value
+          : this.relatedPersonName,
+      relationshipType: data.relationshipType.present
+          ? data.relationshipType.value
+          : this.relationshipType,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      revision: data.revision.present ? data.revision.value : this.revision,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FamilyTieEntry(')
+          ..write('id: $id, ')
+          ..write('personId: $personId, ')
+          ..write('relatedPersonId: $relatedPersonId, ')
+          ..write('relatedPersonName: $relatedPersonName, ')
+          ..write('relationshipType: $relationshipType, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    personId,
+    relatedPersonId,
+    relatedPersonName,
+    relationshipType,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is FamilyTieEntry &&
+          other.id == this.id &&
+          other.personId == this.personId &&
+          other.relatedPersonId == this.relatedPersonId &&
+          other.relatedPersonName == this.relatedPersonName &&
+          other.relationshipType == this.relationshipType &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt &&
+          other.revision == this.revision);
+}
+
+class FamilyTiesCompanion extends UpdateCompanion<FamilyTieEntry> {
+  final Value<String> id;
+  final Value<String> personId;
+  final Value<String?> relatedPersonId;
+  final Value<String> relatedPersonName;
+  final Value<String> relationshipType;
+  final Value<DateTime> createdAt;
+  final Value<DateTime?> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> revision;
+  final Value<int> rowid;
+  const FamilyTiesCompanion({
+    this.id = const Value.absent(),
+    this.personId = const Value.absent(),
+    this.relatedPersonId = const Value.absent(),
+    this.relatedPersonName = const Value.absent(),
+    this.relationshipType = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  FamilyTiesCompanion.insert({
+    required String id,
+    required String personId,
+    this.relatedPersonId = const Value.absent(),
+    required String relatedPersonName,
+    required String relationshipType,
+    required DateTime createdAt,
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       personId = Value(personId),
+       relatedPersonName = Value(relatedPersonName),
+       relationshipType = Value(relationshipType),
+       createdAt = Value(createdAt);
+  static Insertable<FamilyTieEntry> custom({
+    Expression<String>? id,
+    Expression<String>? personId,
+    Expression<String>? relatedPersonId,
+    Expression<String>? relatedPersonName,
+    Expression<String>? relationshipType,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? revision,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (personId != null) 'person_id': personId,
+      if (relatedPersonId != null) 'related_person_id': relatedPersonId,
+      if (relatedPersonName != null) 'related_person_name': relatedPersonName,
+      if (relationshipType != null) 'relationship_type': relationshipType,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (revision != null) 'revision': revision,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  FamilyTiesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? personId,
+    Value<String?>? relatedPersonId,
+    Value<String>? relatedPersonName,
+    Value<String>? relationshipType,
+    Value<DateTime>? createdAt,
+    Value<DateTime?>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? revision,
+    Value<int>? rowid,
+  }) {
+    return FamilyTiesCompanion(
+      id: id ?? this.id,
+      personId: personId ?? this.personId,
+      relatedPersonId: relatedPersonId ?? this.relatedPersonId,
+      relatedPersonName: relatedPersonName ?? this.relatedPersonName,
+      relationshipType: relationshipType ?? this.relationshipType,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      revision: revision ?? this.revision,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (personId.present) {
+      map['person_id'] = Variable<String>(personId.value);
+    }
+    if (relatedPersonId.present) {
+      map['related_person_id'] = Variable<String>(relatedPersonId.value);
+    }
+    if (relatedPersonName.present) {
+      map['related_person_name'] = Variable<String>(relatedPersonName.value);
+    }
+    if (relationshipType.present) {
+      map['relationship_type'] = Variable<String>(relationshipType.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (revision.present) {
+      map['revision'] = Variable<int>(revision.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FamilyTiesCompanion(')
+          ..write('id: $id, ')
+          ..write('personId: $personId, ')
+          ..write('relatedPersonId: $relatedPersonId, ')
+          ..write('relatedPersonName: $relatedPersonName, ')
+          ..write('relationshipType: $relationshipType, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $MinistryExperiencesTable extends MinistryExperiences
+    with TableInfo<$MinistryExperiencesTable, MinistryExperienceEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $MinistryExperiencesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _contentMeta = const VerificationMeta(
+    'content',
+  );
+  @override
+  late final GeneratedColumn<String> content = GeneratedColumn<String>(
+    'content',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _mediaUrlsMeta = const VerificationMeta(
+    'mediaUrls',
+  );
+  @override
+  late final GeneratedColumn<String> mediaUrls = GeneratedColumn<String>(
+    'media_urls',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  );
+  static const VerificationMeta _tagsMeta = const VerificationMeta('tags');
+  @override
+  late final GeneratedColumn<String> tags = GeneratedColumn<String>(
+    'tags',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  );
+  static const VerificationMeta _dateTimeFieldMeta = const VerificationMeta(
+    'dateTimeField',
+  );
+  @override
+  late final GeneratedColumn<DateTime> dateTimeField =
+      GeneratedColumn<DateTime>(
+        'date_time',
+        aliasedName,
+        false,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: true,
+      );
+  static const VerificationMeta _locationOrModalityMeta =
+      const VerificationMeta('locationOrModality');
+  @override
+  late final GeneratedColumn<String> locationOrModality =
+      GeneratedColumn<String>(
+        'location_or_modality',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _revisionMeta = const VerificationMeta(
+    'revision',
+  );
+  @override
+  late final GeneratedColumn<int> revision = GeneratedColumn<int>(
+    'revision',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    title,
+    content,
+    mediaUrls,
+    tags,
+    dateTimeField,
+    locationOrModality,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'ministry_experiences';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<MinistryExperienceEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('content')) {
+      context.handle(
+        _contentMeta,
+        content.isAcceptableOrUnknown(data['content']!, _contentMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_contentMeta);
+    }
+    if (data.containsKey('media_urls')) {
+      context.handle(
+        _mediaUrlsMeta,
+        mediaUrls.isAcceptableOrUnknown(data['media_urls']!, _mediaUrlsMeta),
+      );
+    }
+    if (data.containsKey('tags')) {
+      context.handle(
+        _tagsMeta,
+        tags.isAcceptableOrUnknown(data['tags']!, _tagsMeta),
+      );
+    }
+    if (data.containsKey('date_time')) {
+      context.handle(
+        _dateTimeFieldMeta,
+        dateTimeField.isAcceptableOrUnknown(
+          data['date_time']!,
+          _dateTimeFieldMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_dateTimeFieldMeta);
+    }
+    if (data.containsKey('location_or_modality')) {
+      context.handle(
+        _locationOrModalityMeta,
+        locationOrModality.isAcceptableOrUnknown(
+          data['location_or_modality']!,
+          _locationOrModalityMeta,
+        ),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    if (data.containsKey('revision')) {
+      context.handle(
+        _revisionMeta,
+        revision.isAcceptableOrUnknown(data['revision']!, _revisionMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  MinistryExperienceEntry map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return MinistryExperienceEntry(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      )!,
+      content: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}content'],
+      )!,
+      mediaUrls: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}media_urls'],
+      )!,
+      tags: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}tags'],
+      )!,
+      dateTimeField: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}date_time'],
+      )!,
+      locationOrModality: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}location_or_modality'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+      revision: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}revision'],
+      )!,
+    );
+  }
+
+  @override
+  $MinistryExperiencesTable createAlias(String alias) {
+    return $MinistryExperiencesTable(attachedDatabase, alias);
+  }
+}
+
+class MinistryExperienceEntry extends DataClass
+    implements Insertable<MinistryExperienceEntry> {
+  final String id;
+  final String title;
+  final String content;
+  final String mediaUrls;
+  final String tags;
+  final DateTime dateTimeField;
+  final String? locationOrModality;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime? deletedAt;
+  final int revision;
+  const MinistryExperienceEntry({
+    required this.id,
+    required this.title,
+    required this.content,
+    required this.mediaUrls,
+    required this.tags,
+    required this.dateTimeField,
+    this.locationOrModality,
+    required this.createdAt,
+    required this.updatedAt,
+    this.deletedAt,
+    required this.revision,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['title'] = Variable<String>(title);
+    map['content'] = Variable<String>(content);
+    map['media_urls'] = Variable<String>(mediaUrls);
+    map['tags'] = Variable<String>(tags);
+    map['date_time'] = Variable<DateTime>(dateTimeField);
+    if (!nullToAbsent || locationOrModality != null) {
+      map['location_or_modality'] = Variable<String>(locationOrModality);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    map['revision'] = Variable<int>(revision);
+    return map;
+  }
+
+  MinistryExperiencesCompanion toCompanion(bool nullToAbsent) {
+    return MinistryExperiencesCompanion(
+      id: Value(id),
+      title: Value(title),
+      content: Value(content),
+      mediaUrls: Value(mediaUrls),
+      tags: Value(tags),
+      dateTimeField: Value(dateTimeField),
+      locationOrModality: locationOrModality == null && nullToAbsent
+          ? const Value.absent()
+          : Value(locationOrModality),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      revision: Value(revision),
+    );
+  }
+
+  factory MinistryExperienceEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return MinistryExperienceEntry(
+      id: serializer.fromJson<String>(json['id']),
+      title: serializer.fromJson<String>(json['title']),
+      content: serializer.fromJson<String>(json['content']),
+      mediaUrls: serializer.fromJson<String>(json['mediaUrls']),
+      tags: serializer.fromJson<String>(json['tags']),
+      dateTimeField: serializer.fromJson<DateTime>(json['dateTimeField']),
+      locationOrModality: serializer.fromJson<String?>(
+        json['locationOrModality'],
+      ),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      revision: serializer.fromJson<int>(json['revision']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'title': serializer.toJson<String>(title),
+      'content': serializer.toJson<String>(content),
+      'mediaUrls': serializer.toJson<String>(mediaUrls),
+      'tags': serializer.toJson<String>(tags),
+      'dateTimeField': serializer.toJson<DateTime>(dateTimeField),
+      'locationOrModality': serializer.toJson<String?>(locationOrModality),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'revision': serializer.toJson<int>(revision),
+    };
+  }
+
+  MinistryExperienceEntry copyWith({
+    String? id,
+    String? title,
+    String? content,
+    String? mediaUrls,
+    String? tags,
+    DateTime? dateTimeField,
+    Value<String?> locationOrModality = const Value.absent(),
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    Value<DateTime?> deletedAt = const Value.absent(),
+    int? revision,
+  }) => MinistryExperienceEntry(
+    id: id ?? this.id,
+    title: title ?? this.title,
+    content: content ?? this.content,
+    mediaUrls: mediaUrls ?? this.mediaUrls,
+    tags: tags ?? this.tags,
+    dateTimeField: dateTimeField ?? this.dateTimeField,
+    locationOrModality: locationOrModality.present
+        ? locationOrModality.value
+        : this.locationOrModality,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    revision: revision ?? this.revision,
+  );
+  MinistryExperienceEntry copyWithCompanion(MinistryExperiencesCompanion data) {
+    return MinistryExperienceEntry(
+      id: data.id.present ? data.id.value : this.id,
+      title: data.title.present ? data.title.value : this.title,
+      content: data.content.present ? data.content.value : this.content,
+      mediaUrls: data.mediaUrls.present ? data.mediaUrls.value : this.mediaUrls,
+      tags: data.tags.present ? data.tags.value : this.tags,
+      dateTimeField: data.dateTimeField.present
+          ? data.dateTimeField.value
+          : this.dateTimeField,
+      locationOrModality: data.locationOrModality.present
+          ? data.locationOrModality.value
+          : this.locationOrModality,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      revision: data.revision.present ? data.revision.value : this.revision,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MinistryExperienceEntry(')
+          ..write('id: $id, ')
+          ..write('title: $title, ')
+          ..write('content: $content, ')
+          ..write('mediaUrls: $mediaUrls, ')
+          ..write('tags: $tags, ')
+          ..write('dateTimeField: $dateTimeField, ')
+          ..write('locationOrModality: $locationOrModality, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    title,
+    content,
+    mediaUrls,
+    tags,
+    dateTimeField,
+    locationOrModality,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is MinistryExperienceEntry &&
+          other.id == this.id &&
+          other.title == this.title &&
+          other.content == this.content &&
+          other.mediaUrls == this.mediaUrls &&
+          other.tags == this.tags &&
+          other.dateTimeField == this.dateTimeField &&
+          other.locationOrModality == this.locationOrModality &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt &&
+          other.revision == this.revision);
+}
+
+class MinistryExperiencesCompanion
+    extends UpdateCompanion<MinistryExperienceEntry> {
+  final Value<String> id;
+  final Value<String> title;
+  final Value<String> content;
+  final Value<String> mediaUrls;
+  final Value<String> tags;
+  final Value<DateTime> dateTimeField;
+  final Value<String?> locationOrModality;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> revision;
+  final Value<int> rowid;
+  const MinistryExperiencesCompanion({
+    this.id = const Value.absent(),
+    this.title = const Value.absent(),
+    this.content = const Value.absent(),
+    this.mediaUrls = const Value.absent(),
+    this.tags = const Value.absent(),
+    this.dateTimeField = const Value.absent(),
+    this.locationOrModality = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  MinistryExperiencesCompanion.insert({
+    required String id,
+    required String title,
+    required String content,
+    this.mediaUrls = const Value.absent(),
+    this.tags = const Value.absent(),
+    required DateTime dateTimeField,
+    this.locationOrModality = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       title = Value(title),
+       content = Value(content),
+       dateTimeField = Value(dateTimeField),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<MinistryExperienceEntry> custom({
+    Expression<String>? id,
+    Expression<String>? title,
+    Expression<String>? content,
+    Expression<String>? mediaUrls,
+    Expression<String>? tags,
+    Expression<DateTime>? dateTimeField,
+    Expression<String>? locationOrModality,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? revision,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (title != null) 'title': title,
+      if (content != null) 'content': content,
+      if (mediaUrls != null) 'media_urls': mediaUrls,
+      if (tags != null) 'tags': tags,
+      if (dateTimeField != null) 'date_time': dateTimeField,
+      if (locationOrModality != null)
+        'location_or_modality': locationOrModality,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (revision != null) 'revision': revision,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  MinistryExperiencesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? title,
+    Value<String>? content,
+    Value<String>? mediaUrls,
+    Value<String>? tags,
+    Value<DateTime>? dateTimeField,
+    Value<String?>? locationOrModality,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? revision,
+    Value<int>? rowid,
+  }) {
+    return MinistryExperiencesCompanion(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      content: content ?? this.content,
+      mediaUrls: mediaUrls ?? this.mediaUrls,
+      tags: tags ?? this.tags,
+      dateTimeField: dateTimeField ?? this.dateTimeField,
+      locationOrModality: locationOrModality ?? this.locationOrModality,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      revision: revision ?? this.revision,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (content.present) {
+      map['content'] = Variable<String>(content.value);
+    }
+    if (mediaUrls.present) {
+      map['media_urls'] = Variable<String>(mediaUrls.value);
+    }
+    if (tags.present) {
+      map['tags'] = Variable<String>(tags.value);
+    }
+    if (dateTimeField.present) {
+      map['date_time'] = Variable<DateTime>(dateTimeField.value);
+    }
+    if (locationOrModality.present) {
+      map['location_or_modality'] = Variable<String>(locationOrModality.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (revision.present) {
+      map['revision'] = Variable<int>(revision.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MinistryExperiencesCompanion(')
+          ..write('id: $id, ')
+          ..write('title: $title, ')
+          ..write('content: $content, ')
+          ..write('mediaUrls: $mediaUrls, ')
+          ..write('tags: $tags, ')
+          ..write('dateTimeField: $dateTimeField, ')
+          ..write('locationOrModality: $locationOrModality, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $PersonPhotosTable extends PersonPhotos
+    with TableInfo<$PersonPhotosTable, PersonPhotoEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PersonPhotosTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _personIdMeta = const VerificationMeta(
+    'personId',
+  );
+  @override
+  late final GeneratedColumn<String> personId = GeneratedColumn<String>(
+    'person_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _photoTypeMeta = const VerificationMeta(
+    'photoType',
+  );
+  @override
+  late final GeneratedColumn<String> photoType = GeneratedColumn<String>(
+    'photo_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _imageDataMeta = const VerificationMeta(
+    'imageData',
+  );
+  @override
+  late final GeneratedColumn<String> imageData = GeneratedColumn<String>(
+    'image_data',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _revisionMeta = const VerificationMeta(
+    'revision',
+  );
+  @override
+  late final GeneratedColumn<int> revision = GeneratedColumn<int>(
+    'revision',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    personId,
+    photoType,
+    imageData,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'person_photos';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PersonPhotoEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('person_id')) {
+      context.handle(
+        _personIdMeta,
+        personId.isAcceptableOrUnknown(data['person_id']!, _personIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_personIdMeta);
+    }
+    if (data.containsKey('photo_type')) {
+      context.handle(
+        _photoTypeMeta,
+        photoType.isAcceptableOrUnknown(data['photo_type']!, _photoTypeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_photoTypeMeta);
+    }
+    if (data.containsKey('image_data')) {
+      context.handle(
+        _imageDataMeta,
+        imageData.isAcceptableOrUnknown(data['image_data']!, _imageDataMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_imageDataMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    if (data.containsKey('revision')) {
+      context.handle(
+        _revisionMeta,
+        revision.isAcceptableOrUnknown(data['revision']!, _revisionMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  PersonPhotoEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PersonPhotoEntry(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      personId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}person_id'],
+      )!,
+      photoType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}photo_type'],
+      )!,
+      imageData: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}image_data'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      ),
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+      revision: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}revision'],
+      )!,
+    );
+  }
+
+  @override
+  $PersonPhotosTable createAlias(String alias) {
+    return $PersonPhotosTable(attachedDatabase, alias);
+  }
+}
+
+class PersonPhotoEntry extends DataClass
+    implements Insertable<PersonPhotoEntry> {
+  final String id;
+  final String personId;
+  final String photoType;
+  final String imageData;
+  final DateTime createdAt;
+  final DateTime? updatedAt;
+  final DateTime? deletedAt;
+  final int revision;
+  const PersonPhotoEntry({
+    required this.id,
+    required this.personId,
+    required this.photoType,
+    required this.imageData,
+    required this.createdAt,
+    this.updatedAt,
+    this.deletedAt,
+    required this.revision,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['person_id'] = Variable<String>(personId);
+    map['photo_type'] = Variable<String>(photoType);
+    map['image_data'] = Variable<String>(imageData);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    map['revision'] = Variable<int>(revision);
+    return map;
+  }
+
+  PersonPhotosCompanion toCompanion(bool nullToAbsent) {
+    return PersonPhotosCompanion(
+      id: Value(id),
+      personId: Value(personId),
+      photoType: Value(photoType),
+      imageData: Value(imageData),
+      createdAt: Value(createdAt),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      revision: Value(revision),
+    );
+  }
+
+  factory PersonPhotoEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PersonPhotoEntry(
+      id: serializer.fromJson<String>(json['id']),
+      personId: serializer.fromJson<String>(json['personId']),
+      photoType: serializer.fromJson<String>(json['photoType']),
+      imageData: serializer.fromJson<String>(json['imageData']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      revision: serializer.fromJson<int>(json['revision']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'personId': serializer.toJson<String>(personId),
+      'photoType': serializer.toJson<String>(photoType),
+      'imageData': serializer.toJson<String>(imageData),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'revision': serializer.toJson<int>(revision),
+    };
+  }
+
+  PersonPhotoEntry copyWith({
+    String? id,
+    String? personId,
+    String? photoType,
+    String? imageData,
+    DateTime? createdAt,
+    Value<DateTime?> updatedAt = const Value.absent(),
+    Value<DateTime?> deletedAt = const Value.absent(),
+    int? revision,
+  }) => PersonPhotoEntry(
+    id: id ?? this.id,
+    personId: personId ?? this.personId,
+    photoType: photoType ?? this.photoType,
+    imageData: imageData ?? this.imageData,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    revision: revision ?? this.revision,
+  );
+  PersonPhotoEntry copyWithCompanion(PersonPhotosCompanion data) {
+    return PersonPhotoEntry(
+      id: data.id.present ? data.id.value : this.id,
+      personId: data.personId.present ? data.personId.value : this.personId,
+      photoType: data.photoType.present ? data.photoType.value : this.photoType,
+      imageData: data.imageData.present ? data.imageData.value : this.imageData,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      revision: data.revision.present ? data.revision.value : this.revision,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PersonPhotoEntry(')
+          ..write('id: $id, ')
+          ..write('personId: $personId, ')
+          ..write('photoType: $photoType, ')
+          ..write('imageData: $imageData, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    personId,
+    photoType,
+    imageData,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PersonPhotoEntry &&
+          other.id == this.id &&
+          other.personId == this.personId &&
+          other.photoType == this.photoType &&
+          other.imageData == this.imageData &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt &&
+          other.revision == this.revision);
+}
+
+class PersonPhotosCompanion extends UpdateCompanion<PersonPhotoEntry> {
+  final Value<String> id;
+  final Value<String> personId;
+  final Value<String> photoType;
+  final Value<String> imageData;
+  final Value<DateTime> createdAt;
+  final Value<DateTime?> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> revision;
+  final Value<int> rowid;
+  const PersonPhotosCompanion({
+    this.id = const Value.absent(),
+    this.personId = const Value.absent(),
+    this.photoType = const Value.absent(),
+    this.imageData = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  PersonPhotosCompanion.insert({
+    required String id,
+    required String personId,
+    required String photoType,
+    required String imageData,
+    required DateTime createdAt,
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       personId = Value(personId),
+       photoType = Value(photoType),
+       imageData = Value(imageData),
+       createdAt = Value(createdAt);
+  static Insertable<PersonPhotoEntry> custom({
+    Expression<String>? id,
+    Expression<String>? personId,
+    Expression<String>? photoType,
+    Expression<String>? imageData,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? revision,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (personId != null) 'person_id': personId,
+      if (photoType != null) 'photo_type': photoType,
+      if (imageData != null) 'image_data': imageData,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (revision != null) 'revision': revision,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  PersonPhotosCompanion copyWith({
+    Value<String>? id,
+    Value<String>? personId,
+    Value<String>? photoType,
+    Value<String>? imageData,
+    Value<DateTime>? createdAt,
+    Value<DateTime?>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? revision,
+    Value<int>? rowid,
+  }) {
+    return PersonPhotosCompanion(
+      id: id ?? this.id,
+      personId: personId ?? this.personId,
+      photoType: photoType ?? this.photoType,
+      imageData: imageData ?? this.imageData,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      revision: revision ?? this.revision,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (personId.present) {
+      map['person_id'] = Variable<String>(personId.value);
+    }
+    if (photoType.present) {
+      map['photo_type'] = Variable<String>(photoType.value);
+    }
+    if (imageData.present) {
+      map['image_data'] = Variable<String>(imageData.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (revision.present) {
+      map['revision'] = Variable<int>(revision.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PersonPhotosCompanion(')
+          ..write('id: $id, ')
+          ..write('personId: $personId, ')
+          ..write('photoType: $photoType, ')
+          ..write('imageData: $imageData, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $PersonPublicationsTable extends PersonPublications
+    with TableInfo<$PersonPublicationsTable, PersonPublicationEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PersonPublicationsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _personIdMeta = const VerificationMeta(
+    'personId',
+  );
+  @override
+  late final GeneratedColumn<String> personId = GeneratedColumn<String>(
+    'person_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _publicationTitleMeta = const VerificationMeta(
+    'publicationTitle',
+  );
+  @override
+  late final GeneratedColumn<String> publicationTitle = GeneratedColumn<String>(
+    'publication_title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _itemTypeMeta = const VerificationMeta(
+    'itemType',
+  );
+  @override
+  late final GeneratedColumn<String> itemType = GeneratedColumn<String>(
+    'item_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _dateMeta = const VerificationMeta('date');
+  @override
+  late final GeneratedColumn<String> date = GeneratedColumn<String>(
+    'date',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _notesMeta = const VerificationMeta('notes');
+  @override
+  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
+    'notes',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _revisionMeta = const VerificationMeta(
+    'revision',
+  );
+  @override
+  late final GeneratedColumn<int> revision = GeneratedColumn<int>(
+    'revision',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    personId,
+    publicationTitle,
+    itemType,
+    status,
+    date,
+    notes,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'person_publications';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PersonPublicationEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('person_id')) {
+      context.handle(
+        _personIdMeta,
+        personId.isAcceptableOrUnknown(data['person_id']!, _personIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_personIdMeta);
+    }
+    if (data.containsKey('publication_title')) {
+      context.handle(
+        _publicationTitleMeta,
+        publicationTitle.isAcceptableOrUnknown(
+          data['publication_title']!,
+          _publicationTitleMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_publicationTitleMeta);
+    }
+    if (data.containsKey('item_type')) {
+      context.handle(
+        _itemTypeMeta,
+        itemType.isAcceptableOrUnknown(data['item_type']!, _itemTypeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_itemTypeMeta);
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_statusMeta);
+    }
+    if (data.containsKey('date')) {
+      context.handle(
+        _dateMeta,
+        date.isAcceptableOrUnknown(data['date']!, _dateMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_dateMeta);
+    }
+    if (data.containsKey('notes')) {
+      context.handle(
+        _notesMeta,
+        notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    if (data.containsKey('revision')) {
+      context.handle(
+        _revisionMeta,
+        revision.isAcceptableOrUnknown(data['revision']!, _revisionMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  PersonPublicationEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PersonPublicationEntry(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      personId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}person_id'],
+      )!,
+      publicationTitle: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}publication_title'],
+      )!,
+      itemType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}item_type'],
+      )!,
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      date: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}date'],
+      )!,
+      notes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}notes'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      ),
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+      revision: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}revision'],
+      )!,
+    );
+  }
+
+  @override
+  $PersonPublicationsTable createAlias(String alias) {
+    return $PersonPublicationsTable(attachedDatabase, alias);
+  }
+}
+
+class PersonPublicationEntry extends DataClass
+    implements Insertable<PersonPublicationEntry> {
+  final String id;
+  final String personId;
+  final String publicationTitle;
+  final String itemType;
+  final String status;
+  final String date;
+  final String? notes;
+  final DateTime createdAt;
+  final DateTime? updatedAt;
+  final DateTime? deletedAt;
+  final int revision;
+  const PersonPublicationEntry({
+    required this.id,
+    required this.personId,
+    required this.publicationTitle,
+    required this.itemType,
+    required this.status,
+    required this.date,
+    this.notes,
+    required this.createdAt,
+    this.updatedAt,
+    this.deletedAt,
+    required this.revision,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['person_id'] = Variable<String>(personId);
+    map['publication_title'] = Variable<String>(publicationTitle);
+    map['item_type'] = Variable<String>(itemType);
+    map['status'] = Variable<String>(status);
+    map['date'] = Variable<String>(date);
+    if (!nullToAbsent || notes != null) {
+      map['notes'] = Variable<String>(notes);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    map['revision'] = Variable<int>(revision);
+    return map;
+  }
+
+  PersonPublicationsCompanion toCompanion(bool nullToAbsent) {
+    return PersonPublicationsCompanion(
+      id: Value(id),
+      personId: Value(personId),
+      publicationTitle: Value(publicationTitle),
+      itemType: Value(itemType),
+      status: Value(status),
+      date: Value(date),
+      notes: notes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(notes),
+      createdAt: Value(createdAt),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      revision: Value(revision),
+    );
+  }
+
+  factory PersonPublicationEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PersonPublicationEntry(
+      id: serializer.fromJson<String>(json['id']),
+      personId: serializer.fromJson<String>(json['personId']),
+      publicationTitle: serializer.fromJson<String>(json['publicationTitle']),
+      itemType: serializer.fromJson<String>(json['itemType']),
+      status: serializer.fromJson<String>(json['status']),
+      date: serializer.fromJson<String>(json['date']),
+      notes: serializer.fromJson<String?>(json['notes']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      revision: serializer.fromJson<int>(json['revision']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'personId': serializer.toJson<String>(personId),
+      'publicationTitle': serializer.toJson<String>(publicationTitle),
+      'itemType': serializer.toJson<String>(itemType),
+      'status': serializer.toJson<String>(status),
+      'date': serializer.toJson<String>(date),
+      'notes': serializer.toJson<String?>(notes),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'revision': serializer.toJson<int>(revision),
+    };
+  }
+
+  PersonPublicationEntry copyWith({
+    String? id,
+    String? personId,
+    String? publicationTitle,
+    String? itemType,
+    String? status,
+    String? date,
+    Value<String?> notes = const Value.absent(),
+    DateTime? createdAt,
+    Value<DateTime?> updatedAt = const Value.absent(),
+    Value<DateTime?> deletedAt = const Value.absent(),
+    int? revision,
+  }) => PersonPublicationEntry(
+    id: id ?? this.id,
+    personId: personId ?? this.personId,
+    publicationTitle: publicationTitle ?? this.publicationTitle,
+    itemType: itemType ?? this.itemType,
+    status: status ?? this.status,
+    date: date ?? this.date,
+    notes: notes.present ? notes.value : this.notes,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    revision: revision ?? this.revision,
+  );
+  PersonPublicationEntry copyWithCompanion(PersonPublicationsCompanion data) {
+    return PersonPublicationEntry(
+      id: data.id.present ? data.id.value : this.id,
+      personId: data.personId.present ? data.personId.value : this.personId,
+      publicationTitle: data.publicationTitle.present
+          ? data.publicationTitle.value
+          : this.publicationTitle,
+      itemType: data.itemType.present ? data.itemType.value : this.itemType,
+      status: data.status.present ? data.status.value : this.status,
+      date: data.date.present ? data.date.value : this.date,
+      notes: data.notes.present ? data.notes.value : this.notes,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      revision: data.revision.present ? data.revision.value : this.revision,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PersonPublicationEntry(')
+          ..write('id: $id, ')
+          ..write('personId: $personId, ')
+          ..write('publicationTitle: $publicationTitle, ')
+          ..write('itemType: $itemType, ')
+          ..write('status: $status, ')
+          ..write('date: $date, ')
+          ..write('notes: $notes, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    personId,
+    publicationTitle,
+    itemType,
+    status,
+    date,
+    notes,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PersonPublicationEntry &&
+          other.id == this.id &&
+          other.personId == this.personId &&
+          other.publicationTitle == this.publicationTitle &&
+          other.itemType == this.itemType &&
+          other.status == this.status &&
+          other.date == this.date &&
+          other.notes == this.notes &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt &&
+          other.revision == this.revision);
+}
+
+class PersonPublicationsCompanion
+    extends UpdateCompanion<PersonPublicationEntry> {
+  final Value<String> id;
+  final Value<String> personId;
+  final Value<String> publicationTitle;
+  final Value<String> itemType;
+  final Value<String> status;
+  final Value<String> date;
+  final Value<String?> notes;
+  final Value<DateTime> createdAt;
+  final Value<DateTime?> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> revision;
+  final Value<int> rowid;
+  const PersonPublicationsCompanion({
+    this.id = const Value.absent(),
+    this.personId = const Value.absent(),
+    this.publicationTitle = const Value.absent(),
+    this.itemType = const Value.absent(),
+    this.status = const Value.absent(),
+    this.date = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  PersonPublicationsCompanion.insert({
+    required String id,
+    required String personId,
+    required String publicationTitle,
+    required String itemType,
+    required String status,
+    required String date,
+    this.notes = const Value.absent(),
+    required DateTime createdAt,
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       personId = Value(personId),
+       publicationTitle = Value(publicationTitle),
+       itemType = Value(itemType),
+       status = Value(status),
+       date = Value(date),
+       createdAt = Value(createdAt);
+  static Insertable<PersonPublicationEntry> custom({
+    Expression<String>? id,
+    Expression<String>? personId,
+    Expression<String>? publicationTitle,
+    Expression<String>? itemType,
+    Expression<String>? status,
+    Expression<String>? date,
+    Expression<String>? notes,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? revision,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (personId != null) 'person_id': personId,
+      if (publicationTitle != null) 'publication_title': publicationTitle,
+      if (itemType != null) 'item_type': itemType,
+      if (status != null) 'status': status,
+      if (date != null) 'date': date,
+      if (notes != null) 'notes': notes,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (revision != null) 'revision': revision,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  PersonPublicationsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? personId,
+    Value<String>? publicationTitle,
+    Value<String>? itemType,
+    Value<String>? status,
+    Value<String>? date,
+    Value<String?>? notes,
+    Value<DateTime>? createdAt,
+    Value<DateTime?>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? revision,
+    Value<int>? rowid,
+  }) {
+    return PersonPublicationsCompanion(
+      id: id ?? this.id,
+      personId: personId ?? this.personId,
+      publicationTitle: publicationTitle ?? this.publicationTitle,
+      itemType: itemType ?? this.itemType,
+      status: status ?? this.status,
+      date: date ?? this.date,
+      notes: notes ?? this.notes,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      revision: revision ?? this.revision,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (personId.present) {
+      map['person_id'] = Variable<String>(personId.value);
+    }
+    if (publicationTitle.present) {
+      map['publication_title'] = Variable<String>(publicationTitle.value);
+    }
+    if (itemType.present) {
+      map['item_type'] = Variable<String>(itemType.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (date.present) {
+      map['date'] = Variable<String>(date.value);
+    }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (revision.present) {
+      map['revision'] = Variable<int>(revision.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PersonPublicationsCompanion(')
+          ..write('id: $id, ')
+          ..write('personId: $personId, ')
+          ..write('publicationTitle: $publicationTitle, ')
+          ..write('itemType: $itemType, ')
+          ..write('status: $status, ')
+          ..write('date: $date, ')
+          ..write('notes: $notes, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $ResearchArticlesTable extends ResearchArticles
+    with TableInfo<$ResearchArticlesTable, ResearchArticleEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ResearchArticlesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _summaryMeta = const VerificationMeta(
+    'summary',
+  );
+  @override
+  late final GeneratedColumn<String> summary = GeneratedColumn<String>(
+    'summary',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _contentMeta = const VerificationMeta(
+    'content',
+  );
+  @override
+  late final GeneratedColumn<String> content = GeneratedColumn<String>(
+    'content',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _tagsMeta = const VerificationMeta('tags');
+  @override
+  late final GeneratedColumn<String> tags = GeneratedColumn<String>(
+    'tags',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  );
+  static const VerificationMeta _attachmentsMeta = const VerificationMeta(
+    'attachments',
+  );
+  @override
+  late final GeneratedColumn<String> attachments = GeneratedColumn<String>(
+    'attachments',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _revisionMeta = const VerificationMeta(
+    'revision',
+  );
+  @override
+  late final GeneratedColumn<int> revision = GeneratedColumn<int>(
+    'revision',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    title,
+    summary,
+    content,
+    tags,
+    attachments,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'research_articles';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ResearchArticleEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('summary')) {
+      context.handle(
+        _summaryMeta,
+        summary.isAcceptableOrUnknown(data['summary']!, _summaryMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_summaryMeta);
+    }
+    if (data.containsKey('content')) {
+      context.handle(
+        _contentMeta,
+        content.isAcceptableOrUnknown(data['content']!, _contentMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_contentMeta);
+    }
+    if (data.containsKey('tags')) {
+      context.handle(
+        _tagsMeta,
+        tags.isAcceptableOrUnknown(data['tags']!, _tagsMeta),
+      );
+    }
+    if (data.containsKey('attachments')) {
+      context.handle(
+        _attachmentsMeta,
+        attachments.isAcceptableOrUnknown(
+          data['attachments']!,
+          _attachmentsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    if (data.containsKey('revision')) {
+      context.handle(
+        _revisionMeta,
+        revision.isAcceptableOrUnknown(data['revision']!, _revisionMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ResearchArticleEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ResearchArticleEntry(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      )!,
+      summary: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}summary'],
+      )!,
+      content: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}content'],
+      )!,
+      tags: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}tags'],
+      )!,
+      attachments: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}attachments'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+      revision: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}revision'],
+      )!,
+    );
+  }
+
+  @override
+  $ResearchArticlesTable createAlias(String alias) {
+    return $ResearchArticlesTable(attachedDatabase, alias);
+  }
+}
+
+class ResearchArticleEntry extends DataClass
+    implements Insertable<ResearchArticleEntry> {
+  final String id;
+  final String title;
+  final String summary;
+  final String content;
+  final String tags;
+  final String attachments;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime? deletedAt;
+  final int revision;
+  const ResearchArticleEntry({
+    required this.id,
+    required this.title,
+    required this.summary,
+    required this.content,
+    required this.tags,
+    required this.attachments,
+    required this.createdAt,
+    required this.updatedAt,
+    this.deletedAt,
+    required this.revision,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['title'] = Variable<String>(title);
+    map['summary'] = Variable<String>(summary);
+    map['content'] = Variable<String>(content);
+    map['tags'] = Variable<String>(tags);
+    map['attachments'] = Variable<String>(attachments);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    map['revision'] = Variable<int>(revision);
+    return map;
+  }
+
+  ResearchArticlesCompanion toCompanion(bool nullToAbsent) {
+    return ResearchArticlesCompanion(
+      id: Value(id),
+      title: Value(title),
+      summary: Value(summary),
+      content: Value(content),
+      tags: Value(tags),
+      attachments: Value(attachments),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      revision: Value(revision),
+    );
+  }
+
+  factory ResearchArticleEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ResearchArticleEntry(
+      id: serializer.fromJson<String>(json['id']),
+      title: serializer.fromJson<String>(json['title']),
+      summary: serializer.fromJson<String>(json['summary']),
+      content: serializer.fromJson<String>(json['content']),
+      tags: serializer.fromJson<String>(json['tags']),
+      attachments: serializer.fromJson<String>(json['attachments']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      revision: serializer.fromJson<int>(json['revision']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'title': serializer.toJson<String>(title),
+      'summary': serializer.toJson<String>(summary),
+      'content': serializer.toJson<String>(content),
+      'tags': serializer.toJson<String>(tags),
+      'attachments': serializer.toJson<String>(attachments),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'revision': serializer.toJson<int>(revision),
+    };
+  }
+
+  ResearchArticleEntry copyWith({
+    String? id,
+    String? title,
+    String? summary,
+    String? content,
+    String? tags,
+    String? attachments,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    Value<DateTime?> deletedAt = const Value.absent(),
+    int? revision,
+  }) => ResearchArticleEntry(
+    id: id ?? this.id,
+    title: title ?? this.title,
+    summary: summary ?? this.summary,
+    content: content ?? this.content,
+    tags: tags ?? this.tags,
+    attachments: attachments ?? this.attachments,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    revision: revision ?? this.revision,
+  );
+  ResearchArticleEntry copyWithCompanion(ResearchArticlesCompanion data) {
+    return ResearchArticleEntry(
+      id: data.id.present ? data.id.value : this.id,
+      title: data.title.present ? data.title.value : this.title,
+      summary: data.summary.present ? data.summary.value : this.summary,
+      content: data.content.present ? data.content.value : this.content,
+      tags: data.tags.present ? data.tags.value : this.tags,
+      attachments: data.attachments.present
+          ? data.attachments.value
+          : this.attachments,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      revision: data.revision.present ? data.revision.value : this.revision,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ResearchArticleEntry(')
+          ..write('id: $id, ')
+          ..write('title: $title, ')
+          ..write('summary: $summary, ')
+          ..write('content: $content, ')
+          ..write('tags: $tags, ')
+          ..write('attachments: $attachments, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    title,
+    summary,
+    content,
+    tags,
+    attachments,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ResearchArticleEntry &&
+          other.id == this.id &&
+          other.title == this.title &&
+          other.summary == this.summary &&
+          other.content == this.content &&
+          other.tags == this.tags &&
+          other.attachments == this.attachments &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt &&
+          other.revision == this.revision);
+}
+
+class ResearchArticlesCompanion extends UpdateCompanion<ResearchArticleEntry> {
+  final Value<String> id;
+  final Value<String> title;
+  final Value<String> summary;
+  final Value<String> content;
+  final Value<String> tags;
+  final Value<String> attachments;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> revision;
+  final Value<int> rowid;
+  const ResearchArticlesCompanion({
+    this.id = const Value.absent(),
+    this.title = const Value.absent(),
+    this.summary = const Value.absent(),
+    this.content = const Value.absent(),
+    this.tags = const Value.absent(),
+    this.attachments = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ResearchArticlesCompanion.insert({
+    required String id,
+    required String title,
+    required String summary,
+    required String content,
+    this.tags = const Value.absent(),
+    this.attachments = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       title = Value(title),
+       summary = Value(summary),
+       content = Value(content),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<ResearchArticleEntry> custom({
+    Expression<String>? id,
+    Expression<String>? title,
+    Expression<String>? summary,
+    Expression<String>? content,
+    Expression<String>? tags,
+    Expression<String>? attachments,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? revision,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (title != null) 'title': title,
+      if (summary != null) 'summary': summary,
+      if (content != null) 'content': content,
+      if (tags != null) 'tags': tags,
+      if (attachments != null) 'attachments': attachments,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (revision != null) 'revision': revision,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ResearchArticlesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? title,
+    Value<String>? summary,
+    Value<String>? content,
+    Value<String>? tags,
+    Value<String>? attachments,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? revision,
+    Value<int>? rowid,
+  }) {
+    return ResearchArticlesCompanion(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      summary: summary ?? this.summary,
+      content: content ?? this.content,
+      tags: tags ?? this.tags,
+      attachments: attachments ?? this.attachments,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      revision: revision ?? this.revision,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (summary.present) {
+      map['summary'] = Variable<String>(summary.value);
+    }
+    if (content.present) {
+      map['content'] = Variable<String>(content.value);
+    }
+    if (tags.present) {
+      map['tags'] = Variable<String>(tags.value);
+    }
+    if (attachments.present) {
+      map['attachments'] = Variable<String>(attachments.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (revision.present) {
+      map['revision'] = Variable<int>(revision.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ResearchArticlesCompanion(')
+          ..write('id: $id, ')
+          ..write('title: $title, ')
+          ..write('summary: $summary, ')
+          ..write('content: $content, ')
+          ..write('tags: $tags, ')
+          ..write('attachments: $attachments, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $ResearchTagsTable extends ResearchTags
+    with TableInfo<$ResearchTagsTable, ResearchTagEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ResearchTagsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _revisionMeta = const VerificationMeta(
+    'revision',
+  );
+  @override
+  late final GeneratedColumn<int> revision = GeneratedColumn<int>(
+    'revision',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    name,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'research_tags';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ResearchTagEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    if (data.containsKey('revision')) {
+      context.handle(
+        _revisionMeta,
+        revision.isAcceptableOrUnknown(data['revision']!, _revisionMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ResearchTagEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ResearchTagEntry(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      ),
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+      revision: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}revision'],
+      )!,
+    );
+  }
+
+  @override
+  $ResearchTagsTable createAlias(String alias) {
+    return $ResearchTagsTable(attachedDatabase, alias);
+  }
+}
+
+class ResearchTagEntry extends DataClass
+    implements Insertable<ResearchTagEntry> {
+  final String id;
+  final String name;
+  final DateTime createdAt;
+  final DateTime? updatedAt;
+  final DateTime? deletedAt;
+  final int revision;
+  const ResearchTagEntry({
+    required this.id,
+    required this.name,
+    required this.createdAt,
+    this.updatedAt,
+    this.deletedAt,
+    required this.revision,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    map['revision'] = Variable<int>(revision);
+    return map;
+  }
+
+  ResearchTagsCompanion toCompanion(bool nullToAbsent) {
+    return ResearchTagsCompanion(
+      id: Value(id),
+      name: Value(name),
+      createdAt: Value(createdAt),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      revision: Value(revision),
+    );
+  }
+
+  factory ResearchTagEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ResearchTagEntry(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      revision: serializer.fromJson<int>(json['revision']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'revision': serializer.toJson<int>(revision),
+    };
+  }
+
+  ResearchTagEntry copyWith({
+    String? id,
+    String? name,
+    DateTime? createdAt,
+    Value<DateTime?> updatedAt = const Value.absent(),
+    Value<DateTime?> deletedAt = const Value.absent(),
+    int? revision,
+  }) => ResearchTagEntry(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    revision: revision ?? this.revision,
+  );
+  ResearchTagEntry copyWithCompanion(ResearchTagsCompanion data) {
+    return ResearchTagEntry(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      revision: data.revision.present ? data.revision.value : this.revision,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ResearchTagEntry(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, name, createdAt, updatedAt, deletedAt, revision);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ResearchTagEntry &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt &&
+          other.revision == this.revision);
+}
+
+class ResearchTagsCompanion extends UpdateCompanion<ResearchTagEntry> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<DateTime> createdAt;
+  final Value<DateTime?> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> revision;
+  final Value<int> rowid;
+  const ResearchTagsCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ResearchTagsCompanion.insert({
+    required String id,
+    required String name,
+    required DateTime createdAt,
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name),
+       createdAt = Value(createdAt);
+  static Insertable<ResearchTagEntry> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? revision,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (revision != null) 'revision': revision,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ResearchTagsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<DateTime>? createdAt,
+    Value<DateTime?>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? revision,
+    Value<int>? rowid,
+  }) {
+    return ResearchTagsCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      revision: revision ?? this.revision,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (revision.present) {
+      map['revision'] = Variable<int>(revision.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ResearchTagsCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $TerritorySectorsTable extends TerritorySectors
+    with TableInfo<$TerritorySectorsTable, TerritorySectorEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $TerritorySectorsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _descriptionMeta = const VerificationMeta(
+    'description',
+  );
+  @override
+  late final GeneratedColumn<String> description = GeneratedColumn<String>(
+    'description',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _revisionMeta = const VerificationMeta(
+    'revision',
+  );
+  @override
+  late final GeneratedColumn<int> revision = GeneratedColumn<int>(
+    'revision',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    name,
+    description,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'territory_sectors';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<TerritorySectorEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('description')) {
+      context.handle(
+        _descriptionMeta,
+        description.isAcceptableOrUnknown(
+          data['description']!,
+          _descriptionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    if (data.containsKey('revision')) {
+      context.handle(
+        _revisionMeta,
+        revision.isAcceptableOrUnknown(data['revision']!, _revisionMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  TerritorySectorEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return TerritorySectorEntry(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      description: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}description'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      ),
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+      revision: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}revision'],
+      )!,
+    );
+  }
+
+  @override
+  $TerritorySectorsTable createAlias(String alias) {
+    return $TerritorySectorsTable(attachedDatabase, alias);
+  }
+}
+
+class TerritorySectorEntry extends DataClass
+    implements Insertable<TerritorySectorEntry> {
+  final String id;
+  final String name;
+  final String? description;
+  final DateTime createdAt;
+  final DateTime? updatedAt;
+  final DateTime? deletedAt;
+  final int revision;
+  const TerritorySectorEntry({
+    required this.id,
+    required this.name,
+    this.description,
+    required this.createdAt,
+    this.updatedAt,
+    this.deletedAt,
+    required this.revision,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    if (!nullToAbsent || description != null) {
+      map['description'] = Variable<String>(description);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    map['revision'] = Variable<int>(revision);
+    return map;
+  }
+
+  TerritorySectorsCompanion toCompanion(bool nullToAbsent) {
+    return TerritorySectorsCompanion(
+      id: Value(id),
+      name: Value(name),
+      description: description == null && nullToAbsent
+          ? const Value.absent()
+          : Value(description),
+      createdAt: Value(createdAt),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      revision: Value(revision),
+    );
+  }
+
+  factory TerritorySectorEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return TerritorySectorEntry(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      description: serializer.fromJson<String?>(json['description']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      revision: serializer.fromJson<int>(json['revision']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'description': serializer.toJson<String?>(description),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'revision': serializer.toJson<int>(revision),
+    };
+  }
+
+  TerritorySectorEntry copyWith({
+    String? id,
+    String? name,
+    Value<String?> description = const Value.absent(),
+    DateTime? createdAt,
+    Value<DateTime?> updatedAt = const Value.absent(),
+    Value<DateTime?> deletedAt = const Value.absent(),
+    int? revision,
+  }) => TerritorySectorEntry(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    description: description.present ? description.value : this.description,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    revision: revision ?? this.revision,
+  );
+  TerritorySectorEntry copyWithCompanion(TerritorySectorsCompanion data) {
+    return TerritorySectorEntry(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      description: data.description.present
+          ? data.description.value
+          : this.description,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      revision: data.revision.present ? data.revision.value : this.revision,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TerritorySectorEntry(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('description: $description, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    name,
+    description,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is TerritorySectorEntry &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.description == this.description &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt &&
+          other.revision == this.revision);
+}
+
+class TerritorySectorsCompanion extends UpdateCompanion<TerritorySectorEntry> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<String?> description;
+  final Value<DateTime> createdAt;
+  final Value<DateTime?> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> revision;
+  final Value<int> rowid;
+  const TerritorySectorsCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.description = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  TerritorySectorsCompanion.insert({
+    required String id,
+    required String name,
+    this.description = const Value.absent(),
+    required DateTime createdAt,
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name),
+       createdAt = Value(createdAt);
+  static Insertable<TerritorySectorEntry> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<String>? description,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? revision,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (description != null) 'description': description,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (revision != null) 'revision': revision,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  TerritorySectorsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<String?>? description,
+    Value<DateTime>? createdAt,
+    Value<DateTime?>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? revision,
+    Value<int>? rowid,
+  }) {
+    return TerritorySectorsCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      revision: revision ?? this.revision,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (description.present) {
+      map['description'] = Variable<String>(description.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (revision.present) {
+      map['revision'] = Variable<int>(revision.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TerritorySectorsCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('description: $description, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $StudentManualOrderTable extends StudentManualOrder
+    with TableInfo<$StudentManualOrderTable, StudentManualOrderEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $StudentManualOrderTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _studyIdMeta = const VerificationMeta(
+    'studyId',
+  );
+  @override
+  late final GeneratedColumn<String> studyId = GeneratedColumn<String>(
+    'study_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _manualIndexMeta = const VerificationMeta(
+    'manualIndex',
+  );
+  @override
+  late final GeneratedColumn<int> manualIndex = GeneratedColumn<int>(
+    'manual_index',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _revisionMeta = const VerificationMeta(
+    'revision',
+  );
+  @override
+  late final GeneratedColumn<int> revision = GeneratedColumn<int>(
+    'revision',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    studyId,
+    manualIndex,
+    updatedAt,
+    deletedAt,
+    revision,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'student_manual_order';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<StudentManualOrderEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('study_id')) {
+      context.handle(
+        _studyIdMeta,
+        studyId.isAcceptableOrUnknown(data['study_id']!, _studyIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_studyIdMeta);
+    }
+    if (data.containsKey('manual_index')) {
+      context.handle(
+        _manualIndexMeta,
+        manualIndex.isAcceptableOrUnknown(
+          data['manual_index']!,
+          _manualIndexMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_manualIndexMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    if (data.containsKey('revision')) {
+      context.handle(
+        _revisionMeta,
+        revision.isAcceptableOrUnknown(data['revision']!, _revisionMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {studyId};
+  @override
+  StudentManualOrderEntry map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return StudentManualOrderEntry(
+      studyId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}study_id'],
+      )!,
+      manualIndex: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}manual_index'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      ),
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+      revision: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}revision'],
+      )!,
+    );
+  }
+
+  @override
+  $StudentManualOrderTable createAlias(String alias) {
+    return $StudentManualOrderTable(attachedDatabase, alias);
+  }
+}
+
+class StudentManualOrderEntry extends DataClass
+    implements Insertable<StudentManualOrderEntry> {
+  final String studyId;
+  final int manualIndex;
+  final DateTime? updatedAt;
+  final DateTime? deletedAt;
+  final int revision;
+  const StudentManualOrderEntry({
+    required this.studyId,
+    required this.manualIndex,
+    this.updatedAt,
+    this.deletedAt,
+    required this.revision,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['study_id'] = Variable<String>(studyId);
+    map['manual_index'] = Variable<int>(manualIndex);
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    map['revision'] = Variable<int>(revision);
+    return map;
+  }
+
+  StudentManualOrderCompanion toCompanion(bool nullToAbsent) {
+    return StudentManualOrderCompanion(
+      studyId: Value(studyId),
+      manualIndex: Value(manualIndex),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      revision: Value(revision),
+    );
+  }
+
+  factory StudentManualOrderEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return StudentManualOrderEntry(
+      studyId: serializer.fromJson<String>(json['studyId']),
+      manualIndex: serializer.fromJson<int>(json['manualIndex']),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      revision: serializer.fromJson<int>(json['revision']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'studyId': serializer.toJson<String>(studyId),
+      'manualIndex': serializer.toJson<int>(manualIndex),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'revision': serializer.toJson<int>(revision),
+    };
+  }
+
+  StudentManualOrderEntry copyWith({
+    String? studyId,
+    int? manualIndex,
+    Value<DateTime?> updatedAt = const Value.absent(),
+    Value<DateTime?> deletedAt = const Value.absent(),
+    int? revision,
+  }) => StudentManualOrderEntry(
+    studyId: studyId ?? this.studyId,
+    manualIndex: manualIndex ?? this.manualIndex,
+    updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    revision: revision ?? this.revision,
+  );
+  StudentManualOrderEntry copyWithCompanion(StudentManualOrderCompanion data) {
+    return StudentManualOrderEntry(
+      studyId: data.studyId.present ? data.studyId.value : this.studyId,
+      manualIndex: data.manualIndex.present
+          ? data.manualIndex.value
+          : this.manualIndex,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      revision: data.revision.present ? data.revision.value : this.revision,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('StudentManualOrderEntry(')
+          ..write('studyId: $studyId, ')
+          ..write('manualIndex: $manualIndex, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(studyId, manualIndex, updatedAt, deletedAt, revision);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is StudentManualOrderEntry &&
+          other.studyId == this.studyId &&
+          other.manualIndex == this.manualIndex &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt &&
+          other.revision == this.revision);
+}
+
+class StudentManualOrderCompanion
+    extends UpdateCompanion<StudentManualOrderEntry> {
+  final Value<String> studyId;
+  final Value<int> manualIndex;
+  final Value<DateTime?> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> revision;
+  final Value<int> rowid;
+  const StudentManualOrderCompanion({
+    this.studyId = const Value.absent(),
+    this.manualIndex = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  StudentManualOrderCompanion.insert({
+    required String studyId,
+    required int manualIndex,
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : studyId = Value(studyId),
+       manualIndex = Value(manualIndex);
+  static Insertable<StudentManualOrderEntry> custom({
+    Expression<String>? studyId,
+    Expression<int>? manualIndex,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? revision,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (studyId != null) 'study_id': studyId,
+      if (manualIndex != null) 'manual_index': manualIndex,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (revision != null) 'revision': revision,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  StudentManualOrderCompanion copyWith({
+    Value<String>? studyId,
+    Value<int>? manualIndex,
+    Value<DateTime?>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? revision,
+    Value<int>? rowid,
+  }) {
+    return StudentManualOrderCompanion(
+      studyId: studyId ?? this.studyId,
+      manualIndex: manualIndex ?? this.manualIndex,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      revision: revision ?? this.revision,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (studyId.present) {
+      map['study_id'] = Variable<String>(studyId.value);
+    }
+    if (manualIndex.present) {
+      map['manual_index'] = Variable<int>(manualIndex.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (revision.present) {
+      map['revision'] = Variable<int>(revision.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('StudentManualOrderCompanion(')
+          ..write('studyId: $studyId, ')
+          ..write('manualIndex: $manualIndex, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $ExternalCalendarEventsTable extends ExternalCalendarEvents
+    with TableInfo<$ExternalCalendarEventsTable, ExternalCalendarEventEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ExternalCalendarEventsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _providerMeta = const VerificationMeta(
+    'provider',
+  );
+  @override
+  late final GeneratedColumn<String> provider = GeneratedColumn<String>(
+    'provider',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _externalAccountMeta = const VerificationMeta(
+    'externalAccount',
+  );
+  @override
+  late final GeneratedColumn<String> externalAccount = GeneratedColumn<String>(
+    'external_account',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _calendarIdMeta = const VerificationMeta(
+    'calendarId',
+  );
+  @override
+  late final GeneratedColumn<String> calendarId = GeneratedColumn<String>(
+    'calendar_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _externalEventIdMeta = const VerificationMeta(
+    'externalEventId',
+  );
+  @override
+  late final GeneratedColumn<String> externalEventId = GeneratedColumn<String>(
+    'external_event_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _iCalUidMeta = const VerificationMeta(
+    'iCalUid',
+  );
+  @override
+  late final GeneratedColumn<String> iCalUid = GeneratedColumn<String>(
+    'ical_uid',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _locationMeta = const VerificationMeta(
+    'location',
+  );
+  @override
+  late final GeneratedColumn<String> location = GeneratedColumn<String>(
+    'location',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _descriptionMeta = const VerificationMeta(
+    'description',
+  );
+  @override
+  late final GeneratedColumn<String> description = GeneratedColumn<String>(
+    'description',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _startTimeMeta = const VerificationMeta(
+    'startTime',
+  );
+  @override
+  late final GeneratedColumn<DateTime> startTime = GeneratedColumn<DateTime>(
+    'start_time',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _endTimeMeta = const VerificationMeta(
+    'endTime',
+  );
+  @override
+  late final GeneratedColumn<DateTime> endTime = GeneratedColumn<DateTime>(
+    'end_time',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _timeZoneMeta = const VerificationMeta(
+    'timeZone',
+  );
+  @override
+  late final GeneratedColumn<String> timeZone = GeneratedColumn<String>(
+    'time_zone',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _isAllDayMeta = const VerificationMeta(
+    'isAllDay',
+  );
+  @override
+  late final GeneratedColumn<bool> isAllDay = GeneratedColumn<bool>(
+    'is_all_day',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_all_day" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _externalStatusMeta = const VerificationMeta(
+    'externalStatus',
+  );
+  @override
+  late final GeneratedColumn<String> externalStatus = GeneratedColumn<String>(
+    'external_status',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _lastModifiedExternalMeta =
+      const VerificationMeta('lastModifiedExternal');
+  @override
+  late final GeneratedColumn<DateTime> lastModifiedExternal =
+      GeneratedColumn<DateTime>(
+        'last_modified_external',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _lastSyncedAtMeta = const VerificationMeta(
+    'lastSyncedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastSyncedAt = GeneratedColumn<DateTime>(
+    'last_synced_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _isDeletedExternalMeta = const VerificationMeta(
+    'isDeletedExternal',
+  );
+  @override
+  late final GeneratedColumn<bool> isDeletedExternal = GeneratedColumn<bool>(
+    'is_deleted_external',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_deleted_external" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _metadataMeta = const VerificationMeta(
+    'metadata',
+  );
+  @override
+  late final GeneratedColumn<String> metadata = GeneratedColumn<String>(
+    'metadata',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _etagMeta = const VerificationMeta('etag');
+  @override
+  late final GeneratedColumn<String> etag = GeneratedColumn<String>(
+    'etag',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _revisionMeta = const VerificationMeta(
+    'revision',
+  );
+  @override
+  late final GeneratedColumn<int> revision = GeneratedColumn<int>(
+    'revision',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    provider,
+    externalAccount,
+    calendarId,
+    externalEventId,
+    iCalUid,
+    title,
+    location,
+    description,
+    startTime,
+    endTime,
+    timeZone,
+    isAllDay,
+    externalStatus,
+    lastModifiedExternal,
+    lastSyncedAt,
+    isDeletedExternal,
+    metadata,
+    etag,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'external_calendar_events';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ExternalCalendarEventEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('provider')) {
+      context.handle(
+        _providerMeta,
+        provider.isAcceptableOrUnknown(data['provider']!, _providerMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_providerMeta);
+    }
+    if (data.containsKey('external_account')) {
+      context.handle(
+        _externalAccountMeta,
+        externalAccount.isAcceptableOrUnknown(
+          data['external_account']!,
+          _externalAccountMeta,
+        ),
+      );
+    }
+    if (data.containsKey('calendar_id')) {
+      context.handle(
+        _calendarIdMeta,
+        calendarId.isAcceptableOrUnknown(data['calendar_id']!, _calendarIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_calendarIdMeta);
+    }
+    if (data.containsKey('external_event_id')) {
+      context.handle(
+        _externalEventIdMeta,
+        externalEventId.isAcceptableOrUnknown(
+          data['external_event_id']!,
+          _externalEventIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_externalEventIdMeta);
+    }
+    if (data.containsKey('ical_uid')) {
+      context.handle(
+        _iCalUidMeta,
+        iCalUid.isAcceptableOrUnknown(data['ical_uid']!, _iCalUidMeta),
+      );
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('location')) {
+      context.handle(
+        _locationMeta,
+        location.isAcceptableOrUnknown(data['location']!, _locationMeta),
+      );
+    }
+    if (data.containsKey('description')) {
+      context.handle(
+        _descriptionMeta,
+        description.isAcceptableOrUnknown(
+          data['description']!,
+          _descriptionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('start_time')) {
+      context.handle(
+        _startTimeMeta,
+        startTime.isAcceptableOrUnknown(data['start_time']!, _startTimeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_startTimeMeta);
+    }
+    if (data.containsKey('end_time')) {
+      context.handle(
+        _endTimeMeta,
+        endTime.isAcceptableOrUnknown(data['end_time']!, _endTimeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_endTimeMeta);
+    }
+    if (data.containsKey('time_zone')) {
+      context.handle(
+        _timeZoneMeta,
+        timeZone.isAcceptableOrUnknown(data['time_zone']!, _timeZoneMeta),
+      );
+    }
+    if (data.containsKey('is_all_day')) {
+      context.handle(
+        _isAllDayMeta,
+        isAllDay.isAcceptableOrUnknown(data['is_all_day']!, _isAllDayMeta),
+      );
+    }
+    if (data.containsKey('external_status')) {
+      context.handle(
+        _externalStatusMeta,
+        externalStatus.isAcceptableOrUnknown(
+          data['external_status']!,
+          _externalStatusMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_modified_external')) {
+      context.handle(
+        _lastModifiedExternalMeta,
+        lastModifiedExternal.isAcceptableOrUnknown(
+          data['last_modified_external']!,
+          _lastModifiedExternalMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_synced_at')) {
+      context.handle(
+        _lastSyncedAtMeta,
+        lastSyncedAt.isAcceptableOrUnknown(
+          data['last_synced_at']!,
+          _lastSyncedAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('is_deleted_external')) {
+      context.handle(
+        _isDeletedExternalMeta,
+        isDeletedExternal.isAcceptableOrUnknown(
+          data['is_deleted_external']!,
+          _isDeletedExternalMeta,
+        ),
+      );
+    }
+    if (data.containsKey('metadata')) {
+      context.handle(
+        _metadataMeta,
+        metadata.isAcceptableOrUnknown(data['metadata']!, _metadataMeta),
+      );
+    }
+    if (data.containsKey('etag')) {
+      context.handle(
+        _etagMeta,
+        etag.isAcceptableOrUnknown(data['etag']!, _etagMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    if (data.containsKey('revision')) {
+      context.handle(
+        _revisionMeta,
+        revision.isAcceptableOrUnknown(data['revision']!, _revisionMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ExternalCalendarEventEntry map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ExternalCalendarEventEntry(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      provider: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}provider'],
+      )!,
+      externalAccount: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}external_account'],
+      ),
+      calendarId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}calendar_id'],
+      )!,
+      externalEventId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}external_event_id'],
+      )!,
+      iCalUid: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}ical_uid'],
+      ),
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      )!,
+      location: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}location'],
+      ),
+      description: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}description'],
+      ),
+      startTime: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}start_time'],
+      )!,
+      endTime: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}end_time'],
+      )!,
+      timeZone: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}time_zone'],
+      ),
+      isAllDay: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_all_day'],
+      )!,
+      externalStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}external_status'],
+      ),
+      lastModifiedExternal: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_modified_external'],
+      ),
+      lastSyncedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_synced_at'],
+      ),
+      isDeletedExternal: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_deleted_external'],
+      )!,
+      metadata: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}metadata'],
+      ),
+      etag: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}etag'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+      revision: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}revision'],
+      )!,
+    );
+  }
+
+  @override
+  $ExternalCalendarEventsTable createAlias(String alias) {
+    return $ExternalCalendarEventsTable(attachedDatabase, alias);
+  }
+}
+
+class ExternalCalendarEventEntry extends DataClass
+    implements Insertable<ExternalCalendarEventEntry> {
+  final String id;
+  final String provider;
+  final String? externalAccount;
+  final String calendarId;
+  final String externalEventId;
+  final String? iCalUid;
+  final String title;
+  final String? location;
+  final String? description;
+  final DateTime startTime;
+  final DateTime endTime;
+  final String? timeZone;
+  final bool isAllDay;
+  final String? externalStatus;
+  final DateTime? lastModifiedExternal;
+  final DateTime? lastSyncedAt;
+  final bool isDeletedExternal;
+  final String? metadata;
+  final String? etag;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime? deletedAt;
+  final int revision;
+  const ExternalCalendarEventEntry({
+    required this.id,
+    required this.provider,
+    this.externalAccount,
+    required this.calendarId,
+    required this.externalEventId,
+    this.iCalUid,
+    required this.title,
+    this.location,
+    this.description,
+    required this.startTime,
+    required this.endTime,
+    this.timeZone,
+    required this.isAllDay,
+    this.externalStatus,
+    this.lastModifiedExternal,
+    this.lastSyncedAt,
+    required this.isDeletedExternal,
+    this.metadata,
+    this.etag,
+    required this.createdAt,
+    required this.updatedAt,
+    this.deletedAt,
+    required this.revision,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['provider'] = Variable<String>(provider);
+    if (!nullToAbsent || externalAccount != null) {
+      map['external_account'] = Variable<String>(externalAccount);
+    }
+    map['calendar_id'] = Variable<String>(calendarId);
+    map['external_event_id'] = Variable<String>(externalEventId);
+    if (!nullToAbsent || iCalUid != null) {
+      map['ical_uid'] = Variable<String>(iCalUid);
+    }
+    map['title'] = Variable<String>(title);
+    if (!nullToAbsent || location != null) {
+      map['location'] = Variable<String>(location);
+    }
+    if (!nullToAbsent || description != null) {
+      map['description'] = Variable<String>(description);
+    }
+    map['start_time'] = Variable<DateTime>(startTime);
+    map['end_time'] = Variable<DateTime>(endTime);
+    if (!nullToAbsent || timeZone != null) {
+      map['time_zone'] = Variable<String>(timeZone);
+    }
+    map['is_all_day'] = Variable<bool>(isAllDay);
+    if (!nullToAbsent || externalStatus != null) {
+      map['external_status'] = Variable<String>(externalStatus);
+    }
+    if (!nullToAbsent || lastModifiedExternal != null) {
+      map['last_modified_external'] = Variable<DateTime>(lastModifiedExternal);
+    }
+    if (!nullToAbsent || lastSyncedAt != null) {
+      map['last_synced_at'] = Variable<DateTime>(lastSyncedAt);
+    }
+    map['is_deleted_external'] = Variable<bool>(isDeletedExternal);
+    if (!nullToAbsent || metadata != null) {
+      map['metadata'] = Variable<String>(metadata);
+    }
+    if (!nullToAbsent || etag != null) {
+      map['etag'] = Variable<String>(etag);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    map['revision'] = Variable<int>(revision);
+    return map;
+  }
+
+  ExternalCalendarEventsCompanion toCompanion(bool nullToAbsent) {
+    return ExternalCalendarEventsCompanion(
+      id: Value(id),
+      provider: Value(provider),
+      externalAccount: externalAccount == null && nullToAbsent
+          ? const Value.absent()
+          : Value(externalAccount),
+      calendarId: Value(calendarId),
+      externalEventId: Value(externalEventId),
+      iCalUid: iCalUid == null && nullToAbsent
+          ? const Value.absent()
+          : Value(iCalUid),
+      title: Value(title),
+      location: location == null && nullToAbsent
+          ? const Value.absent()
+          : Value(location),
+      description: description == null && nullToAbsent
+          ? const Value.absent()
+          : Value(description),
+      startTime: Value(startTime),
+      endTime: Value(endTime),
+      timeZone: timeZone == null && nullToAbsent
+          ? const Value.absent()
+          : Value(timeZone),
+      isAllDay: Value(isAllDay),
+      externalStatus: externalStatus == null && nullToAbsent
+          ? const Value.absent()
+          : Value(externalStatus),
+      lastModifiedExternal: lastModifiedExternal == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastModifiedExternal),
+      lastSyncedAt: lastSyncedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastSyncedAt),
+      isDeletedExternal: Value(isDeletedExternal),
+      metadata: metadata == null && nullToAbsent
+          ? const Value.absent()
+          : Value(metadata),
+      etag: etag == null && nullToAbsent ? const Value.absent() : Value(etag),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      revision: Value(revision),
+    );
+  }
+
+  factory ExternalCalendarEventEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ExternalCalendarEventEntry(
+      id: serializer.fromJson<String>(json['id']),
+      provider: serializer.fromJson<String>(json['provider']),
+      externalAccount: serializer.fromJson<String?>(json['externalAccount']),
+      calendarId: serializer.fromJson<String>(json['calendarId']),
+      externalEventId: serializer.fromJson<String>(json['externalEventId']),
+      iCalUid: serializer.fromJson<String?>(json['iCalUid']),
+      title: serializer.fromJson<String>(json['title']),
+      location: serializer.fromJson<String?>(json['location']),
+      description: serializer.fromJson<String?>(json['description']),
+      startTime: serializer.fromJson<DateTime>(json['startTime']),
+      endTime: serializer.fromJson<DateTime>(json['endTime']),
+      timeZone: serializer.fromJson<String?>(json['timeZone']),
+      isAllDay: serializer.fromJson<bool>(json['isAllDay']),
+      externalStatus: serializer.fromJson<String?>(json['externalStatus']),
+      lastModifiedExternal: serializer.fromJson<DateTime?>(
+        json['lastModifiedExternal'],
+      ),
+      lastSyncedAt: serializer.fromJson<DateTime?>(json['lastSyncedAt']),
+      isDeletedExternal: serializer.fromJson<bool>(json['isDeletedExternal']),
+      metadata: serializer.fromJson<String?>(json['metadata']),
+      etag: serializer.fromJson<String?>(json['etag']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      revision: serializer.fromJson<int>(json['revision']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'provider': serializer.toJson<String>(provider),
+      'externalAccount': serializer.toJson<String?>(externalAccount),
+      'calendarId': serializer.toJson<String>(calendarId),
+      'externalEventId': serializer.toJson<String>(externalEventId),
+      'iCalUid': serializer.toJson<String?>(iCalUid),
+      'title': serializer.toJson<String>(title),
+      'location': serializer.toJson<String?>(location),
+      'description': serializer.toJson<String?>(description),
+      'startTime': serializer.toJson<DateTime>(startTime),
+      'endTime': serializer.toJson<DateTime>(endTime),
+      'timeZone': serializer.toJson<String?>(timeZone),
+      'isAllDay': serializer.toJson<bool>(isAllDay),
+      'externalStatus': serializer.toJson<String?>(externalStatus),
+      'lastModifiedExternal': serializer.toJson<DateTime?>(
+        lastModifiedExternal,
+      ),
+      'lastSyncedAt': serializer.toJson<DateTime?>(lastSyncedAt),
+      'isDeletedExternal': serializer.toJson<bool>(isDeletedExternal),
+      'metadata': serializer.toJson<String?>(metadata),
+      'etag': serializer.toJson<String?>(etag),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'revision': serializer.toJson<int>(revision),
+    };
+  }
+
+  ExternalCalendarEventEntry copyWith({
+    String? id,
+    String? provider,
+    Value<String?> externalAccount = const Value.absent(),
+    String? calendarId,
+    String? externalEventId,
+    Value<String?> iCalUid = const Value.absent(),
+    String? title,
+    Value<String?> location = const Value.absent(),
+    Value<String?> description = const Value.absent(),
+    DateTime? startTime,
+    DateTime? endTime,
+    Value<String?> timeZone = const Value.absent(),
+    bool? isAllDay,
+    Value<String?> externalStatus = const Value.absent(),
+    Value<DateTime?> lastModifiedExternal = const Value.absent(),
+    Value<DateTime?> lastSyncedAt = const Value.absent(),
+    bool? isDeletedExternal,
+    Value<String?> metadata = const Value.absent(),
+    Value<String?> etag = const Value.absent(),
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    Value<DateTime?> deletedAt = const Value.absent(),
+    int? revision,
+  }) => ExternalCalendarEventEntry(
+    id: id ?? this.id,
+    provider: provider ?? this.provider,
+    externalAccount: externalAccount.present
+        ? externalAccount.value
+        : this.externalAccount,
+    calendarId: calendarId ?? this.calendarId,
+    externalEventId: externalEventId ?? this.externalEventId,
+    iCalUid: iCalUid.present ? iCalUid.value : this.iCalUid,
+    title: title ?? this.title,
+    location: location.present ? location.value : this.location,
+    description: description.present ? description.value : this.description,
+    startTime: startTime ?? this.startTime,
+    endTime: endTime ?? this.endTime,
+    timeZone: timeZone.present ? timeZone.value : this.timeZone,
+    isAllDay: isAllDay ?? this.isAllDay,
+    externalStatus: externalStatus.present
+        ? externalStatus.value
+        : this.externalStatus,
+    lastModifiedExternal: lastModifiedExternal.present
+        ? lastModifiedExternal.value
+        : this.lastModifiedExternal,
+    lastSyncedAt: lastSyncedAt.present ? lastSyncedAt.value : this.lastSyncedAt,
+    isDeletedExternal: isDeletedExternal ?? this.isDeletedExternal,
+    metadata: metadata.present ? metadata.value : this.metadata,
+    etag: etag.present ? etag.value : this.etag,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    revision: revision ?? this.revision,
+  );
+  ExternalCalendarEventEntry copyWithCompanion(
+    ExternalCalendarEventsCompanion data,
+  ) {
+    return ExternalCalendarEventEntry(
+      id: data.id.present ? data.id.value : this.id,
+      provider: data.provider.present ? data.provider.value : this.provider,
+      externalAccount: data.externalAccount.present
+          ? data.externalAccount.value
+          : this.externalAccount,
+      calendarId: data.calendarId.present
+          ? data.calendarId.value
+          : this.calendarId,
+      externalEventId: data.externalEventId.present
+          ? data.externalEventId.value
+          : this.externalEventId,
+      iCalUid: data.iCalUid.present ? data.iCalUid.value : this.iCalUid,
+      title: data.title.present ? data.title.value : this.title,
+      location: data.location.present ? data.location.value : this.location,
+      description: data.description.present
+          ? data.description.value
+          : this.description,
+      startTime: data.startTime.present ? data.startTime.value : this.startTime,
+      endTime: data.endTime.present ? data.endTime.value : this.endTime,
+      timeZone: data.timeZone.present ? data.timeZone.value : this.timeZone,
+      isAllDay: data.isAllDay.present ? data.isAllDay.value : this.isAllDay,
+      externalStatus: data.externalStatus.present
+          ? data.externalStatus.value
+          : this.externalStatus,
+      lastModifiedExternal: data.lastModifiedExternal.present
+          ? data.lastModifiedExternal.value
+          : this.lastModifiedExternal,
+      lastSyncedAt: data.lastSyncedAt.present
+          ? data.lastSyncedAt.value
+          : this.lastSyncedAt,
+      isDeletedExternal: data.isDeletedExternal.present
+          ? data.isDeletedExternal.value
+          : this.isDeletedExternal,
+      metadata: data.metadata.present ? data.metadata.value : this.metadata,
+      etag: data.etag.present ? data.etag.value : this.etag,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      revision: data.revision.present ? data.revision.value : this.revision,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ExternalCalendarEventEntry(')
+          ..write('id: $id, ')
+          ..write('provider: $provider, ')
+          ..write('externalAccount: $externalAccount, ')
+          ..write('calendarId: $calendarId, ')
+          ..write('externalEventId: $externalEventId, ')
+          ..write('iCalUid: $iCalUid, ')
+          ..write('title: $title, ')
+          ..write('location: $location, ')
+          ..write('description: $description, ')
+          ..write('startTime: $startTime, ')
+          ..write('endTime: $endTime, ')
+          ..write('timeZone: $timeZone, ')
+          ..write('isAllDay: $isAllDay, ')
+          ..write('externalStatus: $externalStatus, ')
+          ..write('lastModifiedExternal: $lastModifiedExternal, ')
+          ..write('lastSyncedAt: $lastSyncedAt, ')
+          ..write('isDeletedExternal: $isDeletedExternal, ')
+          ..write('metadata: $metadata, ')
+          ..write('etag: $etag, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hashAll([
+    id,
+    provider,
+    externalAccount,
+    calendarId,
+    externalEventId,
+    iCalUid,
+    title,
+    location,
+    description,
+    startTime,
+    endTime,
+    timeZone,
+    isAllDay,
+    externalStatus,
+    lastModifiedExternal,
+    lastSyncedAt,
+    isDeletedExternal,
+    metadata,
+    etag,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  ]);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ExternalCalendarEventEntry &&
+          other.id == this.id &&
+          other.provider == this.provider &&
+          other.externalAccount == this.externalAccount &&
+          other.calendarId == this.calendarId &&
+          other.externalEventId == this.externalEventId &&
+          other.iCalUid == this.iCalUid &&
+          other.title == this.title &&
+          other.location == this.location &&
+          other.description == this.description &&
+          other.startTime == this.startTime &&
+          other.endTime == this.endTime &&
+          other.timeZone == this.timeZone &&
+          other.isAllDay == this.isAllDay &&
+          other.externalStatus == this.externalStatus &&
+          other.lastModifiedExternal == this.lastModifiedExternal &&
+          other.lastSyncedAt == this.lastSyncedAt &&
+          other.isDeletedExternal == this.isDeletedExternal &&
+          other.metadata == this.metadata &&
+          other.etag == this.etag &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt &&
+          other.revision == this.revision);
+}
+
+class ExternalCalendarEventsCompanion
+    extends UpdateCompanion<ExternalCalendarEventEntry> {
+  final Value<String> id;
+  final Value<String> provider;
+  final Value<String?> externalAccount;
+  final Value<String> calendarId;
+  final Value<String> externalEventId;
+  final Value<String?> iCalUid;
+  final Value<String> title;
+  final Value<String?> location;
+  final Value<String?> description;
+  final Value<DateTime> startTime;
+  final Value<DateTime> endTime;
+  final Value<String?> timeZone;
+  final Value<bool> isAllDay;
+  final Value<String?> externalStatus;
+  final Value<DateTime?> lastModifiedExternal;
+  final Value<DateTime?> lastSyncedAt;
+  final Value<bool> isDeletedExternal;
+  final Value<String?> metadata;
+  final Value<String?> etag;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> revision;
+  final Value<int> rowid;
+  const ExternalCalendarEventsCompanion({
+    this.id = const Value.absent(),
+    this.provider = const Value.absent(),
+    this.externalAccount = const Value.absent(),
+    this.calendarId = const Value.absent(),
+    this.externalEventId = const Value.absent(),
+    this.iCalUid = const Value.absent(),
+    this.title = const Value.absent(),
+    this.location = const Value.absent(),
+    this.description = const Value.absent(),
+    this.startTime = const Value.absent(),
+    this.endTime = const Value.absent(),
+    this.timeZone = const Value.absent(),
+    this.isAllDay = const Value.absent(),
+    this.externalStatus = const Value.absent(),
+    this.lastModifiedExternal = const Value.absent(),
+    this.lastSyncedAt = const Value.absent(),
+    this.isDeletedExternal = const Value.absent(),
+    this.metadata = const Value.absent(),
+    this.etag = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ExternalCalendarEventsCompanion.insert({
+    required String id,
+    required String provider,
+    this.externalAccount = const Value.absent(),
+    required String calendarId,
+    required String externalEventId,
+    this.iCalUid = const Value.absent(),
+    required String title,
+    this.location = const Value.absent(),
+    this.description = const Value.absent(),
+    required DateTime startTime,
+    required DateTime endTime,
+    this.timeZone = const Value.absent(),
+    this.isAllDay = const Value.absent(),
+    this.externalStatus = const Value.absent(),
+    this.lastModifiedExternal = const Value.absent(),
+    this.lastSyncedAt = const Value.absent(),
+    this.isDeletedExternal = const Value.absent(),
+    this.metadata = const Value.absent(),
+    this.etag = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       provider = Value(provider),
+       calendarId = Value(calendarId),
+       externalEventId = Value(externalEventId),
+       title = Value(title),
+       startTime = Value(startTime),
+       endTime = Value(endTime),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<ExternalCalendarEventEntry> custom({
+    Expression<String>? id,
+    Expression<String>? provider,
+    Expression<String>? externalAccount,
+    Expression<String>? calendarId,
+    Expression<String>? externalEventId,
+    Expression<String>? iCalUid,
+    Expression<String>? title,
+    Expression<String>? location,
+    Expression<String>? description,
+    Expression<DateTime>? startTime,
+    Expression<DateTime>? endTime,
+    Expression<String>? timeZone,
+    Expression<bool>? isAllDay,
+    Expression<String>? externalStatus,
+    Expression<DateTime>? lastModifiedExternal,
+    Expression<DateTime>? lastSyncedAt,
+    Expression<bool>? isDeletedExternal,
+    Expression<String>? metadata,
+    Expression<String>? etag,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? revision,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (provider != null) 'provider': provider,
+      if (externalAccount != null) 'external_account': externalAccount,
+      if (calendarId != null) 'calendar_id': calendarId,
+      if (externalEventId != null) 'external_event_id': externalEventId,
+      if (iCalUid != null) 'ical_uid': iCalUid,
+      if (title != null) 'title': title,
+      if (location != null) 'location': location,
+      if (description != null) 'description': description,
+      if (startTime != null) 'start_time': startTime,
+      if (endTime != null) 'end_time': endTime,
+      if (timeZone != null) 'time_zone': timeZone,
+      if (isAllDay != null) 'is_all_day': isAllDay,
+      if (externalStatus != null) 'external_status': externalStatus,
+      if (lastModifiedExternal != null)
+        'last_modified_external': lastModifiedExternal,
+      if (lastSyncedAt != null) 'last_synced_at': lastSyncedAt,
+      if (isDeletedExternal != null) 'is_deleted_external': isDeletedExternal,
+      if (metadata != null) 'metadata': metadata,
+      if (etag != null) 'etag': etag,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (revision != null) 'revision': revision,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ExternalCalendarEventsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? provider,
+    Value<String?>? externalAccount,
+    Value<String>? calendarId,
+    Value<String>? externalEventId,
+    Value<String?>? iCalUid,
+    Value<String>? title,
+    Value<String?>? location,
+    Value<String?>? description,
+    Value<DateTime>? startTime,
+    Value<DateTime>? endTime,
+    Value<String?>? timeZone,
+    Value<bool>? isAllDay,
+    Value<String?>? externalStatus,
+    Value<DateTime?>? lastModifiedExternal,
+    Value<DateTime?>? lastSyncedAt,
+    Value<bool>? isDeletedExternal,
+    Value<String?>? metadata,
+    Value<String?>? etag,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? revision,
+    Value<int>? rowid,
+  }) {
+    return ExternalCalendarEventsCompanion(
+      id: id ?? this.id,
+      provider: provider ?? this.provider,
+      externalAccount: externalAccount ?? this.externalAccount,
+      calendarId: calendarId ?? this.calendarId,
+      externalEventId: externalEventId ?? this.externalEventId,
+      iCalUid: iCalUid ?? this.iCalUid,
+      title: title ?? this.title,
+      location: location ?? this.location,
+      description: description ?? this.description,
+      startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
+      timeZone: timeZone ?? this.timeZone,
+      isAllDay: isAllDay ?? this.isAllDay,
+      externalStatus: externalStatus ?? this.externalStatus,
+      lastModifiedExternal: lastModifiedExternal ?? this.lastModifiedExternal,
+      lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
+      isDeletedExternal: isDeletedExternal ?? this.isDeletedExternal,
+      metadata: metadata ?? this.metadata,
+      etag: etag ?? this.etag,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      revision: revision ?? this.revision,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (provider.present) {
+      map['provider'] = Variable<String>(provider.value);
+    }
+    if (externalAccount.present) {
+      map['external_account'] = Variable<String>(externalAccount.value);
+    }
+    if (calendarId.present) {
+      map['calendar_id'] = Variable<String>(calendarId.value);
+    }
+    if (externalEventId.present) {
+      map['external_event_id'] = Variable<String>(externalEventId.value);
+    }
+    if (iCalUid.present) {
+      map['ical_uid'] = Variable<String>(iCalUid.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (location.present) {
+      map['location'] = Variable<String>(location.value);
+    }
+    if (description.present) {
+      map['description'] = Variable<String>(description.value);
+    }
+    if (startTime.present) {
+      map['start_time'] = Variable<DateTime>(startTime.value);
+    }
+    if (endTime.present) {
+      map['end_time'] = Variable<DateTime>(endTime.value);
+    }
+    if (timeZone.present) {
+      map['time_zone'] = Variable<String>(timeZone.value);
+    }
+    if (isAllDay.present) {
+      map['is_all_day'] = Variable<bool>(isAllDay.value);
+    }
+    if (externalStatus.present) {
+      map['external_status'] = Variable<String>(externalStatus.value);
+    }
+    if (lastModifiedExternal.present) {
+      map['last_modified_external'] = Variable<DateTime>(
+        lastModifiedExternal.value,
+      );
+    }
+    if (lastSyncedAt.present) {
+      map['last_synced_at'] = Variable<DateTime>(lastSyncedAt.value);
+    }
+    if (isDeletedExternal.present) {
+      map['is_deleted_external'] = Variable<bool>(isDeletedExternal.value);
+    }
+    if (metadata.present) {
+      map['metadata'] = Variable<String>(metadata.value);
+    }
+    if (etag.present) {
+      map['etag'] = Variable<String>(etag.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (revision.present) {
+      map['revision'] = Variable<int>(revision.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ExternalCalendarEventsCompanion(')
+          ..write('id: $id, ')
+          ..write('provider: $provider, ')
+          ..write('externalAccount: $externalAccount, ')
+          ..write('calendarId: $calendarId, ')
+          ..write('externalEventId: $externalEventId, ')
+          ..write('iCalUid: $iCalUid, ')
+          ..write('title: $title, ')
+          ..write('location: $location, ')
+          ..write('description: $description, ')
+          ..write('startTime: $startTime, ')
+          ..write('endTime: $endTime, ')
+          ..write('timeZone: $timeZone, ')
+          ..write('isAllDay: $isAllDay, ')
+          ..write('externalStatus: $externalStatus, ')
+          ..write('lastModifiedExternal: $lastModifiedExternal, ')
+          ..write('lastSyncedAt: $lastSyncedAt, ')
+          ..write('isDeletedExternal: $isDeletedExternal, ')
+          ..write('metadata: $metadata, ')
+          ..write('etag: $etag, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $CalendarEventLinksTable extends CalendarEventLinks
+    with TableInfo<$CalendarEventLinksTable, CalendarEventLinkEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CalendarEventLinksTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _appointmentIdMeta = const VerificationMeta(
+    'appointmentId',
+  );
+  @override
+  late final GeneratedColumn<String> appointmentId = GeneratedColumn<String>(
+    'appointment_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _externalEventIdMeta = const VerificationMeta(
+    'externalEventId',
+  );
+  @override
+  late final GeneratedColumn<String> externalEventId = GeneratedColumn<String>(
+    'external_event_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _providerMeta = const VerificationMeta(
+    'provider',
+  );
+  @override
+  late final GeneratedColumn<String> provider = GeneratedColumn<String>(
+    'provider',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _syncStatusMeta = const VerificationMeta(
+    'syncStatus',
+  );
+  @override
+  late final GeneratedColumn<String> syncStatus = GeneratedColumn<String>(
+    'sync_status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('synced'),
+  );
+  static const VerificationMeta _lastErrorMeta = const VerificationMeta(
+    'lastError',
+  );
+  @override
+  late final GeneratedColumn<String> lastError = GeneratedColumn<String>(
+    'last_error',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _localRevisionAtSyncMeta =
+      const VerificationMeta('localRevisionAtSync');
+  @override
+  late final GeneratedColumn<int> localRevisionAtSync = GeneratedColumn<int>(
+    'local_revision_at_sync',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _externalETagAtSyncMeta =
+      const VerificationMeta('externalETagAtSync');
+  @override
+  late final GeneratedColumn<String> externalETagAtSync =
+      GeneratedColumn<String>(
+        'external_etag_at_sync',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _revisionMeta = const VerificationMeta(
+    'revision',
+  );
+  @override
+  late final GeneratedColumn<int> revision = GeneratedColumn<int>(
+    'revision',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    appointmentId,
+    externalEventId,
+    provider,
+    syncStatus,
+    lastError,
+    localRevisionAtSync,
+    externalETagAtSync,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'calendar_event_links';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CalendarEventLinkEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('appointment_id')) {
+      context.handle(
+        _appointmentIdMeta,
+        appointmentId.isAcceptableOrUnknown(
+          data['appointment_id']!,
+          _appointmentIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_appointmentIdMeta);
+    }
+    if (data.containsKey('external_event_id')) {
+      context.handle(
+        _externalEventIdMeta,
+        externalEventId.isAcceptableOrUnknown(
+          data['external_event_id']!,
+          _externalEventIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_externalEventIdMeta);
+    }
+    if (data.containsKey('provider')) {
+      context.handle(
+        _providerMeta,
+        provider.isAcceptableOrUnknown(data['provider']!, _providerMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_providerMeta);
+    }
+    if (data.containsKey('sync_status')) {
+      context.handle(
+        _syncStatusMeta,
+        syncStatus.isAcceptableOrUnknown(data['sync_status']!, _syncStatusMeta),
+      );
+    }
+    if (data.containsKey('last_error')) {
+      context.handle(
+        _lastErrorMeta,
+        lastError.isAcceptableOrUnknown(data['last_error']!, _lastErrorMeta),
+      );
+    }
+    if (data.containsKey('local_revision_at_sync')) {
+      context.handle(
+        _localRevisionAtSyncMeta,
+        localRevisionAtSync.isAcceptableOrUnknown(
+          data['local_revision_at_sync']!,
+          _localRevisionAtSyncMeta,
+        ),
+      );
+    }
+    if (data.containsKey('external_etag_at_sync')) {
+      context.handle(
+        _externalETagAtSyncMeta,
+        externalETagAtSync.isAcceptableOrUnknown(
+          data['external_etag_at_sync']!,
+          _externalETagAtSyncMeta,
+        ),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    if (data.containsKey('revision')) {
+      context.handle(
+        _revisionMeta,
+        revision.isAcceptableOrUnknown(data['revision']!, _revisionMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  CalendarEventLinkEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CalendarEventLinkEntry(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      appointmentId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}appointment_id'],
+      )!,
+      externalEventId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}external_event_id'],
+      )!,
+      provider: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}provider'],
+      )!,
+      syncStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sync_status'],
+      )!,
+      lastError: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}last_error'],
+      ),
+      localRevisionAtSync: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}local_revision_at_sync'],
+      )!,
+      externalETagAtSync: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}external_etag_at_sync'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+      revision: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}revision'],
+      )!,
+    );
+  }
+
+  @override
+  $CalendarEventLinksTable createAlias(String alias) {
+    return $CalendarEventLinksTable(attachedDatabase, alias);
+  }
+}
+
+class CalendarEventLinkEntry extends DataClass
+    implements Insertable<CalendarEventLinkEntry> {
+  final String id;
+  final String appointmentId;
+  final String externalEventId;
+  final String provider;
+  final String syncStatus;
+  final String? lastError;
+  final int localRevisionAtSync;
+  final String? externalETagAtSync;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime? deletedAt;
+  final int revision;
+  const CalendarEventLinkEntry({
+    required this.id,
+    required this.appointmentId,
+    required this.externalEventId,
+    required this.provider,
+    required this.syncStatus,
+    this.lastError,
+    required this.localRevisionAtSync,
+    this.externalETagAtSync,
+    required this.createdAt,
+    required this.updatedAt,
+    this.deletedAt,
+    required this.revision,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['appointment_id'] = Variable<String>(appointmentId);
+    map['external_event_id'] = Variable<String>(externalEventId);
+    map['provider'] = Variable<String>(provider);
+    map['sync_status'] = Variable<String>(syncStatus);
+    if (!nullToAbsent || lastError != null) {
+      map['last_error'] = Variable<String>(lastError);
+    }
+    map['local_revision_at_sync'] = Variable<int>(localRevisionAtSync);
+    if (!nullToAbsent || externalETagAtSync != null) {
+      map['external_etag_at_sync'] = Variable<String>(externalETagAtSync);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    map['revision'] = Variable<int>(revision);
+    return map;
+  }
+
+  CalendarEventLinksCompanion toCompanion(bool nullToAbsent) {
+    return CalendarEventLinksCompanion(
+      id: Value(id),
+      appointmentId: Value(appointmentId),
+      externalEventId: Value(externalEventId),
+      provider: Value(provider),
+      syncStatus: Value(syncStatus),
+      lastError: lastError == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastError),
+      localRevisionAtSync: Value(localRevisionAtSync),
+      externalETagAtSync: externalETagAtSync == null && nullToAbsent
+          ? const Value.absent()
+          : Value(externalETagAtSync),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      revision: Value(revision),
+    );
+  }
+
+  factory CalendarEventLinkEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CalendarEventLinkEntry(
+      id: serializer.fromJson<String>(json['id']),
+      appointmentId: serializer.fromJson<String>(json['appointmentId']),
+      externalEventId: serializer.fromJson<String>(json['externalEventId']),
+      provider: serializer.fromJson<String>(json['provider']),
+      syncStatus: serializer.fromJson<String>(json['syncStatus']),
+      lastError: serializer.fromJson<String?>(json['lastError']),
+      localRevisionAtSync: serializer.fromJson<int>(
+        json['localRevisionAtSync'],
+      ),
+      externalETagAtSync: serializer.fromJson<String?>(
+        json['externalETagAtSync'],
+      ),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      revision: serializer.fromJson<int>(json['revision']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'appointmentId': serializer.toJson<String>(appointmentId),
+      'externalEventId': serializer.toJson<String>(externalEventId),
+      'provider': serializer.toJson<String>(provider),
+      'syncStatus': serializer.toJson<String>(syncStatus),
+      'lastError': serializer.toJson<String?>(lastError),
+      'localRevisionAtSync': serializer.toJson<int>(localRevisionAtSync),
+      'externalETagAtSync': serializer.toJson<String?>(externalETagAtSync),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'revision': serializer.toJson<int>(revision),
+    };
+  }
+
+  CalendarEventLinkEntry copyWith({
+    String? id,
+    String? appointmentId,
+    String? externalEventId,
+    String? provider,
+    String? syncStatus,
+    Value<String?> lastError = const Value.absent(),
+    int? localRevisionAtSync,
+    Value<String?> externalETagAtSync = const Value.absent(),
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    Value<DateTime?> deletedAt = const Value.absent(),
+    int? revision,
+  }) => CalendarEventLinkEntry(
+    id: id ?? this.id,
+    appointmentId: appointmentId ?? this.appointmentId,
+    externalEventId: externalEventId ?? this.externalEventId,
+    provider: provider ?? this.provider,
+    syncStatus: syncStatus ?? this.syncStatus,
+    lastError: lastError.present ? lastError.value : this.lastError,
+    localRevisionAtSync: localRevisionAtSync ?? this.localRevisionAtSync,
+    externalETagAtSync: externalETagAtSync.present
+        ? externalETagAtSync.value
+        : this.externalETagAtSync,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    revision: revision ?? this.revision,
+  );
+  CalendarEventLinkEntry copyWithCompanion(CalendarEventLinksCompanion data) {
+    return CalendarEventLinkEntry(
+      id: data.id.present ? data.id.value : this.id,
+      appointmentId: data.appointmentId.present
+          ? data.appointmentId.value
+          : this.appointmentId,
+      externalEventId: data.externalEventId.present
+          ? data.externalEventId.value
+          : this.externalEventId,
+      provider: data.provider.present ? data.provider.value : this.provider,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      lastError: data.lastError.present ? data.lastError.value : this.lastError,
+      localRevisionAtSync: data.localRevisionAtSync.present
+          ? data.localRevisionAtSync.value
+          : this.localRevisionAtSync,
+      externalETagAtSync: data.externalETagAtSync.present
+          ? data.externalETagAtSync.value
+          : this.externalETagAtSync,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      revision: data.revision.present ? data.revision.value : this.revision,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CalendarEventLinkEntry(')
+          ..write('id: $id, ')
+          ..write('appointmentId: $appointmentId, ')
+          ..write('externalEventId: $externalEventId, ')
+          ..write('provider: $provider, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('lastError: $lastError, ')
+          ..write('localRevisionAtSync: $localRevisionAtSync, ')
+          ..write('externalETagAtSync: $externalETagAtSync, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    appointmentId,
+    externalEventId,
+    provider,
+    syncStatus,
+    lastError,
+    localRevisionAtSync,
+    externalETagAtSync,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CalendarEventLinkEntry &&
+          other.id == this.id &&
+          other.appointmentId == this.appointmentId &&
+          other.externalEventId == this.externalEventId &&
+          other.provider == this.provider &&
+          other.syncStatus == this.syncStatus &&
+          other.lastError == this.lastError &&
+          other.localRevisionAtSync == this.localRevisionAtSync &&
+          other.externalETagAtSync == this.externalETagAtSync &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt &&
+          other.revision == this.revision);
+}
+
+class CalendarEventLinksCompanion
+    extends UpdateCompanion<CalendarEventLinkEntry> {
+  final Value<String> id;
+  final Value<String> appointmentId;
+  final Value<String> externalEventId;
+  final Value<String> provider;
+  final Value<String> syncStatus;
+  final Value<String?> lastError;
+  final Value<int> localRevisionAtSync;
+  final Value<String?> externalETagAtSync;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> revision;
+  final Value<int> rowid;
+  const CalendarEventLinksCompanion({
+    this.id = const Value.absent(),
+    this.appointmentId = const Value.absent(),
+    this.externalEventId = const Value.absent(),
+    this.provider = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.lastError = const Value.absent(),
+    this.localRevisionAtSync = const Value.absent(),
+    this.externalETagAtSync = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CalendarEventLinksCompanion.insert({
+    required String id,
+    required String appointmentId,
+    required String externalEventId,
+    required String provider,
+    this.syncStatus = const Value.absent(),
+    this.lastError = const Value.absent(),
+    this.localRevisionAtSync = const Value.absent(),
+    this.externalETagAtSync = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       appointmentId = Value(appointmentId),
+       externalEventId = Value(externalEventId),
+       provider = Value(provider),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<CalendarEventLinkEntry> custom({
+    Expression<String>? id,
+    Expression<String>? appointmentId,
+    Expression<String>? externalEventId,
+    Expression<String>? provider,
+    Expression<String>? syncStatus,
+    Expression<String>? lastError,
+    Expression<int>? localRevisionAtSync,
+    Expression<String>? externalETagAtSync,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? revision,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (appointmentId != null) 'appointment_id': appointmentId,
+      if (externalEventId != null) 'external_event_id': externalEventId,
+      if (provider != null) 'provider': provider,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (lastError != null) 'last_error': lastError,
+      if (localRevisionAtSync != null)
+        'local_revision_at_sync': localRevisionAtSync,
+      if (externalETagAtSync != null)
+        'external_etag_at_sync': externalETagAtSync,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (revision != null) 'revision': revision,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CalendarEventLinksCompanion copyWith({
+    Value<String>? id,
+    Value<String>? appointmentId,
+    Value<String>? externalEventId,
+    Value<String>? provider,
+    Value<String>? syncStatus,
+    Value<String?>? lastError,
+    Value<int>? localRevisionAtSync,
+    Value<String?>? externalETagAtSync,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? revision,
+    Value<int>? rowid,
+  }) {
+    return CalendarEventLinksCompanion(
+      id: id ?? this.id,
+      appointmentId: appointmentId ?? this.appointmentId,
+      externalEventId: externalEventId ?? this.externalEventId,
+      provider: provider ?? this.provider,
+      syncStatus: syncStatus ?? this.syncStatus,
+      lastError: lastError ?? this.lastError,
+      localRevisionAtSync: localRevisionAtSync ?? this.localRevisionAtSync,
+      externalETagAtSync: externalETagAtSync ?? this.externalETagAtSync,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      revision: revision ?? this.revision,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (appointmentId.present) {
+      map['appointment_id'] = Variable<String>(appointmentId.value);
+    }
+    if (externalEventId.present) {
+      map['external_event_id'] = Variable<String>(externalEventId.value);
+    }
+    if (provider.present) {
+      map['provider'] = Variable<String>(provider.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(syncStatus.value);
+    }
+    if (lastError.present) {
+      map['last_error'] = Variable<String>(lastError.value);
+    }
+    if (localRevisionAtSync.present) {
+      map['local_revision_at_sync'] = Variable<int>(localRevisionAtSync.value);
+    }
+    if (externalETagAtSync.present) {
+      map['external_etag_at_sync'] = Variable<String>(externalETagAtSync.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (revision.present) {
+      map['revision'] = Variable<int>(revision.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CalendarEventLinksCompanion(')
+          ..write('id: $id, ')
+          ..write('appointmentId: $appointmentId, ')
+          ..write('externalEventId: $externalEventId, ')
+          ..write('provider: $provider, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('lastError: $lastError, ')
+          ..write('localRevisionAtSync: $localRevisionAtSync, ')
+          ..write('externalETagAtSync: $externalETagAtSync, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -9630,6 +15936,25 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $TerritoryLandmarksTable territoryLandmarks =
       $TerritoryLandmarksTable(this);
   late final $AppKvStoreTable appKvStore = $AppKvStoreTable(this);
+  late final $FamilyTiesTable familyTies = $FamilyTiesTable(this);
+  late final $MinistryExperiencesTable ministryExperiences =
+      $MinistryExperiencesTable(this);
+  late final $PersonPhotosTable personPhotos = $PersonPhotosTable(this);
+  late final $PersonPublicationsTable personPublications =
+      $PersonPublicationsTable(this);
+  late final $ResearchArticlesTable researchArticles = $ResearchArticlesTable(
+    this,
+  );
+  late final $ResearchTagsTable researchTags = $ResearchTagsTable(this);
+  late final $TerritorySectorsTable territorySectors = $TerritorySectorsTable(
+    this,
+  );
+  late final $StudentManualOrderTable studentManualOrder =
+      $StudentManualOrderTable(this);
+  late final $ExternalCalendarEventsTable externalCalendarEvents =
+      $ExternalCalendarEventsTable(this);
+  late final $CalendarEventLinksTable calendarEventLinks =
+      $CalendarEventLinksTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -9647,6 +15972,16 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     phoneContacts,
     territoryLandmarks,
     appKvStore,
+    familyTies,
+    ministryExperiences,
+    personPhotos,
+    personPublications,
+    researchArticles,
+    researchTags,
+    territorySectors,
+    studentManualOrder,
+    externalCalendarEvents,
+    calendarEventLinks,
   ];
 }
 
@@ -16117,6 +22452,3237 @@ typedef $$AppKvStoreTableProcessedTableManager =
       AppKvEntry,
       PrefetchHooks Function()
     >;
+typedef $$FamilyTiesTableCreateCompanionBuilder = FamilyTiesCompanion Function({
+  required String id,
+  required String personId,
+  Value<String?> relatedPersonId,
+  required String relatedPersonName,
+  required String relationshipType,
+  required DateTime createdAt,
+  Value<DateTime?> updatedAt,
+  Value<DateTime?> deletedAt,
+  Value<int> revision,
+  Value<int> rowid,
+});
+typedef $$FamilyTiesTableUpdateCompanionBuilder = FamilyTiesCompanion Function({
+  Value<String> id,
+  Value<String> personId,
+  Value<String?> relatedPersonId,
+  Value<String> relatedPersonName,
+  Value<String> relationshipType,
+  Value<DateTime> createdAt,
+  Value<DateTime?> updatedAt,
+  Value<DateTime?> deletedAt,
+  Value<int> revision,
+  Value<int> rowid,
+});
+
+class $$FamilyTiesTableFilterComposer
+    extends Composer<_$AppDatabase, $FamilyTiesTable> {
+  $$FamilyTiesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get personId => $composableBuilder(
+    column: $table.personId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get relatedPersonId => $composableBuilder(
+    column: $table.relatedPersonId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get relatedPersonName => $composableBuilder(
+    column: $table.relatedPersonName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get relationshipType => $composableBuilder(
+    column: $table.relationshipType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$FamilyTiesTableOrderingComposer
+    extends Composer<_$AppDatabase, $FamilyTiesTable> {
+  $$FamilyTiesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get personId => $composableBuilder(
+    column: $table.personId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get relatedPersonId => $composableBuilder(
+    column: $table.relatedPersonId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get relatedPersonName => $composableBuilder(
+    column: $table.relatedPersonName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get relationshipType => $composableBuilder(
+    column: $table.relationshipType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$FamilyTiesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $FamilyTiesTable> {
+  $$FamilyTiesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get personId =>
+      $composableBuilder(column: $table.personId, builder: (column) => column);
+
+  GeneratedColumn<String> get relatedPersonId => $composableBuilder(
+    column: $table.relatedPersonId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get relatedPersonName => $composableBuilder(
+    column: $table.relatedPersonName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get relationshipType => $composableBuilder(
+    column: $table.relationshipType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get revision =>
+      $composableBuilder(column: $table.revision, builder: (column) => column);
+}
+
+class $$FamilyTiesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $FamilyTiesTable,
+          FamilyTieEntry,
+          $$FamilyTiesTableFilterComposer,
+          $$FamilyTiesTableOrderingComposer,
+          $$FamilyTiesTableAnnotationComposer,
+          $$FamilyTiesTableCreateCompanionBuilder,
+          $$FamilyTiesTableUpdateCompanionBuilder,
+          (
+            FamilyTieEntry,
+            BaseReferences<_$AppDatabase, $FamilyTiesTable, FamilyTieEntry>,
+          ),
+          FamilyTieEntry,
+          PrefetchHooks Function()
+        > {
+  $$FamilyTiesTableTableManager(_$AppDatabase db, $FamilyTiesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$FamilyTiesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$FamilyTiesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$FamilyTiesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> personId = const Value.absent(),
+                Value<String?> relatedPersonId = const Value.absent(),
+                Value<String> relatedPersonName = const Value.absent(),
+                Value<String> relationshipType = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FamilyTiesCompanion(
+                id: id,
+                personId: personId,
+                relatedPersonId: relatedPersonId,
+                relatedPersonName: relatedPersonName,
+                relationshipType: relationshipType,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String personId,
+                Value<String?> relatedPersonId = const Value.absent(),
+                required String relatedPersonName,
+                required String relationshipType,
+                required DateTime createdAt,
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FamilyTiesCompanion.insert(
+                id: id,
+                personId: personId,
+                relatedPersonId: relatedPersonId,
+                relatedPersonName: relatedPersonName,
+                relationshipType: relationshipType,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$FamilyTiesTable, FamilyTieEntry>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $FamilyTiesTable,
+                    FamilyTieEntry
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$FamilyTiesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $FamilyTiesTable,
+      FamilyTieEntry,
+      $$FamilyTiesTableFilterComposer,
+      $$FamilyTiesTableOrderingComposer,
+      $$FamilyTiesTableAnnotationComposer,
+      $$FamilyTiesTableCreateCompanionBuilder,
+      $$FamilyTiesTableUpdateCompanionBuilder,
+      (
+        FamilyTieEntry,
+        BaseReferences<_$AppDatabase, $FamilyTiesTable, FamilyTieEntry>,
+      ),
+      FamilyTieEntry,
+      PrefetchHooks Function()
+    >;
+typedef $$MinistryExperiencesTableCreateCompanionBuilder =
+    MinistryExperiencesCompanion Function({
+      required String id,
+      required String title,
+      required String content,
+      Value<String> mediaUrls,
+      Value<String> tags,
+      required DateTime dateTimeField,
+      Value<String?> locationOrModality,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> revision,
+      Value<int> rowid,
+    });
+typedef $$MinistryExperiencesTableUpdateCompanionBuilder =
+    MinistryExperiencesCompanion Function({
+      Value<String> id,
+      Value<String> title,
+      Value<String> content,
+      Value<String> mediaUrls,
+      Value<String> tags,
+      Value<DateTime> dateTimeField,
+      Value<String?> locationOrModality,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> revision,
+      Value<int> rowid,
+    });
+
+class $$MinistryExperiencesTableFilterComposer
+    extends Composer<_$AppDatabase, $MinistryExperiencesTable> {
+  $$MinistryExperiencesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get content => $composableBuilder(
+    column: $table.content,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get mediaUrls => $composableBuilder(
+    column: $table.mediaUrls,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get tags => $composableBuilder(
+    column: $table.tags,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get dateTimeField => $composableBuilder(
+    column: $table.dateTimeField,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get locationOrModality => $composableBuilder(
+    column: $table.locationOrModality,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$MinistryExperiencesTableOrderingComposer
+    extends Composer<_$AppDatabase, $MinistryExperiencesTable> {
+  $$MinistryExperiencesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get content => $composableBuilder(
+    column: $table.content,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get mediaUrls => $composableBuilder(
+    column: $table.mediaUrls,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get tags => $composableBuilder(
+    column: $table.tags,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get dateTimeField => $composableBuilder(
+    column: $table.dateTimeField,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get locationOrModality => $composableBuilder(
+    column: $table.locationOrModality,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$MinistryExperiencesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $MinistryExperiencesTable> {
+  $$MinistryExperiencesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get content =>
+      $composableBuilder(column: $table.content, builder: (column) => column);
+
+  GeneratedColumn<String> get mediaUrls =>
+      $composableBuilder(column: $table.mediaUrls, builder: (column) => column);
+
+  GeneratedColumn<String> get tags =>
+      $composableBuilder(column: $table.tags, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get dateTimeField => $composableBuilder(
+    column: $table.dateTimeField,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get locationOrModality => $composableBuilder(
+    column: $table.locationOrModality,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get revision =>
+      $composableBuilder(column: $table.revision, builder: (column) => column);
+}
+
+class $$MinistryExperiencesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $MinistryExperiencesTable,
+          MinistryExperienceEntry,
+          $$MinistryExperiencesTableFilterComposer,
+          $$MinistryExperiencesTableOrderingComposer,
+          $$MinistryExperiencesTableAnnotationComposer,
+          $$MinistryExperiencesTableCreateCompanionBuilder,
+          $$MinistryExperiencesTableUpdateCompanionBuilder,
+          (
+            MinistryExperienceEntry,
+            BaseReferences<
+              _$AppDatabase,
+              $MinistryExperiencesTable,
+              MinistryExperienceEntry
+            >,
+          ),
+          MinistryExperienceEntry,
+          PrefetchHooks Function()
+        > {
+  $$MinistryExperiencesTableTableManager(
+    _$AppDatabase db,
+    $MinistryExperiencesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$MinistryExperiencesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$MinistryExperiencesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$MinistryExperiencesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> title = const Value.absent(),
+                Value<String> content = const Value.absent(),
+                Value<String> mediaUrls = const Value.absent(),
+                Value<String> tags = const Value.absent(),
+                Value<DateTime> dateTimeField = const Value.absent(),
+                Value<String?> locationOrModality = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => MinistryExperiencesCompanion(
+                id: id,
+                title: title,
+                content: content,
+                mediaUrls: mediaUrls,
+                tags: tags,
+                dateTimeField: dateTimeField,
+                locationOrModality: locationOrModality,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String title,
+                required String content,
+                Value<String> mediaUrls = const Value.absent(),
+                Value<String> tags = const Value.absent(),
+                required DateTime dateTimeField,
+                Value<String?> locationOrModality = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => MinistryExperiencesCompanion.insert(
+                id: id,
+                title: title,
+                content: content,
+                mediaUrls: mediaUrls,
+                tags: tags,
+                dateTimeField: dateTimeField,
+                locationOrModality: locationOrModality,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<
+                    $MinistryExperiencesTable,
+                    MinistryExperienceEntry
+                  >(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $MinistryExperiencesTable,
+                    MinistryExperienceEntry
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$MinistryExperiencesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $MinistryExperiencesTable,
+      MinistryExperienceEntry,
+      $$MinistryExperiencesTableFilterComposer,
+      $$MinistryExperiencesTableOrderingComposer,
+      $$MinistryExperiencesTableAnnotationComposer,
+      $$MinistryExperiencesTableCreateCompanionBuilder,
+      $$MinistryExperiencesTableUpdateCompanionBuilder,
+      (
+        MinistryExperienceEntry,
+        BaseReferences<
+          _$AppDatabase,
+          $MinistryExperiencesTable,
+          MinistryExperienceEntry
+        >,
+      ),
+      MinistryExperienceEntry,
+      PrefetchHooks Function()
+    >;
+typedef $$PersonPhotosTableCreateCompanionBuilder =
+    PersonPhotosCompanion Function({
+      required String id,
+      required String personId,
+      required String photoType,
+      required String imageData,
+      required DateTime createdAt,
+      Value<DateTime?> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> revision,
+      Value<int> rowid,
+    });
+typedef $$PersonPhotosTableUpdateCompanionBuilder =
+    PersonPhotosCompanion Function({
+      Value<String> id,
+      Value<String> personId,
+      Value<String> photoType,
+      Value<String> imageData,
+      Value<DateTime> createdAt,
+      Value<DateTime?> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> revision,
+      Value<int> rowid,
+    });
+
+class $$PersonPhotosTableFilterComposer
+    extends Composer<_$AppDatabase, $PersonPhotosTable> {
+  $$PersonPhotosTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get personId => $composableBuilder(
+    column: $table.personId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get photoType => $composableBuilder(
+    column: $table.photoType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get imageData => $composableBuilder(
+    column: $table.imageData,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$PersonPhotosTableOrderingComposer
+    extends Composer<_$AppDatabase, $PersonPhotosTable> {
+  $$PersonPhotosTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get personId => $composableBuilder(
+    column: $table.personId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get photoType => $composableBuilder(
+    column: $table.photoType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get imageData => $composableBuilder(
+    column: $table.imageData,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$PersonPhotosTableAnnotationComposer
+    extends Composer<_$AppDatabase, $PersonPhotosTable> {
+  $$PersonPhotosTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get personId =>
+      $composableBuilder(column: $table.personId, builder: (column) => column);
+
+  GeneratedColumn<String> get photoType =>
+      $composableBuilder(column: $table.photoType, builder: (column) => column);
+
+  GeneratedColumn<String> get imageData =>
+      $composableBuilder(column: $table.imageData, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get revision =>
+      $composableBuilder(column: $table.revision, builder: (column) => column);
+}
+
+class $$PersonPhotosTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $PersonPhotosTable,
+          PersonPhotoEntry,
+          $$PersonPhotosTableFilterComposer,
+          $$PersonPhotosTableOrderingComposer,
+          $$PersonPhotosTableAnnotationComposer,
+          $$PersonPhotosTableCreateCompanionBuilder,
+          $$PersonPhotosTableUpdateCompanionBuilder,
+          (
+            PersonPhotoEntry,
+            BaseReferences<_$AppDatabase, $PersonPhotosTable, PersonPhotoEntry>,
+          ),
+          PersonPhotoEntry,
+          PrefetchHooks Function()
+        > {
+  $$PersonPhotosTableTableManager(_$AppDatabase db, $PersonPhotosTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PersonPhotosTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$PersonPhotosTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$PersonPhotosTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> personId = const Value.absent(),
+                Value<String> photoType = const Value.absent(),
+                Value<String> imageData = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PersonPhotosCompanion(
+                id: id,
+                personId: personId,
+                photoType: photoType,
+                imageData: imageData,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String personId,
+                required String photoType,
+                required String imageData,
+                required DateTime createdAt,
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PersonPhotosCompanion.insert(
+                id: id,
+                personId: personId,
+                photoType: photoType,
+                imageData: imageData,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$PersonPhotosTable, PersonPhotoEntry>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $PersonPhotosTable,
+                    PersonPhotoEntry
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$PersonPhotosTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $PersonPhotosTable,
+      PersonPhotoEntry,
+      $$PersonPhotosTableFilterComposer,
+      $$PersonPhotosTableOrderingComposer,
+      $$PersonPhotosTableAnnotationComposer,
+      $$PersonPhotosTableCreateCompanionBuilder,
+      $$PersonPhotosTableUpdateCompanionBuilder,
+      (
+        PersonPhotoEntry,
+        BaseReferences<_$AppDatabase, $PersonPhotosTable, PersonPhotoEntry>,
+      ),
+      PersonPhotoEntry,
+      PrefetchHooks Function()
+    >;
+typedef $$PersonPublicationsTableCreateCompanionBuilder =
+    PersonPublicationsCompanion Function({
+      required String id,
+      required String personId,
+      required String publicationTitle,
+      required String itemType,
+      required String status,
+      required String date,
+      Value<String?> notes,
+      required DateTime createdAt,
+      Value<DateTime?> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> revision,
+      Value<int> rowid,
+    });
+typedef $$PersonPublicationsTableUpdateCompanionBuilder =
+    PersonPublicationsCompanion Function({
+      Value<String> id,
+      Value<String> personId,
+      Value<String> publicationTitle,
+      Value<String> itemType,
+      Value<String> status,
+      Value<String> date,
+      Value<String?> notes,
+      Value<DateTime> createdAt,
+      Value<DateTime?> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> revision,
+      Value<int> rowid,
+    });
+
+class $$PersonPublicationsTableFilterComposer
+    extends Composer<_$AppDatabase, $PersonPublicationsTable> {
+  $$PersonPublicationsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get personId => $composableBuilder(
+    column: $table.personId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get publicationTitle => $composableBuilder(
+    column: $table.publicationTitle,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get itemType => $composableBuilder(
+    column: $table.itemType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get date => $composableBuilder(
+    column: $table.date,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$PersonPublicationsTableOrderingComposer
+    extends Composer<_$AppDatabase, $PersonPublicationsTable> {
+  $$PersonPublicationsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get personId => $composableBuilder(
+    column: $table.personId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get publicationTitle => $composableBuilder(
+    column: $table.publicationTitle,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get itemType => $composableBuilder(
+    column: $table.itemType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get date => $composableBuilder(
+    column: $table.date,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$PersonPublicationsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $PersonPublicationsTable> {
+  $$PersonPublicationsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get personId =>
+      $composableBuilder(column: $table.personId, builder: (column) => column);
+
+  GeneratedColumn<String> get publicationTitle => $composableBuilder(
+    column: $table.publicationTitle,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get itemType =>
+      $composableBuilder(column: $table.itemType, builder: (column) => column);
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<String> get date =>
+      $composableBuilder(column: $table.date, builder: (column) => column);
+
+  GeneratedColumn<String> get notes =>
+      $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get revision =>
+      $composableBuilder(column: $table.revision, builder: (column) => column);
+}
+
+class $$PersonPublicationsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $PersonPublicationsTable,
+          PersonPublicationEntry,
+          $$PersonPublicationsTableFilterComposer,
+          $$PersonPublicationsTableOrderingComposer,
+          $$PersonPublicationsTableAnnotationComposer,
+          $$PersonPublicationsTableCreateCompanionBuilder,
+          $$PersonPublicationsTableUpdateCompanionBuilder,
+          (
+            PersonPublicationEntry,
+            BaseReferences<
+              _$AppDatabase,
+              $PersonPublicationsTable,
+              PersonPublicationEntry
+            >,
+          ),
+          PersonPublicationEntry,
+          PrefetchHooks Function()
+        > {
+  $$PersonPublicationsTableTableManager(
+    _$AppDatabase db,
+    $PersonPublicationsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PersonPublicationsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$PersonPublicationsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$PersonPublicationsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> personId = const Value.absent(),
+                Value<String> publicationTitle = const Value.absent(),
+                Value<String> itemType = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String> date = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PersonPublicationsCompanion(
+                id: id,
+                personId: personId,
+                publicationTitle: publicationTitle,
+                itemType: itemType,
+                status: status,
+                date: date,
+                notes: notes,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String personId,
+                required String publicationTitle,
+                required String itemType,
+                required String status,
+                required String date,
+                Value<String?> notes = const Value.absent(),
+                required DateTime createdAt,
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PersonPublicationsCompanion.insert(
+                id: id,
+                personId: personId,
+                publicationTitle: publicationTitle,
+                itemType: itemType,
+                status: status,
+                date: date,
+                notes: notes,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$PersonPublicationsTable, PersonPublicationEntry>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $PersonPublicationsTable,
+                    PersonPublicationEntry
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$PersonPublicationsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $PersonPublicationsTable,
+      PersonPublicationEntry,
+      $$PersonPublicationsTableFilterComposer,
+      $$PersonPublicationsTableOrderingComposer,
+      $$PersonPublicationsTableAnnotationComposer,
+      $$PersonPublicationsTableCreateCompanionBuilder,
+      $$PersonPublicationsTableUpdateCompanionBuilder,
+      (
+        PersonPublicationEntry,
+        BaseReferences<
+          _$AppDatabase,
+          $PersonPublicationsTable,
+          PersonPublicationEntry
+        >,
+      ),
+      PersonPublicationEntry,
+      PrefetchHooks Function()
+    >;
+typedef $$ResearchArticlesTableCreateCompanionBuilder =
+    ResearchArticlesCompanion Function({
+      required String id,
+      required String title,
+      required String summary,
+      required String content,
+      Value<String> tags,
+      Value<String> attachments,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> revision,
+      Value<int> rowid,
+    });
+typedef $$ResearchArticlesTableUpdateCompanionBuilder =
+    ResearchArticlesCompanion Function({
+      Value<String> id,
+      Value<String> title,
+      Value<String> summary,
+      Value<String> content,
+      Value<String> tags,
+      Value<String> attachments,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> revision,
+      Value<int> rowid,
+    });
+
+class $$ResearchArticlesTableFilterComposer
+    extends Composer<_$AppDatabase, $ResearchArticlesTable> {
+  $$ResearchArticlesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get summary => $composableBuilder(
+    column: $table.summary,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get content => $composableBuilder(
+    column: $table.content,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get tags => $composableBuilder(
+    column: $table.tags,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get attachments => $composableBuilder(
+    column: $table.attachments,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$ResearchArticlesTableOrderingComposer
+    extends Composer<_$AppDatabase, $ResearchArticlesTable> {
+  $$ResearchArticlesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get summary => $composableBuilder(
+    column: $table.summary,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get content => $composableBuilder(
+    column: $table.content,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get tags => $composableBuilder(
+    column: $table.tags,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get attachments => $composableBuilder(
+    column: $table.attachments,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$ResearchArticlesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ResearchArticlesTable> {
+  $$ResearchArticlesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get summary =>
+      $composableBuilder(column: $table.summary, builder: (column) => column);
+
+  GeneratedColumn<String> get content =>
+      $composableBuilder(column: $table.content, builder: (column) => column);
+
+  GeneratedColumn<String> get tags =>
+      $composableBuilder(column: $table.tags, builder: (column) => column);
+
+  GeneratedColumn<String> get attachments => $composableBuilder(
+    column: $table.attachments,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get revision =>
+      $composableBuilder(column: $table.revision, builder: (column) => column);
+}
+
+class $$ResearchArticlesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ResearchArticlesTable,
+          ResearchArticleEntry,
+          $$ResearchArticlesTableFilterComposer,
+          $$ResearchArticlesTableOrderingComposer,
+          $$ResearchArticlesTableAnnotationComposer,
+          $$ResearchArticlesTableCreateCompanionBuilder,
+          $$ResearchArticlesTableUpdateCompanionBuilder,
+          (
+            ResearchArticleEntry,
+            BaseReferences<
+              _$AppDatabase,
+              $ResearchArticlesTable,
+              ResearchArticleEntry
+            >,
+          ),
+          ResearchArticleEntry,
+          PrefetchHooks Function()
+        > {
+  $$ResearchArticlesTableTableManager(
+    _$AppDatabase db,
+    $ResearchArticlesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ResearchArticlesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ResearchArticlesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ResearchArticlesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> title = const Value.absent(),
+                Value<String> summary = const Value.absent(),
+                Value<String> content = const Value.absent(),
+                Value<String> tags = const Value.absent(),
+                Value<String> attachments = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ResearchArticlesCompanion(
+                id: id,
+                title: title,
+                summary: summary,
+                content: content,
+                tags: tags,
+                attachments: attachments,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String title,
+                required String summary,
+                required String content,
+                Value<String> tags = const Value.absent(),
+                Value<String> attachments = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ResearchArticlesCompanion.insert(
+                id: id,
+                title: title,
+                summary: summary,
+                content: content,
+                tags: tags,
+                attachments: attachments,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$ResearchArticlesTable, ResearchArticleEntry>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $ResearchArticlesTable,
+                    ResearchArticleEntry
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$ResearchArticlesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ResearchArticlesTable,
+      ResearchArticleEntry,
+      $$ResearchArticlesTableFilterComposer,
+      $$ResearchArticlesTableOrderingComposer,
+      $$ResearchArticlesTableAnnotationComposer,
+      $$ResearchArticlesTableCreateCompanionBuilder,
+      $$ResearchArticlesTableUpdateCompanionBuilder,
+      (
+        ResearchArticleEntry,
+        BaseReferences<
+          _$AppDatabase,
+          $ResearchArticlesTable,
+          ResearchArticleEntry
+        >,
+      ),
+      ResearchArticleEntry,
+      PrefetchHooks Function()
+    >;
+typedef $$ResearchTagsTableCreateCompanionBuilder =
+    ResearchTagsCompanion Function({
+      required String id,
+      required String name,
+      required DateTime createdAt,
+      Value<DateTime?> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> revision,
+      Value<int> rowid,
+    });
+typedef $$ResearchTagsTableUpdateCompanionBuilder =
+    ResearchTagsCompanion Function({
+      Value<String> id,
+      Value<String> name,
+      Value<DateTime> createdAt,
+      Value<DateTime?> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> revision,
+      Value<int> rowid,
+    });
+
+class $$ResearchTagsTableFilterComposer
+    extends Composer<_$AppDatabase, $ResearchTagsTable> {
+  $$ResearchTagsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$ResearchTagsTableOrderingComposer
+    extends Composer<_$AppDatabase, $ResearchTagsTable> {
+  $$ResearchTagsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$ResearchTagsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ResearchTagsTable> {
+  $$ResearchTagsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get revision =>
+      $composableBuilder(column: $table.revision, builder: (column) => column);
+}
+
+class $$ResearchTagsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ResearchTagsTable,
+          ResearchTagEntry,
+          $$ResearchTagsTableFilterComposer,
+          $$ResearchTagsTableOrderingComposer,
+          $$ResearchTagsTableAnnotationComposer,
+          $$ResearchTagsTableCreateCompanionBuilder,
+          $$ResearchTagsTableUpdateCompanionBuilder,
+          (
+            ResearchTagEntry,
+            BaseReferences<_$AppDatabase, $ResearchTagsTable, ResearchTagEntry>,
+          ),
+          ResearchTagEntry,
+          PrefetchHooks Function()
+        > {
+  $$ResearchTagsTableTableManager(_$AppDatabase db, $ResearchTagsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ResearchTagsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ResearchTagsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ResearchTagsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ResearchTagsCompanion(
+                id: id,
+                name: name,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String name,
+                required DateTime createdAt,
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ResearchTagsCompanion.insert(
+                id: id,
+                name: name,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$ResearchTagsTable, ResearchTagEntry>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $ResearchTagsTable,
+                    ResearchTagEntry
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$ResearchTagsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ResearchTagsTable,
+      ResearchTagEntry,
+      $$ResearchTagsTableFilterComposer,
+      $$ResearchTagsTableOrderingComposer,
+      $$ResearchTagsTableAnnotationComposer,
+      $$ResearchTagsTableCreateCompanionBuilder,
+      $$ResearchTagsTableUpdateCompanionBuilder,
+      (
+        ResearchTagEntry,
+        BaseReferences<_$AppDatabase, $ResearchTagsTable, ResearchTagEntry>,
+      ),
+      ResearchTagEntry,
+      PrefetchHooks Function()
+    >;
+typedef $$TerritorySectorsTableCreateCompanionBuilder =
+    TerritorySectorsCompanion Function({
+      required String id,
+      required String name,
+      Value<String?> description,
+      required DateTime createdAt,
+      Value<DateTime?> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> revision,
+      Value<int> rowid,
+    });
+typedef $$TerritorySectorsTableUpdateCompanionBuilder =
+    TerritorySectorsCompanion Function({
+      Value<String> id,
+      Value<String> name,
+      Value<String?> description,
+      Value<DateTime> createdAt,
+      Value<DateTime?> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> revision,
+      Value<int> rowid,
+    });
+
+class $$TerritorySectorsTableFilterComposer
+    extends Composer<_$AppDatabase, $TerritorySectorsTable> {
+  $$TerritorySectorsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$TerritorySectorsTableOrderingComposer
+    extends Composer<_$AppDatabase, $TerritorySectorsTable> {
+  $$TerritorySectorsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$TerritorySectorsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $TerritorySectorsTable> {
+  $$TerritorySectorsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get revision =>
+      $composableBuilder(column: $table.revision, builder: (column) => column);
+}
+
+class $$TerritorySectorsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $TerritorySectorsTable,
+          TerritorySectorEntry,
+          $$TerritorySectorsTableFilterComposer,
+          $$TerritorySectorsTableOrderingComposer,
+          $$TerritorySectorsTableAnnotationComposer,
+          $$TerritorySectorsTableCreateCompanionBuilder,
+          $$TerritorySectorsTableUpdateCompanionBuilder,
+          (
+            TerritorySectorEntry,
+            BaseReferences<
+              _$AppDatabase,
+              $TerritorySectorsTable,
+              TerritorySectorEntry
+            >,
+          ),
+          TerritorySectorEntry,
+          PrefetchHooks Function()
+        > {
+  $$TerritorySectorsTableTableManager(
+    _$AppDatabase db,
+    $TerritorySectorsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$TerritorySectorsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$TerritorySectorsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$TerritorySectorsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String?> description = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TerritorySectorsCompanion(
+                id: id,
+                name: name,
+                description: description,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String name,
+                Value<String?> description = const Value.absent(),
+                required DateTime createdAt,
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TerritorySectorsCompanion.insert(
+                id: id,
+                name: name,
+                description: description,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$TerritorySectorsTable, TerritorySectorEntry>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $TerritorySectorsTable,
+                    TerritorySectorEntry
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$TerritorySectorsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $TerritorySectorsTable,
+      TerritorySectorEntry,
+      $$TerritorySectorsTableFilterComposer,
+      $$TerritorySectorsTableOrderingComposer,
+      $$TerritorySectorsTableAnnotationComposer,
+      $$TerritorySectorsTableCreateCompanionBuilder,
+      $$TerritorySectorsTableUpdateCompanionBuilder,
+      (
+        TerritorySectorEntry,
+        BaseReferences<
+          _$AppDatabase,
+          $TerritorySectorsTable,
+          TerritorySectorEntry
+        >,
+      ),
+      TerritorySectorEntry,
+      PrefetchHooks Function()
+    >;
+typedef $$StudentManualOrderTableCreateCompanionBuilder =
+    StudentManualOrderCompanion Function({
+      required String studyId,
+      required int manualIndex,
+      Value<DateTime?> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> revision,
+      Value<int> rowid,
+    });
+typedef $$StudentManualOrderTableUpdateCompanionBuilder =
+    StudentManualOrderCompanion Function({
+      Value<String> studyId,
+      Value<int> manualIndex,
+      Value<DateTime?> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> revision,
+      Value<int> rowid,
+    });
+
+class $$StudentManualOrderTableFilterComposer
+    extends Composer<_$AppDatabase, $StudentManualOrderTable> {
+  $$StudentManualOrderTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get studyId => $composableBuilder(
+    column: $table.studyId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get manualIndex => $composableBuilder(
+    column: $table.manualIndex,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$StudentManualOrderTableOrderingComposer
+    extends Composer<_$AppDatabase, $StudentManualOrderTable> {
+  $$StudentManualOrderTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get studyId => $composableBuilder(
+    column: $table.studyId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get manualIndex => $composableBuilder(
+    column: $table.manualIndex,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$StudentManualOrderTableAnnotationComposer
+    extends Composer<_$AppDatabase, $StudentManualOrderTable> {
+  $$StudentManualOrderTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get studyId =>
+      $composableBuilder(column: $table.studyId, builder: (column) => column);
+
+  GeneratedColumn<int> get manualIndex => $composableBuilder(
+    column: $table.manualIndex,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get revision =>
+      $composableBuilder(column: $table.revision, builder: (column) => column);
+}
+
+class $$StudentManualOrderTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $StudentManualOrderTable,
+          StudentManualOrderEntry,
+          $$StudentManualOrderTableFilterComposer,
+          $$StudentManualOrderTableOrderingComposer,
+          $$StudentManualOrderTableAnnotationComposer,
+          $$StudentManualOrderTableCreateCompanionBuilder,
+          $$StudentManualOrderTableUpdateCompanionBuilder,
+          (
+            StudentManualOrderEntry,
+            BaseReferences<
+              _$AppDatabase,
+              $StudentManualOrderTable,
+              StudentManualOrderEntry
+            >,
+          ),
+          StudentManualOrderEntry,
+          PrefetchHooks Function()
+        > {
+  $$StudentManualOrderTableTableManager(
+    _$AppDatabase db,
+    $StudentManualOrderTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$StudentManualOrderTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$StudentManualOrderTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$StudentManualOrderTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> studyId = const Value.absent(),
+                Value<int> manualIndex = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => StudentManualOrderCompanion(
+                studyId: studyId,
+                manualIndex: manualIndex,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String studyId,
+                required int manualIndex,
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => StudentManualOrderCompanion.insert(
+                studyId: studyId,
+                manualIndex: manualIndex,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<
+                    $StudentManualOrderTable,
+                    StudentManualOrderEntry
+                  >(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $StudentManualOrderTable,
+                    StudentManualOrderEntry
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$StudentManualOrderTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $StudentManualOrderTable,
+      StudentManualOrderEntry,
+      $$StudentManualOrderTableFilterComposer,
+      $$StudentManualOrderTableOrderingComposer,
+      $$StudentManualOrderTableAnnotationComposer,
+      $$StudentManualOrderTableCreateCompanionBuilder,
+      $$StudentManualOrderTableUpdateCompanionBuilder,
+      (
+        StudentManualOrderEntry,
+        BaseReferences<
+          _$AppDatabase,
+          $StudentManualOrderTable,
+          StudentManualOrderEntry
+        >,
+      ),
+      StudentManualOrderEntry,
+      PrefetchHooks Function()
+    >;
+typedef $$ExternalCalendarEventsTableCreateCompanionBuilder =
+    ExternalCalendarEventsCompanion Function({
+      required String id,
+      required String provider,
+      Value<String?> externalAccount,
+      required String calendarId,
+      required String externalEventId,
+      Value<String?> iCalUid,
+      required String title,
+      Value<String?> location,
+      Value<String?> description,
+      required DateTime startTime,
+      required DateTime endTime,
+      Value<String?> timeZone,
+      Value<bool> isAllDay,
+      Value<String?> externalStatus,
+      Value<DateTime?> lastModifiedExternal,
+      Value<DateTime?> lastSyncedAt,
+      Value<bool> isDeletedExternal,
+      Value<String?> metadata,
+      Value<String?> etag,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> revision,
+      Value<int> rowid,
+    });
+typedef $$ExternalCalendarEventsTableUpdateCompanionBuilder =
+    ExternalCalendarEventsCompanion Function({
+      Value<String> id,
+      Value<String> provider,
+      Value<String?> externalAccount,
+      Value<String> calendarId,
+      Value<String> externalEventId,
+      Value<String?> iCalUid,
+      Value<String> title,
+      Value<String?> location,
+      Value<String?> description,
+      Value<DateTime> startTime,
+      Value<DateTime> endTime,
+      Value<String?> timeZone,
+      Value<bool> isAllDay,
+      Value<String?> externalStatus,
+      Value<DateTime?> lastModifiedExternal,
+      Value<DateTime?> lastSyncedAt,
+      Value<bool> isDeletedExternal,
+      Value<String?> metadata,
+      Value<String?> etag,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> revision,
+      Value<int> rowid,
+    });
+
+class $$ExternalCalendarEventsTableFilterComposer
+    extends Composer<_$AppDatabase, $ExternalCalendarEventsTable> {
+  $$ExternalCalendarEventsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get provider => $composableBuilder(
+    column: $table.provider,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get externalAccount => $composableBuilder(
+    column: $table.externalAccount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get calendarId => $composableBuilder(
+    column: $table.calendarId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get externalEventId => $composableBuilder(
+    column: $table.externalEventId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get iCalUid => $composableBuilder(
+    column: $table.iCalUid,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get location => $composableBuilder(
+    column: $table.location,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get startTime => $composableBuilder(
+    column: $table.startTime,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get endTime => $composableBuilder(
+    column: $table.endTime,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get timeZone => $composableBuilder(
+    column: $table.timeZone,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isAllDay => $composableBuilder(
+    column: $table.isAllDay,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get externalStatus => $composableBuilder(
+    column: $table.externalStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastModifiedExternal => $composableBuilder(
+    column: $table.lastModifiedExternal,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastSyncedAt => $composableBuilder(
+    column: $table.lastSyncedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isDeletedExternal => $composableBuilder(
+    column: $table.isDeletedExternal,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get metadata => $composableBuilder(
+    column: $table.metadata,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get etag => $composableBuilder(
+    column: $table.etag,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$ExternalCalendarEventsTableOrderingComposer
+    extends Composer<_$AppDatabase, $ExternalCalendarEventsTable> {
+  $$ExternalCalendarEventsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get provider => $composableBuilder(
+    column: $table.provider,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get externalAccount => $composableBuilder(
+    column: $table.externalAccount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get calendarId => $composableBuilder(
+    column: $table.calendarId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get externalEventId => $composableBuilder(
+    column: $table.externalEventId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get iCalUid => $composableBuilder(
+    column: $table.iCalUid,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get location => $composableBuilder(
+    column: $table.location,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get startTime => $composableBuilder(
+    column: $table.startTime,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get endTime => $composableBuilder(
+    column: $table.endTime,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get timeZone => $composableBuilder(
+    column: $table.timeZone,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isAllDay => $composableBuilder(
+    column: $table.isAllDay,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get externalStatus => $composableBuilder(
+    column: $table.externalStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastModifiedExternal => $composableBuilder(
+    column: $table.lastModifiedExternal,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastSyncedAt => $composableBuilder(
+    column: $table.lastSyncedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isDeletedExternal => $composableBuilder(
+    column: $table.isDeletedExternal,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get metadata => $composableBuilder(
+    column: $table.metadata,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get etag => $composableBuilder(
+    column: $table.etag,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$ExternalCalendarEventsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ExternalCalendarEventsTable> {
+  $$ExternalCalendarEventsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get provider =>
+      $composableBuilder(column: $table.provider, builder: (column) => column);
+
+  GeneratedColumn<String> get externalAccount => $composableBuilder(
+    column: $table.externalAccount,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get calendarId => $composableBuilder(
+    column: $table.calendarId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get externalEventId => $composableBuilder(
+    column: $table.externalEventId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get iCalUid =>
+      $composableBuilder(column: $table.iCalUid, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get location =>
+      $composableBuilder(column: $table.location, builder: (column) => column);
+
+  GeneratedColumn<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get startTime =>
+      $composableBuilder(column: $table.startTime, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get endTime =>
+      $composableBuilder(column: $table.endTime, builder: (column) => column);
+
+  GeneratedColumn<String> get timeZone =>
+      $composableBuilder(column: $table.timeZone, builder: (column) => column);
+
+  GeneratedColumn<bool> get isAllDay =>
+      $composableBuilder(column: $table.isAllDay, builder: (column) => column);
+
+  GeneratedColumn<String> get externalStatus => $composableBuilder(
+    column: $table.externalStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get lastModifiedExternal => $composableBuilder(
+    column: $table.lastModifiedExternal,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get lastSyncedAt => $composableBuilder(
+    column: $table.lastSyncedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isDeletedExternal => $composableBuilder(
+    column: $table.isDeletedExternal,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get metadata =>
+      $composableBuilder(column: $table.metadata, builder: (column) => column);
+
+  GeneratedColumn<String> get etag =>
+      $composableBuilder(column: $table.etag, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get revision =>
+      $composableBuilder(column: $table.revision, builder: (column) => column);
+}
+
+class $$ExternalCalendarEventsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ExternalCalendarEventsTable,
+          ExternalCalendarEventEntry,
+          $$ExternalCalendarEventsTableFilterComposer,
+          $$ExternalCalendarEventsTableOrderingComposer,
+          $$ExternalCalendarEventsTableAnnotationComposer,
+          $$ExternalCalendarEventsTableCreateCompanionBuilder,
+          $$ExternalCalendarEventsTableUpdateCompanionBuilder,
+          (
+            ExternalCalendarEventEntry,
+            BaseReferences<
+              _$AppDatabase,
+              $ExternalCalendarEventsTable,
+              ExternalCalendarEventEntry
+            >,
+          ),
+          ExternalCalendarEventEntry,
+          PrefetchHooks Function()
+        > {
+  $$ExternalCalendarEventsTableTableManager(
+    _$AppDatabase db,
+    $ExternalCalendarEventsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ExternalCalendarEventsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$ExternalCalendarEventsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$ExternalCalendarEventsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> provider = const Value.absent(),
+                Value<String?> externalAccount = const Value.absent(),
+                Value<String> calendarId = const Value.absent(),
+                Value<String> externalEventId = const Value.absent(),
+                Value<String?> iCalUid = const Value.absent(),
+                Value<String> title = const Value.absent(),
+                Value<String?> location = const Value.absent(),
+                Value<String?> description = const Value.absent(),
+                Value<DateTime> startTime = const Value.absent(),
+                Value<DateTime> endTime = const Value.absent(),
+                Value<String?> timeZone = const Value.absent(),
+                Value<bool> isAllDay = const Value.absent(),
+                Value<String?> externalStatus = const Value.absent(),
+                Value<DateTime?> lastModifiedExternal = const Value.absent(),
+                Value<DateTime?> lastSyncedAt = const Value.absent(),
+                Value<bool> isDeletedExternal = const Value.absent(),
+                Value<String?> metadata = const Value.absent(),
+                Value<String?> etag = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ExternalCalendarEventsCompanion(
+                id: id,
+                provider: provider,
+                externalAccount: externalAccount,
+                calendarId: calendarId,
+                externalEventId: externalEventId,
+                iCalUid: iCalUid,
+                title: title,
+                location: location,
+                description: description,
+                startTime: startTime,
+                endTime: endTime,
+                timeZone: timeZone,
+                isAllDay: isAllDay,
+                externalStatus: externalStatus,
+                lastModifiedExternal: lastModifiedExternal,
+                lastSyncedAt: lastSyncedAt,
+                isDeletedExternal: isDeletedExternal,
+                metadata: metadata,
+                etag: etag,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String provider,
+                Value<String?> externalAccount = const Value.absent(),
+                required String calendarId,
+                required String externalEventId,
+                Value<String?> iCalUid = const Value.absent(),
+                required String title,
+                Value<String?> location = const Value.absent(),
+                Value<String?> description = const Value.absent(),
+                required DateTime startTime,
+                required DateTime endTime,
+                Value<String?> timeZone = const Value.absent(),
+                Value<bool> isAllDay = const Value.absent(),
+                Value<String?> externalStatus = const Value.absent(),
+                Value<DateTime?> lastModifiedExternal = const Value.absent(),
+                Value<DateTime?> lastSyncedAt = const Value.absent(),
+                Value<bool> isDeletedExternal = const Value.absent(),
+                Value<String?> metadata = const Value.absent(),
+                Value<String?> etag = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ExternalCalendarEventsCompanion.insert(
+                id: id,
+                provider: provider,
+                externalAccount: externalAccount,
+                calendarId: calendarId,
+                externalEventId: externalEventId,
+                iCalUid: iCalUid,
+                title: title,
+                location: location,
+                description: description,
+                startTime: startTime,
+                endTime: endTime,
+                timeZone: timeZone,
+                isAllDay: isAllDay,
+                externalStatus: externalStatus,
+                lastModifiedExternal: lastModifiedExternal,
+                lastSyncedAt: lastSyncedAt,
+                isDeletedExternal: isDeletedExternal,
+                metadata: metadata,
+                etag: etag,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<
+                    $ExternalCalendarEventsTable,
+                    ExternalCalendarEventEntry
+                  >(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $ExternalCalendarEventsTable,
+                    ExternalCalendarEventEntry
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$ExternalCalendarEventsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ExternalCalendarEventsTable,
+      ExternalCalendarEventEntry,
+      $$ExternalCalendarEventsTableFilterComposer,
+      $$ExternalCalendarEventsTableOrderingComposer,
+      $$ExternalCalendarEventsTableAnnotationComposer,
+      $$ExternalCalendarEventsTableCreateCompanionBuilder,
+      $$ExternalCalendarEventsTableUpdateCompanionBuilder,
+      (
+        ExternalCalendarEventEntry,
+        BaseReferences<
+          _$AppDatabase,
+          $ExternalCalendarEventsTable,
+          ExternalCalendarEventEntry
+        >,
+      ),
+      ExternalCalendarEventEntry,
+      PrefetchHooks Function()
+    >;
+typedef $$CalendarEventLinksTableCreateCompanionBuilder =
+    CalendarEventLinksCompanion Function({
+      required String id,
+      required String appointmentId,
+      required String externalEventId,
+      required String provider,
+      Value<String> syncStatus,
+      Value<String?> lastError,
+      Value<int> localRevisionAtSync,
+      Value<String?> externalETagAtSync,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> revision,
+      Value<int> rowid,
+    });
+typedef $$CalendarEventLinksTableUpdateCompanionBuilder =
+    CalendarEventLinksCompanion Function({
+      Value<String> id,
+      Value<String> appointmentId,
+      Value<String> externalEventId,
+      Value<String> provider,
+      Value<String> syncStatus,
+      Value<String?> lastError,
+      Value<int> localRevisionAtSync,
+      Value<String?> externalETagAtSync,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> revision,
+      Value<int> rowid,
+    });
+
+class $$CalendarEventLinksTableFilterComposer
+    extends Composer<_$AppDatabase, $CalendarEventLinksTable> {
+  $$CalendarEventLinksTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get appointmentId => $composableBuilder(
+    column: $table.appointmentId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get externalEventId => $composableBuilder(
+    column: $table.externalEventId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get provider => $composableBuilder(
+    column: $table.provider,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lastError => $composableBuilder(
+    column: $table.lastError,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get localRevisionAtSync => $composableBuilder(
+    column: $table.localRevisionAtSync,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get externalETagAtSync => $composableBuilder(
+    column: $table.externalETagAtSync,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CalendarEventLinksTableOrderingComposer
+    extends Composer<_$AppDatabase, $CalendarEventLinksTable> {
+  $$CalendarEventLinksTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get appointmentId => $composableBuilder(
+    column: $table.appointmentId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get externalEventId => $composableBuilder(
+    column: $table.externalEventId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get provider => $composableBuilder(
+    column: $table.provider,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lastError => $composableBuilder(
+    column: $table.lastError,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get localRevisionAtSync => $composableBuilder(
+    column: $table.localRevisionAtSync,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get externalETagAtSync => $composableBuilder(
+    column: $table.externalETagAtSync,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CalendarEventLinksTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CalendarEventLinksTable> {
+  $$CalendarEventLinksTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get appointmentId => $composableBuilder(
+    column: $table.appointmentId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get externalEventId => $composableBuilder(
+    column: $table.externalEventId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get provider =>
+      $composableBuilder(column: $table.provider, builder: (column) => column);
+
+  GeneratedColumn<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get lastError =>
+      $composableBuilder(column: $table.lastError, builder: (column) => column);
+
+  GeneratedColumn<int> get localRevisionAtSync => $composableBuilder(
+    column: $table.localRevisionAtSync,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get externalETagAtSync => $composableBuilder(
+    column: $table.externalETagAtSync,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get revision =>
+      $composableBuilder(column: $table.revision, builder: (column) => column);
+}
+
+class $$CalendarEventLinksTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CalendarEventLinksTable,
+          CalendarEventLinkEntry,
+          $$CalendarEventLinksTableFilterComposer,
+          $$CalendarEventLinksTableOrderingComposer,
+          $$CalendarEventLinksTableAnnotationComposer,
+          $$CalendarEventLinksTableCreateCompanionBuilder,
+          $$CalendarEventLinksTableUpdateCompanionBuilder,
+          (
+            CalendarEventLinkEntry,
+            BaseReferences<
+              _$AppDatabase,
+              $CalendarEventLinksTable,
+              CalendarEventLinkEntry
+            >,
+          ),
+          CalendarEventLinkEntry,
+          PrefetchHooks Function()
+        > {
+  $$CalendarEventLinksTableTableManager(
+    _$AppDatabase db,
+    $CalendarEventLinksTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CalendarEventLinksTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CalendarEventLinksTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CalendarEventLinksTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> appointmentId = const Value.absent(),
+                Value<String> externalEventId = const Value.absent(),
+                Value<String> provider = const Value.absent(),
+                Value<String> syncStatus = const Value.absent(),
+                Value<String?> lastError = const Value.absent(),
+                Value<int> localRevisionAtSync = const Value.absent(),
+                Value<String?> externalETagAtSync = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CalendarEventLinksCompanion(
+                id: id,
+                appointmentId: appointmentId,
+                externalEventId: externalEventId,
+                provider: provider,
+                syncStatus: syncStatus,
+                lastError: lastError,
+                localRevisionAtSync: localRevisionAtSync,
+                externalETagAtSync: externalETagAtSync,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String appointmentId,
+                required String externalEventId,
+                required String provider,
+                Value<String> syncStatus = const Value.absent(),
+                Value<String?> lastError = const Value.absent(),
+                Value<int> localRevisionAtSync = const Value.absent(),
+                Value<String?> externalETagAtSync = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CalendarEventLinksCompanion.insert(
+                id: id,
+                appointmentId: appointmentId,
+                externalEventId: externalEventId,
+                provider: provider,
+                syncStatus: syncStatus,
+                lastError: lastError,
+                localRevisionAtSync: localRevisionAtSync,
+                externalETagAtSync: externalETagAtSync,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$CalendarEventLinksTable, CalendarEventLinkEntry>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $CalendarEventLinksTable,
+                    CalendarEventLinkEntry
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CalendarEventLinksTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CalendarEventLinksTable,
+      CalendarEventLinkEntry,
+      $$CalendarEventLinksTableFilterComposer,
+      $$CalendarEventLinksTableOrderingComposer,
+      $$CalendarEventLinksTableAnnotationComposer,
+      $$CalendarEventLinksTableCreateCompanionBuilder,
+      $$CalendarEventLinksTableUpdateCompanionBuilder,
+      (
+        CalendarEventLinkEntry,
+        BaseReferences<
+          _$AppDatabase,
+          $CalendarEventLinksTable,
+          CalendarEventLinkEntry
+        >,
+      ),
+      CalendarEventLinkEntry,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -16145,4 +25711,27 @@ class $AppDatabaseManager {
       $$TerritoryLandmarksTableTableManager(_db, _db.territoryLandmarks);
   $$AppKvStoreTableTableManager get appKvStore =>
       $$AppKvStoreTableTableManager(_db, _db.appKvStore);
+  $$FamilyTiesTableTableManager get familyTies =>
+      $$FamilyTiesTableTableManager(_db, _db.familyTies);
+  $$MinistryExperiencesTableTableManager get ministryExperiences =>
+      $$MinistryExperiencesTableTableManager(_db, _db.ministryExperiences);
+  $$PersonPhotosTableTableManager get personPhotos =>
+      $$PersonPhotosTableTableManager(_db, _db.personPhotos);
+  $$PersonPublicationsTableTableManager get personPublications =>
+      $$PersonPublicationsTableTableManager(_db, _db.personPublications);
+  $$ResearchArticlesTableTableManager get researchArticles =>
+      $$ResearchArticlesTableTableManager(_db, _db.researchArticles);
+  $$ResearchTagsTableTableManager get researchTags =>
+      $$ResearchTagsTableTableManager(_db, _db.researchTags);
+  $$TerritorySectorsTableTableManager get territorySectors =>
+      $$TerritorySectorsTableTableManager(_db, _db.territorySectors);
+  $$StudentManualOrderTableTableManager get studentManualOrder =>
+      $$StudentManualOrderTableTableManager(_db, _db.studentManualOrder);
+  $$ExternalCalendarEventsTableTableManager get externalCalendarEvents =>
+      $$ExternalCalendarEventsTableTableManager(
+        _db,
+        _db.externalCalendarEvents,
+      );
+  $$CalendarEventLinksTableTableManager get calendarEventLinks =>
+      $$CalendarEventLinksTableTableManager(_db, _db.calendarEventLinks);
 }

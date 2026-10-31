@@ -68,9 +68,40 @@ class AppSettingsManager {
       } catch (_) {}
     }());
   }
+
+  Future<Map<String, String>> getAllSettings() async {
+    await _initStore();
+    return Map<String, String>.unmodifiable(_memoryCache);
+  }
 }
 
 final appSettingsManagerProvider = Provider<AppSettingsManager>((ref) {
   final db = ref.watch(databaseProvider);
   return AppSettingsManager(db);
 });
+
+class AppSettingsNotifier extends Notifier<Map<String, String>> {
+  @override
+  Map<String, String> build() {
+    final manager = ref.watch(appSettingsManagerProvider);
+    return Map<String, String>.from(manager._memoryCache);
+  }
+
+  Future<void> setString(String key, String value) async {
+    final manager = ref.read(appSettingsManagerProvider);
+    await manager.setString(key, value);
+    state = Map<String, String>.from(manager._memoryCache);
+  }
+
+  Future<void> remove(String key) async {
+    final manager = ref.read(appSettingsManagerProvider);
+    await manager.remove(key);
+    state = Map<String, String>.from(manager._memoryCache);
+  }
+
+  String? get(String key) => state[key];
+}
+
+final appSettingsNotifierProvider = NotifierProvider<AppSettingsNotifier, Map<String, String>>(
+  AppSettingsNotifier.new,
+);

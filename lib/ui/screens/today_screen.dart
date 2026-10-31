@@ -12,12 +12,48 @@ import 'activities_screen.dart';
 import 'contacts_map_screen.dart';
 import 'person_detail_screen.dart';
 import 'sector_detail_screen.dart';
+import '../../core/feature_registry.dart';
 import 'settings_screen.dart';
+import 'global_search_screen.dart';
+import 'next_actions_screen.dart';
+
 
 class TodayScreen extends ConsumerWidget {
-  final Function(int) onTabChange;
+  final Function(int)? onTabChange;
+  final Function(AppFeature)? onFeatureNavigate;
 
-  const TodayScreen({super.key, required this.onTabChange});
+  const TodayScreen({super.key, this.onTabChange, this.onFeatureNavigate});
+
+  void _navigateTo(AppFeature feature) {
+    if (onFeatureNavigate != null) {
+      onFeatureNavigate!(feature);
+    } else if (onTabChange != null) {
+      onTabChange!(_featureToLegacyIndex(feature));
+    }
+  }
+
+  static int _featureToLegacyIndex(AppFeature feature) {
+    switch (feature) {
+      case AppFeature.today:
+        return 0;
+      case AppFeature.people:
+        return 1;
+      case AppFeature.phones:
+        return 2;
+      case AppFeature.agenda:
+        return 3;
+      case AppFeature.studies:
+        return 4;
+      case AppFeature.dashboard:
+        return 5;
+      case AppFeature.experiences:
+        return 6;
+      case AppFeature.notesResearch:
+        return 7;
+      case AppFeature.territoryMaps:
+        return 1;
+    }
+  }
 
   void _showSyncStatusModal(BuildContext context, WidgetRef ref) async {
     final repo = ref.read(repositoryProvider);
@@ -465,8 +501,16 @@ class TodayScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Hoje no Ministério'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            tooltip: 'Busca Global Unificada',
+            onPressed: () {
+              showSearch(context: context, delegate: GlobalSearchDelegate(ref: ref));
+            },
+          ),
           // Botão de alternância rápida: Modo Sol Intenso / Alto Contraste (Ideia 1)
           IconButton(
+
             icon: Icon(
               isSunMode ? Icons.wb_sunny : Icons.wb_sunny_outlined,
               color: isSunMode ? Colors.amber : Colors.white,
@@ -588,7 +632,7 @@ class TodayScreen extends ConsumerWidget {
                         ),
                         const SizedBox(width: 8),
                         InkWell(
-                          onTap: () => onTabChange(5),
+                          onTap: () => _navigateTo(AppFeature.dashboard),
                           child: const Padding(
                             padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                             child: Row(
@@ -675,7 +719,7 @@ class TodayScreen extends ConsumerWidget {
                         Expanded(
                           flex: 2,
                           child: InkWell(
-                            onTap: () => onTabChange(4),
+                            onTap: () => _navigateTo(AppFeature.studies),
                             borderRadius: BorderRadius.circular(10),
                             child: Container(
                               padding: const EdgeInsets.all(12),
@@ -744,7 +788,7 @@ class TodayScreen extends ConsumerWidget {
                     icon: Icons.person_add_alt_1,
                     label: 'Nova Pessoa',
                     color: isDark ? const Color(0xFF60A5FA) : AppTheme.primaryBlue,
-                    onTap: () => onTabChange(1),
+                    onTap: () => _navigateTo(AppFeature.people),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -753,7 +797,7 @@ class TodayScreen extends ConsumerWidget {
                     icon: Icons.repeat,
                     label: 'Revisitas',
                     color: AppTheme.accentTeal,
-                    onTap: () => onTabChange(1),
+                    onTap: () => _navigateTo(AppFeature.people),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -762,7 +806,7 @@ class TodayScreen extends ConsumerWidget {
                     icon: Icons.menu_book,
                     label: 'Estudos',
                     color: const Color(0xFF7C3AED),
-                    onTap: () => onTabChange(4),
+                    onTap: () => _navigateTo(AppFeature.studies),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -789,7 +833,7 @@ class TodayScreen extends ConsumerWidget {
                     icon: Icons.phone_forwarded,
                     label: 'Telefones',
                     color: const Color(0xFF0284C7),
-                    onTap: () => onTabChange(2),
+                    onTap: () => _navigateTo(AppFeature.phones),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -798,7 +842,7 @@ class TodayScreen extends ConsumerWidget {
                     icon: Icons.auto_stories,
                     label: 'Experiências',
                     color: const Color(0xFFD97706),
-                    onTap: () => onTabChange(6),
+                    onTap: () => _navigateTo(AppFeature.experiences),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -807,7 +851,7 @@ class TodayScreen extends ConsumerWidget {
                     icon: Icons.note_alt_outlined,
                     label: 'Anotações',
                     color: const Color(0xFF475569),
-                    onTap: () => onTabChange(7),
+                    onTap: () => _navigateTo(AppFeature.notesResearch),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -816,7 +860,7 @@ class TodayScreen extends ConsumerWidget {
                     icon: Icons.analytics,
                     label: 'Estatísticas',
                     color: const Color(0xFF6366F1),
-                    onTap: () => onTabChange(5),
+                    onTap: () => _navigateTo(AppFeature.dashboard),
                   ),
                 ),
               ],
@@ -1028,7 +1072,7 @@ class TodayScreen extends ConsumerWidget {
                               ),
                             );
                           } else {
-                            onTabChange(2);
+                            _navigateTo(AppFeature.agenda);
                           }
                         },
                       ),
@@ -1042,15 +1086,31 @@ class TodayScreen extends ConsumerWidget {
             const SizedBox(height: 24),
 
             // Seção: Retornos e Ações Pendentes
-            Text(
-              'Ações e Revisitas Pendentes',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white : AppTheme.textDark,
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    'Ações e Revisitas Pendentes',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : AppTheme.textDark,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                TextButton.icon(
+                  icon: const Icon(Icons.tune, size: 16),
+                  label: const Text('Ver Categorias'),
+                  onPressed: () {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const NextActionsScreen()));
+                  },
+                ),
+              ],
             ),
             const SizedBox(height: 8),
+
             peopleAsync.when(
               data: (people) {
                 final pending = people
