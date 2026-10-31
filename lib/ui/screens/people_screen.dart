@@ -1177,9 +1177,11 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                                   children: [
                                     const Icon(Icons.schedule, size: 16, color: AppTheme.accentTeal),
                                     const SizedBox(width: 4),
-                                    Text(
-                                      'Horário: ${person.preferredSchedule!}',
-                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.accentTeal),
+                                    Expanded(
+                                      child: Text(
+                                        'Horário: ${person.preferredSchedule!}',
+                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.accentTeal),
+                                      ),
                                     ),
                                   ],
                                 ),
