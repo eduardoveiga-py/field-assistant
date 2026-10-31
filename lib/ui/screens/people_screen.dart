@@ -16,6 +16,8 @@ import '../widgets/map_location_picker_dialog.dart';
 import '../../reports/report_export_service.dart';
 import '../../media/person_photos_manager.dart';
 import '../../media/media_picker_helper.dart';
+import '../../contacts/recent_seeds_helper.dart';
+import '../widgets/recent_seed_badge.dart';
 
 class PeopleScreen extends ConsumerStatefulWidget {
   const PeopleScreen({super.key});
@@ -696,6 +698,7 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
     final peopleAsync = ref.watch(peopleStreamProvider);
     final allStudies = ref.watch(studiesStreamProvider).value ?? [];
     final allParticipants = ref.watch(studyParticipantsStreamProvider).value ?? [];
+    final allVisits = ref.watch(visitsStreamProvider).value ?? [];
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -808,18 +811,34 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Row(
                   children: [
-                    ...['Todos', 'Interessados', 'Revisitas', 'Estudos', 'Passadas', 'Encerradas'].map((filter) {
+                    ...['Todos', 'Sementes Recentes', 'Interessados', 'Revisitas', 'Estudos', 'Passadas', 'Encerradas'].map((filter) {
                       final isSelected = _selectedFilter == filter;
+                      final isSeeds = filter == 'Sementes Recentes';
                       return Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: FilterChip(
+                          avatar: isSeeds
+                              ? Icon(
+                                  Icons.eco,
+                                  size: 16,
+                                  color: isSelected
+                                      ? (isDark ? const Color(0xFFA7F3D0) : const Color(0xFF14532D))
+                                      : (isDark ? const Color(0xFF34D399) : const Color(0xFF16A34A)),
+                                )
+                              : null,
                           label: Text(filter),
                           selected: isSelected,
                           onSelected: (selected) {
                             setState(() => _selectedFilter = filter);
                           },
-                          selectedColor: AppTheme.primaryBlue.withValues(alpha: 0.15),
-                          checkmarkColor: AppTheme.primaryBlue,
+                          selectedColor: isSeeds
+                              ? (isDark
+                                  ? const Color(0xFF064E3B).withValues(alpha: 0.45)
+                                  : const Color(0xFFDCFCE7))
+                              : AppTheme.primaryBlue.withValues(alpha: 0.15),
+                          checkmarkColor: isSeeds
+                              ? (isDark ? const Color(0xFFA7F3D0) : const Color(0xFF14532D))
+                              : AppTheme.primaryBlue,
                         ),
                       );
                     }),
@@ -894,6 +913,8 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                   // Filtro por categoria
                   if (_selectedFilter == 'Todos') {
                     if (p.status == 'revisita_passada' || p.status == 'revisita_encerrada') return false;
+                  } else if (_selectedFilter == 'Sementes Recentes') {
+                    if (!RecentSeedsHelper.isRecentSeed(person: p, visits: allVisits)) return false;
                   } else if (_selectedFilter == 'Interessados') {
                     if (p.status != 'interessado') return false;
                   } else if (_selectedFilter == 'Revisitas') {
@@ -924,7 +945,9 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                           const SizedBox(height: 12),
                           Text(
                             query.isEmpty
-                                ? 'Nenhum contato cadastrado ainda.\nToque em "+ Novo Contato" para começar.'
+                                ? (_selectedFilter == 'Sementes Recentes'
+                                    ? 'Nenhuma semente recente pendente de revisita no momento.'
+                                    : 'Nenhum contato cadastrado ainda.\nToque em "+ Novo Contato" para começar.')
                                 : 'Nenhum contato encontrado para "$query".',
                             textAlign: TextAlign.center,
                             style: TextStyle(color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted, fontSize: 15),
@@ -1011,6 +1034,12 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                                             person.phone!,
                                             style: TextStyle(fontSize: 13, color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted),
                                           ),
+                                        if (RecentSeedsHelper.isRecentSeed(person: person, visits: allVisits)) ...[
+                                          const SizedBox(height: 4),
+                                          RecentSeedBadge(
+                                            firstContactAt: person.firstContactAt,
+                                          ),
+                                        ],
                                         if (personTagList.isNotEmpty || person.status == 'revisita_passada') ...[
                                           const SizedBox(height: 4),
                                           Wrap(
@@ -1035,11 +1064,18 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                                                 ),
                                                 child: Text('#$t', style: const TextStyle(fontSize: 10)),
                                               )),
-                                              InkWell(
-                                                onTap: () => _showEditTagsDialog(context, person),
-                                                child: Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                                  child: const Icon(Icons.add_circle_outline, size: 14, color: AppTheme.primaryBlue),
+                                              Semantics(
+                                                button: true,
+                                                label: 'Adicionar etiqueta',
+                                                child: InkWell(
+                                                  onTap: () => _showEditTagsDialog(context, person),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                  child: ConstrainedBox(
+                                                    constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                                                    child: const Center(
+                                                      child: Icon(Icons.add_circle_outline, size: 16, color: AppTheme.primaryBlue),
+                                                    ),
+                                                  ),
                                                 ),
                                               ),
                                             ],
@@ -1084,27 +1120,32 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                                       const PopupMenuItem(value: 'revisita_passada', child: Text('📤 Revisita Passada')),
                                       const PopupMenuItem(value: 'outro', child: Text('⚪ Outro')),
                                     ],
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: color.withValues(alpha: 0.15),
-                                        borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(color: color.withValues(alpha: 0.4)),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text(
-                                            _getStatusLabel(person.status),
-                                            style: TextStyle(
-                                              color: color,
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.bold,
-                                            ),
+                                    child: ConstrainedBox(
+                                      constraints: const BoxConstraints(minHeight: 48, minWidth: 48),
+                                      child: Center(
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: color.withValues(alpha: 0.15),
+                                            borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(color: color.withValues(alpha: 0.4)),
                                           ),
-                                          const SizedBox(width: 2),
-                                          Icon(Icons.arrow_drop_down, size: 14, color: color),
-                                        ],
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(
+                                                _getStatusLabel(person.status),
+                                                style: TextStyle(
+                                                  color: color,
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 2),
+                                              Icon(Icons.arrow_drop_down, size: 14, color: color),
+                                            ],
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -1228,11 +1269,13 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                                 children: [
                                   if (person.phone != null && person.phone!.isNotEmpty) ...[
                                     IconButton(
+                                      constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
                                       icon: const Icon(Icons.phone, size: 20, color: AppTheme.primaryBlue),
                                       tooltip: 'Ligar',
                                       onPressed: () => _makePhoneCall(person.phone!),
                                     ),
                                     IconButton(
+                                      constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
                                       icon: const Icon(Icons.chat, size: 20, color: Color(0xFF25D366)),
                                       tooltip: 'WhatsApp',
                                       onPressed: () => _openWhatsApp(person.phone!),
@@ -1240,6 +1283,7 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                                   ],
                                   if (person.address != null && person.address!.isNotEmpty) ...[
                                     IconButton(
+                                      constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
                                       icon: const Icon(Icons.map_outlined, size: 20, color: AppTheme.primaryBlue),
                                       tooltip: 'Ver no Mapa do Território',
                                       onPressed: () {
@@ -1252,12 +1296,14 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                                       },
                                     ),
                                     IconButton(
+                                      constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
                                       icon: const Icon(Icons.open_in_new, size: 20, color: AppTheme.accentTeal),
                                       tooltip: 'Abrir no Google Maps',
                                       onPressed: () => _openMapRoute(person.address!, person.latitude, person.longitude),
                                     ),
                                   ],
                                   IconButton(
+                                    constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
                                     icon: const Icon(Icons.arrow_forward_ios, size: 14),
                                     tooltip: 'Acessar cadastro completo',
                                     onPressed: () {

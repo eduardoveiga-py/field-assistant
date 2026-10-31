@@ -16,6 +16,8 @@ import '../../reports/web_downloader.dart';
 import '../../settings/app_settings_manager.dart';
 import '../providers.dart';
 import 'person_detail_screen.dart';
+import '../../appointments/plan_b_recommender.dart';
+import '../widgets/plan_b_dialog.dart';
 
 class _CopyWizardRoutine {
   final String id;
@@ -1239,6 +1241,51 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                     final repo = ref.read(repositoryProvider);
                     await repo.updateAppointment(appt.copyWith(status: 'realizado'));
                     if (ctx.mounted) Navigator.pop(ctx);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.alt_route, color: Colors.orange),
+                  title: const Text('Estudante Desmarcou (Ver Plano B)'),
+                  subtitle: const Text('Marca como cancelado e sugere contatos próximos para o horário'),
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    final repo = ref.read(repositoryProvider);
+                    await repo.updateAppointment(appt.copyWith(status: 'cancelado'));
+
+                    final people = ref.read(peopleStreamProvider).value ?? [];
+                    final visits = ref.read(visitsStreamProvider).value ?? [];
+                    final cancelledPerson = appt.personId != null
+                        ? people.where((p) => p.id == appt.personId).firstOrNull
+                        : null;
+
+                    final targetPerson = cancelledPerson ??
+                        PersonEntry(
+                          id: 'temp_appt_${appt.id}',
+                          name: appt.title,
+                          status: 'potencial',
+                          tags: '[]',
+                          firstContactAt: DateTime.now(),
+                          createdAt: DateTime.now(),
+                          updatedAt: DateTime.now(),
+                          revision: 1,
+                        );
+
+                    final suggestions = PlanBRecommender.getSuggestions(
+                      cancelledPerson: targetPerson,
+                      allPeople: people,
+                      allVisits: visits,
+                      currentLat: targetPerson.latitude,
+                      currentLng: targetPerson.longitude,
+                      targetDateTime: appt.startTime,
+                    );
+
+                    if (context.mounted) {
+                      PlanBDialog.show(
+                        context,
+                        cancelledPerson: targetPerson,
+                        suggestions: suggestions,
+                      );
+                    }
                   },
                 ),
                 if (appt.personId != null)

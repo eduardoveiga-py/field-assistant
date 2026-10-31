@@ -53,6 +53,11 @@ final studySessionsStreamProvider = StreamProvider<List<StudySessionEntry>>((ref
   return (repo.db.select(repo.db.studySessions)..where((t) => t.deletedAt.isNull())).watch();
 });
 
+final visitsStreamProvider = StreamProvider<List<VisitEntry>>((ref) {
+  final repo = ref.watch(repositoryProvider);
+  return (repo.db.select(repo.db.visits)..where((t) => t.deletedAt.isNull())).watch();
+});
+
 /// Notifier e Provider do Modo Sol Intenso & Alto Contraste
 class SunModeNotifier extends Notifier<bool> {
   @override

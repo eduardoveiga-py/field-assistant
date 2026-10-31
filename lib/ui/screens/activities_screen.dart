@@ -4,6 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../providers.dart';
+import '../widgets/pioneer_pace_card.dart';
+import '../../activities/auto_corrective_timer_logic.dart';
+import '../widgets/auto_corrective_timer_dialog.dart';
 
 class ActivitiesScreen extends ConsumerStatefulWidget {
   const ActivitiesScreen({super.key});
@@ -43,10 +46,42 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
             setState(() {
               _timerSeconds++;
             });
+
+            // Alerta de cronômetro ligado ininterruptamente (R5: > 4 horas)
+            if (_timerSeconds >= 14400 && !_stoppedNoticeDismissed) {
+              _stoppedNoticeDismissed = true;
+              _checkAutoCorrectiveTimer();
+            }
           }
         });
       }
     });
+  }
+
+  void _checkAutoCorrectiveTimer() {
+    final state = AutoCorrectiveTimerLogic.evaluate(
+      isRunning: _isTimerRunning,
+      startedAt: DateTime.now().subtract(Duration(seconds: _timerSeconds)),
+      accumulatedDuration: Duration.zero,
+    );
+
+    if (state.shouldShowWarning && mounted) {
+      AutoCorrectiveTimerDialog.show(
+        context,
+        state: state,
+        onApplyAdjustment: (newDuration) {
+          setState(() {
+            _timerSeconds = newDuration.inSeconds;
+          });
+        },
+        onKeepCurrent: () {
+          setState(() {
+            _stoppedNoticeDismissed = true;
+          });
+        },
+        onDiscard: _resetTimer,
+      );
+    }
   }
 
   void _resetTimer() {
@@ -421,6 +456,25 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
                     ],
                   ),
                 ),
+              ),
+
+              // Calculadora de Ritmo Real de Campo do Pioneiro (R2)
+              Builder(
+                builder: (context) {
+                  final now = DateTime.now();
+                  final currentMonthStart = DateTime(now.year, now.month, 1);
+                  final currentMonthEnd = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+                  final currentMonthActivities = allActivities.where((a) =>
+                      a.deletedAt == null &&
+                      a.date.isAfter(currentMonthStart.subtract(const Duration(seconds: 1))) &&
+                      a.date.isBefore(currentMonthEnd.add(const Duration(seconds: 1)))).toList();
+                  final currentMonthSeconds = currentMonthActivities.fold<int>(0, (sum, a) => sum + a.durationSeconds);
+                  final currentMonthCompletedHours = currentMonthSeconds / 3600.0;
+
+                  return PioneerPaceCard(
+                    currentMonthCompletedHours: currentMonthCompletedHours,
+                  );
+                },
               ),
 
               // Barra de seleção de período

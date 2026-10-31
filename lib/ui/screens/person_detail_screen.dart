@@ -28,6 +28,8 @@ import '../../territory/geocoding_service.dart';
 import '../widgets/map_location_picker_dialog.dart';
 import '../../territory/sector_manager.dart';
 import 'contacts_map_screen.dart';
+import '../../contacts/doorstep_briefing_helper.dart';
+import '../widgets/doorstep_briefing_card.dart';
 
 class PersonDetailScreen extends ConsumerStatefulWidget {
   final String personId;
@@ -2135,31 +2137,7 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
   // ---------------------------------------------------------------------------
 
   List<Map<String, dynamic>> _parseNotes(String? raw) {
-    if (raw == null) return [];
-    final trimmed = raw.trim();
-    if (trimmed.isEmpty || trimmed == '[]') return [];
-    try {
-      final decoded = jsonDecode(trimmed);
-      if (decoded is List) {
-        if (decoded.isEmpty) return [];
-        final list = <Map<String, dynamic>>[];
-        for (final item in decoded) {
-          if (item is Map) {
-            list.add(Map<String, dynamic>.from(item));
-          }
-        }
-        if (list.isNotEmpty) return list;
-      }
-    } catch (_) {}
-
-    // Compatibilidade legada com texto puro ou primitivos JSON que não sejam listas de notas
-    return [
-      {
-        'id': 'legacy-note',
-        'text': trimmed,
-        'createdAt': DateTime.now().toIso8601String(),
-      }
-    ];
+    return DoorstepBriefingHelper.parseNotes(raw);
   }
 
   Future<void> _saveNotes(AppRepository repo, PersonEntry person, List<Map<String, dynamic>> notes) async {
@@ -2168,33 +2146,7 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
   }
 
   List<Map<String, dynamic>> _parseTargets(String? raw) {
-    if (raw == null) return [];
-    final trimmed = raw.trim();
-    if (trimmed.isEmpty || trimmed == '[]') return [];
-    try {
-      final decoded = jsonDecode(trimmed);
-      if (decoded is List) {
-        if (decoded.isEmpty) return [];
-        final list = <Map<String, dynamic>>[];
-        for (final item in decoded) {
-          if (item is Map) {
-            list.add(Map<String, dynamic>.from(item));
-          }
-        }
-        if (list.isNotEmpty) return list;
-      }
-    } catch (_) {}
-
-    // Compatibilidade legada com texto puro ou primitivos JSON que não sejam listas de alvos
-    return [
-      {
-        'id': 'legacy-target',
-        'title': trimmed,
-        'isCompleted': false,
-        'createdAt': DateTime.now().toIso8601String(),
-        'completedAt': null,
-      }
-    ];
+    return DoorstepBriefingHelper.parseTargets(raw);
   }
 
   Future<void> _saveTargets(AppRepository repo, PersonEntry person, List<Map<String, dynamic>> targets) async {
@@ -3131,6 +3083,28 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                 ],
               ),
             ),
+          ),
+          const SizedBox(height: 12),
+
+          // -------------------------------------------------------------------
+          // Card de "Briefing na Porta" (Consolidação em 1 Toque - R1)
+          // -------------------------------------------------------------------
+          StreamBuilder<List<VisitEntry>>(
+            stream: repo.watchVisitsForPerson(person.id),
+            builder: (context, visitSnapshot) {
+              final latestVisit = (visitSnapshot.data ?? []).firstOrNull;
+              final briefingData = DoorstepBriefingHelper.build(
+                person: person,
+                linkedStudy: linkedStudy,
+                latestVisit: latestVisit,
+              );
+              return DoorstepBriefingCard(
+                data: briefingData,
+                onOpenJwLibrary: linkedStudy != null
+                    ? () => _openPublicationLink(context, linkedStudy)
+                    : null,
+              );
+            },
           ),
           const SizedBox(height: 12),
 
