@@ -2,6 +2,7 @@ import 'dart:convert';
 import '../database/app_database.dart';
 import '../publications/publication_catalog.dart';
 import '../publications/publication_link_resolver.dart';
+import '../voice_notes/voice_note_models.dart';
 
 /// Modelo de dados consolidado para o card de Briefing na Porta (30 segundos).
 class DoorstepBriefingData {
@@ -23,6 +24,15 @@ class DoorstepBriefingData {
   /// Título da publicação vinculada ao estudo (se houver)
   final String? publicationTitle;
 
+  /// Caminho do arquivo de áudio gravado na última nota de voz
+  final String? audioFilePath;
+
+  /// Transcrição da última nota de voz
+  final String? voiceNoteTranscription;
+
+  /// Duração em segundos da última nota de voz
+  final int? voiceNoteDurationSeconds;
+
   const DoorstepBriefingData({
     this.lessonAndPoint,
     this.jwLibraryUri,
@@ -30,6 +40,9 @@ class DoorstepBriefingData {
     this.spiritualGoal,
     this.empathyNote,
     this.publicationTitle,
+    this.audioFilePath,
+    this.voiceNoteTranscription,
+    this.voiceNoteDurationSeconds,
   });
 
   bool get hasLessonOrTopic => lessonAndPoint != null && lessonAndPoint!.trim().isNotEmpty;
@@ -37,10 +50,17 @@ class DoorstepBriefingData {
   bool get hasPendingDoubt => pendingDoubt != null && pendingDoubt!.trim().isNotEmpty;
   bool get hasSpiritualGoal => spiritualGoal != null && spiritualGoal!.trim().isNotEmpty;
   bool get hasEmpathyNote => empathyNote != null && empathyNote!.trim().isNotEmpty;
+  bool get hasVoiceNote =>
+      (audioFilePath != null && audioFilePath!.trim().isNotEmpty) ||
+      (voiceNoteTranscription != null && voiceNoteTranscription!.trim().isNotEmpty);
 
   /// Indica se há pelo menos um dado relevante para exibição no card
   bool get hasAnyData =>
-      hasLessonOrTopic || hasPendingDoubt || hasSpiritualGoal || hasEmpathyNote;
+      hasLessonOrTopic ||
+      hasPendingDoubt ||
+      hasSpiritualGoal ||
+      hasEmpathyNote ||
+      hasVoiceNote;
 
   @override
   bool operator ==(Object other) =>
@@ -52,7 +72,10 @@ class DoorstepBriefingData {
           pendingDoubt == other.pendingDoubt &&
           spiritualGoal == other.spiritualGoal &&
           empathyNote == other.empathyNote &&
-          publicationTitle == other.publicationTitle;
+          publicationTitle == other.publicationTitle &&
+          audioFilePath == other.audioFilePath &&
+          voiceNoteTranscription == other.voiceNoteTranscription &&
+          voiceNoteDurationSeconds == other.voiceNoteDurationSeconds;
 
   @override
   int get hashCode =>
@@ -61,13 +84,17 @@ class DoorstepBriefingData {
       pendingDoubt.hashCode ^
       spiritualGoal.hashCode ^
       empathyNote.hashCode ^
-      publicationTitle.hashCode;
+      publicationTitle.hashCode ^
+      audioFilePath.hashCode ^
+      voiceNoteTranscription.hashCode ^
+      voiceNoteDurationSeconds.hashCode;
 
   @override
   String toString() =>
       'DoorstepBriefingData(lessonAndPoint: $lessonAndPoint, jwLibraryUri: $jwLibraryUri, '
       'pendingDoubt: $pendingDoubt, spiritualGoal: $spiritualGoal, empathyNote: $empathyNote, '
-      'publicationTitle: $publicationTitle)';
+      'publicationTitle: $publicationTitle, audioFilePath: $audioFilePath, '
+      'voiceNoteTranscription: $voiceNoteTranscription, voiceNoteDurationSeconds: $voiceNoteDurationSeconds)';
 }
 
 /// Helper puro responsável por consolidar os dados para o Briefing na Porta.
@@ -77,11 +104,12 @@ class DoorstepBriefingHelper {
     required PersonEntry person,
     BibleStudyEntry? linkedStudy,
     VisitEntry? latestVisit,
+    VoiceNoteItem? latestVoiceNote,
   }) {
-    final lessonInfo = _extractLessonAndPoint(linkedStudy, latestVisit);
-    final pendingDoubt = _extractPendingDoubt(latestVisit, linkedStudy, person);
+    final lessonInfo = _extractLessonAndPoint(linkedStudy, latestVisit, latestVoiceNote);
+    final pendingDoubt = _extractPendingDoubt(latestVisit, linkedStudy, person, latestVoiceNote);
     final spiritualGoal = _extractSpiritualGoal(person, linkedStudy);
-    final empathyNote = _extractEmpathyNote(person);
+    final empathyNote = _extractEmpathyNote(person, latestVoiceNote);
 
     return DoorstepBriefingData(
       lessonAndPoint: lessonInfo.lessonAndPoint,
@@ -90,13 +118,17 @@ class DoorstepBriefingHelper {
       pendingDoubt: pendingDoubt,
       spiritualGoal: spiritualGoal,
       empathyNote: empathyNote,
+      audioFilePath: latestVoiceNote?.audioFilePath,
+      voiceNoteTranscription: latestVoiceNote?.transcription,
+      voiceNoteDurationSeconds: latestVoiceNote?.audioDurationSeconds,
     );
   }
 
   static ({String? lessonAndPoint, Uri? jwLibraryUri, String? publicationTitle}) _extractLessonAndPoint(
     BibleStudyEntry? linkedStudy,
-    VisitEntry? latestVisit,
-  ) {
+    VisitEntry? latestVisit, [
+    VoiceNoteItem? latestVoiceNote,
+  ]) {
     String? lessonAndPoint;
     Uri? jwLibraryUri;
     String? publicationTitle;
@@ -160,6 +192,18 @@ class DoorstepBriefingHelper {
       }
     }
 
+    if ((lessonAndPoint == null || lessonAndPoint.isEmpty) && latestVoiceNote != null) {
+      if (latestVoiceNote.detectedLesson != null && latestVoiceNote.detectedPoint != null) {
+        final pad = latestVoiceNote.detectedLesson.toString().padLeft(2, '0');
+        lessonAndPoint = 'Lição $pad, Ponto ${latestVoiceNote.detectedPoint}';
+      } else if (latestVoiceNote.detectedLesson != null) {
+        final pad = latestVoiceNote.detectedLesson.toString().padLeft(2, '0');
+        lessonAndPoint = 'Lição $pad';
+      } else if (latestVoiceNote.detectedPoint != null) {
+        lessonAndPoint = 'Ponto ${latestVoiceNote.detectedPoint}';
+      }
+    }
+
     return (
       lessonAndPoint: lessonAndPoint != null && lessonAndPoint.trim().isNotEmpty ? lessonAndPoint.trim() : null,
       jwLibraryUri: jwLibraryUri,
@@ -170,8 +214,9 @@ class DoorstepBriefingHelper {
   static String? _extractPendingDoubt(
     VisitEntry? latestVisit,
     BibleStudyEntry? linkedStudy,
-    PersonEntry person,
-  ) {
+    PersonEntry person, [
+    VoiceNoteItem? latestVoiceNote,
+  ]) {
     if (latestVisit != null) {
       final question = latestVisit.expressedQuestion?.trim();
       if (question != null && question.isNotEmpty) return question;
@@ -196,6 +241,11 @@ class DoorstepBriefingHelper {
     final personNextAction = person.nextActionNote?.trim();
     if (personNextAction != null && personNextAction.isNotEmpty) return personNextAction;
 
+    if (latestVoiceNote != null) {
+      final voiceDoubt = latestVoiceNote.extractedPendingDoubt?.trim();
+      if (voiceDoubt != null && voiceDoubt.isNotEmpty) return voiceDoubt;
+    }
+
     return null;
   }
 
@@ -219,9 +269,13 @@ class DoorstepBriefingHelper {
     return null;
   }
 
-  static String? _extractEmpathyNote(PersonEntry person) {
+  static String? _extractEmpathyNote(PersonEntry person, [VoiceNoteItem? latestVoiceNote]) {
     final notes = parseNotes(person.generalNotes);
-    if (notes.isEmpty) return null;
+    if (notes.isEmpty) {
+      final voiceEmpathy = latestVoiceNote?.extractedEmpathyNote?.trim();
+      if (voiceEmpathy != null && voiceEmpathy.isNotEmpty) return voiceEmpathy;
+      return null;
+    }
 
     final validNotes = notes.where((n) {
       final text = n['text']?.toString().trim();

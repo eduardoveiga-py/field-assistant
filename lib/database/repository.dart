@@ -401,6 +401,17 @@ class AppRepository {
         .getSingleOrNull();
   }
 
+  Future<BibleStudyEntry?> getPrimaryStudyForPerson(String personId) async {
+    final participants = await (db.select(db.studyParticipants)
+          ..where((tbl) => tbl.personId.equals(personId) & tbl.deletedAt.isNull()))
+        .get();
+    if (participants.isEmpty) return null;
+    final primary = participants.where((p) => p.isPrimary).firstOrNull ?? participants.first;
+    return (db.select(db.bibleStudies)
+          ..where((tbl) => tbl.id.equals(primary.studyId) & tbl.deletedAt.isNull()))
+        .getSingleOrNull();
+  }
+
   Future<BibleStudyEntry> createStudy({
     String? id,
     required String title,

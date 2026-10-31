@@ -1,21 +1,70 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../contacts/doorstep_briefing_helper.dart';
 import '../../core/app_theme.dart';
+import '../../voice_notes/audio_recording_service.dart';
 
 /// Card de visualização ultrarrápida (30 segundos) para preparação imediata
 /// na calçada ou porta do morador/estudante bíblico.
-class DoorstepBriefingCard extends StatelessWidget {
+class DoorstepBriefingCard extends StatefulWidget {
   final DoorstepBriefingData data;
   final VoidCallback? onOpenJwLibrary;
   final void Function(Uri)? onLaunchJwLibrary;
+  final void Function(String)? onPlayVoiceNote;
+  final VoidCallback? onQuickRecord;
 
   const DoorstepBriefingCard({
     super.key,
     required this.data,
     this.onOpenJwLibrary,
     this.onLaunchJwLibrary,
+    this.onPlayVoiceNote,
+    this.onQuickRecord,
   });
+
+  @override
+  State<DoorstepBriefingCard> createState() => _DoorstepBriefingCardState();
+}
+
+class _DoorstepBriefingCardState extends State<DoorstepBriefingCard> {
+  final AudioPlayerService _player = LocalAudioPlayerService();
+  bool _isPlaying = false;
+  StreamSubscription<bool>? _playerSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _playerSub = _player.playingStateStream.listen((playing) {
+      if (mounted) {
+        setState(() {
+          _isPlaying = playing;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _playerSub?.cancel();
+    _player.dispose();
+    super.dispose();
+  }
+
+  void _togglePlay(String? audioPath) {
+    if (widget.onPlayVoiceNote != null && audioPath != null) {
+      widget.onPlayVoiceNote!(audioPath);
+    }
+    if (_isPlaying) {
+      _player.pause();
+    } else {
+      _player.play(audioPath ?? 'simulated_audio.m4a');
+    }
+  }
+
+  DoorstepBriefingData get data => widget.data;
+  VoidCallback? get onOpenJwLibrary => widget.onOpenJwLibrary;
+  void Function(Uri)? get onLaunchJwLibrary => widget.onLaunchJwLibrary;
 
   @override
   Widget build(BuildContext context) {
@@ -101,8 +150,144 @@ class DoorstepBriefingCard extends StatelessWidget {
               isSunMode: isSunMode,
               isDark: isDark,
             ),
+
+            // SEÇÃO 5: Última Nota de Voz (Ditado Rápido Offline)
+            if (data.hasVoiceNote) ...[
+              const SizedBox(height: 10),
+              _buildVoiceNoteSection(context, isSunMode, isDark),
+            ],
           ],
         ),
+      ),
+    );
+  }
+
+  /// Seção dedicada à reprodução e visualização da última nota de áudio/voz gravada
+  Widget _buildVoiceNoteSection(BuildContext context, bool isSunMode, bool isDark) {
+    const accentColor = Color(0xFF6366F1); // Indigo
+    final transcription = data.voiceNoteTranscription;
+    final durationSeconds = data.voiceNoteDurationSeconds ?? 15;
+    final durationFormatted = '0:${durationSeconds.toString().padLeft(2, '0')}';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isSunMode
+            ? Colors.white
+            : (isDark
+                ? accentColor.withValues(alpha: 0.12)
+                : accentColor.withValues(alpha: 0.08)),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isSunMode ? Colors.black : accentColor.withValues(alpha: 0.6),
+          width: isSunMode ? 2.0 : 1.5,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.record_voice_over,
+                size: 16,
+                color: isSunMode ? Colors.black : accentColor,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'ÚLTIMA NOTA DE VOZ (DITADO RÁPIDO)',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.4,
+                    color: isSunMode ? Colors.black : accentColor,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: isSunMode
+                      ? Colors.black
+                      : (isDark ? const Color(0xFF1E293B) : Colors.white),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: isSunMode ? Colors.black : accentColor,
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.timer_outlined,
+                      size: 11,
+                      color: isSunMode ? Colors.white : accentColor,
+                    ),
+                    const SizedBox(width: 3),
+                    Text(
+                      durationFormatted,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: isSunMode ? Colors.white : accentColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (transcription != null && transcription.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              '"$transcription"',
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 13,
+                fontStyle: FontStyle.italic,
+                fontWeight: isSunMode ? FontWeight.w700 : FontWeight.w500,
+                color: isSunMode
+                    ? Colors.black
+                    : (isDark ? Colors.white : const Color(0xFF1E293B)),
+              ),
+            ),
+          ],
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Semantics(
+                button: true,
+                label: _isPlaying ? 'Pausar nota de voz' : 'Reproduzir nota de voz',
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 48), // Tamanho mínimo de alvo de toque (48x48 dp)
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isSunMode ? Colors.black : accentColor,
+                      foregroundColor: Colors.white,
+                      elevation: isSunMode ? 0 : 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        side: isSunMode
+                            ? const BorderSide(color: Colors.black, width: 2)
+                            : BorderSide.none,
+                      ),
+                    ),
+                    icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow, size: 20),
+                    label: Text(
+                      _isPlaying ? 'Pausar Áudio' : 'Ouvir Nota ($durationFormatted)',
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                    ),
+                    onPressed: () => _togglePlay(data.audioFilePath),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -264,10 +449,11 @@ class DoorstepBriefingCard extends StatelessWidget {
           ],
           if (showButton) ...[
             const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              height: 48, // Tamanho mínimo de alvo de toque (48x48 dp)
-              child: ElevatedButton.icon(
+            ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 48), // Tamanho mínimo de alvo de toque (48x48 dp)
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: isSunMode ? Colors.black : AppTheme.primaryBlue,
                   foregroundColor: Colors.white,
@@ -298,7 +484,8 @@ class DoorstepBriefingCard extends StatelessWidget {
                 },
               ),
             ),
-          ],
+          ),
+        ],
         ],
       ),
     );

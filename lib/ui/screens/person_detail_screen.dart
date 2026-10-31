@@ -30,6 +30,9 @@ import '../../territory/sector_manager.dart';
 import 'contacts_map_screen.dart';
 import '../../contacts/doorstep_briefing_helper.dart';
 import '../widgets/doorstep_briefing_card.dart';
+import '../../voice_notes/voice_notes_manager.dart';
+import '../../voice_notes/voice_note_models.dart';
+import '../widgets/quick_voice_note_dialog.dart';
 
 class PersonDetailScreen extends ConsumerStatefulWidget {
   final String personId;
@@ -1669,7 +1672,34 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 48),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF4F46E5),
+                        side: const BorderSide(color: Color(0xFF4F46E5), width: 1.5),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      icon: const Icon(Icons.mic, size: 20),
+                      label: const Text(
+                        'Preencher via Registro Rápido / Ditado (15s)',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        QuickVoiceNoteDialog.show(
+                          context: context,
+                          person: person,
+                          linkedStudy: existingStudy,
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     initialValue: selectedType,
                     decoration: const InputDecoration(labelText: 'Tipo de Contato'),
@@ -2594,6 +2624,7 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
     BibleStudyEntry? linkedStudy,
     bool isDark,
   ) {
+    final isSunMode = ref.watch(sunModeProvider);
     final allPhotos = ref.watch(personPhotosStreamProvider).value ?? [];
     final personPhoto = allPhotos.where((p) => p.personId == person.id && p.photoType == 'person').firstOrNull;
     final housePhoto = allPhotos.where((p) => p.personId == person.id && p.photoType == 'house').firstOrNull;
@@ -3093,20 +3124,62 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
             stream: repo.watchVisitsForPerson(person.id),
             builder: (context, visitSnapshot) {
               final latestVisit = (visitSnapshot.data ?? []).firstOrNull;
-              final briefingData = DoorstepBriefingHelper.build(
-                person: person,
-                linkedStudy: linkedStudy,
-                latestVisit: latestVisit,
-              );
-              return DoorstepBriefingCard(
-                data: briefingData,
-                onOpenJwLibrary: linkedStudy != null
-                    ? () => _openPublicationLink(context, linkedStudy)
-                    : null,
+              return StreamBuilder<List<VoiceNoteItem>>(
+                stream: ref.watch(voiceNotesManagerProvider).watchVoiceNotesForPerson(person.id),
+                builder: (context, voiceSnapshot) {
+                  final latestVoiceNote = (voiceSnapshot.data ?? []).firstOrNull;
+                  final briefingData = DoorstepBriefingHelper.build(
+                    person: person,
+                    linkedStudy: linkedStudy,
+                    latestVisit: latestVisit,
+                    latestVoiceNote: latestVoiceNote,
+                  );
+                  return DoorstepBriefingCard(
+                    data: briefingData,
+                    onOpenJwLibrary: linkedStudy != null
+                        ? () => _openPublicationLink(context, linkedStudy)
+                        : null,
+                    onQuickRecord: () => QuickVoiceNoteDialog.show(
+                      context: context,
+                      person: person,
+                      linkedStudy: linkedStudy,
+                    ),
+                  );
+                },
               );
             },
           ),
           const SizedBox(height: 12),
+
+          // Botão Rápido de Áudio / Ditado (15s) - Nível 3
+          ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 48), // Alvo de toque mínimo >= 48dp
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isSunMode ? Colors.black : const Color(0xFF4F46E5),
+                foregroundColor: Colors.white,
+                elevation: isSunMode ? 0 : 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  side: isSunMode ? const BorderSide(color: Colors.black, width: 2) : BorderSide.none,
+                ),
+              ),
+              icon: const Icon(Icons.mic, size: 20),
+              label: const Text(
+                'Registro Rápido por Áudio / Ditado (15s)',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+              onPressed: () => QuickVoiceNoteDialog.show(
+                context: context,
+                person: person,
+                linkedStudy: linkedStudy,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
 
           // Alerta e Botão Proeminente se pessoa tem status 'estudo' sem estudo iniciado
           if (person.status == 'estudo' && linkedStudy == null) ...[

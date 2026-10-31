@@ -26,6 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>O aplicativo precisa de acesso ao microfone para permitir o registro rápido de notas de voz após as visitas.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>O aplicativo utiliza o reconhecimento de fala para transcrever offline as anotações do ministério.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
