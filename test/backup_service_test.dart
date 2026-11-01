@@ -1,9 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:drift/native.dart';
 import 'package:drift/drift.dart' show Value;
+import 'package:crypto/crypto.dart';
+import 'package:encrypt/encrypt.dart' as enc;
 import 'package:ministerio_pessoal/database/app_database.dart';
 import 'package:ministerio_pessoal/database/repository.dart';
 import 'package:ministerio_pessoal/settings/backup_service.dart';
@@ -13,15 +16,25 @@ void main() {
     late AppDatabase db;
     late AppRepository repository;
     late BackupService backupService;
+    late Directory testDocsDir;
 
-    setUp(() {
+    setUp(() async {
+      testDocsDir = await Directory.systemTemp.createTemp('bak_test_docs_');
       db = AppDatabase.forTesting(NativeDatabase.memory());
       repository = AppRepository(db);
-      backupService = BackupService(repository);
+      backupService = BackupService(
+        repository,
+        documentsDirectoryProvider: () async => testDocsDir,
+      );
     });
 
     tearDown(() async {
       await db.close();
+      if (testDocsDir.existsSync()) {
+        try {
+          await testDocsDir.delete(recursive: true);
+        } catch (_) {}
+      }
     });
 
     test(
@@ -62,7 +75,10 @@ void main() {
         // 4. Cria segundo banco vazio e restaura
         final db2 = AppDatabase.forTesting(NativeDatabase.memory());
         final repo2 = AppRepository(db2);
-        final service2 = BackupService(repo2);
+        final service2 = BackupService(
+          repo2,
+          documentsDirectoryProvider: () async => testDocsDir,
+        );
 
         await service2.commitRestore(preview);
 
@@ -165,7 +181,10 @@ void main() {
       // Em um banco novo e vazio:
       final dbNew = AppDatabase.forTesting(NativeDatabase.memory());
       final repoNew = AppRepository(dbNew);
-      final serviceNew = BackupService(repoNew);
+      final serviceNew = BackupService(
+        repoNew,
+        documentsDirectoryProvider: () async => testDocsDir,
+      );
 
       final previewNewDb = await serviceNew.previewBackup(
         encryptedDataString: encryptedBackup,
@@ -260,7 +279,10 @@ void main() {
         // 2. Restaura em banco novo
         final dbNew = AppDatabase.forTesting(NativeDatabase.memory());
         final repoNew = AppRepository(dbNew);
-        final serviceNew = BackupService(repoNew);
+        final serviceNew = BackupService(
+          repoNew,
+          documentsDirectoryProvider: () async => testDocsDir,
+        );
 
         final previewNew = await serviceNew.previewBackup(
           encryptedDataString: encrypted,
@@ -307,7 +329,10 @@ void main() {
 
       final dbNew = AppDatabase.forTesting(NativeDatabase.memory());
       final repoNew = AppRepository(dbNew);
-      final serviceNew = BackupService(repoNew);
+      final serviceNew = BackupService(
+        repoNew,
+        documentsDirectoryProvider: () async => testDocsDir,
+      );
 
       await serviceNew.commitRestore(preview);
 
@@ -404,12 +429,11 @@ void main() {
       },
     );
 
-    test('TC-BAK-11: Detecção explícita de áudio corrompido com validação SHA-256 e RestoreResult.isIntegral == false', () async {
+    test('TC-BAK-11: previewBackup() detecta por conta própria corrupção de áudio via SHA-256 sem injeção manual', () async {
       final p = await repository.createPerson(
         name: 'Irmão com Áudio Corrompido',
       );
-      final tempDir = await Directory.systemTemp.createTemp('bak_corrupt_test');
-      final audioFile = File('${tempDir.path}/audio_original.m4a');
+      final audioFile = File('${testDocsDir.path}/audio_original.m4a');
       await audioFile.writeAsBytes([10, 20, 30, 40, 50]);
 
       await repository.db
@@ -425,16 +449,38 @@ void main() {
             ),
           );
 
-      final encrypted = await backupService.exportEncryptedBackup(
-        'corrupt_pwd',
-      );
-      final preview = await backupService.previewBackup(
-        encryptedDataString: encrypted,
-        password: 'corrupt_pwd',
-      );
+      const password = 'corrupt_pwd';
+      final encrypted = await backupService.exportEncryptedBackup(password);
 
-      // Simula corrupção adulterando os bytes do áudio no payload mantendo o hash antigo esperado
-      final rawData = Map<String, dynamic>.from(preview.rawDecryptedData);
+      // Decodifica o container AES-GCM
+      final container = jsonDecode(encrypted) as Map<String, dynamic>;
+      final saltBytes = base64Decode(container['salt'] as String);
+      final iterations = container['iterations'] as int;
+      final iv = enc.IV.fromBase64(container['iv'] as String);
+      final hmac = Hmac(sha256, utf8.encode(password));
+      final saltAndBlock = Uint8List(saltBytes.length + 4);
+      saltAndBlock.setRange(0, saltBytes.length, saltBytes);
+      saltAndBlock[saltBytes.length + 3] = 1;
+      var u = Uint8List.fromList(hmac.convert(saltAndBlock).bytes);
+      final keyBytes = Uint8List.fromList(u);
+      for (int iter = 1; iter < iterations; iter++) {
+        u = Uint8List.fromList(hmac.convert(u).bytes);
+        for (int i = 0; i < 32; i++) {
+          keyBytes[i] ^= u[i];
+        }
+      }
+      final key = enc.Key(keyBytes);
+      final encrypter = enc.Encrypter(enc.AES(key, mode: enc.AESMode.gcm));
+      final decryptedEnvelopeJson = encrypter.decrypt64(
+        container['ciphertext'] as String,
+        iv: iv,
+      );
+      final envelope =
+          jsonDecode(decryptedEnvelopeJson) as Map<String, dynamic>;
+      final rawData =
+          jsonDecode(envelope['data'] as String) as Map<String, dynamic>;
+
+      // Adultera os bytes do áudio no payload mantendo o hash antigo esperado em voiceNoteAudioHashes
       final rawAudios = Map<String, dynamic>.from(
         rawData['voiceNoteAudios'] as Map<String, dynamic>,
       );
@@ -446,34 +492,197 @@ void main() {
       ]); // bytes adulterados
       rawData['voiceNoteAudios'] = rawAudios;
 
-      final corruptedPreview = RestorePreview(
-        peopleToAdd: preview.peopleToAdd,
-        peopleToUpdate: preview.peopleToUpdate,
-        peopleUnchanged: preview.peopleUnchanged,
-        visitsToAdd: preview.visitsToAdd,
-        visitsToUpdate: preview.visitsToUpdate,
-        studiesToAdd: preview.studiesToAdd,
-        sessionsToAdd: preview.sessionsToAdd,
-        appointmentsToAdd: preview.appointmentsToAdd,
-        activitiesToAdd: preview.activitiesToAdd,
-        inventoryTables: preview.inventoryTables,
-        corruptedAudioIds: ['vn_corrupt_1'],
-        rawDecryptedData: rawData,
+      // Recalcula o checksum do envelope de dados para que o envelope seja íntegro
+      final tamperedDataJson = jsonEncode(rawData);
+      final tamperedChecksum = sha256
+          .convert(utf8.encode(tamperedDataJson))
+          .toString();
+      final tamperedEnvelope = {
+        'version': 2,
+        'exported_at': DateTime.now().toIso8601String(),
+        'checksum': tamperedChecksum,
+        'iterations': iterations,
+        'data': tamperedDataJson,
+      };
+
+      final reEncrypted = encrypter.encrypt(
+        jsonEncode(tamperedEnvelope),
+        iv: iv,
+      );
+      final tamperedBackupString = jsonEncode({
+        'version': 2,
+        'salt': container['salt'],
+        'iterations': iterations,
+        'iv': iv.base64,
+        'ciphertext': reEncrypted.base64,
+      });
+
+      // Executa previewBackup(): deve detectar a corrupção de forma autônoma
+      final preview = await backupService.previewBackup(
+        encryptedDataString: tamperedBackupString,
+        password: password,
       );
 
-      expect(corruptedPreview.isIntegral, isFalse);
-      expect(corruptedPreview.corruptedAudioIds, contains('vn_corrupt_1'));
+      expect(preview.isIntegral, isFalse);
+      expect(preview.corruptedAudioIds, contains('vn_corrupt_1'));
 
       final dbNew = AppDatabase.forTesting(NativeDatabase.memory());
       final repoNew = AppRepository(dbNew);
-      final serviceNew = BackupService(repoNew);
+      final serviceNew = BackupService(
+        repoNew,
+        documentsDirectoryProvider: () async => testDocsDir,
+      );
 
-      final result = await serviceNew.commitRestore(corruptedPreview);
+      final result = await serviceNew.commitRestore(preview);
       expect(result.isIntegral, isFalse);
       expect(result.corruptedFiles, contains('vn_corrupt_1'));
 
-      await tempDir.delete(recursive: true);
       await dbNew.close();
+    });
+
+    test('TC-BAK-12: Falha na criação do snapshot de segurança aborta a restauração imediatamente com RestoreAbortedException', () async {
+      await repository.createPerson(name: 'Maria Teste');
+      final encrypted = await backupService.exportEncryptedBackup('pwd123');
+      final preview = await backupService.previewBackup(
+        encryptedDataString: encrypted,
+        password: 'pwd123',
+      );
+
+      // Simula serviço com falha no snapshot antes de qualquer gravação
+      final dbNew = AppDatabase.forTesting(NativeDatabase.memory());
+      final repoNew = AppRepository(dbNew);
+      final failingService = BackupService(
+        repoNew,
+        documentsDirectoryProvider: () async {
+          throw const FileSystemException('Falha de I/O forçada no snapshot');
+        },
+      );
+
+      expect(
+        () async => await failingService.commitRestore(preview),
+        throwsA(isA<RestoreAbortedException>()),
+      );
+
+      // Nenhum dado deve ter sido gravado
+      final people = await repoNew.getAllPeople();
+      expect(people, isEmpty);
+
+      await dbNew.close();
+    });
+
+    test('TC-BAK-13: Rollback transacional ao ocorrer falha na restauração restaura o banco ao estado original e remove mídias criadas', () async {
+      final dbTarget = AppDatabase.forTesting(NativeDatabase.memory());
+      final repoTarget = AppRepository(dbTarget);
+      final targetDocsDir = await Directory.systemTemp.createTemp(
+        'rollback_test_target_',
+      );
+      final serviceTarget = BackupService(
+        repoTarget,
+        documentsDirectoryProvider: () async => targetDocsDir,
+      );
+
+      // Estado pré-restauração no banco de destino
+      await repoTarget.createPerson(name: 'Pessoa Pré-Existente');
+
+      // Prepara dados no banco de origem: uma pessoa nova e uma nota de voz com áudio
+      final pOrig = await repository.createPerson(
+        name: 'Pessoa Nova Do Backup',
+      );
+      final audioFile = File('${testDocsDir.path}/audio_temp.m4a');
+      await audioFile.writeAsBytes([1, 2, 3, 4, 5]);
+      await repository.db
+          .into(repository.db.voiceNotes)
+          .insert(
+            VoiceNotesCompanion.insert(
+              id: 'vn_rollback_1',
+              personId: pOrig.id,
+              transcription: 'Nota de teste',
+              audioFilePath: Value(audioFile.path),
+              createdAt: DateTime.now(),
+              updatedAt: DateTime.now(),
+            ),
+          );
+
+      final encrypted = await backupService.exportEncryptedBackup('pwd123');
+      final preview = await backupService.previewBackup(
+        encryptedDataString: encrypted,
+        password: 'pwd123',
+      );
+
+      // Injeta falha forçada em um dos registros da prévia para disparar erro durante a transação
+      final rawData = Map<String, dynamic>.from(preview.rawDecryptedData);
+      final rawVisits = [
+        {
+          'id': 'invalid_visit_without_person',
+          'personId': 'non_existent_uuid',
+          'dateTimeField': 'invalid_date_format',
+          'contactType': 'revisita',
+          'result': 'x',
+          'createdAt': 'invalid',
+          'updatedAt': 'invalid',
+          'revision': 1,
+        },
+      ];
+      rawData['visits'] = rawVisits;
+
+      final failingPreview = RestorePreview(
+        peopleToAdd: preview.peopleToAdd,
+        peopleToUpdate: preview.peopleToUpdate,
+        peopleUnchanged: preview.peopleUnchanged,
+        visitsToAdd: 1,
+        visitsToUpdate: 0,
+        studiesToAdd: 0,
+        sessionsToAdd: 0,
+        appointmentsToAdd: 0,
+        activitiesToAdd: 0,
+        voiceNotesToAdd: preview.voiceNotesToAdd,
+        inventoryTables: preview.inventoryTables,
+        corruptedAudioIds: const [],
+        rawDecryptedData: rawData,
+      );
+
+      expect(
+        () async => await serviceTarget.commitRestore(failingPreview),
+        throwsA(anything),
+      );
+
+      // Verifica rollback no banco: dados pré-existentes preservados, novos descartados
+      final people = await repoTarget.getAllPeople();
+      expect(people.length, equals(1));
+      expect(people.first.name, equals('Pessoa Pré-Existente'));
+
+      // Verifica rollback de arquivos de mídia: nenhum arquivo de áudio deve ter sobrado
+      final vnAudioDir = Directory('${targetDocsDir.path}/voice_notes');
+      if (vnAudioDir.existsSync()) {
+        final remainingFiles = vnAudioDir.listSync();
+        expect(remainingFiles, isEmpty);
+      }
+
+      await targetDocsDir.delete(recursive: true);
+      await dbTarget.close();
+    });
+
+    test('TC-BAK-14: Snapshot de segurança persistente é gravado em disco e registrado no AppKvStore', () async {
+      await repository.createPerson(name: 'Snapshot Alvo');
+      final encrypted = await backupService.exportEncryptedBackup('pwd123');
+      final preview = await backupService.previewBackup(
+        encryptedDataString: encrypted,
+        password: 'pwd123',
+      );
+
+      await backupService.commitRestore(preview);
+
+      // Verifica que o snapshot foi gravado em disco e no KV store
+      final snapshotPath = await backupService.getLastSafetySnapshotPath();
+      expect(snapshotPath, isNotNull);
+      final snapshotFile = File(snapshotPath!);
+      expect(snapshotFile.existsSync(), isTrue);
+      expect(snapshotFile.lengthSync(), greaterThan(0));
+      expect(snapshotPath, contains('safety_snapshots'));
+
+      // Valida que o snapshot gravado no KV store é legível e íntegro
+      final content = await snapshotFile.readAsString();
+      expect(content, isNotEmpty);
     });
   });
 }

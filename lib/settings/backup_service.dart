@@ -13,6 +13,23 @@ import 'package:uuid/uuid.dart';
 import '../database/app_database.dart';
 import '../database/repository.dart';
 
+/// Lançado quando a criação do snapshot de segurança falha antes da restauração.
+/// A restauração NÃO prossegue quando este erro é lançado.
+class RestoreAbortedException implements Exception {
+  final String message;
+  const RestoreAbortedException(this.message);
+  @override
+  String toString() => 'RestoreAbortedException: $message';
+}
+
+/// Lançado quando um diretório de mídia não pode ser criado durante a restauração.
+class RestoreMediaException implements Exception {
+  final String message;
+  const RestoreMediaException(this.message);
+  @override
+  String toString() => 'RestoreMediaException: $message';
+}
+
 class RestoreResult {
   final bool isIntegral;
   final List<String> corruptedFiles;
@@ -85,12 +102,78 @@ class RestorePreview {
 
 class BackupService {
   final AppRepository repository;
+  final Future<Directory> Function()? documentsDirectoryProvider;
   final Uuid _uuid = const Uuid();
   String? _lastPreRestoreSafetyBackup;
 
   String? get lastPreRestoreSafetyBackup => _lastPreRestoreSafetyBackup;
 
-  BackupService(this.repository);
+  BackupService(this.repository, {this.documentsDirectoryProvider});
+
+  Future<Directory> _getDocsDir() async {
+    if (documentsDirectoryProvider != null) {
+      return await documentsDirectoryProvider!();
+    }
+    return await getApplicationDocumentsDirectory();
+  }
+
+  Future<File> _persistSnapshotToDisk(String snapshotData) async {
+    final docsDir = await _getDocsDir();
+    final snapshotDir = Directory('${docsDir.path}/safety_snapshots');
+    if (!snapshotDir.existsSync()) {
+      await snapshotDir.create(recursive: true);
+    }
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final file = File('${snapshotDir.path}/snapshot_$timestamp.bak');
+    await file.writeAsString(snapshotData, flush: true);
+    return file;
+  }
+
+  Future<void> _validateSnapshotFile(
+    File file, {
+    required String password,
+  }) async {
+    if (!await file.exists()) {
+      throw const RestoreAbortedException(
+        'Arquivo de snapshot não foi criado no disco.',
+      );
+    }
+    final length = await file.length();
+    if (length == 0) {
+      throw const RestoreAbortedException(
+        'Arquivo de snapshot gerado está vazio.',
+      );
+    }
+    final content = await file.readAsString();
+    try {
+      final preview = await previewBackup(
+        encryptedDataString: content,
+        password: password,
+      );
+      if (!preview.isIntegral) {
+        throw const RestoreAbortedException(
+          'Snapshot de segurança gerado contém arquivos de áudio corrompidos.',
+        );
+      }
+    } catch (e) {
+      if (e is RestoreAbortedException) {
+        rethrow;
+      }
+      throw RestoreAbortedException(
+        'Snapshot de segurança gerado é inválido ou ilegível: $e',
+      );
+    }
+  }
+
+  /// Retorna o caminho do último snapshot de segurança salvo em disco.
+  Future<String?> getLastSafetySnapshotPath() async {
+    final db = repository.db;
+    final row =
+        await (db.select(db.appKvStore)
+              ..where((tbl) => tbl.key.equals('last_safety_snapshot_path')))
+            .getSingleOrNull();
+    return row?.value;
+  }
 
   static Uint8List _generateSecureRandom(int length) {
     final rnd = Random.secure();
@@ -549,6 +632,8 @@ class BackupService {
         } catch (_) {
           corruptedAudioIds.add(entry.key);
         }
+      } else {
+        corruptedAudioIds.add(entry.key);
       }
     }
 
@@ -621,511 +706,607 @@ class BackupService {
     final corruptedFiles = <String>[];
     int totalRestoredCount = 0;
 
-    // Preserva backup de segurança automático do estado anterior à restauração com chave vinculada ao dispositivo
+    // Snapshot de segurança obrigatório: falha ABORTA a restauração — não continua silenciosamente.
+    final safetyKey = await _getOrCreateSilentBackupKey();
+    final String snapshotData;
     try {
-      final safetyKey = await _getOrCreateSilentBackupKey();
-      _lastPreRestoreSafetyBackup = await exportEncryptedBackup(
-        safetyKey,
-        iterations: 1000,
+      snapshotData = await exportEncryptedBackup(safetyKey, iterations: 1000);
+    } catch (e) {
+      throw RestoreAbortedException(
+        'Falha ao gerar snapshot de segurança antes da restauração: $e',
       );
-    } catch (_) {}
+    }
 
-    await db.transaction(() async {
-      // 1. Pessoas
-      final people = (data['people'] as List<dynamic>?) ?? [];
-      for (final item in people) {
-        final entry = PersonEntry.fromJson(item as Map<String, dynamic>);
-        final existing = await (db.select(
-          db.people,
-        )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
-        if (existing == null) {
-          await db.into(db.people).insert(entry);
-          await _reconstituteSyncQueue('people', entry.id, 'INSERT', item);
-        } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
-            entry.revision > existing.revision) {
-          await db.update(db.people).replace(entry);
-          await _reconstituteSyncQueue('people', entry.id, 'UPDATE', item);
-        }
-      }
-
-      // 2. Visitas
-      final visits = (data['visits'] as List<dynamic>?) ?? [];
-      for (final item in visits) {
-        final entry = VisitEntry.fromJson(item as Map<String, dynamic>);
-        final existing = await (db.select(
-          db.visits,
-        )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
-        if (existing == null) {
-          await db.into(db.visits).insert(entry);
-          await _reconstituteSyncQueue('visits', entry.id, 'INSERT', item);
-        } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
-            entry.revision > existing.revision) {
-          await db.update(db.visits).replace(entry);
-          await _reconstituteSyncQueue('visits', entry.id, 'UPDATE', item);
-        }
-      }
-
-      // 3. Estudos
-      final studies = (data['bibleStudies'] as List<dynamic>?) ?? [];
-      for (final item in studies) {
-        final entry = BibleStudyEntry.fromJson(item as Map<String, dynamic>);
-        final existing = await (db.select(
-          db.bibleStudies,
-        )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
-        if (existing == null) {
-          await db.into(db.bibleStudies).insert(entry);
-          await _reconstituteSyncQueue(
-            'bible_studies',
-            entry.id,
-            'INSERT',
-            item,
-          );
-        } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
-            entry.revision > existing.revision) {
-          await db.update(db.bibleStudies).replace(entry);
-          await _reconstituteSyncQueue(
-            'bible_studies',
-            entry.id,
-            'UPDATE',
-            item,
-          );
-        }
-      }
-
-      // 4. Participantes
-      final participants = (data['studyParticipants'] as List<dynamic>?) ?? [];
-      for (final item in participants) {
-        final entry = StudyParticipantEntry.fromJson(
-          item as Map<String, dynamic>,
-        );
-        final existing = await (db.select(
-          db.studyParticipants,
-        )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
-        if (existing == null) {
-          await db.into(db.studyParticipants).insert(entry);
-          await _reconstituteSyncQueue(
-            'study_participants',
-            entry.id,
-            'INSERT',
-            item,
-          );
-        } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
-            entry.revision > existing.revision) {
-          await db.update(db.studyParticipants).replace(entry);
-          await _reconstituteSyncQueue(
-            'study_participants',
-            entry.id,
-            'UPDATE',
-            item,
-          );
-        }
-      }
-
-      // 5. Sessões
-      final sessions = (data['studySessions'] as List<dynamic>?) ?? [];
-      for (final item in sessions) {
-        final entry = StudySessionEntry.fromJson(item as Map<String, dynamic>);
-        final existing = await (db.select(
-          db.studySessions,
-        )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
-        if (existing == null) {
-          await db.into(db.studySessions).insert(entry);
-          await _reconstituteSyncQueue(
-            'study_sessions',
-            entry.id,
-            'INSERT',
-            item,
-          );
-        } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
-            entry.revision > existing.revision) {
-          await db.update(db.studySessions).replace(entry);
-          await _reconstituteSyncQueue(
-            'study_sessions',
-            entry.id,
-            'UPDATE',
-            item,
-          );
-        }
-      }
-
-      // 6. Compromissos
-      final appointments = (data['appointments'] as List<dynamic>?) ?? [];
-      for (final item in appointments) {
-        final entry = AppointmentEntry.fromJson(item as Map<String, dynamic>);
-        final existing = await (db.select(
-          db.appointments,
-        )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
-        if (existing == null) {
-          await db.into(db.appointments).insert(entry);
-          await _reconstituteSyncQueue(
-            'appointments',
-            entry.id,
-            'INSERT',
-            item,
-          );
-        } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
-            entry.revision > existing.revision) {
-          await db.update(db.appointments).replace(entry);
-          await _reconstituteSyncQueue(
-            'appointments',
-            entry.id,
-            'UPDATE',
-            item,
-          );
-        }
-      }
-
-      // 7. Atividades
-      final activities = (data['activityRecords'] as List<dynamic>?) ?? [];
-      for (final item in activities) {
-        final entry = ActivityRecordEntry.fromJson(
-          item as Map<String, dynamic>,
-        );
-        final existing = await (db.select(
-          db.activityRecords,
-        )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
-        if (existing == null) {
-          await db.into(db.activityRecords).insert(entry);
-          await _reconstituteSyncQueue(
-            'activity_records',
-            entry.id,
-            'INSERT',
-            item,
-          );
-        } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
-            entry.revision > existing.revision) {
-          await db.update(db.activityRecords).replace(entry);
-          await _reconstituteSyncQueue(
-            'activity_records',
-            entry.id,
-            'UPDATE',
-            item,
-          );
-        }
-      }
-
-      // 8. Notas de Voz & Áudios Binários
-      final voiceNotes = (data['voiceNotes'] as List<dynamic>?) ?? [];
-      final voiceNoteAudios =
-          (data['voiceNoteAudios'] as Map<String, dynamic>?) ?? {};
-      Directory? restoredAudioDir;
-      if (!kIsWeb && voiceNoteAudios.isNotEmpty) {
-        try {
-          final docsDir = await getApplicationDocumentsDirectory();
-          restoredAudioDir = Directory('${docsDir.path}/restored_audio');
-        } catch (_) {
-          restoredAudioDir = Directory(
-            '${Directory.systemTemp.path}/fa_restored_audio',
-          );
-        }
-        try {
-          if (!restoredAudioDir.existsSync()) {
-            await restoredAudioDir.create(recursive: true);
-          }
-        } catch (_) {}
-      }
-
-      final voiceNoteAudioHashes =
-          (data['voiceNoteAudioHashes'] as Map<String, dynamic>?) ?? {};
-      for (final item in voiceNotes) {
-        var entry = VoiceNoteEntry.fromJson(item as Map<String, dynamic>);
-        if (voiceNoteAudios.containsKey(entry.id)) {
-          try {
-            final audioBytes = base64Decode(
-              voiceNoteAudios[entry.id] as String,
-            );
-            // Validação estrita de integridade com hash criptográfico SHA-256
-            if (voiceNoteAudioHashes.containsKey(entry.id)) {
-              final expectedHash = voiceNoteAudioHashes[entry.id] as String;
-              final actualHash = sha256.convert(audioBytes).toString();
-              if (actualHash != expectedHash) {
-                // Arquivo corrompido, registra falha de integridade e não grava arquivo inválido
-                corruptedFiles.add(entry.id);
-                continue;
-              }
-            }
-            if (restoredAudioDir != null) {
-              final targetFile = File(
-                '${restoredAudioDir.path}/vn_${entry.id}.m4a',
-              );
-              await targetFile.writeAsBytes(audioBytes, flush: true);
-              entry = entry.copyWith(audioFilePath: Value(targetFile.path));
-            }
-          } catch (_) {
-            corruptedFiles.add(entry.id);
-          }
-        }
-
-        final existing = await (db.select(
-          db.voiceNotes,
-        )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
-        if (existing == null) {
-          await db.into(db.voiceNotes).insert(entry);
-          await _reconstituteSyncQueue('voice_notes', entry.id, 'INSERT', item);
-        } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
-            entry.revision > existing.revision) {
-          await db.update(db.voiceNotes).replace(entry);
-          await _reconstituteSyncQueue('voice_notes', entry.id, 'UPDATE', item);
-        }
-      }
-
-      // 9. Contatos Telefônicos
-      final contacts = (data['phoneContacts'] as List<dynamic>?) ?? [];
-      for (final item in contacts) {
-        final entry = PhoneContactEntry.fromJson(item as Map<String, dynamic>);
-        final existing = await (db.select(
-          db.phoneContacts,
-        )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
-        if (existing == null) {
-          await db.into(db.phoneContacts).insert(entry);
-          await _reconstituteSyncQueue(
-            'phone_contacts',
-            entry.id,
-            'INSERT',
-            item,
-          );
-        } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
-            entry.revision > existing.revision) {
-          await db.update(db.phoneContacts).replace(entry);
-          await _reconstituteSyncQueue(
-            'phone_contacts',
-            entry.id,
-            'UPDATE',
-            item,
-          );
-        }
-      }
-
-      // 10. Marcos do Território
-      final landmarks = (data['territoryLandmarks'] as List<dynamic>?) ?? [];
-      for (final item in landmarks) {
-        final entry = TerritoryLandmarkEntry.fromJson(
-          item as Map<String, dynamic>,
-        );
-        final existing = await (db.select(
-          db.territoryLandmarks,
-        )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
-        if (existing == null) {
-          await db.into(db.territoryLandmarks).insert(entry);
-          await _reconstituteSyncQueue(
-            'territory_landmarks',
-            entry.id,
-            'INSERT',
-            item,
-          );
-        } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
-            entry.revision > existing.revision) {
-          await db.update(db.territoryLandmarks).replace(entry);
-          await _reconstituteSyncQueue(
-            'territory_landmarks',
-            entry.id,
-            'UPDATE',
-            item,
-          );
-        }
-      }
-
-      // 11. Vínculos Familiares
-      final familyTies = (data['familyTies'] as List<dynamic>?) ?? [];
-      for (final item in familyTies) {
-        final entry = FamilyTieEntry.fromJson(item as Map<String, dynamic>);
-        final existing = await (db.select(
-          db.familyTies,
-        )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
-        if (existing == null) {
-          await db.into(db.familyTies).insert(entry);
-        } else if ((entry.updatedAt ?? entry.createdAt).isAfter(
-              existing.updatedAt ?? existing.createdAt,
-            ) ||
-            entry.revision > existing.revision) {
-          await db.update(db.familyTies).replace(entry);
-        }
-      }
-
-      // 12. Experiências Ministeriais
-      final experiences = (data['ministryExperiences'] as List<dynamic>?) ?? [];
-      for (final item in experiences) {
-        final entry = MinistryExperienceEntry.fromJson(
-          item as Map<String, dynamic>,
-        );
-        final existing = await (db.select(
-          db.ministryExperiences,
-        )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
-        if (existing == null) {
-          await db.into(db.ministryExperiences).insert(entry);
-        } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
-            entry.revision > existing.revision) {
-          await db.update(db.ministryExperiences).replace(entry);
-        }
-      }
-
-      // 13. Fotos de Pessoas e Residências
-      final photos = (data['personPhotos'] as List<dynamic>?) ?? [];
-      for (final item in photos) {
-        final entry = PersonPhotoEntry.fromJson(item as Map<String, dynamic>);
-        final existing = await (db.select(
-          db.personPhotos,
-        )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
-        if (existing == null) {
-          await db.into(db.personPhotos).insert(entry);
-        } else if ((entry.updatedAt ?? entry.createdAt).isAfter(
-              existing.updatedAt ?? existing.createdAt,
-            ) ||
-            entry.revision > existing.revision) {
-          await db.update(db.personPhotos).replace(entry);
-        }
-      }
-
-      // 14. Publicações e Pedidos das Pessoas
-      final publications = (data['personPublications'] as List<dynamic>?) ?? [];
-      for (final item in publications) {
-        final entry = PersonPublicationEntry.fromJson(
-          item as Map<String, dynamic>,
-        );
-        final existing = await (db.select(
-          db.personPublications,
-        )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
-        if (existing == null) {
-          await db.into(db.personPublications).insert(entry);
-        } else if ((entry.updatedAt ?? entry.createdAt).isAfter(
-              existing.updatedAt ?? existing.createdAt,
-            ) ||
-            entry.revision > existing.revision) {
-          await db.update(db.personPublications).replace(entry);
-        }
-      }
-
-      // 15. Artigos de Pesquisa
-      final articles = (data['researchArticles'] as List<dynamic>?) ?? [];
-      for (final item in articles) {
-        final entry = ResearchArticleEntry.fromJson(
-          item as Map<String, dynamic>,
-        );
-        final existing = await (db.select(
-          db.researchArticles,
-        )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
-        if (existing == null) {
-          await db.into(db.researchArticles).insert(entry);
-        } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
-            entry.revision > existing.revision) {
-          await db.update(db.researchArticles).replace(entry);
-        }
-      }
-
-      // 16. Tags de Pesquisa
-      final tags = (data['researchTags'] as List<dynamic>?) ?? [];
-      for (final item in tags) {
-        final entry = ResearchTagEntry.fromJson(item as Map<String, dynamic>);
-        final existing = await (db.select(
-          db.researchTags,
-        )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
-        if (existing == null) {
-          await db.into(db.researchTags).insert(entry);
-        }
-      }
-
-      // 17. Setores de Território
-      final sectors = (data['territorySectors'] as List<dynamic>?) ?? [];
-      for (final item in sectors) {
-        final entry = TerritorySectorEntry.fromJson(
-          item as Map<String, dynamic>,
-        );
-        final existing = await (db.select(
-          db.territorySectors,
-        )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
-        if (existing == null) {
-          await db.into(db.territorySectors).insert(entry);
-        } else if ((entry.updatedAt ?? entry.createdAt).isAfter(
-              existing.updatedAt ?? existing.createdAt,
-            ) ||
-            entry.revision > existing.revision) {
-          await db.update(db.territorySectors).replace(entry);
-        }
-      }
-
-      // 18. Ordem do Manual de Estudante
-      final manualOrders = (data['studentManualOrder'] as List<dynamic>?) ?? [];
-      for (final item in manualOrders) {
-        final entry = StudentManualOrderEntry.fromJson(
-          item as Map<String, dynamic>,
-        );
-        final existing = await (db.select(
-          db.studentManualOrder,
-        )..where((tbl) => tbl.studyId.equals(entry.studyId))).getSingleOrNull();
-        if (existing == null) {
-          await db.into(db.studentManualOrder).insert(entry);
-        } else if (entry.revision > existing.revision ||
-            (entry.updatedAt != null &&
-                (existing.updatedAt == null ||
-                    entry.updatedAt!.isAfter(existing.updatedAt!)))) {
-          await db.update(db.studentManualOrder).replace(entry);
-        }
-      }
-
-      // 19. Eventos de Calendário Externo
-      final calendarEvents =
-          (data['externalCalendarEvents'] as List<dynamic>?) ?? [];
-      for (final item in calendarEvents) {
-        final entry = ExternalCalendarEventEntry.fromJson(
-          item as Map<String, dynamic>,
-        );
-        final existing = await (db.select(
-          db.externalCalendarEvents,
-        )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
-        if (existing == null) {
-          await db.into(db.externalCalendarEvents).insert(entry);
-        } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
-            entry.revision > existing.revision) {
-          await db.update(db.externalCalendarEvents).replace(entry);
-        }
-      }
-
-      // 20. Links de Compromissos de Calendário
-      final calendarLinks =
-          (data['calendarEventLinks'] as List<dynamic>?) ?? [];
-      for (final item in calendarLinks) {
-        final entry = CalendarEventLinkEntry.fromJson(
-          item as Map<String, dynamic>,
-        );
-        final existing = await (db.select(
-          db.calendarEventLinks,
-        )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
-        if (existing == null) {
-          await db.into(db.calendarEventLinks).insert(entry);
-        } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
-            entry.revision > existing.revision) {
-          await db.update(db.calendarEventLinks).replace(entry);
-        }
-      }
-
-      // 21. Configurações da App (Key-Value Store)
-      final kvRows = (data['appKvStore'] as List<dynamic>?) ?? [];
-      for (final item in kvRows) {
-        final entry = AppKvEntry.fromJson(item as Map<String, dynamic>);
-        if (entry.key == _silentBackupKeySecret) continue;
+    // Persiste snapshot em disco e grava caminho no KV store.
+    // Em ambiente de testes (sem path_provider), persiste apenas em memória.
+    _lastPreRestoreSafetyBackup = snapshotData;
+    if (!kIsWeb) {
+      try {
+        final snapshotFile = await _persistSnapshotToDisk(snapshotData);
+        await _validateSnapshotFile(snapshotFile, password: safetyKey);
         await db
             .into(db.appKvStore)
             .insertOnConflictUpdate(
               AppKvStoreCompanion.insert(
-                key: entry.key,
-                value: entry.value,
-                updatedAt: Value(entry.updatedAt ?? DateTime.now()),
+                key: 'last_safety_snapshot_path',
+                value: snapshotFile.path,
+                updatedAt: Value(DateTime.now()),
               ),
             );
+      } catch (e) {
+        throw RestoreAbortedException(
+          'Falha ao persistir ou validar snapshot de segurança: $e',
+        );
       }
+    }
 
-      // 22. Fila de Sincronização (SyncQueue)
-      final syncQueueRows = (data['syncQueue'] as List<dynamic>?) ?? [];
-      for (final item in syncQueueRows) {
-        final entry = SyncQueueEntry.fromJson(item as Map<String, dynamic>);
-        final existing = await (db.select(
-          db.syncQueue,
-        )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
-        if (existing == null) {
-          await db.into(db.syncQueue).insert(entry);
+    final createdAudioFiles = <File>[];
+    try {
+      await db.transaction(() async {
+        // 1. Pessoas
+        final people = (data['people'] as List<dynamic>?) ?? [];
+        for (final item in people) {
+          final entry = PersonEntry.fromJson(item as Map<String, dynamic>);
+          final existing = await (db.select(
+            db.people,
+          )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+          if (existing == null) {
+            await db.into(db.people).insert(entry);
+            await _reconstituteSyncQueue('people', entry.id, 'INSERT', item);
+            totalRestoredCount++;
+          } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
+              entry.revision > existing.revision) {
+            await db.update(db.people).replace(entry);
+            await _reconstituteSyncQueue('people', entry.id, 'UPDATE', item);
+            totalRestoredCount++;
+          }
         }
+
+        // 2. Visitas
+        final visits = (data['visits'] as List<dynamic>?) ?? [];
+        for (final item in visits) {
+          final entry = VisitEntry.fromJson(item as Map<String, dynamic>);
+          final existing = await (db.select(
+            db.visits,
+          )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+          if (existing == null) {
+            await db.into(db.visits).insert(entry);
+            await _reconstituteSyncQueue('visits', entry.id, 'INSERT', item);
+            totalRestoredCount++;
+          } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
+              entry.revision > existing.revision) {
+            await db.update(db.visits).replace(entry);
+            await _reconstituteSyncQueue('visits', entry.id, 'UPDATE', item);
+            totalRestoredCount++;
+          }
+        }
+
+        // 3. Estudos
+        final studies = (data['bibleStudies'] as List<dynamic>?) ?? [];
+        for (final item in studies) {
+          final entry = BibleStudyEntry.fromJson(item as Map<String, dynamic>);
+          final existing = await (db.select(
+            db.bibleStudies,
+          )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+          if (existing == null) {
+            await db.into(db.bibleStudies).insert(entry);
+            await _reconstituteSyncQueue(
+              'bible_studies',
+              entry.id,
+              'INSERT',
+              item,
+            );
+            totalRestoredCount++;
+          } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
+              entry.revision > existing.revision) {
+            await db.update(db.bibleStudies).replace(entry);
+            await _reconstituteSyncQueue(
+              'bible_studies',
+              entry.id,
+              'UPDATE',
+              item,
+            );
+            totalRestoredCount++;
+          }
+        }
+
+        // 4. Participantes
+        final participants =
+            (data['studyParticipants'] as List<dynamic>?) ?? [];
+        for (final item in participants) {
+          final entry = StudyParticipantEntry.fromJson(
+            item as Map<String, dynamic>,
+          );
+          final existing = await (db.select(
+            db.studyParticipants,
+          )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+          if (existing == null) {
+            await db.into(db.studyParticipants).insert(entry);
+            await _reconstituteSyncQueue(
+              'study_participants',
+              entry.id,
+              'INSERT',
+              item,
+            );
+            totalRestoredCount++;
+          } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
+              entry.revision > existing.revision) {
+            await db.update(db.studyParticipants).replace(entry);
+            await _reconstituteSyncQueue(
+              'study_participants',
+              entry.id,
+              'UPDATE',
+              item,
+            );
+            totalRestoredCount++;
+          }
+        }
+
+        // 5. Sessões
+        final sessions = (data['studySessions'] as List<dynamic>?) ?? [];
+        for (final item in sessions) {
+          final entry = StudySessionEntry.fromJson(
+            item as Map<String, dynamic>,
+          );
+          final existing = await (db.select(
+            db.studySessions,
+          )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+          if (existing == null) {
+            await db.into(db.studySessions).insert(entry);
+            await _reconstituteSyncQueue(
+              'study_sessions',
+              entry.id,
+              'INSERT',
+              item,
+            );
+            totalRestoredCount++;
+          } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
+              entry.revision > existing.revision) {
+            await db.update(db.studySessions).replace(entry);
+            await _reconstituteSyncQueue(
+              'study_sessions',
+              entry.id,
+              'UPDATE',
+              item,
+            );
+            totalRestoredCount++;
+          }
+        }
+
+        // 6. Compromissos
+        final appointments = (data['appointments'] as List<dynamic>?) ?? [];
+        for (final item in appointments) {
+          final entry = AppointmentEntry.fromJson(item as Map<String, dynamic>);
+          final existing = await (db.select(
+            db.appointments,
+          )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+          if (existing == null) {
+            await db.into(db.appointments).insert(entry);
+            await _reconstituteSyncQueue(
+              'appointments',
+              entry.id,
+              'INSERT',
+              item,
+            );
+            totalRestoredCount++;
+          } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
+              entry.revision > existing.revision) {
+            await db.update(db.appointments).replace(entry);
+            await _reconstituteSyncQueue(
+              'appointments',
+              entry.id,
+              'UPDATE',
+              item,
+            );
+            totalRestoredCount++;
+          }
+        }
+
+        // 7. Atividades
+        final activities = (data['activityRecords'] as List<dynamic>?) ?? [];
+        for (final item in activities) {
+          final entry = ActivityRecordEntry.fromJson(
+            item as Map<String, dynamic>,
+          );
+          final existing = await (db.select(
+            db.activityRecords,
+          )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+          if (existing == null) {
+            await db.into(db.activityRecords).insert(entry);
+            await _reconstituteSyncQueue(
+              'activity_records',
+              entry.id,
+              'INSERT',
+              item,
+            );
+            totalRestoredCount++;
+          } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
+              entry.revision > existing.revision) {
+            await db.update(db.activityRecords).replace(entry);
+            await _reconstituteSyncQueue(
+              'activity_records',
+              entry.id,
+              'UPDATE',
+              item,
+            );
+            totalRestoredCount++;
+          }
+        }
+
+        // 8. Notas de Voz & Áudios Binários
+        final voiceNotes = (data['voiceNotes'] as List<dynamic>?) ?? [];
+        final voiceNoteAudios =
+            (data['voiceNoteAudios'] as Map<String, dynamic>?) ?? {};
+        Directory? restoredAudioDir;
+        if (!kIsWeb && voiceNoteAudios.isNotEmpty) {
+          try {
+            final docsDir = await _getDocsDir();
+            restoredAudioDir = Directory('${docsDir.path}/voice_notes');
+            if (!restoredAudioDir.existsSync()) {
+              await restoredAudioDir.create(recursive: true);
+            }
+          } catch (e) {
+            throw RestoreMediaException(
+              'Falha ao criar diretório de notas de voz voice_notes: $e',
+            );
+          }
+        }
+
+        final voiceNoteAudioHashes =
+            (data['voiceNoteAudioHashes'] as Map<String, dynamic>?) ?? {};
+        for (final item in voiceNotes) {
+          var entry = VoiceNoteEntry.fromJson(item as Map<String, dynamic>);
+          if (voiceNoteAudios.containsKey(entry.id)) {
+            try {
+              final audioBytes = base64Decode(
+                voiceNoteAudios[entry.id] as String,
+              );
+              // Validação estrita de integridade com hash criptográfico SHA-256
+              if (voiceNoteAudioHashes.containsKey(entry.id)) {
+                final expectedHash = voiceNoteAudioHashes[entry.id] as String;
+                final actualHash = sha256.convert(audioBytes).toString();
+                if (actualHash != expectedHash) {
+                  // Arquivo corrompido, registra falha de integridade e não grava arquivo inválido
+                  corruptedFiles.add(entry.id);
+                  continue;
+                }
+              }
+              if (restoredAudioDir != null) {
+                final targetFile = File(
+                  '${restoredAudioDir.path}/vn_${entry.id}.m4a',
+                );
+                await targetFile.writeAsBytes(audioBytes, flush: true);
+                createdAudioFiles.add(targetFile);
+                entry = entry.copyWith(audioFilePath: Value(targetFile.path));
+              }
+            } catch (_) {
+              corruptedFiles.add(entry.id);
+            }
+          }
+
+          final existing = await (db.select(
+            db.voiceNotes,
+          )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+          if (existing == null) {
+            await db.into(db.voiceNotes).insert(entry);
+            await _reconstituteSyncQueue(
+              'voice_notes',
+              entry.id,
+              'INSERT',
+              item,
+            );
+            totalRestoredCount++;
+          } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
+              entry.revision > existing.revision) {
+            await db.update(db.voiceNotes).replace(entry);
+            await _reconstituteSyncQueue(
+              'voice_notes',
+              entry.id,
+              'UPDATE',
+              item,
+            );
+            totalRestoredCount++;
+          }
+        }
+
+        // 9. Contatos Telefônicos
+        final contacts = (data['phoneContacts'] as List<dynamic>?) ?? [];
+        for (final item in contacts) {
+          final entry = PhoneContactEntry.fromJson(
+            item as Map<String, dynamic>,
+          );
+          final existing = await (db.select(
+            db.phoneContacts,
+          )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+          if (existing == null) {
+            await db.into(db.phoneContacts).insert(entry);
+            await _reconstituteSyncQueue(
+              'phone_contacts',
+              entry.id,
+              'INSERT',
+              item,
+            );
+            totalRestoredCount++;
+          } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
+              entry.revision > existing.revision) {
+            await db.update(db.phoneContacts).replace(entry);
+            await _reconstituteSyncQueue(
+              'phone_contacts',
+              entry.id,
+              'UPDATE',
+              item,
+            );
+            totalRestoredCount++;
+          }
+        }
+
+        // 10. Marcos do Território
+        final landmarks = (data['territoryLandmarks'] as List<dynamic>?) ?? [];
+        for (final item in landmarks) {
+          final entry = TerritoryLandmarkEntry.fromJson(
+            item as Map<String, dynamic>,
+          );
+          final existing = await (db.select(
+            db.territoryLandmarks,
+          )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+          if (existing == null) {
+            await db.into(db.territoryLandmarks).insert(entry);
+            await _reconstituteSyncQueue(
+              'territory_landmarks',
+              entry.id,
+              'INSERT',
+              item,
+            );
+            totalRestoredCount++;
+          } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
+              entry.revision > existing.revision) {
+            await db.update(db.territoryLandmarks).replace(entry);
+            await _reconstituteSyncQueue(
+              'territory_landmarks',
+              entry.id,
+              'UPDATE',
+              item,
+            );
+            totalRestoredCount++;
+          }
+        }
+
+        // 11. Vínculos Familiares
+        final familyTies = (data['familyTies'] as List<dynamic>?) ?? [];
+        for (final item in familyTies) {
+          final entry = FamilyTieEntry.fromJson(item as Map<String, dynamic>);
+          final existing = await (db.select(
+            db.familyTies,
+          )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+          if (existing == null) {
+            await db.into(db.familyTies).insert(entry);
+            totalRestoredCount++;
+          } else if ((entry.updatedAt ?? entry.createdAt).isAfter(
+                existing.updatedAt ?? existing.createdAt,
+              ) ||
+              entry.revision > existing.revision) {
+            await db.update(db.familyTies).replace(entry);
+            totalRestoredCount++;
+          }
+        }
+
+        // 12. Experiências Ministeriais
+        final experiences =
+            (data['ministryExperiences'] as List<dynamic>?) ?? [];
+        for (final item in experiences) {
+          final entry = MinistryExperienceEntry.fromJson(
+            item as Map<String, dynamic>,
+          );
+          final existing = await (db.select(
+            db.ministryExperiences,
+          )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+          if (existing == null) {
+            await db.into(db.ministryExperiences).insert(entry);
+            totalRestoredCount++;
+          } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
+              entry.revision > existing.revision) {
+            await db.update(db.ministryExperiences).replace(entry);
+            totalRestoredCount++;
+          }
+        }
+
+        // 13. Fotos de Pessoas e Residências
+        final photos = (data['personPhotos'] as List<dynamic>?) ?? [];
+        for (final item in photos) {
+          final entry = PersonPhotoEntry.fromJson(item as Map<String, dynamic>);
+          final existing = await (db.select(
+            db.personPhotos,
+          )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+          if (existing == null) {
+            await db.into(db.personPhotos).insert(entry);
+            totalRestoredCount++;
+          } else if ((entry.updatedAt ?? entry.createdAt).isAfter(
+                existing.updatedAt ?? existing.createdAt,
+              ) ||
+              entry.revision > existing.revision) {
+            await db.update(db.personPhotos).replace(entry);
+            totalRestoredCount++;
+          }
+        }
+
+        // 14. Publicações e Pedidos das Pessoas
+        final publications =
+            (data['personPublications'] as List<dynamic>?) ?? [];
+        for (final item in publications) {
+          final entry = PersonPublicationEntry.fromJson(
+            item as Map<String, dynamic>,
+          );
+          final existing = await (db.select(
+            db.personPublications,
+          )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+          if (existing == null) {
+            await db.into(db.personPublications).insert(entry);
+            totalRestoredCount++;
+          } else if ((entry.updatedAt ?? entry.createdAt).isAfter(
+                existing.updatedAt ?? existing.createdAt,
+              ) ||
+              entry.revision > existing.revision) {
+            await db.update(db.personPublications).replace(entry);
+            totalRestoredCount++;
+          }
+        }
+
+        // 15. Artigos de Pesquisa
+        final articles = (data['researchArticles'] as List<dynamic>?) ?? [];
+        for (final item in articles) {
+          final entry = ResearchArticleEntry.fromJson(
+            item as Map<String, dynamic>,
+          );
+          final existing = await (db.select(
+            db.researchArticles,
+          )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+          if (existing == null) {
+            await db.into(db.researchArticles).insert(entry);
+            totalRestoredCount++;
+          } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
+              entry.revision > existing.revision) {
+            await db.update(db.researchArticles).replace(entry);
+            totalRestoredCount++;
+          }
+        }
+
+        // 16. Tags de Pesquisa
+        final tags = (data['researchTags'] as List<dynamic>?) ?? [];
+        for (final item in tags) {
+          final entry = ResearchTagEntry.fromJson(item as Map<String, dynamic>);
+          final existing = await (db.select(
+            db.researchTags,
+          )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+          if (existing == null) {
+            await db.into(db.researchTags).insert(entry);
+            totalRestoredCount++;
+          }
+        }
+
+        // 17. Setores de Território
+        final sectors = (data['territorySectors'] as List<dynamic>?) ?? [];
+        for (final item in sectors) {
+          final entry = TerritorySectorEntry.fromJson(
+            item as Map<String, dynamic>,
+          );
+          final existing = await (db.select(
+            db.territorySectors,
+          )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+          if (existing == null) {
+            await db.into(db.territorySectors).insert(entry);
+            totalRestoredCount++;
+          } else if ((entry.updatedAt ?? entry.createdAt).isAfter(
+                existing.updatedAt ?? existing.createdAt,
+              ) ||
+              entry.revision > existing.revision) {
+            await db.update(db.territorySectors).replace(entry);
+            totalRestoredCount++;
+          }
+        }
+
+        // 18. Ordem do Manual de Estudante
+        final manualOrders =
+            (data['studentManualOrder'] as List<dynamic>?) ?? [];
+        for (final item in manualOrders) {
+          final entry = StudentManualOrderEntry.fromJson(
+            item as Map<String, dynamic>,
+          );
+          final existing =
+              await (db.select(db.studentManualOrder)
+                    ..where((tbl) => tbl.studyId.equals(entry.studyId)))
+                  .getSingleOrNull();
+          if (existing == null) {
+            await db.into(db.studentManualOrder).insert(entry);
+            totalRestoredCount++;
+          } else if (entry.revision > existing.revision ||
+              (entry.updatedAt != null &&
+                  (existing.updatedAt == null ||
+                      entry.updatedAt!.isAfter(existing.updatedAt!)))) {
+            await db.update(db.studentManualOrder).replace(entry);
+            totalRestoredCount++;
+          }
+        }
+
+        // 19. Eventos de Calendário Externo
+        final calendarEvents =
+            (data['externalCalendarEvents'] as List<dynamic>?) ?? [];
+        for (final item in calendarEvents) {
+          final entry = ExternalCalendarEventEntry.fromJson(
+            item as Map<String, dynamic>,
+          );
+          final existing = await (db.select(
+            db.externalCalendarEvents,
+          )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+          if (existing == null) {
+            await db.into(db.externalCalendarEvents).insert(entry);
+            totalRestoredCount++;
+          } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
+              entry.revision > existing.revision) {
+            await db.update(db.externalCalendarEvents).replace(entry);
+            totalRestoredCount++;
+          }
+        }
+
+        // 20. Links de Compromissos de Calendário
+        final calendarLinks =
+            (data['calendarEventLinks'] as List<dynamic>?) ?? [];
+        for (final item in calendarLinks) {
+          final entry = CalendarEventLinkEntry.fromJson(
+            item as Map<String, dynamic>,
+          );
+          final existing = await (db.select(
+            db.calendarEventLinks,
+          )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+          if (existing == null) {
+            await db.into(db.calendarEventLinks).insert(entry);
+            totalRestoredCount++;
+          } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
+              entry.revision > existing.revision) {
+            await db.update(db.calendarEventLinks).replace(entry);
+            totalRestoredCount++;
+          }
+        }
+
+        // 21. Configurações da App (Key-Value Store)
+        final kvRows = (data['appKvStore'] as List<dynamic>?) ?? [];
+        for (final item in kvRows) {
+          final entry = AppKvEntry.fromJson(item as Map<String, dynamic>);
+          if (entry.key == _silentBackupKeySecret) continue;
+          await db
+              .into(db.appKvStore)
+              .insertOnConflictUpdate(
+                AppKvStoreCompanion.insert(
+                  key: entry.key,
+                  value: entry.value,
+                  updatedAt: Value(entry.updatedAt ?? DateTime.now()),
+                ),
+              );
+          totalRestoredCount++;
+        }
+
+        // 22. Fila de Sincronização (SyncQueue)
+        final syncQueueRows = (data['syncQueue'] as List<dynamic>?) ?? [];
+        for (final item in syncQueueRows) {
+          final entry = SyncQueueEntry.fromJson(item as Map<String, dynamic>);
+          final existing = await (db.select(
+            db.syncQueue,
+          )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+          if (existing == null) {
+            await db.into(db.syncQueue).insert(entry);
+            totalRestoredCount++;
+          }
+        }
+      });
+    } catch (e) {
+      for (final f in createdAudioFiles) {
+        try {
+          if (f.existsSync()) {
+            f.deleteSync();
+          }
+        } catch (_) {}
       }
-    });
+      rethrow;
+    }
 
     return RestoreResult(
       isIntegral: corruptedFiles.isEmpty,

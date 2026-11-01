@@ -76,23 +76,24 @@ class AppDatabase extends _$AppDatabase {
         // Migração incremental da versão 3 para a versão 4:
         // Adiciona a coluna pending_resolution em calendar_event_links
         await _createTableIfNotExists(m, calendarEventLinks);
-        await _migrateCalendarEventLinksPendingResolution();
+        await _migrateCalendarEventLinksPendingResolution(m);
       }
     },
   );
 
-  Future<void> _migrateCalendarEventLinksPendingResolution() async {
-    try {
-      final columns = await customSelect(
-        "PRAGMA table_info(calendar_event_links)",
-      ).get();
-      final colNames = columns.map((c) => c.read<String>('name')).toSet();
-      if (!colNames.contains('pending_resolution')) {
-        await customStatement(
-          "ALTER TABLE calendar_event_links ADD COLUMN pending_resolution TEXT;",
-        );
-      }
-    } catch (_) {}
+  Future<void> _migrateCalendarEventLinksPendingResolution(Migrator m) async {
+    // Verifica se a coluna já existe para suportar bancos criados parcialmente.
+    // NÃO silencia erros inesperados — propaga para abortar a migração.
+    final columns = await customSelect(
+      "PRAGMA table_info(calendar_event_links)",
+    ).get();
+    final colNames = columns.map((c) => c.read<String>('name')).toSet();
+    if (!colNames.contains('pending_resolution')) {
+      await m.addColumn(
+        calendarEventLinks,
+        calendarEventLinks.pendingResolution,
+      );
+    }
   }
 
   Future<void> _migrateLandmarksColumns() async {
