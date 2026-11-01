@@ -3,6 +3,7 @@ import 'package:drift/drift.dart' as drift;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:uuid/uuid.dart';
+
 import '../database/app_database.dart';
 import 'calendar_provider.dart';
 
@@ -16,8 +17,9 @@ class AppleEventKitProvider implements CalendarProvider {
   AppleEventKitProvider({
     dev_cal.DeviceCalendarPlugin? deviceCalendarPlugin,
     FlutterSecureStorage? secureStorage,
-  })  : _deviceCalendarPlugin = deviceCalendarPlugin ?? dev_cal.DeviceCalendarPlugin(),
-        _secureStorage = secureStorage ?? const FlutterSecureStorage();
+  }) : _deviceCalendarPlugin =
+           deviceCalendarPlugin ?? dev_cal.DeviceCalendarPlugin(),
+       _secureStorage = secureStorage ?? const FlutterSecureStorage();
 
   @override
   CalendarProviderType get providerType => CalendarProviderType.appleEventKit;
@@ -50,7 +52,9 @@ class AppleEventKitProvider implements CalendarProvider {
       final selected = calendars.where((c) => c.id == selectedId).firstOrNull;
       if (selected != null) return selected.accountName ?? selected.name;
     }
-    return calendars.isNotEmpty ? calendars.first.accountName ?? 'Apple Calendars' : null;
+    return calendars.isNotEmpty
+        ? calendars.first.accountName ?? 'Apple Calendars'
+        : null;
   }
 
   @override
@@ -117,16 +121,15 @@ class AppleEventKitProvider implements CalendarProvider {
 
       final eventsResult = await _deviceCalendarPlugin.retrieveEvents(
         calendarId,
-        dev_cal.RetrieveEventsParams(
-          startDate: startDate,
-          endDate: endDate,
-        ),
+        dev_cal.RetrieveEventsParams(startDate: startDate, endDate: endDate),
       );
 
       if (!eventsResult.isSuccess || eventsResult.data == null) {
         return CalendarSyncResult(
           success: false,
-          errorMessage: eventsResult.errors.map((e) => e.errorMessage).join(', '),
+          errorMessage: eventsResult.errors
+              .map((e) => e.errorMessage)
+              .join(', '),
         );
       }
 
@@ -134,19 +137,28 @@ class AppleEventKitProvider implements CalendarProvider {
       final events = eventsResult.data!;
       final now = DateTime.now();
 
+      final activeExtIds = <String>{};
       for (final ev in events) {
         final evId = ev.eventId;
         if (evId == null) continue;
+        activeExtIds.add(evId);
 
         final startDt = ev.start?.toLocal() ?? now;
-        final endDt = ev.end?.toLocal() ?? startDt.add(const Duration(minutes: 30));
+        final endDt =
+            ev.end?.toLocal() ?? startDt.add(const Duration(minutes: 30));
 
-        final existing = await (db.select(db.externalCalendarEvents)
-              ..where((t) => t.provider.equals('apple_eventkit') & t.externalEventId.equals(evId)))
-            .getSingleOrNull();
+        final existing =
+            await (db.select(db.externalCalendarEvents)..where(
+                  (t) =>
+                      t.provider.equals('apple_eventkit') &
+                      t.externalEventId.equals(evId),
+                ))
+                .getSingleOrNull();
 
         if (existing == null) {
-          await db.into(db.externalCalendarEvents).insert(
+          await db
+              .into(db.externalCalendarEvents)
+              .insert(
                 ExternalCalendarEventsCompanion.insert(
                   id: _uuid.v4(),
                   provider: 'apple_eventkit',
@@ -166,7 +178,9 @@ class AppleEventKitProvider implements CalendarProvider {
               );
           downloaded++;
         } else {
-          await (db.update(db.externalCalendarEvents)..where((t) => t.id.equals(existing.id))).write(
+          await (db.update(
+            db.externalCalendarEvents,
+          )..where((t) => t.id.equals(existing.id))).write(
             ExternalCalendarEventsCompanion(
               title: drift.Value(ev.title ?? existing.title),
               location: drift.Value(ev.location),
@@ -174,6 +188,7 @@ class AppleEventKitProvider implements CalendarProvider {
               startTime: drift.Value(startDt),
               endTime: drift.Value(endDt),
               isAllDay: drift.Value(ev.allDay ?? false),
+              isDeletedExternal: const drift.Value(false),
               lastSyncedAt: drift.Value(now),
               updatedAt: drift.Value(now),
             ),
@@ -182,10 +197,34 @@ class AppleEventKitProvider implements CalendarProvider {
         }
       }
 
-      return CalendarSyncResult(
-        success: true,
-        eventsDownloaded: downloaded,
-      );
+      // Reconciliação de exclusões no Apple Calendar:
+      // Eventos que estavam no banco local dentro da janela consultada mas não retornaram do EventKit foram excluídos externamente
+      final storedEventsInWindow =
+          await (db.select(db.externalCalendarEvents)..where(
+                (t) =>
+                    t.provider.equals('apple_eventkit') &
+                    t.calendarId.equals(calendarId) &
+                    t.isDeletedExternal.equals(false) &
+                    t.startTime.isBiggerOrEqualValue(startDate) &
+                    t.endTime.isSmallerOrEqualValue(endDate),
+              ))
+              .get();
+
+      for (final stored in storedEventsInWindow) {
+        if (!activeExtIds.contains(stored.externalEventId)) {
+          await (db.update(
+            db.externalCalendarEvents,
+          )..where((t) => t.id.equals(stored.id))).write(
+            ExternalCalendarEventsCompanion(
+              isDeletedExternal: const drift.Value(true),
+              externalStatus: const drift.Value('cancelled'),
+              updatedAt: drift.Value(now),
+            ),
+          );
+        }
+      }
+
+      return CalendarSyncResult(success: true, eventsDownloaded: downloaded);
     } catch (e) {
       return CalendarSyncResult(
         success: false,
@@ -203,9 +242,14 @@ class AppleEventKitProvider implements CalendarProvider {
       final calendarId = await getSelectedCalendarId();
       if (calendarId == null) return null;
 
-      final link = await (db.select(db.calendarEventLinks)
-            ..where((t) => t.appointmentId.equals(appointment.id) & t.provider.equals('apple_eventkit') & t.deletedAt.isNull()))
-          .getSingleOrNull();
+      final link =
+          await (db.select(db.calendarEventLinks)..where(
+                (t) =>
+                    t.appointmentId.equals(appointment.id) &
+                    t.provider.equals('apple_eventkit') &
+                    t.deletedAt.isNull(),
+              ))
+              .getSingleOrNull();
 
       final devEvent = dev_cal.Event(
         calendarId,
@@ -223,7 +267,9 @@ class AppleEventKitProvider implements CalendarProvider {
         final now = DateTime.now();
 
         if (link != null) {
-          await (db.update(db.calendarEventLinks)..where((t) => t.id.equals(link.id))).write(
+          await (db.update(
+            db.calendarEventLinks,
+          )..where((t) => t.id.equals(link.id))).write(
             CalendarEventLinksCompanion(
               localRevisionAtSync: drift.Value(appointment.revision),
               syncStatus: const drift.Value('synced'),
@@ -231,7 +277,9 @@ class AppleEventKitProvider implements CalendarProvider {
             ),
           );
         } else {
-          await db.into(db.calendarEventLinks).insert(
+          await db
+              .into(db.calendarEventLinks)
+              .insert(
                 CalendarEventLinksCompanion.insert(
                   id: _uuid.v4(),
                   appointmentId: appointment.id,
@@ -261,18 +309,24 @@ class AppleEventKitProvider implements CalendarProvider {
       final calendarId = await getSelectedCalendarId();
       if (calendarId == null) return false;
 
-      final res = await _deviceCalendarPlugin.deleteEvent(calendarId, externalEventId);
+      final res = await _deviceCalendarPlugin.deleteEvent(
+        calendarId,
+        externalEventId,
+      );
       if (res.isSuccess && (res.data ?? false)) {
         final now = DateTime.now();
-        await (db.update(db.calendarEventLinks)
-              ..where((t) => t.externalEventId.equals(externalEventId) & t.provider.equals('apple_eventkit')))
+        await (db.update(db.calendarEventLinks)..where(
+              (t) =>
+                  t.externalEventId.equals(externalEventId) &
+                  t.provider.equals('apple_eventkit'),
+            ))
             .write(
-          CalendarEventLinksCompanion(
-            deletedAt: drift.Value(now),
-            syncStatus: const drift.Value('synced'),
-            updatedAt: drift.Value(now),
-          ),
-        );
+              CalendarEventLinksCompanion(
+                deletedAt: drift.Value(now),
+                syncStatus: const drift.Value('synced'),
+                updatedAt: drift.Value(now),
+              ),
+            );
         return true;
       }
       return false;

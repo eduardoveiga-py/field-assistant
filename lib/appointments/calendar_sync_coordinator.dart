@@ -1,18 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart' as drift;
+
 import '../database/app_database.dart';
 import '../ui/providers.dart';
 import 'calendar_provider.dart';
 import 'google_calendar_provider.dart';
 import 'apple_eventkit_provider.dart';
 
-enum SyncCoordinationStatus {
-  idle,
-  syncing,
-  success,
-  conflict,
-  error,
-}
+enum SyncCoordinationStatus { idle, syncing, success, conflict, error }
 
 class CalendarConflictItem {
   final CalendarEventLinkEntry link;
@@ -35,18 +30,30 @@ class CalendarSyncCoordinator {
     this.db, {
     GoogleCalendarProvider? google,
     AppleEventKitProvider? apple,
-  })  : googleProvider = google ?? GoogleCalendarProvider(),
-        appleProvider = apple ?? AppleEventKitProvider();
+  }) : googleProvider = google ?? GoogleCalendarProvider(),
+       appleProvider = apple ?? AppleEventKitProvider();
 
   List<CalendarProvider> get allProviders => [googleProvider, appleProvider];
 
-  /// Sincroniza todos os provedores autorizados
+  CalendarProvider? getProviderByName(String providerName) {
+    if (providerName == 'google') return googleProvider;
+    if (providerName == 'apple_eventkit') return appleProvider;
+    return null;
+  }
+
+  /// Sincroniza todos os provedores autorizados executando:
+  /// 1. Download de eventos externos com paginação e syncToken
+  /// 2. Reconciliação em 3 vias (3-way merge) entre estado local, externo e última versão sincronizada
+  /// 3. Detecção determinística de conflitos
+  /// 4. Processamento da Outbox (pending_upload e propagação de exclusões)
+  /// 5. Prevenção absoluta de loops de sincronização
   Future<CalendarSyncResult> syncAll({bool fullSync = false}) async {
     int totalDownloaded = 0;
     int totalUploaded = 0;
     int totalConflicts = 0;
     final errors = <String>[];
 
+    // 1. Download de alterações externas
     for (final provider in allProviders) {
       final authorized = await provider.isAuthorized();
       if (!authorized) continue;
@@ -54,33 +61,180 @@ class CalendarSyncCoordinator {
       final res = await provider.syncEvents(db: db, fullSync: fullSync);
       totalDownloaded += res.eventsDownloaded;
       totalUploaded += res.eventsUploaded;
-      totalConflicts += res.conflictsFound;
       if (!res.success && res.errorMessage != null) {
         errors.add('${provider.providerType.displayName}: ${res.errorMessage}');
       }
     }
 
-    // Após sincronizar os eventos externos, verifica se há compromissos locais criados/editados pendentes de envio
-    final pendingLinks = await (db.select(db.calendarEventLinks)
-          ..where((t) => t.syncStatus.equals('pending_upload') & t.deletedAt.isNull()))
-        .get();
+    // 2. Reconciliação Bidirecional em 3 vias dos vínculos existentes
+    final allLinks = await (db.select(db.calendarEventLinks)).get();
 
-    for (final link in pendingLinks) {
-      final appt = await (db.select(db.appointments)..where((t) => t.id.equals(link.appointmentId))).getSingleOrNull();
-      if (appt == null) continue;
+    for (final link in allLinks) {
+      final provider = getProviderByName(link.provider);
+      final isProvAuth = provider != null && await provider.isAuthorized();
 
-      if (link.provider == 'google') {
-        if (await googleProvider.isAuthorized()) {
-          await googleProvider.pushAppointmentToExternal(db, appt);
+      // Caso 1: Vínculo já marcado como deletado no banco (tombstone) e pendente de exclusão externa
+      if (link.deletedAt != null) {
+        if (link.syncStatus == 'pending_upload' &&
+            link.externalEventId.isNotEmpty &&
+            isProvAuth) {
+          await provider.deleteExternalEvent(db, link.externalEventId);
+          totalUploaded++;
+          await (db.update(
+            db.calendarEventLinks,
+          )..where((t) => t.id.equals(link.id))).write(
+            CalendarEventLinksCompanion(
+              syncStatus: const drift.Value('synced'),
+              updatedAt: drift.Value(DateTime.now()),
+            ),
+          );
+        }
+        continue;
+      }
+
+      // Busca compromisso local associado
+      final appt = await (db.select(
+        db.appointments,
+      )..where((t) => t.id.equals(link.appointmentId))).getSingleOrNull();
+
+      // Caso 2: Compromisso local foi excluído no SQLite (soft delete)
+      if (appt == null || appt.deletedAt != null) {
+        if (link.externalEventId.isNotEmpty && isProvAuth) {
+          await provider.deleteExternalEvent(db, link.externalEventId);
           totalUploaded++;
         }
-      } else if (link.provider == 'apple_eventkit') {
-        if (await appleProvider.isAuthorized()) {
-          await appleProvider.pushAppointmentToExternal(db, appt);
+        await (db.update(
+          db.calendarEventLinks,
+        )..where((t) => t.id.equals(link.id))).write(
+          CalendarEventLinksCompanion(
+            deletedAt: drift.Value(DateTime.now()),
+            syncStatus: const drift.Value('synced'),
+            updatedAt: drift.Value(DateTime.now()),
+          ),
+        );
+        continue;
+      }
+
+      // Busca evento externo associado
+      final ext =
+          await (db.select(db.externalCalendarEvents)..where(
+                (t) =>
+                    t.externalEventId.equals(link.externalEventId) &
+                    t.provider.equals(link.provider),
+              ))
+              .getSingleOrNull();
+
+      // Caso 3: Evento externo foi excluído ou cancelado remotamente
+      if (ext != null &&
+          (ext.isDeletedExternal || ext.externalStatus == 'cancelled')) {
+        // Marca tombstone no vínculo sem apagar o compromisso ministerial local
+        await (db.update(
+          db.calendarEventLinks,
+        )..where((t) => t.id.equals(link.id))).write(
+          CalendarEventLinksCompanion(
+            syncStatus: const drift.Value('external_deleted'),
+            deletedAt: drift.Value(DateTime.now()),
+            updatedAt: drift.Value(DateTime.now()),
+          ),
+        );
+        continue;
+      }
+
+      // Avaliação de alterações:
+      final localChanged =
+          (appt.revision > link.localRevisionAtSync) ||
+          (link.syncStatus == 'pending_upload');
+      final externalChanged =
+          ext != null &&
+          ((link.externalETagAtSync != null &&
+                  ext.etag != null &&
+                  ext.etag != link.externalETagAtSync) ||
+              (ext.lastModifiedExternal != null &&
+                  ext.lastModifiedExternal!.isAfter(link.updatedAt)));
+
+      if (localChanged && externalChanged) {
+        // CONFLITO REAL: Ambos os lados sofreram alterações concorrentes
+        totalConflicts++;
+        await (db.update(
+          db.calendarEventLinks,
+        )..where((t) => t.id.equals(link.id))).write(
+          CalendarEventLinksCompanion(
+            syncStatus: const drift.Value('conflict'),
+            updatedAt: drift.Value(DateTime.now()),
+          ),
+        );
+      } else if (localChanged && !externalChanged) {
+        // Apenas local mudou: Envia para o provedor externo
+        if (isProvAuth) {
+          await provider.pushAppointmentToExternal(db, appt);
+          totalUploaded++;
+        }
+      } else if (!localChanged && externalChanged && ext != null) {
+        // Apenas externo mudou: Atualiza dados de agenda no compromisso local preservando dados pastorais
+        final now = DateTime.now();
+        await (db.update(
+          db.appointments,
+        )..where((t) => t.id.equals(appt.id))).write(
+          AppointmentsCompanion(
+            title: drift.Value(ext.title),
+            startTime: drift.Value(ext.startTime),
+            endTime: drift.Value(ext.endTime),
+            durationMinutes: drift.Value(
+              ext.endTime.difference(ext.startTime).inMinutes,
+            ),
+            locationNotes: ext.location != null
+                ? drift.Value(ext.location)
+                : const drift.Value.absent(),
+            revision: drift.Value(appt.revision + 1),
+            updatedAt: drift.Value(now),
+          ),
+        );
+
+        // Atualiza vínculo para que não seja interpretado como nova modificação local (anti sync-loop)
+        await (db.update(
+          db.calendarEventLinks,
+        )..where((t) => t.id.equals(link.id))).write(
+          CalendarEventLinksCompanion(
+            syncStatus: const drift.Value('synced'),
+            localRevisionAtSync: drift.Value(appt.revision + 1),
+            externalETagAtSync: drift.Value(ext.etag),
+            updatedAt: drift.Value(now),
+          ),
+        );
+      }
+    }
+
+    // 3. Processamento de Novos Compromissos Locais sem vínculos para provedores autorizados
+    final activeAppointments = await (db.select(
+      db.appointments,
+    )..where((t) => t.deletedAt.isNull())).get();
+
+    for (final appt in activeAppointments) {
+      for (final provider in allProviders) {
+        if (!await provider.isAuthorized()) continue;
+        final providerName =
+            provider.providerType == CalendarProviderType.google
+            ? 'google'
+            : 'apple_eventkit';
+
+        final existingLink =
+            await (db.select(db.calendarEventLinks)..where(
+                  (t) =>
+                      t.appointmentId.equals(appt.id) &
+                      t.provider.equals(providerName),
+                ))
+                .getSingleOrNull();
+
+        if (existingLink == null) {
+          await provider.pushAppointmentToExternal(db, appt);
           totalUploaded++;
         }
       }
     }
+
+    // Recontagem precisa de conflitos existentes
+    final remainingConflicts = await getPendingConflicts();
+    totalConflicts = remainingConflicts.length;
 
     return CalendarSyncResult(
       success: errors.isEmpty,
@@ -102,82 +256,117 @@ class CalendarSyncCoordinator {
 
   /// Trata exclusão lógica de compromisso: propaga ao calendário externo e marca tombstone no vínculo
   Future<void> handleLocalAppointmentDeleted(String appointmentId) async {
-    final links = await (db.select(db.calendarEventLinks)
-          ..where((t) => t.appointmentId.equals(appointmentId) & t.deletedAt.isNull()))
-        .get();
+    final links =
+        await (db.select(db.calendarEventLinks)..where(
+              (t) =>
+                  t.appointmentId.equals(appointmentId) & t.deletedAt.isNull(),
+            ))
+            .get();
 
     for (final link in links) {
-      if (link.provider == 'google') {
-        await googleProvider.deleteExternalEvent(db, link.externalEventId);
-      } else if (link.provider == 'apple_eventkit') {
-        await appleProvider.deleteExternalEvent(db, link.externalEventId);
+      final provider = getProviderByName(link.provider);
+      if (provider != null && await provider.isAuthorized()) {
+        await provider.deleteExternalEvent(db, link.externalEventId);
       }
+      await (db.update(
+        db.calendarEventLinks,
+      )..where((t) => t.id.equals(link.id))).write(
+        CalendarEventLinksCompanion(
+          deletedAt: drift.Value(DateTime.now()),
+          syncStatus: const drift.Value('synced'),
+          updatedAt: drift.Value(DateTime.now()),
+        ),
+      );
     }
   }
 
   /// Retorna lista de conflitos pendentes de resolução manual
   Future<List<CalendarConflictItem>> getPendingConflicts() async {
-    final conflictLinks = await (db.select(db.calendarEventLinks)
-          ..where((t) => t.syncStatus.equals('conflict') & t.deletedAt.isNull()))
-        .get();
+    final conflictLinks =
+        await (db.select(db.calendarEventLinks)..where(
+              (t) => t.syncStatus.equals('conflict') & t.deletedAt.isNull(),
+            ))
+            .get();
 
     final result = <CalendarConflictItem>[];
     for (final link in conflictLinks) {
-      final appt = await (db.select(db.appointments)..where((t) => t.id.equals(link.appointmentId))).getSingleOrNull();
+      final appt = await (db.select(
+        db.appointments,
+      )..where((t) => t.id.equals(link.appointmentId))).getSingleOrNull();
       if (appt == null) continue;
 
-      final extEvent = await (db.select(db.externalCalendarEvents)
-            ..where((t) => t.externalEventId.equals(link.externalEventId) & t.provider.equals(link.provider)))
-          .getSingleOrNull();
+      final extEvent =
+          await (db.select(db.externalCalendarEvents)..where(
+                (t) =>
+                    t.externalEventId.equals(link.externalEventId) &
+                    t.provider.equals(link.provider),
+              ))
+              .getSingleOrNull();
 
-      result.add(CalendarConflictItem(
-        link: link,
-        localAppointment: appt,
-        externalEvent: extEvent,
-      ));
+      result.add(
+        CalendarConflictItem(
+          link: link,
+          localAppointment: appt,
+          externalEvent: extEvent,
+        ),
+      );
     }
     return result;
   }
 
-  /// Resolução: Manter versão local (sobrescreve evento externo)
+  /// Resolução: Manter versão local (sobrescreve evento externo e converge)
   Future<void> resolveConflictKeepLocal(CalendarConflictItem conflict) async {
-    if (conflict.link.provider == 'google') {
-      await googleProvider.pushAppointmentToExternal(db, conflict.localAppointment);
-    } else if (conflict.link.provider == 'apple_eventkit') {
-      await appleProvider.pushAppointmentToExternal(db, conflict.localAppointment);
+    final provider = getProviderByName(conflict.link.provider);
+    if (provider != null && await provider.isAuthorized()) {
+      await provider.pushAppointmentToExternal(db, conflict.localAppointment);
     }
 
     final now = DateTime.now();
-    await (db.update(db.calendarEventLinks)..where((t) => t.id.equals(conflict.link.id))).write(
+    await (db.update(
+      db.calendarEventLinks,
+    )..where((t) => t.id.equals(conflict.link.id))).write(
       CalendarEventLinksCompanion(
         syncStatus: const drift.Value('synced'),
+        localRevisionAtSync: drift.Value(conflict.localAppointment.revision),
         updatedAt: drift.Value(now),
       ),
     );
   }
 
-  /// Resolução: Manter versão externa (atualiza compromisso local preservando vínculos pastorais)
-  Future<void> resolveConflictKeepExternal(CalendarConflictItem conflict) async {
+  /// Resolução: Manter versão externa (atualiza compromisso local preservando vínculos pastorais e converge)
+  Future<void> resolveConflictKeepExternal(
+    CalendarConflictItem conflict,
+  ) async {
     if (conflict.externalEvent == null) return;
     final ext = conflict.externalEvent!;
     final now = DateTime.now();
 
-    await (db.update(db.appointments)..where((t) => t.id.equals(conflict.localAppointment.id))).write(
+    await (db.update(
+      db.appointments,
+    )..where((t) => t.id.equals(conflict.localAppointment.id))).write(
       AppointmentsCompanion(
         title: drift.Value(ext.title),
         startTime: drift.Value(ext.startTime),
         endTime: drift.Value(ext.endTime),
-        durationMinutes: drift.Value(ext.endTime.difference(ext.startTime).inMinutes),
-        locationNotes: ext.location != null ? drift.Value(ext.location) : const drift.Value.absent(),
+        durationMinutes: drift.Value(
+          ext.endTime.difference(ext.startTime).inMinutes,
+        ),
+        locationNotes: ext.location != null
+            ? drift.Value(ext.location)
+            : const drift.Value.absent(),
         revision: drift.Value(conflict.localAppointment.revision + 1),
         updatedAt: drift.Value(now),
       ),
     );
 
-    await (db.update(db.calendarEventLinks)..where((t) => t.id.equals(conflict.link.id))).write(
+    await (db.update(
+      db.calendarEventLinks,
+    )..where((t) => t.id.equals(conflict.link.id))).write(
       CalendarEventLinksCompanion(
         syncStatus: const drift.Value('synced'),
-        localRevisionAtSync: drift.Value(conflict.localAppointment.revision + 1),
+        localRevisionAtSync: drift.Value(
+          conflict.localAppointment.revision + 1,
+        ),
         externalETagAtSync: drift.Value(ext.etag),
         updatedAt: drift.Value(now),
       ),
@@ -185,7 +374,9 @@ class CalendarSyncCoordinator {
   }
 }
 
-final calendarSyncCoordinatorProvider = Provider<CalendarSyncCoordinator>((ref) {
+final calendarSyncCoordinatorProvider = Provider<CalendarSyncCoordinator>((
+  ref,
+) {
   final db = ref.watch(databaseProvider);
   return CalendarSyncCoordinator(db);
 });

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../core/app_theme.dart';
 import '../../dashboard/pioneer_pace_calculator.dart';
 import '../../settings/app_settings_manager.dart';
@@ -21,7 +22,11 @@ class PioneerPaceCard extends ConsumerStatefulWidget {
 
 class _PioneerPaceCardState extends ConsumerState<PioneerPaceCard> {
   double _goalHours = 50.0;
-  List<int> _designatedWeekdays = [2, 4, 6]; // Terça, Quinta, Sábado como padrão intuitivo
+  List<int> _designatedWeekdays = [
+    2,
+    4,
+    6,
+  ]; // Terça, Quinta, Sábado como padrão intuitivo
 
   @override
   void initState() {
@@ -32,9 +37,11 @@ class _PioneerPaceCardState extends ConsumerState<PioneerPaceCard> {
   Future<void> _loadSettings() async {
     final settings = ref.read(appSettingsManagerProvider);
     // Leitura com fallback entre a convenção de testes e a convenção de despacho
-    final goalStr = await settings.getString('pioneer_goal_hours') ??
+    final goalStr =
+        await settings.getString('pioneer_goal_hours') ??
         await settings.getString('pioneer_monthly_goal_hours');
-    final weekdaysStr = await settings.getString('pioneer_weekdays') ??
+    final weekdaysStr =
+        await settings.getString('pioneer_weekdays') ??
         await settings.getString('pioneer_designated_weekdays');
 
     if (mounted) {
@@ -46,10 +53,10 @@ class _PioneerPaceCardState extends ConsumerState<PioneerPaceCard> {
           _designatedWeekdays = weekdaysStr.isEmpty
               ? <int>[]
               : weekdaysStr
-                  .split(',')
-                  .map((s) => int.tryParse(s.trim()))
-                  .whereType<int>()
-                  .toList();
+                    .split(',')
+                    .map((s) => int.tryParse(s.trim()))
+                    .whereType<int>()
+                    .toList();
         }
       });
     }
@@ -67,10 +74,12 @@ class _PioneerPaceCardState extends ConsumerState<PioneerPaceCard> {
 
     final settings = ref.read(appSettingsManagerProvider);
     // Dual-write: persiste em ambas as chaves para interoperabilidade total
-    await settings.setString('pioneer_goal_hours', goal.toString());
-    await settings.setString('pioneer_monthly_goal_hours', goal.toString());
-    await settings.setString('pioneer_weekdays', sortedDays.join(','));
-    await settings.setString('pioneer_designated_weekdays', sortedDays.join(','));
+    await Future.wait([
+      settings.setString('pioneer_goal_hours', goal.toString()),
+      settings.setString('pioneer_monthly_goal_hours', goal.toString()),
+      settings.setString('pioneer_weekdays', sortedDays.join(',')),
+      settings.setString('pioneer_designated_weekdays', sortedDays.join(',')),
+    ]);
   }
 
   Future<void> _showConfigDialog(BuildContext context) async {
@@ -101,13 +110,27 @@ class _PioneerPaceCardState extends ConsumerState<PioneerPaceCard> {
       final activitiesAsync = ref.watch(activitiesStreamProvider);
       final allActivities = activitiesAsync.value ?? [];
       final monthStart = DateTime(currentDate.year, currentDate.month, 1);
-      final monthEnd = DateTime(currentDate.year, currentDate.month + 1, 0, 23, 59, 59);
+      final monthEnd = DateTime(
+        currentDate.year,
+        currentDate.month + 1,
+        0,
+        23,
+        59,
+        59,
+      );
 
-      final monthActs = allActivities.where((a) =>
-          a.deletedAt == null &&
-          !a.date.isBefore(monthStart) &&
-          !a.date.isAfter(monthEnd)).toList();
-      final totalSeconds = monthActs.fold<int>(0, (sum, a) => sum + a.durationSeconds);
+      final monthActs = allActivities
+          .where(
+            (a) =>
+                a.deletedAt == null &&
+                !a.date.isBefore(monthStart) &&
+                !a.date.isAfter(monthEnd),
+          )
+          .toList();
+      final totalSeconds = monthActs.fold<int>(
+        0,
+        (sum, a) => sum + a.durationSeconds,
+      );
       completedHours = totalSeconds / 3600.0;
     }
 
@@ -137,10 +160,12 @@ class _PioneerPaceCardState extends ConsumerState<PioneerPaceCard> {
     final borderColor = isSunMode
         ? Colors.black
         : (paceResult.isGoalReached
-            ? AppTheme.successGreen
-            : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)));
+              ? AppTheme.successGreen
+              : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)));
 
-    final borderWidth = isSunMode ? 2.0 : (paceResult.isGoalReached ? 1.5 : 1.0);
+    final borderWidth = isSunMode
+        ? 2.0
+        : (paceResult.isGoalReached ? 1.5 : 1.0);
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -169,12 +194,16 @@ class _PioneerPaceCardState extends ConsumerState<PioneerPaceCard> {
                 child: Row(
                   children: [
                     Icon(
-                      paceResult.isGoalReached ? Icons.check_circle : Icons.speed,
+                      paceResult.isGoalReached
+                          ? Icons.check_circle
+                          : Icons.speed,
                       color: isSunMode
                           ? Colors.black
                           : (paceResult.isGoalReached
-                              ? AppTheme.successGreen
-                              : (isDark ? const Color(0xFF60A5FA) : AppTheme.primaryBlue)),
+                                ? AppTheme.successGreen
+                                : (isDark
+                                      ? const Color(0xFF60A5FA)
+                                      : AppTheme.primaryBlue)),
                       size: 22,
                     ),
                     const SizedBox(width: 8),
@@ -216,13 +245,17 @@ class _PioneerPaceCardState extends ConsumerState<PioneerPaceCard> {
               minHeight: 8,
               backgroundColor: isSunMode
                   ? Colors.grey.shade300
-                  : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                  : (isDark
+                        ? const Color(0xFF334155)
+                        : const Color(0xFFE2E8F0)),
               valueColor: AlwaysStoppedAnimation<Color>(
                 isSunMode
                     ? Colors.black
                     : (paceResult.isGoalReached
-                        ? AppTheme.successGreen
-                        : (isDark ? const Color(0xFF3B82F6) : AppTheme.primaryBlue)),
+                          ? AppTheme.successGreen
+                          : (isDark
+                                ? const Color(0xFF3B82F6)
+                                : AppTheme.primaryBlue)),
               ),
             ),
           ),
@@ -262,19 +295,19 @@ class _PioneerPaceCardState extends ConsumerState<PioneerPaceCard> {
               color: isSunMode
                   ? Colors.white
                   : (paceResult.isGoalReached
-                      ? AppTheme.successGreen.withValues(alpha: 0.12)
-                      : (isDark
-                          ? const Color(0xFF0F172A)
-                          : AppTheme.primaryBlue.withValues(alpha: 0.08))),
+                        ? AppTheme.successGreen.withValues(alpha: 0.12)
+                        : (isDark
+                              ? const Color(0xFF0F172A)
+                              : AppTheme.primaryBlue.withValues(alpha: 0.08))),
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
                 color: isSunMode
                     ? Colors.black
                     : (paceResult.isGoalReached
-                        ? AppTheme.successGreen.withValues(alpha: 0.3)
-                        : (isDark
-                            ? const Color(0xFF334155)
-                            : AppTheme.primaryBlue.withValues(alpha: 0.2))),
+                          ? AppTheme.successGreen.withValues(alpha: 0.3)
+                          : (isDark
+                                ? const Color(0xFF334155)
+                                : AppTheme.primaryBlue.withValues(alpha: 0.2))),
                 width: isSunMode ? 2.0 : 1.0,
               ),
             ),
@@ -283,10 +316,12 @@ class _PioneerPaceCardState extends ConsumerState<PioneerPaceCard> {
                 Icon(
                   paceResult.isGoalReached ? Icons.celebration : Icons.schedule,
                   color: isSunMode
-                        ? Colors.black
-                        : (paceResult.isGoalReached
+                      ? Colors.black
+                      : (paceResult.isGoalReached
                             ? AppTheme.successGreen
-                            : (isDark ? const Color(0xFF60A5FA) : AppTheme.primaryBlue)),
+                            : (isDark
+                                  ? const Color(0xFF60A5FA)
+                                  : AppTheme.primaryBlue)),
                   size: 20,
                 ),
                 const SizedBox(width: 8),
@@ -297,8 +332,8 @@ class _PioneerPaceCardState extends ConsumerState<PioneerPaceCard> {
                       color: isSunMode
                           ? Colors.black
                           : (paceResult.isGoalReached
-                              ? AppTheme.successGreen
-                              : (isDark ? Colors.white : AppTheme.textDark)),
+                                ? AppTheme.successGreen
+                                : (isDark ? Colors.white : AppTheme.textDark)),
                       fontSize: 13,
                       fontWeight: isSunMode ? FontWeight.w900 : FontWeight.bold,
                     ),
@@ -329,7 +364,8 @@ class _PioneerPaceConfigDialog extends StatefulWidget {
   });
 
   @override
-  State<_PioneerPaceConfigDialog> createState() => _PioneerPaceConfigDialogState();
+  State<_PioneerPaceConfigDialog> createState() =>
+      _PioneerPaceConfigDialogState();
 }
 
 class _PioneerPaceConfigDialogState extends State<_PioneerPaceConfigDialog> {
@@ -436,15 +472,19 @@ class _PioneerPaceConfigDialogState extends State<_PioneerPaceConfigDialog> {
                   materialTapTargetSize: MaterialTapTargetSize.padded,
                   selectedColor: isSunMode
                       ? Colors.black
-                      : (isDark ? const Color(0xFF3B82F6) : AppTheme.primaryBlue),
+                      : (isDark
+                            ? const Color(0xFF3B82F6)
+                            : AppTheme.primaryBlue),
                   labelStyle: TextStyle(
                     fontSize: 12,
                     fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
                     color: isSel
                         ? Colors.white
                         : (isSunMode
-                            ? Colors.black
-                            : (isDark ? const Color(0xFFCBD5E1) : AppTheme.textDark)),
+                              ? Colors.black
+                              : (isDark
+                                    ? const Color(0xFFCBD5E1)
+                                    : AppTheme.textDark)),
                   ),
                   onSelected: (val) {
                     if (val) {
@@ -460,7 +500,9 @@ class _PioneerPaceConfigDialogState extends State<_PioneerPaceConfigDialog> {
             const SizedBox(height: 12),
             TextField(
               controller: _customController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               style: TextStyle(
                 color: isSunMode
                     ? Colors.black
@@ -471,7 +513,10 @@ class _PioneerPaceConfigDialogState extends State<_PioneerPaceConfigDialog> {
                 labelText: 'Horas personalizadas',
                 suffixText: 'h',
                 isDense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 12,
+                ),
                 border: const OutlineInputBorder(),
                 labelStyle: TextStyle(
                   color: isSunMode
@@ -510,21 +555,27 @@ class _PioneerPaceConfigDialogState extends State<_PioneerPaceConfigDialog> {
                   selectedColor: isSunMode
                       ? Colors.black.withValues(alpha: 0.15)
                       : (isDark
-                          ? const Color(0xFF3B82F6).withValues(alpha: 0.3)
-                          : AppTheme.primaryBlue.withValues(alpha: 0.2)),
+                            ? const Color(0xFF3B82F6).withValues(alpha: 0.3)
+                            : AppTheme.primaryBlue.withValues(alpha: 0.2)),
                   checkmarkColor: isSunMode
                       ? Colors.black
-                      : (isDark ? const Color(0xFF60A5FA) : AppTheme.primaryBlue),
+                      : (isDark
+                            ? const Color(0xFF60A5FA)
+                            : AppTheme.primaryBlue),
                   labelStyle: TextStyle(
                     fontSize: 12,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    fontWeight: isSelected
+                        ? FontWeight.bold
+                        : FontWeight.normal,
                     color: isSelected
                         ? (isSunMode
-                            ? Colors.black
-                            : (isDark ? Colors.white : AppTheme.primaryBlue))
+                              ? Colors.black
+                              : (isDark ? Colors.white : AppTheme.primaryBlue))
                         : (isSunMode
-                            ? Colors.black87
-                            : (isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted)),
+                              ? Colors.black87
+                              : (isDark
+                                    ? const Color(0xFFCBD5E1)
+                                    : AppTheme.textMuted)),
                   ),
                   onSelected: (selected) {
                     setState(() {
@@ -544,9 +595,7 @@ class _PioneerPaceConfigDialogState extends State<_PioneerPaceConfigDialog> {
       ),
       actions: [
         TextButton(
-          style: TextButton.styleFrom(
-            minimumSize: const Size(48, 48),
-          ),
+          style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
           onPressed: () => Navigator.pop(context),
           child: Text(
             'Cancelar',
@@ -565,12 +614,10 @@ class _PioneerPaceConfigDialogState extends State<_PioneerPaceConfigDialog> {
             foregroundColor: Colors.white,
             minimumSize: const Size(48, 48),
           ),
-          onPressed: () async {
+          onPressed: () {
             FocusScope.of(context).unfocus();
-            await widget.onSave(_tempGoal, _tempWeekdays);
-            if (context.mounted) {
-              Navigator.pop(context);
-            }
+            Navigator.pop(context);
+            widget.onSave(_tempGoal, _tempWeekdays);
           },
           child: const Text('Salvar'),
         ),

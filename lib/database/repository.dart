@@ -1,6 +1,8 @@
 import 'dart:convert';
+
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
+
 import 'app_database.dart';
 
 class AppRepository {
@@ -18,7 +20,9 @@ class AppRepository {
     required String operation,
     required Map<String, dynamic> payload,
   }) async {
-    await db.into(db.syncQueue).insert(
+    await db
+        .into(db.syncQueue)
+        .insert(
           SyncQueueCompanion.insert(
             id: _uuid.v4(),
             entityType: entityType,
@@ -37,14 +41,18 @@ class AppRepository {
   Stream<List<PersonEntry>> watchAllPeople() {
     return (db.select(db.people)
           ..where((tbl) => tbl.deletedAt.isNull())
-          ..orderBy([(t) => OrderingTerm(expression: t.name, mode: OrderingMode.asc)]))
+          ..orderBy([
+            (t) => OrderingTerm(expression: t.name, mode: OrderingMode.asc),
+          ]))
         .watch();
   }
 
   Future<List<PersonEntry>> getAllPeople() {
     return (db.select(db.people)
           ..where((tbl) => tbl.deletedAt.isNull())
-          ..orderBy([(t) => OrderingTerm(expression: t.name, mode: OrderingMode.asc)]))
+          ..orderBy([
+            (t) => OrderingTerm(expression: t.name, mode: OrderingMode.asc),
+          ]))
         .get();
   }
 
@@ -60,7 +68,9 @@ class AppRepository {
 
     final all = await getAllPeople();
     final studies = await getAllStudies();
-    final participants = await (db.select(db.studyParticipants)..where((tbl) => tbl.deletedAt.isNull())).get();
+    final participants = await (db.select(
+      db.studyParticipants,
+    )..where((tbl) => tbl.deletedAt.isNull())).get();
 
     // Cria mapa de personId -> estudos vinculados
     final Map<String, List<BibleStudyEntry>> personStudies = {};
@@ -81,7 +91,8 @@ class AppRepository {
       final tags = p.tags.toLowerCase();
       final schedule = (p.preferredSchedule ?? '').toLowerCase();
 
-      final matchesDirect = name.contains(lower) ||
+      final matchesDirect =
+          name.contains(lower) ||
           phone.contains(lower) ||
           address.contains(lower) ||
           notes.contains(lower) ||
@@ -97,8 +108,10 @@ class AppRepository {
       for (final s in linked) {
         if (s.title.toLowerCase().contains(lower) ||
             s.publicationId.toLowerCase().contains(lower) ||
-            (s.currentLesson != null && 'lição ${s.currentLesson}'.contains(lower)) ||
-            (s.currentParagraph != null && 'parágrafo ${s.currentParagraph}'.contains(lower))) {
+            (s.currentLesson != null &&
+                'lição ${s.currentLesson}'.contains(lower)) ||
+            (s.currentParagraph != null &&
+                'parágrafo ${s.currentParagraph}'.contains(lower))) {
           return true;
         }
       }
@@ -239,15 +252,29 @@ class AppRepository {
   // --------------------------------------------------------------------------
   Stream<List<VisitEntry>> watchVisitsForPerson(String personId) {
     return (db.select(db.visits)
-          ..where((tbl) => tbl.personId.equals(personId) & tbl.deletedAt.isNull())
-          ..orderBy([(t) => OrderingTerm(expression: t.dateTimeField, mode: OrderingMode.desc)]))
+          ..where(
+            (tbl) => tbl.personId.equals(personId) & tbl.deletedAt.isNull(),
+          )
+          ..orderBy([
+            (t) => OrderingTerm(
+              expression: t.dateTimeField,
+              mode: OrderingMode.desc,
+            ),
+          ]))
         .watch();
   }
 
   Future<List<VisitEntry>> getVisitsForPerson(String personId) {
     return (db.select(db.visits)
-          ..where((tbl) => tbl.personId.equals(personId) & tbl.deletedAt.isNull())
-          ..orderBy([(t) => OrderingTerm(expression: t.dateTimeField, mode: OrderingMode.desc)]))
+          ..where(
+            (tbl) => tbl.personId.equals(personId) & tbl.deletedAt.isNull(),
+          )
+          ..orderBy([
+            (t) => OrderingTerm(
+              expression: t.dateTimeField,
+              mode: OrderingMode.desc,
+            ),
+          ]))
         .get();
   }
 
@@ -256,7 +283,9 @@ class AppRepository {
   }
 
   Future<VisitEntry?> getVisitById(String id) {
-    return (db.select(db.visits)..where((tbl) => tbl.id.equals(id) & tbl.deletedAt.isNull())).getSingleOrNull();
+    return (db.select(db.visits)
+          ..where((tbl) => tbl.id.equals(id) & tbl.deletedAt.isNull()))
+        .getSingleOrNull();
   }
 
   Future<VisitEntry> createVisit({
@@ -303,8 +332,16 @@ class AppRepository {
       if (person != null) {
         final updatePersonData = person.copyWith(
           lastContactAt: Value(dateTime),
-          nextActionAt: suggestedReturnDate != null ? Value(suggestedReturnDate) : person.nextActionAt != null ? Value(person.nextActionAt) : const Value.absent(),
-          nextActionNote: nextStep != null ? Value(nextStep) : person.nextActionNote != null ? Value(person.nextActionNote) : const Value.absent(),
+          nextActionAt: suggestedReturnDate != null
+              ? Value(suggestedReturnDate)
+              : person.nextActionAt != null
+              ? Value(person.nextActionAt)
+              : const Value.absent(),
+          nextActionNote: nextStep != null
+              ? Value(nextStep)
+              : person.nextActionNote != null
+              ? Value(person.nextActionNote)
+              : const Value.absent(),
           updatedAt: now,
           revision: person.revision + 1,
         );
@@ -362,7 +399,9 @@ class AppRepository {
   }
 
   Future<void> deleteVisit(String id) async {
-    final visit = await (db.select(db.visits)..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
+    final visit = await (db.select(
+      db.visits,
+    )..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
     if (visit == null) return;
     final now = DateTime.now();
     final updated = visit.copyWith(
@@ -387,12 +426,17 @@ class AppRepository {
   Stream<List<BibleStudyEntry>> watchAllStudies() {
     return (db.select(db.bibleStudies)
           ..where((tbl) => tbl.deletedAt.isNull())
-          ..orderBy([(t) => OrderingTerm(expression: t.startedAt, mode: OrderingMode.desc)]))
+          ..orderBy([
+            (t) =>
+                OrderingTerm(expression: t.startedAt, mode: OrderingMode.desc),
+          ]))
         .watch();
   }
 
   Future<List<BibleStudyEntry>> getAllStudies() {
-    return (db.select(db.bibleStudies)..where((tbl) => tbl.deletedAt.isNull())).get();
+    return (db.select(
+      db.bibleStudies,
+    )..where((tbl) => tbl.deletedAt.isNull())).get();
   }
 
   Future<BibleStudyEntry?> getStudyById(String id) {
@@ -402,13 +446,18 @@ class AppRepository {
   }
 
   Future<BibleStudyEntry?> getPrimaryStudyForPerson(String personId) async {
-    final participants = await (db.select(db.studyParticipants)
-          ..where((tbl) => tbl.personId.equals(personId) & tbl.deletedAt.isNull()))
-        .get();
+    final participants =
+        await (db.select(db.studyParticipants)..where(
+              (tbl) => tbl.personId.equals(personId) & tbl.deletedAt.isNull(),
+            ))
+            .get();
     if (participants.isEmpty) return null;
-    final primary = participants.where((p) => p.isPrimary).firstOrNull ?? participants.first;
-    return (db.select(db.bibleStudies)
-          ..where((tbl) => tbl.id.equals(primary.studyId) & tbl.deletedAt.isNull()))
+    final primary =
+        participants.where((p) => p.isPrimary).firstOrNull ??
+        participants.first;
+    return (db.select(db.bibleStudies)..where(
+          (tbl) => tbl.id.equals(primary.studyId) & tbl.deletedAt.isNull(),
+        ))
         .getSingleOrNull();
   }
 
@@ -464,8 +513,10 @@ class AppRepository {
       // Adiciona participantes associados (M:N)
       for (final personId in participantPersonIds) {
         final partId = _uuid.v4();
-        final isPrimary = (personId == primaryParticipantId) ||
-            (primaryParticipantId == null && personId == participantPersonIds.first);
+        final isPrimary =
+            (personId == primaryParticipantId) ||
+            (primaryParticipantId == null &&
+                personId == participantPersonIds.first);
 
         final partEntry = StudyParticipantEntry(
           id: partId,
@@ -548,8 +599,9 @@ class AppRepository {
   }
 
   Future<List<StudyParticipantEntry>> getParticipantsForStudy(String studyId) {
-    return (db.select(db.studyParticipants)
-          ..where((tbl) => tbl.studyId.equals(studyId) & tbl.deletedAt.isNull()))
+    return (db.select(
+          db.studyParticipants,
+        )..where((tbl) => tbl.studyId.equals(studyId) & tbl.deletedAt.isNull()))
         .get();
   }
 
@@ -594,13 +646,28 @@ class AppRepository {
         final study = await getStudyById(studyId);
         if (study != null) {
           final parsedPara = paragraphsCovered != null
-              ? (int.tryParse(paragraphsCovered) ?? int.tryParse(paragraphsCovered.split(RegExp(r'[-–,]')).last.trim()))
+              ? (int.tryParse(paragraphsCovered) ??
+                    int.tryParse(
+                      paragraphsCovered.split(RegExp(r'[-–,]')).last.trim(),
+                    ))
               : null;
           final updatedStudy = study.copyWith(
             lastSessionAt: Value(dateTime),
-            currentLesson: lessonCovered != null ? Value(lessonCovered) : study.currentLesson != null ? Value(study.currentLesson) : const Value.absent(),
-            currentParagraph: parsedPara != null ? Value(parsedPara) : study.currentParagraph != null ? Value(study.currentParagraph) : const Value.absent(),
-            nextTopic: nextStep != null ? Value(nextStep) : study.nextTopic != null ? Value(study.nextTopic) : const Value.absent(),
+            currentLesson: lessonCovered != null
+                ? Value(lessonCovered)
+                : study.currentLesson != null
+                ? Value(study.currentLesson)
+                : const Value.absent(),
+            currentParagraph: parsedPara != null
+                ? Value(parsedPara)
+                : study.currentParagraph != null
+                ? Value(study.currentParagraph)
+                : const Value.absent(),
+            nextTopic: nextStep != null
+                ? Value(nextStep)
+                : study.nextTopic != null
+                ? Value(study.nextTopic)
+                : const Value.absent(),
             updatedAt: now,
             revision: study.revision + 1,
           );
@@ -652,12 +719,19 @@ class AppRepository {
   Stream<List<StudySessionEntry>> watchSessionsForStudy(String studyId) {
     return (db.select(db.studySessions)
           ..where((tbl) => tbl.studyId.equals(studyId) & tbl.deletedAt.isNull())
-          ..orderBy([(t) => OrderingTerm(expression: t.dateTimeField, mode: OrderingMode.desc)]))
+          ..orderBy([
+            (t) => OrderingTerm(
+              expression: t.dateTimeField,
+              mode: OrderingMode.desc,
+            ),
+          ]))
         .watch();
   }
 
   Future<List<StudySessionEntry>> getAllSessions() {
-    return (db.select(db.studySessions)..where((tbl) => tbl.deletedAt.isNull())).get();
+    return (db.select(
+      db.studySessions,
+    )..where((tbl) => tbl.deletedAt.isNull())).get();
   }
 
   // --------------------------------------------------------------------------
@@ -666,19 +740,27 @@ class AppRepository {
   Stream<List<AppointmentEntry>> watchAppointments() {
     return (db.select(db.appointments)
           ..where((tbl) => tbl.deletedAt.isNull())
-          ..orderBy([(t) => OrderingTerm(expression: t.startTime, mode: OrderingMode.asc)]))
+          ..orderBy([
+            (t) =>
+                OrderingTerm(expression: t.startTime, mode: OrderingMode.asc),
+          ]))
         .watch();
   }
 
   Future<List<AppointmentEntry>> getAllAppointments() {
     return (db.select(db.appointments)
           ..where((tbl) => tbl.deletedAt.isNull())
-          ..orderBy([(t) => OrderingTerm(expression: t.startTime, mode: OrderingMode.asc)]))
+          ..orderBy([
+            (t) =>
+                OrderingTerm(expression: t.startTime, mode: OrderingMode.asc),
+          ]))
         .get();
   }
 
   Future<AppointmentEntry?> getAppointmentById(String id) {
-    return (db.select(db.appointments)..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
+    return (db.select(
+      db.appointments,
+    )..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
   }
 
   Future<AppointmentEntry> createAppointment({
@@ -752,6 +834,19 @@ class AppRepository {
 
     await db.transaction(() async {
       await db.update(db.appointments).replace(updated);
+
+      // Atualiza Outbox: marca vínculos existentes como pendentes de envio aos calendários externos
+      await (db.update(db.calendarEventLinks)..where(
+            (tbl) =>
+                tbl.appointmentId.equals(updated.id) & tbl.deletedAt.isNull(),
+          ))
+          .write(
+            CalendarEventLinksCompanion(
+              syncStatus: const Value('pending_upload'),
+              updatedAt: Value(now),
+            ),
+          );
+
       await _recordSyncOperation(
         entityType: 'appointments',
         entityId: updated.id,
@@ -810,6 +905,19 @@ class AppRepository {
       await db.update(db.appointments).replace(updatedOld);
       await db.into(db.appointments).insert(newAppt);
 
+      // Marca vínculos do compromisso antigo para atualização externa
+      await (db.update(db.calendarEventLinks)..where(
+            (tbl) =>
+                tbl.appointmentId.equals(oldAppointment.id) &
+                tbl.deletedAt.isNull(),
+          ))
+          .write(
+            CalendarEventLinksCompanion(
+              syncStatus: const Value('pending_upload'),
+              updatedAt: Value(now),
+            ),
+          );
+
       await _recordSyncOperation(
         entityType: 'appointments',
         entityId: oldAppointment.id,
@@ -842,7 +950,9 @@ class AppRepository {
   }
 
   Future<void> deleteAppointment(String id) async {
-    final appt = await (db.select(db.appointments)..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
+    final appt = await (db.select(
+      db.appointments,
+    )..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
     if (appt == null) return;
     final now = DateTime.now();
     final updated = appt.copyWith(
@@ -852,6 +962,19 @@ class AppRepository {
     );
     await db.transaction(() async {
       await db.update(db.appointments).replace(updated);
+
+      // Marca vínculos externos com pending_upload e soft delete para propagação da remoção
+      await (db.update(db.calendarEventLinks)..where(
+            (tbl) => tbl.appointmentId.equals(id) & tbl.deletedAt.isNull(),
+          ))
+          .write(
+            CalendarEventLinksCompanion(
+              syncStatus: const Value('pending_upload'),
+              deletedAt: Value(now),
+              updatedAt: Value(now),
+            ),
+          );
+
       await _recordSyncOperation(
         entityType: 'appointments',
         entityId: id,
@@ -867,14 +990,18 @@ class AppRepository {
   Stream<List<ActivityRecordEntry>> watchActivities() {
     return (db.select(db.activityRecords)
           ..where((tbl) => tbl.deletedAt.isNull())
-          ..orderBy([(t) => OrderingTerm(expression: t.date, mode: OrderingMode.desc)]))
+          ..orderBy([
+            (t) => OrderingTerm(expression: t.date, mode: OrderingMode.desc),
+          ]))
         .watch();
   }
 
   Future<List<ActivityRecordEntry>> getAllActivities() {
     return (db.select(db.activityRecords)
           ..where((tbl) => tbl.deletedAt.isNull())
-          ..orderBy([(t) => OrderingTerm(expression: t.date, mode: OrderingMode.desc)]))
+          ..orderBy([
+            (t) => OrderingTerm(expression: t.date, mode: OrderingMode.desc),
+          ]))
         .get();
   }
 
@@ -944,7 +1071,9 @@ class AppRepository {
   }
 
   Future<void> deleteActivityRecord(String id) async {
-    final act = await (db.select(db.activityRecords)..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
+    final act = await (db.select(
+      db.activityRecords,
+    )..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
     if (act == null) return;
     final now = DateTime.now();
     final updated = act.copyWith(
@@ -968,27 +1097,70 @@ class AppRepository {
   // --------------------------------------------------------------------------
   Future<List<Map<String, dynamic>>> getDeletedItems() async {
     final List<Map<String, dynamic>> result = [];
-    final people = await (db.select(db.people)..where((tbl) => tbl.deletedAt.isNotNull())).get();
+    final people = await (db.select(
+      db.people,
+    )..where((tbl) => tbl.deletedAt.isNotNull())).get();
     for (final p in people) {
-      result.add({'type': 'people', 'id': p.id, 'title': p.name, 'subtitle': 'Contato', 'deletedAt': p.deletedAt});
+      result.add({
+        'type': 'people',
+        'id': p.id,
+        'title': p.name,
+        'subtitle': 'Contato',
+        'deletedAt': p.deletedAt,
+      });
     }
-    final visits = await (db.select(db.visits)..where((tbl) => tbl.deletedAt.isNotNull())).get();
+    final visits = await (db.select(
+      db.visits,
+    )..where((tbl) => tbl.deletedAt.isNotNull())).get();
     for (final v in visits) {
-      result.add({'type': 'visits', 'id': v.id, 'title': 'Visita (${v.contactType})', 'subtitle': v.topicsDiscussed ?? 'Sem assunto', 'deletedAt': v.deletedAt});
+      result.add({
+        'type': 'visits',
+        'id': v.id,
+        'title': 'Visita (${v.contactType})',
+        'subtitle': v.topicsDiscussed ?? 'Sem assunto',
+        'deletedAt': v.deletedAt,
+      });
     }
-    final studies = await (db.select(db.bibleStudies)..where((tbl) => tbl.deletedAt.isNotNull())).get();
+    final studies = await (db.select(
+      db.bibleStudies,
+    )..where((tbl) => tbl.deletedAt.isNotNull())).get();
     for (final s in studies) {
-      result.add({'type': 'bible_studies', 'id': s.id, 'title': s.title, 'subtitle': 'Estudo Bíblico', 'deletedAt': s.deletedAt});
+      result.add({
+        'type': 'bible_studies',
+        'id': s.id,
+        'title': s.title,
+        'subtitle': 'Estudo Bíblico',
+        'deletedAt': s.deletedAt,
+      });
     }
-    final appts = await (db.select(db.appointments)..where((tbl) => tbl.deletedAt.isNotNull())).get();
+    final appts = await (db.select(
+      db.appointments,
+    )..where((tbl) => tbl.deletedAt.isNotNull())).get();
     for (final a in appts) {
-      result.add({'type': 'appointments', 'id': a.id, 'title': a.title, 'subtitle': 'Compromisso', 'deletedAt': a.deletedAt});
+      result.add({
+        'type': 'appointments',
+        'id': a.id,
+        'title': a.title,
+        'subtitle': 'Compromisso',
+        'deletedAt': a.deletedAt,
+      });
     }
-    final acts = await (db.select(db.activityRecords)..where((tbl) => tbl.deletedAt.isNotNull())).get();
+    final acts = await (db.select(
+      db.activityRecords,
+    )..where((tbl) => tbl.deletedAt.isNotNull())).get();
     for (final act in acts) {
-      result.add({'type': 'activity_records', 'id': act.id, 'title': 'Atividade (${act.modality})', 'subtitle': '${(act.durationSeconds / 60).round()} min', 'deletedAt': act.deletedAt});
+      result.add({
+        'type': 'activity_records',
+        'id': act.id,
+        'title': 'Atividade (${act.modality})',
+        'subtitle': '${(act.durationSeconds / 60).round()} min',
+        'deletedAt': act.deletedAt,
+      });
     }
-    result.sort((a, b) => (b['deletedAt'] as DateTime).compareTo(a['deletedAt'] as DateTime));
+    result.sort(
+      (a, b) =>
+          (b['deletedAt'] as DateTime).compareTo(a['deletedAt'] as DateTime),
+    );
     return result;
   }
 
@@ -996,36 +1168,90 @@ class AppRepository {
     final now = DateTime.now();
     await db.transaction(() async {
       if (entityType == 'people') {
-        final item = await (db.select(db.people)..where((t) => t.id.equals(id))).getSingleOrNull();
+        final item = await (db.select(
+          db.people,
+        )..where((t) => t.id.equals(id))).getSingleOrNull();
         if (item != null) {
-          await db.update(db.people).replace(item.copyWith(deletedAt: const Value(null), updatedAt: now, revision: item.revision + 1));
+          await db
+              .update(db.people)
+              .replace(
+                item.copyWith(
+                  deletedAt: const Value(null),
+                  updatedAt: now,
+                  revision: item.revision + 1,
+                ),
+              );
         }
       } else if (entityType == 'visits') {
-        final item = await (db.select(db.visits)..where((t) => t.id.equals(id))).getSingleOrNull();
+        final item = await (db.select(
+          db.visits,
+        )..where((t) => t.id.equals(id))).getSingleOrNull();
         if (item != null) {
-          await db.update(db.visits).replace(item.copyWith(deletedAt: const Value(null), updatedAt: now, revision: item.revision + 1));
+          await db
+              .update(db.visits)
+              .replace(
+                item.copyWith(
+                  deletedAt: const Value(null),
+                  updatedAt: now,
+                  revision: item.revision + 1,
+                ),
+              );
         }
       } else if (entityType == 'bible_studies') {
-        final item = await (db.select(db.bibleStudies)..where((t) => t.id.equals(id))).getSingleOrNull();
+        final item = await (db.select(
+          db.bibleStudies,
+        )..where((t) => t.id.equals(id))).getSingleOrNull();
         if (item != null) {
-          await db.update(db.bibleStudies).replace(item.copyWith(deletedAt: const Value(null), updatedAt: now, revision: item.revision + 1));
+          await db
+              .update(db.bibleStudies)
+              .replace(
+                item.copyWith(
+                  deletedAt: const Value(null),
+                  updatedAt: now,
+                  revision: item.revision + 1,
+                ),
+              );
         }
       } else if (entityType == 'appointments') {
-        final item = await (db.select(db.appointments)..where((t) => t.id.equals(id))).getSingleOrNull();
+        final item = await (db.select(
+          db.appointments,
+        )..where((t) => t.id.equals(id))).getSingleOrNull();
         if (item != null) {
-          await db.update(db.appointments).replace(item.copyWith(deletedAt: const Value(null), updatedAt: now, revision: item.revision + 1));
+          await db
+              .update(db.appointments)
+              .replace(
+                item.copyWith(
+                  deletedAt: const Value(null),
+                  updatedAt: now,
+                  revision: item.revision + 1,
+                ),
+              );
         }
       } else if (entityType == 'activity_records') {
-        final item = await (db.select(db.activityRecords)..where((t) => t.id.equals(id))).getSingleOrNull();
+        final item = await (db.select(
+          db.activityRecords,
+        )..where((t) => t.id.equals(id))).getSingleOrNull();
         if (item != null) {
-          await db.update(db.activityRecords).replace(item.copyWith(deletedAt: const Value(null), updatedAt: now, revision: item.revision + 1));
+          await db
+              .update(db.activityRecords)
+              .replace(
+                item.copyWith(
+                  deletedAt: const Value(null),
+                  updatedAt: now,
+                  revision: item.revision + 1,
+                ),
+              );
         }
       }
       await _recordSyncOperation(
         entityType: entityType,
         entityId: id,
         operation: 'UPDATE',
-        payload: {'id': id, 'restored': true, 'updatedAt': now.toIso8601String()},
+        payload: {
+          'id': id,
+          'restored': true,
+          'updatedAt': now.toIso8601String(),
+        },
       );
     });
   }
@@ -1037,13 +1263,19 @@ class AppRepository {
       } else if (entityType == 'visits') {
         await (db.delete(db.visits)..where((t) => t.id.equals(id))).go();
       } else if (entityType == 'bible_studies') {
-        await (db.delete(db.studyParticipants)..where((t) => t.studyId.equals(id))).go();
-        await (db.delete(db.studySessions)..where((t) => t.studyId.equals(id))).go();
+        await (db.delete(
+          db.studyParticipants,
+        )..where((t) => t.studyId.equals(id))).go();
+        await (db.delete(
+          db.studySessions,
+        )..where((t) => t.studyId.equals(id))).go();
         await (db.delete(db.bibleStudies)..where((t) => t.id.equals(id))).go();
       } else if (entityType == 'appointments') {
         await (db.delete(db.appointments)..where((t) => t.id.equals(id))).go();
       } else if (entityType == 'activity_records') {
-        await (db.delete(db.activityRecords)..where((t) => t.id.equals(id))).go();
+        await (db.delete(
+          db.activityRecords,
+        )..where((t) => t.id.equals(id))).go();
       }
       await _recordSyncOperation(
         entityType: entityType,
@@ -1059,8 +1291,14 @@ class AppRepository {
   // --------------------------------------------------------------------------
   Future<List<SyncQueueEntry>> getPendingSyncOperations() {
     return (db.select(db.syncQueue)
-          ..where((tbl) => tbl.status.equals('pending') | tbl.status.equals('in_progress'))
-          ..orderBy([(t) => OrderingTerm(expression: t.createdAt, mode: OrderingMode.asc)]))
+          ..where(
+            (tbl) =>
+                tbl.status.equals('pending') | tbl.status.equals('in_progress'),
+          )
+          ..orderBy([
+            (t) =>
+                OrderingTerm(expression: t.createdAt, mode: OrderingMode.asc),
+          ]))
         .get();
   }
 
@@ -1071,7 +1309,9 @@ class AppRepository {
   }
 
   Future<void> markSyncOperationFailed(String id, String error) async {
-    final op = await (db.select(db.syncQueue)..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
+    final op = await (db.select(
+      db.syncQueue,
+    )..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
     if (op != null) {
       await (db.update(db.syncQueue)..where((tbl) => tbl.id.equals(id))).write(
         SyncQueueCompanion(

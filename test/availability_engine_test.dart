@@ -6,60 +6,66 @@ void main() {
   group('Motor de Disponibilidade e Conflitos de Agenda', () {
     final now = DateTime(2026, 10, 26, 10, 0);
 
-    test('TC-SCHED-01: Detecta sobreposição parcial (14h00-14h30 vs 14h20-14h50)', () {
-      final existing = [
-        AppointmentEntry(
-          id: 'appt-1',
-          title: 'Visita Carlos',
-          startTime: DateTime(2026, 10, 26, 14, 0),
-          endTime: DateTime(2026, 10, 26, 14, 30),
+    test(
+      'TC-SCHED-01: Detecta sobreposição parcial (14h00-14h30 vs 14h20-14h50)',
+      () {
+        final existing = [
+          AppointmentEntry(
+            id: 'appt-1',
+            title: 'Visita Carlos',
+            startTime: DateTime(2026, 10, 26, 14, 0),
+            endTime: DateTime(2026, 10, 26, 14, 30),
+            durationMinutes: 30,
+            status: 'planejado',
+            isProvisional: false,
+            createdAt: now,
+            updatedAt: now,
+            revision: 1,
+          ),
+        ];
+
+        final result = AvailabilityEngine.checkAvailability(
+          startTime: DateTime(2026, 10, 26, 14, 20),
           durationMinutes: 30,
-          status: 'planejado',
-          isProvisional: false,
-          createdAt: now,
-          updatedAt: now,
-          revision: 1,
-        ),
-      ];
+          bufferMinutes: 0,
+          existingAppointments: existing,
+        );
 
-      final result = AvailabilityEngine.checkAvailability(
-        startTime: DateTime(2026, 10, 26, 14, 20),
-        durationMinutes: 30,
-        bufferMinutes: 0,
-        existingAppointments: existing,
-      );
+        expect(result.isAvailable, isFalse);
+        expect(result.conflictingAppointments.length, equals(1));
+        expect(result.suggestedAlternativeSlots.isNotEmpty, isTrue);
+      },
+    );
 
-      expect(result.isAvailable, isFalse);
-      expect(result.conflictingAppointments.length, equals(1));
-      expect(result.suggestedAlternativeSlots.isNotEmpty, isTrue);
-    });
+    test(
+      'TC-SCHED-02: Detecta compromisso totalmente contido em outro intervalo',
+      () {
+        final existing = [
+          AppointmentEntry(
+            id: 'appt-1',
+            title: 'Estudo Longo',
+            startTime: DateTime(2026, 10, 26, 14, 0),
+            endTime: DateTime(2026, 10, 26, 15, 0),
+            durationMinutes: 60,
+            status: 'confirmado',
+            isProvisional: false,
+            createdAt: now,
+            updatedAt: now,
+            revision: 1,
+          ),
+        ];
 
-    test('TC-SCHED-02: Detecta compromisso totalmente contido em outro intervalo', () {
-      final existing = [
-        AppointmentEntry(
-          id: 'appt-1',
-          title: 'Estudo Longo',
-          startTime: DateTime(2026, 10, 26, 14, 0),
-          endTime: DateTime(2026, 10, 26, 15, 0),
-          durationMinutes: 60,
-          status: 'confirmado',
-          isProvisional: false,
-          createdAt: now,
-          updatedAt: now,
-          revision: 1,
-        ),
-      ];
+        final result = AvailabilityEngine.checkAvailability(
+          startTime: DateTime(2026, 10, 26, 14, 15),
+          durationMinutes: 30,
+          bufferMinutes: 0,
+          existingAppointments: existing,
+        );
 
-      final result = AvailabilityEngine.checkAvailability(
-        startTime: DateTime(2026, 10, 26, 14, 15),
-        durationMinutes: 30,
-        bufferMinutes: 0,
-        existingAppointments: existing,
-      );
-
-      expect(result.isAvailable, isFalse);
-      expect(result.conflictingAppointments.first.id, equals('appt-1'));
-    });
+        expect(result.isAvailable, isFalse);
+        expect(result.conflictingAppointments.first.id, equals('appt-1'));
+      },
+    );
 
     test('TC-SCHED-03: Permite horários rigorosamente consecutivos quando não houver buffer obrigatório', () {
       final existing = [
@@ -89,42 +95,45 @@ void main() {
       expect(result.conflictingAppointments, isEmpty);
     });
 
-    test('TC-SCHED-04: Respeita intervalo/buffer de deslocamento configurado', () {
-      final existing = [
-        AppointmentEntry(
-          id: 'appt-1',
-          title: 'Visita 1',
-          startTime: DateTime(2026, 10, 26, 14, 0),
-          endTime: DateTime(2026, 10, 26, 14, 30),
+    test(
+      'TC-SCHED-04: Respeita intervalo/buffer de deslocamento configurado',
+      () {
+        final existing = [
+          AppointmentEntry(
+            id: 'appt-1',
+            title: 'Visita 1',
+            startTime: DateTime(2026, 10, 26, 14, 0),
+            endTime: DateTime(2026, 10, 26, 14, 30),
+            durationMinutes: 30,
+            status: 'confirmado',
+            isProvisional: false,
+            createdAt: now,
+            updatedAt: now,
+            revision: 1,
+          ),
+        ];
+
+        // Buffer de 15 minutos: compromisso das 14h00-14h30 requer janela livre até 14h45
+        final resultWithConflict = AvailabilityEngine.checkAvailability(
+          startTime: DateTime(2026, 10, 26, 14, 35),
           durationMinutes: 30,
-          status: 'confirmado',
-          isProvisional: false,
-          createdAt: now,
-          updatedAt: now,
-          revision: 1,
-        ),
-      ];
+          bufferMinutes: 15,
+          existingAppointments: existing,
+        );
 
-      // Buffer de 15 minutos: compromisso das 14h00-14h30 requer janela livre até 14h45
-      final resultWithConflict = AvailabilityEngine.checkAvailability(
-        startTime: DateTime(2026, 10, 26, 14, 35),
-        durationMinutes: 30,
-        bufferMinutes: 15,
-        existingAppointments: existing,
-      );
+        expect(resultWithConflict.isAvailable, isFalse);
 
-      expect(resultWithConflict.isAvailable, isFalse);
+        // Iniciando às 14h45 (após os 15 min de buffer), deve liberar
+        final resultFree = AvailabilityEngine.checkAvailability(
+          startTime: DateTime(2026, 10, 26, 14, 45),
+          durationMinutes: 30,
+          bufferMinutes: 15,
+          existingAppointments: existing,
+        );
 
-      // Iniciando às 14h45 (após os 15 min de buffer), deve liberar
-      final resultFree = AvailabilityEngine.checkAvailability(
-        startTime: DateTime(2026, 10, 26, 14, 45),
-        durationMinutes: 30,
-        bufferMinutes: 15,
-        existingAppointments: existing,
-      );
-
-      expect(resultFree.isAvailable, isTrue);
-    });
+        expect(resultFree.isAvailable, isTrue);
+      },
+    );
 
     test('TC-SCHED-05: Ignora compromissos cancelados ou reagendados para fins de colisão', () {
       final existing = [
@@ -164,33 +173,36 @@ void main() {
       expect(result.isAvailable, isTrue);
     });
 
-    test('TC-SCHED-06: Ignora compromissos com soft delete (deletedAt != null)', () {
-      final existing = [
-        AppointmentEntry(
-          id: 'appt-deleted',
-          title: 'Visita Excluída',
+    test(
+      'TC-SCHED-06: Ignora compromissos com soft delete (deletedAt != null)',
+      () {
+        final existing = [
+          AppointmentEntry(
+            id: 'appt-deleted',
+            title: 'Visita Excluída',
+            startTime: DateTime(2026, 10, 26, 14, 0),
+            endTime: DateTime(2026, 10, 26, 14, 30),
+            durationMinutes: 30,
+            status: 'confirmado',
+            isProvisional: false,
+            createdAt: now,
+            updatedAt: now,
+            deletedAt: now,
+            revision: 2,
+          ),
+        ];
+
+        final result = AvailabilityEngine.checkAvailability(
           startTime: DateTime(2026, 10, 26, 14, 0),
-          endTime: DateTime(2026, 10, 26, 14, 30),
           durationMinutes: 30,
-          status: 'confirmado',
-          isProvisional: false,
-          createdAt: now,
-          updatedAt: now,
-          deletedAt: now,
-          revision: 2,
-        ),
-      ];
+          bufferMinutes: 0,
+          existingAppointments: existing,
+        );
 
-      final result = AvailabilityEngine.checkAvailability(
-        startTime: DateTime(2026, 10, 26, 14, 0),
-        durationMinutes: 30,
-        bufferMinutes: 0,
-        existingAppointments: existing,
-      );
-
-      expect(result.isAvailable, isTrue);
-      expect(result.conflictingAppointments, isEmpty);
-    });
+        expect(result.isAvailable, isTrue);
+        expect(result.conflictingAppointments, isEmpty);
+      },
+    );
 
     test('TC-SCHED-07: Sugestões de horários alternativos são validadas contra todos os compromissos existentes e nunca colidem', () {
       // Cria agenda densa: 14h00-14h30, 14h30-15h00, 15h00-15h30
@@ -253,7 +265,11 @@ void main() {
           bufferMinutes: 0,
           existingAppointments: existing,
         );
-        expect(collides, isFalse, reason: 'Slot sugerido $slot colide com compromisso existente');
+        expect(
+          collides,
+          isFalse,
+          reason: 'Slot sugerido $slot colide com compromisso existente',
+        );
       }
     });
 
@@ -289,6 +305,116 @@ void main() {
         existingAppointments: existing,
       );
       expect(hasCollision, isFalse);
+    });
+
+    test('TC-SCHED-09: Ignora compromissos cancelados, não realizados ou reagendados', () {
+      final existing = [
+        AppointmentEntry(
+          id: 'appt-canc',
+          title: 'Visita Cancelada',
+          startTime: DateTime(2026, 10, 26, 14, 0),
+          endTime: DateTime(2026, 10, 26, 14, 30),
+          durationMinutes: 30,
+          status: 'cancelado',
+          isProvisional: false,
+          createdAt: now,
+          updatedAt: now,
+          revision: 1,
+        ),
+        AppointmentEntry(
+          id: 'appt-nao-real',
+          title: 'Visita Não Realizada',
+          startTime: DateTime(2026, 10, 26, 15, 0),
+          endTime: DateTime(2026, 10, 26, 15, 30),
+          durationMinutes: 30,
+          status: 'nao_realizado',
+          isProvisional: false,
+          createdAt: now,
+          updatedAt: now,
+          revision: 1,
+        ),
+        AppointmentEntry(
+          id: 'appt-reag',
+          title: 'Visita Reagendada',
+          startTime: DateTime(2026, 10, 26, 16, 0),
+          endTime: DateTime(2026, 10, 26, 16, 30),
+          durationMinutes: 30,
+          status: 'reagendado',
+          isProvisional: false,
+          createdAt: now,
+          updatedAt: now,
+          revision: 1,
+        ),
+      ];
+
+      for (final appt in existing) {
+        final res = AvailabilityEngine.checkAvailability(
+          startTime: appt.startTime,
+          durationMinutes: appt.durationMinutes,
+          existingAppointments: existing,
+        );
+        expect(
+          res.isAvailable,
+          isTrue,
+          reason: 'Status ${appt.status} não deve bloquear horário',
+        );
+      }
+    });
+
+    test('TC-SCHED-10: Eventos externos colidem e bloqueiam horário sem contaminar dados pastorais', () {
+      final extEvents = [
+        ExternalCalendarEventEntry(
+          id: 'ext-1',
+          provider: 'google',
+          calendarId: 'primary',
+          externalEventId: 'g_event_personal',
+          title: 'Consulta Médica Pessoal',
+          startTime: DateTime(2026, 10, 26, 14, 0),
+          endTime: DateTime(2026, 10, 26, 15, 0),
+          isAllDay: false,
+          isDeletedExternal: false,
+          createdAt: now,
+          updatedAt: now,
+          revision: 1,
+        ),
+        ExternalCalendarEventEntry(
+          id: 'ext-cancelled',
+          provider: 'google',
+          calendarId: 'primary',
+          externalEventId: 'g_event_canc',
+          title: 'Reunião Cancelada',
+          startTime: DateTime(2026, 10, 26, 16, 0),
+          endTime: DateTime(2026, 10, 26, 17, 0),
+          isAllDay: false,
+          isDeletedExternal: true, // cancelado remotamente
+          createdAt: now,
+          updatedAt: now,
+          revision: 1,
+        ),
+      ];
+
+      // Colisão com Consulta Médica Pessoal
+      final resConflict = AvailabilityEngine.checkAvailability(
+        startTime: DateTime(2026, 10, 26, 14, 30),
+        durationMinutes: 30,
+        existingAppointments: [],
+        externalEvents: extEvents,
+      );
+      expect(resConflict.isAvailable, isFalse);
+      expect(resConflict.conflictingExternalEvents.length, equals(1));
+      expect(
+        resConflict.conflictingExternalEvents.first.title,
+        equals('Consulta Médica Pessoal'),
+      );
+
+      // Evento cancelado não bloqueia
+      final resFree = AvailabilityEngine.checkAvailability(
+        startTime: DateTime(2026, 10, 26, 16, 0),
+        durationMinutes: 30,
+        existingAppointments: [],
+        externalEvents: extEvents,
+      );
+      expect(resFree.isAvailable, isTrue);
     });
   });
 }
