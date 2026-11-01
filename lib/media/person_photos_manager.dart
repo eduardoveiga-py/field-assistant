@@ -1,7 +1,9 @@
 import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import 'package:drift/drift.dart';
+
 import '../database/app_database.dart';
 import '../ui/providers.dart';
 
@@ -21,26 +23,27 @@ class PersonPhotoItem {
   });
 
   Map<String, dynamic> toMap() => {
-        'id': id,
-        'person_id': personId,
-        'photo_type': photoType,
-        'image_data': imageData,
-        'created_at': createdAt.toIso8601String(),
-      };
+    'id': id,
+    'person_id': personId,
+    'photo_type': photoType,
+    'image_data': imageData,
+    'created_at': createdAt.toIso8601String(),
+  };
 
   factory PersonPhotoItem.fromMap(Map<String, dynamic> map) => PersonPhotoItem(
-        id: map['id'] as String,
-        personId: map['person_id'] as String,
-        photoType: map['photo_type'] as String,
-        imageData: map['image_data'] as String,
-        createdAt: DateTime.parse(map['created_at'] as String),
-      );
+    id: map['id'] as String,
+    personId: map['person_id'] as String,
+    photoType: map['photo_type'] as String,
+    imageData: map['image_data'] as String,
+    createdAt: DateTime.parse(map['created_at'] as String),
+  );
 }
 
 class PersonPhotosManager {
   final AppDatabase db;
   final Uuid _uuid = const Uuid();
-  final StreamController<List<PersonPhotoItem>> _photosController = StreamController<List<PersonPhotoItem>>.broadcast();
+  final StreamController<List<PersonPhotoItem>> _photosController =
+      StreamController<List<PersonPhotoItem>>.broadcast();
   Future<void>? _initFuture;
 
   PersonPhotosManager(this.db) {
@@ -79,7 +82,9 @@ class PersonPhotosManager {
   Future<List<PersonPhotoItem>> getAllPhotos() async {
     await _initTable();
     try {
-      final rows = await db.customSelect('SELECT * FROM person_photos ORDER BY created_at DESC').get();
+      final rows = await db
+          .customSelect('SELECT * FROM person_photos ORDER BY created_at DESC')
+          .get();
       return rows.map((r) => PersonPhotoItem.fromMap(r.data)).toList();
     } catch (_) {
       return [];
@@ -94,10 +99,12 @@ class PersonPhotosManager {
   Future<List<PersonPhotoItem>> getPhotosForPerson(String personId) async {
     await _initTable();
     try {
-      final rows = await db.customSelect(
-        'SELECT * FROM person_photos WHERE person_id = ? ORDER BY created_at DESC',
-        variables: [Variable.withString(personId)],
-      ).get();
+      final rows = await db
+          .customSelect(
+            'SELECT * FROM person_photos WHERE person_id = ? ORDER BY created_at DESC',
+            variables: [Variable.withString(personId)],
+          )
+          .get();
       return rows.map((r) => PersonPhotoItem.fromMap(r.data)).toList();
     } catch (_) {
       return [];
@@ -107,10 +114,15 @@ class PersonPhotosManager {
   Future<PersonPhotoItem?> getPhoto(String personId, String photoType) async {
     await _initTable();
     try {
-      final row = await db.customSelect(
-        'SELECT * FROM person_photos WHERE person_id = ? AND photo_type = ? ORDER BY created_at DESC LIMIT 1',
-        variables: [Variable.withString(personId), Variable.withString(photoType)],
-      ).getSingleOrNull();
+      final row = await db
+          .customSelect(
+            'SELECT * FROM person_photos WHERE person_id = ? AND photo_type = ? ORDER BY created_at DESC LIMIT 1',
+            variables: [
+              Variable.withString(personId),
+              Variable.withString(photoType),
+            ],
+          )
+          .getSingleOrNull();
       return row != null ? PersonPhotoItem.fromMap(row.data) : null;
     } catch (_) {
       return null;
@@ -191,7 +203,10 @@ class PersonPhotosManager {
     await _initTable();
     await db.customUpdate(
       'DELETE FROM person_photos WHERE person_id = ? AND photo_type = ?',
-      variables: [Variable.withString(personId), Variable.withString(photoType)],
+      variables: [
+        Variable.withString(personId),
+        Variable.withString(photoType),
+      ],
     );
     await _refresh();
   }

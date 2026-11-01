@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../../experiences/experience_manager.dart';
@@ -28,7 +29,8 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
 
   void _copyExperience(MinistryExperienceItem exp) {
     final dtFormatted = AppDateUtils.formatDateTimeWithAt(exp.dateTime);
-    final text = '✨ Experiência no Ministério: ${exp.title}\n'
+    final text =
+        '✨ Experiência no Ministério: ${exp.title}\n'
         '📅 Data: $dtFormatted\n'
         '${exp.locationOrModality != null ? "Modalidade: ${exp.locationOrModality}\n" : ""}'
         '${exp.tags.isNotEmpty ? "Tags: ${exp.tags.join(', ')}\n" : ""}\n'
@@ -36,7 +38,9 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
 
     Clipboard.setData(ClipboardData(text: text));
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Experiência copiada para a área de transferência!')),
+      const SnackBar(
+        content: Text('Experiência copiada para a área de transferência!'),
+      ),
     );
   }
 
@@ -53,10 +57,21 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
             child: pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
-                pw.Text('Relato de Experiências do Ministério',
-                    style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900)),
-                pw.Text('${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}',
-                    style: const pw.TextStyle(fontSize: 12, color: PdfColors.grey700)),
+                pw.Text(
+                  'Relato de Experiências do Ministério',
+                  style: pw.TextStyle(
+                    fontSize: 18,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColors.blue900,
+                  ),
+                ),
+                pw.Text(
+                  '${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}',
+                  style: const pw.TextStyle(
+                    fontSize: 12,
+                    color: PdfColors.grey700,
+                  ),
+                ),
               ],
             ),
           ),
@@ -75,23 +90,48 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
                   pw.Row(
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
-                      pw.Text(exp.title, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+                      pw.Text(
+                        exp.title,
+                        style: pw.TextStyle(
+                          fontSize: 14,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
                       pw.Text(
                         '${exp.dateTime.day}/${exp.dateTime.month}/${exp.dateTime.year} às ${exp.dateTime.hour.toString().padLeft(2, '0')}:${exp.dateTime.minute.toString().padLeft(2, '0')}',
-                        style: const pw.TextStyle(fontSize: 11, color: PdfColors.grey700),
+                        style: const pw.TextStyle(
+                          fontSize: 11,
+                          color: PdfColors.grey700,
+                        ),
                       ),
                     ],
                   ),
-                  if (exp.locationOrModality != null && exp.locationOrModality!.isNotEmpty) ...[
+                  if (exp.locationOrModality != null &&
+                      exp.locationOrModality!.isNotEmpty) ...[
                     pw.SizedBox(height: 4),
-                    pw.Text('Modalidade: ${exp.locationOrModality}', style: const pw.TextStyle(fontSize: 11, color: PdfColors.blue700)),
+                    pw.Text(
+                      'Modalidade: ${exp.locationOrModality}',
+                      style: const pw.TextStyle(
+                        fontSize: 11,
+                        color: PdfColors.blue700,
+                      ),
+                    ),
                   ],
                   if (exp.tags.isNotEmpty) ...[
                     pw.SizedBox(height: 4),
-                    pw.Text('Tags: ${exp.tags.join(", ")}', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey600)),
+                    pw.Text(
+                      'Tags: ${exp.tags.join(", ")}',
+                      style: const pw.TextStyle(
+                        fontSize: 10,
+                        color: PdfColors.grey600,
+                      ),
+                    ),
                   ],
                   pw.SizedBox(height: 8),
-                  pw.Text(exp.content, style: const pw.TextStyle(fontSize: 11, lineSpacing: 1.3)),
+                  pw.Text(
+                    exp.content,
+                    style: const pw.TextStyle(fontSize: 11, lineSpacing: 1.3),
+                  ),
                 ],
               ),
             ),
@@ -106,9 +146,14 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
     );
   }
 
-  void _showAddEditExperienceModal(BuildContext context, {MinistryExperienceItem? existing}) {
+  void _showAddEditExperienceModal(
+    BuildContext context, {
+    MinistryExperienceItem? existing,
+  }) {
     final titleController = TextEditingController(text: existing?.title ?? '');
-    final contentController = TextEditingController(text: existing?.content ?? '');
+    final contentController = TextEditingController(
+      text: existing?.content ?? '',
+    );
     DateTime chosenDate = existing?.dateTime ?? DateTime.now();
     TimeOfDay chosenTime = TimeOfDay.fromDateTime(chosenDate);
     String selectedModality = existing?.locationOrModality ?? 'De Casa em Casa';
@@ -123,7 +168,9 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
           final isDark = Theme.of(ctx).brightness == Brightness.dark;
           return Dialog(
             backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 580, maxHeight: 720),
               child: Padding(
@@ -135,12 +182,23 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
                     // Cabeçalho com Título e Fechar
                     Row(
                       children: [
-                        Icon(existing != null ? Icons.edit_note : Icons.auto_stories, color: AppTheme.accentTeal, size: 26),
+                        Icon(
+                          existing != null
+                              ? Icons.edit_note
+                              : Icons.auto_stories,
+                          color: AppTheme.accentTeal,
+                          size: 26,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            existing != null ? 'Editar Experiência' : 'Relatar Nova Experiência',
-                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                            existing != null
+                                ? 'Editar Experiência'
+                                : 'Relatar Nova Experiência',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -172,27 +230,44 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
                               children: [
                                 Expanded(
                                   child: OutlinedButton.icon(
-                                    icon: const Icon(Icons.date_range, size: 16),
-                                    label: Text('${chosenDate.day}/${chosenDate.month}/${chosenDate.year}'),
+                                    icon: const Icon(
+                                      Icons.date_range,
+                                      size: 16,
+                                    ),
+                                    label: Text(
+                                      '${chosenDate.day}/${chosenDate.month}/${chosenDate.year}',
+                                    ),
                                     onPressed: () async {
                                       final p = await showDatePicker(
                                         context: context,
                                         initialDate: chosenDate,
                                         firstDate: DateTime(2020),
-                                        lastDate: DateTime.now().add(const Duration(days: 30)),
+                                        lastDate: DateTime.now().add(
+                                          const Duration(days: 30),
+                                        ),
                                       );
-                                      if (p != null) setDialogState(() => chosenDate = p);
+                                      if (p != null)
+                                        setDialogState(() => chosenDate = p);
                                     },
                                   ),
                                 ),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: OutlinedButton.icon(
-                                    icon: const Icon(Icons.access_time, size: 16),
-                                    label: Text('${chosenTime.hour.toString().padLeft(2, '0')}:${chosenTime.minute.toString().padLeft(2, '0')}'),
+                                    icon: const Icon(
+                                      Icons.access_time,
+                                      size: 16,
+                                    ),
+                                    label: Text(
+                                      '${chosenTime.hour.toString().padLeft(2, '0')}:${chosenTime.minute.toString().padLeft(2, '0')}',
+                                    ),
                                     onPressed: () async {
-                                      final t = await showTimePicker(context: context, initialTime: chosenTime);
-                                      if (t != null) setDialogState(() => chosenTime = t);
+                                      final t = await showTimePicker(
+                                        context: context,
+                                        initialTime: chosenTime,
+                                      );
+                                      if (t != null)
+                                        setDialogState(() => chosenTime = t);
                                     },
                                   ),
                                 ),
@@ -201,16 +276,34 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
                             const SizedBox(height: 10),
                             DropdownButtonFormField<String>(
                               initialValue: selectedModality,
-                              decoration: const InputDecoration(labelText: 'Modalidade / Local'),
+                              decoration: const InputDecoration(
+                                labelText: 'Modalidade / Local',
+                              ),
                               items: const [
-                                DropdownMenuItem(value: 'De Casa em Casa', child: Text('🏠 De Casa em Casa')),
-                                DropdownMenuItem(value: 'TPL / Carrinho', child: Text('🛒 TPL (Testemunho Público)')),
-                                DropdownMenuItem(value: 'Testemunho Informal', child: Text('💬 Testemunho Informal')),
-                                DropdownMenuItem(value: 'Telefone', child: Text('📞 Telefone / Cartas')),
-                                DropdownMenuItem(value: 'Revisita / Estudo', child: Text('📖 Revisita / Estudo Bíblico')),
+                                DropdownMenuItem(
+                                  value: 'De Casa em Casa',
+                                  child: Text('🏠 De Casa em Casa'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'TPL / Carrinho',
+                                  child: Text('🛒 TPL (Testemunho Público)'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'Testemunho Informal',
+                                  child: Text('💬 Testemunho Informal'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'Telefone',
+                                  child: Text('📞 Telefone / Cartas'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'Revisita / Estudo',
+                                  child: Text('📖 Revisita / Estudo Bíblico'),
+                                ),
                               ],
                               onChanged: (val) {
-                                if (val != null) setDialogState(() => selectedModality = val);
+                                if (val != null)
+                                  setDialogState(() => selectedModality = val);
                               },
                             ),
                             const SizedBox(height: 12),
@@ -228,12 +321,25 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                const Text('Fotos / Mídias Anexadas:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                const Text(
+                                  'Fotos / Mídias Anexadas:',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                ),
                                 IconButton.filledTonal(
-                                  icon: const Icon(Icons.add_photo_alternate, size: 18),
+                                  icon: const Icon(
+                                    Icons.add_photo_alternate,
+                                    size: 18,
+                                  ),
                                   tooltip: 'Adicionar Foto / Vídeo',
                                   onPressed: () async {
-                                    final img = await MediaPickerHelper.pickImage(context, title: 'Adicionar Foto à Experiência');
+                                    final img =
+                                        await MediaPickerHelper.pickImage(
+                                          context,
+                                          title: 'Adicionar Foto à Experiência',
+                                        );
                                     if (img != null && img.isNotEmpty) {
                                       setDialogState(() => mediaList.add(img));
                                     }
@@ -254,23 +360,41 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
                                         width: 70,
                                         height: 70,
                                         decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(8),
-                                          border: Border.all(color: Colors.grey.shade300),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                          border: Border.all(
+                                            color: Colors.grey.shade300,
+                                          ),
                                         ),
                                         child: ClipRRect(
-                                          borderRadius: BorderRadius.circular(8),
-                                          child: MediaPickerHelper.buildImageWidget(mediaList[i]),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                          child:
+                                              MediaPickerHelper.buildImageWidget(
+                                                mediaList[i],
+                                              ),
                                         ),
                                       ),
                                       Positioned(
                                         top: -4,
                                         right: -4,
                                         child: InkWell(
-                                          onTap: () => setDialogState(() => mediaList.removeAt(i)),
+                                          onTap: () => setDialogState(
+                                            () => mediaList.removeAt(i),
+                                          ),
                                           child: Container(
                                             padding: const EdgeInsets.all(2),
-                                            decoration: const BoxDecoration(color: Colors.black87, shape: BoxShape.circle),
-                                            child: const Icon(Icons.close, color: Colors.white, size: 14),
+                                            decoration: const BoxDecoration(
+                                              color: Colors.black87,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(
+                                              Icons.close,
+                                              color: Colors.white,
+                                              size: 14,
+                                            ),
                                           ),
                                         ),
                                       ),
@@ -282,15 +406,25 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
 
                             const SizedBox(height: 12),
                             // TAGS
-                            const Text('Tags da Experiência:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                            const Text(
+                              'Tags da Experiência:',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
                             const SizedBox(height: 6),
                             Wrap(
                               spacing: 6,
                               children: tags.map((t) {
                                 return Chip(
-                                  label: Text(t, style: const TextStyle(fontSize: 11)),
+                                  label: Text(
+                                    t,
+                                    style: const TextStyle(fontSize: 11),
+                                  ),
                                   deleteIcon: const Icon(Icons.close, size: 14),
-                                  onDeleted: () => setDialogState(() => tags.remove(t)),
+                                  onDeleted: () =>
+                                      setDialogState(() => tags.remove(t)),
                                   visualDensity: VisualDensity.compact,
                                 );
                               }).toList(),
@@ -308,10 +442,14 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
                                   ),
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.add_circle, color: AppTheme.accentTeal),
+                                  icon: const Icon(
+                                    Icons.add_circle,
+                                    color: AppTheme.accentTeal,
+                                  ),
                                   onPressed: () {
                                     final text = tagInputController.text.trim();
-                                    if (text.isNotEmpty && !tags.contains(text)) {
+                                    if (text.isNotEmpty &&
+                                        !tags.contains(text)) {
                                       setDialogState(() {
                                         tags.add(text);
                                         tagInputController.clear();
@@ -330,7 +468,10 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('Cancelar'),
+                        ),
                         const SizedBox(width: 8),
                         ElevatedButton.icon(
                           icon: const Icon(Icons.check, size: 18),
@@ -344,26 +485,38 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
                             final content = contentController.text.trim();
                             if (title.isEmpty || content.isEmpty) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Informe ao menos o título e o relato da experiência.')),
+                                const SnackBar(
+                                  content: Text(
+                                    'Informe ao menos o título e o relato da experiência.',
+                                  ),
+                                ),
                               );
                               return;
                             }
 
-                            final dt = DateTime(chosenDate.year, chosenDate.month, chosenDate.day, chosenTime.hour, chosenTime.minute);
+                            final dt = DateTime(
+                              chosenDate.year,
+                              chosenDate.month,
+                              chosenDate.day,
+                              chosenTime.hour,
+                              chosenTime.minute,
+                            );
                             final mgr = ref.read(experienceManagerProvider);
 
                             if (existing != null) {
-                              await mgr.updateExperience(MinistryExperienceItem(
-                                id: existing.id,
-                                title: title,
-                                content: content,
-                                mediaUrls: mediaList,
-                                tags: tags,
-                                dateTime: dt,
-                                locationOrModality: selectedModality,
-                                createdAt: existing.createdAt,
-                                updatedAt: DateTime.now(),
-                              ));
+                              await mgr.updateExperience(
+                                MinistryExperienceItem(
+                                  id: existing.id,
+                                  title: title,
+                                  content: content,
+                                  mediaUrls: mediaList,
+                                  tags: tags,
+                                  dateTime: dt,
+                                  locationOrModality: selectedModality,
+                                  createdAt: existing.createdAt,
+                                  updatedAt: DateTime.now(),
+                                ),
+                              );
                             } else {
                               await mgr.addExperience(
                                 title: title,
@@ -378,7 +531,13 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
                             if (ctx.mounted) Navigator.pop(ctx);
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text(existing != null ? 'Experiência atualizada!' : 'Experiência salva com sucesso!')),
+                                SnackBar(
+                                  content: Text(
+                                    existing != null
+                                        ? 'Experiência atualizada!'
+                                        : 'Experiência salva com sucesso!',
+                                  ),
+                                ),
                               );
                             }
                           },
@@ -409,13 +568,15 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
     final query = _searchController.text.trim().toLowerCase();
     final filtered = experiences.where((exp) {
       if (query.isNotEmpty) {
-        final matches = exp.title.toLowerCase().contains(query) ||
+        final matches =
+            exp.title.toLowerCase().contains(query) ||
             exp.content.toLowerCase().contains(query) ||
             (exp.locationOrModality ?? '').toLowerCase().contains(query) ||
             exp.tags.any((t) => t.toLowerCase().contains(query));
         if (!matches) return false;
       }
-      if (_selectedTagFilter != null && !exp.tags.contains(_selectedTagFilter)) {
+      if (_selectedTagFilter != null &&
+          !exp.tags.contains(_selectedTagFilter)) {
         return false;
       }
       return true;
@@ -480,8 +641,11 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
                     child: FilterChip(
                       label: const Text('Todas'),
                       selected: _selectedTagFilter == null,
-                      onSelected: (val) => setState(() => _selectedTagFilter = null),
-                      selectedColor: AppTheme.accentTeal.withValues(alpha: 0.15),
+                      onSelected: (val) =>
+                          setState(() => _selectedTagFilter = null),
+                      selectedColor: AppTheme.accentTeal.withValues(
+                        alpha: 0.15,
+                      ),
                       checkmarkColor: AppTheme.accentTeal,
                     ),
                   ),
@@ -491,8 +655,11 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
                       child: FilterChip(
                         label: Text('#$t'),
                         selected: _selectedTagFilter == t,
-                        onSelected: (val) => setState(() => _selectedTagFilter = val ? t : null),
-                        selectedColor: AppTheme.accentTeal.withValues(alpha: 0.2),
+                        onSelected: (val) =>
+                            setState(() => _selectedTagFilter = val ? t : null),
+                        selectedColor: AppTheme.accentTeal.withValues(
+                          alpha: 0.2,
+                        ),
                       ),
                     ),
                 ],
@@ -510,14 +677,23 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.auto_stories_outlined, size: 56, color: Colors.grey.shade400),
+                          Icon(
+                            Icons.auto_stories_outlined,
+                            size: 56,
+                            color: Colors.grey.shade400,
+                          ),
                           const SizedBox(height: 12),
                           Text(
                             query.isEmpty
                                 ? 'Nenhuma experiência relatada ainda.\nToque em "+ Relatar Experiência" para guardar seus momentos especiais de pregação.'
                                 : 'Nenhuma experiência encontrada para "$query".',
                             textAlign: TextAlign.center,
-                            style: TextStyle(color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted, fontSize: 14),
+                            style: TextStyle(
+                              color: isDark
+                                  ? const Color(0xFFCBD5E1)
+                                  : AppTheme.textMuted,
+                              fontSize: 14,
+                            ),
                           ),
                         ],
                       ),
@@ -528,7 +704,9 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
                     itemCount: filtered.length,
                     itemBuilder: (context, index) {
                       final exp = filtered[index];
-                      final dtFormatted = AppDateUtils.formatDateTimeWithAt(exp.dateTime);
+                      final dtFormatted = AppDateUtils.formatDateTimeWithAt(
+                        exp.dateTime,
+                      );
 
                       return Card(
                         margin: const EdgeInsets.only(bottom: 12),
@@ -543,29 +721,60 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
                                   Container(
                                     padding: const EdgeInsets.all(8),
                                     decoration: BoxDecoration(
-                                      color: AppTheme.accentTeal.withValues(alpha: 0.12),
+                                      color: AppTheme.accentTeal.withValues(
+                                        alpha: 0.12,
+                                      ),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
-                                    child: const Icon(Icons.bookmark_added, color: AppTheme.accentTeal, size: 22),
+                                    child: const Icon(
+                                      Icons.bookmark_added,
+                                      color: AppTheme.accentTeal,
+                                      size: 22,
+                                    ),
                                   ),
                                   const SizedBox(width: 10),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           exp.title,
-                                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
                                         const SizedBox(height: 3),
                                         Row(
                                           children: [
-                                            const Icon(Icons.access_time, size: 12, color: AppTheme.textMuted),
+                                            const Icon(
+                                              Icons.access_time,
+                                              size: 12,
+                                              color: AppTheme.textMuted,
+                                            ),
                                             const SizedBox(width: 4),
-                                            Text(dtFormatted, style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
-                                            if (exp.locationOrModality != null && exp.locationOrModality!.isNotEmpty) ...[
+                                            Text(
+                                              dtFormatted,
+                                              style: const TextStyle(
+                                                fontSize: 11,
+                                                color: AppTheme.textMuted,
+                                              ),
+                                            ),
+                                            if (exp.locationOrModality !=
+                                                    null &&
+                                                exp
+                                                    .locationOrModality!
+                                                    .isNotEmpty) ...[
                                               const SizedBox(width: 8),
-                                              Text('• ${exp.locationOrModality!}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.accentTeal)),
+                                              Text(
+                                                '• ${exp.locationOrModality!}',
+                                                style: const TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: AppTheme.accentTeal,
+                                                ),
+                                              ),
                                             ],
                                           ],
                                         ),
@@ -576,20 +785,36 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
                                     padding: EdgeInsets.zero,
                                     onSelected: (val) async {
                                       if (val == 'edit') {
-                                        _showAddEditExperienceModal(context, existing: exp);
+                                        _showAddEditExperienceModal(
+                                          context,
+                                          existing: exp,
+                                        );
                                       } else if (val == 'delete') {
-                                        final mgr = ref.read(experienceManagerProvider);
+                                        final mgr = ref.read(
+                                          experienceManagerProvider,
+                                        );
                                         await mgr.deleteExperience(exp.id);
                                         if (context.mounted) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(content: Text('Experiência removida.')),
-                                          );
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                    'Experiência removida.',
+                                                  ),
+                                                ),
+                                              );
                                         }
                                       }
                                     },
                                     itemBuilder: (_) => const [
-                                      PopupMenuItem(value: 'edit', child: Text('Editar')),
-                                      PopupMenuItem(value: 'delete', child: Text('Excluir')),
+                                      PopupMenuItem(
+                                        value: 'edit',
+                                        child: Text('Editar'),
+                                      ),
+                                      PopupMenuItem(
+                                        value: 'delete',
+                                        child: Text('Excluir'),
+                                      ),
                                     ],
                                   ),
                                 ],
@@ -600,7 +825,9 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
                                 style: TextStyle(
                                   fontSize: 13,
                                   height: 1.4,
-                                  color: isDark ? AppTheme.darkTextPrimary : AppTheme.textDark,
+                                  color: isDark
+                                      ? AppTheme.darkTextPrimary
+                                      : AppTheme.textDark,
                                 ),
                               ),
 
@@ -615,22 +842,34 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
                                     itemBuilder: (ctx, i) {
                                       final img = exp.mediaUrls[i];
                                       return GestureDetector(
-                                        onTap: () => MediaPickerHelper.showFullScreenImage(
-                                          context,
-                                          imageSource: img,
-                                          title: exp.title,
-                                        ),
+                                        onTap: () =>
+                                            MediaPickerHelper.showFullScreenImage(
+                                              context,
+                                              imageSource: img,
+                                              title: exp.title,
+                                            ),
                                         child: Container(
-                                          margin: const EdgeInsets.only(right: 8),
+                                          margin: const EdgeInsets.only(
+                                            right: 8,
+                                          ),
                                           width: 80,
                                           height: 80,
                                           decoration: BoxDecoration(
-                                            borderRadius: BorderRadius.circular(8),
-                                            border: Border.all(color: Colors.grey.shade300),
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                            border: Border.all(
+                                              color: Colors.grey.shade300,
+                                            ),
                                           ),
                                           child: ClipRRect(
-                                            borderRadius: BorderRadius.circular(8),
-                                            child: MediaPickerHelper.buildImageWidget(img),
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                            child:
+                                                MediaPickerHelper.buildImageWidget(
+                                                  img,
+                                                ),
                                           ),
                                         ),
                                       );
@@ -645,12 +884,24 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
                                   spacing: 4,
                                   children: exp.tags.map((t) {
                                     return Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
                                       decoration: BoxDecoration(
-                                        color: AppTheme.accentTeal.withValues(alpha: 0.1),
+                                        color: AppTheme.accentTeal.withValues(
+                                          alpha: 0.1,
+                                        ),
                                         borderRadius: BorderRadius.circular(4),
                                       ),
-                                      child: Text('#$t', style: const TextStyle(fontSize: 10, color: AppTheme.accentTeal, fontWeight: FontWeight.bold)),
+                                      child: Text(
+                                        '#$t',
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          color: AppTheme.accentTeal,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
                                     );
                                   }).toList(),
                                 ),
@@ -661,9 +912,14 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
                                 mainAxisAlignment: MainAxisAlignment.end,
                                 children: [
                                   OutlinedButton.icon(
-                                    style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
+                                    style: OutlinedButton.styleFrom(
+                                      visualDensity: VisualDensity.compact,
+                                    ),
                                     icon: const Icon(Icons.copy, size: 14),
-                                    label: const Text('Copiar Relato', style: TextStyle(fontSize: 11)),
+                                    label: const Text(
+                                      'Copiar Relato',
+                                      style: TextStyle(fontSize: 11),
+                                    ),
                                     onPressed: () => _copyExperience(exp),
                                   ),
                                   const SizedBox(width: 8),
@@ -673,8 +929,14 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
                                       foregroundColor: Colors.white,
                                       visualDensity: VisualDensity.compact,
                                     ),
-                                    icon: const Icon(Icons.picture_as_pdf, size: 14),
-                                    label: const Text('Exportar PDF', style: TextStyle(fontSize: 11)),
+                                    icon: const Icon(
+                                      Icons.picture_as_pdf,
+                                      size: 14,
+                                    ),
+                                    label: const Text(
+                                      'Exportar PDF',
+                                      style: TextStyle(fontSize: 11),
+                                    ),
                                     onPressed: () => _exportPdf([exp]),
                                   ),
                                 ],

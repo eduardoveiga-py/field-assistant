@@ -442,7 +442,7 @@ void main() {
         equals(4),
       );
       await appDbReopened.close();
-      sqliteDb.dispose();
+      sqliteDb.close();
     });
   });
 }

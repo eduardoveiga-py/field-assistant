@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import 'package:drift/drift.dart';
+
 import '../database/app_database.dart';
 import '../database/repository.dart';
 import '../ui/providers.dart';
@@ -20,7 +22,8 @@ class PhoneContactItem {
   final String? socialHandle;
   final String? notes;
   final List<String> tags;
-  final String origin; // 'Rua', 'TPL / Carrinho', 'Informal', 'Telefone', 'Outro'
+  final String
+  origin; // 'Rua', 'TPL / Carrinho', 'Informal', 'Telefone', 'Outro'
   final String? convertedPersonId;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -44,22 +47,22 @@ class PhoneContactItem {
   });
 
   Map<String, dynamic> toMap() => {
-        'id': id,
-        'name': name,
-        'phone': phone,
-        'secondary_phone': secondaryPhone,
-        'has_whatsapp': hasWhatsApp ? 1 : 0,
-        'whatsapp_info': whatsAppInfo,
-        'has_social': hasSocial ? 1 : 0,
-        'social_platform': socialPlatform,
-        'social_handle': socialHandle,
-        'notes': notes,
-        'tags': jsonEncode(tags),
-        'origin': origin,
-        'converted_person_id': convertedPersonId,
-        'created_at': createdAt.toIso8601String(),
-        'updated_at': updatedAt.toIso8601String(),
-      };
+    'id': id,
+    'name': name,
+    'phone': phone,
+    'secondary_phone': secondaryPhone,
+    'has_whatsapp': hasWhatsApp ? 1 : 0,
+    'whatsapp_info': whatsAppInfo,
+    'has_social': hasSocial ? 1 : 0,
+    'social_platform': socialPlatform,
+    'social_handle': socialHandle,
+    'notes': notes,
+    'tags': jsonEncode(tags),
+    'origin': origin,
+    'converted_person_id': convertedPersonId,
+    'created_at': createdAt.toIso8601String(),
+    'updated_at': updatedAt.toIso8601String(),
+  };
 
   factory PhoneContactItem.fromMap(Map<String, dynamic> map) {
     List<String> parsedTags = [];
@@ -96,7 +99,8 @@ class PhoneContactItem {
 class PhoneContactsManager {
   final AppDatabase db;
   final Uuid _uuid = const Uuid();
-  final StreamController<List<PhoneContactItem>> _controller = StreamController<List<PhoneContactItem>>.broadcast();
+  final StreamController<List<PhoneContactItem>> _controller =
+      StreamController<List<PhoneContactItem>>.broadcast();
 
   PhoneContactsManager(this.db);
 
@@ -123,28 +127,34 @@ class PhoneContactsManager {
 
   Future<List<PhoneContactItem>> getAllPhoneContacts() async {
     try {
-      final rows = await (db.select(db.phoneContacts)
-            ..where((t) => t.deletedAt.isNull())
-            ..orderBy([(t) => OrderingTerm(expression: t.name, mode: OrderingMode.asc)]))
-          .get();
+      final rows =
+          await (db.select(db.phoneContacts)
+                ..where((t) => t.deletedAt.isNull())
+                ..orderBy([
+                  (t) =>
+                      OrderingTerm(expression: t.name, mode: OrderingMode.asc),
+                ]))
+              .get();
       return rows
-          .map((r) => PhoneContactItem(
-                id: r.id,
-                name: r.name,
-                phone: r.phone,
-                secondaryPhone: r.secondaryPhone,
-                hasWhatsApp: r.hasWhatsapp,
-                whatsAppInfo: r.whatsappInfo,
-                hasSocial: r.hasSocial,
-                socialPlatform: r.socialPlatform,
-                socialHandle: r.socialHandle,
-                notes: r.notes,
-                tags: _parseTags(r.tags),
-                origin: r.origin,
-                convertedPersonId: r.convertedPersonId,
-                createdAt: r.createdAt,
-                updatedAt: r.updatedAt,
-              ))
+          .map(
+            (r) => PhoneContactItem(
+              id: r.id,
+              name: r.name,
+              phone: r.phone,
+              secondaryPhone: r.secondaryPhone,
+              hasWhatsApp: r.hasWhatsapp,
+              whatsAppInfo: r.whatsappInfo,
+              hasSocial: r.hasSocial,
+              socialPlatform: r.socialPlatform,
+              socialHandle: r.socialHandle,
+              notes: r.notes,
+              tags: _parseTags(r.tags),
+              origin: r.origin,
+              convertedPersonId: r.convertedPersonId,
+              createdAt: r.createdAt,
+              updatedAt: r.updatedAt,
+            ),
+          )
           .toList();
     } catch (_) {
       return [];
@@ -172,7 +182,9 @@ class PhoneContactsManager {
     final now = DateTime.now();
     final id = _uuid.v4();
 
-    await db.into(db.phoneContacts).insert(
+    await db
+        .into(db.phoneContacts)
+        .insert(
           PhoneContactsCompanion.insert(
             id: id,
             name: name.trim(),
@@ -211,17 +223,19 @@ class PhoneContactsManager {
     );
 
     try {
-      await db.into(db.syncQueue).insert(
-        SyncQueueCompanion.insert(
-          id: _uuid.v4(),
-          entityType: 'phone_contacts',
-          entityId: id,
-          operation: 'INSERT',
-          payload: jsonEncode(item.toMap()),
-          createdAt: now,
-          status: const Value('pending'),
-        ),
-      );
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: _uuid.v4(),
+              entityType: 'phone_contacts',
+              entityId: id,
+              operation: 'INSERT',
+              payload: jsonEncode(item.toMap()),
+              createdAt: now,
+              status: const Value('pending'),
+            ),
+          );
     } catch (_) {}
 
     await _refresh();
@@ -230,7 +244,9 @@ class PhoneContactsManager {
 
   Future<void> updatePhoneContact(PhoneContactItem contact) async {
     final now = DateTime.now();
-    await (db.update(db.phoneContacts)..where((t) => t.id.equals(contact.id))).write(
+    await (db.update(
+      db.phoneContacts,
+    )..where((t) => t.id.equals(contact.id))).write(
       PhoneContactsCompanion(
         name: Value(contact.name.trim()),
         phone: Value(contact.phone.trim()),
@@ -249,17 +265,19 @@ class PhoneContactsManager {
     );
 
     try {
-      await db.into(db.syncQueue).insert(
-        SyncQueueCompanion.insert(
-          id: _uuid.v4(),
-          entityType: 'phone_contacts',
-          entityId: contact.id,
-          operation: 'UPDATE',
-          payload: jsonEncode(contact.toMap()),
-          createdAt: now,
-          status: const Value('pending'),
-        ),
-      );
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: _uuid.v4(),
+              entityType: 'phone_contacts',
+              entityId: contact.id,
+              operation: 'UPDATE',
+              payload: jsonEncode(contact.toMap()),
+              createdAt: now,
+              status: const Value('pending'),
+            ),
+          );
     } catch (_) {}
 
     await _refresh();
@@ -268,24 +286,26 @@ class PhoneContactsManager {
   Future<void> deletePhoneContact(String id) async {
     final now = DateTime.now();
     await (db.update(db.phoneContacts)..where((t) => t.id.equals(id))).write(
-      PhoneContactsCompanion(
-        deletedAt: Value(now),
-        updatedAt: Value(now),
-      ),
+      PhoneContactsCompanion(deletedAt: Value(now), updatedAt: Value(now)),
     );
 
     try {
-      await db.into(db.syncQueue).insert(
-        SyncQueueCompanion.insert(
-          id: _uuid.v4(),
-          entityType: 'phone_contacts',
-          entityId: id,
-          operation: 'DELETE',
-          payload: jsonEncode({'id': id, 'deleted_at': now.toIso8601String()}),
-          createdAt: now,
-          status: const Value('pending'),
-        ),
-      );
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: _uuid.v4(),
+              entityType: 'phone_contacts',
+              entityId: id,
+              operation: 'DELETE',
+              payload: jsonEncode({
+                'id': id,
+                'deleted_at': now.toIso8601String(),
+              }),
+              createdAt: now,
+              status: const Value('pending'),
+            ),
+          );
     } catch (_) {}
 
     await _refresh();
@@ -312,7 +332,9 @@ class PhoneContactsManager {
     );
 
     // Marca o contato telefônico com o personId vinculado
-    await (db.update(db.phoneContacts)..where((t) => t.id.equals(contact.id))).write(
+    await (db.update(
+      db.phoneContacts,
+    )..where((t) => t.id.equals(contact.id))).write(
       PhoneContactsCompanion(
         convertedPersonId: Value(person.id),
         updatedAt: Value(DateTime.now()),
@@ -329,7 +351,9 @@ final phoneContactsManagerProvider = Provider<PhoneContactsManager>((ref) {
   return PhoneContactsManager(repo.db);
 });
 
-final phoneContactsStreamProvider = StreamProvider<List<PhoneContactItem>>((ref) {
+final phoneContactsStreamProvider = StreamProvider<List<PhoneContactItem>>((
+  ref,
+) {
   final mgr = ref.watch(phoneContactsManagerProvider);
   return mgr.watchPhoneContacts();
 });

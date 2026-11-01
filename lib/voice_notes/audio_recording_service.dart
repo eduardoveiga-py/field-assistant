@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
@@ -47,7 +48,8 @@ class RealAudioRecordingService implements AudioRecordingService {
   DateTime? _startedAt;
   String? _currentFilePath;
 
-  final StreamController<int> _durationController = StreamController<int>.broadcast();
+  final StreamController<int> _durationController =
+      StreamController<int>.broadcast();
 
   @override
   bool get isRecording => _isRecording;
@@ -214,7 +216,8 @@ class LocalAudioRecordingService implements AudioRecordingService {
   DateTime? _startedAt;
   String? _currentFilePath;
 
-  final StreamController<int> _durationController = StreamController<int>.broadcast();
+  final StreamController<int> _durationController =
+      StreamController<int>.broadcast();
 
   @override
   bool get isRecording => _isRecording;
@@ -321,7 +324,9 @@ class LocalAudioRecordingService implements AudioRecordingService {
     _isRecording = false;
     _elapsedSeconds = 0;
 
-    if (_currentFilePath != null && !kIsWeb && _currentFilePath!.startsWith('/')) {
+    if (_currentFilePath != null &&
+        !kIsWeb &&
+        _currentFilePath!.startsWith('/')) {
       try {
         final file = File(_currentFilePath!);
         if (file.existsSync()) {
@@ -357,8 +362,10 @@ abstract class AudioPlayerService {
 /// Implementação real do player de áudio usando package:audioplayers.
 class RealAudioPlayerService implements AudioPlayerService {
   final AudioPlayer _player = AudioPlayer();
-  final StreamController<Duration> _posController = StreamController<Duration>.broadcast();
-  final StreamController<bool> _stateController = StreamController<bool>.broadcast();
+  final StreamController<Duration> _posController =
+      StreamController<Duration>.broadcast();
+  final StreamController<bool> _stateController =
+      StreamController<bool>.broadcast();
   StreamSubscription<Duration>? _posSub;
   StreamSubscription<PlayerState>? _stateSub;
   bool _isPlaying = false;
@@ -392,8 +399,11 @@ class RealAudioPlayerService implements AudioPlayerService {
       Source source;
       if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
         source = UrlSource(filePath);
-      } else if (filePath.startsWith('asset://') || filePath.startsWith('assets/')) {
-        source = AssetSource(filePath.replaceFirst('asset://', '').replaceFirst('assets/', ''));
+      } else if (filePath.startsWith('asset://') ||
+          filePath.startsWith('assets/')) {
+        source = AssetSource(
+          filePath.replaceFirst('asset://', '').replaceFirst('assets/', ''),
+        );
       } else {
         source = DeviceFileSource(filePath);
       }
@@ -440,8 +450,10 @@ class LocalAudioPlayerService implements AudioPlayerService {
   bool _isPlaying = false;
   Timer? _ticker;
   int _currentPosSeconds = 0;
-  final StreamController<Duration> _posController = StreamController<Duration>.broadcast();
-  final StreamController<bool> _stateController = StreamController<bool>.broadcast();
+  final StreamController<Duration> _posController =
+      StreamController<Duration>.broadcast();
+  final StreamController<bool> _stateController =
+      StreamController<bool>.broadcast();
 
   @override
   bool get isPlaying => _isPlaying;

@@ -18,7 +18,11 @@ END:VCALENDAR
 ''';
 
       final events = IcsCalendarHelper.parseIcsEvents(icsMissingDtStart);
-      expect(events, isEmpty, reason: 'Evento sem DTSTART deve ser estritamente descartado segundo RFC 5545');
+      expect(
+        events,
+        isEmpty,
+        reason: 'Evento sem DTSTART deve ser estritamente descartado segundo RFC 5545',
+      );
     });
 
     test('parseIcsDateTime retorna null para formato inválido (nunca inventa datas fictícias)', () {
@@ -119,7 +123,10 @@ END:VCALENDAR
       final ics = IcsCalendarHelper.generateIcsCalendar(appts);
 
       expect(ics, contains('BEGIN:VCALENDAR'));
-      expect(ics, contains('PRODID:-//Território Ministério Pessoal//Agenda//PT'));
+      expect(
+        ics,
+        contains('PRODID:-//Território Ministério Pessoal//Agenda//PT'),
+      );
       expect(ics, contains('VERSION:2.0'));
       expect(ics, contains('BEGIN:VEVENT'));
       expect(ics, contains('UID:appt_101@territorio.app'));

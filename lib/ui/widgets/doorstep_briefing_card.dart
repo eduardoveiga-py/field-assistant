@@ -1,6 +1,8 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+
 import '../../contacts/doorstep_briefing_helper.dart';
 import '../../core/app_theme.dart';
 import '../../voice_notes/audio_recording_service.dart';
@@ -76,7 +78,8 @@ class _DoorstepBriefingCardState extends State<DoorstepBriefingCard> {
     final BorderSide? borderSide = cardShape is RoundedRectangleBorder
         ? cardShape.side
         : null;
-    final isSunMode = (borderSide?.color == const Color(0xFF000000) &&
+    final isSunMode =
+        (borderSide?.color == const Color(0xFF000000) &&
             (borderSide?.width ?? 0) >= 2.0) ||
         (theme.colorScheme.primary == const Color(0xFF000000) &&
             theme.scaffoldBackgroundColor == Colors.white &&
@@ -163,7 +166,11 @@ class _DoorstepBriefingCardState extends State<DoorstepBriefingCard> {
   }
 
   /// Seção dedicada à reprodução e visualização da última nota de áudio/voz gravada
-  Widget _buildVoiceNoteSection(BuildContext context, bool isSunMode, bool isDark) {
+  Widget _buildVoiceNoteSection(
+    BuildContext context,
+    bool isSunMode,
+    bool isDark,
+  ) {
     const accentColor = Color(0xFF6366F1); // Indigo
     final transcription = data.voiceNoteTranscription;
     final durationSeconds = data.voiceNoteDurationSeconds ?? 15;
@@ -176,8 +183,8 @@ class _DoorstepBriefingCardState extends State<DoorstepBriefingCard> {
         color: isSunMode
             ? Colors.white
             : (isDark
-                ? accentColor.withValues(alpha: 0.12)
-                : accentColor.withValues(alpha: 0.08)),
+                  ? accentColor.withValues(alpha: 0.12)
+                  : accentColor.withValues(alpha: 0.08)),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: isSunMode ? Colors.black : accentColor.withValues(alpha: 0.6),
@@ -261,9 +268,13 @@ class _DoorstepBriefingCardState extends State<DoorstepBriefingCard> {
             children: [
               Semantics(
                 button: true,
-                label: _isPlaying ? 'Pausar nota de voz' : 'Reproduzir nota de voz',
+                label: _isPlaying
+                    ? 'Pausar nota de voz'
+                    : 'Reproduzir nota de voz',
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(minHeight: 48), // Tamanho mínimo de alvo de toque (48x48 dp)
+                  constraints: const BoxConstraints(
+                    minHeight: 48,
+                  ), // Tamanho mínimo de alvo de toque (48x48 dp)
                   child: ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: isSunMode ? Colors.black : accentColor,
@@ -276,10 +287,18 @@ class _DoorstepBriefingCardState extends State<DoorstepBriefingCard> {
                             : BorderSide.none,
                       ),
                     ),
-                    icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow, size: 20),
+                    icon: Icon(
+                      _isPlaying ? Icons.pause : Icons.play_arrow,
+                      size: 20,
+                    ),
                     label: Text(
-                      _isPlaying ? 'Pausar Áudio' : 'Ouvir Nota ($durationFormatted)',
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                      _isPlaying
+                          ? 'Pausar Áudio'
+                          : 'Ouvir Nota ($durationFormatted)',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     onPressed: () => _togglePlay(data.audioFilePath),
                   ),
@@ -374,9 +393,16 @@ class _DoorstepBriefingCardState extends State<DoorstepBriefingCard> {
   }
 
   /// Seção "Onde Parou" com destaque para a lição e botão de abertura do JW Library
-  Widget _buildWhereWeStoppedSection(BuildContext context, bool isSunMode, bool isDark) {
+  Widget _buildWhereWeStoppedSection(
+    BuildContext context,
+    bool isSunMode,
+    bool isDark,
+  ) {
     final hasContent = data.hasLessonOrTopic;
-    final showButton = data.hasJwLibraryLink || onOpenJwLibrary != null || onLaunchJwLibrary != null;
+    final showButton =
+        data.hasJwLibraryLink ||
+        onOpenJwLibrary != null ||
+        onLaunchJwLibrary != null;
 
     return Container(
       width: double.infinity,
@@ -424,16 +450,21 @@ class _DoorstepBriefingCardState extends State<DoorstepBriefingCard> {
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: isSunMode ? FontWeight.w900 : FontWeight.bold,
-                color: isSunMode ? Colors.black : (isDark ? Colors.white : const Color(0xFF0F172A)),
+                color: isSunMode
+                    ? Colors.black
+                    : (isDark ? Colors.white : const Color(0xFF0F172A)),
               ),
             ),
-            if (data.publicationTitle != null && data.publicationTitle != data.lessonAndPoint) ...[
+            if (data.publicationTitle != null &&
+                data.publicationTitle != data.lessonAndPoint) ...[
               const SizedBox(height: 2),
               Text(
                 data.publicationTitle!,
                 style: TextStyle(
                   fontSize: 12,
-                  color: isSunMode ? Colors.black87 : (isDark ? const Color(0xFF94A3B8) : AppTheme.textMuted),
+                  color: isSunMode
+                      ? Colors.black87
+                      : (isDark ? const Color(0xFF94A3B8) : AppTheme.textMuted),
                 ),
               ),
             ],
@@ -443,49 +474,59 @@ class _DoorstepBriefingCardState extends State<DoorstepBriefingCard> {
               style: TextStyle(
                 fontSize: 13,
                 fontStyle: FontStyle.italic,
-                color: isSunMode ? Colors.black54 : (isDark ? const Color(0xFF64748B) : AppTheme.textMuted),
+                color: isSunMode
+                    ? Colors.black54
+                    : (isDark ? const Color(0xFF64748B) : AppTheme.textMuted),
               ),
             ),
           ],
           if (showButton) ...[
             const SizedBox(height: 10),
             ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 48), // Tamanho mínimo de alvo de toque (48x48 dp)
+              constraints: const BoxConstraints(
+                minHeight: 48,
+              ), // Tamanho mínimo de alvo de toque (48x48 dp)
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: isSunMode ? Colors.black : AppTheme.primaryBlue,
-                  foregroundColor: Colors.white,
-                  elevation: isSunMode ? 0 : 2,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    side: isSunMode
-                        ? const BorderSide(color: Colors.black, width: 2)
-                        : BorderSide.none,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isSunMode
+                        ? Colors.black
+                        : AppTheme.primaryBlue,
+                    foregroundColor: Colors.white,
+                    elevation: isSunMode ? 0 : 2,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: isSunMode
+                          ? const BorderSide(color: Colors.black, width: 2)
+                          : BorderSide.none,
+                    ),
                   ),
-                ),
-                icon: const Icon(Icons.open_in_new, size: 18),
-                label: const Text(
-                  'Abrir no JW Library',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                ),
-                onPressed: () async {
-                  if (onOpenJwLibrary != null) {
-                    onOpenJwLibrary!();
-                  } else if (onLaunchJwLibrary != null && data.jwLibraryUri != null) {
-                    onLaunchJwLibrary!(data.jwLibraryUri!);
-                  } else if (data.jwLibraryUri != null) {
-                    final uri = data.jwLibraryUri!;
-                    if (await canLaunchUrl(uri)) {
-                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  icon: const Icon(Icons.open_in_new, size: 18),
+                  label: const Text(
+                    'Abrir no JW Library',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                  ),
+                  onPressed: () async {
+                    if (onOpenJwLibrary != null) {
+                      onOpenJwLibrary!();
+                    } else if (onLaunchJwLibrary != null &&
+                        data.jwLibraryUri != null) {
+                      onLaunchJwLibrary!(data.jwLibraryUri!);
+                    } else if (data.jwLibraryUri != null) {
+                      final uri = data.jwLibraryUri!;
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(
+                          uri,
+                          mode: LaunchMode.externalApplication,
+                        );
+                      }
                     }
-                  }
-                },
+                  },
+                ),
               ),
             ),
-          ),
-        ],
+          ],
         ],
       ),
     );
@@ -511,17 +552,21 @@ class _DoorstepBriefingCardState extends State<DoorstepBriefingCard> {
         color: isSunMode
             ? Colors.white
             : (hasContent
-                ? (isDark
-                    ? accentColor.withValues(alpha: 0.12)
-                    : accentColor.withValues(alpha: 0.08))
-                : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC))),
+                  ? (isDark
+                        ? accentColor.withValues(alpha: 0.12)
+                        : accentColor.withValues(alpha: 0.08))
+                  : (isDark
+                        ? const Color(0xFF1E293B)
+                        : const Color(0xFFF8FAFC))),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: isSunMode
               ? Colors.black
               : (hasContent
-                  ? accentColor.withValues(alpha: 0.6)
-                  : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))),
+                    ? accentColor.withValues(alpha: 0.6)
+                    : (isDark
+                          ? const Color(0xFF334155)
+                          : const Color(0xFFE2E8F0))),
           width: isSunMode ? 2.0 : (hasContent ? 1.5 : 1.0),
         ),
       ),
@@ -580,7 +625,11 @@ class _DoorstepBriefingCardState extends State<DoorstepBriefingCard> {
   }
 
   /// Card renderizado quando nenhum dado foi coletado ainda (contato novo)
-  Widget _buildEmptyStateCard(BuildContext context, bool isDark, bool isSunMode) {
+  Widget _buildEmptyStateCard(
+    BuildContext context,
+    bool isDark,
+    bool isSunMode,
+  ) {
     return Card(
       elevation: isSunMode ? 0 : 1,
       shape: RoundedRectangleBorder(
@@ -588,7 +637,9 @@ class _DoorstepBriefingCardState extends State<DoorstepBriefingCard> {
         side: isSunMode
             ? const BorderSide(color: Colors.black, width: 2.0)
             : BorderSide(
-                color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                color: isDark
+                    ? const Color(0xFF334155)
+                    : const Color(0xFFE2E8F0),
                 width: 1.2,
               ),
       ),
@@ -601,7 +652,9 @@ class _DoorstepBriefingCardState extends State<DoorstepBriefingCard> {
               decoration: BoxDecoration(
                 color: isSunMode
                     ? Colors.black
-                    : (isDark ? const Color(0xFF334155) : const Color(0xFFEFF6FF)),
+                    : (isDark
+                          ? const Color(0xFF334155)
+                          : const Color(0xFFEFF6FF)),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(

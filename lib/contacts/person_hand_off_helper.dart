@@ -1,4 +1,5 @@
 import 'package:url_launcher/url_launcher.dart';
+
 import '../database/app_database.dart';
 
 class PersonHandOffHelper {
@@ -11,7 +12,7 @@ class PersonHandOffHelper {
     buffer.writeln('🌐 *ENCAMINHAMENTO DE CONTATO / LÍNGUA ESTRANGEIRA* 🌐');
     buffer.writeln('------------------------------------------');
     buffer.writeln('👤 *Nome:* ${person.name}');
-    
+
     if (language != null && language.trim().isNotEmpty) {
       buffer.writeln('🗣️ *Idioma / Língua:* $language');
     }
@@ -25,10 +26,13 @@ class PersonHandOffHelper {
     }
 
     if (person.latitude != null && person.longitude != null) {
-      buffer.writeln('🗺️ *Localização no Mapa:* https://www.google.com/maps/search/?api=1&query=${person.latitude},${person.longitude}');
+      buffer.writeln(
+        '🗺️ *Localização no Mapa:* https://www.google.com/maps/search/?api=1&query=${person.latitude},${person.longitude}',
+      );
     }
 
-    if (person.preferredSchedule != null && person.preferredSchedule!.trim().isNotEmpty) {
+    if (person.preferredSchedule != null &&
+        person.preferredSchedule!.trim().isNotEmpty) {
       buffer.writeln('⏰ *Melhor Horário:* ${person.preferredSchedule}');
     }
 

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ministerio_pessoal/contacts/doorstep_briefing_helper.dart';
@@ -122,13 +123,17 @@ VisitEntry _mockVisit({
 void main() {
   group('ADV-01: Fuzzing de Strings Extremas e Unicode Complexo', () {
     test('Unicode, zero-width, emojis complexos e RTL markers', () {
-      const complexUnicode = '👨‍👩‍👧‍👦 🏳️‍🌈 \u200B\u200C\u200D\uFEFF \u202ETexto RTL Invertido\u202C ﷽';
+      const complexUnicode =
+          '👨‍👩‍👧‍👦 🏳️‍🌈 \u200B\u200C\u200D\uFEFF \u202ETexto RTL Invertido\u202C ﷽';
       final person = _mockPerson(
         generalNotes: jsonEncode([
-          {'text': 'Empatia: $complexUnicode', 'createdAt': '2026-10-30T10:00:00Z'}
+          {
+            'text': 'Empatia: $complexUnicode',
+            'createdAt': '2026-10-30T10:00:00Z',
+          },
         ]),
         contactRestrictions: jsonEncode([
-          {'title': 'Alvo: $complexUnicode', 'isCompleted': false}
+          {'title': 'Alvo: $complexUnicode', 'isCompleted': false},
         ]),
         nextActionNote: 'Ação: $complexUnicode',
       );
@@ -153,10 +158,10 @@ void main() {
       final hugeString = 'X' * 50000;
       final person = _mockPerson(
         generalNotes: jsonEncode([
-          {'text': hugeString, 'createdAt': '2026-10-30T12:00:00Z'}
+          {'text': hugeString, 'createdAt': '2026-10-30T12:00:00Z'},
         ]),
         contactRestrictions: jsonEncode([
-          {'title': hugeString, 'isCompleted': false}
+          {'title': hugeString, 'isCompleted': false},
         ]),
       );
       final visit = _mockVisit(
@@ -181,10 +186,10 @@ void main() {
       const standardWhitespace = '  \t\r\n \u00A0  ';
       final person = _mockPerson(
         generalNotes: jsonEncode([
-          {'text': standardWhitespace, 'createdAt': '2026-10-30T10:00:00Z'}
+          {'text': standardWhitespace, 'createdAt': '2026-10-30T10:00:00Z'},
         ]),
         contactRestrictions: jsonEncode([
-          {'title': standardWhitespace, 'isCompleted': false}
+          {'title': standardWhitespace, 'isCompleted': false},
         ]),
         nextActionNote: standardWhitespace,
       );
@@ -235,12 +240,14 @@ void main() {
     });
 
     test('JSON lista contendo elementos heterogêneos inválidos (primitivos misturados com mapas)', () {
-      const mixedJson = '[1, "string", true, null, [], {"text": "Nota Real", "createdAt": "2026-10-30T15:00:00Z"}]';
+      const mixedJson =
+          '[1, "string", true, null, [], {"text": "Nota Real", "createdAt": "2026-10-30T15:00:00Z"}]';
       final notes = DoorstepBriefingHelper.parseNotes(mixedJson);
       expect(notes.length, equals(1));
       expect(notes.first['text'], equals('Nota Real'));
 
-      const mixedTargets = '[null, 42, {"title": "Alvo Válido", "isCompleted": false}]';
+      const mixedTargets =
+          '[null, 42, {"title": "Alvo Válido", "isCompleted": false}]';
       final targets = DoorstepBriefingHelper.parseTargets(mixedTargets);
       expect(targets.length, equals(1));
       expect(targets.first['title'], equals('Alvo Válido'));
@@ -249,10 +256,10 @@ void main() {
     test('Valores não-string em text e title (ex: inteiros, booleanos)', () {
       final person = _mockPerson(
         generalNotes: jsonEncode([
-          {'text': 123456, 'createdAt': '2026-10-30T10:00:00Z'}
+          {'text': 123456, 'createdAt': '2026-10-30T10:00:00Z'},
         ]),
         contactRestrictions: jsonEncode([
-          {'title': 987654, 'isCompleted': false}
+          {'title': 987654, 'isCompleted': false},
         ]),
       );
 
@@ -290,7 +297,11 @@ void main() {
         (i) => {
           'id': 'n-$i',
           'text': 'Observação $i',
-          'createdAt': DateTime(2025, 1, 1).add(Duration(days: i)).toIso8601String(),
+          'createdAt': DateTime(
+            2025,
+            1,
+            1,
+          ).add(Duration(days: i)).toIso8601String(),
         },
       );
       final person = _mockPerson(generalNotes: jsonEncode(hundredNotes));
@@ -307,44 +318,50 @@ void main() {
 
   group('ADV-03: Casos Limítrofes de Lição, Publicação e Deep Link', () {
     test('Lição e Parágrafo com valores numéricos incomuns (0, negativos, gigantes)', () {
-      final studyZero = _mockStudy(
-        currentLesson: 0,
-        currentParagraph: 0,
+      final studyZero = _mockStudy(currentLesson: 0, currentParagraph: 0);
+      final resZero = DoorstepBriefingHelper.build(
+        person: _mockPerson(),
+        linkedStudy: studyZero,
       );
-      final resZero = DoorstepBriefingHelper.build(person: _mockPerson(), linkedStudy: studyZero);
       expect(resZero.lessonAndPoint, equals('Lição 00, Ponto 0'));
 
       final studyHuge = _mockStudy(
         currentLesson: 9999,
         currentParagraph: 99999,
       );
-      final resHuge = DoorstepBriefingHelper.build(person: _mockPerson(), linkedStudy: studyHuge);
+      final resHuge = DoorstepBriefingHelper.build(
+        person: _mockPerson(),
+        linkedStudy: studyHuge,
+      );
       expect(resHuge.lessonAndPoint, equals('Lição 9999, Ponto 99999'));
 
-      final studyNeg = _mockStudy(
-        currentLesson: -5,
-        currentParagraph: -1,
+      final studyNeg = _mockStudy(currentLesson: -5, currentParagraph: -1);
+      final resNeg = DoorstepBriefingHelper.build(
+        person: _mockPerson(),
+        linkedStudy: studyNeg,
       );
-      final resNeg = DoorstepBriefingHelper.build(person: _mockPerson(), linkedStudy: studyNeg);
       expect(resNeg.lessonAndPoint, equals('Lição -5, Ponto -1'));
     });
 
-    test('Publicação inexistente no catálogo (não causa crash, fallback gracioso)', () {
-      final study = _mockStudy(
-        publicationId: 'non-existent-pub-xyz-999',
-        title: 'Brochura Customizada',
-        currentLesson: 3,
-        currentParagraph: 2,
-      );
+    test(
+      'Publicação inexistente no catálogo (não causa crash, fallback gracioso)',
+      () {
+        final study = _mockStudy(
+          publicationId: 'non-existent-pub-xyz-999',
+          title: 'Brochura Customizada',
+          currentLesson: 3,
+          currentParagraph: 2,
+        );
 
-      final result = DoorstepBriefingHelper.build(
-        person: _mockPerson(),
-        linkedStudy: study,
-      );
+        final result = DoorstepBriefingHelper.build(
+          person: _mockPerson(),
+          linkedStudy: study,
+        );
 
-      expect(result.lessonAndPoint, equals('Lição 03, Ponto 2'));
-      expect(result.publicationTitle, equals('Brochura Customizada'));
-    });
+        expect(result.lessonAndPoint, equals('Lição 03, Ponto 2'));
+        expect(result.publicationTitle, equals('Brochura Customizada'));
+      },
+    );
 
     test('Título com apenas espaços e fallback para título do catálogo', () {
       final study = _mockStudy(
@@ -366,114 +383,127 @@ void main() {
   });
 
   group('ADV-04: Resiliência de Layout e Acessibilidade do Widget (DoorstepBriefingCard)', () {
-    testWidgets('Texto ultra-longo (10.000 chars sem quebras) não quebra renderização', (tester) async {
-      final hugeWord = 'Inquebrável' * 1000;
-      final data = DoorstepBriefingData(
-        lessonAndPoint: hugeWord,
-        pendingDoubt: hugeWord,
-        spiritualGoal: hugeWord,
-        empathyNote: hugeWord,
-        jwLibraryUri: Uri.parse('https://www.jw.org'),
-      );
+    testWidgets(
+      'Texto ultra-longo (10.000 chars sem quebras) não quebra renderização',
+      (tester) async {
+        final hugeWord = 'Inquebrável' * 1000;
+        final data = DoorstepBriefingData(
+          lessonAndPoint: hugeWord,
+          pendingDoubt: hugeWord,
+          spiritualGoal: hugeWord,
+          empathyNote: hugeWord,
+          jwLibraryUri: Uri.parse('https://www.jw.org'),
+        );
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: SingleChildScrollView(
-              child: DoorstepBriefingCard(data: data),
-            ),
-          ),
-        ),
-      );
-
-      expect(tester.takeException(), isNull);
-      expect(find.byType(DoorstepBriefingCard), findsOneWidget);
-    });
-
-    testWidgets('Escalonamento Extremo de Fonte (TextScaler 3.0x - Baixa Visão Severa)', (tester) async {
-      final data = DoorstepBriefingData(
-        lessonAndPoint: 'Lição 05, Ponto 4',
-        pendingDoubt: 'Como explicar a criação para colegas de trabalho?',
-        spiritualGoal: 'Comentar com as próprias palavras',
-        empathyNote: 'Filho iniciou o ano letivo na nova escola',
-        jwLibraryUri: Uri.parse('https://www.jw.org'),
-      );
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: MediaQuery(
-              data: const MediaQueryData(
-                textScaler: TextScaler.linear(3.0),
-              ),
-              child: SingleChildScrollView(
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: SingleChildScrollView(
                 child: DoorstepBriefingCard(data: data),
               ),
             ),
           ),
-        ),
-      );
+        );
 
-      expect(tester.takeException(), isNull);
-      expect(find.text('Briefing na Porta'), findsOneWidget);
-      expect(find.text('30s'), findsOneWidget);
-    });
+        expect(tester.takeException(), isNull);
+        expect(find.byType(DoorstepBriefingCard), findsOneWidget);
+      },
+    );
 
-    testWidgets('Largura Extremamente Estreita (240dp - Telas compactas/Smartwatches)', (tester) async {
-      final data = DoorstepBriefingData(
-        lessonAndPoint: 'Lição 10',
-        pendingDoubt: 'Dúvida curta',
-        spiritualGoal: 'Alvo curto',
-        empathyNote: 'Nota curta',
-        jwLibraryUri: Uri.parse('https://www.jw.org'),
-      );
+    testWidgets(
+      'Escalonamento Extremo de Fonte (TextScaler 3.0x - Baixa Visão Severa)',
+      (tester) async {
+        final data = DoorstepBriefingData(
+          lessonAndPoint: 'Lição 05, Ponto 4',
+          pendingDoubt: 'Como explicar a criação para colegas de trabalho?',
+          spiritualGoal: 'Comentar com as próprias palavras',
+          empathyNote: 'Filho iniciou o ano letivo na nova escola',
+          jwLibraryUri: Uri.parse('https://www.jw.org'),
+        );
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: SizedBox(
-              width: 240,
-              child: SingleChildScrollView(
-                child: DoorstepBriefingCard(data: data),
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: MediaQuery(
+                data: const MediaQueryData(textScaler: TextScaler.linear(3.0)),
+                child: SingleChildScrollView(
+                  child: DoorstepBriefingCard(data: data),
+                ),
               ),
             ),
           ),
-        ),
-      );
+        );
 
-      expect(tester.takeException(), isNull);
-      expect(find.byType(DoorstepBriefingCard), findsOneWidget);
-    });
+        expect(tester.takeException(), isNull);
+        expect(find.text('Briefing na Porta'), findsOneWidget);
+        expect(find.text('30s'), findsOneWidget);
+      },
+    );
 
-    testWidgets('Disparo rápido consecutivo (20 cliques rápidos no botão JW Library)', (tester) async {
-      int tapCount = 0;
-      final data = DoorstepBriefingData(
-        lessonAndPoint: 'Lição 01',
-        jwLibraryUri: Uri.parse('https://www.jw.org'),
-      );
+    testWidgets(
+      'Largura Extremamente Estreita (240dp - Telas compactas/Smartwatches)',
+      (tester) async {
+        final data = DoorstepBriefingData(
+          lessonAndPoint: 'Lição 10',
+          pendingDoubt: 'Dúvida curta',
+          spiritualGoal: 'Alvo curto',
+          empathyNote: 'Nota curta',
+          jwLibraryUri: Uri.parse('https://www.jw.org'),
+        );
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: DoorstepBriefingCard(
-              data: data,
-              onOpenJwLibrary: () => tapCount++,
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: SizedBox(
+                width: 240,
+                child: SingleChildScrollView(
+                  child: DoorstepBriefingCard(data: data),
+                ),
+              ),
             ),
           ),
-        ),
-      );
+        );
 
-      final button = find.widgetWithText(ElevatedButton, 'Abrir no JW Library');
-      expect(button, findsOneWidget);
+        expect(tester.takeException(), isNull);
+        expect(find.byType(DoorstepBriefingCard), findsOneWidget);
+      },
+    );
 
-      for (int i = 0; i < 20; i++) {
-        await tester.tap(button);
-      }
-      await tester.pump();
+    testWidgets(
+      'Disparo rápido consecutivo (20 cliques rápidos no botão JW Library)',
+      (tester) async {
+        int tapCount = 0;
+        final data = DoorstepBriefingData(
+          lessonAndPoint: 'Lição 01',
+          jwLibraryUri: Uri.parse('https://www.jw.org'),
+        );
 
-      expect(tapCount, equals(20));
-      expect(tester.takeException(), isNull);
-    });
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: DoorstepBriefingCard(
+                data: data,
+                onOpenJwLibrary: () => tapCount++,
+              ),
+            ),
+          ),
+        );
+
+        final button = find.widgetWithText(
+          ElevatedButton,
+          'Abrir no JW Library',
+        );
+        expect(button, findsOneWidget);
+
+        for (int i = 0; i < 20; i++) {
+          await tester.tap(button);
+        }
+        await tester.pump();
+
+        expect(tapCount, equals(20));
+        expect(tester.takeException(), isNull);
+      },
+    );
 
     testWidgets('Modo Sol Intenso com ThemeData Customizado', (tester) async {
       final sunTheme = ThemeData(
@@ -484,9 +514,7 @@ void main() {
             side: BorderSide(color: Color(0xFF000000), width: 2.5),
           ),
         ),
-        colorScheme: const ColorScheme.light(
-          primary: Color(0xFF000000),
-        ),
+        colorScheme: const ColorScheme.light(primary: Color(0xFF000000)),
       );
 
       final data = DoorstepBriefingData(
@@ -497,9 +525,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           theme: sunTheme,
-          home: Scaffold(
-            body: DoorstepBriefingCard(data: data),
-          ),
+          home: Scaffold(body: DoorstepBriefingCard(data: data)),
         ),
       );
 
@@ -509,7 +535,9 @@ void main() {
   });
 
   group('ADV-05: Reatividade de Streams Rápidas (StreamBuilder Lifecycle)', () {
-    testWidgets('Stream de visitas com rajada de 30 emissões consecutivas', (tester) async {
+    testWidgets('Stream de visitas com rajada de 30 emissões consecutivas', (
+      tester,
+    ) async {
       final controller = StreamController<List<VisitEntry>>.broadcast();
       final person = _mockPerson();
 
@@ -532,7 +560,10 @@ void main() {
       );
 
       // Estado inicial vazio
-      expect(find.textContaining('Primeiro contato sem histórico registrado'), findsOneWidget);
+      expect(
+        find.textContaining('Primeiro contato sem histórico registrado'),
+        findsOneWidget,
+      );
 
       // Rajada de 30 emissões rápidas
       for (int i = 1; i <= 30; i++) {

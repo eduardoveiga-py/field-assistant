@@ -19,7 +19,8 @@ class PublicationInfo {
 class LanguageAvailability {
   final String languageCode; // pt, tca, bzs
   final String languageName;
-  final String wtlocale; // Código oficial JW (T = Português, TCA = Ticuna, BZS = Libras)
+  final String
+  wtlocale; // Código oficial JW (T = Português, TCA = Ticuna, BZS = Libras)
   final bool isVerified;
   final bool isSignLanguage;
   final String? officialWebUrl;
@@ -47,7 +48,8 @@ class PublicationCatalog {
         languageName: 'Português',
         wtlocale: 'T',
         isVerified: true,
-        officialWebUrl: 'https://www.jw.org/pt/biblioteca/livros/seja-feliz-para-sempre/',
+        officialWebUrl:
+            'https://www.jw.org/pt/biblioteca/livros/seja-feliz-para-sempre/',
       ),
       'tca': LanguageAvailability(
         languageCode: 'tca',
@@ -62,7 +64,8 @@ class PublicationCatalog {
         wtlocale: 'BZS',
         isVerified: true,
         isSignLanguage: true,
-        officialWebUrl: 'https://www.jw.org/bzs/biblioteca/livros/seja-feliz-para-sempre/',
+        officialWebUrl:
+            'https://www.jw.org/bzs/biblioteca/livros/seja-feliz-para-sempre/',
       ),
     },
   );
@@ -111,7 +114,8 @@ class PublicationCatalog {
         languageName: 'Português',
         wtlocale: 'T',
         isVerified: true,
-        officialWebUrl: 'https://www.jw.org/pt/biblioteca/livros/escute-a-deus/',
+        officialWebUrl:
+            'https://www.jw.org/pt/biblioteca/livros/escute-a-deus/',
       ),
       'tca': LanguageAvailability(
         languageCode: 'tca',
@@ -131,7 +135,11 @@ class PublicationCatalog {
     },
   );
 
-  static List<PublicationInfo> get allPublications => [bookLff, brochureLff, brochureListenToGod];
+  static List<PublicationInfo> get allPublications => [
+    bookLff,
+    brochureLff,
+    brochureListenToGod,
+  ];
 
   static PublicationInfo? getById(String id) {
     if (id == 'lff-book' || id == 'lff') return bookLff;

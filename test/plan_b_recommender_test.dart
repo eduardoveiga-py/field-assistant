@@ -33,7 +33,11 @@ void main() {
     }
 
     test('Sugere contatos mais próximos geograficamente com GPS ativo', () {
-      final cancelled = makePerson(id: 'c1', name: 'Estudante Cancelou', status: 'estudo');
+      final cancelled = makePerson(
+        id: 'c1',
+        name: 'Estudante Cancelou',
+        status: 'estudo',
+      );
 
       // Ponto de referência atual: -23.5505, -46.6333 (São Paulo Marco Zero)
       // p1: 300m de distância
@@ -80,26 +84,46 @@ void main() {
       expect(suggestions.first.reason, contains('de você'));
     });
 
-    test('Exclui a própria pessoa cancelada, contatos excluídos ou arquivados', () {
-      final cancelled = makePerson(id: 'c1', name: 'Estudante Cancelou', status: 'estudo');
-      final deleted = makePerson(id: 'd1', name: 'Excluído', status: 'revisita', deletedAt: baseNow);
-      final archived = makePerson(id: 'a1', name: 'Arquivado', status: 'arquivado');
-      final valid = makePerson(id: 'v1', name: 'Válido', status: 'revisita');
+    test(
+      'Exclui a própria pessoa cancelada, contatos excluídos ou arquivados',
+      () {
+        final cancelled = makePerson(
+          id: 'c1',
+          name: 'Estudante Cancelou',
+          status: 'estudo',
+        );
+        final deleted = makePerson(
+          id: 'd1',
+          name: 'Excluído',
+          status: 'revisita',
+          deletedAt: baseNow,
+        );
+        final archived = makePerson(
+          id: 'a1',
+          name: 'Arquivado',
+          status: 'arquivado',
+        );
+        final valid = makePerson(id: 'v1', name: 'Válido', status: 'revisita');
 
-      final suggestions = PlanBRecommender.getSuggestions(
-        cancelledPerson: cancelled,
-        allPeople: [cancelled, deleted, archived, valid],
-        allVisits: [],
-        targetDateTime: baseNow,
-      );
+        final suggestions = PlanBRecommender.getSuggestions(
+          cancelledPerson: cancelled,
+          allPeople: [cancelled, deleted, archived, valid],
+          allVisits: [],
+          targetDateTime: baseNow,
+        );
 
-      expect(suggestions.length, equals(1));
-      expect(suggestions.first.person.id, equals('v1'));
-      expect(suggestions.first.person.name, equals('Válido'));
-    });
+        expect(suggestions.length, equals(1));
+        expect(suggestions.first.person.id, equals('v1'));
+        expect(suggestions.first.person.name, equals('Válido'));
+      },
+    );
 
     test('Fallback sem GPS prioriza dia habitual e sementes recentes', () {
-      final cancelled = makePerson(id: 'c1', name: 'Estudante Cancelou', status: 'estudo');
+      final cancelled = makePerson(
+        id: 'c1',
+        name: 'Estudante Cancelou',
+        status: 'estudo',
+      );
 
       // Sábado às 14h: pSaturday costuma atender aos sábados
       final pSaturday = makePerson(
@@ -131,7 +155,11 @@ void main() {
     });
 
     test('Limita o número de sugestões a no máximo 3 alternativas', () {
-      final cancelled = makePerson(id: 'c1', name: 'Estudante Cancelou', status: 'estudo');
+      final cancelled = makePerson(
+        id: 'c1',
+        name: 'Estudante Cancelou',
+        status: 'estudo',
+      );
       final list = List.generate(
         10,
         (i) => makePerson(id: 'p_$i', name: 'Contato $i', status: 'revisita'),

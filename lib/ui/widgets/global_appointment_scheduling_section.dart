@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../appointments/availability_engine.dart';
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
@@ -62,7 +63,9 @@ class GlobalAppointmentSchedulingSection extends StatelessWidget {
             child: const Text('Ajustar Horário'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.alertAmber),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.alertAmber,
+            ),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Sim, Confirmar Sobreposição'),
           ),
@@ -87,7 +90,8 @@ class GlobalAppointmentSchedulingSection extends StatelessWidget {
     // Filtra os compromissos agendados no mesmo dia civil para o usuário "enxergar" a agenda
     final sameDayAppointments = existingAppointments.where((a) {
       if (a.deletedAt != null) return false;
-      if (excludeAppointmentId != null && a.id == excludeAppointmentId) return false;
+      if (excludeAppointmentId != null && a.id == excludeAppointmentId)
+        return false;
       final status = a.status.toLowerCase();
       if (status == 'cancelado' || status == 'reagendado') return false;
 
@@ -117,11 +121,18 @@ class GlobalAppointmentSchedulingSection extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.event_available, color: AppTheme.primaryBlue, size: 20),
+                    const Icon(
+                      Icons.event_available,
+                      color: AppTheme.primaryBlue,
+                      size: 20,
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       title,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
                     ),
                   ],
                 ),
@@ -135,11 +146,18 @@ class GlobalAppointmentSchedulingSection extends StatelessWidget {
           else
             Row(
               children: [
-                const Icon(Icons.event_available, color: AppTheme.primaryBlue, size: 20),
+                const Icon(
+                  Icons.event_available,
+                  color: AppTheme.primaryBlue,
+                  size: 20,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   title,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
                 ),
               ],
             ),
@@ -148,7 +166,10 @@ class GlobalAppointmentSchedulingSection extends StatelessWidget {
             if (frequencyText != null || existingPersonAppointment != null) ...[
               Container(
                 margin: const EdgeInsets.only(top: 8, bottom: 4),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: existingPersonAppointment != null
                       ? AppTheme.accentTeal.withValues(alpha: 0.1)
@@ -164,9 +185,13 @@ class GlobalAppointmentSchedulingSection extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Icon(
-                      existingPersonAppointment != null ? Icons.event_repeat : Icons.info_outline,
+                      existingPersonAppointment != null
+                          ? Icons.event_repeat
+                          : Icons.info_outline,
                       size: 16,
-                      color: existingPersonAppointment != null ? AppTheme.accentTeal : AppTheme.primaryBlue,
+                      color: existingPersonAppointment != null
+                          ? AppTheme.accentTeal
+                          : AppTheme.primaryBlue,
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -179,14 +204,20 @@ class GlobalAppointmentSchedulingSection extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
-                                color: existingPersonAppointment != null ? AppTheme.accentTeal : AppTheme.primaryBlue,
+                                color: existingPersonAppointment != null
+                                    ? AppTheme.accentTeal
+                                    : AppTheme.primaryBlue,
                               ),
                             ),
                           if (existingPersonAppointment != null) ...[
-                            if (frequencyText != null) const SizedBox(height: 2),
+                            if (frequencyText != null)
+                              const SizedBox(height: 2),
                             Text(
                               'Compromisso já agendado para ${AppDateUtils.formatDate(existingPersonAppointment!.startTime)} às ${AppDateUtils.formatTime(existingPersonAppointment!.startTime)}. Ao confirmar, este compromisso será sincronizado/atualizado com segurança sem duplicar.',
-                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ],
                         ],
@@ -206,7 +237,10 @@ class GlobalAppointmentSchedulingSection extends StatelessWidget {
                     icon: const Icon(Icons.calendar_today, size: 16),
                     label: Text(
                       AppDateUtils.formatDate(selectedDateTime),
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     onPressed: () async {
                       final now = DateTime.now();
@@ -217,13 +251,15 @@ class GlobalAppointmentSchedulingSection extends StatelessWidget {
                         lastDate: DateTime(now.year + 2, 12, 31),
                       );
                       if (picked != null) {
-                        onDateTimeChanged(DateTime(
-                          picked.year,
-                          picked.month,
-                          picked.day,
-                          selectedDateTime.hour,
-                          selectedDateTime.minute,
-                        ));
+                        onDateTimeChanged(
+                          DateTime(
+                            picked.year,
+                            picked.month,
+                            picked.day,
+                            selectedDateTime.hour,
+                            selectedDateTime.minute,
+                          ),
+                        );
                       }
                     },
                   ),
@@ -234,7 +270,10 @@ class GlobalAppointmentSchedulingSection extends StatelessWidget {
                     icon: const Icon(Icons.access_time, size: 16),
                     label: Text(
                       AppDateUtils.formatTime(selectedDateTime),
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     onPressed: () async {
                       final pickedTime = await showTimePicker(
@@ -242,13 +281,15 @@ class GlobalAppointmentSchedulingSection extends StatelessWidget {
                         initialTime: TimeOfDay.fromDateTime(selectedDateTime),
                       );
                       if (pickedTime != null) {
-                        onDateTimeChanged(DateTime(
-                          selectedDateTime.year,
-                          selectedDateTime.month,
-                          selectedDateTime.day,
-                          pickedTime.hour,
-                          pickedTime.minute,
-                        ));
+                        onDateTimeChanged(
+                          DateTime(
+                            selectedDateTime.year,
+                            selectedDateTime.month,
+                            selectedDateTime.day,
+                            pickedTime.hour,
+                            pickedTime.minute,
+                          ),
+                        );
                       }
                     },
                   ),
@@ -263,14 +304,26 @@ class GlobalAppointmentSchedulingSection extends StatelessWidget {
               initialValue: durationMinutes,
               decoration: const InputDecoration(
                 labelText: 'Duração prevista',
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
               ),
               items: const [
                 DropdownMenuItem(value: 15, child: Text('15 minutos (Rápida)')),
-                DropdownMenuItem(value: 30, child: Text('30 minutos (Padrão Revisita)')),
+                DropdownMenuItem(
+                  value: 30,
+                  child: Text('30 minutos (Padrão Revisita)'),
+                ),
                 DropdownMenuItem(value: 45, child: Text('45 minutos')),
-                DropdownMenuItem(value: 60, child: Text('1 hora (Padrão Estudo Bíblico)')),
-                DropdownMenuItem(value: 90, child: Text('1h 30m (Estudo Aprofundado)')),
+                DropdownMenuItem(
+                  value: 60,
+                  child: Text('1 hora (Padrão Estudo Bíblico)'),
+                ),
+                DropdownMenuItem(
+                  value: 90,
+                  child: Text('1h 30m (Estudo Aprofundado)'),
+                ),
               ],
               onChanged: (val) {
                 if (val != null) onDurationChanged(val);
@@ -284,7 +337,9 @@ class GlobalAppointmentSchedulingSection extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                color: isDark
+                    ? const Color(0xFF0F172A)
+                    : const Color(0xFFF1F5F9),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
                   color: isDark ? Colors.white12 : Colors.black12,
@@ -295,11 +350,18 @@ class GlobalAppointmentSchedulingSection extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.calendar_month_outlined, size: 16, color: AppTheme.primaryBlue),
+                      const Icon(
+                        Icons.calendar_month_outlined,
+                        size: 16,
+                        color: AppTheme.primaryBlue,
+                      ),
                       const SizedBox(width: 6),
                       Text(
                         'Compromissos nesta data (${AppDateUtils.formatDate(selectedDateTime)}):',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
                       ),
                     ],
                   ),
@@ -310,22 +372,29 @@ class GlobalAppointmentSchedulingSection extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 11,
                         fontStyle: FontStyle.italic,
-                        color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted,
+                        color: isDark
+                            ? const Color(0xFFCBD5E1)
+                            : AppTheme.textMuted,
                       ),
                     )
                   else
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: sameDayAppointments.map((a) {
-                        final isColliding = availability.conflictingAppointments.any((c) => c.id == a.id);
+                        final isColliding = availability.conflictingAppointments
+                            .any((c) => c.id == a.id);
                         return Padding(
                           padding: const EdgeInsets.symmetric(vertical: 2),
                           child: Row(
                             children: [
                               Icon(
-                                isColliding ? Icons.error_outline : Icons.circle,
+                                isColliding
+                                    ? Icons.error_outline
+                                    : Icons.circle,
                                 size: isColliding ? 14 : 7,
-                                color: isColliding ? AppTheme.alertAmber : AppTheme.primaryBlue,
+                                color: isColliding
+                                    ? AppTheme.alertAmber
+                                    : AppTheme.primaryBlue,
                               ),
                               const SizedBox(width: 6),
                               Expanded(
@@ -333,8 +402,14 @@ class GlobalAppointmentSchedulingSection extends StatelessWidget {
                                   '${AppDateUtils.formatTime(a.startTime)} - ${AppDateUtils.formatTime(a.endTime)}: ${a.title}${a.locationNotes != null ? " (${a.locationNotes})" : ""}',
                                   style: TextStyle(
                                     fontSize: 12,
-                                    fontWeight: isColliding ? FontWeight.bold : FontWeight.normal,
-                                    color: isColliding ? const Color(0xFFB45309) : (isDark ? Colors.white : AppTheme.textDark),
+                                    fontWeight: isColliding
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
+                                    color: isColliding
+                                        ? const Color(0xFFB45309)
+                                        : (isDark
+                                              ? Colors.white
+                                              : AppTheme.textDark),
                                   ),
                                 ),
                               ),
@@ -358,7 +433,9 @@ class GlobalAppointmentSchedulingSection extends StatelessWidget {
                     : AppTheme.alertAmber.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: availability.isAvailable ? AppTheme.successGreen : AppTheme.alertAmber,
+                  color: availability.isAvailable
+                      ? AppTheme.successGreen
+                      : AppTheme.alertAmber,
                   width: 1.2,
                 ),
               ),
@@ -368,9 +445,13 @@ class GlobalAppointmentSchedulingSection extends StatelessWidget {
                   Row(
                     children: [
                       Icon(
-                        availability.isAvailable ? Icons.check_circle : Icons.warning_amber_rounded,
+                        availability.isAvailable
+                            ? Icons.check_circle
+                            : Icons.warning_amber_rounded,
                         size: 18,
-                        color: availability.isAvailable ? AppTheme.successGreen : const Color(0xFFB45309),
+                        color: availability.isAvailable
+                            ? AppTheme.successGreen
+                            : const Color(0xFFB45309),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
@@ -381,7 +462,9 @@ class GlobalAppointmentSchedulingSection extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
-                            color: availability.isAvailable ? AppTheme.successGreen : const Color(0xFF92400E),
+                            color: availability.isAvailable
+                                ? AppTheme.successGreen
+                                : const Color(0xFF92400E),
                           ),
                         ),
                       ),
@@ -389,23 +472,35 @@ class GlobalAppointmentSchedulingSection extends StatelessWidget {
                   ),
 
                   // Sugestões de Horários Livres Alternativos com 1 clique
-                  if (!availability.isAvailable && availability.suggestedAlternativeSlots.isNotEmpty) ...[
+                  if (!availability.isAvailable &&
+                      availability.suggestedAlternativeSlots.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     const Text(
                       'Sugestões de horários livres no Território:',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Wrap(
                       spacing: 6,
                       runSpacing: 4,
-                      children: availability.suggestedAlternativeSlots.map((slot) {
+                      children: availability.suggestedAlternativeSlots.map((
+                        slot,
+                      ) {
                         return ActionChip(
                           visualDensity: VisualDensity.compact,
-                          backgroundColor: AppTheme.primaryBlue.withValues(alpha: 0.1),
+                          backgroundColor: AppTheme.primaryBlue.withValues(
+                            alpha: 0.1,
+                          ),
                           label: Text(
                             '${AppDateUtils.formatDate(slot)} ${AppDateUtils.formatTime(slot)}',
-                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.primaryBlue),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.primaryBlue,
+                            ),
                           ),
                           onPressed: () => onDateTimeChanged(slot),
                         );

@@ -1,10 +1,12 @@
 import 'dart:convert';
+
 import 'package:collection/collection.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+
 import '../../appointments/availability_engine.dart';
 import '../../core/app_theme.dart';
 import '../../database/app_database.dart';
@@ -25,7 +27,8 @@ class StudiesScreen extends ConsumerStatefulWidget {
 }
 
 class _StudiesScreenState extends ConsumerState<StudiesScreen> {
-  String _selectedStatusFilter = 'Ativos'; // 'Ativos', 'Prioridade & Progresso', 'Encerrados'
+  String _selectedStatusFilter =
+      'Ativos'; // 'Ativos', 'Prioridade & Progresso', 'Encerrados'
   final Map<String, int> _manualOrderMap = {};
 
   @override
@@ -43,7 +46,6 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
   }
 
   void _showEndStudyDialog(BuildContext context, BibleStudyEntry study) {
-
     String selectedReason = 'Falta de interesse / tempo';
     final notesController = TextEditingController();
 
@@ -72,14 +74,34 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                 DropdownButtonFormField<String>(
                   initialValue: selectedReason,
                   isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'Motivo do Encerramento *'),
+                  decoration: const InputDecoration(
+                    labelText: 'Motivo do Encerramento *',
+                  ),
                   items: const [
-                    DropdownMenuItem(value: 'Falta de interesse / tempo', child: Text('Falta de interesse / tempo')),
-                    DropdownMenuItem(value: 'Mudou-se de território', child: Text('Mudou-se de território')),
-                    DropdownMenuItem(value: 'Oposição familiar', child: Text('Oposição familiar')),
-                    DropdownMenuItem(value: 'Estudo concluído / Batizado', child: Text('Estudo concluído / Batizado')),
-                    DropdownMenuItem(value: 'Problemas de saúde', child: Text('Problemas de saúde')),
-                    DropdownMenuItem(value: 'Outro', child: Text('Outro motivo')),
+                    DropdownMenuItem(
+                      value: 'Falta de interesse / tempo',
+                      child: Text('Falta de interesse / tempo'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Mudou-se de território',
+                      child: Text('Mudou-se de território'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Oposição familiar',
+                      child: Text('Oposição familiar'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Estudo concluído / Batizado',
+                      child: Text('Estudo concluído / Batizado'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Problemas de saúde',
+                      child: Text('Problemas de saúde'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Outro',
+                      child: Text('Outro motivo'),
+                    ),
                   ],
                   onChanged: (val) {
                     if (val != null) setDialogState(() => selectedReason = val);
@@ -98,9 +120,15 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar'),
+            ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.alertAmber, foregroundColor: Colors.black),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.alertAmber,
+                foregroundColor: Colors.black,
+              ),
               onPressed: () async {
                 final repo = ref.read(repositoryProvider);
                 final reasonPayload = jsonEncode({
@@ -110,7 +138,9 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                 });
                 await repo.updateStudy(
                   study.copyWith(
-                    status: selectedReason == 'Estudo concluído / Batizado' ? 'concluido' : 'encerrado',
+                    status: selectedReason == 'Estudo concluído / Batizado'
+                        ? 'concluido'
+                        : 'encerrado',
                     pauseOrCloseReason: Value(reasonPayload),
                   ),
                 );
@@ -124,7 +154,11 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                 if (ctx.mounted) Navigator.pop(ctx);
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Estudo encerrado ($selectedReason). Contatos mantidos como revisita!')),
+                    SnackBar(
+                      content: Text(
+                        'Estudo encerrado ($selectedReason). Contatos mantidos como revisita!',
+                      ),
+                    ),
                   );
                 }
               },
@@ -136,13 +170,13 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
     );
   }
 
-  Future<void> _reactivateStudy(BuildContext context, BibleStudyEntry study) async {
+  Future<void> _reactivateStudy(
+    BuildContext context,
+    BibleStudyEntry study,
+  ) async {
     final repo = ref.read(repositoryProvider);
     await repo.updateStudy(
-      study.copyWith(
-        status: 'ativo',
-        pauseOrCloseReason: const Value(null),
-      ),
+      study.copyWith(status: 'ativo', pauseOrCloseReason: const Value(null)),
     );
     final parts = await repo.getParticipantsForStudy(study.id);
     for (final part in parts) {
@@ -153,10 +187,13 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
     }
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Estudo "${study.title}" reativado com sucesso!')),
+        SnackBar(
+          content: Text('Estudo "${study.title}" reativado com sucesso!'),
+        ),
       );
     }
   }
+
   // Modal para abrir publicação via PublicationLinkResolver
   void _openPublicationLink(BuildContext context, BibleStudyEntry study) {
     final resolved = PublicationLinkResolver.resolve(
@@ -196,7 +233,10 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                 ),
                 child: Text(
                   resolved.note!,
-                  style: const TextStyle(fontSize: 13, color: Color(0xFF1E3A8A)),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF1E3A8A),
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -204,12 +244,19 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
             if (resolved.url != null) ...[
               Text(
                 'Link Oficial Verificado:',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade700),
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey.shade700,
+                ),
               ),
               const SizedBox(height: 4),
               SelectableText(
                 resolved.url!,
-                style: const TextStyle(fontSize: 12, color: AppTheme.accentTeal),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppTheme.accentTeal,
+                ),
               ),
             ],
           ],
@@ -219,10 +266,16 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
             icon: const Icon(Icons.copy, size: 16),
             label: const Text('Copiar'),
             onPressed: () {
-              Clipboard.setData(ClipboardData(text: resolved.url ?? resolved.displayText));
+              Clipboard.setData(
+                ClipboardData(text: resolved.url ?? resolved.displayText),
+              );
               Navigator.pop(ctx);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Referência copiada para a área de transferência!')),
+                const SnackBar(
+                  content: Text(
+                    'Referência copiada para a área de transferência!',
+                  ),
+                ),
               );
             },
           ),
@@ -235,7 +288,10 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                 if (await canLaunchUrl(uri)) {
                   await launchUrl(uri, mode: LaunchMode.externalApplication);
                 } else if (resolved.fallbackUrl != null) {
-                  await launchUrl(Uri.parse(resolved.fallbackUrl!), mode: LaunchMode.externalApplication);
+                  await launchUrl(
+                    Uri.parse(resolved.fallbackUrl!),
+                    mode: LaunchMode.externalApplication,
+                  );
                 }
                 if (ctx.mounted) Navigator.pop(ctx);
               },
@@ -246,22 +302,34 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
   }
 
   // Modal para registrar ocorrência de sessão de estudo com contagem de assistência e agendamento
-  void _showRecordSessionDialog(BuildContext context, BibleStudyEntry study) async {
-    final participants = await ref.read(repositoryProvider).getParticipantsForStudy(study.id);
-    final primaryPersonId = participants.isNotEmpty ? participants.first.personId : null;
+  void _showRecordSessionDialog(
+    BuildContext context,
+    BibleStudyEntry study,
+  ) async {
+    final participants = await ref
+        .read(repositoryProvider)
+        .getParticipantsForStudy(study.id);
+    final primaryPersonId = participants.isNotEmpty
+        ? participants.first.personId
+        : null;
     final allAppts = ref.read(appointmentsStreamProvider).value ?? [];
 
     // Busca agendamento futuro existente para este estudante para evitar duplicatas
     AppointmentEntry? existingUpcomingAppt;
     if (primaryPersonId != null) {
-      final upcoming = allAppts
-          .where((a) =>
-              a.personId == primaryPersonId &&
-              a.startTime.isAfter(DateTime.now().subtract(const Duration(hours: 1))) &&
-              a.status != 'cancelado' &&
-              a.deletedAt == null)
-          .toList()
-        ..sort((a, b) => a.startTime.compareTo(b.startTime));
+      final upcoming =
+          allAppts
+              .where(
+                (a) =>
+                    a.personId == primaryPersonId &&
+                    a.startTime.isAfter(
+                      DateTime.now().subtract(const Duration(hours: 1)),
+                    ) &&
+                    a.status != 'cancelado' &&
+                    a.deletedAt == null,
+              )
+              .toList()
+            ..sort((a, b) => a.startTime.compareTo(b.startTime));
       if (upcoming.isNotEmpty) {
         existingUpcomingAppt = upcoming.first;
       }
@@ -277,17 +345,26 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
     final allUnits = isLff ? LffBookCatalog.getAllStudyUnits() : const [];
 
     final initialNext = isLff
-        ? LffBookCatalog.getNextProgression(currentLesson: selectedLesson, currentPoint: selectedEndPoint)
+        ? LffBookCatalog.getNextProgression(
+            currentLesson: selectedLesson,
+            currentPoint: selectedEndPoint,
+          )
         : null;
 
-    final lessonController = TextEditingController(text: selectedLesson.toString());
+    final lessonController = TextEditingController(
+      text: selectedLesson.toString(),
+    );
     final paragraphsController = TextEditingController(
       text: isLff
-          ? (selectedStartPoint == selectedEndPoint ? '$selectedStartPoint' : '$selectedStartPoint-$selectedEndPoint')
+          ? (selectedStartPoint == selectedEndPoint
+                ? '$selectedStartPoint'
+                : '$selectedStartPoint-$selectedEndPoint')
           : (study.currentParagraph?.toString() ?? ''),
     );
     final notesController = TextEditingController();
-    final nextStepController = TextEditingController(text: study.nextTopic ?? (initialNext?.label ?? ''));
+    final nextStepController = TextEditingController(
+      text: study.nextTopic ?? (initialNext?.label ?? ''),
+    );
     int attendanceCount = 1;
     bool scheduleNextStudy = true;
 
@@ -329,23 +406,36 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
         builder: (ctx, setDialogState) {
           final dialogIsDark = Theme.of(ctx).brightness == Brightness.dark;
           final allAppts = ref.read(appointmentsStreamProvider).value ?? [];
-          final lessonInfo = isLff ? LffBookCatalog.getLesson(selectedLesson) : null;
+          final lessonInfo = isLff
+              ? LffBookCatalog.getLesson(selectedLesson)
+              : null;
           final progressPercent = isLff
-              ? LffBookCatalog.calculateProgressPercentage(lesson: selectedLesson, point: selectedEndPoint)
+              ? LffBookCatalog.calculateProgressPercentage(
+                  lesson: selectedLesson,
+                  point: selectedEndPoint,
+                )
               : null;
 
           int currentUnitMaxPoints = 6;
           if (isLff) {
-            final foundUnit = allUnits.where((u) => u.id == selectedUnitId).firstOrNull;
-            currentUnitMaxPoints = foundUnit?.totalPoints ?? (lessonInfo?.totalPoints ?? 6);
+            final foundUnit = allUnits
+                .where((u) => u.id == selectedUnitId)
+                .firstOrNull;
+            currentUnitMaxPoints =
+                foundUnit?.totalPoints ?? (lessonInfo?.totalPoints ?? 6);
           }
 
           void updatePoints(int startP, int endP) {
             setDialogState(() {
               selectedStartPoint = startP;
               selectedEndPoint = endP;
-              paragraphsController.text = startP == endP ? '$startP' : '$startP-$endP';
-              final nextProg = LffBookCatalog.getNextProgression(currentLesson: selectedLesson, currentPoint: endP);
+              paragraphsController.text = startP == endP
+                  ? '$startP'
+                  : '$startP-$endP';
+              final nextProg = LffBookCatalog.getNextProgression(
+                currentLesson: selectedLesson,
+                currentPoint: endP,
+              );
               nextStepController.text = nextProg.label;
             });
           }
@@ -364,17 +454,28 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                       children: [
                         Expanded(
                           child: InkWell(
-                            onTap: () => setDialogState(() => sessionOutcome = 'realizada'),
+                            onTap: () => setDialogState(
+                              () => sessionOutcome = 'realizada',
+                            ),
                             borderRadius: BorderRadius.circular(8),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 10,
+                                horizontal: 8,
+                              ),
                               decoration: BoxDecoration(
                                 color: sessionOutcome == 'realizada'
-                                    ? AppTheme.successGreen.withValues(alpha: 0.15)
-                                    : (dialogIsDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
+                                    ? AppTheme.successGreen.withValues(
+                                        alpha: 0.15,
+                                      )
+                                    : (dialogIsDark
+                                          ? const Color(0xFF1E293B)
+                                          : const Color(0xFFF1F5F9)),
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
-                                  color: sessionOutcome == 'realizada' ? AppTheme.successGreen : Colors.transparent,
+                                  color: sessionOutcome == 'realizada'
+                                      ? AppTheme.successGreen
+                                      : Colors.transparent,
                                   width: 1.5,
                                 ),
                               ),
@@ -384,7 +485,9 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                                   Icon(
                                     Icons.check_circle,
                                     size: 16,
-                                    color: sessionOutcome == 'realizada' ? AppTheme.successGreen : Colors.grey,
+                                    color: sessionOutcome == 'realizada'
+                                        ? AppTheme.successGreen
+                                        : Colors.grey,
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
@@ -392,7 +495,9 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                                     style: TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.bold,
-                                      color: sessionOutcome == 'realizada' ? AppTheme.successGreen : Colors.grey,
+                                      color: sessionOutcome == 'realizada'
+                                          ? AppTheme.successGreen
+                                          : Colors.grey,
                                     ),
                                   ),
                                 ],
@@ -403,17 +508,26 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: InkWell(
-                            onTap: () => setDialogState(() => sessionOutcome = 'cancelada'),
+                            onTap: () => setDialogState(
+                              () => sessionOutcome = 'cancelada',
+                            ),
                             borderRadius: BorderRadius.circular(8),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 10,
+                                horizontal: 8,
+                              ),
                               decoration: BoxDecoration(
                                 color: sessionOutcome == 'cancelada'
                                     ? AppTheme.alertRed.withValues(alpha: 0.15)
-                                    : (dialogIsDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
+                                    : (dialogIsDark
+                                          ? const Color(0xFF1E293B)
+                                          : const Color(0xFFF1F5F9)),
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
-                                  color: sessionOutcome == 'cancelada' ? AppTheme.alertRed : Colors.transparent,
+                                  color: sessionOutcome == 'cancelada'
+                                      ? AppTheme.alertRed
+                                      : Colors.transparent,
                                   width: 1.5,
                                 ),
                               ),
@@ -423,7 +537,9 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                                   Icon(
                                     Icons.cancel,
                                     size: 16,
-                                    color: sessionOutcome == 'cancelada' ? AppTheme.alertRed : Colors.grey,
+                                    color: sessionOutcome == 'cancelada'
+                                        ? AppTheme.alertRed
+                                        : Colors.grey,
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
@@ -431,7 +547,9 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                                     style: TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.bold,
-                                      color: sessionOutcome == 'cancelada' ? AppTheme.alertRed : Colors.grey,
+                                      color: sessionOutcome == 'cancelada'
+                                          ? AppTheme.alertRed
+                                          : Colors.grey,
                                     ),
                                   ),
                                 ],
@@ -456,15 +574,29 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                         children: [
                           const Row(
                             children: [
-                              Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 18),
+                              Icon(
+                                Icons.warning_amber_rounded,
+                                color: Color(0xFFDC2626),
+                                size: 18,
+                              ),
                               SizedBox(width: 6),
-                              Text('Registrar Falha / Não Realização', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF991B1B), fontSize: 13)),
+                              Text(
+                                'Registrar Falha / Não Realização',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF991B1B),
+                                  fontSize: 13,
+                                ),
+                              ),
                             ],
                           ),
                           const SizedBox(height: 6),
                           const Text(
                             'O apontamento da falha é contabilizado internamente para atualizar a prioridade do estudante.',
-                            style: TextStyle(fontSize: 11, color: Color(0xFF7F1D1D)),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF7F1D1D),
+                            ),
                           ),
                           const SizedBox(height: 10),
                           DropdownButtonFormField<String>(
@@ -476,14 +608,30 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                               fillColor: Colors.white,
                             ),
                             items: const [
-                              DropdownMenuItem(value: 'Cancelado pelo estudante', child: Text('Cancelado pelo estudante')),
-                              DropdownMenuItem(value: 'Estudante ausente / Não atendeu', child: Text('Estudante ausente / Não atendeu')),
-                              DropdownMenuItem(value: 'Imprevisto pessoal do publicador', child: Text('Imprevisto pessoal do publicador')),
-                              DropdownMenuItem(value: 'Desmarcado com antecedência', child: Text('Desmarcado com antecedência')),
-                              DropdownMenuItem(value: 'Outro motivo', child: Text('Outro motivo')),
+                              DropdownMenuItem(
+                                value: 'Cancelado pelo estudante',
+                                child: Text('Cancelado pelo estudante'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'Estudante ausente / Não atendeu',
+                                child: Text('Estudante ausente / Não atendeu'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'Imprevisto pessoal do publicador',
+                                child: Text('Imprevisto pessoal do publicador'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'Desmarcado com antecedência',
+                                child: Text('Desmarcado com antecedência'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'Outro motivo',
+                                child: Text('Outro motivo'),
+                              ),
                             ],
                             onChanged: (val) {
-                              if (val != null) setDialogState(() => failureMotive = val);
+                              if (val != null)
+                                setDialogState(() => failureMotive = val);
                             },
                           ),
                         ],
@@ -495,9 +643,13 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF7C3AED).withValues(alpha: 0.08),
+                          color: const Color(0xFF7C3AED)
+                              .withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFF7C3AED).withValues(alpha: 0.25)),
+                          border: Border.all(
+                            color: const Color(0xFF7C3AED)
+                                .withValues(alpha: 0.25),
+                          ),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -505,8 +657,22 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                const Text('Progresso no Livro (lff):', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED))),
-                                Text('${progressPercent.toStringAsFixed(1)}%', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED))),
+                                const Text(
+                                  'Progresso no Livro (lff):',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF7C3AED),
+                                  ),
+                                ),
+                                Text(
+                                  '${progressPercent.toStringAsFixed(1)}%',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF7C3AED),
+                                  ),
+                                ),
                               ],
                             ),
                             const SizedBox(height: 6),
@@ -516,7 +682,9 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                                 value: progressPercent / 100.0,
                                 minHeight: 8,
                                 backgroundColor: Colors.purple.shade100,
-                                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF7C3AED)),
+                                valueColor: const AlwaysStoppedAnimation<Color>(
+                                  Color(0xFF7C3AED),
+                                ),
                               ),
                             ),
                           ],
@@ -526,7 +694,9 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                       DropdownButtonFormField<String>(
                         initialValue: selectedUnitId,
                         isExpanded: true,
-                        decoration: const InputDecoration(labelText: 'Unidade / Lição Estudada (lff) *'),
+                        decoration: const InputDecoration(
+                          labelText: 'Unidade / Lição Estudada (lff) *',
+                        ),
                         items: allUnits.map((u) {
                           return DropdownMenuItem<String>(
                             value: u.id,
@@ -543,9 +713,16 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                             setDialogState(() {
                               selectedUnitId = val;
                               if (val.startsWith('lesson_')) {
-                                selectedLesson = int.parse(val.replaceFirst('lesson_', ''));
-                                lessonController.text = selectedLesson.toString();
-                                final nextProg = LffBookCatalog.getNextProgression(currentLesson: selectedLesson, currentPoint: selectedEndPoint);
+                                selectedLesson = int.parse(
+                                  val.replaceFirst('lesson_', ''),
+                                );
+                                lessonController.text = selectedLesson
+                                    .toString();
+                                final nextProg =
+                                    LffBookCatalog.getNextProgression(
+                                      currentLesson: selectedLesson,
+                                      currentPoint: selectedEndPoint,
+                                    );
                                 nextStepController.text = nextProg.label;
                               } else {
                                 nextStepController.text = val;
@@ -557,7 +734,10 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                       const SizedBox(height: 12),
                       Text(
                         'Pontos Cobertos:',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 6),
                       Wrap(
@@ -565,11 +745,14 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                         runSpacing: 4,
                         children: List.generate(currentUnitMaxPoints, (idx) {
                           final pNum = idx + 1;
-                          final isSelected = pNum >= selectedStartPoint && pNum <= selectedEndPoint;
+                          final isSelected =
+                              pNum >= selectedStartPoint &&
+                              pNum <= selectedEndPoint;
                           return FilterChip(
                             label: Text('Ponto $pNum'),
                             selected: isSelected,
-                            selectedColor: const Color(0xFF7C3AED).withValues(alpha: 0.25),
+                            selectedColor: const Color(0xFF7C3AED)
+                                .withValues(alpha: 0.25),
                             checkmarkColor: const Color(0xFF7C3AED),
                             onSelected: (val) {
                               if (val) {
@@ -582,9 +765,15 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                                 if (selectedStartPoint == selectedEndPoint) {
                                   // Mínimo 1 selecionado
                                 } else if (pNum == selectedEndPoint) {
-                                  updatePoints(selectedStartPoint, selectedEndPoint - 1);
+                                  updatePoints(
+                                    selectedStartPoint,
+                                    selectedEndPoint - 1,
+                                  );
                                 } else if (pNum == selectedStartPoint) {
-                                  updatePoints(selectedStartPoint + 1, selectedEndPoint);
+                                  updatePoints(
+                                    selectedStartPoint + 1,
+                                    selectedEndPoint,
+                                  );
                                 }
                               }
                             },
@@ -600,11 +789,17 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                         ),
                         onChanged: (text) {
                           final parsed = int.tryParse(text.trim());
-                          if (parsed != null && parsed >= 1 && parsed <= currentUnitMaxPoints) {
+                          if (parsed != null &&
+                              parsed >= 1 &&
+                              parsed <= currentUnitMaxPoints) {
                             setDialogState(() {
                               selectedStartPoint = parsed;
                               selectedEndPoint = parsed;
-                              final nextProg = LffBookCatalog.getNextProgression(currentLesson: selectedLesson, currentPoint: parsed);
+                              final nextProg =
+                                  LffBookCatalog.getNextProgression(
+                                    currentLesson: selectedLesson,
+                                    currentPoint: parsed,
+                                  );
                               nextStepController.text = nextProg.label;
                             });
                           }
@@ -617,7 +812,9 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                           Expanded(
                             child: TextField(
                               controller: lessonController,
-                              decoration: const InputDecoration(labelText: 'Lição estudada'),
+                              decoration: const InputDecoration(
+                                labelText: 'Lição estudada',
+                              ),
                               keyboardType: TextInputType.number,
                             ),
                           ),
@@ -625,7 +822,9 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                           Expanded(
                             child: TextField(
                               controller: paragraphsController,
-                              decoration: const InputDecoration(labelText: 'Parágrafos'),
+                              decoration: const InputDecoration(
+                                labelText: 'Parágrafos',
+                              ),
                             ),
                           ),
                         ],
@@ -635,11 +834,16 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
 
                     // Seletor de Contagem de Presentes / Assistência
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFF7C3AED).withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFF7C3AED).withValues(alpha: 0.3)),
+                        border: Border.all(
+                          color: const Color(0xFF7C3AED).withValues(alpha: 0.3),
+                        ),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -650,16 +854,31 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                               children: [
                                 const Text(
                                   'Número de Presentes',
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF7C3AED)),
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                    color: Color(0xFF7C3AED),
+                                  ),
                                 ),
-                                Text('Estudante e acompanhantes', style: TextStyle(fontSize: 11, color: dialogIsDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted)),
+                                Text(
+                                  'Estudante e acompanhantes',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: dialogIsDark
+                                        ? const Color(0xFFCBD5E1)
+                                        : AppTheme.textMuted,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
                           Row(
                             children: [
                               IconButton(
-                                icon: const Icon(Icons.remove_circle_outline, color: Color(0xFF7C3AED)),
+                                icon: const Icon(
+                                  Icons.remove_circle_outline,
+                                  color: Color(0xFF7C3AED),
+                                ),
                                 onPressed: () {
                                   if (attendanceCount > 1) {
                                     setDialogState(() => attendanceCount--);
@@ -668,10 +887,17 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                               ),
                               Text(
                                 '$attendanceCount',
-                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED)),
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF7C3AED),
+                                ),
                               ),
                               IconButton(
-                                icon: const Icon(Icons.add_circle_outline, color: Color(0xFF7C3AED)),
+                                icon: const Icon(
+                                  Icons.add_circle_outline,
+                                  color: Color(0xFF7C3AED),
+                                ),
                                 onPressed: () {
                                   setDialogState(() => attendanceCount++);
                                 },
@@ -687,7 +913,9 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                   TextField(
                     controller: notesController,
                     decoration: InputDecoration(
-                      labelText: sessionOutcome == 'cancelada' ? 'Observações da falha' : 'Observações da sessão',
+                      labelText: sessionOutcome == 'cancelada'
+                          ? 'Observações da falha'
+                          : 'Observações da sessão',
                       hintText: sessionOutcome == 'cancelada'
                           ? 'Descreva o que houve ou motivo de contato...'
                           : 'Dúvidas esclarecidas, pontos de interesse...',
@@ -707,11 +935,14 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                   GlobalAppointmentSchedulingSection(
                     title: 'Agendar Próximo Estudo',
                     isEnabled: scheduleNextStudy,
-                    onToggle: (v) => setDialogState(() => scheduleNextStudy = v),
+                    onToggle: (v) =>
+                        setDialogState(() => scheduleNextStudy = v),
                     selectedDateTime: nextStudyDateTime,
-                    onDateTimeChanged: (dt) => setDialogState(() => nextStudyDateTime = dt),
+                    onDateTimeChanged: (dt) =>
+                        setDialogState(() => nextStudyDateTime = dt),
                     durationMinutes: nextStudyDuration,
-                    onDurationChanged: (d) => setDialogState(() => nextStudyDuration = d),
+                    onDurationChanged: (d) =>
+                        setDialogState(() => nextStudyDuration = d),
                     existingAppointments: allAppts,
                     existingPersonAppointment: existingUpcomingAppt,
                     frequencyText: freqLabel,
@@ -720,10 +951,15 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
               ),
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancelar'),
+              ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: sessionOutcome == 'cancelada' ? AppTheme.alertRed : const Color(0xFF7C3AED),
+                  backgroundColor: sessionOutcome == 'cancelada'
+                      ? AppTheme.alertRed
+                      : const Color(0xFF7C3AED),
                   foregroundColor: Colors.white,
                 ),
                 onPressed: () async {
@@ -733,16 +969,21 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                       durationMinutes: nextStudyDuration,
                       existingAppointments: allAppts,
                     );
-                    final canProceed = await GlobalAppointmentSchedulingSection.confirmConflictIfNeeded(
-                      context: context,
-                      availability: avail,
-                    );
+                    final canProceed =
+                        await GlobalAppointmentSchedulingSection.confirmConflictIfNeeded(
+                          context: context,
+                          availability: avail,
+                        );
                     if (!canProceed) return;
                   }
 
                   final repo = ref.read(repositoryProvider);
-                  final participants = await repo.getParticipantsForStudy(study.id);
-                  final primaryPersonId = participants.isNotEmpty ? participants.first.personId : null;
+                  final participants = await repo.getParticipantsForStudy(
+                    study.id,
+                  );
+                  final primaryPersonId = participants.isNotEmpty
+                      ? participants.first.personId
+                      : null;
 
                   if (sessionOutcome == 'cancelada') {
                     final formattedNotes = notesController.text.trim().isEmpty
@@ -755,9 +996,13 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                       lessonCovered: study.currentLesson,
                       paragraphsCovered: null,
                       sessionNotes: formattedNotes,
-                      nextStep: nextStepController.text.trim().isEmpty ? null : nextStepController.text.trim(),
+                      nextStep: nextStepController.text.trim().isEmpty
+                          ? null
+                          : nextStepController.text.trim(),
                       status: 'cancelada',
-                      participantIds: participants.map((p) => p.personId).toList(),
+                      participantIds: participants
+                          .map((p) => p.personId)
+                          .toList(),
                     );
 
                     if (nextStepController.text.trim().isNotEmpty) {
@@ -768,29 +1013,48 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                       );
                     }
                   } else {
-                    final lesson = isLff ? selectedLesson : int.tryParse(lessonController.text.trim());
-                    final formattedNotes = DashboardCalculator.formatSessionNotesWithAttendance(
-                      notesController.text.trim().isEmpty ? null : notesController.text.trim(),
-                      attendanceCount,
-                    );
+                    final lesson = isLff
+                        ? selectedLesson
+                        : int.tryParse(lessonController.text.trim());
+                    final formattedNotes =
+                        DashboardCalculator.formatSessionNotesWithAttendance(
+                          notesController.text.trim().isEmpty
+                              ? null
+                              : notesController.text.trim(),
+                          attendanceCount,
+                        );
 
                     await repo.createStudySession(
                       studyId: study.id,
                       dateTime: DateTime.now(),
                       lessonCovered: lesson,
-                      paragraphsCovered: paragraphsController.text.trim().isEmpty ? null : paragraphsController.text.trim(),
+                      paragraphsCovered:
+                          paragraphsController.text.trim().isEmpty
+                          ? null
+                          : paragraphsController.text.trim(),
                       sessionNotes: formattedNotes,
-                      nextStep: nextStepController.text.trim().isEmpty ? null : nextStepController.text.trim(),
+                      nextStep: nextStepController.text.trim().isEmpty
+                          ? null
+                          : nextStepController.text.trim(),
                       status: 'realizada',
-                      participantIds: participants.map((p) => p.personId).toList(),
+                      participantIds: participants
+                          .map((p) => p.personId)
+                          .toList(),
                     );
 
                     // Atualiza a lição e ponto atual no registro do estudo
                     await repo.updateStudy(
                       study.copyWith(
                         currentLesson: Value(lesson),
-                        currentParagraph: Value(int.tryParse(paragraphsController.text.trim()) ?? (isLff ? selectedEndPoint : null)),
-                        nextTopic: Value(nextStepController.text.trim().isEmpty ? null : nextStepController.text.trim()),
+                        currentParagraph: Value(
+                          int.tryParse(paragraphsController.text.trim()) ??
+                              (isLff ? selectedEndPoint : null),
+                        ),
+                        nextTopic: Value(
+                          nextStepController.text.trim().isEmpty
+                              ? null
+                              : nextStepController.text.trim(),
+                        ),
                         lastSessionAt: Value(DateTime.now()),
                       ),
                     );
@@ -798,14 +1062,19 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
 
                   if (scheduleNextStudy) {
                     // Prevenção de duplicidade: atualiza compromisso existente na mesma data ou cria novo
-                    final existingAppts = ref.read(appointmentsStreamProvider).value ?? [];
-                    final existingOnDate = existingAppts.firstWhereOrNull((a) =>
-                        a.deletedAt == null &&
-                        a.status != 'cancelado' &&
-                        ((primaryPersonId != null && a.personId == primaryPersonId) || (a.studyId != null && a.studyId == study.id)) &&
-                        a.startTime.year == nextStudyDateTime.year &&
-                        a.startTime.month == nextStudyDateTime.month &&
-                        a.startTime.day == nextStudyDateTime.day);
+                    final existingAppts =
+                        ref.read(appointmentsStreamProvider).value ?? [];
+                    final existingOnDate = existingAppts.firstWhereOrNull(
+                      (a) =>
+                          a.deletedAt == null &&
+                          a.status != 'cancelado' &&
+                          ((primaryPersonId != null &&
+                                  a.personId == primaryPersonId) ||
+                              (a.studyId != null && a.studyId == study.id)) &&
+                          a.startTime.year == nextStudyDateTime.year &&
+                          a.startTime.month == nextStudyDateTime.month &&
+                          a.startTime.day == nextStudyDateTime.day,
+                    );
 
                     if (existingOnDate != null) {
                       await repo.updateAppointment(
@@ -813,7 +1082,9 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                           studyId: Value(study.id),
                           personId: Value(primaryPersonId),
                           startTime: nextStudyDateTime,
-                          endTime: nextStudyDateTime.add(Duration(minutes: nextStudyDuration)),
+                          endTime: nextStudyDateTime.add(
+                            Duration(minutes: nextStudyDuration),
+                          ),
                           durationMinutes: nextStudyDuration,
                           status: 'confirmado',
                         ),
@@ -824,7 +1095,9 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                         studyId: study.id,
                         title: 'Estudo Bíblico: ${study.title}',
                         startTime: nextStudyDateTime,
-                        endTime: nextStudyDateTime.add(Duration(minutes: nextStudyDuration)),
+                        endTime: nextStudyDateTime.add(
+                          Duration(minutes: nextStudyDuration),
+                        ),
                         durationMinutes: nextStudyDuration,
                         status: 'confirmado',
                       );
@@ -834,7 +1107,11 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                   if (ctx.mounted) Navigator.pop(ctx);
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Sessão registrada com sucesso! ($attendanceCount presentes computados)')),
+                      SnackBar(
+                        content: Text(
+                          'Sessão registrada com sucesso! ($attendanceCount presentes computados)',
+                        ),
+                      ),
                     );
                   }
                 },
@@ -883,44 +1160,83 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                     isExpanded: true,
                     decoration: const InputDecoration(labelText: 'Publicação'),
                     items: PublicationCatalog.allPublications.map((p) {
-                      return DropdownMenuItem(value: p.id, child: Text(p.title, maxLines: 1, overflow: TextOverflow.ellipsis));
+                      return DropdownMenuItem(
+                        value: p.id,
+                        child: Text(
+                          p.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      );
                     }).toList(),
                     onChanged: (val) {
-                      if (val != null) setDialogState(() => selectedPublicationId = val);
+                      if (val != null)
+                        setDialogState(() => selectedPublicationId = val);
                     },
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     initialValue: selectedLanguage,
-                    decoration: const InputDecoration(labelText: 'Idioma do estudo'),
+                    decoration: const InputDecoration(
+                      labelText: 'Idioma do estudo',
+                    ),
                     items: const [
                       DropdownMenuItem(value: 'pt', child: Text('Português')),
-                      DropdownMenuItem(value: 'bzs', child: Text('Libras (Língua de Sinais)')),
+                      DropdownMenuItem(
+                        value: 'bzs',
+                        child: Text('Libras (Língua de Sinais)'),
+                      ),
                       DropdownMenuItem(value: 'tca', child: Text('Ticuna')),
                     ],
                     onChanged: (val) {
-                      if (val != null) setDialogState(() => selectedLanguage = val);
+                      if (val != null)
+                        setDialogState(() => selectedLanguage = val);
                     },
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     initialValue: selectedFrequency,
-                    decoration: const InputDecoration(labelText: 'Frequência do estudo'),
+                    decoration: const InputDecoration(
+                      labelText: 'Frequência do estudo',
+                    ),
                     items: const [
-                      DropdownMenuItem(value: 'semanal', child: Text('Semanal (1x por semana)')),
-                      DropdownMenuItem(value: 'duas_vezes_semana', child: Text('Intensivo (2x por semana)')),
-                      DropdownMenuItem(value: 'quinzenal', child: Text('Quinzenal (A cada 15 dias)')),
+                      DropdownMenuItem(
+                        value: 'semanal',
+                        child: Text('Semanal (1x por semana)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'duas_vezes_semana',
+                        child: Text('Intensivo (2x por semana)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'quinzenal',
+                        child: Text('Quinzenal (A cada 15 dias)'),
+                      ),
                     ],
                     onChanged: (val) {
-                      if (val != null) setDialogState(() => selectedFrequency = val);
+                      if (val != null)
+                        setDialogState(() => selectedFrequency = val);
                     },
                   ),
                   const SizedBox(height: 14),
-                  const Text('Quem participa ou acompanha o estudo:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                  Text('Selecione o estudante principal e os acompanhantes (ex: casal ou familiares):', style: TextStyle(fontSize: 12, color: isDarkDialog ? const Color(0xFFCBD5E1) : AppTheme.textMuted)),
+                  const Text(
+                    'Quem participa ou acompanha o estudo:',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                  Text(
+                    'Selecione o estudante principal e os acompanhantes (ex: casal ou familiares):',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDarkDialog
+                          ? const Color(0xFFCBD5E1)
+                          : AppTheme.textMuted,
+                    ),
+                  ),
                   const SizedBox(height: 6),
                   if (people.isEmpty)
-                    const Text('Cadastre pessoas na aba Contatos para vinculá-las ao estudo.')
+                    const Text(
+                      'Cadastre pessoas na aba Contatos para vinculá-las ao estudo.',
+                    )
                   else
                     Wrap(
                       spacing: 8,
@@ -948,13 +1264,20 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
               ),
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancelar'),
+              ),
               ElevatedButton(
                 onPressed: () async {
                   final title = titleController.text.trim();
                   if (title.isEmpty || selectedPeopleIds.isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Informe o título e selecione pelo menos um participante.')),
+                      const SnackBar(
+                        content: Text(
+                          'Informe o título e selecione pelo menos um participante.',
+                        ),
+                      ),
                     );
                     return;
                   }
@@ -1000,7 +1323,10 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
               Text(
                 'Nenhum estudo bíblico ativo para calcular prioridade.\nAdicione ou ative um estudo para ver a lista inteligente.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted, fontSize: 15),
+                style: TextStyle(
+                  color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted,
+                  fontSize: 15,
+                ),
               ),
             ],
           ),
@@ -1025,14 +1351,20 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
           color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
           child: Row(
             children: [
-              const Icon(Icons.info_outline, size: 16, color: AppTheme.primaryBlue),
+              const Icon(
+                Icons.info_outline,
+                size: 16,
+                color: AppTheme.primaryBlue,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'Prioridade calculada por frequência (2x/sem), ritmo e assiduidade. Arraste para reordenar.',
                   style: TextStyle(
                     fontSize: 12,
-                    color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1E40AF),
+                    color: isDark
+                        ? const Color(0xFF93C5FD)
+                        : const Color(0xFF1E40AF),
                   ),
                 ),
               ),
@@ -1058,7 +1390,9 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
             itemBuilder: (context, index) {
               final item = priorityItems[index];
               final study = item.study;
-              final lffLesson = study.publicationId == 'lff-book' && study.currentLesson != null
+              final lffLesson =
+                  study.publicationId == 'lff-book' &&
+                      study.currentLesson != null
                   ? LffBookCatalog.getLesson(study.currentLesson!)
                   : null;
 
@@ -1096,33 +1430,50 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                             width: 28,
                             height: 28,
                             decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                              color: isDark
+                                  ? const Color(0xFF334155)
+                                  : const Color(0xFFE2E8F0),
                               shape: BoxShape.circle,
                             ),
                             alignment: Alignment.center,
                             child: Text(
                               '#${item.manualRank}',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               study.title,
-                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
                             decoration: BoxDecoration(
                               color: priorityColor.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: priorityColor.withValues(alpha: 0.4)),
+                              border: Border.all(
+                                color: priorityColor.withValues(alpha: 0.4),
+                              ),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(priorityIcon, size: 14, color: priorityColor),
+                                Icon(
+                                  priorityIcon,
+                                  size: 14,
+                                  color: priorityColor,
+                                ),
                                 const SizedBox(width: 4),
                                 Text(
                                   item.priorityTier,
@@ -1142,7 +1493,12 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                       const SizedBox(height: 4),
                       Text(
                         'Estudante: ${item.primaryPerson.name}',
-                        style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark
+                              ? const Color(0xFFCBD5E1)
+                              : AppTheme.textMuted,
+                        ),
                       ),
                       const SizedBox(height: 8),
                       // Progresso LFF
@@ -1155,14 +1511,21 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                                 study.currentLesson != null
                                     ? 'Lição ${study.currentLesson}: ${lffLesson?.title ?? "Seja Feliz Para Sempre!"}'
                                     : 'Livro Seja Feliz Para Sempre!',
-                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
                             Text(
                               '${item.progressPercent.toStringAsFixed(1)}%',
-                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.accentTeal),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.accentTeal,
+                              ),
                             ),
                           ],
                         ),
@@ -1172,8 +1535,12 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                           child: LinearProgressIndicator(
                             value: item.progressPercent / 100.0,
                             minHeight: 6,
-                            backgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                            valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.accentTeal),
+                            backgroundColor: isDark
+                                ? const Color(0xFF334155)
+                                : const Color(0xFFE2E8F0),
+                            valueColor: const AlwaysStoppedAnimation<Color>(
+                              AppTheme.accentTeal,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -1185,44 +1552,84 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                         children: [
                           if (item.frequency == 'duas_vezes_semana')
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFFEF3C7),
                                 borderRadius: BorderRadius.circular(4),
                               ),
-                              child: const Text('🔥 2x / semana', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFB45309))),
+                              child: const Text(
+                                '🔥 2x / semana',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFFB45309),
+                                ),
+                              ),
                             ),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                              color: isDark
+                                  ? const Color(0xFF1E293B)
+                                  : const Color(0xFFF1F5F9),
                               borderRadius: BorderRadius.circular(4),
                             ),
-                            child: Text(item.velocityLabel, style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted)),
+                            child: Text(
+                              item.velocityLabel,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isDark
+                                    ? const Color(0xFFCBD5E1)
+                                    : AppTheme.textMuted,
+                              ),
+                            ),
                           ),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                              color: isDark
+                                  ? const Color(0xFF1E293B)
+                                  : const Color(0xFFF1F5F9),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
                               item.daysSinceLastSession != null
                                   ? 'Última: ${item.daysSinceLastSession}d atrás'
                                   : 'Sem sessões ainda',
-                              style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted),
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isDark
+                                    ? const Color(0xFFCBD5E1)
+                                    : AppTheme.textMuted,
+                              ),
                             ),
                           ),
                           if (item.spiritualGoalsMetCount > 0)
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFDCFCE7),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(
                                 '🎯 ${item.spiritualGoalsMetCount} meta(s)',
-                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF166534)),
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF166534),
+                                ),
                               ),
                             ),
                         ],
@@ -1233,12 +1640,17 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                           Expanded(
                             child: OutlinedButton.icon(
                               icon: const Icon(Icons.person, size: 16),
-                              label: const Text('Contato', style: TextStyle(fontSize: 12)),
+                              label: const Text(
+                                'Contato',
+                                style: TextStyle(fontSize: 12),
+                              ),
                               onPressed: () {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (_) => PersonDetailScreen(personId: item.primaryPerson.id),
+                                    builder: (_) => PersonDetailScreen(
+                                      personId: item.primaryPerson.id,
+                                    ),
                                   ),
                                 );
                               },
@@ -1251,9 +1663,16 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                                 backgroundColor: const Color(0xFF7C3AED),
                                 foregroundColor: Colors.white,
                               ),
-                              icon: const Icon(Icons.playlist_add_check, size: 16),
-                              label: const Text('Registrar Sessão', style: TextStyle(fontSize: 12)),
-                              onPressed: () => _showRecordSessionDialog(context, study),
+                              icon: const Icon(
+                                Icons.playlist_add_check,
+                                size: 16,
+                              ),
+                              label: const Text(
+                                'Registrar Sessão',
+                                style: TextStyle(fontSize: 12),
+                              ),
+                              onPressed: () =>
+                                  _showRecordSessionDialog(context, study),
                             ),
                           ),
                         ],
@@ -1279,9 +1698,7 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Estudos Bíblicos'),
-      ),
+      appBar: AppBar(title: const Text('Estudos Bíblicos')),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: AppTheme.primaryBlue,
         foregroundColor: Colors.white,
@@ -1291,8 +1708,12 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
       ),
       body: studiesAsync.when(
         data: (studies) {
-          final activeStudies = studies.where((s) => s.status == 'ativo').toList();
-          final closedStudies = studies.where((s) => s.status != 'ativo').toList();
+          final activeStudies = studies
+              .where((s) => s.status == 'ativo')
+              .toList();
+          final closedStudies = studies
+              .where((s) => s.status != 'ativo')
+              .toList();
 
           final filtered = studies.where((s) {
             if (_selectedStatusFilter == 'Ativos') {
@@ -1307,7 +1728,10 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
             children: [
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 color: isDark ? const Color(0xFF0F172A) : Colors.white,
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
@@ -1317,23 +1741,36 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                         label: Text('Ativos (${activeStudies.length})'),
                         selected: _selectedStatusFilter == 'Ativos',
                         onSelected: (val) {
-                          if (val) setState(() => _selectedStatusFilter = 'Ativos');
+                          if (val)
+                            setState(() => _selectedStatusFilter = 'Ativos');
                         },
                       ),
                       const SizedBox(width: 8),
                       ChoiceChip(
-                        label: Text('Prioridade & Progresso (${activeStudies.length})'),
-                        selected: _selectedStatusFilter == 'Prioridade & Progresso',
+                        label: Text(
+                          'Prioridade & Progresso (${activeStudies.length})',
+                        ),
+                        selected:
+                            _selectedStatusFilter == 'Prioridade & Progresso',
                         onSelected: (val) {
-                          if (val) setState(() => _selectedStatusFilter = 'Prioridade & Progresso');
+                          if (val)
+                            setState(
+                              () => _selectedStatusFilter =
+                                  'Prioridade & Progresso',
+                            );
                         },
                       ),
                       const SizedBox(width: 8),
                       ChoiceChip(
-                        label: Text('Encerrados / Concluídos (${closedStudies.length})'),
+                        label: Text(
+                          'Encerrados / Concluídos (${closedStudies.length})',
+                        ),
                         selected: _selectedStatusFilter == 'Encerrados',
                         onSelected: (val) {
-                          if (val) setState(() => _selectedStatusFilter = 'Encerrados');
+                          if (val)
+                            setState(
+                              () => _selectedStatusFilter = 'Encerrados',
+                            );
                         },
                       ),
                     ],
@@ -1358,14 +1795,23 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.menu_book, size: 56, color: Colors.grey.shade400),
+                              Icon(
+                                Icons.menu_book,
+                                size: 56,
+                                color: Colors.grey.shade400,
+                              ),
                               const SizedBox(height: 12),
                               Text(
                                 _selectedStatusFilter == 'Ativos'
                                     ? 'Nenhum estudo bíblico ativo no momento.\nToque em "+ Novo Estudo" para registrar.'
                                     : 'Nenhum estudo encerrado ou concluído.',
                                 textAlign: TextAlign.center,
-                                style: TextStyle(color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted, fontSize: 15),
+                                style: TextStyle(
+                                  color: isDark
+                                      ? const Color(0xFFCBD5E1)
+                                      : AppTheme.textMuted,
+                                  fontSize: 15,
+                                ),
                               ),
                             ],
                           ),
@@ -1376,13 +1822,17 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                         itemCount: filtered.length,
                         itemBuilder: (context, index) {
                           final study = filtered[index];
-                          final pub = PublicationCatalog.getById(study.publicationId);
+                          final pub = PublicationCatalog.getById(
+                            study.publicationId,
+                          );
 
                           String? endReason;
-                          if (study.pauseOrCloseReason != null && study.pauseOrCloseReason!.isNotEmpty) {
+                          if (study.pauseOrCloseReason != null &&
+                              study.pauseOrCloseReason!.isNotEmpty) {
                             try {
                               final d = jsonDecode(study.pauseOrCloseReason!);
-                              if (d is Map && d.containsKey('endReason')) endReason = d['endReason'];
+                              if (d is Map && d.containsKey('endReason'))
+                                endReason = d['endReason'];
                             } catch (_) {
                               endReason = study.pauseOrCloseReason;
                             }
@@ -1396,24 +1846,42 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
                                       Expanded(
                                         child: Text(
                                           study.title,
-                                          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                                          style: const TextStyle(
+                                            fontSize: 17,
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
                                       ),
                                       IconButton(
-                                        icon: const Icon(Icons.account_box_outlined, color: AppTheme.primaryBlue, size: 22),
-                                        tooltip: 'Ver Cadastro e Opções da Pessoa',
+                                        icon: const Icon(
+                                          Icons.account_box_outlined,
+                                          color: AppTheme.primaryBlue,
+                                          size: 22,
+                                        ),
+                                        tooltip:
+                                            'Ver Cadastro e Opções da Pessoa',
                                         onPressed: () async {
-                                          final parts = await ref.read(repositoryProvider).getParticipantsForStudy(study.id);
-                                          if (parts.isNotEmpty && context.mounted) {
+                                          final parts = await ref
+                                              .read(repositoryProvider)
+                                              .getParticipantsForStudy(
+                                                study.id,
+                                              );
+                                          if (parts.isNotEmpty &&
+                                              context.mounted) {
                                             Navigator.push(
                                               context,
                                               MaterialPageRoute(
-                                                builder: (_) => PersonDetailScreen(personId: parts.first.personId),
+                                                builder: (_) =>
+                                                    PersonDetailScreen(
+                                                      personId:
+                                                          parts.first.personId,
+                                                    ),
                                               ),
                                             );
                                           }
@@ -1421,12 +1889,20 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                                       ),
                                       const SizedBox(width: 4),
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 4,
+                                        ),
                                         decoration: BoxDecoration(
                                           color: study.status == 'ativo'
-                                              ? AppTheme.successGreen.withValues(alpha: 0.1)
-                                              : (isDark ? const Color(0xFF334155) : Colors.grey.shade200),
-                                          borderRadius: BorderRadius.circular(6),
+                                              ? AppTheme.successGreen
+                                                    .withValues(alpha: 0.1)
+                                              : (isDark
+                                                    ? const Color(0xFF334155)
+                                                    : Colors.grey.shade200),
+                                          borderRadius: BorderRadius.circular(
+                                            6,
+                                          ),
                                         ),
                                         child: Text(
                                           study.status.toUpperCase(),
@@ -1435,7 +1911,9 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                                             fontWeight: FontWeight.bold,
                                             color: study.status == 'ativo'
                                                 ? AppTheme.successGreen
-                                                : (isDark ? const Color(0xFFCBD5E1) : Colors.grey.shade700),
+                                                : (isDark
+                                                      ? const Color(0xFFCBD5E1)
+                                                      : Colors.grey.shade700),
                                           ),
                                         ),
                                       ),
@@ -1444,42 +1922,81 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                                   const SizedBox(height: 6),
                                   Text(
                                     pub?.title ?? study.publicationId,
-                                    style: TextStyle(fontSize: 13, color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted),
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: isDark
+                                          ? const Color(0xFFCBD5E1)
+                                          : AppTheme.textMuted,
+                                    ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                   const SizedBox(height: 8),
                                   FutureBuilder<List<StudyParticipantEntry>>(
-                                    future: ref.read(repositoryProvider).getParticipantsForStudy(study.id),
+                                    future: ref
+                                        .read(repositoryProvider)
+                                        .getParticipantsForStudy(study.id),
                                     builder: (context, partSnap) {
                                       final parts = partSnap.data ?? [];
-                                      if (parts.isEmpty) return const SizedBox.shrink();
-                                      final people = ref.watch(peopleStreamProvider).value ?? [];
-                                      final peopleMap = {for (var p in people) p.id: p.name};
-                                      final names = parts.map((p) => peopleMap[p.personId] ?? 'Participante').join(', ');
+                                      if (parts.isEmpty)
+                                        return const SizedBox.shrink();
+                                      final people =
+                                          ref
+                                              .watch(peopleStreamProvider)
+                                              .value ??
+                                          [];
+                                      final peopleMap = {
+                                        for (var p in people) p.id: p.name,
+                                      };
+                                      final names = parts
+                                          .map(
+                                            (p) =>
+                                                peopleMap[p.personId] ??
+                                                'Participante',
+                                          )
+                                          .join(', ');
                                       return InkWell(
                                         onTap: () {
                                           if (parts.isNotEmpty) {
                                             Navigator.push(
                                               context,
                                               MaterialPageRoute(
-                                                builder: (_) => PersonDetailScreen(personId: parts.first.personId),
+                                                builder: (_) =>
+                                                    PersonDetailScreen(
+                                                      personId:
+                                                          parts.first.personId,
+                                                    ),
                                               ),
                                             );
                                           }
                                         },
                                         borderRadius: BorderRadius.circular(6),
                                         child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                                          margin: const EdgeInsets.only(bottom: 8),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 5,
+                                          ),
+                                          margin: const EdgeInsets.only(
+                                            bottom: 8,
+                                          ),
                                           decoration: BoxDecoration(
-                                            color: AppTheme.primaryBlue.withValues(alpha: 0.08),
-                                            borderRadius: BorderRadius.circular(6),
-                                            border: Border.all(color: AppTheme.primaryBlue.withValues(alpha: 0.2)),
+                                            color: AppTheme.primaryBlue
+                                                .withValues(alpha: 0.08),
+                                            borderRadius: BorderRadius.circular(
+                                              6,
+                                            ),
+                                            border: Border.all(
+                                              color: AppTheme.primaryBlue
+                                                  .withValues(alpha: 0.2),
+                                            ),
                                           ),
                                           child: Row(
                                             children: [
-                                              const Icon(Icons.people_alt_outlined, size: 16, color: AppTheme.primaryBlue),
+                                              const Icon(
+                                                Icons.people_alt_outlined,
+                                                size: 16,
+                                                color: AppTheme.primaryBlue,
+                                              ),
                                               const SizedBox(width: 6),
                                               Expanded(
                                                 child: Text(
@@ -1491,7 +2008,11 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                                                   ),
                                                 ),
                                               ),
-                                              const Icon(Icons.arrow_forward_ios, size: 11, color: AppTheme.primaryBlue),
+                                              const Icon(
+                                                Icons.arrow_forward_ios,
+                                                size: 11,
+                                                color: AppTheme.primaryBlue,
+                                              ),
                                             ],
                                           ),
                                         ),
@@ -1501,43 +2022,83 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                                   Container(
                                     padding: const EdgeInsets.all(10),
                                     decoration: BoxDecoration(
-                                      color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                                      color: isDark
+                                          ? const Color(0xFF1E293B)
+                                          : const Color(0xFFF1F5F9),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceAround,
                                       children: [
                                         Column(
                                           children: [
-                                            Text('Lição Atual', style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted)),
                                             Text(
-                                              study.currentLesson != null ? 'Lição ${study.currentLesson}' : 'Não iniciada',
-                                              style: const TextStyle(fontWeight: FontWeight.bold),
+                                              'Lição Atual',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: isDark
+                                                    ? const Color(0xFFCBD5E1)
+                                                    : AppTheme.textMuted,
+                                              ),
+                                            ),
+                                            Text(
+                                              study.currentLesson != null
+                                                  ? 'Lição ${study.currentLesson}'
+                                                  : 'Não iniciada',
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                              ),
                                             ),
                                           ],
                                         ),
                                         Column(
                                           children: [
                                             Text(
-                                              study.publicationId == 'lff-book' || study.publicationId == 'lff-brochure' ? 'Ponto Atual' : 'Parágrafo',
-                                              style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted),
+                                              study.publicationId ==
+                                                          'lff-book' ||
+                                                      study.publicationId ==
+                                                          'lff-brochure'
+                                                  ? 'Ponto Atual'
+                                                  : 'Parágrafo',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: isDark
+                                                    ? const Color(0xFFCBD5E1)
+                                                    : AppTheme.textMuted,
+                                              ),
                                             ),
                                             Text(
                                               study.currentParagraph != null
-                                                  ? (study.publicationId == 'lff-book' || study.publicationId == 'lff-brochure'
-                                                      ? 'Ponto ${study.currentParagraph}'
-                                                      : '§ ${study.currentParagraph}')
+                                                  ? (study.publicationId ==
+                                                                'lff-book' ||
+                                                            study.publicationId ==
+                                                                'lff-brochure'
+                                                        ? 'Ponto ${study.currentParagraph}'
+                                                        : '§ ${study.currentParagraph}')
                                                   : '—',
-                                              style: const TextStyle(fontWeight: FontWeight.bold),
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                              ),
                                             ),
                                           ],
                                         ),
                                         Column(
                                           children: [
-                                            Text('Idioma', style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted)),
+                                            Text(
+                                              'Idioma',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: isDark
+                                                    ? const Color(0xFFCBD5E1)
+                                                    : AppTheme.textMuted,
+                                              ),
+                                            ),
                                             Text(
                                               study.language.toUpperCase(),
-                                              style: const TextStyle(fontWeight: FontWeight.bold),
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                              ),
                                             ),
                                           ],
                                         ),
@@ -1554,12 +2115,20 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                                       ),
                                       child: Row(
                                         children: [
-                                          const Icon(Icons.info_outline, color: Color(0xFFB45309), size: 16),
+                                          const Icon(
+                                            Icons.info_outline,
+                                            color: Color(0xFFB45309),
+                                            size: 16,
+                                          ),
                                           const SizedBox(width: 6),
                                           Expanded(
                                             child: Text(
                                               'Motivo do Encerramento: $endReason',
-                                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF92400E)),
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.bold,
+                                                color: Color(0xFF92400E),
+                                              ),
                                             ),
                                           ),
                                         ],
@@ -1572,24 +2141,47 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                                       Expanded(
                                         child: OutlinedButton.icon(
                                           style: OutlinedButton.styleFrom(
-                                            foregroundColor: AppTheme.primaryBlue,
-                                            side: const BorderSide(color: AppTheme.primaryBlue),
+                                            foregroundColor:
+                                                AppTheme.primaryBlue,
+                                            side: const BorderSide(
+                                              color: AppTheme.primaryBlue,
+                                            ),
                                           ),
-                                          icon: const Icon(Icons.person_outline, size: 16),
-                                          label: const Text('Ver Cadastro & Opções'),
+                                          icon: const Icon(
+                                            Icons.person_outline,
+                                            size: 16,
+                                          ),
+                                          label: const Text(
+                                            'Ver Cadastro & Opções',
+                                          ),
                                           onPressed: () async {
-                                            final parts = await ref.read(repositoryProvider).getParticipantsForStudy(study.id);
-                                            if (parts.isNotEmpty && context.mounted) {
+                                            final parts = await ref
+                                                .read(repositoryProvider)
+                                                .getParticipantsForStudy(
+                                                  study.id,
+                                                );
+                                            if (parts.isNotEmpty &&
+                                                context.mounted) {
                                               Navigator.push(
                                                 context,
                                                 MaterialPageRoute(
-                                                  builder: (_) => PersonDetailScreen(personId: parts.first.personId),
+                                                  builder: (_) =>
+                                                      PersonDetailScreen(
+                                                        personId: parts
+                                                            .first
+                                                            .personId,
+                                                      ),
                                                 ),
                                               );
                                             } else if (context.mounted) {
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                const SnackBar(content: Text('Nenhum contato vinculado diretamente a este estudo.')),
-                                              );
+                                              ScaffoldMessenger.of(context)
+                                                  .showSnackBar(
+                                                    const SnackBar(
+                                                      content: Text(
+                                                        'Nenhum contato vinculado diretamente a este estudo.',
+                                                      ),
+                                                    ),
+                                                  );
                                             }
                                           },
                                         ),
@@ -1601,17 +2193,33 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                                     children: [
                                       Expanded(
                                         child: OutlinedButton.icon(
-                                          icon: const Icon(Icons.menu_book, size: 16),
-                                          label: const Text('Abrir no JW Library'),
-                                          onPressed: () => _openPublicationLink(context, study),
+                                          icon: const Icon(
+                                            Icons.menu_book,
+                                            size: 16,
+                                          ),
+                                          label: const Text(
+                                            'Abrir no JW Library',
+                                          ),
+                                          onPressed: () => _openPublicationLink(
+                                            context,
+                                            study,
+                                          ),
                                         ),
                                       ),
                                       const SizedBox(width: 8),
                                       Expanded(
                                         child: ElevatedButton.icon(
-                                          icon: const Icon(Icons.playlist_add_check, size: 16),
+                                          icon: const Icon(
+                                            Icons.playlist_add_check,
+                                            size: 16,
+                                          ),
                                           label: const Text('Sessão'),
-                                          onPressed: study.status == 'ativo' ? () => _showRecordSessionDialog(context, study) : null,
+                                          onPressed: study.status == 'ativo'
+                                              ? () => _showRecordSessionDialog(
+                                                  context,
+                                                  study,
+                                                )
+                                              : null,
                                         ),
                                       ),
                                     ],
@@ -1623,12 +2231,21 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                                       child: OutlinedButton.icon(
                                         style: OutlinedButton.styleFrom(
                                           foregroundColor: AppTheme.alertRed,
-                                          side: const BorderSide(color: AppTheme.alertRed),
+                                          side: const BorderSide(
+                                            color: AppTheme.alertRed,
+                                          ),
                                           visualDensity: VisualDensity.compact,
                                         ),
-                                        icon: const Icon(Icons.stop_circle_outlined, size: 16),
-                                        label: const Text('Encerrar Estudo (com motivo)', style: TextStyle(fontSize: 12)),
-                                        onPressed: () => _showEndStudyDialog(context, study),
+                                        icon: const Icon(
+                                          Icons.stop_circle_outlined,
+                                          size: 16,
+                                        ),
+                                        label: const Text(
+                                          'Encerrar Estudo (com motivo)',
+                                          style: TextStyle(fontSize: 12),
+                                        ),
+                                        onPressed: () =>
+                                            _showEndStudyDialog(context, study),
                                       ),
                                     )
                                   else
@@ -1636,13 +2253,21 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                                       width: double.infinity,
                                       child: ElevatedButton.icon(
                                         style: ElevatedButton.styleFrom(
-                                          backgroundColor: AppTheme.successGreen,
+                                          backgroundColor:
+                                              AppTheme.successGreen,
                                           foregroundColor: Colors.white,
                                           visualDensity: VisualDensity.compact,
                                         ),
-                                        icon: const Icon(Icons.refresh, size: 16),
-                                        label: const Text('Reativar Estudo Bíblico', style: TextStyle(fontSize: 12)),
-                                        onPressed: () => _reactivateStudy(context, study),
+                                        icon: const Icon(
+                                          Icons.refresh,
+                                          size: 16,
+                                        ),
+                                        label: const Text(
+                                          'Reativar Estudo Bíblico',
+                                          style: TextStyle(fontSize: 12),
+                                        ),
+                                        onPressed: () =>
+                                            _reactivateStudy(context, study),
                                       ),
                                     ),
                                 ],

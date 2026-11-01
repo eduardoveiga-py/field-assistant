@@ -1,8 +1,9 @@
 import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+
 import 'tile_cache_interface.dart';
-import 'tile_cache_web.dart'
-    if (dart.library.io) 'tile_cache_native.dart';
+import 'tile_cache_web.dart' if (dart.library.io) 'tile_cache_native.dart';
 
 class TileCacheService {
   static final TileCacheService instance = TileCacheService._internal();
@@ -95,13 +96,19 @@ class _CachedTileWidgetState extends State<CachedTileWidget> {
   @override
   void didUpdateWidget(CachedTileWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.z != widget.z || oldWidget.x != widget.x || oldWidget.y != widget.y) {
+    if (oldWidget.z != widget.z ||
+        oldWidget.x != widget.x ||
+        oldWidget.y != widget.y) {
       _loadTile();
     }
   }
 
   Future<void> _loadTile() async {
-    final bytes = await TileCacheService.instance.getTileBytes(widget.z, widget.x, widget.y);
+    final bytes = await TileCacheService.instance.getTileBytes(
+      widget.z,
+      widget.x,
+      widget.y,
+    );
     if (mounted) {
       setState(() {
         _tileBytes = bytes;
@@ -126,7 +133,9 @@ class _CachedTileWidgetState extends State<CachedTileWidget> {
       width: widget.size,
       height: widget.size,
       decoration: BoxDecoration(
-        color: widget.isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
+        color: widget.isDark
+            ? const Color(0xFF1E293B)
+            : const Color(0xFFE2E8F0),
         border: Border.all(
           color: widget.isDark ? Colors.white10 : Colors.black12,
           width: 0.5,

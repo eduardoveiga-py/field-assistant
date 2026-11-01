@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+
 import '../../core/app_theme.dart';
 import '../../media/media_picker_helper.dart';
 import '../../research/research_manager.dart';
@@ -18,8 +19,10 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
   String? _selectedCategoryTag;
   bool _isWeeklyCardExpanded = true;
   String _sampleTitle = 'Como a Bíblia pode ajudar você?';
-  String _sampleQuestion = 'Você acha que a Bíblia pode nos ajudar a lidar com as ansiedades da vida?';
-  String _sampleScripture = 'Filipenses 4:6, 7 — "Não fiquem ansiosos por causa de coisa alguma, mas em tudo... as suas petições sejam conhecidas por Deus."';
+  String _sampleQuestion =
+      'Você acha que a Bíblia pode nos ajudar a lidar com as ansiedades da vida?';
+  String _sampleScripture =
+      'Filipenses 4:6, 7 — "Não fiquem ansiosos por causa de coisa alguma, mas em tudo... as suas petições sejam conhecidas por Deus."';
   String _samplePublication = 'Livro "Seja Feliz Para Sempre!" (Lição 01)';
   String _sampleVideoUrl = 'https://www.jw.org/pt/biblioteca/videos/';
 
@@ -73,7 +76,11 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                               if (ctx.mounted) Navigator.pop(ctx);
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Categoria "$text" criada com sucesso!')),
+                                  SnackBar(
+                                    content: Text(
+                                      'Categoria "$text" criada com sucesso!',
+                                    ),
+                                  ),
                                 );
                               }
                             }
@@ -84,10 +91,19 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                     ),
                     const SizedBox(height: 16),
                     const Divider(),
-                    const Text('Categorias Existentes:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    const Text(
+                      'Categorias Existentes:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
                     const SizedBox(height: 8),
                     if (tags.isEmpty)
-                      const Text('Nenhuma categoria cadastrada.', style: TextStyle(color: AppTheme.textMuted))
+                      const Text(
+                        'Nenhuma categoria cadastrada.',
+                        style: TextStyle(color: AppTheme.textMuted),
+                      )
                     else
                       ListView.builder(
                         shrinkWrap: true,
@@ -97,7 +113,12 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                           final t = tags[i];
                           return ListTile(
                             dense: true,
-                            title: Text(t.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                            title: Text(
+                              t.name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -105,22 +126,39 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                                   icon: const Icon(Icons.edit, size: 18),
                                   tooltip: 'Renomear',
                                   onPressed: () {
-                                    final editController = TextEditingController(text: t.name);
+                                    final editController =
+                                        TextEditingController(text: t.name);
                                     showDialog(
                                       context: context,
                                       builder: (editCtx) => AlertDialog(
                                         title: const Text('Renomear Categoria'),
-                                        content: TextField(controller: editController, autofocus: true),
+                                        content: TextField(
+                                          controller: editController,
+                                          autofocus: true,
+                                        ),
                                         actions: [
-                                          TextButton(onPressed: () => Navigator.pop(editCtx), child: const Text('Cancelar')),
+                                          TextButton(
+                                            onPressed: () =>
+                                                Navigator.pop(editCtx),
+                                            child: const Text('Cancelar'),
+                                          ),
                                           ElevatedButton(
                                             onPressed: () async {
-                                              final newName = editController.text.trim();
+                                              final newName = editController
+                                                  .text
+                                                  .trim();
                                               if (newName.isNotEmpty) {
-                                                final mgr = ref.read(researchManagerProvider);
-                                                await mgr.updateTag(t.id, newName);
-                                                if (editCtx.mounted) Navigator.pop(editCtx);
-                                                if (ctx.mounted) Navigator.pop(ctx);
+                                                final mgr = ref.read(
+                                                  researchManagerProvider,
+                                                );
+                                                await mgr.updateTag(
+                                                  t.id,
+                                                  newName,
+                                                );
+                                                if (editCtx.mounted)
+                                                  Navigator.pop(editCtx);
+                                                if (ctx.mounted)
+                                                  Navigator.pop(ctx);
                                               }
                                             },
                                             child: const Text('Salvar'),
@@ -131,15 +169,27 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                                   },
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                                  icon: const Icon(
+                                    Icons.delete_outline,
+                                    size: 18,
+                                    color: Colors.red,
+                                  ),
                                   tooltip: 'Excluir',
                                   onPressed: () async {
-                                    final mgr = ref.read(researchManagerProvider);
+                                    final mgr = ref.read(
+                                      researchManagerProvider,
+                                    );
                                     await mgr.deleteTag(t.id);
                                     if (ctx.mounted) Navigator.pop(ctx);
                                     if (context.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text('Categoria "${t.name}" excluída.')),
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'Categoria "${t.name}" excluída.',
+                                          ),
+                                        ),
                                       );
                                     }
                                   },
@@ -154,7 +204,10 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
               ),
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Fechar')),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Fechar'),
+              ),
             ],
           );
         },
@@ -166,7 +219,9 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (ctx) {
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
 
@@ -186,7 +241,10 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                       width: 40,
                       height: 4,
                       margin: const EdgeInsets.only(bottom: 16),
-                      decoration: BoxDecoration(color: Colors.grey.shade400, borderRadius: BorderRadius.circular(2)),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade400,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
                   ),
                   Row(
@@ -196,10 +254,16 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                       Expanded(
                         child: Text(
                           article.title,
-                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
-                      IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
                     ],
                   ),
                   if (article.tags.isNotEmpty) ...[
@@ -208,8 +272,16 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                       spacing: 6,
                       children: article.tags.map((t) {
                         return Chip(
-                          label: Text('#$t', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                          backgroundColor: AppTheme.primaryBlue.withValues(alpha: 0.1),
+                          label: Text(
+                            '#$t',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          backgroundColor: AppTheme.primaryBlue.withValues(
+                            alpha: 0.1,
+                          ),
                           visualDensity: VisualDensity.compact,
                         );
                       }).toList(),
@@ -221,21 +293,32 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
+                      color: isDark
+                          ? const Color(0xFF1E293B)
+                          : const Color(0xFFEFF6FF),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppTheme.primaryBlue.withValues(alpha: 0.3)),
+                      border: Border.all(
+                        color: AppTheme.primaryBlue.withValues(alpha: 0.3),
+                      ),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
                           '📌 Resumo para Visitas / Estudos:',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.primaryBlue),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: AppTheme.primaryBlue,
+                          ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           article.summary,
-                          style: const TextStyle(fontSize: 13, fontStyle: FontStyle.italic),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontStyle: FontStyle.italic,
+                          ),
                         ),
                       ],
                     ),
@@ -243,21 +326,32 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                   const SizedBox(height: 16),
 
                   // Conteúdo Completo
-                  const Text('Conteúdo e Textos de Apoio:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  const Text(
+                    'Conteúdo e Textos de Apoio:',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
                   const SizedBox(height: 8),
                   SelectableText(
                     article.content,
                     style: TextStyle(
                       fontSize: 14,
                       height: 1.6,
-                      color: isDark ? AppTheme.darkTextPrimary : AppTheme.textDark,
+                      color: isDark
+                          ? AppTheme.darkTextPrimary
+                          : AppTheme.textDark,
                     ),
                   ),
 
                   // Anexos / Fotos
                   if (article.attachments.isNotEmpty) ...[
                     const SizedBox(height: 20),
-                    const Text('Fotos e Materiais Anexados:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    const Text(
+                      'Fotos e Materiais Anexados:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
                     const SizedBox(height: 8),
                     SizedBox(
                       height: 100,
@@ -267,7 +361,11 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                         itemBuilder: (c, i) {
                           final att = article.attachments[i];
                           return GestureDetector(
-                            onTap: () => MediaPickerHelper.showFullScreenImage(context, imageSource: att, title: article.title),
+                            onTap: () => MediaPickerHelper.showFullScreenImage(
+                              context,
+                              imageSource: att,
+                              title: article.title,
+                            ),
                             child: Container(
                               margin: const EdgeInsets.only(right: 10),
                               width: 100,
@@ -295,9 +393,18 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                         icon: const Icon(Icons.copy, size: 16),
                         label: const Text('Copiar Texto'),
                         onPressed: () {
-                          Clipboard.setData(ClipboardData(text: '${article.title}\n\n${article.summary}\n\n${article.content}'));
+                          Clipboard.setData(
+                            ClipboardData(
+                              text:
+                                  '${article.title}\n\n${article.summary}\n\n${article.content}',
+                            ),
+                          );
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Pesquisa copiada para a área de transferência!')),
+                            const SnackBar(
+                              content: Text(
+                                'Pesquisa copiada para a área de transferência!',
+                              ),
+                            ),
                           );
                         },
                       ),
@@ -321,10 +428,17 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
     );
   }
 
-  void _showAddEditArticleModal(BuildContext context, {ResearchArticleItem? existing}) {
+  void _showAddEditArticleModal(
+    BuildContext context, {
+    ResearchArticleItem? existing,
+  }) {
     final titleController = TextEditingController(text: existing?.title ?? '');
-    final summaryController = TextEditingController(text: existing?.summary ?? '');
-    final contentController = TextEditingController(text: existing?.content ?? '');
+    final summaryController = TextEditingController(
+      text: existing?.summary ?? '',
+    );
+    final contentController = TextEditingController(
+      text: existing?.content ?? '',
+    );
     final tags = List<String>.from(existing?.tags ?? []);
     final attachments = List<String>.from(existing?.attachments ?? []);
     final tagInputController = TextEditingController();
@@ -338,7 +452,9 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
           final isDark = Theme.of(ctx).brightness == Brightness.dark;
           return Dialog(
             backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 580, maxHeight: 720),
               child: Padding(
@@ -349,12 +465,23 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                   children: [
                     Row(
                       children: [
-                        Icon(existing != null ? Icons.edit_document : Icons.menu_book, color: AppTheme.primaryBlue, size: 26),
+                        Icon(
+                          existing != null
+                              ? Icons.edit_document
+                              : Icons.menu_book,
+                          color: AppTheme.primaryBlue,
+                          size: 26,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            existing != null ? 'Editar Material de Pesquisa' : 'Nova Pesquisa para o Ministério',
-                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                            existing != null
+                                ? 'Editar Material de Pesquisa'
+                                : 'Nova Pesquisa para o Ministério',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -374,7 +501,10 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                           children: [
                             const Text(
                               'Cadastre argumentos, matérias bíblicas e raciocínios para usar durante as visitas e estudos.',
-                              style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppTheme.textMuted,
+                              ),
                             ),
                             const SizedBox(height: 12),
                             TextField(
@@ -398,7 +528,8 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                             TextField(
                               controller: contentController,
                               decoration: const InputDecoration(
-                                labelText: 'Conteúdo Completo & Textos Bíblicos *',
+                                labelText:
+                                    'Conteúdo Completo & Textos Bíblicos *',
                                 hintText: 'Digite o conteúdo detalhado, perguntas para raciocinar e textos bíblicos de referência...',
                               ),
                               maxLines: 6,
@@ -406,7 +537,13 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                             const SizedBox(height: 12),
 
                             // SELETOR DE CATEGORIAS / TAGS
-                            const Text('Categorias / Tags:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                            const Text(
+                              'Categorias / Tags:',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
                             const SizedBox(height: 6),
                             if (availableTags.isNotEmpty)
                               Wrap(
@@ -415,7 +552,10 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                                 children: availableTags.map((t) {
                                   final isSelected = tags.contains(t.name);
                                   return FilterChip(
-                                    label: Text(t.name, style: const TextStyle(fontSize: 11)),
+                                    label: Text(
+                                      t.name,
+                                      style: const TextStyle(fontSize: 11),
+                                    ),
                                     selected: isSelected,
                                     onSelected: (val) {
                                       setDialogState(() {
@@ -443,11 +583,17 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                                   ),
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.add_circle, color: AppTheme.primaryBlue),
+                                  icon: const Icon(
+                                    Icons.add_circle,
+                                    color: AppTheme.primaryBlue,
+                                  ),
                                   onPressed: () async {
                                     final text = tagInputController.text.trim();
-                                    if (text.isNotEmpty && !tags.contains(text)) {
-                                      final mgr = ref.read(researchManagerProvider);
+                                    if (text.isNotEmpty &&
+                                        !tags.contains(text)) {
+                                      final mgr = ref.read(
+                                        researchManagerProvider,
+                                      );
                                       await mgr.addTag(text);
                                       setDialogState(() {
                                         tags.add(text);
@@ -464,13 +610,28 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                const Text('Fotos / Arquivos de Apoio:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                const Text(
+                                  'Fotos / Arquivos de Apoio:',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                ),
                                 IconButton.filledTonal(
-                                  icon: const Icon(Icons.add_photo_alternate, size: 18),
+                                  icon: const Icon(
+                                    Icons.add_photo_alternate,
+                                    size: 18,
+                                  ),
                                   onPressed: () async {
-                                    final img = await MediaPickerHelper.pickImage(context, title: 'Anexar Imagem à Pesquisa');
+                                    final img =
+                                        await MediaPickerHelper.pickImage(
+                                          context,
+                                          title: 'Anexar Imagem à Pesquisa',
+                                        );
                                     if (img != null && img.isNotEmpty) {
-                                      setDialogState(() => attachments.add(img));
+                                      setDialogState(
+                                        () => attachments.add(img),
+                                      );
                                     }
                                   },
                                 ),
@@ -481,7 +642,9 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                               Wrap(
                                 spacing: 8,
                                 runSpacing: 8,
-                                children: List.generate(attachments.length, (i) {
+                                children: List.generate(attachments.length, (
+                                  i,
+                                ) {
                                   return Stack(
                                     clipBehavior: Clip.none,
                                     children: [
@@ -489,23 +652,41 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                                         width: 70,
                                         height: 70,
                                         decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(8),
-                                          border: Border.all(color: Colors.grey.shade300),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                          border: Border.all(
+                                            color: Colors.grey.shade300,
+                                          ),
                                         ),
                                         child: ClipRRect(
-                                          borderRadius: BorderRadius.circular(8),
-                                          child: MediaPickerHelper.buildImageWidget(attachments[i]),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                          child:
+                                              MediaPickerHelper.buildImageWidget(
+                                                attachments[i],
+                                              ),
                                         ),
                                       ),
                                       Positioned(
                                         top: -4,
                                         right: -4,
                                         child: InkWell(
-                                          onTap: () => setDialogState(() => attachments.removeAt(i)),
+                                          onTap: () => setDialogState(
+                                            () => attachments.removeAt(i),
+                                          ),
                                           child: Container(
                                             padding: const EdgeInsets.all(2),
-                                            decoration: const BoxDecoration(color: Colors.black87, shape: BoxShape.circle),
-                                            child: const Icon(Icons.close, color: Colors.white, size: 14),
+                                            decoration: const BoxDecoration(
+                                              color: Colors.black87,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(
+                                              Icons.close,
+                                              color: Colors.white,
+                                              size: 14,
+                                            ),
                                           ),
                                         ),
                                       ),
@@ -522,7 +703,10 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('Cancelar'),
+                        ),
                         const SizedBox(width: 8),
                         ElevatedButton.icon(
                           icon: const Icon(Icons.check, size: 18),
@@ -531,25 +715,33 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                             final title = titleController.text.trim();
                             final summary = summaryController.text.trim();
                             final content = contentController.text.trim();
-                            if (title.isEmpty || summary.isEmpty || content.isEmpty) {
+                            if (title.isEmpty ||
+                                summary.isEmpty ||
+                                content.isEmpty) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Por favor, preencha o título, o resumo e o conteúdo completo.')),
+                                const SnackBar(
+                                  content: Text(
+                                    'Por favor, preencha o título, o resumo e o conteúdo completo.',
+                                  ),
+                                ),
                               );
                               return;
                             }
 
                             final mgr = ref.read(researchManagerProvider);
                             if (existing != null) {
-                              await mgr.updateArticle(ResearchArticleItem(
-                                id: existing.id,
-                                title: title,
-                                summary: summary,
-                                content: content,
-                                tags: tags,
-                                attachments: attachments,
-                                createdAt: existing.createdAt,
-                                updatedAt: DateTime.now(),
-                              ));
+                              await mgr.updateArticle(
+                                ResearchArticleItem(
+                                  id: existing.id,
+                                  title: title,
+                                  summary: summary,
+                                  content: content,
+                                  tags: tags,
+                                  attachments: attachments,
+                                  createdAt: existing.createdAt,
+                                  updatedAt: DateTime.now(),
+                                ),
+                              );
                             } else {
                               await mgr.addArticle(
                                 title: title,
@@ -563,7 +755,13 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                             if (ctx.mounted) Navigator.pop(ctx);
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text(existing != null ? 'Pesquisa atualizada!' : 'Pesquisa cadastrada com sucesso!')),
+                                SnackBar(
+                                  content: Text(
+                                    existing != null
+                                        ? 'Pesquisa atualizada!'
+                                        : 'Pesquisa cadastrada com sucesso!',
+                                  ),
+                                ),
                               );
                             }
                           },
@@ -598,11 +796,15 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
         final summaryMatches = a.summary.toLowerCase().contains(query);
         final contentMatches = a.content.toLowerCase().contains(query);
         final tagMatches = a.tags.any((t) => t.toLowerCase().contains(query));
-        if (!titleMatches && !summaryMatches && !contentMatches && !tagMatches) {
+        if (!titleMatches &&
+            !summaryMatches &&
+            !contentMatches &&
+            !tagMatches) {
           return false;
         }
       }
-      if (_selectedCategoryTag != null && !a.tags.contains(_selectedCategoryTag)) {
+      if (_selectedCategoryTag != null &&
+          !a.tags.contains(_selectedCategoryTag)) {
         return false;
       }
       return true;
@@ -642,7 +844,8 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                hintText: 'Pesquisar em todo o texto, título, resumo ou assunto...',
+                hintText:
+                    'Pesquisar em todo o texto, título, resumo ou assunto...',
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
@@ -673,8 +876,11 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                           child: FilterChip(
                             label: const Text('Todas Categorias'),
                             selected: _selectedCategoryTag == null,
-                            onSelected: (val) => setState(() => _selectedCategoryTag = null),
-                            selectedColor: AppTheme.primaryBlue.withValues(alpha: 0.15),
+                            onSelected: (val) =>
+                                setState(() => _selectedCategoryTag = null),
+                            selectedColor: AppTheme.primaryBlue.withValues(
+                              alpha: 0.15,
+                            ),
                             checkmarkColor: AppTheme.primaryBlue,
                           ),
                         ),
@@ -684,8 +890,13 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                             child: FilterChip(
                               label: Text(t.name),
                               selected: _selectedCategoryTag == t.name,
-                              onSelected: (val) => setState(() => _selectedCategoryTag = val ? t.name : null),
-                              selectedColor: AppTheme.primaryBlue.withValues(alpha: 0.15),
+                              onSelected: (val) => setState(
+                                () =>
+                                    _selectedCategoryTag = val ? t.name : null,
+                              ),
+                              selectedColor: AppTheme.primaryBlue.withValues(
+                                alpha: 0.15,
+                              ),
                               checkmarkColor: AppTheme.primaryBlue,
                             ),
                           ),
@@ -694,7 +905,9 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                   ),
                 ),
                 TextButton.icon(
-                  style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                  ),
                   icon: const Icon(Icons.tune, size: 14),
                   label: const Text('Tags', style: TextStyle(fontSize: 12)),
                   onPressed: () => _showManageTagsDialog(context, tags),
@@ -713,14 +926,23 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.menu_book_outlined, size: 56, color: Colors.grey.shade400),
+                          Icon(
+                            Icons.menu_book_outlined,
+                            size: 56,
+                            color: Colors.grey.shade400,
+                          ),
                           const SizedBox(height: 12),
                           Text(
                             query.isEmpty
                                 ? 'Nenhuma pesquisa cadastrada ainda.\nToque em "+ Nova Pesquisa" para organizar matérias e textos bíblicos para o ministério.'
                                 : 'Nenhuma matéria encontrada com a expressão "$query".',
                             textAlign: TextAlign.center,
-                            style: TextStyle(color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted, fontSize: 14),
+                            style: TextStyle(
+                              color: isDark
+                                  ? const Color(0xFFCBD5E1)
+                                  : AppTheme.textMuted,
+                              fontSize: 14,
+                            ),
                           ),
                         ],
                       ),
@@ -745,26 +967,38 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                                   Container(
                                     padding: const EdgeInsets.all(8),
                                     decoration: BoxDecoration(
-                                      color: AppTheme.primaryBlue.withValues(alpha: 0.12),
+                                      color: AppTheme.primaryBlue.withValues(
+                                        alpha: 0.12,
+                                      ),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
-                                    child: const Icon(Icons.article, color: AppTheme.primaryBlue, size: 22),
+                                    child: const Icon(
+                                      Icons.article,
+                                      color: AppTheme.primaryBlue,
+                                      size: 22,
+                                    ),
                                   ),
                                   const SizedBox(width: 10),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           item.title,
-                                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
                                         const SizedBox(height: 4),
                                         Text(
                                           item.summary,
                                           style: TextStyle(
                                             fontSize: 13,
-                                            color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textDark,
+                                            color: isDark
+                                                ? const Color(0xFFCBD5E1)
+                                                : AppTheme.textDark,
                                             height: 1.3,
                                           ),
                                           maxLines: 3,
@@ -777,20 +1011,36 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                                     padding: EdgeInsets.zero,
                                     onSelected: (val) async {
                                       if (val == 'edit') {
-                                        _showAddEditArticleModal(context, existing: item);
+                                        _showAddEditArticleModal(
+                                          context,
+                                          existing: item,
+                                        );
                                       } else if (val == 'delete') {
-                                        final mgr = ref.read(researchManagerProvider);
+                                        final mgr = ref.read(
+                                          researchManagerProvider,
+                                        );
                                         await mgr.deleteArticle(item.id);
                                         if (context.mounted) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(content: Text('Pesquisa removida.')),
-                                          );
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                    'Pesquisa removida.',
+                                                  ),
+                                                ),
+                                              );
                                         }
                                       }
                                     },
                                     itemBuilder: (_) => const [
-                                      PopupMenuItem(value: 'edit', child: Text('Editar')),
-                                      PopupMenuItem(value: 'delete', child: Text('Excluir')),
+                                      PopupMenuItem(
+                                        value: 'edit',
+                                        child: Text('Editar'),
+                                      ),
+                                      PopupMenuItem(
+                                        value: 'delete',
+                                        child: Text('Excluir'),
+                                      ),
                                     ],
                                   ),
                                 ],
@@ -801,26 +1051,49 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                                   spacing: 4,
                                   children: item.tags.map((t) {
                                     return Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
                                       decoration: BoxDecoration(
-                                        color: AppTheme.primaryBlue.withValues(alpha: 0.08),
+                                        color: AppTheme.primaryBlue.withValues(
+                                          alpha: 0.08,
+                                        ),
                                         borderRadius: BorderRadius.circular(4),
                                       ),
-                                      child: Text('#$t', style: const TextStyle(fontSize: 10, color: AppTheme.primaryBlue, fontWeight: FontWeight.bold)),
+                                      child: Text(
+                                        '#$t',
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          color: AppTheme.primaryBlue,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
                                     );
                                   }).toList(),
                                 ),
                               ],
                               const Divider(height: 18),
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   if (item.attachments.isNotEmpty)
                                     Row(
                                       children: [
-                                        const Icon(Icons.attach_file, size: 14, color: AppTheme.textMuted),
+                                        const Icon(
+                                          Icons.attach_file,
+                                          size: 14,
+                                          color: AppTheme.textMuted,
+                                        ),
                                         const SizedBox(width: 4),
-                                        Text('${item.attachments.length} anexo(s)', style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                                        Text(
+                                          '${item.attachments.length} anexo(s)',
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            color: AppTheme.textMuted,
+                                          ),
+                                        ),
                                       ],
                                     )
                                   else
@@ -830,11 +1103,24 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                                       backgroundColor: AppTheme.primaryBlue,
                                       foregroundColor: Colors.white,
                                       visualDensity: VisualDensity.compact,
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 4,
+                                      ),
                                     ),
-                                    icon: const Icon(Icons.chrome_reader_mode, size: 14),
-                                    label: const Text('Leia mais', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                    onPressed: () => _showReadMoreDialog(context, item),
+                                    icon: const Icon(
+                                      Icons.chrome_reader_mode,
+                                      size: 14,
+                                    ),
+                                    label: const Text(
+                                      'Leia mais',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    onPressed: () =>
+                                        _showReadMoreDialog(context, item),
                                   ),
                                 ],
                               ),
@@ -862,7 +1148,8 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           InkWell(
-            onTap: () => setState(() => _isWeeklyCardExpanded = !_isWeeklyCardExpanded),
+            onTap: () =>
+                setState(() => _isWeeklyCardExpanded = !_isWeeklyCardExpanded),
             borderRadius: BorderRadius.circular(14),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -874,7 +1161,11 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                       color: const Color(0xFFF59E0B).withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(Icons.style_outlined, color: Color(0xFFB45309), size: 18),
+                    child: const Icon(
+                      Icons.style_outlined,
+                      color: Color(0xFFB45309),
+                      size: 18,
+                    ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -885,22 +1176,43 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                           children: [
                             const Text(
                               'Cartão de Bolso da Semana',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF92400E)),
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                color: Color(0xFF92400E),
+                              ),
                             ),
                             const SizedBox(width: 6),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 5,
+                                vertical: 1,
+                              ),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFB45309).withValues(alpha: 0.15),
+                                color: const Color(0xFFB45309)
+                                    .withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(4),
                               ),
-                              child: const Text('Vida e Ministério', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF92400E))),
+                              child: const Text(
+                                'Vida e Ministério',
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF92400E),
+                                ),
+                              ),
                             ),
                           ],
                         ),
                         Text(
                           _sampleTitle,
-                          style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF78350F), fontWeight: FontWeight.w500),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDark
+                                ? const Color(0xFFCBD5E1)
+                                : const Color(0xFF78350F),
+                            fontWeight: FontWeight.w500,
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -908,8 +1220,15 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                     ),
                   ),
                   IconButton(
-                    icon: Icon(_isWeeklyCardExpanded ? Icons.expand_less : Icons.expand_more, color: const Color(0xFFB45309)),
-                    onPressed: () => setState(() => _isWeeklyCardExpanded = !_isWeeklyCardExpanded),
+                    icon: Icon(
+                      _isWeeklyCardExpanded
+                          ? Icons.expand_less
+                          : Icons.expand_more,
+                      color: const Color(0xFFB45309),
+                    ),
+                    onPressed: () => setState(
+                      () => _isWeeklyCardExpanded = !_isWeeklyCardExpanded,
+                    ),
                     visualDensity: VisualDensity.compact,
                   ),
                 ],
@@ -926,11 +1245,21 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('❓ Pergunta: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFFB45309))),
+                      const Text(
+                        '❓ Pergunta: ',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                          color: Color(0xFFB45309),
+                        ),
+                      ),
                       Expanded(
                         child: Text(
                           _sampleQuestion,
-                          style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontStyle: FontStyle.italic,
+                          ),
                         ),
                       ),
                     ],
@@ -939,11 +1268,21 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('📖 Texto: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFFB45309))),
+                      const Text(
+                        '📖 Texto: ',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                          color: Color(0xFFB45309),
+                        ),
+                      ),
                       Expanded(
                         child: Text(
                           _sampleScripture,
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ],
@@ -952,7 +1291,14 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('💡 Oferta: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFFB45309))),
+                      const Text(
+                        '💡 Oferta: ',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                          color: Color(0xFFB45309),
+                        ),
+                      ),
                       Expanded(
                         child: Text(
                           _samplePublication,
@@ -970,19 +1316,30 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                             backgroundColor: const Color(0xFFD97706),
                             foregroundColor: Colors.white,
                             visualDensity: VisualDensity.compact,
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 8,
+                            ),
                           ),
                           icon: const Icon(Icons.copy, size: 14),
-                          label: const Text('Copiar p/ WhatsApp', style: TextStyle(fontSize: 11)),
+                          label: const Text(
+                            'Copiar p/ WhatsApp',
+                            style: TextStyle(fontSize: 11),
+                          ),
                           onPressed: () {
-                            final text = '''*Apresentação Modelo da Semana*
+                            final text =
+                                '''*Apresentação Modelo da Semana*
 Olá! Gostaria de compartilhar uma breve reflexão:
 ❓ *Pergunta:* $_sampleQuestion
 📖 *Texto Bíblico:* $_sampleScripture
 💡 *Saiba mais:* $_samplePublication''';
                             Clipboard.setData(ClipboardData(text: text));
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Apresentação copiada para envio via WhatsApp/SMS!')),
+                              const SnackBar(
+                                content: Text(
+                                  'Apresentação copiada para envio via WhatsApp/SMS!',
+                                ),
+                              ),
                             );
                           },
                         ),
@@ -993,22 +1350,36 @@ Olá! Gostaria de compartilhar uma breve reflexão:
                           foregroundColor: const Color(0xFFB45309),
                           side: const BorderSide(color: Color(0xFFF59E0B)),
                           visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 8,
+                          ),
                         ),
                         icon: const Icon(Icons.play_circle_outline, size: 14),
-                        label: const Text('Vídeo', style: TextStyle(fontSize: 11)),
+                        label: const Text(
+                          'Vídeo',
+                          style: TextStyle(fontSize: 11),
+                        ),
                         onPressed: () async {
                           final uri = Uri.parse(_sampleVideoUrl);
                           if (await canLaunchUrl(uri)) {
-                            await launchUrl(uri, mode: LaunchMode.externalApplication);
+                            await launchUrl(
+                              uri,
+                              mode: LaunchMode.externalApplication,
+                            );
                           }
                         },
                       ),
                       const SizedBox(width: 4),
                       IconButton(
-                        icon: const Icon(Icons.edit_note, color: Color(0xFFB45309), size: 20),
+                        icon: const Icon(
+                          Icons.edit_note,
+                          color: Color(0xFFB45309),
+                          size: 20,
+                        ),
                         tooltip: 'Editar Apresentação da Semana',
-                        onPressed: () => _showEditWeeklyPresentationModal(context),
+                        onPressed: () =>
+                            _showEditWeeklyPresentationModal(context),
                         visualDensity: VisualDensity.compact,
                       ),
                     ],
@@ -1045,37 +1416,53 @@ Olá! Gostaria de compartilhar uma breve reflexão:
             children: [
               TextField(
                 controller: titleCtrl,
-                decoration: const InputDecoration(labelText: 'Tema / Título da Apresentação'),
+                decoration: const InputDecoration(
+                  labelText: 'Tema / Título da Apresentação',
+                ),
               ),
               const SizedBox(height: 8),
               TextField(
                 controller: questionCtrl,
-                decoration: const InputDecoration(labelText: 'Pergunta de Introdução'),
+                decoration: const InputDecoration(
+                  labelText: 'Pergunta de Introdução',
+                ),
                 maxLines: 2,
               ),
               const SizedBox(height: 8),
               TextField(
                 controller: scriptureCtrl,
-                decoration: const InputDecoration(labelText: 'Texto Bíblico Principal'),
+                decoration: const InputDecoration(
+                  labelText: 'Texto Bíblico Principal',
+                ),
                 maxLines: 2,
               ),
               const SizedBox(height: 8),
               TextField(
                 controller: pubCtrl,
-                decoration: const InputDecoration(labelText: 'Publicação de Oferta'),
+                decoration: const InputDecoration(
+                  labelText: 'Publicação de Oferta',
+                ),
               ),
               const SizedBox(height: 8),
               TextField(
                 controller: videoCtrl,
-                decoration: const InputDecoration(labelText: 'Link do Vídeo / JW Library'),
+                decoration: const InputDecoration(
+                  labelText: 'Link do Vídeo / JW Library',
+                ),
               ),
             ],
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD97706), foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFD97706),
+              foregroundColor: Colors.white,
+            ),
             onPressed: () {
               setState(() {
                 _sampleTitle = titleCtrl.text.trim();
@@ -1086,7 +1473,11 @@ Olá! Gostaria de compartilhar uma breve reflexão:
               });
               Navigator.pop(ctx);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Cartão de Bolso da Semana atualizado com sucesso!')),
+                const SnackBar(
+                  content: Text(
+                    'Cartão de Bolso da Semana atualizado com sucesso!',
+                  ),
+                ),
               );
             },
             child: const Text('Salvar Cartão'),
@@ -1096,4 +1487,3 @@ Olá! Gostaria de compartilhar uma breve reflexão:
     );
   }
 }
-

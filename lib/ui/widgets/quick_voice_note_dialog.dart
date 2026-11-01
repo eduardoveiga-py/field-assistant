@@ -1,7 +1,9 @@
 import 'dart:async';
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../core/app_theme.dart';
 import '../../database/app_database.dart';
 import '../../voice_notes/audio_recording_service.dart';
@@ -53,7 +55,8 @@ class QuickVoiceNoteDialog extends ConsumerStatefulWidget {
   }
 
   @override
-  ConsumerState<QuickVoiceNoteDialog> createState() => _QuickVoiceNoteDialogState();
+  ConsumerState<QuickVoiceNoteDialog> createState() =>
+      _QuickVoiceNoteDialogState();
 }
 
 class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
@@ -90,9 +93,15 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
   @override
   void initState() {
     super.initState();
-    _recordingService = widget.recordingService ?? (kIsWeb ? LocalAudioRecordingService() : RealAudioRecordingService());
-    _dictationService = widget.dictationService ?? (kIsWeb ? LocalVoiceDictationService() : RealVoiceDictationService());
-    _playerService = widget.playerService ?? (kIsWeb ? LocalAudioPlayerService() : RealAudioPlayerService());
+    _recordingService =
+        widget.recordingService ??
+        (kIsWeb ? LocalAudioRecordingService() : RealAudioRecordingService());
+    _dictationService =
+        widget.dictationService ??
+        (kIsWeb ? LocalVoiceDictationService() : RealVoiceDictationService());
+    _playerService =
+        widget.playerService ??
+        (kIsWeb ? LocalAudioPlayerService() : RealAudioPlayerService());
     // Inicia explicitamente como revisita por padrão seguro, exigindo confirmação do usuário para estudo
     _selectedContactType = 'revisita';
     _selectedResult = 'revisita_feita';
@@ -160,7 +169,9 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
           });
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Permissão de microfone negada. Digite o resumo manualmente.'),
+              content: Text(
+                'Permissão de microfone negada. Digite o resumo manualmente.',
+              ),
               backgroundColor: Colors.orange,
             ),
           );
@@ -230,7 +241,9 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
     if (_isPlayingAudio) {
       _playerService.pause();
     } else {
-      _playerService.play(_recordingResult?.filePath ?? 'simulated_voice_note.m4a');
+      _playerService.play(
+        _recordingResult?.filePath ?? 'simulated_voice_note.m4a',
+      );
     }
   }
 
@@ -244,15 +257,23 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
     final currentText = _transcriptionController.text.trim();
     final customLesson = int.tryParse(_lessonController.text.trim());
     final customPoint = int.tryParse(_pointController.text.trim());
-    final customPending = _pendingController.text.trim().isEmpty ? null : _pendingController.text.trim();
-    final customEmpathy = _empathyController.text.trim().isEmpty ? null : _empathyController.text.trim();
+    final customPending = _pendingController.text.trim().isEmpty
+        ? null
+        : _pendingController.text.trim();
+    final customEmpathy = _empathyController.text.trim().isEmpty
+        ? null
+        : _empathyController.text.trim();
 
     final finalParsed = _parsedNote.copyWith(
       lesson: customLesson ?? _parsedNote.lesson,
       point: customPoint ?? _parsedNote.point,
       pendingDoubt: customPending,
       empathyNote: customEmpathy,
-      rawText: currentText.isEmpty ? (_parsedNote.rawText.isNotEmpty ? _parsedNote.rawText : 'Nota de voz rápida') : currentText,
+      rawText: currentText.isEmpty
+          ? (_parsedNote.rawText.isNotEmpty
+                ? _parsedNote.rawText
+                : 'Nota de voz rápida')
+          : currentText,
     );
 
     try {
@@ -261,7 +282,8 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
         personId: widget.person.id,
         parsedNote: finalParsed,
         audioFilePath: _recordingResult?.filePath,
-        audioDurationSeconds: _recordingResult?.durationSeconds ?? (_seconds > 0 ? _seconds : 15),
+        audioDurationSeconds:
+            _recordingResult?.durationSeconds ?? (_seconds > 0 ? _seconds : 15),
         contactType: _selectedContactType,
         result: _selectedResult,
         updateStudyProgress: _updateStudyProgress,
@@ -309,8 +331,12 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
 
     // Detecção de SunMode (alto contraste)
     final cardShape = theme.cardTheme.shape;
-    final BorderSide? borderSide = cardShape is RoundedRectangleBorder ? cardShape.side : null;
-    final isSunMode = (borderSide?.color == const Color(0xFF000000) && (borderSide?.width ?? 0) >= 2.0) ||
+    final BorderSide? borderSide = cardShape is RoundedRectangleBorder
+        ? cardShape.side
+        : null;
+    final isSunMode =
+        (borderSide?.color == const Color(0xFF000000) &&
+            (borderSide?.width ?? 0) >= 2.0) ||
         (theme.colorScheme.primary == const Color(0xFF000000) &&
             theme.scaffoldBackgroundColor == Colors.white &&
             theme.brightness == Brightness.light);
@@ -318,7 +344,9 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
     return Dialog(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: isSunMode ? const BorderSide(color: Colors.black, width: 2.5) : BorderSide.none,
+        side: isSunMode
+            ? const BorderSide(color: Colors.black, width: 2.5)
+            : BorderSide.none,
       ),
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       child: ConstrainedBox(
@@ -379,7 +407,11 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
       ),
       child: Row(
         children: [
-          Icon(Icons.info_outline, color: isSunMode ? Colors.black : Colors.amber.shade900, size: 20),
+          Icon(
+            Icons.info_outline,
+            color: isSunMode ? Colors.black : Colors.amber.shade900,
+            size: 20,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -401,10 +433,14 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isSunMode ? Colors.white : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC)),
+        color: isSunMode
+            ? Colors.white
+            : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC)),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: isSunMode ? Colors.black : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+          color: isSunMode
+              ? Colors.black
+              : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
           width: isSunMode ? 2.0 : 1.0,
         ),
       ),
@@ -413,7 +449,11 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
         children: [
           Row(
             children: [
-              Icon(Icons.tune, size: 16, color: isSunMode ? Colors.black : AppTheme.primaryBlue),
+              Icon(
+                Icons.tune,
+                size: 16,
+                color: isSunMode ? Colors.black : AppTheme.primaryBlue,
+              ),
               const SizedBox(width: 6),
               Flexible(
                 child: FittedBox(
@@ -443,25 +483,42 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
                 decoration: InputDecoration(
                   labelText: 'Tipo de Contato',
                   isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
                 items: const [
                   DropdownMenuItem(
                     value: 'revisita',
-                    child: FittedBox(fit: BoxFit.scaleDown, child: Text('Revisita')),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text('Revisita'),
+                    ),
                   ),
                   DropdownMenuItem(
                     value: 'estudo',
-                    child: FittedBox(fit: BoxFit.scaleDown, child: Text('Estudo Bíblico')),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text('Estudo Bíblico'),
+                    ),
                   ),
                   DropdownMenuItem(
                     value: 'conversa_inicial',
-                    child: FittedBox(fit: BoxFit.scaleDown, child: Text('Conversa Inicial')),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text('Conversa Inicial'),
+                    ),
                   ),
                   DropdownMenuItem(
                     value: 'outro',
-                    child: FittedBox(fit: BoxFit.scaleDown, child: Text('Outro')),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text('Outro'),
+                    ),
                   ),
                 ],
                 onChanged: (val) {
@@ -484,29 +541,49 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
                 decoration: InputDecoration(
                   labelText: 'Resultado',
                   isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
                 items: const [
                   DropdownMenuItem(
                     value: 'revisita_feita',
-                    child: FittedBox(fit: BoxFit.scaleDown, child: Text('Visita Feita')),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text('Visita Feita'),
+                    ),
                   ),
                   DropdownMenuItem(
                     value: 'estudo_realizado',
-                    child: FittedBox(fit: BoxFit.scaleDown, child: Text('Estudo Realizado')),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text('Estudo Realizado'),
+                    ),
                   ),
                   DropdownMenuItem(
                     value: 'ocupado',
-                    child: FittedBox(fit: BoxFit.scaleDown, child: Text('Ocupado')),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text('Ocupado'),
+                    ),
                   ),
                   DropdownMenuItem(
                     value: 'nao_em_casa',
-                    child: FittedBox(fit: BoxFit.scaleDown, child: Text('Não em Casa')),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text('Não em Casa'),
+                    ),
                   ),
                   DropdownMenuItem(
                     value: 'outro',
-                    child: FittedBox(fit: BoxFit.scaleDown, child: Text('Outro')),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text('Outro'),
+                    ),
                   ),
                 ],
                 onChanged: (val) {
@@ -587,7 +664,9 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: isSunMode ? Colors.black : const Color(0xFF4F46E5).withValues(alpha: 0.12),
+            color: isSunMode
+                ? Colors.black
+                : const Color(0xFF4F46E5).withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(
@@ -609,7 +688,9 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
                   style: TextStyle(
                     fontSize: 17,
                     fontWeight: isSunMode ? FontWeight.w900 : FontWeight.bold,
-                    color: isSunMode ? Colors.black : (isDark ? Colors.white : AppTheme.textDark),
+                    color: isSunMode
+                        ? Colors.black
+                        : (isDark ? Colors.white : AppTheme.textDark),
                   ),
                 ),
               ),
@@ -617,7 +698,9 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
                 widget.person.name,
                 style: TextStyle(
                   fontSize: 13,
-                  color: isSunMode ? Colors.black87 : (isDark ? const Color(0xFF94A3B8) : AppTheme.textMuted),
+                  color: isSunMode
+                      ? Colors.black87
+                      : (isDark ? const Color(0xFF94A3B8) : AppTheme.textMuted),
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -642,12 +725,18 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isSunMode ? Colors.white : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
+        color: isSunMode
+            ? Colors.white
+            : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isSunMode
               ? Colors.black
-              : (_isRecording ? Colors.red : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))),
+              : (_isRecording
+                    ? Colors.red
+                    : (isDark
+                          ? const Color(0xFF334155)
+                          : const Color(0xFFCBD5E1))),
           width: isSunMode ? 2.0 : (_isRecording ? 2.0 : 1.2),
         ),
       ),
@@ -670,18 +759,24 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
                       height: 12,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: _isRecording ? Colors.red : (_seconds > 0 ? Colors.green : Colors.grey),
+                        color: _isRecording
+                            ? Colors.red
+                            : (_seconds > 0 ? Colors.green : Colors.grey),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Text(
                       _isRecording
                           ? 'Gravando áudio...'
-                          : (_seconds > 0 ? 'Gravação finalizada' : 'Pronto para gravar'),
+                          : (_seconds > 0
+                                ? 'Gravação finalizada'
+                                : 'Pronto para gravar'),
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
-                        color: isSunMode ? Colors.black : (_isRecording ? Colors.red : null),
+                        color: isSunMode
+                            ? Colors.black
+                            : (_isRecording ? Colors.red : null),
                       ),
                     ),
                   ],
@@ -707,9 +802,13 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
             child: LinearProgressIndicator(
               value: progress,
               minHeight: 6,
-              backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
+              backgroundColor: isDark
+                  ? const Color(0xFF1E293B)
+                  : const Color(0xFFE2E8F0),
               valueColor: AlwaysStoppedAnimation<Color>(
-                isSunMode ? Colors.black : (_seconds >= 15 ? Colors.green : AppTheme.primaryBlue),
+                isSunMode
+                    ? Colors.black
+                    : (_seconds >= 15 ? Colors.green : AppTheme.primaryBlue),
               ),
             ),
           ),
@@ -717,7 +816,11 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
             const SizedBox(height: 6),
             const Text(
               '✓ Duração ideal para notas de campo alcançada',
-              style: TextStyle(fontSize: 11, color: Colors.green, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.green,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ],
           const SizedBox(height: 14),
@@ -731,11 +834,15 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
                   constraints: const BoxConstraints(minHeight: 48),
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: isSunMode ? Colors.black : const Color(0xFF4F46E5),
+                      backgroundColor: isSunMode
+                          ? Colors.black
+                          : const Color(0xFF4F46E5),
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
-                        side: isSunMode ? const BorderSide(color: Colors.black, width: 2) : BorderSide.none,
+                        side: isSunMode
+                            ? const BorderSide(color: Colors.black, width: 2)
+                            : BorderSide.none,
                       ),
                     ),
                     onPressed: _startRecording,
@@ -747,7 +854,11 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
                         Flexible(
                           child: FittedBox(
                             fit: BoxFit.scaleDown,
-                            child: Text(_seconds == 0 ? 'Iniciar Gravação' : 'Gravar Novamente'),
+                            child: Text(
+                              _seconds == 0
+                                  ? 'Iniciar Gravação'
+                                  : 'Gravar Novamente',
+                            ),
                           ),
                         ),
                       ],
@@ -763,7 +874,9 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
-                        side: isSunMode ? const BorderSide(color: Colors.black, width: 2) : BorderSide.none,
+                        side: isSunMode
+                            ? const BorderSide(color: Colors.black, width: 2)
+                            : BorderSide.none,
                       ),
                     ),
                     onPressed: _stopRecording,
@@ -787,20 +900,32 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
                   constraints: const BoxConstraints(minHeight: 48),
                   child: OutlinedButton(
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: isSunMode ? Colors.black : AppTheme.primaryBlue,
-                      side: BorderSide(color: isSunMode ? Colors.black : AppTheme.primaryBlue, width: isSunMode ? 2.0 : 1.2),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      foregroundColor: isSunMode
+                          ? Colors.black
+                          : AppTheme.primaryBlue,
+                      side: BorderSide(
+                        color: isSunMode ? Colors.black : AppTheme.primaryBlue,
+                        width: isSunMode ? 2.0 : 1.2,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                     onPressed: _toggleAudioPreview,
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(_isPlayingAudio ? Icons.pause : Icons.play_arrow, size: 20),
+                        Icon(
+                          _isPlayingAudio ? Icons.pause : Icons.play_arrow,
+                          size: 20,
+                        ),
                         const SizedBox(width: 8),
                         Flexible(
                           child: FittedBox(
                             fit: BoxFit.scaleDown,
-                            child: Text(_isPlayingAudio ? 'Pausar' : 'Ouvir Áudio'),
+                            child: Text(
+                              _isPlayingAudio ? 'Pausar' : 'Ouvir Áudio',
+                            ),
                           ),
                         ),
                       ],
@@ -816,16 +941,21 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
 
   Widget _buildStructuredPreview(bool isSunMode, bool isDark) {
     final hasLesson = _parsedNote.lesson != null || _parsedNote.point != null;
-    final progressText = _parsedNote.formattedProgress ?? 'Nenhuma lição detectada';
+    final progressText =
+        _parsedNote.formattedProgress ?? 'Nenhuma lição detectada';
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: isSunMode ? Colors.white : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
+        color: isSunMode
+            ? Colors.white
+            : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isSunMode ? Colors.black : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+          color: isSunMode
+              ? Colors.black
+              : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
           width: isSunMode ? 2.0 : 1.2,
         ),
       ),
@@ -859,12 +989,18 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             decoration: BoxDecoration(
-              color: isSunMode ? Colors.white : (isDark ? const Color(0xFF0F172A) : Colors.white),
+              color: isSunMode
+                  ? Colors.white
+                  : (isDark ? const Color(0xFF0F172A) : Colors.white),
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
                 color: isSunMode
                     ? Colors.black
-                    : (hasLesson ? const Color(0xFF7C3AED) : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))),
+                    : (hasLesson
+                          ? const Color(0xFF7C3AED)
+                          : (isDark
+                                ? const Color(0xFF334155)
+                                : const Color(0xFFCBD5E1))),
                 width: isSunMode ? 2.0 : (hasLesson ? 1.5 : 1.0),
               ),
             ),
@@ -876,7 +1012,9 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
                     Icon(
                       Icons.menu_book,
                       size: 16,
-                      color: isSunMode ? Colors.black : (hasLesson ? const Color(0xFF7C3AED) : Colors.grey),
+                      color: isSunMode
+                          ? Colors.black
+                          : (hasLesson ? const Color(0xFF7C3AED) : Colors.grey),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -884,7 +1022,9 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
                         '📖 Progresso: $progressText',
                         style: TextStyle(
                           fontSize: 13,
-                          fontWeight: hasLesson ? FontWeight.bold : FontWeight.normal,
+                          fontWeight: hasLesson
+                              ? FontWeight.bold
+                              : FontWeight.normal,
                           color: isSunMode ? Colors.black : null,
                         ),
                       ),
@@ -909,7 +1049,9 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
                           labelText: 'Lição',
                           hintText: 'Ex: 18',
                           isDense: true,
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                         style: const TextStyle(fontSize: 13),
                       ),
@@ -930,7 +1072,9 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
                           labelText: 'Ponto / Parágrafo',
                           hintText: 'Ex: 3',
                           isDense: true,
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                         style: const TextStyle(fontSize: 13),
                       ),
@@ -953,7 +1097,9 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
               hintText: 'Ex: Mostrar vídeo sobre batismo',
               isDense: true,
               prefixIcon: const Icon(Icons.help_outline, size: 18),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             style: const TextStyle(fontSize: 13),
           ),
@@ -970,7 +1116,9 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
               hintText: 'Ex: Turno de trabalho vai mudar na próxima semana',
               isDense: true,
               prefixIcon: const Icon(Icons.favorite_outline, size: 18),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             style: const TextStyle(fontSize: 13),
           ),
@@ -1010,7 +1158,9 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
 
   Widget _buildActionButtons(bool isSunMode, bool isDark) {
     return ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: 48), // Alvo de toque mínimo 48dp
+      constraints: const BoxConstraints(
+        minHeight: 48,
+      ), // Alvo de toque mínimo 48dp
       child: SizedBox(
         width: double.infinity,
         child: ElevatedButton(
@@ -1021,7 +1171,9 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
-              side: isSunMode ? const BorderSide(color: Colors.black, width: 2) : BorderSide.none,
+              side: isSunMode
+                  ? const BorderSide(color: Colors.black, width: 2)
+                  : BorderSide.none,
             ),
           ),
           onPressed: _isSaving ? null : _saveAndApplyBriefing,
@@ -1033,7 +1185,10 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
                 const SizedBox(
                   width: 20,
                   height: 20,
-                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ),
                 )
               else
                 const Icon(Icons.flash_on, size: 20),
@@ -1042,8 +1197,13 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
                   child: Text(
-                    _isSaving ? 'Salvando...' : 'Salvar Visita & Atualizar Briefing',
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                    _isSaving
+                        ? 'Salvando...'
+                        : 'Salvar Visita & Atualizar Briefing',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ),

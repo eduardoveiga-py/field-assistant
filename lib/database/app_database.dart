@@ -1,33 +1,36 @@
 import 'package:drift/drift.dart';
+
 import 'tables.dart';
 import 'connection/connection.dart' as impl;
 
 part 'app_database.g.dart';
 
-@DriftDatabase(tables: [
-  People,
-  Visits,
-  BibleStudies,
-  StudyParticipants,
-  StudySessions,
-  Appointments,
-  ActivityRecords,
-  SyncQueue,
-  VoiceNotes,
-  PhoneContacts,
-  TerritoryLandmarks,
-  AppKvStore,
-  FamilyTies,
-  MinistryExperiences,
-  PersonPhotos,
-  PersonPublications,
-  ResearchArticles,
-  ResearchTags,
-  TerritorySectors,
-  StudentManualOrder,
-  ExternalCalendarEvents,
-  CalendarEventLinks,
-])
+@DriftDatabase(
+  tables: [
+    People,
+    Visits,
+    BibleStudies,
+    StudyParticipants,
+    StudySessions,
+    Appointments,
+    ActivityRecords,
+    SyncQueue,
+    VoiceNotes,
+    PhoneContacts,
+    TerritoryLandmarks,
+    AppKvStore,
+    FamilyTies,
+    MinistryExperiences,
+    PersonPhotos,
+    PersonPublications,
+    ResearchArticles,
+    ResearchTags,
+    TerritorySectors,
+    StudentManualOrder,
+    ExternalCalendarEvents,
+    CalendarEventLinks,
+  ],
+)
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? e]) : super(e ?? impl.constructDb());
 
@@ -74,18 +77,30 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> _migrateLandmarksColumns() async {
     try {
-      final columns = await customSelect("PRAGMA table_info(territory_landmarks)").get();
+      final columns = await customSelect(
+        "PRAGMA table_info(territory_landmarks)",
+      ).get();
       final colNames = columns.map((c) => c.read<String>('name')).toSet();
       if (!colNames.contains('updated_at')) {
-        await customStatement("ALTER TABLE territory_landmarks ADD COLUMN updated_at INTEGER;");
-        await customStatement("UPDATE territory_landmarks SET updated_at = created_at WHERE updated_at IS NULL;");
+        await customStatement(
+          "ALTER TABLE territory_landmarks ADD COLUMN updated_at INTEGER;",
+        );
+        await customStatement(
+          "UPDATE territory_landmarks SET updated_at = created_at WHERE updated_at IS NULL;",
+        );
       }
       if (!colNames.contains('deleted_at')) {
-        await customStatement("ALTER TABLE territory_landmarks ADD COLUMN deleted_at INTEGER;");
+        await customStatement(
+          "ALTER TABLE territory_landmarks ADD COLUMN deleted_at INTEGER;",
+        );
       }
       if (!colNames.contains('revision')) {
-        await customStatement("ALTER TABLE territory_landmarks ADD COLUMN revision INTEGER NOT NULL DEFAULT 1;");
-        await customStatement("UPDATE territory_landmarks SET revision = 1 WHERE revision IS NULL;");
+        await customStatement(
+          "ALTER TABLE territory_landmarks ADD COLUMN revision INTEGER NOT NULL DEFAULT 1;",
+        );
+        await customStatement(
+          "UPDATE territory_landmarks SET revision = 1 WHERE revision IS NULL;",
+        );
       }
     } catch (_) {}
   }
@@ -114,17 +129,27 @@ class AppDatabase extends _$AppDatabase {
         final colNames = columns.map((c) => c.read<String>('name')).toSet();
 
         if (!colNames.contains('updated_at')) {
-          await customStatement("ALTER TABLE $tbl ADD COLUMN updated_at INTEGER;");
+          await customStatement(
+            "ALTER TABLE $tbl ADD COLUMN updated_at INTEGER;",
+          );
           if (colNames.contains('created_at')) {
-            await customStatement("UPDATE $tbl SET updated_at = created_at WHERE updated_at IS NULL;");
+            await customStatement(
+              "UPDATE $tbl SET updated_at = created_at WHERE updated_at IS NULL;",
+            );
           }
         }
         if (!colNames.contains('deleted_at')) {
-          await customStatement("ALTER TABLE $tbl ADD COLUMN deleted_at INTEGER;");
+          await customStatement(
+            "ALTER TABLE $tbl ADD COLUMN deleted_at INTEGER;",
+          );
         }
         if (!colNames.contains('revision')) {
-          await customStatement("ALTER TABLE $tbl ADD COLUMN revision INTEGER NOT NULL DEFAULT 1;");
-          await customStatement("UPDATE $tbl SET revision = 1 WHERE revision IS NULL;");
+          await customStatement(
+            "ALTER TABLE $tbl ADD COLUMN revision INTEGER NOT NULL DEFAULT 1;",
+          );
+          await customStatement(
+            "UPDATE $tbl SET revision = 1 WHERE revision IS NULL;",
+          );
         }
       } catch (_) {}
     }
@@ -136,7 +161,9 @@ class AppDatabase extends _$AppDatabase {
         "SELECT count(*) as count FROM sqlite_master WHERE type='table' AND name='app_settings_kv'",
       ).getSingle();
       if (kvLegacyCheck.read<int>('count') > 0) {
-        final legacyRows = await customSelect("SELECT key, value FROM app_settings_kv").get();
+        final legacyRows = await customSelect(
+          "SELECT key, value FROM app_settings_kv",
+        ).get();
         for (final row in legacyRows) {
           final k = row.read<String>('key');
           final v = row.read<String>('value');

@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
@@ -50,7 +51,9 @@ class RealVoiceDictationService implements VoiceDictationService {
     try {
       final available = await isAvailable();
       if (!available) {
-        onError?.call('Reconhecimento de fala indisponível no dispositivo. Digite o resumo manualmente.');
+        onError?.call(
+          'Reconhecimento de fala indisponível no dispositivo. Digite o resumo manualmente.',
+        );
         return;
       }
 

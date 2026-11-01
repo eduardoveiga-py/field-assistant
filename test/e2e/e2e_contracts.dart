@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+
 import 'package:ministerio_pessoal/database/app_database.dart';
 import 'package:ministerio_pessoal/publications/publication_link_resolver.dart';
 import 'package:ministerio_pessoal/territory/geolocation_helper.dart';
@@ -36,11 +37,14 @@ class DoorstepBriefingHelper {
     if (linkedStudy != null) {
       if (linkedStudy.currentLesson != null) {
         if (linkedStudy.currentParagraph != null) {
-          lessonAndPoint = 'Lição ${linkedStudy.currentLesson.toString().padLeft(2, '0')}, Ponto ${linkedStudy.currentParagraph}';
+          lessonAndPoint =
+              'Lição ${linkedStudy.currentLesson.toString().padLeft(2, '0')}, Ponto ${linkedStudy.currentParagraph}';
         } else {
-          lessonAndPoint = 'Lição ${linkedStudy.currentLesson.toString().padLeft(2, '0')}';
+          lessonAndPoint =
+              'Lição ${linkedStudy.currentLesson.toString().padLeft(2, '0')}';
         }
-      } else if (linkedStudy.manualReference != null && linkedStudy.manualReference!.isNotEmpty) {
+      } else if (linkedStudy.manualReference != null &&
+          linkedStudy.manualReference!.isNotEmpty) {
         lessonAndPoint = linkedStudy.manualReference;
       }
 
@@ -60,7 +64,8 @@ class DoorstepBriefingHelper {
     }
 
     // 2. Pendência deixada da última visita
-    final pendingDoubt = latestVisit?.expressedQuestion ??
+    final pendingDoubt =
+        latestVisit?.expressedQuestion ??
         latestVisit?.nextStep ??
         linkedStudy?.pendingDoubts;
 
@@ -68,9 +73,8 @@ class DoorstepBriefingHelper {
     final spiritualGoal = linkedStudy?.learningGoals ?? person.nextActionNote;
 
     // 4. Toque de empatia (última observação ou necessidade pessoal)
-    final empathyNote = latestVisit?.notes ??
-        person.generalNotes ??
-        person.contactRestrictions;
+    final empathyNote =
+        latestVisit?.notes ?? person.generalNotes ?? person.contactRestrictions;
 
     return DoorstepBriefingData(
       lessonAndPoint: lessonAndPoint,
@@ -114,10 +118,16 @@ class PioneerPaceCalculator {
     required DateTime currentDate,
   }) {
     final bool isGoalReached = completedHours >= goalHours;
-    final double remainingHours = isGoalReached ? 0.0 : math.max(0.0, goalHours - completedHours);
+    final double remainingHours = isGoalReached
+        ? 0.0
+        : math.max(0.0, goalHours - completedHours);
 
     // Contagem de saídas programadas restantes no mês (do dia atual até o último dia do mês)
-    final int lastDayOfMonth = DateTime(currentDate.year, currentDate.month + 1, 0).day;
+    final int lastDayOfMonth = DateTime(
+      currentDate.year,
+      currentDate.month + 1,
+      0,
+    ).day;
     int remainingOutings = 0;
 
     if (designatedWeekdays.isNotEmpty) {
@@ -142,7 +152,8 @@ class PioneerPaceCalculator {
       final hoursStr = remainingHours.truncateToDouble() == remainingHours
           ? remainingHours.toStringAsFixed(0)
           : remainingHours.toStringAsFixed(1);
-      formattedPaceText = 'Faltam ${hoursStr}h em 0 saídas. Seu ritmo ideal é de ${hoursPart}h${minPart.toString().padLeft(2, '0')}m por saída';
+      formattedPaceText =
+          'Faltam ${hoursStr}h em 0 saídas. Seu ritmo ideal é de ${hoursPart}h${minPart.toString().padLeft(2, '0')}m por saída';
     } else {
       final totalMin = ((remainingHours / remainingOutings) * 60).round();
       idealPacePerOuting = Duration(minutes: totalMin);
@@ -151,7 +162,8 @@ class PioneerPaceCalculator {
       final hoursStr = remainingHours.truncateToDouble() == remainingHours
           ? remainingHours.toStringAsFixed(0)
           : remainingHours.toStringAsFixed(1);
-      formattedPaceText = 'Faltam ${hoursStr}h em $remainingOutings saídas. Seu ritmo ideal é de ${hoursPart}h${minPart.toString().padLeft(2, '0')}m por saída';
+      formattedPaceText =
+          'Faltam ${hoursStr}h em $remainingOutings saídas. Seu ritmo ideal é de ${hoursPart}h${minPart.toString().padLeft(2, '0')}m por saída';
     }
 
     return PioneerPaceResult(
@@ -189,10 +201,12 @@ class RecentSeedsHelper {
 
     // Semente recente: ainda NÃO recebeu a primeira revisita ou estudo bíblico
     // (visitas do tipo 'revisita' ou 'estudo')
-    final hasCompletedRevisit = visits.any((v) =>
-        v.personId == person.id &&
-        v.deletedAt == null &&
-        (v.contactType == 'revisita' || v.contactType == 'estudo'));
+    final hasCompletedRevisit = visits.any(
+      (v) =>
+          v.personId == person.id &&
+          v.deletedAt == null &&
+          (v.contactType == 'revisita' || v.contactType == 'estudo'),
+    );
 
     return !hasCompletedRevisit;
   }
@@ -242,13 +256,22 @@ class PlanBRecommender {
     DateTime? targetDateTime,
   }) async {
     final target = targetDateTime ?? DateTime.now();
-    const weekdayNames = ['', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado', 'domingo'];
+    const weekdayNames = [
+      '',
+      'segunda',
+      'terça',
+      'quarta',
+      'quinta',
+      'sexta',
+      'sábado',
+      'domingo',
+    ];
     final currentDayName = weekdayNames[target.weekday];
 
     // 1. Filtra candidatos válidos (exclui a pessoa cancelada e contatos deletados)
-    final candidates = allPeople.where((p) =>
-        p.id != cancelledPerson.id &&
-        p.deletedAt == null).toList();
+    final candidates = allPeople
+        .where((p) => p.id != cancelledPerson.id && p.deletedAt == null)
+        .toList();
 
     if (candidates.isEmpty) return [];
 
@@ -269,13 +292,15 @@ class PlanBRecommender {
       }
 
       // Encontra a última visita ou pendência registrada
-      final personVisits = allVisits
-          .where((v) => v.personId == person.id && v.deletedAt == null)
-          .toList()
-        ..sort((a, b) => b.dateTimeField.compareTo(a.dateTimeField));
+      final personVisits =
+          allVisits
+              .where((v) => v.personId == person.id && v.deletedAt == null)
+              .toList()
+            ..sort((a, b) => b.dateTimeField.compareTo(a.dateTimeField));
 
       final latestVisit = personVisits.isNotEmpty ? personVisits.first : null;
-      final pendingStep = latestVisit?.nextStep ??
+      final pendingStep =
+          latestVisit?.nextStep ??
           latestVisit?.expressedQuestion ??
           person.nextActionNote;
 
@@ -292,7 +317,8 @@ class PlanBRecommender {
         reasonParts.add('Contato flexível sugerido');
       }
 
-      if (person.preferredSchedule != null && person.preferredSchedule!.isNotEmpty) {
+      if (person.preferredSchedule != null &&
+          person.preferredSchedule!.isNotEmpty) {
         final schedLower = person.preferredSchedule!.toLowerCase();
         if (schedLower.contains(currentDayName)) {
           reasonParts.add('Costuma atender aos ${currentDayName}s');
@@ -303,12 +329,14 @@ class PlanBRecommender {
         reasonParts.add('Aguardando revisita');
       }
 
-      suggestions.add(PlanBSuggestion(
-        person: person,
-        distanceKm: distKm,
-        reason: reasonParts.join(' • '),
-        pendingStep: pendingStep,
-      ));
+      suggestions.add(
+        PlanBSuggestion(
+          person: person,
+          distanceKm: distKm,
+          reason: reasonParts.join(' • '),
+          pendingStep: pendingStep,
+        ),
+      );
     }
 
     // 3. Ordenação inteligente:
@@ -380,18 +408,23 @@ class AutoCorrectiveTimerLogic {
     }
 
     final diffSinceStart = now.difference(startedAt);
-    final totalElapsed = accumulatedDuration + (diffSinceStart.isNegative ? Duration.zero : diffSinceStart);
+    final totalElapsed =
+        accumulatedDuration +
+        (diffSinceStart.isNegative ? Duration.zero : diffSinceStart);
 
     // 1. Detecção de reabertura inativa (reopened_inactive)
     if (lastHeartbeat != null) {
       final inactivity = now.difference(lastHeartbeat);
       if (inactivity > inactiveGapThreshold) {
-        final activePortion = accumulatedDuration + lastHeartbeat.difference(startedAt);
+        final activePortion =
+            accumulatedDuration + lastHeartbeat.difference(startedAt);
         return AutoCorrectiveTimerState(
           shouldShowWarning: true,
           elapsedDuration: totalElapsed,
           warningReason: 'reopened_inactive',
-          suggestedAdjustment: activePortion > Duration.zero ? activePortion : const Duration(hours: 2),
+          suggestedAdjustment: activePortion > Duration.zero
+              ? activePortion
+              : const Duration(hours: 2),
         );
       }
     }
@@ -400,8 +433,10 @@ class AutoCorrectiveTimerLogic {
     if (totalElapsed > longRunningThreshold) {
       Duration suggested = const Duration(hours: 2);
       if (lastHeartbeat != null) {
-        final activePortion = accumulatedDuration + lastHeartbeat.difference(startedAt);
-        if (activePortion > Duration.zero && activePortion <= longRunningThreshold) {
+        final activePortion =
+            accumulatedDuration + lastHeartbeat.difference(startedAt);
+        if (activePortion > Duration.zero &&
+            activePortion <= longRunningThreshold) {
           suggested = activePortion;
         }
       }

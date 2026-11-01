@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:math';
+
 import 'package:drift/drift.dart';
+
 import '../database/app_database.dart';
 import '../publications/lff_book_catalog.dart';
 
@@ -33,7 +35,9 @@ class StudentPriorityItem {
   PersonEntry get primaryPerson => person;
   double get progressPercent => progressPercentage;
   String get frequency => study.frequency;
-  int? get daysSinceLastSession => study.lastSessionAt != null ? DateTime.now().difference(study.lastSessionAt!).inDays : null;
+  int? get daysSinceLastSession => study.lastSessionAt != null
+      ? DateTime.now().difference(study.lastSessionAt!).inDays
+      : null;
   int get spiritualGoalsMetCount => completedGoalsCount;
   int get manualRank => manualOrderIndex + 1;
 
@@ -77,7 +81,11 @@ class StudentPriorityEngine {
   static Future<Map<String, int>> loadManualOrder(AppDatabase db) async {
     await _ensureTable(db);
     try {
-      final rows = await db.customSelect('SELECT study_id, manual_index FROM student_manual_order').get();
+      final rows = await db
+          .customSelect(
+            'SELECT study_id, manual_index FROM student_manual_order',
+          )
+          .get();
       final map = <String, int>{};
       for (final r in rows) {
         final sId = r.read<String>('study_id');
@@ -91,13 +99,19 @@ class StudentPriorityEngine {
   }
 
   /// Salva todas as ordens manuais permanentemente no SQLite
-  static Future<void> saveAllManualOrders(AppDatabase db, Map<String, int> manualOrderMap) async {
+  static Future<void> saveAllManualOrders(
+    AppDatabase db,
+    Map<String, int> manualOrderMap,
+  ) async {
     await _ensureTable(db);
     try {
       for (final entry in manualOrderMap.entries) {
         await db.customInsert(
           'INSERT OR REPLACE INTO student_manual_order (study_id, manual_index) VALUES (?, ?)',
-          variables: [Variable.withString(entry.key), Variable.withInt(entry.value)],
+          variables: [
+            Variable.withString(entry.key),
+            Variable.withInt(entry.value),
+          ],
         );
       }
     } catch (_) {}
@@ -140,7 +154,6 @@ class StudentPriorityEngine {
     }
   }
 
-
   /// Calcula os itens ordenados do mais interessado para o menos interessado
   static List<StudentPriorityItem> calculatePriorities({
     List<BibleStudyEntry>? studies,
@@ -157,21 +170,32 @@ class StudentPriorityEngine {
     final effectiveManualOrder = manualOrder ?? manualOrderMap ?? const {};
     final now = nowOverride ?? DateTime.now();
     final personMap = {for (var p in people) p.id: p};
-    final activeList = effectiveStudies.where((s) => s.status == 'ativo' && s.deletedAt == null).toList();
+    final activeList = effectiveStudies
+        .where((s) => s.status == 'ativo' && s.deletedAt == null)
+        .toList();
 
     final List<StudentPriorityItem> items = [];
 
     for (final study in activeList) {
       // Participante principal do estudo
-      final studyParts = participants.where((p) => p.studyId == study.id && p.deletedAt == null).toList();
-      final primaryPart = studyParts.where((p) => p.isPrimary).firstOrNull ?? studyParts.firstOrNull;
-      final person = primaryPart != null ? personMap[primaryPart.personId] : null;
+      final studyParts = participants
+          .where((p) => p.studyId == study.id && p.deletedAt == null)
+          .toList();
+      final primaryPart =
+          studyParts.where((p) => p.isPrimary).firstOrNull ??
+          studyParts.firstOrNull;
+      final person = primaryPart != null
+          ? personMap[primaryPart.personId]
+          : null;
 
       if (person == null || person.deletedAt != null) continue;
 
       // Sessões deste estudo
-      final studySessions = sessions.where((s) => s.studyId == study.id && s.deletedAt == null).toList()
-        ..sort((a, b) => b.dateTimeField.compareTo(a.dateTimeField));
+      final studySessions =
+          sessions
+              .where((s) => s.studyId == study.id && s.deletedAt == null)
+              .toList()
+            ..sort((a, b) => b.dateTimeField.compareTo(a.dateTimeField));
 
       int successful = 0;
       int failed = 0;
@@ -188,9 +212,13 @@ class StudentPriorityEngine {
       // Opção 2x por semana pontua significativamente mais
       double score = 0.0;
       final freq = study.frequency.toLowerCase();
-      final isTwiceAWeek = freq.contains('2') || freq.contains('duas') || freq == 'duas_vezes_semana';
+      final isTwiceAWeek =
+          freq.contains('2') ||
+          freq.contains('duas') ||
+          freq == 'duas_vezes_semana';
       if (isTwiceAWeek) {
-        score += 80.0; // Pontuação premium para estudantes que estudam 2x/semana
+        score +=
+            80.0; // Pontuação premium para estudantes que estudam 2x/semana
       } else if (freq == 'semanal') {
         score += 40.0;
       } else {
@@ -216,7 +244,8 @@ class StudentPriorityEngine {
       final currentPoint = study.currentParagraph ?? 1;
 
       // Velocidade estimada em lições por semana
-      final double lessonsPerWeekVelocity = (currentLesson - 1 + (currentPoint / 6.0)) / studyAgeWeeks;
+      final double lessonsPerWeekVelocity =
+          (currentLesson - 1 + (currentPoint / 6.0)) / studyAgeWeeks;
 
       // Quem consome matéria mais rápido pontua mais (mesmo que esteja no início do livro!)
       if (lessonsPerWeekVelocity >= 1.5) {
@@ -231,7 +260,8 @@ class StudentPriorityEngine {
 
       // 4. Cumprimento de Metas Espirituais
       int completedGoals = 0;
-      if (person.contactRestrictions != null && person.contactRestrictions!.isNotEmpty) {
+      if (person.contactRestrictions != null &&
+          person.contactRestrictions!.isNotEmpty) {
         try {
           final decoded = jsonDecode(person.contactRestrictions!);
           if (decoded is List) {
@@ -277,18 +307,20 @@ class StudentPriorityEngine {
 
       final manualIndex = effectiveManualOrder[study.id] ?? 999999;
 
-      items.add(StudentPriorityItem(
-        study: study,
-        person: person,
-        internalScore: score,
-        progressPercentage: progress,
-        lessonsPerWeekVelocity: lessonsPerWeekVelocity,
-        velocityLabel: velocityLabel,
-        completedGoalsCount: completedGoals,
-        successfulSessionsCount: successful,
-        failedSessionsCount: failed,
-        manualOrderIndex: manualIndex,
-      ));
+      items.add(
+        StudentPriorityItem(
+          study: study,
+          person: person,
+          internalScore: score,
+          progressPercentage: progress,
+          lessonsPerWeekVelocity: lessonsPerWeekVelocity,
+          velocityLabel: velocityLabel,
+          completedGoalsCount: completedGoals,
+          successfulSessionsCount: successful,
+          failedSessionsCount: failed,
+          manualOrderIndex: manualIndex,
+        ),
+      );
     }
 
     // Se houver ordens manuais definidas pelo usuário, prioriza-as; caso contrário, ordena pelo score interno decrescente

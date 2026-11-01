@@ -4,6 +4,7 @@ import 'package:drift/native.dart';
 import 'package:ministerio_pessoal/database/app_database.dart';
 import 'package:ministerio_pessoal/database/repository.dart';
 import 'package:ministerio_pessoal/settings/app_settings_manager.dart';
+
 import 'e2e_contracts.dart';
 
 void main() {
@@ -68,9 +69,18 @@ void main() {
         expect(briefing.jwLibraryUri, isNotNull);
         expect(briefing.jwLibraryUri.toString(), contains('pub=lff'));
         expect(briefing.jwLibraryUri.toString(), contains('lesson=4'));
-        expect(briefing.pendingDoubt, equals('Por que Deus permite o sofrimento?'));
-        expect(briefing.spiritualGoal, equals('Entender o propósito de Deus para a Terra'));
-        expect(briefing.empathyNote, equals('Lucas estava preocupado com a cirurgia da mãe'));
+        expect(
+          briefing.pendingDoubt,
+          equals('Por que Deus permite o sofrimento?'),
+        );
+        expect(
+          briefing.spiritualGoal,
+          equals('Entender o propósito de Deus para a Terra'),
+        );
+        expect(
+          briefing.empathyNote,
+          equals('Lucas estava preocupado com a cirurgia da mãe'),
+        );
       });
 
       test('TC-R1-02: Study only without previous visits extracts goals and JW Library link', () async {
@@ -98,7 +108,10 @@ void main() {
         expect(briefing.lessonAndPoint, equals('Lição 01, Ponto 1'));
         expect(briefing.jwLibraryUri, isNotNull);
         expect(briefing.pendingDoubt, isNull);
-        expect(briefing.spiritualGoal, equals('Descobrir a esperança da Bíblia'));
+        expect(
+          briefing.spiritualGoal,
+          equals('Descobrir a esperança da Bíblia'),
+        );
         expect(briefing.empathyNote, isNull);
       });
 
@@ -127,34 +140,43 @@ void main() {
 
         expect(briefing.lessonAndPoint, isNull);
         expect(briefing.jwLibraryUri, isNull);
-        expect(briefing.pendingDoubt, equals('Quem escreveu a Bíblia e quando?'));
+        expect(
+          briefing.pendingDoubt,
+          equals('Quem escreveu a Bíblia e quando?'),
+        );
         expect(briefing.spiritualGoal, isNull);
-        expect(briefing.empathyNote, equals('Conversamos sobre a confiabilidade histórica da Bíblia'));
+        expect(
+          briefing.empathyNote,
+          equals('Conversamos sobre a confiabilidade histórica da Bíblia'),
+        );
       });
 
-      test('TC-R1-04: JW Library deep link resolution generates canonical URL', () async {
-        final person = await repo.createPerson(name: 'Daniel Santos');
-        final study = await repo.createStudy(
-          title: 'Estudo Daniel',
-          participantPersonIds: [person.id],
-          publicationId: 'lff-book',
-          language: 'pt',
-          currentLesson: 12,
-          currentParagraph: 5,
-        );
+      test(
+        'TC-R1-04: JW Library deep link resolution generates canonical URL',
+        () async {
+          final person = await repo.createPerson(name: 'Daniel Santos');
+          final study = await repo.createStudy(
+            title: 'Estudo Daniel',
+            participantPersonIds: [person.id],
+            publicationId: 'lff-book',
+            language: 'pt',
+            currentLesson: 12,
+            currentParagraph: 5,
+          );
 
-        final briefing = DoorstepBriefingHelper.build(
-          person: person,
-          linkedStudy: study,
-        );
+          final briefing = DoorstepBriefingHelper.build(
+            person: person,
+            linkedStudy: study,
+          );
 
-        expect(briefing.jwLibraryUri, isNotNull);
-        final uriStr = briefing.jwLibraryUri.toString();
-        expect(uriStr, startsWith('https://www.jw.org/finder'));
-        expect(uriStr, contains('srcid=jwlshare'));
-        expect(uriStr, contains('wtlocale=T'));
-        expect(uriStr, contains('lesson=12'));
-      });
+          expect(briefing.jwLibraryUri, isNotNull);
+          final uriStr = briefing.jwLibraryUri.toString();
+          expect(uriStr, startsWith('https://www.jw.org/finder'));
+          expect(uriStr, contains('srcid=jwlshare'));
+          expect(uriStr, contains('wtlocale=T'));
+          expect(uriStr, contains('lesson=12'));
+        },
+      );
 
       test('TC-R1-05: Manual reference fallback formats lesson/point gracefully when publication is customized', () async {
         final person = await repo.createPerson(name: 'Elena Rostova');
@@ -198,9 +220,16 @@ void main() {
         // Se testarmos com 5 saídas exatas:
         final calcWith5Outings = PioneerPaceCalculator.calculate(
           goalHours: 50.0,
-          designatedWeekdays: [2, 4], // apenas Terça e Quinta a partir do dia 15
+          designatedWeekdays: [
+            2,
+            4,
+          ], // apenas Terça e Quinta a partir do dia 15
           completedHours: 32.0,
-          currentDate: DateTime(2026, 10, 16), // 20(Ter), 22(Qui), 27(Ter), 29(Qui) = 4 ou 5
+          currentDate: DateTime(
+            2026,
+            10,
+            16,
+          ), // 20(Ter), 22(Qui), 27(Ter), 29(Qui) = 4 ou 5
         );
         expect(calcWith5Outings.remainingHours, equals(18.0));
 
@@ -209,12 +238,24 @@ void main() {
           goalHours: 50.0,
           designatedWeekdays: [6], // 5 sábados no mês a partir de data inicial
           completedHours: 32.0,
-          currentDate: DateTime(2026, 5, 2), // Maio de 2026 tem sábados nos dias 2, 9, 16, 23, 30 = 5 sábados
+          currentDate: DateTime(
+            2026,
+            5,
+            2,
+          ), // Maio de 2026 tem sábados nos dias 2, 9, 16, 23, 30 = 5 sábados
         );
         expect(manualCalc.remainingOutings, equals(5));
         expect(manualCalc.remainingHours, equals(18.0));
-        expect(manualCalc.idealPacePerOuting, equals(const Duration(hours: 3, minutes: 36)));
-        expect(manualCalc.formattedPaceText, equals('Faltam 18h em 5 saídas. Seu ritmo ideal é de 3h36m por saída'));
+        expect(
+          manualCalc.idealPacePerOuting,
+          equals(const Duration(hours: 3, minutes: 36)),
+        );
+        expect(
+          manualCalc.formattedPaceText,
+          equals(
+            'Faltam 18h em 5 saídas. Seu ritmo ideal é de 3h36m por saída',
+          ),
+        );
       });
 
       test('TC-R2-02: Auxiliary pioneer standard (30h goal, 10h completed, 8 outings -> 2h30m per outing)', () {
@@ -231,8 +272,16 @@ void main() {
 
         expect(result.remainingHours, equals(20.0));
         expect(result.remainingOutings, equals(8));
-        expect(result.idealPacePerOuting, equals(const Duration(hours: 2, minutes: 30)));
-        expect(result.formattedPaceText, equals('Faltam 20h em 8 saídas. Seu ritmo ideal é de 2h30m por saída'));
+        expect(
+          result.idealPacePerOuting,
+          equals(const Duration(hours: 2, minutes: 30)),
+        );
+        expect(
+          result.formattedPaceText,
+          equals(
+            'Faltam 20h em 8 saídas. Seu ritmo ideal é de 2h30m por saída',
+          ),
+        );
       });
 
       test('TC-R2-03: Single designated weekday (e.g. Saturdays only) correctly counts remaining occurrences', () {
@@ -248,7 +297,10 @@ void main() {
         expect(result.remainingOutings, equals(2));
         expect(result.remainingHours, equals(6.0));
         expect(result.idealPacePerOuting, equals(const Duration(hours: 3)));
-        expect(result.formattedPaceText, equals('Faltam 6h em 2 saídas. Seu ritmo ideal é de 3h00m por saída'));
+        expect(
+          result.formattedPaceText,
+          equals('Faltam 6h em 2 saídas. Seu ritmo ideal é de 3h00m por saída'),
+        );
       });
 
       test('TC-R2-04: Multiple designated weekdays (Tuesday, Thursday, Saturday) dynamically computed to month-end', () {
@@ -318,7 +370,13 @@ void main() {
         );
 
         expect(isRecent, isTrue);
-        expect(RecentSeedsHelper.getElapsedText(firstContactAt: firstContact, nowOverride: now), equals('há 2 dias'));
+        expect(
+          RecentSeedsHelper.getElapsedText(
+            firstContactAt: firstContact,
+            nowOverride: now,
+          ),
+          equals('há 2 dias'),
+        );
       });
 
       test('TC-R3-02: Contact registered 4 days ago with zero visits flags isRecentSeed = true', () async {
@@ -337,7 +395,13 @@ void main() {
         );
 
         expect(isRecent, isTrue);
-        expect(RecentSeedsHelper.getElapsedText(firstContactAt: firstContact, nowOverride: now), equals('há 4 dias'));
+        expect(
+          RecentSeedsHelper.getElapsedText(
+            firstContactAt: firstContact,
+            nowOverride: now,
+          ),
+          equals('há 4 dias'),
+        );
       });
 
       test('TC-R3-03: Contact registered 3 days ago with completed revisit flags isRecentSeed = false', () async {
@@ -386,9 +450,27 @@ void main() {
       test('TC-R3-05: Elapsed text accurately displays "Hoje", "há 1 dia", "há N dias"', () {
         final now = DateTime(2026, 10, 30, 12, 0);
 
-        expect(RecentSeedsHelper.getElapsedText(firstContactAt: now, nowOverride: now), equals('Hoje'));
-        expect(RecentSeedsHelper.getElapsedText(firstContactAt: now.subtract(const Duration(days: 1)), nowOverride: now), equals('há 1 dia'));
-        expect(RecentSeedsHelper.getElapsedText(firstContactAt: now.subtract(const Duration(days: 5)), nowOverride: now), equals('há 5 dias'));
+        expect(
+          RecentSeedsHelper.getElapsedText(
+            firstContactAt: now,
+            nowOverride: now,
+          ),
+          equals('Hoje'),
+        );
+        expect(
+          RecentSeedsHelper.getElapsedText(
+            firstContactAt: now.subtract(const Duration(days: 1)),
+            nowOverride: now,
+          ),
+          equals('há 1 dia'),
+        );
+        expect(
+          RecentSeedsHelper.getElapsedText(
+            firstContactAt: now.subtract(const Duration(days: 5)),
+            nowOverride: now,
+          ),
+          equals('há 5 dias'),
+        );
       });
     });
 
@@ -458,7 +540,10 @@ void main() {
         expect(suggestions.length, equals(2));
         expect(suggestions.first.person.id, equals(candidatePending.id));
         expect(suggestions.first.distanceKm, isNull);
-        expect(suggestions.first.pendingStep, equals('Responder dúvida sobre ressurreição'));
+        expect(
+          suggestions.first.pendingStep,
+          equals('Responder dúvida sobre ressurreição'),
+        );
       });
 
       test('TC-R4-03: Preferred schedule matching aligns candidate with current weekday/time slot', () async {
@@ -479,7 +564,10 @@ void main() {
           targetDateTime: tuesday,
         );
 
-        expect(suggestions.first.reason, contains('Costuma atender aos terças'));
+        expect(
+          suggestions.first.reason,
+          contains('Costuma atender aos terças'),
+        );
       });
 
       test('TC-R4-04: Pending step and expressed question propagated to suggestion for doorstep readiness', () async {
@@ -518,7 +606,9 @@ void main() {
         await (db.update(db.appointments)..where((t) => t.id.equals(appt.id)))
             .write(const AppointmentsCompanion(status: Value('cancelado')));
 
-        final updatedAppt = (await repo.getAllAppointments()).firstWhere((a) => a.id == appt.id);
+        final updatedAppt = (await repo.getAllAppointments()).firstWhere(
+          (a) => a.id == appt.id,
+        );
         expect(updatedAppt.status, equals('cancelado'));
 
         // Chamada ao Plano B
@@ -555,7 +645,10 @@ void main() {
 
         expect(state.shouldShowWarning, isFalse);
         expect(state.warningReason, isEmpty);
-        expect(state.elapsedDuration, equals(const Duration(hours: 1, minutes: 30)));
+        expect(
+          state.elapsedDuration,
+          equals(const Duration(hours: 1, minutes: 30)),
+        );
       });
 
       test('TC-R5-02: Long-running session (> 4 hours continuous) triggers warningReason = long_running', () {
@@ -572,13 +665,28 @@ void main() {
 
         expect(state.shouldShowWarning, isTrue);
         expect(state.warningReason, equals('long_running'));
-        expect(state.elapsedDuration, equals(const Duration(hours: 5, minutes: 30)));
+        expect(
+          state.elapsedDuration,
+          equals(const Duration(hours: 5, minutes: 30)),
+        );
       });
 
       test('TC-R5-03: Reopening app after inactive period with running timer triggers warningReason = reopened_inactive', () {
         final startedAt = DateTime(2026, 10, 30, 9, 0);
-        final lastHeartbeat = DateTime(2026, 10, 30, 11, 0); // Fechou o app às 11:00 (2h de campo)
-        final reloadedNow = DateTime(2026, 10, 30, 16, 0); // Reabriu 5h depois (às 16:00)
+        final lastHeartbeat = DateTime(
+          2026,
+          10,
+          30,
+          11,
+          0,
+        ); // Fechou o app às 11:00 (2h de campo)
+        final reloadedNow = DateTime(
+          2026,
+          10,
+          30,
+          16,
+          0,
+        ); // Reabriu 5h depois (às 16:00)
 
         final state = AutoCorrectiveTimerLogic.evaluate(
           isRunning: true,
@@ -595,7 +703,13 @@ void main() {
 
       test('TC-R5-04: Suggested adjustment allows trimming excess forgotten duration back to last active heartbeat', () {
         final startedAt = DateTime(2026, 10, 30, 8, 30);
-        final lastHeartbeat = DateTime(2026, 10, 30, 11, 15); // 2h45 de campo ativo
+        final lastHeartbeat = DateTime(
+          2026,
+          10,
+          30,
+          11,
+          15,
+        ); // 2h45 de campo ativo
         final reloadedNow = DateTime(2026, 10, 30, 18, 00); // 9h30 no total
 
         final state = AutoCorrectiveTimerLogic.evaluate(
@@ -607,23 +721,42 @@ void main() {
         );
 
         expect(state.shouldShowWarning, isTrue);
-        expect(state.suggestedAdjustment, equals(const Duration(hours: 2, minutes: 45)));
+        expect(
+          state.suggestedAdjustment,
+          equals(const Duration(hours: 2, minutes: 45)),
+        );
       });
 
-      test('TC-R5-05: Timer state persistence and recovery via AppSettingsManager', () async {
-        final startTime = DateTime(2026, 10, 30, 9, 0);
-        await settings.setString('timer_is_running', 'true');
-        await settings.setString('timer_started_at', startTime.toIso8601String());
-        await settings.setString('timer_accumulated_seconds', '1800'); // 30 min prévios
+      test(
+        'TC-R5-05: Timer state persistence and recovery via AppSettingsManager',
+        () async {
+          final startTime = DateTime(2026, 10, 30, 9, 0);
+          await settings.setString('timer_is_running', 'true');
+          await settings.setString(
+            'timer_started_at',
+            startTime.toIso8601String(),
+          );
+          await settings.setString(
+            'timer_accumulated_seconds',
+            '1800',
+          ); // 30 min prévios
 
-        final isRunning = (await settings.getString('timer_is_running')) == 'true';
-        final savedStart = DateTime.parse((await settings.getString('timer_started_at'))!);
-        final accumulated = Duration(seconds: int.parse((await settings.getString('timer_accumulated_seconds'))!));
+          final isRunning =
+              (await settings.getString('timer_is_running')) == 'true';
+          final savedStart = DateTime.parse(
+            (await settings.getString('timer_started_at'))!,
+          );
+          final accumulated = Duration(
+            seconds: int.parse(
+              (await settings.getString('timer_accumulated_seconds'))!,
+            ),
+          );
 
-        expect(isRunning, isTrue);
-        expect(savedStart, equals(startTime));
-        expect(accumulated, equals(const Duration(minutes: 30)));
-      });
+          expect(isRunning, isTrue);
+          expect(savedStart, equals(startTime));
+          expect(accumulated, equals(const Duration(minutes: 30)));
+        },
+      );
     });
   });
 }

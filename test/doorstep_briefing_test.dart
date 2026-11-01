@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ministerio_pessoal/contacts/doorstep_briefing_helper.dart';
@@ -120,154 +121,155 @@ VisitEntry _createVisit({
 }
 
 void main() {
-  group('DoorstepBriefingHelper - Onde Parou (Lição, Ponto e JW Library Link)', () {
-    test('TC-01: Estudo com lição 4 e parágrafo 3 (lff-book)', () {
-      final person = _createPerson();
-      final study = _createStudy(
-        publicationId: 'lff-book',
-        language: 'pt',
-        currentLesson: 4,
-        currentParagraph: 3,
+  group(
+    'DoorstepBriefingHelper - Onde Parou (Lição, Ponto e JW Library Link)',
+    () {
+      test('TC-01: Estudo com lição 4 e parágrafo 3 (lff-book)', () {
+        final person = _createPerson();
+        final study = _createStudy(
+          publicationId: 'lff-book',
+          language: 'pt',
+          currentLesson: 4,
+          currentParagraph: 3,
+        );
+
+        final briefing = DoorstepBriefingHelper.build(
+          person: person,
+          linkedStudy: study,
+        );
+
+        expect(briefing.lessonAndPoint, equals('Lição 04, Ponto 3'));
+        expect(briefing.jwLibraryUri, isNotNull);
+        expect(briefing.jwLibraryUri.toString(), contains('pub=lff&lesson=4'));
+        expect(briefing.hasLessonOrTopic, isTrue);
+        expect(briefing.hasJwLibraryLink, isTrue);
+      });
+
+      test('TC-02: Estudo com lição 12 e parágrafo null', () {
+        final person = _createPerson();
+        final study = _createStudy(
+          publicationId: 'lff-book',
+          language: 'pt',
+          currentLesson: 12,
+          currentParagraph: null,
+        );
+
+        final briefing = DoorstepBriefingHelper.build(
+          person: person,
+          linkedStudy: study,
+        );
+
+        expect(briefing.lessonAndPoint, equals('Lição 12'));
+        expect(briefing.jwLibraryUri, isNotNull);
+        expect(briefing.jwLibraryUri.toString(), contains('pub=lff&lesson=12'));
+      });
+
+      test('TC-03: Estudo com apenas parágrafo 5', () {
+        final person = _createPerson();
+        final study = _createStudy(currentLesson: null, currentParagraph: 5);
+
+        final briefing = DoorstepBriefingHelper.build(
+          person: person,
+          linkedStudy: study,
+        );
+
+        expect(briefing.lessonAndPoint, equals('Ponto 5'));
+      });
+
+      test('TC-04: Estudo com manualReference', () {
+        final person = _createPerson();
+        final study = _createStudy(
+          currentLesson: null,
+          currentParagraph: null,
+          manualReference: 'Sentinela 02/2026',
+        );
+
+        final briefing = DoorstepBriefingHelper.build(
+          person: person,
+          linkedStudy: study,
+        );
+
+        expect(briefing.lessonAndPoint, equals('Sentinela 02/2026'));
+      });
+
+      test('TC-05: Estudo com apenas title: "Estudo Bíblico"', () {
+        final person = _createPerson();
+        final study = _createStudy(
+          title: 'Estudo Bíblico',
+          currentLesson: null,
+          currentParagraph: null,
+          manualReference: null,
+        );
+
+        final briefing = DoorstepBriefingHelper.build(
+          person: person,
+          linkedStudy: study,
+        );
+
+        expect(briefing.lessonAndPoint, equals('Estudo Bíblico'));
+      });
+
+      test(
+        'TC-06: Sem estudo; última visita com scriptureOrPub e topicsDiscussed',
+        () {
+          final person = _createPerson();
+          final visit = _createVisit(
+            scriptureOrPub: 'Sl 37:11',
+            topicsDiscussed: 'Futuro',
+          );
+
+          final briefing = DoorstepBriefingHelper.build(
+            person: person,
+            latestVisit: visit,
+          );
+
+          expect(briefing.lessonAndPoint, equals('Sl 37:11 — Futuro'));
+          expect(briefing.jwLibraryUri, isNull);
+        },
       );
 
-      final briefing = DoorstepBriefingHelper.build(
-        person: person,
-        linkedStudy: study,
-      );
+      test('TC-07: Sem estudo; última visita com apenas scriptureOrPub', () {
+        final person = _createPerson();
+        final visit = _createVisit(
+          scriptureOrPub: 'Sl 37:11',
+          topicsDiscussed: null,
+        );
 
-      expect(briefing.lessonAndPoint, equals('Lição 04, Ponto 3'));
-      expect(briefing.jwLibraryUri, isNotNull);
-      expect(briefing.jwLibraryUri.toString(), contains('pub=lff&lesson=4'));
-      expect(briefing.hasLessonOrTopic, isTrue);
-      expect(briefing.hasJwLibraryLink, isTrue);
-    });
+        final briefing = DoorstepBriefingHelper.build(
+          person: person,
+          latestVisit: visit,
+        );
 
-    test('TC-02: Estudo com lição 12 e parágrafo null', () {
-      final person = _createPerson();
-      final study = _createStudy(
-        publicationId: 'lff-book',
-        language: 'pt',
-        currentLesson: 12,
-        currentParagraph: null,
-      );
+        expect(briefing.lessonAndPoint, equals('Sl 37:11'));
+        expect(briefing.jwLibraryUri, isNull);
+      });
 
-      final briefing = DoorstepBriefingHelper.build(
-        person: person,
-        linkedStudy: study,
-      );
+      test('TC-08: Sem estudo; última visita com apenas topicsDiscussed', () {
+        final person = _createPerson();
+        final visit = _createVisit(
+          scriptureOrPub: null,
+          topicsDiscussed: 'Futuro',
+        );
 
-      expect(briefing.lessonAndPoint, equals('Lição 12'));
-      expect(briefing.jwLibraryUri, isNotNull);
-      expect(briefing.jwLibraryUri.toString(), contains('pub=lff&lesson=12'));
-    });
+        final briefing = DoorstepBriefingHelper.build(
+          person: person,
+          latestVisit: visit,
+        );
 
-    test('TC-03: Estudo com apenas parágrafo 5', () {
-      final person = _createPerson();
-      final study = _createStudy(
-        currentLesson: null,
-        currentParagraph: 5,
-      );
+        expect(briefing.lessonAndPoint, equals('Futuro'));
+        expect(briefing.jwLibraryUri, isNull);
+      });
 
-      final briefing = DoorstepBriefingHelper.build(
-        person: person,
-        linkedStudy: study,
-      );
+      test('TC-09: Sem estudo e sem visita', () {
+        final person = _createPerson();
 
-      expect(briefing.lessonAndPoint, equals('Ponto 5'));
-    });
+        final briefing = DoorstepBriefingHelper.build(person: person);
 
-    test('TC-04: Estudo com manualReference', () {
-      final person = _createPerson();
-      final study = _createStudy(
-        currentLesson: null,
-        currentParagraph: null,
-        manualReference: 'Sentinela 02/2026',
-      );
-
-      final briefing = DoorstepBriefingHelper.build(
-        person: person,
-        linkedStudy: study,
-      );
-
-      expect(briefing.lessonAndPoint, equals('Sentinela 02/2026'));
-    });
-
-    test('TC-05: Estudo com apenas title: "Estudo Bíblico"', () {
-      final person = _createPerson();
-      final study = _createStudy(
-        title: 'Estudo Bíblico',
-        currentLesson: null,
-        currentParagraph: null,
-        manualReference: null,
-      );
-
-      final briefing = DoorstepBriefingHelper.build(
-        person: person,
-        linkedStudy: study,
-      );
-
-      expect(briefing.lessonAndPoint, equals('Estudo Bíblico'));
-    });
-
-    test('TC-06: Sem estudo; última visita com scriptureOrPub e topicsDiscussed', () {
-      final person = _createPerson();
-      final visit = _createVisit(
-        scriptureOrPub: 'Sl 37:11',
-        topicsDiscussed: 'Futuro',
-      );
-
-      final briefing = DoorstepBriefingHelper.build(
-        person: person,
-        latestVisit: visit,
-      );
-
-      expect(briefing.lessonAndPoint, equals('Sl 37:11 — Futuro'));
-      expect(briefing.jwLibraryUri, isNull);
-    });
-
-    test('TC-07: Sem estudo; última visita com apenas scriptureOrPub', () {
-      final person = _createPerson();
-      final visit = _createVisit(
-        scriptureOrPub: 'Sl 37:11',
-        topicsDiscussed: null,
-      );
-
-      final briefing = DoorstepBriefingHelper.build(
-        person: person,
-        latestVisit: visit,
-      );
-
-      expect(briefing.lessonAndPoint, equals('Sl 37:11'));
-      expect(briefing.jwLibraryUri, isNull);
-    });
-
-    test('TC-08: Sem estudo; última visita com apenas topicsDiscussed', () {
-      final person = _createPerson();
-      final visit = _createVisit(
-        scriptureOrPub: null,
-        topicsDiscussed: 'Futuro',
-      );
-
-      final briefing = DoorstepBriefingHelper.build(
-        person: person,
-        latestVisit: visit,
-      );
-
-      expect(briefing.lessonAndPoint, equals('Futuro'));
-      expect(briefing.jwLibraryUri, isNull);
-    });
-
-    test('TC-09: Sem estudo e sem visita', () {
-      final person = _createPerson();
-
-      final briefing = DoorstepBriefingHelper.build(
-        person: person,
-      );
-
-      expect(briefing.lessonAndPoint, isNull);
-      expect(briefing.jwLibraryUri, isNull);
-    });
-  });
+        expect(briefing.lessonAndPoint, isNull);
+        expect(briefing.jwLibraryUri, isNull);
+      });
+    },
+  );
 
   group('DoorstepBriefingHelper - Pendências da Última Visita (Precedência)', () {
     test('TC-10: latestVisit.expressedQuestion tem primeira prioridade', () {
@@ -288,41 +290,47 @@ void main() {
       expect(briefing.pendingDoubt, equals('Por que sofremos?'));
     });
 
-    test('TC-11: expressedQuestion nulo, fallback para latestVisit.nextStep', () {
-      final person = _createPerson(nextActionNote: 'Ação da pessoa');
-      final study = _createStudy(pendingDoubts: 'Dúvida do estudo');
-      final visit = _createVisit(
-        expressedQuestion: null,
-        nextStep: 'Voltar quinta',
-        notes: 'Nota da visita',
-      );
+    test(
+      'TC-11: expressedQuestion nulo, fallback para latestVisit.nextStep',
+      () {
+        final person = _createPerson(nextActionNote: 'Ação da pessoa');
+        final study = _createStudy(pendingDoubts: 'Dúvida do estudo');
+        final visit = _createVisit(
+          expressedQuestion: null,
+          nextStep: 'Voltar quinta',
+          notes: 'Nota da visita',
+        );
 
-      final briefing = DoorstepBriefingHelper.build(
-        person: person,
-        linkedStudy: study,
-        latestVisit: visit,
-      );
+        final briefing = DoorstepBriefingHelper.build(
+          person: person,
+          linkedStudy: study,
+          latestVisit: visit,
+        );
 
-      expect(briefing.pendingDoubt, equals('Voltar quinta'));
-    });
+        expect(briefing.pendingDoubt, equals('Voltar quinta'));
+      },
+    );
 
-    test('TC-12: Questão e próximo passo nulos, fallback para study.pendingDoubts', () {
-      final person = _createPerson(nextActionNote: 'Ação da pessoa');
-      final study = _createStudy(pendingDoubts: 'Dúvida sobre trindade');
-      final visit = _createVisit(
-        expressedQuestion: null,
-        nextStep: null,
-        notes: 'Nota da visita',
-      );
+    test(
+      'TC-12: Questão e próximo passo nulos, fallback para study.pendingDoubts',
+      () {
+        final person = _createPerson(nextActionNote: 'Ação da pessoa');
+        final study = _createStudy(pendingDoubts: 'Dúvida sobre trindade');
+        final visit = _createVisit(
+          expressedQuestion: null,
+          nextStep: null,
+          notes: 'Nota da visita',
+        );
 
-      final briefing = DoorstepBriefingHelper.build(
-        person: person,
-        linkedStudy: study,
-        latestVisit: visit,
-      );
+        final briefing = DoorstepBriefingHelper.build(
+          person: person,
+          linkedStudy: study,
+          latestVisit: visit,
+        );
 
-      expect(briefing.pendingDoubt, equals('Dúvida sobre trindade'));
-    });
+        expect(briefing.pendingDoubt, equals('Dúvida sobre trindade'));
+      },
+    );
 
     test('TC-12b: Questão, próximo passo e dúvidas nulos, fallback para study.nextTopic', () {
       final person = _createPerson();
@@ -373,15 +381,16 @@ void main() {
       expect(briefing.pendingDoubt, equals('Dúvida sobre trindade'));
     });
 
-    test('TC-14: Sem visitas e sem estudo, fallback para person.nextActionNote', () {
-      final person = _createPerson(nextActionNote: 'Levar revista');
+    test(
+      'TC-14: Sem visitas e sem estudo, fallback para person.nextActionNote',
+      () {
+        final person = _createPerson(nextActionNote: 'Levar revista');
 
-      final briefing = DoorstepBriefingHelper.build(
-        person: person,
-      );
+        final briefing = DoorstepBriefingHelper.build(person: person);
 
-      expect(briefing.pendingDoubt, equals('Levar revista'));
-    });
+        expect(briefing.pendingDoubt, equals('Levar revista'));
+      },
+    );
 
     test('TC-15: Todos os campos de pendência nulos ou vazios', () {
       final person = _createPerson(nextActionNote: '   ');
@@ -407,7 +416,11 @@ void main() {
       final person = _createPerson(
         contactRestrictions: jsonEncode([
           {'id': 't-1', 'title': 'Alvo 1 Concluído', 'isCompleted': true},
-          {'id': 't-2', 'title': 'Ler o Salmo 37 até terça', 'isCompleted': false},
+          {
+            'id': 't-2',
+            'title': 'Ler o Salmo 37 até terça',
+            'isCompleted': false,
+          },
         ]),
       );
 
@@ -433,9 +446,7 @@ void main() {
     });
 
     test('TC-18: contactRestrictions com texto puro legado', () {
-      final person = _createPerson(
-        contactRestrictions: 'Assistir reunião',
-      );
+      final person = _createPerson(contactRestrictions: 'Assistir reunião');
 
       final briefing = DoorstepBriefingHelper.build(person: person);
 
@@ -467,8 +478,16 @@ void main() {
     test('TC-21: generalNotes JSON com 2 notas com datas; seleciona nota mais recente', () {
       final person = _createPerson(
         generalNotes: jsonEncode([
-          {'id': 'n-1', 'text': 'Nota antiga', 'createdAt': '2026-10-20T10:00:00Z'},
-          {'id': 'n-2', 'text': 'Mãe internada com pneumonia', 'createdAt': '2026-10-28T10:00:00Z'},
+          {
+            'id': 'n-1',
+            'text': 'Nota antiga',
+            'createdAt': '2026-10-20T10:00:00Z',
+          },
+          {
+            'id': 'n-2',
+            'text': 'Mãe internada com pneumonia',
+            'createdAt': '2026-10-28T10:00:00Z',
+          },
         ]),
       );
 
@@ -501,7 +520,11 @@ void main() {
       final person = _createPerson(
         generalNotes: jsonEncode([
           {'id': 'n-1', 'text': '   ', 'createdAt': '2026-10-29T10:00:00Z'},
-          {'id': 'n-2', 'text': 'Família viajou para o interior', 'createdAt': '2026-10-28T10:00:00Z'},
+          {
+            'id': 'n-2',
+            'text': 'Família viajou para o interior',
+            'createdAt': '2026-10-28T10:00:00Z',
+          },
         ]),
       );
 
@@ -573,7 +596,9 @@ void main() {
     test('TC-28: Igualdade (==) e hashCode de DoorstepBriefingData', () {
       final d1 = DoorstepBriefingData(
         lessonAndPoint: 'Lição 04',
-        jwLibraryUri: Uri.parse('https://www.jw.org/finder?srcid=jwlshare&wtlocale=T&pub=lff&lesson=4'),
+        jwLibraryUri: Uri.parse(
+          'https://www.jw.org/finder?srcid=jwlshare&wtlocale=T&pub=lff&lesson=4',
+        ),
         pendingDoubt: 'Dúvida',
         spiritualGoal: 'Alvo',
         empathyNote: 'Nota',
@@ -582,7 +607,9 @@ void main() {
 
       final d2 = DoorstepBriefingData(
         lessonAndPoint: 'Lição 04',
-        jwLibraryUri: Uri.parse('https://www.jw.org/finder?srcid=jwlshare&wtlocale=T&pub=lff&lesson=4'),
+        jwLibraryUri: Uri.parse(
+          'https://www.jw.org/finder?srcid=jwlshare&wtlocale=T&pub=lff&lesson=4',
+        ),
         pendingDoubt: 'Dúvida',
         spiritualGoal: 'Alvo',
         empathyNote: 'Nota',
@@ -596,56 +623,65 @@ void main() {
   });
 
   group('DoorstepBriefingCard - Testes de Widget', () {
-    testWidgets('TC-W1: Renderização completa com todos os campos e disparo de callbacks', (tester) async {
-      var tappedOpen = 0;
+    testWidgets(
+      'TC-W1: Renderização completa com todos os campos e disparo de callbacks',
+      (tester) async {
+        var tappedOpen = 0;
 
-      final data = DoorstepBriefingData(
-        lessonAndPoint: 'Lição 04, Ponto 3',
-        publicationTitle: 'Seja Feliz para Sempre!',
-        jwLibraryUri: Uri.parse('https://www.jw.org/finder?srcid=jwlshare&wtlocale=T&pub=lff&lesson=4'),
-        pendingDoubt: 'Por que Deus permite o sofrimento?',
-        spiritualGoal: 'Baixar o app JW Library',
-        empathyNote: 'Mãe internada com pneumonia',
-      );
+        final data = DoorstepBriefingData(
+          lessonAndPoint: 'Lição 04, Ponto 3',
+          publicationTitle: 'Seja Feliz para Sempre!',
+          jwLibraryUri: Uri.parse(
+            'https://www.jw.org/finder?srcid=jwlshare&wtlocale=T&pub=lff&lesson=4',
+          ),
+          pendingDoubt: 'Por que Deus permite o sofrimento?',
+          spiritualGoal: 'Baixar o app JW Library',
+          empathyNote: 'Mãe internada com pneumonia',
+        );
 
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: AppTheme.lightTheme,
-          home: Scaffold(
-            body: SingleChildScrollView(
-              child: DoorstepBriefingCard(
-                data: data,
-                onOpenJwLibrary: () => tappedOpen++,
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppTheme.lightTheme,
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: DoorstepBriefingCard(
+                  data: data,
+                  onOpenJwLibrary: () => tappedOpen++,
+                ),
               ),
             ),
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
+        );
+        await tester.pumpAndSettle();
 
-      expect(find.text('Briefing na Porta'), findsOneWidget);
-      expect(find.text('30s'), findsOneWidget);
-      expect(find.text('Lição 04, Ponto 3'), findsOneWidget);
-      expect(find.text('Seja Feliz para Sempre!'), findsOneWidget);
-      expect(find.text('Por que Deus permite o sofrimento?'), findsOneWidget);
-      expect(find.text('Baixar o app JW Library'), findsOneWidget);
-      expect(find.text('Mãe internada com pneumonia'), findsOneWidget);
+        expect(find.text('Briefing na Porta'), findsOneWidget);
+        expect(find.text('30s'), findsOneWidget);
+        expect(find.text('Lição 04, Ponto 3'), findsOneWidget);
+        expect(find.text('Seja Feliz para Sempre!'), findsOneWidget);
+        expect(find.text('Por que Deus permite o sofrimento?'), findsOneWidget);
+        expect(find.text('Baixar o app JW Library'), findsOneWidget);
+        expect(find.text('Mãe internada com pneumonia'), findsOneWidget);
 
-      final btn = find.widgetWithText(ElevatedButton, 'Abrir no JW Library');
-      expect(btn, findsOneWidget);
+        final btn = find.widgetWithText(ElevatedButton, 'Abrir no JW Library');
+        expect(btn, findsOneWidget);
 
-      await tester.tap(btn);
-      await tester.pumpAndSettle();
+        await tester.tap(btn);
+        await tester.pumpAndSettle();
 
-      expect(tappedOpen, equals(1));
-    });
+        expect(tappedOpen, equals(1));
+      },
+    );
 
-    testWidgets('TC-W1b: Disparo do callback alternativo onLaunchJwLibrary', (tester) async {
+    testWidgets('TC-W1b: Disparo do callback alternativo onLaunchJwLibrary', (
+      tester,
+    ) async {
       Uri? launchedUri;
 
       final data = DoorstepBriefingData(
         lessonAndPoint: 'Lição 04, Ponto 3',
-        jwLibraryUri: Uri.parse('https://www.jw.org/finder?srcid=jwlshare&wtlocale=T&pub=lff&lesson=4'),
+        jwLibraryUri: Uri.parse(
+          'https://www.jw.org/finder?srcid=jwlshare&wtlocale=T&pub=lff&lesson=4',
+        ),
         pendingDoubt: 'Dúvida',
       );
 
@@ -674,176 +710,209 @@ void main() {
       expect(launchedUri.toString(), contains('pub=lff&lesson=4'));
     });
 
-    testWidgets('TC-W2: Texto longo de 500 caracteres em dúvidas e notas não causa overflow', (tester) async {
-      final longDoubt = 'D' * 500;
-      final longNote = 'N' * 500;
+    testWidgets(
+      'TC-W2: Texto longo de 500 caracteres em dúvidas e notas não causa overflow',
+      (tester) async {
+        final longDoubt = 'D' * 500;
+        final longNote = 'N' * 500;
 
-      final data = DoorstepBriefingData(
-        lessonAndPoint: 'Lição 02',
-        pendingDoubt: longDoubt,
-        spiritualGoal: 'Alvo Normal',
-        empathyNote: longNote,
-      );
+        final data = DoorstepBriefingData(
+          lessonAndPoint: 'Lição 02',
+          pendingDoubt: longDoubt,
+          spiritualGoal: 'Alvo Normal',
+          empathyNote: longNote,
+        );
 
-      tester.view.physicalSize = const Size(414, 896); // iPhone XR
-      tester.view.devicePixelRatio = 2.0;
-      addTearDown(() => tester.view.resetPhysicalSize());
+        tester.view.physicalSize = const Size(414, 896); // iPhone XR
+        tester.view.devicePixelRatio = 2.0;
+        addTearDown(() => tester.view.resetPhysicalSize());
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: SingleChildScrollView(
-              child: DoorstepBriefingCard(data: data),
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(tester.takeException(), isNull);
-    });
-
-    testWidgets('TC-W3: Renderização em Alto Contraste (sunModeTheme) preserva alvo de toque >= 48dp', (tester) async {
-      final data = DoorstepBriefingData(
-        lessonAndPoint: 'Lição 05',
-        jwLibraryUri: Uri.parse('https://www.jw.org/finder?srcid=jwlshare&wtlocale=T&pub=lff&lesson=5'),
-        pendingDoubt: 'Dúvida rápida',
-      );
-
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: AppTheme.sunModeTheme,
-          home: Scaffold(
-            body: SingleChildScrollView(
-              child: DoorstepBriefingCard(data: data),
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      final cardFinder = find.byType(Card);
-      expect(cardFinder, findsOneWidget);
-
-      final buttonFinder = find.byType(ElevatedButton);
-      expect(buttonFinder, findsOneWidget);
-
-      final size = tester.getSize(buttonFinder);
-      expect(size.height, greaterThanOrEqualTo(48.0));
-      expect(size.width, greaterThanOrEqualTo(48.0));
-      expect(tester.takeException(), isNull);
-    });
-
-    testWidgets('TC-W4: Ocultação do botão JW Library quando não há link nem callback', (tester) async {
-      final data = const DoorstepBriefingData(
-        lessonAndPoint: 'Sl 37:11 — Futuro',
-        pendingDoubt: 'Conversar na sexta',
-      );
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: SingleChildScrollView(
-              child: DoorstepBriefingCard(data: data),
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.widgetWithText(ElevatedButton, 'Abrir no JW Library'), findsNothing);
-    });
-
-    testWidgets('TC-W5: Degradação graciosa com campos nulos/vazios exibindo placeholders', (tester) async {
-      final data = const DoorstepBriefingData(
-        lessonAndPoint: 'Lição 01',
-      );
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: SingleChildScrollView(
-              child: DoorstepBriefingCard(data: data),
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Sem pendências registradas da última visita'), findsOneWidget);
-      expect(find.text('Nenhum alvo espiritual ativo cadastrado'), findsOneWidget);
-      expect(find.text('Nenhuma observação pessoal recente'), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    });
-
-    testWidgets('TC-W6: Estado vazio total (!data.hasAnyData) renderiza empty state card', (tester) async {
-      final data = const DoorstepBriefingData();
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: SingleChildScrollView(
-              child: DoorstepBriefingCard(data: data),
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Briefing na Porta (30s)'), findsOneWidget);
-      expect(find.textContaining('Primeiro contato sem histórico registrado'), findsOneWidget);
-      expect(find.text('ONDE PAROU'), findsNothing);
-      expect(tester.takeException(), isNull);
-    });
-
-    testWidgets('TC-W7: Modo noturno (ThemeData.dark()) renderiza sem overflow', (tester) async {
-      final data = DoorstepBriefingData(
-        lessonAndPoint: 'Lição 03, Ponto 1',
-        pendingDoubt: 'Dúvida sobre oração',
-        spiritualGoal: 'Orar todos os dias',
-        empathyNote: 'Família em recuperação de gripe',
-      );
-
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: ThemeData.dark(),
-          home: Scaffold(
-            body: SingleChildScrollView(
-              child: DoorstepBriefingCard(data: data),
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Briefing na Porta'), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    });
-
-    testWidgets('TC-W8: Escalonamento de fontes (Accessibility 1.5x) renderiza sem overflow', (tester) async {
-      final data = DoorstepBriefingData(
-        lessonAndPoint: 'Lição 04, Ponto 2',
-        pendingDoubt: 'Pergunta sobre o Reino de Deus',
-        spiritualGoal: 'Assistir a uma reunião',
-        empathyNote: 'Trabalha em turno noturno',
-      );
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: MediaQuery(
-            data: const MediaQueryData(textScaler: TextScaler.linear(1.5)),
-            child: Scaffold(
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
               body: SingleChildScrollView(
                 child: DoorstepBriefingCard(data: data),
               ),
             ),
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
+        );
+        await tester.pumpAndSettle();
 
-      expect(find.text('Briefing na Porta'), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    });
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'TC-W3: Renderização em Alto Contraste (sunModeTheme) preserva alvo de toque >= 48dp',
+      (tester) async {
+        final data = DoorstepBriefingData(
+          lessonAndPoint: 'Lição 05',
+          jwLibraryUri: Uri.parse(
+            'https://www.jw.org/finder?srcid=jwlshare&wtlocale=T&pub=lff&lesson=5',
+          ),
+          pendingDoubt: 'Dúvida rápida',
+        );
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppTheme.sunModeTheme,
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: DoorstepBriefingCard(data: data),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final cardFinder = find.byType(Card);
+        expect(cardFinder, findsOneWidget);
+
+        final buttonFinder = find.byType(ElevatedButton);
+        expect(buttonFinder, findsOneWidget);
+
+        final size = tester.getSize(buttonFinder);
+        expect(size.height, greaterThanOrEqualTo(48.0));
+        expect(size.width, greaterThanOrEqualTo(48.0));
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'TC-W4: Ocultação do botão JW Library quando não há link nem callback',
+      (tester) async {
+        final data = const DoorstepBriefingData(
+          lessonAndPoint: 'Sl 37:11 — Futuro',
+          pendingDoubt: 'Conversar na sexta',
+        );
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: DoorstepBriefingCard(data: data),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.widgetWithText(ElevatedButton, 'Abrir no JW Library'),
+          findsNothing,
+        );
+      },
+    );
+
+    testWidgets(
+      'TC-W5: Degradação graciosa com campos nulos/vazios exibindo placeholders',
+      (tester) async {
+        final data = const DoorstepBriefingData(lessonAndPoint: 'Lição 01');
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: DoorstepBriefingCard(data: data),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.text('Sem pendências registradas da última visita'),
+          findsOneWidget,
+        );
+        expect(
+          find.text('Nenhum alvo espiritual ativo cadastrado'),
+          findsOneWidget,
+        );
+        expect(find.text('Nenhuma observação pessoal recente'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'TC-W6: Estado vazio total (!data.hasAnyData) renderiza empty state card',
+      (tester) async {
+        final data = const DoorstepBriefingData();
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: DoorstepBriefingCard(data: data),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Briefing na Porta (30s)'), findsOneWidget);
+        expect(
+          find.textContaining('Primeiro contato sem histórico registrado'),
+          findsOneWidget,
+        );
+        expect(find.text('ONDE PAROU'), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'TC-W7: Modo noturno (ThemeData.dark()) renderiza sem overflow',
+      (tester) async {
+        final data = DoorstepBriefingData(
+          lessonAndPoint: 'Lição 03, Ponto 1',
+          pendingDoubt: 'Dúvida sobre oração',
+          spiritualGoal: 'Orar todos os dias',
+          empathyNote: 'Família em recuperação de gripe',
+        );
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData.dark(),
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: DoorstepBriefingCard(data: data),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Briefing na Porta'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'TC-W8: Escalonamento de fontes (Accessibility 1.5x) renderiza sem overflow',
+      (tester) async {
+        final data = DoorstepBriefingData(
+          lessonAndPoint: 'Lição 04, Ponto 2',
+          pendingDoubt: 'Pergunta sobre o Reino de Deus',
+          spiritualGoal: 'Assistir a uma reunião',
+          empathyNote: 'Trabalha em turno noturno',
+        );
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: MediaQuery(
+              data: const MediaQueryData(textScaler: TextScaler.linear(1.5)),
+              child: Scaffold(
+                body: SingleChildScrollView(
+                  child: DoorstepBriefingCard(data: data),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Briefing na Porta'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
   });
 }

@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../database/app_database.dart';
 import '../database/repository.dart';
 import '../ui/providers.dart';
@@ -39,8 +41,14 @@ class SupabaseSyncService {
   SupabaseSyncService({
     required this.db,
     required this.repository,
-    this.supabaseUrl = const String.fromEnvironment('SUPABASE_URL', defaultValue: ''),
-    this.supabaseAnonKey = const String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: ''),
+    this.supabaseUrl = const String.fromEnvironment(
+      'SUPABASE_URL',
+      defaultValue: '',
+    ),
+    this.supabaseAnonKey = const String.fromEnvironment(
+      'SUPABASE_ANON_KEY',
+      defaultValue: '',
+    ),
     this.clientOverride,
   });
 
@@ -52,7 +60,8 @@ class SupabaseSyncService {
     final url = supabaseUrl.trim();
     final key = supabaseAnonKey.trim();
     if (url.isEmpty || key.isEmpty) return false;
-    if (url.contains('your-supabase-url') || key.contains('your-anon-key')) return false;
+    if (url.contains('your-supabase-url') || key.contains('your-anon-key'))
+      return false;
     return true;
   }
 
@@ -66,7 +75,10 @@ class SupabaseSyncService {
   /// Sanitiza o payload antes de enviar para a nuvem.
   /// Para notas de voz, remove caminhos de arquivos locais da memória flash do dispositivo
   /// garantindo estrita privacidade e evitando vazamento de diretórios locais.
-  static Map<String, dynamic> sanitizePayload(String entityType, Map<String, dynamic> payload) {
+  static Map<String, dynamic> sanitizePayload(
+    String entityType,
+    Map<String, dynamic> payload,
+  ) {
     final sanitized = Map<String, dynamic>.from(payload);
     if (entityType == 'voice_notes') {
       sanitized.remove('audio_file_path');
@@ -125,7 +137,8 @@ class SupabaseSyncService {
       successCount: pushResult.successCount + pullResult.successCount,
       failureCount: pushResult.failureCount + pullResult.failureCount,
       conflictCount: pushResult.conflictCount + pullResult.conflictCount,
-      message: 'Sincronização bidirecional: ${pushResult.successCount} enviados, ${pullResult.successCount} recebidos.',
+      message:
+          'Sincronização bidirecional: ${pushResult.successCount} enviados, ${pullResult.successCount} recebidos.',
     );
   }
 
@@ -156,7 +169,15 @@ class SupabaseSyncService {
 
     int received = 0;
     try {
-      const tables = ['people', 'visits', 'bible_studies', 'appointments', 'voice_notes', 'phone_contacts', 'territory_landmarks'];
+      const tables = [
+        'people',
+        'visits',
+        'bible_studies',
+        'appointments',
+        'voice_notes',
+        'phone_contacts',
+        'territory_landmarks',
+      ];
       for (final table in tables) {
         try {
           final res = await client.from(table).select().limit(50);
@@ -199,7 +220,8 @@ class SupabaseSyncService {
         successCount: 0,
         failureCount: 0,
         conflictCount: 0,
-        message: 'Supabase não configurado. ${pendingOps.length} registros mantidos salvos localmente no SQLite.',
+        message:
+            'Supabase não configurado. ${pendingOps.length} registros mantidos salvos localmente no SQLite.',
       );
     }
 
@@ -233,12 +255,14 @@ class SupabaseSyncService {
       // Backoff exponencial: 2^tentativas segundos (máx 300s)
       final backoffSeconds = pow(2, op.attempts).clamp(1, 300).toInt();
       final now = DateTime.now();
-      if (now.difference(op.createdAt).inSeconds < backoffSeconds && op.attempts > 0) {
+      if (now.difference(op.createdAt).inSeconds < backoffSeconds &&
+          op.attempts > 0) {
         continue; // Aguarda intervalo de backoff
       }
 
       try {
-        final Map<String, dynamic> rawPayload = jsonDecode(op.payload) as Map<String, dynamic>;
+        final Map<String, dynamic> rawPayload =
+            jsonDecode(op.payload) as Map<String, dynamic>;
         final cleanPayload = sanitizePayload(op.entityType, rawPayload);
         final tableName = mapEntityToRemoteTable(op.entityType);
         final operation = op.operation.toUpperCase();
@@ -258,14 +282,23 @@ class SupabaseSyncService {
         if (e.code == '23505' || e.code == '409') {
           conflicts++;
           _setStatus(SyncStatus.conflict);
-          await repository.markSyncOperationFailed(op.id, 'Conflito detectado: ${e.message}');
+          await repository.markSyncOperationFailed(
+            op.id,
+            'Conflito detectado: ${e.message}',
+          );
         } else {
           failure++;
-          await repository.markSyncOperationFailed(op.id, 'Erro PostgREST: ${e.message}');
+          await repository.markSyncOperationFailed(
+            op.id,
+            'Erro PostgREST: ${e.message}',
+          );
         }
       } catch (e) {
         failure++;
-        await repository.markSyncOperationFailed(op.id, 'Erro na sincronização: $e');
+        await repository.markSyncOperationFailed(
+          op.id,
+          'Erro na sincronização: $e',
+        );
       }
     }
 
@@ -282,7 +315,8 @@ class SupabaseSyncService {
       successCount: success,
       failureCount: failure,
       conflictCount: conflicts,
-      message: 'Sincronização concluída: $success enviados, $failure falhas, $conflicts conflitos.',
+      message:
+          'Sincronização concluída: $success enviados, $failure falhas, $conflicts conflitos.',
     );
   }
 
@@ -294,10 +328,7 @@ class SupabaseSyncService {
 /// Provider do serviço de sincronização do Supabase
 final supabaseSyncServiceProvider = Provider<SupabaseSyncService>((ref) {
   final repo = ref.watch(repositoryProvider);
-  return SupabaseSyncService(
-    db: repo.db,
-    repository: repo,
-  );
+  return SupabaseSyncService(db: repo.db, repository: repo);
 });
 
 /// Stream provider do status reativo de sincronização

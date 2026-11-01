@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../core/app_theme.dart';
 import '../core/feature_registry.dart';
 import 'screens/today_screen.dart';
@@ -17,7 +18,8 @@ class MainNavigationShell extends ConsumerStatefulWidget {
   const MainNavigationShell({super.key});
 
   @override
-  ConsumerState<MainNavigationShell> createState() => _MainNavigationShellState();
+  ConsumerState<MainNavigationShell> createState() =>
+      _MainNavigationShellState();
 }
 
 class _MainNavigationShellState extends ConsumerState<MainNavigationShell> {
@@ -155,15 +157,22 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell> {
                 leading: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: (isDark ? const Color(0xFF94A3B8) : Colors.blueGrey).withValues(alpha: 0.12),
+                    color: (isDark ? const Color(0xFF94A3B8) : Colors.blueGrey)
+                        .withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Icon(Icons.settings, color: isDark ? const Color(0xFF94A3B8) : Colors.blueGrey, size: 24),
+                  child: Icon(
+                    Icons.settings,
+                    color: isDark ? const Color(0xFF94A3B8) : Colors.blueGrey,
+                    size: 24,
+                  ),
                 ),
                 title: Text(
                   'Ajustes & Backup',
                   style: TextStyle(
-                    fontWeight: _showingSettings ? FontWeight.bold : FontWeight.w600,
+                    fontWeight: _showingSettings
+                        ? FontWeight.bold
+                        : FontWeight.w600,
                     color: _showingSettings ? AppTheme.primaryBlue : null,
                   ),
                 ),
@@ -172,7 +181,11 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell> {
                   style: TextStyle(fontSize: 12),
                 ),
                 trailing: _showingSettings
-                    ? const Icon(Icons.check, color: AppTheme.primaryBlue, size: 20)
+                    ? const Icon(
+                        Icons.check,
+                        color: AppTheme.primaryBlue,
+                        size: 20,
+                      )
                     : const Icon(Icons.chevron_right, size: 18),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -229,11 +242,10 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell> {
           color: isSelected ? color : null,
         ),
       ),
-      subtitle: Text(
-        feature.description,
-        style: const TextStyle(fontSize: 12),
-      ),
-      trailing: isSelected ? Icon(Icons.check, color: color, size: 20) : const Icon(Icons.chevron_right, size: 18),
+      subtitle: Text(feature.description, style: const TextStyle(fontSize: 12)),
+      trailing: isSelected
+          ? Icon(Icons.check, color: color, size: 20)
+          : const Icon(Icons.chevron_right, size: 18),
       onTap: onTap,
     );
   }
@@ -278,7 +290,9 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell> {
           NavigationRailDestination(
             icon: Icon(f.icon),
             selectedIcon: Icon(f.icon),
-            label: Text(f.title.split(' ').first), // Hoje, Pessoas, Telefones, Agenda, Estudos, Estatísticas, etc.
+            label: Text(
+              f.title.split(' ').first,
+            ), // Hoje, Pessoas, Telefones, Agenda, Estudos, Estatísticas, etc.
           ),
         );
         railFeatures.add(f);
@@ -306,7 +320,9 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell> {
               builder: (context, constraints) {
                 return SingleChildScrollView(
                   child: ConstrainedBox(
-                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight,
+                    ),
                     child: IntrinsicHeight(
                       child: NavigationRail(
                         selectedIndex: selectedRailIndex,
@@ -323,7 +339,11 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell> {
                         labelType: NavigationRailLabelType.all,
                         leading: const Padding(
                           padding: EdgeInsets.symmetric(vertical: 14),
-                          child: Icon(Icons.menu_book, color: AppTheme.primaryBlue, size: 30),
+                          child: Icon(
+                            Icons.menu_book,
+                            color: AppTheme.primaryBlue,
+                            size: 30,
+                          ),
                         ),
                         destinations: railDestinations,
                       ),

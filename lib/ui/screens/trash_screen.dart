@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../providers.dart';
@@ -18,9 +19,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Registros Excluídos (Lixeira)'),
-      ),
+      appBar: AppBar(title: const Text('Registros Excluídos (Lixeira)')),
       body: FutureBuilder<List<Map<String, dynamic>>>(
         future: repo.getDeletedItems(),
         builder: (context, snapshot) {
@@ -36,17 +35,29 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.delete_sweep_outlined, size: 64, color: Colors.grey.shade400),
+                    Icon(
+                      Icons.delete_sweep_outlined,
+                      size: 64,
+                      color: Colors.grey.shade400,
+                    ),
                     const SizedBox(height: 12),
                     const Text(
                       'A lixeira está vazia',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 6),
                     Text(
                       'Nenhum contato, visita, estudo ou compromisso excluído logicamente no momento.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted, fontSize: 13),
+                      style: TextStyle(
+                        color: isDark
+                            ? const Color(0xFFCBD5E1)
+                            : AppTheme.textMuted,
+                        fontSize: 13,
+                      ),
                     ),
                   ],
                 ),
@@ -69,43 +80,76 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
                 margin: const EdgeInsets.only(bottom: 8),
                 child: ListTile(
                   leading: CircleAvatar(
-                    backgroundColor: isDark ? const Color(0xFF334155) : Colors.grey.shade200,
-                    child: Icon(_getIconForType(type), color: isDark ? const Color(0xFFCBD5E1) : Colors.grey.shade700, size: 20),
+                    backgroundColor: isDark
+                        ? const Color(0xFF334155)
+                        : Colors.grey.shade200,
+                    child: Icon(
+                      _getIconForType(type),
+                      color: isDark
+                          ? const Color(0xFFCBD5E1)
+                          : Colors.grey.shade700,
+                      size: 20,
+                    ),
                   ),
-                  title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  title: Text(
+                    title,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
                   subtitle: Text(
                     '$subtitle • Excluído em: ${AppDateUtils.formatDateTime(deletedAt)}',
-                    style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark
+                          ? const Color(0xFFCBD5E1)
+                          : AppTheme.textMuted,
+                    ),
                   ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.restore, color: AppTheme.primaryBlue),
+                        icon: const Icon(
+                          Icons.restore,
+                          color: AppTheme.primaryBlue,
+                        ),
                         tooltip: 'Restaurar',
                         onPressed: () async {
                           await repo.restoreDeletedItem(type, id);
                           setState(() {});
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('"$title" restaurado com sucesso!')),
+                              SnackBar(
+                                content: Text(
+                                  '"$title" restaurado com sucesso!',
+                                ),
+                              ),
                             );
                           }
                         },
                       ),
                       IconButton(
-                        icon: const Icon(Icons.delete_forever, color: AppTheme.alertRed),
+                        icon: const Icon(
+                          Icons.delete_forever,
+                          color: AppTheme.alertRed,
+                        ),
                         tooltip: 'Excluir Definitivamente',
                         onPressed: () async {
                           final confirm = await showDialog<bool>(
                             context: context,
                             builder: (c) => AlertDialog(
                               title: const Text('Exclusão Definitiva'),
-                              content: Text('Tem certeza de que deseja apagar permanentemente "$title"? Esta ação não pode ser desfeita.'),
+                              content: Text(
+                                'Tem certeza de que deseja apagar permanentemente "$title"? Esta ação não pode ser desfeita.',
+                              ),
                               actions: [
-                                TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancelar')),
+                                TextButton(
+                                  onPressed: () => Navigator.pop(c, false),
+                                  child: const Text('Cancelar'),
+                                ),
                                 ElevatedButton(
-                                  style: ElevatedButton.styleFrom(backgroundColor: AppTheme.alertRed),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppTheme.alertRed,
+                                  ),
                                   onPressed: () => Navigator.pop(c, true),
                                   child: const Text('Excluir Definitivamente'),
                                 ),
@@ -118,7 +162,11 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
                             setState(() {});
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('"$title" excluído permanentemente.')),
+                                SnackBar(
+                                  content: Text(
+                                    '"$title" excluído permanentemente.',
+                                  ),
+                                ),
                               );
                             }
                           }

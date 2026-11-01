@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../../core/demo_data.dart';
@@ -16,7 +17,6 @@ import '../../core/feature_registry.dart';
 import 'settings_screen.dart';
 import 'global_search_screen.dart';
 import 'next_actions_screen.dart';
-
 
 class TodayScreen extends ConsumerWidget {
   final Function(int)? onTabChange;
@@ -76,14 +76,21 @@ class TodayScreen extends ConsumerWidget {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.cloud_sync, color: AppTheme.primaryBlue, size: 28),
+                  const Icon(
+                    Icons.cloud_sync,
+                    color: AppTheme.primaryBlue,
+                    size: 28,
+                  ),
                   const SizedBox(width: 10),
                   const Text(
                     'Estado da Sincronização',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const Spacer(),
-                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
                 ],
               ),
               const SizedBox(height: 12),
@@ -95,12 +102,19 @@ class TodayScreen extends ConsumerWidget {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.check_circle, color: AppTheme.successGreen, size: 20),
+                    const Icon(
+                      Icons.check_circle,
+                      color: AppTheme.successGreen,
+                      size: 20,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'Modo Offline-First ativo. Seus dados estão preservados no SQLite/Wasm local.',
-                        style: TextStyle(fontSize: 13, color: Colors.blue.shade900),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.blue.shade900,
+                        ),
                       ),
                     ),
                   ],
@@ -111,7 +125,9 @@ class TodayScreen extends ConsumerWidget {
               const SizedBox(height: 4),
               const Text('• Backend de destino: Supabase (PostgreSQL)'),
               const SizedBox(height: 4),
-              Text('• Última checagem: ${AppDateUtils.formatDateTime(DateTime.now())}'),
+              Text(
+                '• Última checagem: ${AppDateUtils.formatDateTime(DateTime.now())}',
+              ),
               const SizedBox(height: 18),
               SizedBox(
                 width: double.infinity,
@@ -122,9 +138,11 @@ class TodayScreen extends ConsumerWidget {
                     Navigator.pop(ctx);
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text(pendingOps.isEmpty
-                            ? 'Todos os registros locais já estão sincronizados!'
-                            : '${pendingOps.length} operação(ões) enfileirada(s) processada(s) localmente.'),
+                        content: Text(
+                          pendingOps.isEmpty
+                              ? 'Todos os registros locais já estão sincronizados!'
+                              : '${pendingOps.length} operação(ões) enfileirada(s) processada(s) localmente.',
+                        ),
                       ),
                     );
                   },
@@ -144,7 +162,9 @@ class TodayScreen extends ConsumerWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (ctx) => Consumer(
         builder: (ctx, innerRef, _) {
           final sectors = innerRef.watch(sectorsStreamProvider).value ?? [];
@@ -152,7 +172,9 @@ class TodayScreen extends ConsumerWidget {
 
           return SafeArea(
             child: ConstrainedBox(
-              constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.85),
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(ctx).size.height * 0.85,
+              ),
               child: SingleChildScrollView(
                 padding: EdgeInsets.only(
                   top: 20,
@@ -169,12 +191,24 @@ class TodayScreen extends ConsumerWidget {
                       children: [
                         const Row(
                           children: [
-                            Icon(Icons.holiday_village, color: AppTheme.accentTeal),
+                            Icon(
+                              Icons.holiday_village,
+                              color: AppTheme.accentTeal,
+                            ),
                             SizedBox(width: 8),
-                            Text('Gerenciar Bairros / Setores', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                            Text(
+                              'Gerenciar Bairros / Setores',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ],
                         ),
-                        IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(ctx),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 12),
@@ -184,7 +218,13 @@ class TodayScreen extends ConsumerWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('Adicionar Novo Bairro / Setor:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                            const Text(
+                              'Adicionar Novo Bairro / Setor:',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
                             const SizedBox(height: 8),
                             TextField(
                               controller: nameController,
@@ -210,7 +250,10 @@ class TodayScreen extends ConsumerWidget {
                                 onPressed: () async {
                                   final name = nameController.text.trim();
                                   if (name.isEmpty) return;
-                                  await mgr.addSector(name, description: descController.text.trim());
+                                  await mgr.addSector(
+                                    name,
+                                    description: descController.text.trim(),
+                                  );
                                   nameController.clear();
                                   descController.clear();
                                 },
@@ -221,23 +264,49 @@ class TodayScreen extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    const Text('Bairros Cadastrados no Território:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    const Text(
+                      'Bairros Cadastrados no Território:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
                     const SizedBox(height: 8),
                     if (sectors.isEmpty)
                       Text(
                         'Nenhum bairro cadastrado.',
-                        style: TextStyle(color: Theme.of(ctx).brightness == Brightness.dark ? const Color(0xFFCBD5E1) : AppTheme.textMuted),
+                        style: TextStyle(
+                          color: Theme.of(ctx).brightness == Brightness.dark
+                              ? const Color(0xFFCBD5E1)
+                              : AppTheme.textMuted,
+                        ),
                       )
                     else
                       for (final s in sectors)
                         Card(
                           margin: const EdgeInsets.only(bottom: 6),
                           child: ListTile(
-                            leading: const Icon(Icons.location_city, color: AppTheme.primaryBlue),
-                            title: Text(s.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                            subtitle: Text(s.description?.isNotEmpty == true ? s.description! : 'Setor do território'),
+                            leading: const Icon(
+                              Icons.location_city,
+                              color: AppTheme.primaryBlue,
+                            ),
+                            title: Text(
+                              s.name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            subtitle: Text(
+                              s.description?.isNotEmpty == true
+                                  ? s.description!
+                                  : 'Setor do território',
+                            ),
                             trailing: IconButton(
-                              icon: const Icon(Icons.delete_outline, color: AppTheme.alertRed, size: 20),
+                              icon: const Icon(
+                                Icons.delete_outline,
+                                color: AppTheme.alertRed,
+                                size: 20,
+                              ),
                               tooltip: 'Excluir setor',
                               onPressed: () async {
                                 await mgr.deleteSector(s.id);
@@ -276,7 +345,10 @@ class TodayScreen extends ConsumerWidget {
                 Icon(Icons.public, color: AppTheme.primaryBlue),
                 SizedBox(width: 8),
                 Expanded(
-                  child: Text('🌐 Novo Contato Estrangeiro', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  child: Text(
+                    '🌐 Novo Contato Estrangeiro',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ],
             ),
@@ -297,7 +369,8 @@ class TodayScreen extends ConsumerWidget {
                     controller: langController,
                     decoration: const InputDecoration(
                       labelText: 'Idioma / Língua Falada *',
-                      hintText: 'Ex: Espanhol, Inglês, Francês, Mandarim, Crioulo...',
+                      hintText:
+                          'Ex: Espanhol, Inglês, Francês, Mandarim, Crioulo...',
                       prefixIcon: Icon(Icons.translate),
                     ),
                   ),
@@ -326,26 +399,44 @@ class TodayScreen extends ConsumerWidget {
                           style: OutlinedButton.styleFrom(
                             foregroundColor: AppTheme.accentTeal,
                             side: const BorderSide(color: AppTheme.accentTeal),
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 8,
+                            ),
                           ),
                           icon: const Icon(Icons.map, size: 16),
-                          label: const Text('🗺️ Pinar Localização', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          label: const Text(
+                            '🗺️ Pinar Localização',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                           onPressed: () async {
-                            final initialLat = double.tryParse(latController.text.trim());
-                            final initialLng = double.tryParse(lngController.text.trim());
-                            final res = await showDialog<ReverseGeocodingResult>(
-                              context: context,
-                              builder: (_) => MapLocationPickerDialog(
-                                initialLat: initialLat,
-                                initialLng: initialLng,
-                                initialAddress: addressController.text.trim(),
-                              ),
+                            final initialLat = double.tryParse(
+                              latController.text.trim(),
                             );
+                            final initialLng = double.tryParse(
+                              lngController.text.trim(),
+                            );
+                            final res =
+                                await showDialog<ReverseGeocodingResult>(
+                                  context: context,
+                                  builder: (_) => MapLocationPickerDialog(
+                                    initialLat: initialLat,
+                                    initialLng: initialLng,
+                                    initialAddress: addressController.text
+                                        .trim(),
+                                  ),
+                                );
                             if (res != null) {
                               setDialogState(() {
-                                latController.text = res.latitude.toStringAsFixed(6);
-                                lngController.text = res.longitude.toStringAsFixed(6);
-                                if (addressController.text.trim().isEmpty && res.streetAndNumber.isNotEmpty) {
+                                latController.text = res.latitude
+                                    .toStringAsFixed(6);
+                                lngController.text = res.longitude
+                                    .toStringAsFixed(6);
+                                if (addressController.text.trim().isEmpty &&
+                                    res.streetAndNumber.isNotEmpty) {
                                   addressController.text = res.formattedSummary;
                                 }
                               });
@@ -355,11 +446,16 @@ class TodayScreen extends ConsumerWidget {
                       ),
                     ],
                   ),
-                  if (latController.text.isNotEmpty && lngController.text.isNotEmpty) ...[
+                  if (latController.text.isNotEmpty &&
+                      lngController.text.isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Text(
                       '📍 GPS: ${latController.text}, ${lngController.text}',
-                      style: const TextStyle(fontSize: 11, color: AppTheme.accentTeal, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppTheme.accentTeal,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ],
                   const SizedBox(height: 10),
@@ -376,7 +472,8 @@ class TodayScreen extends ConsumerWidget {
                     controller: notesController,
                     decoration: const InputDecoration(
                       labelText: 'Observações / Publicação Deixada',
-                      hintText: 'Ex: Ficou com folheto em espanhol, aceitou visita',
+                      hintText:
+                          'Ex: Ficou com folheto em espanhol, aceitou visita',
                       prefixIcon: Icon(Icons.note_alt_outlined),
                     ),
                     maxLines: 2,
@@ -384,9 +481,16 @@ class TodayScreen extends ConsumerWidget {
                   const SizedBox(height: 12),
                   CheckboxListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text('Encaminhar para Irmão Responsável via WhatsApp', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    title: const Text(
+                      'Encaminhar para Irmão Responsável via WhatsApp',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     value: sendViaWhatsApp,
-                    onChanged: (val) => setDialogState(() => sendViaWhatsApp = val ?? true),
+                    onChanged: (val) =>
+                        setDialogState(() => sendViaWhatsApp = val ?? true),
                   ),
                 ],
               ),
@@ -410,11 +514,17 @@ class TodayScreen extends ConsumerWidget {
                   final person = await repo.createPerson(
                     name: name,
                     status: 'interessado',
-                    phone: phoneController.text.trim().isEmpty ? null : phoneController.text.trim(),
-                    address: addressController.text.trim().isEmpty ? null : addressController.text.trim(),
+                    phone: phoneController.text.trim().isEmpty
+                        ? null
+                        : phoneController.text.trim(),
+                    address: addressController.text.trim().isEmpty
+                        ? null
+                        : addressController.text.trim(),
                     latitude: lat,
                     longitude: lng,
-                    preferredSchedule: scheduleController.text.trim().isEmpty ? null : scheduleController.text.trim(),
+                    preferredSchedule: scheduleController.text.trim().isEmpty
+                        ? null
+                        : scheduleController.text.trim(),
                     generalNotes: notesController.text.trim().isEmpty
                         ? (lang.isNotEmpty ? 'Idioma falado: $lang' : null)
                         : '${notesController.text.trim()}${lang.isNotEmpty ? "\nIdioma: $lang" : ""}',
@@ -427,13 +537,19 @@ class TodayScreen extends ConsumerWidget {
                     await PersonHandOffHelper.sendViaWhatsApp(
                       person: person,
                       language: lang.isNotEmpty ? lang : null,
-                      additionalNotes: notesController.text.trim().isEmpty ? null : notesController.text.trim(),
+                      additionalNotes: notesController.text.trim().isEmpty
+                          ? null
+                          : notesController.text.trim(),
                     );
                   }
 
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Contato estrangeiro ($name) registrado com sucesso!')),
+                      SnackBar(
+                        content: Text(
+                          'Contato estrangeiro ($name) registrado com sucesso!',
+                        ),
+                      ),
                     );
                   }
                 },
@@ -447,8 +563,18 @@ class TodayScreen extends ConsumerWidget {
 
   String _getMonthName(int month) {
     const months = [
-      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+      'Janeiro',
+      'Fevereiro',
+      'Março',
+      'Abril',
+      'Maio',
+      'Junho',
+      'Julho',
+      'Agosto',
+      'Setembro',
+      'Outubro',
+      'Novembro',
+      'Dezembro',
     ];
     return (month >= 1 && month <= 12) ? months[month - 1] : '';
   }
@@ -461,7 +587,10 @@ class TodayScreen extends ConsumerWidget {
     final peopleAsync = ref.watch(peopleStreamProvider);
     final sectors = ref.watch(sectorsStreamProvider).value ?? [];
     final people = peopleAsync.value ?? [];
-    final passedPersonIds = people.where((p) => p.status.toLowerCase() == 'revisita_passada').map((p) => p.id).toSet();
+    final passedPersonIds = people
+        .where((p) => p.status.toLowerCase() == 'revisita_passada')
+        .map((p) => p.id)
+        .toSet();
     final activities = ref.watch(activitiesStreamProvider).value ?? [];
     final studies = ref.watch(studiesStreamProvider).value ?? [];
     final sessions = ref.watch(studySessionsStreamProvider).value ?? [];
@@ -484,15 +613,25 @@ class TodayScreen extends ConsumerWidget {
     final hoursFormatted = AppDateUtils.formatDuration(totalMonthSeconds);
 
     // Preservação Estatística: Estudos com sessões realizadas no mês atual + estudos ativos não repassados
-    final monthHeldSessions = sessions.where((s) =>
-        s.deletedAt == null &&
-        s.status.toLowerCase() == 'realizada' &&
-        s.dateTimeField.isAfter(monthStart.subtract(const Duration(seconds: 1))) &&
-        s.dateTimeField.isBefore(monthEnd.add(const Duration(seconds: 1)))).toList();
+    final monthHeldSessions = sessions
+        .where(
+          (s) =>
+              s.deletedAt == null &&
+              s.status.toLowerCase() == 'realizada' &&
+              s.dateTimeField.isAfter(
+                monthStart.subtract(const Duration(seconds: 1)),
+              ) &&
+              s.dateTimeField.isBefore(
+                monthEnd.add(const Duration(seconds: 1)),
+              ),
+        )
+        .toList();
 
     final activeStudiesCount = studies.where((s) {
       if (s.deletedAt != null) return false;
-      final hadSessionThisMonth = monthHeldSessions.any((sess) => sess.studyId == s.id);
+      final hadSessionThisMonth = monthHeldSessions.any(
+        (sess) => sess.studyId == s.id,
+      );
       if (hadSessionThisMonth) return true; // Conta na estatística mensal mesmo se repassado ou concluído depois
       return s.status == 'ativo';
     }).length;
@@ -505,22 +644,30 @@ class TodayScreen extends ConsumerWidget {
             icon: const Icon(Icons.search),
             tooltip: 'Busca Global Unificada',
             onPressed: () {
-              showSearch(context: context, delegate: GlobalSearchDelegate(ref: ref));
+              showSearch(
+                context: context,
+                delegate: GlobalSearchDelegate(ref: ref),
+              );
             },
           ),
           // Botão de alternância rápida: Modo Sol Intenso / Alto Contraste (Ideia 1)
           IconButton(
-
             icon: Icon(
               isSunMode ? Icons.wb_sunny : Icons.wb_sunny_outlined,
               color: isSunMode ? Colors.amber : Colors.white,
             ),
-            tooltip: isSunMode ? 'Desativar Modo Sol' : '☀️ Modo Sol Intenso (Alto Contraste)',
+            tooltip: isSunMode
+                ? 'Desativar Modo Sol'
+                : '☀️ Modo Sol Intenso (Alto Contraste)',
             onPressed: () {
               ref.read(sunModeProvider.notifier).state = !isSunMode;
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text(!isSunMode ? '☀️ Modo Sol Intenso e Alto Contraste ativado!' : 'Modo normal restaurado.'),
+                  content: Text(
+                    !isSunMode
+                        ? '☀️ Modo Sol Intenso e Alto Contraste ativado!'
+                        : 'Modo normal restaurado.',
+                  ),
                   duration: const Duration(seconds: 2),
                 ),
               );
@@ -543,7 +690,11 @@ class TodayScreen extends ConsumerWidget {
                   SizedBox(width: 4),
                   Text(
                     'Salvo Localmente',
-                    style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
@@ -593,7 +744,11 @@ class TodayScreen extends ConsumerWidget {
               elevation: 2,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
-                side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                side: BorderSide(
+                  color: isDark
+                      ? const Color(0xFF334155)
+                      : const Color(0xFFE2E8F0),
+                ),
               ),
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -609,10 +764,16 @@ class TodayScreen extends ConsumerWidget {
                               Container(
                                 padding: const EdgeInsets.all(6),
                                 decoration: BoxDecoration(
-                                  color: AppTheme.primaryBlue.withValues(alpha: 0.12),
+                                  color: AppTheme.primaryBlue.withValues(
+                                    alpha: 0.12,
+                                  ),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: const Icon(Icons.analytics_outlined, color: AppTheme.primaryBlue, size: 20),
+                                child: const Icon(
+                                  Icons.analytics_outlined,
+                                  color: AppTheme.primaryBlue,
+                                  size: 20,
+                                ),
                               ),
                               const SizedBox(width: 8),
                               Expanded(
@@ -623,7 +784,9 @@ class TodayScreen extends ConsumerWidget {
                                   style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.bold,
-                                    color: isDark ? Colors.white : AppTheme.textDark,
+                                    color: isDark
+                                        ? Colors.white
+                                        : AppTheme.textDark,
                                   ),
                                 ),
                               ),
@@ -634,12 +797,26 @@ class TodayScreen extends ConsumerWidget {
                         InkWell(
                           onTap: () => _navigateTo(AppFeature.dashboard),
                           child: const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 2,
+                            ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Text('Detalhes', style: TextStyle(fontSize: 12, color: AppTheme.primaryBlue, fontWeight: FontWeight.bold)),
-                                Icon(Icons.chevron_right, size: 16, color: AppTheme.primaryBlue),
+                                Text(
+                                  'Detalhes',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppTheme.primaryBlue,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Icon(
+                                  Icons.chevron_right,
+                                  size: 16,
+                                  color: AppTheme.primaryBlue,
+                                ),
                               ],
                             ),
                           ),
@@ -656,33 +833,51 @@ class TodayScreen extends ConsumerWidget {
                             onTap: () {
                               Navigator.push(
                                 context,
-                                MaterialPageRoute(builder: (_) => const ActivitiesScreen()),
+                                MaterialPageRoute(
+                                  builder: (_) => const ActivitiesScreen(),
+                                ),
                               );
                             },
                             borderRadius: BorderRadius.circular(10),
                             child: Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                                color: isDark
+                                    ? const Color(0xFF1E293B)
+                                    : const Color(0xFFF8FAFC),
                                 borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                                border: Border.all(
+                                  color: isDark
+                                      ? const Color(0xFF334155)
+                                      : const Color(0xFFE2E8F0),
+                                ),
                               ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
                                       Expanded(
                                         child: Text(
                                           'Horas Realizadas',
-                                          style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted),
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: isDark
+                                                ? const Color(0xFFCBD5E1)
+                                                : AppTheme.textMuted,
+                                          ),
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
                                       const SizedBox(width: 4),
-                                      const Icon(Icons.timer_outlined, size: 14, color: AppTheme.primaryBlue),
+                                      const Icon(
+                                        Icons.timer_outlined,
+                                        size: 14,
+                                        color: AppTheme.primaryBlue,
+                                      ),
                                     ],
                                   ),
                                   const SizedBox(height: 4),
@@ -700,14 +895,24 @@ class TodayScreen extends ConsumerWidget {
                                     child: LinearProgressIndicator(
                                       value: progressFraction,
                                       minHeight: 6,
-                                      backgroundColor: isDark ? const Color(0xFF334155) : Colors.blue.shade100,
-                                      valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primaryBlue),
+                                      backgroundColor: isDark
+                                          ? const Color(0xFF334155)
+                                          : Colors.blue.shade100,
+                                      valueColor:
+                                          const AlwaysStoppedAnimation<Color>(
+                                            AppTheme.primaryBlue,
+                                          ),
                                     ),
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
                                     'Meta: ${hourGoal}h (${(progressFraction * 100).toStringAsFixed(0)}%)',
-                                    style: TextStyle(fontSize: 10, color: isDark ? const Color(0xFF94A3B8) : AppTheme.textMuted),
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: isDark
+                                          ? const Color(0xFF94A3B8)
+                                          : AppTheme.textMuted,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -724,26 +929,42 @@ class TodayScreen extends ConsumerWidget {
                             child: Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                                color: isDark
+                                    ? const Color(0xFF1E293B)
+                                    : const Color(0xFFF8FAFC),
                                 borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                                border: Border.all(
+                                  color: isDark
+                                      ? const Color(0xFF334155)
+                                      : const Color(0xFFE2E8F0),
+                                ),
                               ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
                                       Expanded(
                                         child: Text(
                                           'Estudos',
-                                          style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted),
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: isDark
+                                                ? const Color(0xFFCBD5E1)
+                                                : AppTheme.textMuted,
+                                          ),
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
                                       const SizedBox(width: 4),
-                                      const Icon(Icons.school_outlined, size: 14, color: Color(0xFF7C3AED)),
+                                      const Icon(
+                                        Icons.school_outlined,
+                                        size: 14,
+                                        color: Color(0xFF7C3AED),
+                                      ),
                                     ],
                                   ),
                                   const SizedBox(height: 4),
@@ -757,14 +978,24 @@ class TodayScreen extends ConsumerWidget {
                                   ),
                                   const SizedBox(height: 6),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFF7C3AED).withValues(alpha: 0.15),
+                                      color: const Color(0xFF7C3AED)
+                                          .withValues(alpha: 0.15),
                                       borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: Text(
-                                      activeStudiesCount == 1 ? '1 ativo no mês' : '$activeStudiesCount ativos no mês',
-                                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED)),
+                                      activeStudiesCount == 1
+                                          ? '1 ativo no mês'
+                                          : '$activeStudiesCount ativos no mês',
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF7C3AED),
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -787,7 +1018,9 @@ class TodayScreen extends ConsumerWidget {
                   child: _QuickActionButton(
                     icon: Icons.person_add_alt_1,
                     label: 'Nova Pessoa',
-                    color: isDark ? const Color(0xFF60A5FA) : AppTheme.primaryBlue,
+                    color: isDark
+                        ? const Color(0xFF60A5FA)
+                        : AppTheme.primaryBlue,
                     onTap: () => _navigateTo(AppFeature.people),
                   ),
                 ),
@@ -818,7 +1051,9 @@ class TodayScreen extends ConsumerWidget {
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => const ActivitiesScreen()),
+                        MaterialPageRoute(
+                          builder: (_) => const ActivitiesScreen(),
+                        ),
                       );
                     },
                   ),
@@ -876,7 +1111,9 @@ class TodayScreen extends ConsumerWidget {
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => const ContactsMapScreen()),
+                        MaterialPageRoute(
+                          builder: (_) => const ContactsMapScreen(),
+                        ),
                       );
                     },
                   ),
@@ -911,7 +1148,10 @@ class TodayScreen extends ConsumerWidget {
                 ),
                 TextButton.icon(
                   icon: const Icon(Icons.settings, size: 16),
-                  label: const Text('Gerenciar', style: TextStyle(fontSize: 12)),
+                  label: const Text(
+                    'Gerenciar',
+                    style: TextStyle(fontSize: 12),
+                  ),
                   onPressed: () => _showManageSectorsModal(context, ref),
                 ),
               ],
@@ -948,30 +1188,47 @@ class TodayScreen extends ConsumerWidget {
                       final addr = (p.address ?? '').toLowerCase();
                       final tags = p.tags.toLowerCase();
                       final notes = (p.generalNotes ?? '').toLowerCase();
-                      return addr.contains(sectorLower) || tags.contains(sectorLower) || notes.contains(sectorLower);
+                      return addr.contains(sectorLower) ||
+                          tags.contains(sectorLower) ||
+                          notes.contains(sectorLower);
                     }).length;
 
                     return Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: ActionChip(
-                        avatar: const Icon(Icons.holiday_village, size: 16, color: AppTheme.accentTeal),
+                        avatar: const Icon(
+                          Icons.holiday_village,
+                          size: 16,
+                          color: AppTheme.accentTeal,
+                        ),
                         label: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
                               sector.name,
-                              style: const TextStyle(fontWeight: FontWeight.bold),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                             const SizedBox(width: 6),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
-                                color: AppTheme.accentTeal.withValues(alpha: 0.2),
+                                color: AppTheme.accentTeal.withValues(
+                                  alpha: 0.2,
+                                ),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Text(
                                 '$count',
-                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.accentTeal),
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.accentTeal,
+                                ),
                               ),
                             ),
                           ],
@@ -980,7 +1237,8 @@ class TodayScreen extends ConsumerWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => SectorDetailScreen(sector: sector),
+                              builder: (_) =>
+                                  SectorDetailScreen(sector: sector),
                             ),
                           );
                         },
@@ -1004,13 +1262,16 @@ class TodayScreen extends ConsumerWidget {
             appointmentsAsync.when(
               data: (appts) {
                 final todayAppts = appts
-                    .where((a) =>
-                        (a.personId == null || !passedPersonIds.contains(a.personId)) &&
-                        a.startTime.day == now.day &&
-                        a.startTime.month == now.month &&
-                        a.startTime.year == now.year &&
-                        a.status != 'cancelado' &&
-                        a.status != 'reagendado')
+                    .where(
+                      (a) =>
+                          (a.personId == null ||
+                              !passedPersonIds.contains(a.personId)) &&
+                          a.startTime.day == now.day &&
+                          a.startTime.month == now.month &&
+                          a.startTime.year == now.year &&
+                          a.status != 'cancelado' &&
+                          a.status != 'reagendado',
+                    )
                     .toList();
 
                 if (todayAppts.isEmpty) {
@@ -1019,12 +1280,20 @@ class TodayScreen extends ConsumerWidget {
                       padding: const EdgeInsets.all(16),
                       child: Row(
                         children: [
-                          Icon(Icons.event_available, color: Colors.grey.shade400, size: 36),
+                          Icon(
+                            Icons.event_available,
+                            color: Colors.grey.shade400,
+                            size: 36,
+                          ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
                               'Nenhum compromisso marcado para hoje. Toque em Agenda para agendar.',
-                              style: TextStyle(color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted),
+                              style: TextStyle(
+                                color: isDark
+                                    ? const Color(0xFFCBD5E1)
+                                    : AppTheme.textMuted,
+                              ),
                             ),
                           ),
                         ],
@@ -1041,25 +1310,37 @@ class TodayScreen extends ConsumerWidget {
                         leading: Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: (isDark ? const Color(0xFF60A5FA) : AppTheme.primaryBlue).withValues(alpha: 0.1),
+                            color:
+                                (isDark
+                                        ? const Color(0xFF60A5FA)
+                                        : AppTheme.primaryBlue)
+                                    .withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
                             AppDateUtils.formatTime(a.startTime),
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              color: isDark ? const Color(0xFF93C5FD) : AppTheme.primaryBlue,
+                              color: isDark
+                                  ? const Color(0xFF93C5FD)
+                                  : AppTheme.primaryBlue,
                             ),
                           ),
                         ),
-                        title: Text(a.title, style: const TextStyle(fontWeight: FontWeight.bold)),
+                        title: Text(
+                          a.title,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
                         subtitle: Text(
                           'Duração: ${a.durationMinutes} min • Status: ${a.status}',
                           style: const TextStyle(fontSize: 13),
                         ),
                         trailing: a.isProvisional
                             ? const Chip(
-                                label: Text('Provisório', style: TextStyle(fontSize: 11)),
+                                label: Text(
+                                  'Provisório',
+                                  style: TextStyle(fontSize: 11),
+                                ),
                                 backgroundColor: Color(0xFFFEF3C7),
                               )
                             : const Icon(Icons.chevron_right),
@@ -1068,7 +1349,8 @@ class TodayScreen extends ConsumerWidget {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) => PersonDetailScreen(personId: a.personId!),
+                                builder: (_) =>
+                                    PersonDetailScreen(personId: a.personId!),
                               ),
                             );
                           } else {
@@ -1104,7 +1386,12 @@ class TodayScreen extends ConsumerWidget {
                   icon: const Icon(Icons.tune, size: 16),
                   label: const Text('Ver Categorias'),
                   onPressed: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const NextActionsScreen()));
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const NextActionsScreen(),
+                      ),
+                    );
                   },
                 ),
               ],
@@ -1114,10 +1401,14 @@ class TodayScreen extends ConsumerWidget {
             peopleAsync.when(
               data: (people) {
                 final pending = people
-                    .where((p) =>
-                        p.status.toLowerCase() != 'revisita_passada' &&
-                        p.nextActionAt != null &&
-                        p.nextActionAt!.isBefore(now.add(const Duration(days: 1))))
+                    .where(
+                      (p) =>
+                          p.status.toLowerCase() != 'revisita_passada' &&
+                          p.nextActionAt != null &&
+                          p.nextActionAt!.isBefore(
+                            now.add(const Duration(days: 1)),
+                          ),
+                    )
                     .toList();
 
                 if (pending.isEmpty) {
@@ -1126,12 +1417,20 @@ class TodayScreen extends ConsumerWidget {
                       padding: const EdgeInsets.all(16),
                       child: Row(
                         children: [
-                          const Icon(Icons.check_circle_outline, color: AppTheme.successGreen, size: 36),
+                          const Icon(
+                            Icons.check_circle_outline,
+                            color: AppTheme.successGreen,
+                            size: 36,
+                          ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
                               'Todas as revisitas e ações combinadas estão em dia!',
-                              style: TextStyle(color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted),
+                              style: TextStyle(
+                                color: isDark
+                                    ? const Color(0xFFCBD5E1)
+                                    : AppTheme.textMuted,
+                              ),
                             ),
                           ),
                         ],
@@ -1147,18 +1446,33 @@ class TodayScreen extends ConsumerWidget {
                       margin: const EdgeInsets.only(bottom: 8),
                       child: ListTile(
                         leading: CircleAvatar(
-                          backgroundColor: isOverdue ? AppTheme.alertRed.withValues(alpha: 0.1) : AppTheme.accentTeal.withValues(alpha: 0.1),
+                          backgroundColor: isOverdue
+                              ? AppTheme.alertRed.withValues(alpha: 0.1)
+                              : AppTheme.accentTeal.withValues(alpha: 0.1),
                           child: Icon(
-                            isOverdue ? Icons.warning_amber_rounded : Icons.schedule,
-                            color: isOverdue ? AppTheme.alertRed : AppTheme.accentTeal,
+                            isOverdue
+                                ? Icons.warning_amber_rounded
+                                : Icons.schedule,
+                            color: isOverdue
+                                ? AppTheme.alertRed
+                                : AppTheme.accentTeal,
                           ),
                         ),
-                        title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                        title: Text(
+                          p.name,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
                         subtitle: Text(
                           '${p.nextActionNote ?? "Sem anotação"} • Data: ${AppDateUtils.formatDate(p.nextActionAt)}',
                           style: TextStyle(
-                            color: isOverdue ? AppTheme.alertRed : (isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted),
-                            fontWeight: isOverdue ? FontWeight.w600 : FontWeight.normal,
+                            color: isOverdue
+                                ? AppTheme.alertRed
+                                : (isDark
+                                      ? const Color(0xFFCBD5E1)
+                                      : AppTheme.textMuted),
+                            fontWeight: isOverdue
+                                ? FontWeight.w600
+                                : FontWeight.normal,
                           ),
                         ),
                         trailing: const Icon(Icons.chevron_right),
@@ -1166,7 +1480,8 @@ class TodayScreen extends ConsumerWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => PersonDetailScreen(personId: p.id),
+                              builder: (_) =>
+                                  PersonDetailScreen(personId: p.id),
                             ),
                           );
                         },
@@ -1190,14 +1505,21 @@ class TodayScreen extends ConsumerWidget {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.science, color: isDark ? const Color(0xFF60A5FA) : AppTheme.primaryBlue),
+                        Icon(
+                          Icons.science,
+                          color: isDark
+                              ? const Color(0xFF60A5FA)
+                              : AppTheme.primaryBlue,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             'Modo de Demonstração Disponível',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              color: isDark ? const Color(0xFF93C5FD) : AppTheme.primaryBlue,
+                              color: isDark
+                                  ? const Color(0xFF93C5FD)
+                                  : AppTheme.primaryBlue,
                             ),
                           ),
                         ),
@@ -1206,7 +1528,12 @@ class TodayScreen extends ConsumerWidget {
                     const SizedBox(height: 6),
                     Text(
                       'Você pode popular o sistema com dados demonstrativos fictícios para testar sem conectar ao Supabase.',
-                      style: TextStyle(fontSize: 13, color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: isDark
+                            ? const Color(0xFFCBD5E1)
+                            : AppTheme.textMuted,
+                      ),
                     ),
                     const SizedBox(height: 10),
                     OutlinedButton.icon(
@@ -1217,7 +1544,11 @@ class TodayScreen extends ConsumerWidget {
                         await DemoDataGenerator.populateDemoData(repo);
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Dados de demonstração gerados com sucesso!')),
+                            const SnackBar(
+                              content: Text(
+                                'Dados de demonstração gerados com sucesso!',
+                              ),
+                            ),
                           );
                         }
                       },

@@ -5,6 +5,7 @@ import 'package:drift/drift.dart' show Value;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
+
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../../appointments/availability_engine.dart';
@@ -82,12 +83,17 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
   static Color _getAppointmentActivityColor(AppointmentEntry appt) {
     final titleLower = appt.title.toLowerCase();
     if (titleLower.contains('viagem')) return const Color(0xFF0D9488); // Teal
-    if (titleLower.contains('ausência') || titleLower.contains('ausencia')) return const Color(0xFFD97706); // Amber
+    if (titleLower.contains('ausência') || titleLower.contains('ausencia'))
+      return const Color(0xFFD97706); // Amber
     if (titleLower.contains('folga')) return const Color(0xFF64748B); // Slate
-    if (titleLower.contains('pessoal')) return const Color(0xFF9333EA); // Purple
-    if (titleLower.contains('outro')) return const Color(0xFF475569); // Slate Grey
-    if (titleLower.contains('estudo') || appt.studyId != null) return const Color(0xFF059669); // Emerald Green
-    if (titleLower.contains('revisita')) return const Color(0xFFEA580C); // Orange
+    if (titleLower.contains('pessoal'))
+      return const Color(0xFF9333EA); // Purple
+    if (titleLower.contains('outro'))
+      return const Color(0xFF475569); // Slate Grey
+    if (titleLower.contains('estudo') || appt.studyId != null)
+      return const Color(0xFF059669); // Emerald Green
+    if (titleLower.contains('revisita'))
+      return const Color(0xFFEA580C); // Orange
     return const Color(0xFF2563EB); // Royal Blue (Campo)
   }
 
@@ -115,7 +121,10 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
     });
   }
 
-  Future<({int created, int updated})?> _syncFromWebcalUrl(String rawUrl, {bool silent = false}) async {
+  Future<({int created, int updated})?> _syncFromWebcalUrl(
+    String rawUrl, {
+    bool silent = false,
+  }) async {
     var cleanUrl = rawUrl.trim().replaceAll(RegExp(r'^["\x27]|["\x27]$'), '');
     if (cleanUrl.startsWith('webcal://') || cleanUrl.startsWith('webcals://')) {
       cleanUrl = cleanUrl.replaceFirst(RegExp(r'^webcals?://'), 'https://');
@@ -131,14 +140,16 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
       if (icsBody == null && !silent) {
         throw Exception(
           'Não foi possível acessar a URL diretamente por restrições de rede ou CORS.\n\n'
-          'Por favor, utilize a integração oficial em "Calendários Conectados", ou baixe o arquivo .ics e importe usando "Selecionar Arquivo .ics" para manter seus dados 100% privados.'
+          'Por favor, utilize a integração oficial em "Calendários Conectados", ou baixe o arquivo .ics e importe usando "Selecionar Arquivo .ics" para manter seus dados 100% privados.',
         );
       }
     }
 
     if (icsBody != null) {
       final res = await _importIcsContent(icsBody);
-      await ref.read(appSettingsManagerProvider).setString('saved_calendar_url', cleanUrl);
+      await ref
+          .read(appSettingsManagerProvider)
+          .setString('saved_calendar_url', cleanUrl);
       return res;
     }
     return null;
@@ -200,9 +211,12 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
     final start = formatCalDate(appt.startTime);
     final end = formatCalDate(appt.endTime);
     final text = Uri.encodeComponent(appt.title);
-    final details = Uri.encodeComponent(appt.locationNotes ?? 'Agendado pelo App Ministério Pessoal');
+    final details = Uri.encodeComponent(
+      appt.locationNotes ?? 'Agendado pelo App Ministério Pessoal',
+    );
 
-    final url = 'https://calendar.google.com/calendar/render?action=TEMPLATE&text=$text&dates=$start/$end&details=$details';
+    final url =
+        'https://calendar.google.com/calendar/render?action=TEMPLATE&text=$text&dates=$start/$end&details=$details';
     final uri = Uri.parse(url);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -237,9 +251,13 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
       buffer.writeln('SUMMARY:${a.title.replaceAll("\n", " ")}');
       if (a.locationNotes != null && a.locationNotes!.isNotEmpty) {
         buffer.writeln('LOCATION:${a.locationNotes!.replaceAll("\n", " ")}');
-        buffer.writeln('DESCRIPTION:${a.locationNotes!.replaceAll("\n", "\\n")}');
+        buffer.writeln(
+          'DESCRIPTION:${a.locationNotes!.replaceAll("\n", "\\n")}',
+        );
       }
-      buffer.writeln('STATUS:${a.status == "realizado" ? "CONFIRMED" : "TENTATIVE"}');
+      buffer.writeln(
+        'STATUS:${a.status == "realizado" ? "CONFIRMED" : "TENTATIVE"}',
+      );
       buffer.writeln('END:VEVENT');
     }
 
@@ -260,7 +278,8 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
         existing = existingAppts.where((a) => a.id == ev.apptId).firstOrNull;
       }
       existing ??= existingAppts.where((a) {
-        final sameTitle = a.title.trim().toLowerCase() == ev.summary.trim().toLowerCase();
+        final sameTitle =
+            a.title.trim().toLowerCase() == ev.summary.trim().toLowerCase();
         final timeDiff = a.startTime.difference(ev.startTime).inMinutes.abs();
         return sameTitle && timeDiff < 5;
       }).firstOrNull;
@@ -319,18 +338,25 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
             const SizedBox(height: 12),
             OutlinedButton.icon(
               icon: const Icon(Icons.copy, size: 16),
-              label: const Text('Copiar Conteúdo iCal para a Área de Transferência'),
+              label: const Text(
+                'Copiar Conteúdo iCal para a Área de Transferência',
+              ),
               onPressed: () {
                 Clipboard.setData(ClipboardData(text: icsData));
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('iCal copiado para a área de transferência!')),
+                  const SnackBar(
+                    content: Text('iCal copiado para a área de transferência!'),
+                  ),
                 );
               },
             ),
           ],
         ),
         actions: [
-          ElevatedButton(onPressed: () => Navigator.pop(ctx), child: const Text('Entendido')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Entendido'),
+          ),
         ],
       ),
     );
@@ -371,7 +397,10 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
           ElevatedButton.icon(
             icon: const Icon(Icons.file_download_done, size: 16),
             label: const Text('Importar'),
@@ -379,7 +408,11 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
               final raw = textController.text.trim();
               if (raw.isEmpty || !raw.contains('BEGIN:VEVENT')) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Conteúdo iCal inválido ou sem eventos (VEVENT).')),
+                  const SnackBar(
+                    content: Text(
+                      'Conteúdo iCal inválido ou sem eventos (VEVENT).',
+                    ),
+                  ),
                 );
                 return;
               }
@@ -387,7 +420,11 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
               if (ctx.mounted) Navigator.pop(ctx);
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Importação concluída! ${res.created} novo(s), ${res.updated} atualizado(s).')),
+                  SnackBar(
+                    content: Text(
+                      'Importação concluída! ${res.created} novo(s), ${res.updated} atualizado(s).',
+                    ),
+                  ),
                 );
               }
             },
@@ -403,7 +440,11 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
     if (text.isEmpty || !text.contains('BEGIN:VEVENT')) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('A área de transferência não contém eventos iCal válidos (VEVENT).')),
+          const SnackBar(
+            content: Text(
+              'A área de transferência não contém eventos iCal válidos (VEVENT).',
+            ),
+          ),
         );
       }
       return;
@@ -411,14 +452,23 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
     final res = await _importIcsContent(text);
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Importado da área de transferência! ${res.created} novo(s), ${res.updated} atualizado(s).')),
+        SnackBar(
+          content: Text(
+            'Importado da área de transferência! ${res.created} novo(s), ${res.updated} atualizado(s).',
+          ),
+        ),
       );
     }
   }
 
-  void _showOfficialCalendarSyncModal(BuildContext context, List<AppointmentEntry> allAppts) {
+  void _showOfficialCalendarSyncModal(
+    BuildContext context,
+    List<AppointmentEntry> allAppts,
+  ) {
     final googleUrlController = TextEditingController();
-    ref.read(appSettingsManagerProvider).getString('saved_calendar_url').then((val) {
+    ref.read(appSettingsManagerProvider).getString('saved_calendar_url').then((
+      val,
+    ) {
       if (val != null && val.isNotEmpty && googleUrlController.text.isEmpty) {
         googleUrlController.text = val;
       }
@@ -428,7 +478,9 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheetState) {
           final isDark = Theme.of(ctx).brightness == Brightness.dark;
@@ -451,12 +503,25 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                       children: [
                         const Row(
                           children: [
-                            Icon(Icons.sync_alt, color: AppTheme.primaryBlue, size: 24),
+                            Icon(
+                              Icons.sync_alt,
+                              color: AppTheme.primaryBlue,
+                              size: 24,
+                            ),
                             SizedBox(width: 8),
-                            Text('Sincronização de Calendários', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                            Text(
+                              'Sincronização de Calendários',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ],
                         ),
-                        IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(ctx),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 6),
@@ -470,7 +535,11 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                       elevation: 1,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                        side: BorderSide(
+                          color: isDark
+                              ? const Color(0xFF334155)
+                              : const Color(0xFFE2E8F0),
+                        ),
                       ),
                       child: Padding(
                         padding: const EdgeInsets.all(14),
@@ -482,23 +551,35 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                                 Container(
                                   padding: const EdgeInsets.all(6),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF4285F4).withValues(alpha: 0.12),
+                                    color: const Color(0xFF4285F4)
+                                        .withValues(alpha: 0.12),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
-                                  child: const Icon(Icons.calendar_month, color: Color(0xFF4285F4), size: 22),
+                                  child: const Icon(
+                                    Icons.calendar_month,
+                                    color: Color(0xFF4285F4),
+                                    size: 22,
+                                  ),
                                 ),
                                 const SizedBox(width: 10),
                                 const Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         'Google Agenda (Google Calendar)',
-                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 15,
+                                        ),
                                       ),
                                       Text(
                                         'calendar.google.com',
-                                        style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: AppTheme.textMuted,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -511,12 +592,23 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                               runSpacing: 8,
                               children: [
                                 OutlinedButton.icon(
-                                  icon: const Icon(Icons.open_in_browser, size: 16),
-                                  label: const Text('Abrir Google Agenda no Navegador', style: TextStyle(fontSize: 12)),
+                                  icon: const Icon(
+                                    Icons.open_in_browser,
+                                    size: 16,
+                                  ),
+                                  label: const Text(
+                                    'Abrir Google Agenda no Navegador',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
                                   onPressed: () async {
-                                    final uri = Uri.parse('https://calendar.google.com');
+                                    final uri = Uri.parse(
+                                      'https://calendar.google.com',
+                                    );
                                     if (await canLaunchUrl(uri)) {
-                                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                      await launchUrl(
+                                        uri,
+                                        mode: LaunchMode.externalApplication,
+                                      );
                                     }
                                   },
                                 ),
@@ -525,12 +617,24 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                                     backgroundColor: const Color(0xFF1E40AF),
                                     foregroundColor: Colors.white,
                                   ),
-                                  icon: const Icon(Icons.file_download, size: 16),
-                                  label: const Text('Exportar todos para Google Agenda (.ics)', style: TextStyle(fontSize: 12)),
+                                  icon: const Icon(
+                                    Icons.file_download,
+                                    size: 16,
+                                  ),
+                                  label: const Text(
+                                    'Exportar todos para Google Agenda (.ics)',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
                                   onPressed: () {
                                     final icsData = _generateIcsFile(allAppts);
-                                    FileDownloader.download('ministerio_pessoal_agenda.ics', icsData);
-                                    _showIcsExportResultDialog(context, icsData);
+                                    FileDownloader.download(
+                                      'ministerio_pessoal_agenda.ics',
+                                      icsData,
+                                    );
+                                    _showIcsExportResultDialog(
+                                      context,
+                                      icsData,
+                                    );
                                   },
                                 ),
                               ],
@@ -538,22 +642,35 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                             const Divider(height: 24),
                             const Text(
                               'Importar / Puxar do Google Agenda:',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E40AF)),
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                color: Color(0xFF1E40AF),
+                              ),
                             ),
                             const SizedBox(height: 6),
                             Container(
                               padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
-                                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                                color: isDark
+                                    ? const Color(0xFF0F172A)
+                                    : const Color(0xFFF8FAFC),
                                 borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                                border: Border.all(
+                                  color: isDark
+                                      ? const Color(0xFF334155)
+                                      : const Color(0xFFE2E8F0),
+                                ),
                               ),
                               child: const Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
                                     'Instruções passo a passo:',
-                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
                                   ),
                                   SizedBox(height: 4),
                                   Text(
@@ -573,16 +690,25 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                                 decoration: BoxDecoration(
                                   color: Colors.amber.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: Colors.amber.shade700),
+                                  border: Border.all(
+                                    color: Colors.amber.shade700,
+                                  ),
                                 ),
                                 child: Row(
                                   children: [
-                                    Icon(Icons.info_outline, size: 16, color: Colors.amber.shade800),
+                                    Icon(
+                                      Icons.info_outline,
+                                      size: 16,
+                                      color: Colors.amber.shade800,
+                                    ),
                                     const SizedBox(width: 8),
                                     const Expanded(
                                       child: Text(
                                         'Dica Web: No navegador, use "Selecionar Arquivo .ics" ou "Baixar no Navegador" para importar com 1 clique sem restrições de CORS.',
-                                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -593,7 +719,8 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                             TextField(
                               controller: googleUrlController,
                               decoration: const InputDecoration(
-                                labelText: 'Endereço iCal / Webcal do Google Agenda',
+                                labelText:
+                                    'Endereço iCal / Webcal do Google Agenda',
                                 hintText: 'https://calendar.google.com/calendar/ical/.../basic.ics',
                                 isDense: true,
                               ),
@@ -609,15 +736,30 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                                     foregroundColor: Colors.white,
                                   ),
                                   icon: const Icon(Icons.file_open, size: 16),
-                                  label: const Text('Selecionar Arquivo .ics', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                  label: const Text(
+                                    'Selecionar Arquivo .ics',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
                                   onPressed: () async {
-                                    final picked = await IcsPickerHelper.pickIcsFile();
+                                    final picked =
+                                        await IcsPickerHelper.pickIcsFile();
                                     if (picked != null && picked.isNotEmpty) {
-                                      final res = await _importIcsContent(picked);
+                                      final res = await _importIcsContent(
+                                        picked,
+                                      );
                                       if (ctx.mounted) Navigator.pop(ctx);
                                       if (context.mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(content: Text('Google Agenda importado com sucesso! ${res.created} novo(s), ${res.updated} atualizado(s).')),
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              'Google Agenda importado com sucesso! ${res.created} novo(s), ${res.updated} atualizado(s).',
+                                            ),
+                                          ),
                                         );
                                       }
                                     }
@@ -625,78 +767,145 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                                 ),
                                 OutlinedButton.icon(
                                   icon: const Icon(Icons.download, size: 16),
-                                  label: const Text('Baixar no Navegador', style: TextStyle(fontSize: 12)),
+                                  label: const Text(
+                                    'Baixar no Navegador',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
                                   onPressed: () async {
-                                    final rawUrl = googleUrlController.text.trim();
+                                    final rawUrl = googleUrlController.text
+                                        .trim();
                                     if (rawUrl.isEmpty) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Cole a URL do Google Agenda acima para baixar no navegador.')),
-                                      );
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'Cole a URL do Google Agenda acima para baixar no navegador.',
+                                              ),
+                                            ),
+                                          );
                                       return;
                                     }
                                     var cleanUrl = rawUrl;
                                     if (cleanUrl.startsWith('webcal://')) {
-                                      cleanUrl = cleanUrl.replaceFirst('webcal://', 'https://');
+                                      cleanUrl = cleanUrl.replaceFirst(
+                                        'webcal://',
+                                        'https://',
+                                      );
                                     }
                                     final uri = Uri.parse(cleanUrl);
                                     if (await canLaunchUrl(uri)) {
-                                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                      await launchUrl(
+                                        uri,
+                                        mode: LaunchMode.externalApplication,
+                                      );
                                     }
                                   },
                                 ),
                                 OutlinedButton.icon(
                                   icon: isSyncingGoogle
-                                      ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                                      ? const SizedBox(
+                                          width: 14,
+                                          height: 14,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        )
                                       : const Icon(Icons.sync, size: 16),
-                                  label: Text(isSyncingGoogle ? 'Sincronizando...' : 'Sincronizar via Webcal', style: const TextStyle(fontSize: 12)),
+                                  label: Text(
+                                    isSyncingGoogle
+                                        ? 'Sincronizando...'
+                                        : 'Sincronizar via Webcal',
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
                                   onPressed: isSyncingGoogle
                                       ? null
                                       : () async {
-                                          final rawUrl = googleUrlController.text.trim();
+                                          final rawUrl = googleUrlController
+                                              .text
+                                              .trim();
                                           if (rawUrl.isEmpty) {
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              const SnackBar(content: Text('Informe uma URL de calendário válida.')),
-                                            );
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text(
+                                                      'Informe uma URL de calendário válida.',
+                                                    ),
+                                                  ),
+                                                );
                                             return;
                                           }
-                                          setSheetState(() => isSyncingGoogle = true);
+                                          setSheetState(
+                                            () => isSyncingGoogle = true,
+                                          );
                                           try {
-                                            final res = await _syncFromWebcalUrl(rawUrl);
+                                            final res =
+                                                await _syncFromWebcalUrl(
+                                                  rawUrl,
+                                                );
                                             if (res != null) {
-                                              if (ctx.mounted) Navigator.pop(ctx);
+                                              if (ctx.mounted)
+                                                Navigator.pop(ctx);
                                               if (context.mounted) {
-                                                ScaffoldMessenger.of(context).showSnackBar(
-                                                  SnackBar(content: Text('Google Agenda sincronizado com sucesso! ${res.created} novo(s), ${res.updated} atualizado(s).')),
+                                                ScaffoldMessenger.of(
+                                                  context,
+                                                ).showSnackBar(
+                                                  SnackBar(
+                                                    content: Text(
+                                                      'Google Agenda sincronizado com sucesso! ${res.created} novo(s), ${res.updated} atualizado(s).',
+                                                    ),
+                                                  ),
                                                 );
                                               }
                                             } else {
                                               if (context.mounted) {
-                                                ScaffoldMessenger.of(context).showSnackBar(
-                                                  const SnackBar(content: Text('Não foi possível obter calendário válido via Webcal.')),
-                                                );
+                                                ScaffoldMessenger.of(context)
+                                                    .showSnackBar(
+                                                      const SnackBar(
+                                                        content: Text(
+                                                          'Não foi possível obter calendário válido via Webcal.',
+                                                        ),
+                                                      ),
+                                                    );
                                               }
                                             }
                                           } catch (e) {
                                             if (context.mounted) {
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                SnackBar(content: Text('Erro na sincronização: $e')),
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                SnackBar(
+                                                  content: Text(
+                                                    'Erro na sincronização: $e',
+                                                  ),
+                                                ),
                                               );
                                             }
                                           } finally {
                                             if (ctx.mounted) {
-                                              setSheetState(() => isSyncingGoogle = false);
+                                              setSheetState(
+                                                () => isSyncingGoogle = false,
+                                              );
                                             }
                                           }
                                         },
                                 ),
                                 OutlinedButton.icon(
-                                  icon: const Icon(Icons.content_paste, size: 16),
-                                  label: const Text('Colar Texto .ics', style: TextStyle(fontSize: 12)),
+                                  icon: const Icon(
+                                    Icons.content_paste,
+                                    size: 16,
+                                  ),
+                                  label: const Text(
+                                    'Colar Texto .ics',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
                                   onPressed: () => _showPasteIcsDialog(context),
                                 ),
                                 OutlinedButton.icon(
                                   icon: const Icon(Icons.paste, size: 16),
-                                  label: const Text('Colar da Área de Transferência', style: TextStyle(fontSize: 12)),
+                                  label: const Text(
+                                    'Colar da Área de Transferência',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
                                   onPressed: () => _pasteFromClipboard(context),
                                 ),
                               ],
@@ -711,7 +920,11 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                       elevation: 1,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                        side: BorderSide(
+                          color: isDark
+                              ? const Color(0xFF334155)
+                              : const Color(0xFFE2E8F0),
+                        ),
                       ),
                       child: Padding(
                         padding: const EdgeInsets.all(14),
@@ -723,23 +936,35 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                                 Container(
                                   padding: const EdgeInsets.all(6),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                                    color: const Color(0xFF10B981)
+                                        .withValues(alpha: 0.12),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
-                                  child: const Icon(Icons.apple, color: Color(0xFF10B981), size: 22),
+                                  child: const Icon(
+                                    Icons.apple,
+                                    color: Color(0xFF10B981),
+                                    size: 22,
+                                  ),
                                 ),
                                 const SizedBox(width: 10),
                                 const Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         'Apple Calendar / iCloud (iPhone / iPad)',
-                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 15,
+                                        ),
                                       ),
                                       Text(
                                         'Calendário nativo iOS / iPadOS',
-                                        style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: AppTheme.textMuted,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -753,10 +978,16 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                                 foregroundColor: Colors.white,
                               ),
                               icon: const Icon(Icons.file_download, size: 16),
-                              label: const Text('Exportar para Apple Calendar (.ics)', style: TextStyle(fontSize: 12)),
+                              label: const Text(
+                                'Exportar para Apple Calendar (.ics)',
+                                style: TextStyle(fontSize: 12),
+                              ),
                               onPressed: () {
                                 final icsData = _generateIcsFile(allAppts);
-                                FileDownloader.download('ministerio_pessoal_agenda_apple.ics', icsData);
+                                FileDownloader.download(
+                                  'ministerio_pessoal_agenda_apple.ics',
+                                  icsData,
+                                );
                                 _showIcsExportResultDialog(context, icsData);
                               },
                             ),
@@ -774,7 +1005,10 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
     );
   }
 
-  void _showNewAppointmentModal(BuildContext context, {DateTime? initialDateTime}) {
+  void _showNewAppointmentModal(
+    BuildContext context, {
+    DateTime? initialDateTime,
+  }) {
     final titleController = TextEditingController();
     DateTime chosenDate = initialDateTime ?? _selectedDate;
     TimeOfDay chosenTime = initialDateTime != null
@@ -792,8 +1026,15 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) {
-          final start = DateTime(chosenDate.year, chosenDate.month, chosenDate.day, chosenTime.hour, chosenTime.minute);
-          final existingAppts = ref.read(appointmentsStreamProvider).value ?? [];
+          final start = DateTime(
+            chosenDate.year,
+            chosenDate.month,
+            chosenDate.day,
+            chosenTime.hour,
+            chosenTime.minute,
+          );
+          final existingAppts =
+              ref.read(appointmentsStreamProvider).value ?? [];
           final availability = AvailabilityEngine.checkAvailability(
             startTime: start,
             durationMinutes: durationMinutes,
@@ -807,7 +1048,8 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
             for (int i = 1; i < recurrenceCount; i++) {
               if (recurrence == 'Semanal' || recurrence == 'Toda semana') {
                 occurrences.add(start.add(Duration(days: i * 7)));
-              } else if (recurrence == 'Quinzenal' || recurrence == 'A cada 15 dias') {
+              } else if (recurrence == 'Quinzenal' ||
+                  recurrence == 'A cada 15 dias') {
                 occurrences.add(start.add(Duration(days: i * 14)));
               } else if (recurrence == '2x por semana') {
                 final daysOffset = (i ~/ 2) * 7 + (i % 2 == 1 ? 3 : 0);
@@ -819,7 +1061,9 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                 final year = start.year + yearOffset;
                 final daysInMonth = DateTime(year, month + 1, 0).day;
                 final day = start.day.clamp(1, daysInMonth);
-                occurrences.add(DateTime(year, month, day, start.hour, start.minute));
+                occurrences.add(
+                  DateTime(year, month, day, start.hour, start.minute),
+                );
               } else if (recurrence == 'A cada 2 meses') {
                 final targetMonth = start.month + (i * 2);
                 final yearOffset = (targetMonth - 1) ~/ 12;
@@ -827,7 +1071,9 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                 final year = start.year + yearOffset;
                 final daysInMonth = DateTime(year, month + 1, 0).day;
                 final day = start.day.clamp(1, daysInMonth);
-                occurrences.add(DateTime(year, month, day, start.hour, start.minute));
+                occurrences.add(
+                  DateTime(year, month, day, start.hour, start.minute),
+                );
               }
             }
           }
@@ -860,29 +1106,65 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                 children: [
                   DropdownButtonFormField<String>(
                     initialValue: appointmentCategory,
-                    decoration: const InputDecoration(labelText: 'Tipo de Compromisso'),
+                    decoration: const InputDecoration(
+                      labelText: 'Tipo de Compromisso',
+                    ),
                     items: const [
-                      DropdownMenuItem(value: 'Serviço de Campo', child: Text('🚶 Saída de Campo / Testemunho')),
-                      DropdownMenuItem(value: 'Revisita', child: Text('🔄 Revisita')),
-                      DropdownMenuItem(value: 'Estudo Bíblico', child: Text('📖 Estudo Bíblico')),
-                      DropdownMenuItem(value: 'Reunião', child: Text('🏛️ Reunião Congregacional')),
-                      DropdownMenuItem(value: 'Viagem', child: Text('✈️ Viagem (Bloqueio de Agenda)')),
-                      DropdownMenuItem(value: 'Folga', child: Text('🏖️ Folga / Descanso (Bloqueio de Agenda)')),
-                      DropdownMenuItem(value: 'Ausência', child: Text('🚫 Ausência / Indisponível')),
-                      DropdownMenuItem(value: 'Pessoal', child: Text('👤 Pessoal (Médico, Família, Trabalho)')),
-                      DropdownMenuItem(value: 'Outro', child: Text('📌 Outro Compromisso')),
+                      DropdownMenuItem(
+                        value: 'Serviço de Campo',
+                        child: Text('🚶 Saída de Campo / Testemunho'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Revisita',
+                        child: Text('🔄 Revisita'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Estudo Bíblico',
+                        child: Text('📖 Estudo Bíblico'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Reunião',
+                        child: Text('🏛️ Reunião Congregacional'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Viagem',
+                        child: Text('✈️ Viagem (Bloqueio de Agenda)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Folga',
+                        child: Text(
+                          '🏖️ Folga / Descanso (Bloqueio de Agenda)',
+                        ),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Ausência',
+                        child: Text('🚫 Ausência / Indisponível'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Pessoal',
+                        child: Text('👤 Pessoal (Médico, Família, Trabalho)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Outro',
+                        child: Text('📌 Outro Compromisso'),
+                      ),
                     ],
                     onChanged: (val) {
                       if (val != null) {
                         setDialogState(() {
                           appointmentCategory = val;
                           if (titleController.text.isEmpty) {
-                            if (val == 'Pessoal') titleController.text = 'Compromisso Pessoal';
-                            if (val == 'Reunião') titleController.text = 'Reunião Congregacional';
-                            if (val == 'Serviço de Campo') titleController.text = 'Saída de Campo';
-                            if (val == 'Viagem') titleController.text = 'Viagem';
+                            if (val == 'Pessoal')
+                              titleController.text = 'Compromisso Pessoal';
+                            if (val == 'Reunião')
+                              titleController.text = 'Reunião Congregacional';
+                            if (val == 'Serviço de Campo')
+                              titleController.text = 'Saída de Campo';
+                            if (val == 'Viagem')
+                              titleController.text = 'Viagem';
                             if (val == 'Folga') titleController.text = 'Folga';
-                            if (val == 'Ausência') titleController.text = 'Ausência';
+                            if (val == 'Ausência')
+                              titleController.text = 'Ausência';
                           }
                         });
                       }
@@ -893,7 +1175,9 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                     controller: titleController,
                     decoration: InputDecoration(
                       labelText: 'Título do compromisso *',
-                      hintText: appointmentCategory == 'Pessoal' ? 'Ex: Consulta médica ou Banco' : 'Ex: Revisita ou Estudo Bíblico',
+                      hintText: appointmentCategory == 'Pessoal'
+                          ? 'Ex: Consulta médica ou Banco'
+                          : 'Ex: Revisita ou Estudo Bíblico',
                     ),
                     autofocus: true,
                   ),
@@ -906,16 +1190,29 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                         prefixIcon: Icon(Icons.person_outline, size: 20),
                       ),
                       items: [
-                        const DropdownMenuItem<String?>(value: null, child: Text('Nenhum vínculo')),
-                        ...people.map((p) => DropdownMenuItem<String?>(value: p.id, child: Text(p.name))),
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('Nenhum vínculo'),
+                        ),
+                        ...people.map(
+                          (p) => DropdownMenuItem<String?>(
+                            value: p.id,
+                            child: Text(p.name),
+                          ),
+                        ),
                       ],
                       onChanged: (val) {
                         setDialogState(() {
                           selectedPersonId = val;
                           if (val != null) {
-                            final p = people.firstWhere((element) => element.id == val);
-                            if (titleController.text.isEmpty || titleController.text == 'Revisita' || titleController.text == 'Estudo Bíblico') {
-                              titleController.text = '${appointmentCategory == "Estudo Bíblico" ? "Estudo" : "Revisita"}: ${p.name}';
+                            final p = people.firstWhere(
+                              (element) => element.id == val,
+                            );
+                            if (titleController.text.isEmpty ||
+                                titleController.text == 'Revisita' ||
+                                titleController.text == 'Estudo Bíblico') {
+                              titleController.text =
+                                  '${appointmentCategory == "Estudo Bíblico" ? "Estudo" : "Revisita"}: ${p.name}';
                             }
                           }
                         });
@@ -932,8 +1229,12 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                           final p = await showDatePicker(
                             context: context,
                             initialDate: chosenDate,
-                            firstDate: DateTime.now().subtract(const Duration(days: 30)),
-                            lastDate: DateTime.now().add(const Duration(days: 365)),
+                            firstDate: DateTime.now().subtract(
+                              const Duration(days: 30),
+                            ),
+                            lastDate: DateTime.now().add(
+                              const Duration(days: 365),
+                            ),
                           );
                           if (p != null) setDialogState(() => chosenDate = p);
                         },
@@ -941,7 +1242,9 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                       const SizedBox(width: 8),
                       OutlinedButton.icon(
                         icon: const Icon(Icons.access_time, size: 16),
-                        label: Text('${chosenTime.hour.toString().padLeft(2, '0')}:${chosenTime.minute.toString().padLeft(2, '0')}'),
+                        label: Text(
+                          '${chosenTime.hour.toString().padLeft(2, '0')}:${chosenTime.minute.toString().padLeft(2, '0')}',
+                        ),
                         onPressed: () async {
                           final t = await showTimePicker(
                             context: context,
@@ -955,30 +1258,68 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                   const SizedBox(height: 12),
                   DropdownButtonFormField<int>(
                     initialValue: durationMinutes,
-                    decoration: const InputDecoration(labelText: 'Duração estimada'),
+                    decoration: const InputDecoration(
+                      labelText: 'Duração estimada',
+                    ),
                     items: const [
-                      DropdownMenuItem(value: 15, child: Text('15 min (Rápida)')),
-                      DropdownMenuItem(value: 30, child: Text('30 min (Padrão)')),
+                      DropdownMenuItem(
+                        value: 15,
+                        child: Text('15 min (Rápida)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 30,
+                        child: Text('30 min (Padrão)'),
+                      ),
                       DropdownMenuItem(value: 45, child: Text('45 min')),
-                      DropdownMenuItem(value: 60, child: Text('60 min (1 hora)')),
-                      DropdownMenuItem(value: 90, child: Text('90 min (1h 30m)')),
-                      DropdownMenuItem(value: 120, child: Text('120 min (2 horas)')),
+                      DropdownMenuItem(
+                        value: 60,
+                        child: Text('60 min (1 hora)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 90,
+                        child: Text('90 min (1h 30m)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 120,
+                        child: Text('120 min (2 horas)'),
+                      ),
                     ],
                     onChanged: (val) {
-                      if (val != null) setDialogState(() => durationMinutes = val);
+                      if (val != null)
+                        setDialogState(() => durationMinutes = val);
                     },
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     initialValue: recurrence,
-                    decoration: const InputDecoration(labelText: 'Repetição / Recorrência'),
+                    decoration: const InputDecoration(
+                      labelText: 'Repetição / Recorrência',
+                    ),
                     items: const [
-                      DropdownMenuItem(value: 'Único', child: Text('Apenas esta data (Único)')),
-                      DropdownMenuItem(value: '2x por semana', child: Text('2x por semana')),
-                      DropdownMenuItem(value: 'Semanal', child: Text('Semanal (Toda semana)')),
-                      DropdownMenuItem(value: 'Quinzenal', child: Text('Quinzenal (A cada 15 dias)')),
-                      DropdownMenuItem(value: 'Mensal', child: Text('Mensal (a cada mês)')),
-                      DropdownMenuItem(value: 'A cada 2 meses', child: Text('A cada 2 meses (Bimestral)')),
+                      DropdownMenuItem(
+                        value: 'Único',
+                        child: Text('Apenas esta data (Único)'),
+                      ),
+                      DropdownMenuItem(
+                        value: '2x por semana',
+                        child: Text('2x por semana'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Semanal',
+                        child: Text('Semanal (Toda semana)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Quinzenal',
+                        child: Text('Quinzenal (A cada 15 dias)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Mensal',
+                        child: Text('Mensal (a cada mês)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'A cada 2 meses',
+                        child: Text('A cada 2 meses (Bimestral)'),
+                      ),
                     ],
                     onChanged: (val) {
                       if (val != null) setDialogState(() => recurrence = val);
@@ -988,24 +1329,49 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                     const SizedBox(height: 12),
                     DropdownButtonFormField<int>(
                       initialValue: recurrenceCount,
-                      decoration: const InputDecoration(labelText: 'Quantidade de ocorrências'),
+                      decoration: const InputDecoration(
+                        labelText: 'Quantidade de ocorrências',
+                      ),
                       items: const [
-                        DropdownMenuItem(value: 4, child: Text('4 ocorrências')),
-                        DropdownMenuItem(value: 8, child: Text('8 ocorrências')),
-                        DropdownMenuItem(value: 12, child: Text('12 ocorrências')),
-                        DropdownMenuItem(value: 16, child: Text('16 ocorrências')),
+                        DropdownMenuItem(
+                          value: 4,
+                          child: Text('4 ocorrências'),
+                        ),
+                        DropdownMenuItem(
+                          value: 8,
+                          child: Text('8 ocorrências'),
+                        ),
+                        DropdownMenuItem(
+                          value: 12,
+                          child: Text('12 ocorrências'),
+                        ),
+                        DropdownMenuItem(
+                          value: 16,
+                          child: Text('16 ocorrências'),
+                        ),
                       ],
                       onChanged: (val) {
-                        if (val != null) setDialogState(() => recurrenceCount = val);
+                        if (val != null)
+                          setDialogState(() => recurrenceCount = val);
                       },
                     ),
                     const SizedBox(height: 8),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: const Text('Respeitar disponibilidade da agenda', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                      subtitle: const Text('Pula automaticamente horários conflitantes via AvailabilityEngine', style: TextStyle(fontSize: 11)),
+                      title: const Text(
+                        'Respeitar disponibilidade da agenda',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      subtitle: const Text(
+                        'Pula automaticamente horários conflitantes via AvailabilityEngine',
+                        style: TextStyle(fontSize: 11),
+                      ),
                       value: respectAvailability,
-                      onChanged: (val) => setDialogState(() => respectAvailability = val),
+                      onChanged: (val) =>
+                          setDialogState(() => respectAvailability = val),
                     ),
                   ],
                   const SizedBox(height: 10),
@@ -1013,7 +1379,8 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                     controller: locationController,
                     decoration: const InputDecoration(
                       labelText: 'Local ou observação',
-                      hintText: 'Ex: Salão do Reino / Casa do estudante / Pessoal',
+                      hintText:
+                          'Ex: Salão do Reino / Casa do estudante / Pessoal',
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -1021,12 +1388,18 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: (recurrence == 'Único' ? availability.isAvailable : recurrenceConflicts == 0)
+                      color:
+                          (recurrence == 'Único'
+                              ? availability.isAvailable
+                              : recurrenceConflicts == 0)
                           ? AppTheme.successGreen.withValues(alpha: 0.1)
                           : AppTheme.alertAmber.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
-                        color: (recurrence == 'Único' ? availability.isAvailable : recurrenceConflicts == 0)
+                        color:
+                            (recurrence == 'Único'
+                                ? availability.isAvailable
+                                : recurrenceConflicts == 0)
                             ? AppTheme.successGreen
                             : AppTheme.alertAmber,
                       ),
@@ -1037,10 +1410,15 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                         Row(
                           children: [
                             Icon(
-                              (recurrence == 'Único' ? availability.isAvailable : recurrenceConflicts == 0)
+                              (recurrence == 'Único'
+                                      ? availability.isAvailable
+                                      : recurrenceConflicts == 0)
                                   ? Icons.check_circle
                                   : Icons.warning_amber,
-                              color: (recurrence == 'Único' ? availability.isAvailable : recurrenceConflicts == 0)
+                              color:
+                                  (recurrence == 'Único'
+                                      ? availability.isAvailable
+                                      : recurrenceConflicts == 0)
                                   ? AppTheme.successGreen
                                   : AppTheme.alertAmber,
                               size: 20,
@@ -1051,12 +1429,15 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                                 recurrence == 'Único'
                                     ? availability.message
                                     : recurrenceConflicts == 0
-                                        ? 'Todas as ${occurrences.length} datas estão 100% livres!'
-                                        : 'Atenção: $recurrenceConflicts de ${occurrences.length} datas possuem sobreposição!',
+                                    ? 'Todas as ${occurrences.length} datas estão 100% livres!'
+                                    : 'Atenção: $recurrenceConflicts de ${occurrences.length} datas possuem sobreposição!',
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 13,
-                                  color: (recurrence == 'Único' ? availability.isAvailable : recurrenceConflicts == 0)
+                                  color:
+                                      (recurrence == 'Único'
+                                          ? availability.isAvailable
+                                          : recurrenceConflicts == 0)
                                       ? AppTheme.successGreen
                                       : const Color(0xFF92400E),
                                 ),
@@ -1064,22 +1445,34 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                             ),
                           ],
                         ),
-                        if (recurrence == 'Único' && !availability.isAvailable && availability.suggestedAlternativeSlots.isNotEmpty) ...[
+                        if (recurrence == 'Único' &&
+                            !availability.isAvailable &&
+                            availability
+                                .suggestedAlternativeSlots
+                                .isNotEmpty) ...[
                           const SizedBox(height: 6),
-                          const Text('Sugestões livres:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                          const Text(
+                            'Sugestões livres:',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                           Wrap(
                             spacing: 6,
-                            children: availability.suggestedAlternativeSlots.map((s) {
-                              return ActionChip(
-                                label: Text(AppDateUtils.formatTime(s)),
-                                onPressed: () {
-                                  setDialogState(() {
-                                    chosenDate = s;
-                                    chosenTime = TimeOfDay.fromDateTime(s);
-                                  });
-                                },
-                              );
-                            }).toList(),
+                            children: availability.suggestedAlternativeSlots
+                                .map((s) {
+                                  return ActionChip(
+                                    label: Text(AppDateUtils.formatTime(s)),
+                                    onPressed: () {
+                                      setDialogState(() {
+                                        chosenDate = s;
+                                        chosenTime = TimeOfDay.fromDateTime(s);
+                                      });
+                                    },
+                                  );
+                                })
+                                .toList(),
                           ),
                         ],
                       ],
@@ -1089,13 +1482,18 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
               ),
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancelar'),
+              ),
               ElevatedButton(
                 onPressed: () async {
                   final title = titleController.text.trim();
                   if (title.isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Informe o título do compromisso.')),
+                      const SnackBar(
+                        content: Text('Informe o título do compromisso.'),
+                      ),
                     );
                     return;
                   }
@@ -1103,7 +1501,9 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                   final repo = ref.read(repositoryProvider);
                   int createdCount = 0;
                   int skippedCount = 0;
-                  final runningAppts = List<AppointmentEntry>.from(existingAppts);
+                  final runningAppts = List<AppointmentEntry>.from(
+                    existingAppts,
+                  );
 
                   for (final occ in occurrences) {
                     final occEnd = occ.add(Duration(minutes: durationMinutes));
@@ -1113,7 +1513,9 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                       existingAppointments: runningAppts,
                     );
 
-                    if (hasConflict && respectAvailability && occurrences.length > 1) {
+                    if (hasConflict &&
+                        respectAvailability &&
+                        occurrences.length > 1) {
                       skippedCount++;
                       continue;
                     }
@@ -1125,7 +1527,9 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                       endTime: occEnd,
                       durationMinutes: durationMinutes,
                       status: 'confirmado',
-                      locationNotes: locationController.text.trim().isEmpty ? null : locationController.text.trim(),
+                      locationNotes: locationController.text.trim().isEmpty
+                          ? null
+                          : locationController.text.trim(),
                     );
                     runningAppts.add(newEntry);
                     createdCount++;
@@ -1136,9 +1540,8 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                     final message = occurrences.length == 1
                         ? 'Compromisso agendado no calendário com sucesso!'
                         : '$createdCount compromisso(s) recorrente(s) agendado(s)!${skippedCount > 0 ? " ($skippedCount pulado(s) por conflito)" : ""}';
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(message)),
-                    );
+                    ScaffoldMessenger.of(context)
+                        .showSnackBar(SnackBar(content: Text(message)));
                   }
                 },
                 child: const Text('Salvar no Calendário'),
@@ -1171,52 +1574,82 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                 Row(
                   children: [
                     CircleAvatar(
-                      backgroundColor: _getStatusColor(appt.status).withValues(alpha: 0.15),
-                      child: Icon(Icons.event, color: _getStatusColor(appt.status)),
+                      backgroundColor: _getStatusColor(appt.status)
+                          .withValues(alpha: 0.15),
+                      child: Icon(
+                        Icons.event,
+                        color: _getStatusColor(appt.status),
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(appt.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                          Text(
+                            appt.title,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                           Text(
                             '${AppDateUtils.formatDateTime(appt.startTime)} - ${AppDateUtils.formatTime(appt.endTime)} (${appt.durationMinutes} min)',
-                            style: const TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                            style: const TextStyle(
+                              color: AppTheme.textMuted,
+                              fontSize: 13,
+                            ),
                           ),
                         ],
                       ),
                     ),
-                    IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
                   ],
                 ),
                 const Divider(height: 24),
                 ListTile(
-                  leading: const Icon(Icons.sync_alt, color: AppTheme.primaryBlue),
+                  leading: const Icon(
+                    Icons.sync_alt,
+                    color: AppTheme.primaryBlue,
+                  ),
                   title: const Text('Reagendar (Preservar Histórico)'),
-                  subtitle: const Text('Move para nova data mantendo rastreabilidade'),
+                  subtitle: const Text(
+                    'Move para nova data mantendo rastreabilidade',
+                  ),
                   onTap: () {
                     Navigator.pop(ctx);
                     _showRescheduleModal(context, appt);
                   },
                 ),
                 ListTile(
-                  leading: const Icon(Icons.check_circle_outline, color: AppTheme.successGreen),
+                  leading: const Icon(
+                    Icons.check_circle_outline,
+                    color: AppTheme.successGreen,
+                  ),
                   title: const Text('Marcar como Realizado'),
                   onTap: () async {
                     final repo = ref.read(repositoryProvider);
-                    await repo.updateAppointment(appt.copyWith(status: 'realizado'));
+                    await repo.updateAppointment(
+                      appt.copyWith(status: 'realizado'),
+                    );
                     if (ctx.mounted) Navigator.pop(ctx);
                   },
                 ),
                 ListTile(
                   leading: const Icon(Icons.alt_route, color: Colors.orange),
                   title: const Text('Estudante Desmarcou (Ver Plano B)'),
-                  subtitle: const Text('Marca como cancelado e sugere contatos próximos para o horário'),
+                  subtitle: const Text(
+                    'Marca como cancelado e sugere contatos próximos para o horário',
+                  ),
                   onTap: () async {
                     Navigator.pop(ctx);
                     final repo = ref.read(repositoryProvider);
-                    await repo.updateAppointment(appt.copyWith(status: 'cancelado'));
+                    await repo.updateAppointment(
+                      appt.copyWith(status: 'cancelado'),
+                    );
 
                     final people = ref.read(peopleStreamProvider).value ?? [];
                     final visits = ref.read(visitsStreamProvider).value ?? [];
@@ -1224,7 +1657,8 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                         ? people.where((p) => p.id == appt.personId).firstOrNull
                         : null;
 
-                    final targetPerson = cancelledPerson ??
+                    final targetPerson =
+                        cancelledPerson ??
                         PersonEntry(
                           id: 'temp_appt_${appt.id}',
                           name: appt.title,
@@ -1256,37 +1690,54 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                 ),
                 if (appt.personId != null)
                   ListTile(
-                    leading: const Icon(Icons.person_outline, color: AppTheme.accentTeal),
+                    leading: const Icon(
+                      Icons.person_outline,
+                      color: AppTheme.accentTeal,
+                    ),
                     title: const Text('Abrir Cadastro da Pessoa'),
                     onTap: () {
                       Navigator.pop(ctx);
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => PersonDetailScreen(personId: appt.personId!),
+                          builder: (_) =>
+                              PersonDetailScreen(personId: appt.personId!),
                         ),
                       );
                     },
                   ),
                 ListTile(
-                  leading: const Icon(Icons.calendar_month, color: Color(0xFF1E40AF)),
+                  leading: const Icon(
+                    Icons.calendar_month,
+                    color: Color(0xFF1E40AF),
+                  ),
                   title: const Text('Adicionar ao Google Agenda'),
-                  subtitle: const Text('Abre o Google Agenda no navegador com dados preenchidos'),
+                  subtitle: const Text(
+                    'Abre o Google Agenda no navegador com dados preenchidos',
+                  ),
                   onTap: () {
                     Navigator.pop(ctx);
                     _exportToGoogleCalendar(appt);
                   },
                 ),
                 ListTile(
-                  leading: const Icon(Icons.delete_outline, color: AppTheme.alertRed),
-                  title: const Text('Excluir Compromisso', style: TextStyle(color: AppTheme.alertRed)),
+                  leading: const Icon(
+                    Icons.delete_outline,
+                    color: AppTheme.alertRed,
+                  ),
+                  title: const Text(
+                    'Excluir Compromisso',
+                    style: TextStyle(color: AppTheme.alertRed),
+                  ),
                   onTap: () async {
                     final repo = ref.read(repositoryProvider);
                     await repo.deleteAppointment(appt.id);
                     if (ctx.mounted) Navigator.pop(ctx);
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Compromisso movido para a lixeira.')),
+                        const SnackBar(
+                          content: Text('Compromisso movido para a lixeira.'),
+                        ),
                       );
                     }
                   },
@@ -1308,8 +1759,15 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) {
-          final start = DateTime(chosenDate.year, chosenDate.month, chosenDate.day, chosenTime.hour, chosenTime.minute);
-          final existingAppts = ref.read(appointmentsStreamProvider).value ?? [];
+          final start = DateTime(
+            chosenDate.year,
+            chosenDate.month,
+            chosenDate.day,
+            chosenTime.hour,
+            chosenTime.minute,
+          );
+          final existingAppts =
+              ref.read(appointmentsStreamProvider).value ?? [];
           final availability = AvailabilityEngine.checkAvailability(
             startTime: start,
             durationMinutes: durationMinutes,
@@ -1330,11 +1788,20 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(appt.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  Text(
+                    appt.title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
                   const SizedBox(height: 6),
                   Text(
                     'Anterior: ${AppDateUtils.formatDateTime(appt.startTime)}',
-                    style: const TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                    style: const TextStyle(
+                      color: AppTheme.textMuted,
+                      fontSize: 13,
+                    ),
                   ),
                   const SizedBox(height: 16),
                   Row(
@@ -1346,8 +1813,12 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                           final p = await showDatePicker(
                             context: context,
                             initialDate: chosenDate,
-                            firstDate: DateTime.now().subtract(const Duration(days: 30)),
-                            lastDate: DateTime.now().add(const Duration(days: 365)),
+                            firstDate: DateTime.now().subtract(
+                              const Duration(days: 30),
+                            ),
+                            lastDate: DateTime.now().add(
+                              const Duration(days: 365),
+                            ),
                           );
                           if (p != null) setDialogState(() => chosenDate = p);
                         },
@@ -1355,7 +1826,9 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                       const SizedBox(width: 8),
                       OutlinedButton.icon(
                         icon: const Icon(Icons.access_time, size: 16),
-                        label: Text('${chosenTime.hour.toString().padLeft(2, '0')}:${chosenTime.minute.toString().padLeft(2, '0')}'),
+                        label: Text(
+                          '${chosenTime.hour.toString().padLeft(2, '0')}:${chosenTime.minute.toString().padLeft(2, '0')}',
+                        ),
                         onPressed: () async {
                           final t = await showTimePicker(
                             context: context,
@@ -1370,10 +1843,14 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: availability.isAvailable ? AppTheme.successGreen.withValues(alpha: 0.1) : AppTheme.alertAmber.withValues(alpha: 0.15),
+                      color: availability.isAvailable
+                          ? AppTheme.successGreen.withValues(alpha: 0.1)
+                          : AppTheme.alertAmber.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
-                        color: availability.isAvailable ? AppTheme.successGreen : AppTheme.alertAmber,
+                        color: availability.isAvailable
+                            ? AppTheme.successGreen
+                            : AppTheme.alertAmber,
                       ),
                     ),
                     child: Column(
@@ -1382,8 +1859,12 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                         Row(
                           children: [
                             Icon(
-                              availability.isAvailable ? Icons.check_circle : Icons.warning_amber,
-                              color: availability.isAvailable ? AppTheme.successGreen : AppTheme.alertAmber,
+                              availability.isAvailable
+                                  ? Icons.check_circle
+                                  : Icons.warning_amber,
+                              color: availability.isAvailable
+                                  ? AppTheme.successGreen
+                                  : AppTheme.alertAmber,
                               size: 18,
                             ),
                             const SizedBox(width: 6),
@@ -1393,7 +1874,9 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 12,
-                                  color: availability.isAvailable ? AppTheme.successGreen : const Color(0xFF92400E),
+                                  color: availability.isAvailable
+                                      ? AppTheme.successGreen
+                                      : const Color(0xFF92400E),
                                 ),
                               ),
                             ),
@@ -1406,7 +1889,10 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
               ),
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancelar'),
+              ),
               ElevatedButton(
                 onPressed: () async {
                   final repo = ref.read(repositoryProvider);
@@ -1418,7 +1904,11 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                   if (ctx.mounted) Navigator.pop(ctx);
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Compromisso reagendado com sucesso! Histórico preservado.')),
+                      const SnackBar(
+                        content: Text(
+                          'Compromisso reagendado com sucesso! Histórico preservado.',
+                        ),
+                      ),
                     );
                   }
                 },
@@ -1431,39 +1921,51 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
     );
   }
 
-  void _showMonthlyScheduleCopyWizard(BuildContext context, List<AppointmentEntry> allAppts) {
+  void _showMonthlyScheduleCopyWizard(
+    BuildContext context,
+    List<AppointmentEntry> allAppts,
+  ) {
     int sourceYear = _selectedDate.year;
     int sourceMonth = _selectedDate.month;
     int targetYear = sourceMonth == 12 ? sourceYear + 1 : sourceYear;
     int targetMonth = sourceMonth == 12 ? 1 : sourceMonth + 1;
 
-    final sourceAppts = allAppts.where((a) =>
-        a.deletedAt == null &&
-        a.status != 'cancelado' &&
-        a.startTime.year == sourceYear &&
-        a.startTime.month == sourceMonth).toList();
+    final sourceAppts = allAppts
+        .where(
+          (a) =>
+              a.deletedAt == null &&
+              a.status != 'cancelado' &&
+              a.startTime.year == sourceYear &&
+              a.startTime.month == sourceMonth,
+        )
+        .toList();
 
     // Cria lista inicial mutável de rotinas identificadas no mês de origem
     final List<_CopyWizardRoutine> wizardRoutines = [];
     final seen = <String>{};
     for (final a in sourceAppts) {
-      final key = '${a.title}_${a.startTime.weekday}_${a.startTime.hour}_${a.startTime.minute}';
+      final key =
+          '${a.title}_${a.startTime.weekday}_${a.startTime.hour}_${a.startTime.minute}';
       if (!seen.contains(key)) {
         seen.add(key);
-        wizardRoutines.add(_CopyWizardRoutine(
-          id: key,
-          title: a.title,
-          weekday: a.startTime.weekday,
-          hour: a.startTime.hour,
-          minute: a.startTime.minute,
-          durationMinutes: a.durationMinutes,
-          frequency: 'semanal',
-          secondWeekday: (a.startTime.weekday + 3) % 7 == 0 ? 7 : (a.startTime.weekday + 3) % 7,
-          isEnabled: true,
-          isExpanded: false,
-          personId: a.personId,
-          notes: a.locationNotes,
-        ));
+        wizardRoutines.add(
+          _CopyWizardRoutine(
+            id: key,
+            title: a.title,
+            weekday: a.startTime.weekday,
+            hour: a.startTime.hour,
+            minute: a.startTime.minute,
+            durationMinutes: a.durationMinutes,
+            frequency: 'semanal',
+            secondWeekday: (a.startTime.weekday + 3) % 7 == 0
+                ? 7
+                : (a.startTime.weekday + 3) % 7,
+            isEnabled: true,
+            isExpanded: false,
+            personId: a.personId,
+            notes: a.locationNotes,
+          ),
+        );
       }
     }
 
@@ -1472,13 +1974,21 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setWizardState) {
           final isDark = Theme.of(ctx).brightness == Brightness.dark;
-          final targetExistingAppts = allAppts.where((a) =>
-              a.deletedAt == null &&
-              a.status != 'cancelado' &&
-              a.startTime.year == targetYear &&
-              a.startTime.month == targetMonth).toList();
+          final targetExistingAppts = allAppts
+              .where(
+                (a) =>
+                    a.deletedAt == null &&
+                    a.status != 'cancelado' &&
+                    a.startTime.year == targetYear &&
+                    a.startTime.month == targetMonth,
+              )
+              .toList();
 
-          final daysInTargetMonth = DateTime(targetYear, targetMonth + 1, 0).day;
+          final daysInTargetMonth = DateTime(
+            targetYear,
+            targetMonth + 1,
+            0,
+          ).day;
 
           // Função de cálculo de datas conforme a frequência selecionada
           List<DateTime> calculateRoutineDates(_CopyWizardRoutine r) {
@@ -1486,10 +1996,17 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
             final secondMatches = <DateTime>[];
 
             for (int day = 1; day <= daysInTargetMonth; day++) {
-              final candidate = DateTime(targetYear, targetMonth, day, r.hour, r.minute);
+              final candidate = DateTime(
+                targetYear,
+                targetMonth,
+                day,
+                r.hour,
+                r.minute,
+              );
               if (candidate.weekday == r.weekday) {
                 primaryMatches.add(candidate);
-              } else if (r.frequency == '2x_semana' && candidate.weekday == r.secondWeekday) {
+              } else if (r.frequency == '2x_semana' &&
+                  candidate.weekday == r.secondWeekday) {
                 secondMatches.add(candidate);
               }
             }
@@ -1522,18 +2039,33 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
             final dates = calculateRoutineDates(r);
             for (final dt in dates) {
               final hasDuplicate = targetExistingAppts.any((existing) {
-                final sameTitle = existing.title.trim().toLowerCase() == r.title.trim().toLowerCase();
-                final timeDiff = existing.startTime.difference(dt).inMinutes.abs();
+                final sameTitle =
+                    existing.title.trim().toLowerCase() ==
+                    r.title.trim().toLowerCase();
+                final timeDiff = existing.startTime
+                    .difference(dt)
+                    .inMinutes
+                    .abs();
                 return sameTitle && timeDiff < 15;
               });
               if (!hasDuplicate) totalPendingToCreate++;
             }
           }
 
-          const weekdayLabels = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
+          const weekdayLabels = [
+            'Segunda',
+            'Terça',
+            'Quarta',
+            'Quinta',
+            'Sexta',
+            'Sábado',
+            'Domingo',
+          ];
 
           return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             title: Row(
               children: [
                 const Icon(Icons.copy_all_rounded, color: AppTheme.primaryBlue),
@@ -1541,7 +2073,11 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                 Expanded(
                   child: Text(
                     'Assistente: Replicar Programação',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : AppTheme.textDark),
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : AppTheme.textDark,
+                    ),
                   ),
                 ),
               ],
@@ -1556,25 +2092,45 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                     Text(
                       'Replica com segurança as rotinas do ministério, revisitas e estudos de um mês para o outro. '
                       'Você pode confirmar, editar frequência, dia, hora ou remover cada atividade antes de agendar.',
-                      style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : AppTheme.textMuted),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark
+                            ? const Color(0xFF94A3B8)
+                            : AppTheme.textMuted,
+                      ),
                     ),
                     const SizedBox(height: 12),
                     Row(
                       children: [
                         Expanded(
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 8,
+                            ),
                             decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                              color: isDark
+                                  ? const Color(0xFF1E293B)
+                                  : const Color(0xFFF1F5F9),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('Origem:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primaryBlue)),
+                                const Text(
+                                  'Origem:',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.primaryBlue,
+                                  ),
+                                ),
                                 Text(
                                   '${_getMonthName(sourceMonth)} $sourceYear',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
                                 ),
                               ],
                             ),
@@ -1582,23 +2138,46 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                         ),
                         const Padding(
                           padding: EdgeInsets.symmetric(horizontal: 8),
-                          child: Icon(Icons.arrow_forward, size: 18, color: AppTheme.primaryBlue),
+                          child: Icon(
+                            Icons.arrow_forward,
+                            size: 18,
+                            color: AppTheme.primaryBlue,
+                          ),
                         ),
                         Expanded(
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 8,
+                            ),
                             decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
+                              color: isDark
+                                  ? const Color(0xFF1E293B)
+                                  : const Color(0xFFEFF6FF),
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: AppTheme.primaryBlue.withValues(alpha: 0.3)),
+                              border: Border.all(
+                                color: AppTheme.primaryBlue.withValues(
+                                  alpha: 0.3,
+                                ),
+                              ),
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('Destino:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.accentTeal)),
+                                const Text(
+                                  'Destino:',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.accentTeal,
+                                  ),
+                                ),
                                 Text(
                                   '${_getMonthName(targetMonth)} $targetYear',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
                                 ),
                               ],
                             ),
@@ -1612,11 +2191,18 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                       children: [
                         Text(
                           'Rotinas Identificadas no Mês (${wizardRoutines.length}):',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
                         ),
                         Text(
                           '${wizardRoutines.where((r) => r.isEnabled).length} ativa(s)',
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primaryBlue),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.primaryBlue,
+                          ),
                         ),
                       ],
                     ),
@@ -1625,13 +2211,18 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF1E293B) : Colors.grey.shade50,
+                          color: isDark
+                              ? const Color(0xFF1E293B)
+                              : Colors.grey.shade50,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Center(
                           child: Text(
                             'Nenhuma rotina ou compromisso ativo encontrado no mês de origem.',
-                            style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.textMuted,
+                            ),
                           ),
                         ),
                       )
@@ -1641,9 +2232,16 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                         int alreadyExistsCount = 0;
                         int freeCount = 0;
                         for (final dt in targetDates) {
-                          final hasDuplicate = targetExistingAppts.any((existing) {
-                            final sameTitle = existing.title.trim().toLowerCase() == r.title.trim().toLowerCase();
-                            final timeDiff = existing.startTime.difference(dt).inMinutes.abs();
+                          final hasDuplicate = targetExistingAppts.any((
+                            existing,
+                          ) {
+                            final sameTitle =
+                                existing.title.trim().toLowerCase() ==
+                                r.title.trim().toLowerCase();
+                            final timeDiff = existing.startTime
+                                .difference(dt)
+                                .inMinutes
+                                .abs();
                             return sameTitle && timeDiff < 15;
                           });
                           if (hasDuplicate) {
@@ -1654,30 +2252,37 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                         }
 
                         final weekdayName = weekdayLabels[r.weekday - 1];
-                        final timeStr = '${r.hour.toString().padLeft(2, '0')}:${r.minute.toString().padLeft(2, '0')}';
+                        final timeStr =
+                            '${r.hour.toString().padLeft(2, '0')}:${r.minute.toString().padLeft(2, '0')}';
                         final freqLabel = r.frequency == 'semanal'
                             ? 'Semanal'
                             : r.frequency == 'quinzenal_1_3'
-                                ? 'Quinzenal (1ª e 3ª semana)'
-                                : r.frequency == 'quinzenal_2_4'
-                                    ? 'Quinzenal (2ª e 4ª semana)'
-                                    : r.frequency == 'mensal'
-                                        ? 'Mensal (1x)'
-                                        : '2x por semana ($weekdayName e ${weekdayLabels[r.secondWeekday - 1]})';
+                            ? 'Quinzenal (1ª e 3ª semana)'
+                            : r.frequency == 'quinzenal_2_4'
+                            ? 'Quinzenal (2ª e 4ª semana)'
+                            : r.frequency == 'mensal'
+                            ? 'Mensal (1x)'
+                            : '2x por semana ($weekdayName e ${weekdayLabels[r.secondWeekday - 1]})';
 
                         return Container(
                           margin: const EdgeInsets.only(bottom: 10),
                           decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                            color: isDark
+                                ? const Color(0xFF1E293B)
+                                : Colors.white,
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
                               color: !r.isEnabled
                                   ? Colors.grey.withValues(alpha: 0.3)
                                   : r.isExpanded
-                                      ? AppTheme.primaryBlue
-                                      : (freeCount > 0
-                                          ? (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))
-                                          : AppTheme.alertAmber.withValues(alpha: 0.5)),
+                                  ? AppTheme.primaryBlue
+                                  : (freeCount > 0
+                                        ? (isDark
+                                              ? const Color(0xFF334155)
+                                              : const Color(0xFFCBD5E1))
+                                        : AppTheme.alertAmber.withValues(
+                                            alpha: 0.5,
+                                          )),
                               width: r.isExpanded ? 1.5 : 1.0,
                             ),
                           ),
@@ -1686,7 +2291,10 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                             children: [
                               // Cabeçalho da rotina
                               Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 8,
+                                ),
                                 child: Row(
                                   children: [
                                     Checkbox(
@@ -1701,37 +2309,53 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                                     Container(
                                       padding: const EdgeInsets.all(6),
                                       decoration: BoxDecoration(
-                                        color: AppTheme.primaryBlue.withValues(alpha: 0.1),
+                                        color: AppTheme.primaryBlue.withValues(
+                                          alpha: 0.1,
+                                        ),
                                         borderRadius: BorderRadius.circular(6),
                                       ),
                                       child: Icon(
                                         r.title.toLowerCase().contains('estudo')
                                             ? Icons.menu_book
-                                            : r.title.toLowerCase().contains('revisita')
-                                                ? Icons.repeat
-                                                : Icons.directions_walk,
+                                            : r.title.toLowerCase().contains(
+                                                'revisita',
+                                              )
+                                            ? Icons.repeat
+                                            : Icons.directions_walk,
                                         size: 18,
-                                        color: r.isEnabled ? AppTheme.primaryBlue : Colors.grey,
+                                        color: r.isEnabled
+                                            ? AppTheme.primaryBlue
+                                            : Colors.grey,
                                       ),
                                     ),
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             r.title,
                                             style: TextStyle(
                                               fontWeight: FontWeight.bold,
                                               fontSize: 13,
-                                              decoration: r.isEnabled ? null : TextDecoration.lineThrough,
-                                              color: r.isEnabled ? null : Colors.grey,
+                                              decoration: r.isEnabled
+                                                  ? null
+                                                  : TextDecoration.lineThrough,
+                                              color: r.isEnabled
+                                                  ? null
+                                                  : Colors.grey,
                                             ),
                                           ),
                                           const SizedBox(height: 2),
                                           Text(
                                             '$weekdayName às $timeStr (${r.durationMinutes} min) • $freqLabel',
-                                            style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : AppTheme.textMuted),
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: isDark
+                                                  ? const Color(0xFF94A3B8)
+                                                  : AppTheme.textMuted,
+                                            ),
                                           ),
                                           const SizedBox(height: 4),
                                           Wrap(
@@ -1739,38 +2363,86 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                                             children: [
                                               if (freeCount > 0 && r.isEnabled)
                                                 Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 6,
+                                                        vertical: 2,
+                                                      ),
                                                   decoration: BoxDecoration(
-                                                    color: AppTheme.successGreen.withValues(alpha: 0.15),
-                                                    borderRadius: BorderRadius.circular(4),
+                                                    color: AppTheme.successGreen
+                                                        .withValues(
+                                                          alpha: 0.15,
+                                                        ),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          4,
+                                                        ),
                                                   ),
                                                   child: Text(
                                                     '✅ $freeCount data(s) a criar',
-                                                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.successGreen),
+                                                    style: const TextStyle(
+                                                      fontSize: 10,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      color:
+                                                          AppTheme.successGreen,
+                                                    ),
                                                   ),
                                                 ),
-                                              if (alreadyExistsCount > 0 && r.isEnabled)
+                                              if (alreadyExistsCount > 0 &&
+                                                  r.isEnabled)
                                                 Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 6,
+                                                        vertical: 2,
+                                                      ),
                                                   decoration: BoxDecoration(
-                                                    color: AppTheme.alertAmber.withValues(alpha: 0.15),
-                                                    borderRadius: BorderRadius.circular(4),
+                                                    color: AppTheme.alertAmber
+                                                        .withValues(
+                                                          alpha: 0.15,
+                                                        ),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          4,
+                                                        ),
                                                   ),
                                                   child: Text(
                                                     '⚠️ $alreadyExistsCount data(s) já existente(s)',
-                                                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.alertAmber),
+                                                    style: const TextStyle(
+                                                      fontSize: 10,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      color:
+                                                          AppTheme.alertAmber,
+                                                    ),
                                                   ),
                                                 ),
                                               if (!r.isEnabled)
                                                 Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 6,
+                                                        vertical: 2,
+                                                      ),
                                                   decoration: BoxDecoration(
-                                                    color: Colors.grey.withValues(alpha: 0.15),
-                                                    borderRadius: BorderRadius.circular(4),
+                                                    color: Colors.grey
+                                                        .withValues(
+                                                          alpha: 0.15,
+                                                        ),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          4,
+                                                        ),
                                                   ),
                                                   child: const Text(
                                                     'Desmarcado para este mês',
-                                                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey),
+                                                    style: TextStyle(
+                                                      fontSize: 10,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      color: Colors.grey,
+                                                    ),
                                                   ),
                                                 ),
                                             ],
@@ -1779,9 +2451,18 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                                       ),
                                     ),
                                     IconButton(
-                                      icon: Icon(r.isExpanded ? Icons.expand_less : Icons.tune, size: 18),
-                                      tooltip: r.isExpanded ? 'Fechar detalhes' : 'Alterar dia, hora, frequência...',
-                                      color: r.isExpanded ? AppTheme.primaryBlue : AppTheme.textMuted,
+                                      icon: Icon(
+                                        r.isExpanded
+                                            ? Icons.expand_less
+                                            : Icons.tune,
+                                        size: 18,
+                                      ),
+                                      tooltip: r.isExpanded
+                                          ? 'Fechar detalhes'
+                                          : 'Alterar dia, hora, frequência...',
+                                      color: r.isExpanded
+                                          ? AppTheme.primaryBlue
+                                          : AppTheme.textMuted,
                                       onPressed: () {
                                         setWizardState(() {
                                           r.isExpanded = !r.isExpanded;
@@ -1789,7 +2470,11 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                                       },
                                     ),
                                     IconButton(
-                                      icon: const Icon(Icons.delete_outline, size: 18, color: AppTheme.alertRed),
+                                      icon: const Icon(
+                                        Icons.delete_outline,
+                                        size: 18,
+                                        color: AppTheme.alertRed,
+                                      ),
                                       tooltip: 'Excluir esta rotina',
                                       onPressed: () {
                                         setWizardState(() {
@@ -1806,13 +2491,20 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                                 const Divider(height: 1),
                                 Container(
                                   padding: const EdgeInsets.all(12),
-                                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                                  color: isDark
+                                      ? const Color(0xFF0F172A)
+                                      : const Color(0xFFF8FAFC),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       const Text(
                                         'Personalizar Programação para o Mês de Destino:',
-                                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primaryBlue),
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppTheme.primaryBlue,
+                                        ),
                                       ),
                                       const SizedBox(height: 8),
                                       Row(
@@ -1820,13 +2512,26 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                                           Expanded(
                                             child: DropdownButtonFormField<int>(
                                               initialValue: r.weekday,
-                                              decoration: const InputDecoration(labelText: 'Dia da Semana', isDense: true),
+                                              decoration: const InputDecoration(
+                                                labelText: 'Dia da Semana',
+                                                isDense: true,
+                                              ),
                                               items: List.generate(7, (i) {
-                                                return DropdownMenuItem(value: i + 1, child: Text(weekdayLabels[i], style: const TextStyle(fontSize: 12)));
+                                                return DropdownMenuItem(
+                                                  value: i + 1,
+                                                  child: Text(
+                                                    weekdayLabels[i],
+                                                    style: const TextStyle(
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                );
                                               }),
                                               onChanged: (val) {
                                                 if (val != null) {
-                                                  setWizardState(() => r.weekday = val);
+                                                  setWizardState(
+                                                    () => r.weekday = val,
+                                                  );
                                                 }
                                               },
                                             ),
@@ -1835,10 +2540,14 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                                           Expanded(
                                             child: InkWell(
                                               onTap: () async {
-                                                final picked = await showTimePicker(
-                                                  context: context,
-                                                  initialTime: TimeOfDay(hour: r.hour, minute: r.minute),
-                                                );
+                                                final picked =
+                                                    await showTimePicker(
+                                                      context: context,
+                                                      initialTime: TimeOfDay(
+                                                        hour: r.hour,
+                                                        minute: r.minute,
+                                                      ),
+                                                    );
                                                 if (picked != null) {
                                                   setWizardState(() {
                                                     r.hour = picked.hour;
@@ -1847,12 +2556,30 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                                                 }
                                               },
                                               child: InputDecorator(
-                                                decoration: const InputDecoration(labelText: 'Horário', isDense: true),
+                                                decoration:
+                                                    const InputDecoration(
+                                                      labelText: 'Horário',
+                                                      isDense: true,
+                                                    ),
                                                 child: Row(
-                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment
+                                                          .spaceBetween,
                                                   children: [
-                                                    Text(timeStr, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                                    const Icon(Icons.access_time, size: 16, color: AppTheme.primaryBlue),
+                                                    Text(
+                                                      timeStr,
+                                                      style: const TextStyle(
+                                                        fontSize: 12,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                    const Icon(
+                                                      Icons.access_time,
+                                                      size: 16,
+                                                      color:
+                                                          AppTheme.primaryBlue,
+                                                    ),
                                                   ],
                                                 ),
                                               ),
@@ -1865,41 +2592,150 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                                         children: [
                                           Expanded(
                                             flex: 3,
-                                            child: DropdownButtonFormField<String>(
-                                              initialValue: r.frequency,
-                                              decoration: const InputDecoration(labelText: 'Frequência do Estudo/Revisita', isDense: true),
-                                              items: const [
-                                                DropdownMenuItem(value: 'semanal', child: Text('Semanal (Toda semana)', style: TextStyle(fontSize: 12))),
-                                                DropdownMenuItem(value: 'quinzenal_1_3', child: Text('Quinzenal (1ª e 3ª semana)', style: TextStyle(fontSize: 12))),
-                                                DropdownMenuItem(value: 'quinzenal_2_4', child: Text('Quinzenal (2ª e 4ª semana)', style: TextStyle(fontSize: 12))),
-                                                DropdownMenuItem(value: 'mensal', child: Text('Mensal (1ª ocorrência)', style: TextStyle(fontSize: 12))),
-                                                DropdownMenuItem(value: '2x_semana', child: Text('2x por semana', style: TextStyle(fontSize: 12))),
-                                              ],
-                                              onChanged: (val) {
-                                                if (val != null) {
-                                                  setWizardState(() => r.frequency = val);
-                                                }
-                                              },
-                                            ),
+                                            child:
+                                                DropdownButtonFormField<String>(
+                                                  initialValue: r.frequency,
+                                                  decoration:
+                                                      const InputDecoration(
+                                                        labelText: 'Frequência do Estudo/Revisita',
+                                                        isDense: true,
+                                                      ),
+                                                  items: const [
+                                                    DropdownMenuItem(
+                                                      value: 'semanal',
+                                                      child: Text(
+                                                        'Semanal (Toda semana)',
+                                                        style: TextStyle(
+                                                          fontSize: 12,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    DropdownMenuItem(
+                                                      value: 'quinzenal_1_3',
+                                                      child: Text(
+                                                        'Quinzenal (1ª e 3ª semana)',
+                                                        style: TextStyle(
+                                                          fontSize: 12,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    DropdownMenuItem(
+                                                      value: 'quinzenal_2_4',
+                                                      child: Text(
+                                                        'Quinzenal (2ª e 4ª semana)',
+                                                        style: TextStyle(
+                                                          fontSize: 12,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    DropdownMenuItem(
+                                                      value: 'mensal',
+                                                      child: Text(
+                                                        'Mensal (1ª ocorrência)',
+                                                        style: TextStyle(
+                                                          fontSize: 12,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    DropdownMenuItem(
+                                                      value: '2x_semana',
+                                                      child: Text(
+                                                        '2x por semana',
+                                                        style: TextStyle(
+                                                          fontSize: 12,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                  onChanged: (val) {
+                                                    if (val != null) {
+                                                      setWizardState(
+                                                        () => r.frequency = val,
+                                                      );
+                                                    }
+                                                  },
+                                                ),
                                           ),
                                           const SizedBox(width: 8),
                                           Expanded(
                                             flex: 2,
                                             child: DropdownButtonFormField<int>(
                                               initialValue: r.durationMinutes,
-                                              decoration: const InputDecoration(labelText: 'Duração', isDense: true),
+                                              decoration: const InputDecoration(
+                                                labelText: 'Duração',
+                                                isDense: true,
+                                              ),
                                               items: const [
-                                                DropdownMenuItem(value: 15, child: Text('15 min', style: TextStyle(fontSize: 12))),
-                                                DropdownMenuItem(value: 20, child: Text('20 min', style: TextStyle(fontSize: 12))),
-                                                DropdownMenuItem(value: 30, child: Text('30 min', style: TextStyle(fontSize: 12))),
-                                                DropdownMenuItem(value: 45, child: Text('45 min', style: TextStyle(fontSize: 12))),
-                                                DropdownMenuItem(value: 60, child: Text('60 min', style: TextStyle(fontSize: 12))),
-                                                DropdownMenuItem(value: 90, child: Text('90 min', style: TextStyle(fontSize: 12))),
-                                                DropdownMenuItem(value: 120, child: Text('120 min', style: TextStyle(fontSize: 12))),
+                                                DropdownMenuItem(
+                                                  value: 15,
+                                                  child: Text(
+                                                    '15 min',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ),
+                                                DropdownMenuItem(
+                                                  value: 20,
+                                                  child: Text(
+                                                    '20 min',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ),
+                                                DropdownMenuItem(
+                                                  value: 30,
+                                                  child: Text(
+                                                    '30 min',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ),
+                                                DropdownMenuItem(
+                                                  value: 45,
+                                                  child: Text(
+                                                    '45 min',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ),
+                                                DropdownMenuItem(
+                                                  value: 60,
+                                                  child: Text(
+                                                    '60 min',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ),
+                                                DropdownMenuItem(
+                                                  value: 90,
+                                                  child: Text(
+                                                    '90 min',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ),
+                                                DropdownMenuItem(
+                                                  value: 120,
+                                                  child: Text(
+                                                    '120 min',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ),
                                               ],
                                               onChanged: (val) {
                                                 if (val != null) {
-                                                  setWizardState(() => r.durationMinutes = val);
+                                                  setWizardState(
+                                                    () =>
+                                                        r.durationMinutes = val,
+                                                  );
                                                 }
                                               },
                                             ),
@@ -1910,13 +2746,26 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                                         const SizedBox(height: 8),
                                         DropdownButtonFormField<int>(
                                           initialValue: r.secondWeekday,
-                                          decoration: const InputDecoration(labelText: 'Segundo Dia da Semana (para 2x/semana)', isDense: true),
+                                          decoration: const InputDecoration(
+                                            labelText: 'Segundo Dia da Semana (para 2x/semana)',
+                                            isDense: true,
+                                          ),
                                           items: List.generate(7, (i) {
-                                            return DropdownMenuItem(value: i + 1, child: Text(weekdayLabels[i], style: const TextStyle(fontSize: 12)));
+                                            return DropdownMenuItem(
+                                              value: i + 1,
+                                              child: Text(
+                                                weekdayLabels[i],
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            );
                                           }),
                                           onChanged: (val) {
                                             if (val != null) {
-                                              setWizardState(() => r.secondWeekday = val);
+                                              setWizardState(
+                                                () => r.secondWeekday = val,
+                                              );
                                             }
                                           },
                                         ),
@@ -1925,7 +2774,13 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                                       Text(
                                         'Datas calculadas para ${_getMonthName(targetMonth)}: '
                                         '${targetDates.map((d) => "${d.day.toString().padLeft(2, "0")}/${d.month.toString().padLeft(2, "0")}").join(", ")}',
-                                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569)),
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: isDark
+                                              ? const Color(0xFFCBD5E1)
+                                              : const Color(0xFF475569),
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -1940,7 +2795,10 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
               ),
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancelar'),
+              ),
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.primaryBlue,
@@ -1948,19 +2806,30 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                 ),
                 icon: const Icon(Icons.check, size: 16),
                 label: Text('Replicar e Agendar ($totalPendingToCreate novos)'),
-                onPressed: totalPendingToCreate == 0 && wizardRoutines.every((r) => !r.isEnabled)
+                onPressed:
+                    totalPendingToCreate == 0 &&
+                        wizardRoutines.every((r) => !r.isEnabled)
                     ? null
                     : () async {
                         final repo = ref.read(repositoryProvider);
                         int totalCreated = 0;
                         int totalSkipped = 0;
 
-                        for (final r in wizardRoutines.where((r) => r.isEnabled)) {
+                        for (final r in wizardRoutines.where(
+                          (r) => r.isEnabled,
+                        )) {
                           final dates = calculateRoutineDates(r);
                           for (final targetDt in dates) {
-                            final hasDuplicate = targetExistingAppts.any((existing) {
-                              final sameTitle = existing.title.trim().toLowerCase() == r.title.trim().toLowerCase();
-                              final timeDiff = existing.startTime.difference(targetDt).inMinutes.abs();
+                            final hasDuplicate = targetExistingAppts.any((
+                              existing,
+                            ) {
+                              final sameTitle =
+                                  existing.title.trim().toLowerCase() ==
+                                  r.title.trim().toLowerCase();
+                              final timeDiff = existing.startTime
+                                  .difference(targetDt)
+                                  .inMinutes
+                                  .abs();
                               return sameTitle && timeDiff < 15;
                             });
 
@@ -1973,7 +2842,9 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                               personId: r.personId,
                               title: r.title,
                               startTime: targetDt,
-                              endTime: targetDt.add(Duration(minutes: r.durationMinutes)),
+                              endTime: targetDt.add(
+                                Duration(minutes: r.durationMinutes),
+                              ),
                               durationMinutes: r.durationMinutes,
                               status: 'confirmado',
                               locationNotes: r.notes,
@@ -2017,8 +2888,15 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) {
-          final start = DateTime(chosenDate.year, chosenDate.month, chosenDate.day, chosenTime.hour, chosenTime.minute);
-          final existingAppts = ref.read(appointmentsStreamProvider).value ?? [];
+          final start = DateTime(
+            chosenDate.year,
+            chosenDate.month,
+            chosenDate.day,
+            chosenTime.hour,
+            chosenTime.minute,
+          );
+          final existingAppts =
+              ref.read(appointmentsStreamProvider).value ?? [];
           final availability = AvailabilityEngine.checkAvailability(
             startTime: start,
             durationMinutes: durationMinutes,
@@ -2039,7 +2917,9 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                 final year = start.year + yearOffset;
                 final daysInMonth = DateTime(year, month + 1, 0).day;
                 final day = start.day.clamp(1, daysInMonth);
-                occurrences.add(DateTime(year, month, day, start.hour, start.minute));
+                occurrences.add(
+                  DateTime(year, month, day, start.hour, start.minute),
+                );
               }
             }
           }
@@ -2059,12 +2939,26 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                 children: [
                   DropdownButtonFormField<String>(
                     initialValue: modality,
-                    decoration: const InputDecoration(labelText: 'Modalidade de Testemunho'),
+                    decoration: const InputDecoration(
+                      labelText: 'Modalidade de Testemunho',
+                    ),
                     items: const [
-                      DropdownMenuItem(value: 'De Casa em Casa', child: Text('🏠 De Casa em Casa')),
-                      DropdownMenuItem(value: 'Testemunho Público (Carrinho)', child: Text('🛒 Testemunho Público (Carrinho)')),
-                      DropdownMenuItem(value: 'Testemunho Informal', child: Text('💬 Testemunho Informal')),
-                      DropdownMenuItem(value: 'Cartas e Telefone', child: Text('✉️ Cartas e Telefone')),
+                      DropdownMenuItem(
+                        value: 'De Casa em Casa',
+                        child: Text('🏠 De Casa em Casa'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Testemunho Público (Carrinho)',
+                        child: Text('🛒 Testemunho Público (Carrinho)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Testemunho Informal',
+                        child: Text('💬 Testemunho Informal'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Cartas e Telefone',
+                        child: Text('✉️ Cartas e Telefone'),
+                      ),
                       DropdownMenuItem(value: 'Outro', child: Text('📌 Outro')),
                     ],
                     onChanged: (val) {
@@ -2081,8 +2975,12 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                           final p = await showDatePicker(
                             context: context,
                             initialDate: chosenDate,
-                            firstDate: DateTime.now().subtract(const Duration(days: 30)),
-                            lastDate: DateTime.now().add(const Duration(days: 365)),
+                            firstDate: DateTime.now().subtract(
+                              const Duration(days: 30),
+                            ),
+                            lastDate: DateTime.now().add(
+                              const Duration(days: 365),
+                            ),
                           );
                           if (p != null) setDialogState(() => chosenDate = p);
                         },
@@ -2090,7 +2988,9 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                       const SizedBox(width: 8),
                       OutlinedButton.icon(
                         icon: const Icon(Icons.access_time, size: 16),
-                        label: Text('${chosenTime.hour.toString().padLeft(2, '0')}:${chosenTime.minute.toString().padLeft(2, '0')}'),
+                        label: Text(
+                          '${chosenTime.hour.toString().padLeft(2, '0')}:${chosenTime.minute.toString().padLeft(2, '0')}',
+                        ),
                         onPressed: () async {
                           final t = await showTimePicker(
                             context: context,
@@ -2104,27 +3004,59 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                   const SizedBox(height: 12),
                   DropdownButtonFormField<int>(
                     initialValue: durationMinutes,
-                    decoration: const InputDecoration(labelText: 'Duração Prevista'),
+                    decoration: const InputDecoration(
+                      labelText: 'Duração Prevista',
+                    ),
                     items: const [
-                      DropdownMenuItem(value: 60, child: Text('1 hora (60 min)')),
-                      DropdownMenuItem(value: 90, child: Text('1h 30m (90 min)')),
-                      DropdownMenuItem(value: 120, child: Text('2 horas (120 min)')),
-                      DropdownMenuItem(value: 150, child: Text('2h 30m (150 min)')),
-                      DropdownMenuItem(value: 180, child: Text('3 horas (180 min)')),
+                      DropdownMenuItem(
+                        value: 60,
+                        child: Text('1 hora (60 min)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 90,
+                        child: Text('1h 30m (90 min)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 120,
+                        child: Text('2 horas (120 min)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 150,
+                        child: Text('2h 30m (150 min)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 180,
+                        child: Text('3 horas (180 min)'),
+                      ),
                     ],
                     onChanged: (val) {
-                      if (val != null) setDialogState(() => durationMinutes = val);
+                      if (val != null)
+                        setDialogState(() => durationMinutes = val);
                     },
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     initialValue: recurrence,
-                    decoration: const InputDecoration(labelText: 'Repetição / Recorrência'),
+                    decoration: const InputDecoration(
+                      labelText: 'Repetição / Recorrência',
+                    ),
                     items: const [
-                      DropdownMenuItem(value: 'Único', child: Text('Apenas esta data (Único)')),
-                      DropdownMenuItem(value: 'Toda semana', child: Text('Toda semana (Semanal)')),
-                      DropdownMenuItem(value: 'A cada 15 dias', child: Text('A cada 15 dias (Quinzenal)')),
-                      DropdownMenuItem(value: 'Mensal', child: Text('Mensal (a cada 4 semanas)')),
+                      DropdownMenuItem(
+                        value: 'Único',
+                        child: Text('Apenas esta data (Único)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Toda semana',
+                        child: Text('Toda semana (Semanal)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'A cada 15 dias',
+                        child: Text('A cada 15 dias (Quinzenal)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Mensal',
+                        child: Text('Mensal (a cada 4 semanas)'),
+                      ),
                     ],
                     onChanged: (val) {
                       if (val != null) setDialogState(() => recurrence = val);
@@ -2134,24 +3066,49 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                     const SizedBox(height: 12),
                     DropdownButtonFormField<int>(
                       initialValue: recurrenceCount,
-                      decoration: const InputDecoration(labelText: 'Quantidade de ocorrências'),
+                      decoration: const InputDecoration(
+                        labelText: 'Quantidade de ocorrências',
+                      ),
                       items: const [
-                        DropdownMenuItem(value: 4, child: Text('4 semanas (1 mês)')),
-                        DropdownMenuItem(value: 8, child: Text('8 semanas (2 meses)')),
-                        DropdownMenuItem(value: 12, child: Text('12 semanas (3 meses)')),
-                        DropdownMenuItem(value: 16, child: Text('16 semanas (4 meses)')),
+                        DropdownMenuItem(
+                          value: 4,
+                          child: Text('4 semanas (1 mês)'),
+                        ),
+                        DropdownMenuItem(
+                          value: 8,
+                          child: Text('8 semanas (2 meses)'),
+                        ),
+                        DropdownMenuItem(
+                          value: 12,
+                          child: Text('12 semanas (3 meses)'),
+                        ),
+                        DropdownMenuItem(
+                          value: 16,
+                          child: Text('16 semanas (4 meses)'),
+                        ),
                       ],
                       onChanged: (val) {
-                        if (val != null) setDialogState(() => recurrenceCount = val);
+                        if (val != null)
+                          setDialogState(() => recurrenceCount = val);
                       },
                     ),
                     const SizedBox(height: 8),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: const Text('Respeitar disponibilidade da agenda', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                      subtitle: const Text('Pula automaticamente horários conflitantes via AvailabilityEngine', style: TextStyle(fontSize: 11)),
+                      title: const Text(
+                        'Respeitar disponibilidade da agenda',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      subtitle: const Text(
+                        'Pula automaticamente horários conflitantes via AvailabilityEngine',
+                        style: TextStyle(fontSize: 11),
+                      ),
                       value: respectAvailability,
-                      onChanged: (val) => setDialogState(() => respectAvailability = val),
+                      onChanged: (val) =>
+                          setDialogState(() => respectAvailability = val),
                     ),
                   ],
                   const SizedBox(height: 10),
@@ -2166,17 +3123,25 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: availability.isAvailable ? AppTheme.successGreen.withValues(alpha: 0.1) : AppTheme.alertAmber.withValues(alpha: 0.15),
+                      color: availability.isAvailable
+                          ? AppTheme.successGreen.withValues(alpha: 0.1)
+                          : AppTheme.alertAmber.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
-                        color: availability.isAvailable ? AppTheme.successGreen : AppTheme.alertAmber,
+                        color: availability.isAvailable
+                            ? AppTheme.successGreen
+                            : AppTheme.alertAmber,
                       ),
                     ),
                     child: Row(
                       children: [
                         Icon(
-                          availability.isAvailable ? Icons.check_circle : Icons.warning_amber,
-                          color: availability.isAvailable ? AppTheme.successGreen : AppTheme.alertAmber,
+                          availability.isAvailable
+                              ? Icons.check_circle
+                              : Icons.warning_amber,
+                          color: availability.isAvailable
+                              ? AppTheme.successGreen
+                              : AppTheme.alertAmber,
                           size: 20,
                         ),
                         const SizedBox(width: 8),
@@ -2186,7 +3151,9 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 13,
-                              color: availability.isAvailable ? AppTheme.successGreen : const Color(0xFF92400E),
+                              color: availability.isAvailable
+                                  ? AppTheme.successGreen
+                                  : const Color(0xFF92400E),
                             ),
                           ),
                         ),
@@ -2197,13 +3164,18 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
               ),
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancelar'),
+              ),
               ElevatedButton(
                 onPressed: () async {
                   final repo = ref.read(repositoryProvider);
                   int createdCount = 0;
                   int skippedCount = 0;
-                  final runningAppts = List<AppointmentEntry>.from(existingAppts);
+                  final runningAppts = List<AppointmentEntry>.from(
+                    existingAppts,
+                  );
 
                   for (final occ in occurrences) {
                     final occEnd = occ.add(Duration(minutes: durationMinutes));
@@ -2213,7 +3185,9 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                       existingAppointments: runningAppts,
                     );
 
-                    if (hasConflict && respectAvailability && occurrences.length > 1) {
+                    if (hasConflict &&
+                        respectAvailability &&
+                        occurrences.length > 1) {
                       skippedCount++;
                       continue;
                     }
@@ -2224,7 +3198,9 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                       endTime: occEnd,
                       durationMinutes: durationMinutes,
                       status: 'confirmado',
-                      locationNotes: locationController.text.trim().isEmpty ? null : locationController.text.trim(),
+                      locationNotes: locationController.text.trim().isEmpty
+                          ? null
+                          : locationController.text.trim(),
                     );
                     runningAppts.add(newEntry);
                     createdCount++;
@@ -2235,9 +3211,8 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                     final message = occurrences.length == 1
                         ? 'Saída de campo programada com sucesso!'
                         : '$createdCount saídas de campo programadas!${skippedCount > 0 ? " ($skippedCount puladas por conflito)" : ""}';
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(message)),
-                    );
+                    ScaffoldMessenger.of(context)
+                        .showSnackBar(SnackBar(content: Text(message)));
                   }
                 },
                 child: const Text('Programar Saída'),
@@ -2256,11 +3231,14 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
     final month = _selectedDate.month;
     final firstDayOfMonth = DateTime(year, month, 1);
     final daysInMonth = DateTime(year, month + 1, 0).day;
-    final startingWeekday = firstDayOfMonth.weekday % 7; // 0 = Domingo, 1 = Segunda...
+    final startingWeekday =
+        firstDayOfMonth.weekday % 7; // 0 = Domingo, 1 = Segunda...
 
     final Map<int, List<AppointmentEntry>> apptsByDay = {};
     for (final a in allAppts) {
-      if (a.deletedAt == null && a.startTime.year == year && a.startTime.month == month) {
+      if (a.deletedAt == null &&
+          a.startTime.year == year &&
+          a.startTime.month == month) {
         apptsByDay.putIfAbsent(a.startTime.day, () => []).add(a);
       }
     }
@@ -2281,13 +3259,102 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 6),
                 child: Row(
                   children: [
-                    const Expanded(child: Center(child: Text('DOM', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: AppTheme.alertRed)))),
-                    Expanded(child: Center(child: Text('SEG', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted)))),
-                    Expanded(child: Center(child: Text('TER', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted)))),
-                    Expanded(child: Center(child: Text('QUA', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted)))),
-                    Expanded(child: Center(child: Text('QUI', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted)))),
-                    Expanded(child: Center(child: Text('SEX', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted)))),
-                    Expanded(child: Center(child: Text('SÁB', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: isDark ? const Color(0xFF93C5FD) : AppTheme.primaryBlue)))),
+                    const Expanded(
+                      child: Center(
+                        child: Text(
+                          'DOM',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11,
+                            color: AppTheme.alertRed,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          'SEG',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11,
+                            color: isDark
+                                ? const Color(0xFFCBD5E1)
+                                : AppTheme.textMuted,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          'TER',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11,
+                            color: isDark
+                                ? const Color(0xFFCBD5E1)
+                                : AppTheme.textMuted,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          'QUA',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11,
+                            color: isDark
+                                ? const Color(0xFFCBD5E1)
+                                : AppTheme.textMuted,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          'QUI',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11,
+                            color: isDark
+                                ? const Color(0xFFCBD5E1)
+                                : AppTheme.textMuted,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          'SEX',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11,
+                            color: isDark
+                                ? const Color(0xFFCBD5E1)
+                                : AppTheme.textMuted,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          'SÁB',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11,
+                            color: isDark
+                                ? const Color(0xFF93C5FD)
+                                : AppTheme.primaryBlue,
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -2306,15 +3373,22 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                 itemCount: 42,
                 itemBuilder: (context, index) {
                   final dayNumber = index - startingWeekday + 1;
-                  final isCurrentMonth = dayNumber >= 1 && dayNumber <= daysInMonth;
+                  final isCurrentMonth =
+                      dayNumber >= 1 && dayNumber <= daysInMonth;
 
                   if (!isCurrentMonth) {
                     return const SizedBox.shrink();
                   }
 
                   final cellDate = DateTime(year, month, dayNumber);
-                  final isSelected = cellDate.day == _selectedDate.day && cellDate.month == _selectedDate.month && cellDate.year == _selectedDate.year;
-                  final isToday = cellDate.day == DateTime.now().day && cellDate.month == DateTime.now().month && cellDate.year == DateTime.now().year;
+                  final isSelected =
+                      cellDate.day == _selectedDate.day &&
+                      cellDate.month == _selectedDate.month &&
+                      cellDate.year == _selectedDate.year;
+                  final isToday =
+                      cellDate.day == DateTime.now().day &&
+                      cellDate.month == DateTime.now().month &&
+                      cellDate.year == DateTime.now().year;
                   final dayAppts = apptsByDay[dayNumber] ?? [];
 
                   return InkWell(
@@ -2323,18 +3397,30 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                     },
                     borderRadius: BorderRadius.circular(6),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 3,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: isSelected
-                            ? (isDark ? const Color(0xFF3B82F6).withValues(alpha: 0.25) : AppTheme.primaryBlue.withValues(alpha: 0.12))
+                            ? (isDark
+                                  ? const Color(0xFF3B82F6)
+                                        .withValues(alpha: 0.25)
+                                  : AppTheme.primaryBlue.withValues(
+                                      alpha: 0.12,
+                                    ))
                             : (isDark ? const Color(0xFF1E293B) : Colors.white),
                         borderRadius: BorderRadius.circular(6),
                         border: Border.all(
                           color: isSelected
-                              ? (isDark ? const Color(0xFF60A5FA) : AppTheme.primaryBlue)
+                              ? (isDark
+                                    ? const Color(0xFF60A5FA)
+                                    : AppTheme.primaryBlue)
                               : isToday
-                                  ? AppTheme.accentTeal
-                                  : (isDark ? const Color(0xFF334155) : Colors.grey.shade200),
+                              ? AppTheme.accentTeal
+                              : (isDark
+                                    ? const Color(0xFF334155)
+                                    : Colors.grey.shade200),
                           width: isSelected || isToday ? 2.0 : 1.0,
                         ),
                       ),
@@ -2345,18 +3431,32 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                  vertical: 1,
+                                ),
                                 decoration: isToday
-                                    ? BoxDecoration(color: isDark ? const Color(0xFF3B82F6) : AppTheme.primaryBlue, borderRadius: BorderRadius.circular(8))
+                                    ? BoxDecoration(
+                                        color: isDark
+                                            ? const Color(0xFF3B82F6)
+                                            : AppTheme.primaryBlue,
+                                        borderRadius: BorderRadius.circular(8),
+                                      )
                                     : null,
                                 child: Text(
                                   '$dayNumber',
                                   style: TextStyle(
                                     fontSize: 11,
-                                    fontWeight: isSelected || isToday ? FontWeight.bold : FontWeight.w600,
+                                    fontWeight: isSelected || isToday
+                                        ? FontWeight.bold
+                                        : FontWeight.w600,
                                     color: isToday
                                         ? Colors.white
-                                        : (index % 7 == 0 ? AppTheme.alertRed : (isDark ? Colors.white : AppTheme.textDark)),
+                                        : (index % 7 == 0
+                                              ? AppTheme.alertRed
+                                              : (isDark
+                                                    ? Colors.white
+                                                    : AppTheme.textDark)),
                                   ),
                                 ),
                               ),
@@ -2366,7 +3466,9 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                                   style: TextStyle(
                                     fontSize: 8.5,
                                     fontWeight: FontWeight.bold,
-                                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                    color: isDark
+                                        ? const Color(0xFF94A3B8)
+                                        : const Color(0xFF64748B),
                                   ),
                                 ),
                             ],
@@ -2376,14 +3478,24 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                             Builder(
                               builder: (context) {
                                 final color = _getAppointmentActivityColor(a);
-                                final timeStr = AppDateUtils.formatTime(a.startTime);
+                                final timeStr = AppDateUtils.formatTime(
+                                  a.startTime,
+                                );
                                 return Container(
                                   margin: const EdgeInsets.only(top: 2),
-                                  padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 3,
+                                    vertical: 1,
+                                  ),
                                   decoration: BoxDecoration(
-                                    color: color.withValues(alpha: isDark ? 0.35 : 0.15),
+                                    color: color.withValues(
+                                      alpha: isDark ? 0.35 : 0.15,
+                                    ),
                                     borderRadius: BorderRadius.circular(3),
-                                    border: Border.all(color: color.withValues(alpha: 0.6), width: 0.6),
+                                    border: Border.all(
+                                      color: color.withValues(alpha: 0.6),
+                                      width: 0.6,
+                                    ),
                                   ),
                                   child: Row(
                                     children: [
@@ -2392,7 +3504,9 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                                         style: TextStyle(
                                           fontSize: 8.5,
                                           fontWeight: FontWeight.bold,
-                                          color: isDark ? color.withValues(alpha: 0.95) : color,
+                                          color: isDark
+                                              ? color.withValues(alpha: 0.95)
+                                              : color,
                                         ),
                                       ),
                                       const SizedBox(width: 2),
@@ -2402,7 +3516,9 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                                           style: TextStyle(
                                             fontSize: 8.5,
                                             fontWeight: FontWeight.w600,
-                                            color: isDark ? Colors.white : AppTheme.textDark,
+                                            color: isDark
+                                                ? Colors.white
+                                                : AppTheme.textDark,
                                           ),
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
@@ -2436,14 +3552,24 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                         Expanded(
                           child: Text(
                             'Compromissos em ${AppDateUtils.formatDate(_selectedDate)}',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: isDark ? Colors.white : AppTheme.textDark),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                              color: isDark ? Colors.white : AppTheme.textDark,
+                            ),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         TextButton.icon(
                           icon: const Icon(Icons.add, size: 16),
-                          label: const Text('Novo', style: TextStyle(fontSize: 12)),
-                          onPressed: () => _showNewAppointmentModal(context, initialDateTime: _selectedDate),
+                          label: const Text(
+                            'Novo',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                          onPressed: () => _showNewAppointmentModal(
+                            context,
+                            initialDateTime: _selectedDate,
+                          ),
                         ),
                       ],
                     ),
@@ -2452,14 +3578,23 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF1E293B) : Colors.grey.shade50,
+                          color: isDark
+                              ? const Color(0xFF1E293B)
+                              : Colors.grey.shade50,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: isDark ? const Color(0xFF334155) : Colors.grey.shade200),
+                          border: Border.all(
+                            color: isDark
+                                ? const Color(0xFF334155)
+                                : Colors.grey.shade200,
+                          ),
                         ),
                         child: const Center(
                           child: Text(
                             'Nenhum compromisso agendado para esta data.',
-                            style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                            style: TextStyle(
+                              color: AppTheme.textMuted,
+                              fontSize: 13,
+                            ),
                           ),
                         ),
                       )
@@ -2474,16 +3609,25 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
                             side: BorderSide(
-                              color: isDark ? const Color(0xFF334155) : Colors.grey.shade200,
+                              color: isDark
+                                  ? const Color(0xFF334155)
+                                  : Colors.grey.shade200,
                             ),
                           ),
                           child: ListTile(
                             leading: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 6,
+                              ),
                               decoration: BoxDecoration(
-                                color: color.withValues(alpha: isDark ? 0.25 : 0.12),
+                                color: color.withValues(
+                                  alpha: isDark ? 0.25 : 0.12,
+                                ),
                                 borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: color.withValues(alpha: 0.5)),
+                                border: Border.all(
+                                  color: color.withValues(alpha: 0.5),
+                                ),
                               ),
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
@@ -2498,7 +3642,12 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                                   ),
                                   Text(
                                     '${appt.durationMinutes}m',
-                                    style: TextStyle(fontSize: 9, color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted),
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      color: isDark
+                                          ? const Color(0xFFCBD5E1)
+                                          : AppTheme.textMuted,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -2508,16 +3657,24 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 14,
-                                decoration: isDone ? TextDecoration.lineThrough : null,
+                                decoration: isDone
+                                    ? TextDecoration.lineThrough
+                                    : null,
                               ),
                             ),
                             subtitle: Text(
                               appt.locationNotes ?? 'Status: ${appt.status}',
-                              style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : AppTheme.textMuted),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDark
+                                    ? const Color(0xFF94A3B8)
+                                    : AppTheme.textMuted,
+                              ),
                             ),
                             trailing: IconButton(
                               icon: const Icon(Icons.more_vert, size: 20),
-                              onPressed: () => _showAppointmentActions(context, appt),
+                              onPressed: () =>
+                                  _showAppointmentActions(context, appt),
                             ),
                           ),
                         );
@@ -2535,7 +3692,9 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
   // 2. Visão de Calendário Semanal
   Widget _buildWeekCalendarView(List<AppointmentEntry> allAppts) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final monday = _selectedDate.subtract(Duration(days: (_selectedDate.weekday - 1) % 7));
+    final monday = _selectedDate.subtract(
+      Duration(days: (_selectedDate.weekday - 1) % 7),
+    );
     final weekDays = List.generate(7, (i) => monday.add(Duration(days: i)));
 
     return ListView.builder(
@@ -2543,14 +3702,31 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
       itemCount: 7,
       itemBuilder: (context, index) {
         final day = weekDays[index];
-        final isToday = day.day == DateTime.now().day && day.month == DateTime.now().month && day.year == DateTime.now().year;
-        final dayAppts = allAppts.where((a) =>
-            a.deletedAt == null &&
-            a.startTime.year == day.year &&
-            a.startTime.month == day.month &&
-            a.startTime.day == day.day).toList()..sort((a, b) => a.startTime.compareTo(b.startTime));
+        final isToday =
+            day.day == DateTime.now().day &&
+            day.month == DateTime.now().month &&
+            day.year == DateTime.now().year;
+        final dayAppts =
+            allAppts
+                .where(
+                  (a) =>
+                      a.deletedAt == null &&
+                      a.startTime.year == day.year &&
+                      a.startTime.month == day.month &&
+                      a.startTime.day == day.day,
+                )
+                .toList()
+              ..sort((a, b) => a.startTime.compareTo(b.startTime));
 
-        const weekdayNames = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
+        const weekdayNames = [
+          'Segunda',
+          'Terça',
+          'Quarta',
+          'Quinta',
+          'Sexta',
+          'Sábado',
+          'Domingo',
+        ];
 
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
@@ -2558,7 +3734,11 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
             color: isDark ? const Color(0xFF1E293B) : Colors.white,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: isToday ? AppTheme.accentTeal : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+              color: isToday
+                  ? AppTheme.accentTeal
+                  : (isDark
+                        ? const Color(0xFF334155)
+                        : const Color(0xFFE2E8F0)),
               width: isToday ? 2.0 : 1.0,
             ),
           ),
@@ -2566,12 +3746,21 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: isToday
-                      ? (isDark ? const Color(0xFF3B82F6).withValues(alpha: 0.25) : AppTheme.primaryBlue.withValues(alpha: 0.1))
-                      : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(9)),
+                      ? (isDark
+                            ? const Color(0xFF3B82F6).withValues(alpha: 0.25)
+                            : AppTheme.primaryBlue.withValues(alpha: 0.1))
+                      : (isDark
+                            ? const Color(0xFF0F172A)
+                            : const Color(0xFFF8FAFC)),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(9),
+                  ),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -2581,12 +3770,19 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 13,
-                        color: isToday ? AppTheme.primaryBlue : (isDark ? Colors.white : AppTheme.textDark),
+                        color: isToday
+                            ? AppTheme.primaryBlue
+                            : (isDark ? Colors.white : AppTheme.textDark),
                       ),
                     ),
                     Text(
                       '${dayAppts.length} compromisso(s)',
-                      style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : AppTheme.textMuted),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isDark
+                            ? const Color(0xFF94A3B8)
+                            : AppTheme.textMuted,
+                      ),
                     ),
                   ],
                 ),
@@ -2594,7 +3790,10 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
               if (dayAppts.isEmpty)
                 const Padding(
                   padding: EdgeInsets.all(12),
-                  child: Text('Nenhum compromisso', style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+                  child: Text(
+                    'Nenhum compromisso',
+                    style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                  ),
                 )
               else
                 ...dayAppts.map((appt) {
@@ -2602,18 +3801,36 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                   return ListTile(
                     dense: true,
                     leading: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: color.withValues(alpha: isDark ? 0.3 : 0.15),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
                         AppDateUtils.formatTime(appt.startTime),
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: color),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11,
+                          color: color,
+                        ),
                       ),
                     ),
-                    title: Text(appt.title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                    subtitle: appt.locationNotes != null ? Text(appt.locationNotes!, style: const TextStyle(fontSize: 11)) : null,
+                    title: Text(
+                      appt.title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
+                    subtitle: appt.locationNotes != null
+                        ? Text(
+                            appt.locationNotes!,
+                            style: const TextStyle(fontSize: 11),
+                          )
+                        : null,
                     trailing: IconButton(
                       icon: const Icon(Icons.more_vert, size: 18),
                       onPressed: () => _showAppointmentActions(context, appt),
@@ -2630,11 +3847,15 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
   // 3. Visão de Calendário Diário por Hora
   Widget _buildDayHourlyGridView(List<AppointmentEntry> allAppts) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final dayAppts = allAppts.where((a) =>
-        a.deletedAt == null &&
-        a.startTime.year == _selectedDate.year &&
-        a.startTime.month == _selectedDate.month &&
-        a.startTime.day == _selectedDate.day).toList();
+    final dayAppts = allAppts
+        .where(
+          (a) =>
+              a.deletedAt == null &&
+              a.startTime.year == _selectedDate.year &&
+              a.startTime.month == _selectedDate.month &&
+              a.startTime.day == _selectedDate.day,
+        )
+        .toList();
 
     return SingleChildScrollView(
       controller: _timeScrollController,
@@ -2645,17 +3866,32 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
           child: Column(
             children: List.generate(16, (i) {
               final hour = 7 + i; // 07:00 às 22:00
-              final hourStart = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day, hour, 0);
+              final hourStart = DateTime(
+                _selectedDate.year,
+                _selectedDate.month,
+                _selectedDate.day,
+                hour,
+                0,
+              );
               final hourEnd = hourStart.add(const Duration(hours: 1));
 
-              final inThisHour = dayAppts.where((a) =>
-                  a.startTime.isBefore(hourEnd) && a.endTime.isAfter(hourStart)).toList();
+              final inThisHour = dayAppts
+                  .where(
+                    (a) =>
+                        a.startTime.isBefore(hourEnd) &&
+                        a.endTime.isAfter(hourStart),
+                  )
+                  .toList();
 
               return Container(
                 height: 60,
                 decoration: BoxDecoration(
                   border: Border(
-                    bottom: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                    bottom: BorderSide(
+                      color: isDark
+                          ? const Color(0xFF334155)
+                          : const Color(0xFFE2E8F0),
+                    ),
                   ),
                 ),
                 child: Row(
@@ -2664,7 +3900,13 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                       width: 50,
                       child: Text(
                         '${hour.toString().padLeft(2, '0')}:00',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isDark ? const Color(0xFF94A3B8) : AppTheme.textMuted),
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: isDark
+                              ? const Color(0xFF94A3B8)
+                              : AppTheme.textMuted,
+                        ),
                       ),
                     ),
                     const VerticalDivider(width: 1),
@@ -2674,7 +3916,13 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                               onTap: () {
                                 _showNewAppointmentModal(
                                   context,
-                                  initialDateTime: DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day, hour, 0),
+                                  initialDateTime: DateTime(
+                                    _selectedDate.year,
+                                    _selectedDate.month,
+                                    _selectedDate.day,
+                                    hour,
+                                    0,
+                                  ),
                                 );
                               },
                               child: const SizedBox.expand(),
@@ -2684,21 +3932,38 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                               itemCount: inThisHour.length,
                               itemBuilder: (ctx, idx) {
                                 final appt = inThisHour[idx];
-                                final color = _getAppointmentActivityColor(appt);
+                                final color = _getAppointmentActivityColor(
+                                  appt,
+                                );
                                 return InkWell(
-                                  onTap: () => _showAppointmentActions(context, appt),
+                                  onTap: () =>
+                                      _showAppointmentActions(context, appt),
                                   child: Container(
-                                    margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    margin: const EdgeInsets.symmetric(
+                                      horizontal: 4,
+                                      vertical: 4,
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 6,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: color.withValues(alpha: isDark ? 0.35 : 0.15),
+                                      color: color.withValues(
+                                        alpha: isDark ? 0.35 : 0.15,
+                                      ),
                                       borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: color.withValues(alpha: 0.6)),
+                                      border: Border.all(
+                                        color: color.withValues(alpha: 0.6),
+                                      ),
                                     ),
                                     child: Center(
                                       child: Text(
                                         '${AppDateUtils.formatTime(appt.startTime)} ${appt.title}',
-                                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isDark ? Colors.white : color),
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: isDark ? Colors.white : color,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -2719,8 +3984,11 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
   // 4. Visão em Lista Linear
   Widget _buildListView(List<AppointmentEntry> allAppts) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final activeAppts = allAppts.where((a) => a.deletedAt == null && a.status != 'cancelado').toList()
-      ..sort((a, b) => a.startTime.compareTo(b.startTime));
+    final activeAppts =
+        allAppts
+            .where((a) => a.deletedAt == null && a.status != 'cancelado')
+            .toList()
+          ..sort((a, b) => a.startTime.compareTo(b.startTime));
 
     if (activeAppts.isEmpty) {
       return Center(
@@ -2755,7 +4023,9 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
           margin: const EdgeInsets.only(bottom: 8),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8),
-            side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+            side: BorderSide(
+              color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+            ),
           ),
           child: ListTile(
             leading: Container(
@@ -2778,7 +4048,12 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                   ),
                   Text(
                     '${appt.durationMinutes}m',
-                    style: TextStyle(fontSize: 10, color: isDark ? const Color(0xFF94A3B8) : AppTheme.textMuted),
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: isDark
+                          ? const Color(0xFF94A3B8)
+                          : AppTheme.textMuted,
+                    ),
                   ),
                 ],
               ),
@@ -2793,7 +4068,10 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
             ),
             subtitle: Text(
               '${AppDateUtils.formatDate(appt.startTime)} • ${appt.locationNotes ?? appt.status}',
-              style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : AppTheme.textMuted),
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark ? const Color(0xFF94A3B8) : AppTheme.textMuted,
+              ),
             ),
             trailing: IconButton(
               icon: const Icon(Icons.more_vert, size: 20),
@@ -2811,22 +4089,42 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
     final activitiesAsync = ref.watch(activitiesStreamProvider);
     final peopleAsync = ref.watch(peopleStreamProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final passedPersonIds = (peopleAsync.value ?? []).where((p) => p.status == 'revisita_passada').map((p) => p.id).toSet();
-    final allAppts = (appointmentsAsync.value ?? []).where((a) => a.personId == null || !passedPersonIds.contains(a.personId)).toList();
+    final passedPersonIds = (peopleAsync.value ?? [])
+        .where((p) => p.status == 'revisita_passada')
+        .map((p) => p.id)
+        .toSet();
+    final allAppts = (appointmentsAsync.value ?? [])
+        .where(
+          (a) => a.personId == null || !passedPersonIds.contains(a.personId),
+        )
+        .toList();
     final allActivities = activitiesAsync.value ?? [];
 
-    final monthActivities = allActivities.where((a) =>
-        a.deletedAt == null &&
-        a.date.year == _selectedDate.year &&
-        a.date.month == _selectedDate.month).toList();
-    final actualHours = monthActivities.fold(0.0, (acc, a) => acc + (a.durationSeconds / 3600.0));
+    final monthActivities = allActivities
+        .where(
+          (a) =>
+              a.deletedAt == null &&
+              a.date.year == _selectedDate.year &&
+              a.date.month == _selectedDate.month,
+        )
+        .toList();
+    final actualHours = monthActivities.fold(
+      0.0,
+      (acc, a) => acc + (a.durationSeconds / 3600.0),
+    );
 
-    final monthAppts = allAppts.where((a) =>
-        a.deletedAt == null &&
-        a.status != 'cancelado' &&
-        a.startTime.year == _selectedDate.year &&
-        a.startTime.month == _selectedDate.month).toList();
-    final scheduledHours = monthAppts.where(isMinistryAppointment).fold(0.0, (acc, a) => acc + (a.durationMinutes / 60.0));
+    final monthAppts = allAppts
+        .where(
+          (a) =>
+              a.deletedAt == null &&
+              a.status != 'cancelado' &&
+              a.startTime.year == _selectedDate.year &&
+              a.startTime.month == _selectedDate.month,
+        )
+        .toList();
+    final scheduledHours = monthAppts
+        .where(isMinistryAppointment)
+        .fold(0.0, (acc, a) => acc + (a.durationMinutes / 60.0));
 
     return Scaffold(
       appBar: AppBar(
@@ -2838,16 +4136,24 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                 ? IconButton(
                     icon: const Icon(Icons.sync_alt),
                     tooltip: 'Sincronizar Calendários (Google / iCloud / .ics)',
-                    onPressed: () => _showOfficialCalendarSyncModal(context, allAppts),
+                    onPressed: () =>
+                        _showOfficialCalendarSyncModal(context, allAppts),
                   )
                 : FilledButton.tonalIcon(
                     style: FilledButton.styleFrom(
                       visualDensity: VisualDensity.compact,
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 0,
+                      ),
                     ),
                     icon: const Icon(Icons.sync_alt, size: 16),
-                    label: const Text('Sincronizar Calendários', style: TextStyle(fontSize: 12)),
-                    onPressed: () => _showOfficialCalendarSyncModal(context, allAppts),
+                    label: const Text(
+                      'Sincronizar Calendários',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    onPressed: () =>
+                        _showOfficialCalendarSyncModal(context, allAppts),
                   ),
           ),
           IconButton(
@@ -2862,7 +4168,9 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'fab_novo_compromisso',
-        backgroundColor: isDark ? const Color(0xFF3B82F6) : AppTheme.primaryBlue,
+        backgroundColor: isDark
+            ? const Color(0xFF3B82F6)
+            : AppTheme.primaryBlue,
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add),
         label: const Text('Novo Compromisso'),
@@ -2883,7 +4191,11 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                     Expanded(
                       child: Row(
                         children: [
-                          const Icon(Icons.sync, size: 16, color: AppTheme.primaryBlue),
+                          const Icon(
+                            Icons.sync,
+                            size: 16,
+                            color: AppTheme.primaryBlue,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
@@ -2891,7 +4203,9 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
-                                color: isDark ? const Color(0xFF93C5FD) : AppTheme.primaryBlue,
+                                color: isDark
+                                    ? const Color(0xFF93C5FD)
+                                    : AppTheme.primaryBlue,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -2901,10 +4215,19 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                     ),
                     const SizedBox(width: 8),
                     TextButton.icon(
-                      style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                      ),
                       icon: const Icon(Icons.sync_alt, size: 14),
-                      label: const Text('Configurar / Importar', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                      onPressed: () => _showOfficialCalendarSyncModal(context, allAppts),
+                      label: const Text(
+                        'Configurar / Importar',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      onPressed: () =>
+                          _showOfficialCalendarSyncModal(context, allAppts),
                     ),
                   ],
                 ),
@@ -2932,11 +4255,19 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                           onPressed: () {
                             setState(() {
                               if (_viewMode == 'Mês') {
-                                _selectedDate = DateTime(_selectedDate.year, _selectedDate.month - 1, _selectedDate.day.clamp(1, 28));
+                                _selectedDate = DateTime(
+                                  _selectedDate.year,
+                                  _selectedDate.month - 1,
+                                  _selectedDate.day.clamp(1, 28),
+                                );
                               } else if (_viewMode == 'Semana') {
-                                _selectedDate = _selectedDate.subtract(const Duration(days: 7));
+                                _selectedDate = _selectedDate.subtract(
+                                  const Duration(days: 7),
+                                );
                               } else {
-                                _selectedDate = _selectedDate.subtract(const Duration(days: 1));
+                                _selectedDate = _selectedDate.subtract(
+                                  const Duration(days: 1),
+                                );
                               }
                             });
                           },
@@ -2957,11 +4288,19 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                           onPressed: () {
                             setState(() {
                               if (_viewMode == 'Mês') {
-                                _selectedDate = DateTime(_selectedDate.year, _selectedDate.month + 1, _selectedDate.day.clamp(1, 28));
+                                _selectedDate = DateTime(
+                                  _selectedDate.year,
+                                  _selectedDate.month + 1,
+                                  _selectedDate.day.clamp(1, 28),
+                                );
                               } else if (_viewMode == 'Semana') {
-                                _selectedDate = _selectedDate.add(const Duration(days: 7));
+                                _selectedDate = _selectedDate.add(
+                                  const Duration(days: 7),
+                                );
                               } else {
-                                _selectedDate = _selectedDate.add(const Duration(days: 1));
+                                _selectedDate = _selectedDate.add(
+                                  const Duration(days: 1),
+                                );
                               }
                             });
                           },
@@ -2975,16 +4314,30 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
                       segments: const [
-                        ButtonSegment(value: 'Mês', label: Text('Mês', style: TextStyle(fontSize: 12))),
-                        ButtonSegment(value: 'Semana', label: Text('Semana', style: TextStyle(fontSize: 12))),
-                        ButtonSegment(value: 'Dia', label: Text('Dia', style: TextStyle(fontSize: 12))),
-                        ButtonSegment(value: 'Lista', label: Text('Lista', style: TextStyle(fontSize: 12))),
+                        ButtonSegment(
+                          value: 'Mês',
+                          label: Text('Mês', style: TextStyle(fontSize: 12)),
+                        ),
+                        ButtonSegment(
+                          value: 'Semana',
+                          label: Text('Semana', style: TextStyle(fontSize: 12)),
+                        ),
+                        ButtonSegment(
+                          value: 'Dia',
+                          label: Text('Dia', style: TextStyle(fontSize: 12)),
+                        ),
+                        ButtonSegment(
+                          value: 'Lista',
+                          label: Text('Lista', style: TextStyle(fontSize: 12)),
+                        ),
                       ],
                       selected: {_viewMode},
                       onSelectionChanged: (val) {
                         setState(() => _viewMode = val.first);
                         if (_viewMode == 'Dia') {
-                          WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToCurrentTime());
+                          WidgetsBinding.instance.addPostFrameCallback(
+                            (_) => _scrollToCurrentTime(),
+                          );
                         }
                       },
                     );
@@ -3002,7 +4355,9 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                                 tooltip: 'Hoje',
                                 visualDensity: VisualDensity.compact,
                                 onPressed: () {
-                                  setState(() => _selectedDate = DateTime.now());
+                                  setState(
+                                    () => _selectedDate = DateTime.now(),
+                                  );
                                   _scrollToCurrentTime();
                                 },
                               ),
@@ -3016,10 +4371,7 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
 
                     return Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        navRow,
-                        segButton,
-                      ],
+                      children: [navRow, segButton],
                     );
                   },
                 ),
@@ -3037,7 +4389,11 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                 constraints: const BoxConstraints(maxWidth: 860),
                 child: Row(
                   children: [
-                    const Icon(Icons.av_timer, size: 18, color: AppTheme.primaryBlue),
+                    const Icon(
+                      Icons.av_timer,
+                      size: 18,
+                      color: AppTheme.primaryBlue,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -3045,7 +4401,9 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1E40AF),
+                          color: isDark
+                              ? const Color(0xFF93C5FD)
+                              : const Color(0xFF1E40AF),
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -3055,13 +4413,27 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                       children: [
                         TextButton.icon(
                           icon: const Icon(Icons.copy_all_outlined, size: 15),
-                          label: const Text('Copiar Programação', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                          onPressed: () => _showMonthlyScheduleCopyWizard(context, allAppts),
+                          label: const Text(
+                            'Copiar Programação',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          onPressed: () =>
+                              _showMonthlyScheduleCopyWizard(context, allAppts),
                         ),
                         TextButton.icon(
                           icon: const Icon(Icons.alarm_add, size: 15),
-                          label: const Text('Programar Campo', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                          onPressed: () => _showFieldMinistryScheduleModal(context),
+                          label: const Text(
+                            'Programar Campo',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          onPressed: () =>
+                              _showFieldMinistryScheduleModal(context),
                         ),
                       ],
                     ),
@@ -3076,7 +4448,13 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
           Expanded(
             child: appointmentsAsync.when(
               data: (appts) {
-                final activeAppts = appts.where((a) => a.personId == null || !passedPersonIds.contains(a.personId)).toList();
+                final activeAppts = appts
+                    .where(
+                      (a) =>
+                          a.personId == null ||
+                          !passedPersonIds.contains(a.personId),
+                    )
+                    .toList();
                 if (_viewMode == 'Mês') {
                   return _buildMonthCalendarView(activeAppts);
                 } else if (_viewMode == 'Semana') {

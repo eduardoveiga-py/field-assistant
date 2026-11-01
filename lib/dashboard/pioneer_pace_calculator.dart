@@ -45,7 +45,9 @@ class PioneerPaceCalculator {
     final safeGoal = math.max(0.0, goalHours);
     final safeCompleted = math.max(0.0, completedHours);
     final bool isGoalReached = safeCompleted >= safeGoal && safeGoal > 0;
-    final double remainingHours = isGoalReached ? 0.0 : math.max(0.0, safeGoal - safeCompleted);
+    final double remainingHours = isGoalReached
+        ? 0.0
+        : math.max(0.0, safeGoal - safeCompleted);
 
     // Contagem de saídas programadas restantes no mês (do dia atual até o último dia do mês)
     const daysInMonth = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
@@ -81,7 +83,8 @@ class PioneerPaceCalculator {
       final hoursStr = remainingHours.truncateToDouble() == remainingHours
           ? remainingHours.toStringAsFixed(0)
           : remainingHours.toStringAsFixed(1);
-      formattedPaceText = 'Faltam ${hoursStr}h em 0 saídas. Seu ritmo ideal é de ${hoursPart}h${minPart.toString().padLeft(2, '0')}m por saída';
+      formattedPaceText =
+          'Faltam ${hoursStr}h em 0 saídas. Seu ritmo ideal é de ${hoursPart}h${minPart.toString().padLeft(2, '0')}m por saída';
     } else {
       final totalMin = ((remainingHours / remainingOutings) * 60).round();
       idealPacePerOuting = Duration(minutes: totalMin);
@@ -90,7 +93,8 @@ class PioneerPaceCalculator {
       final hoursStr = remainingHours.truncateToDouble() == remainingHours
           ? remainingHours.toStringAsFixed(0)
           : remainingHours.toStringAsFixed(1);
-      formattedPaceText = 'Faltam ${hoursStr}h em $remainingOutings saídas. Seu ritmo ideal é de ${hoursPart}h${minPart.toString().padLeft(2, '0')}m por saída';
+      formattedPaceText =
+          'Faltam ${hoursStr}h em $remainingOutings saídas. Seu ritmo ideal é de ${hoursPart}h${minPart.toString().padLeft(2, '0')}m por saída';
     }
 
     return PioneerPaceResult(

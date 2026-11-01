@@ -15,14 +15,22 @@ class AppTheme {
   static const Color successGreen = Color(0xFF16A34A);
 
   // Helpers contextuais para alto contraste (Tema Claro x Escuro)
-  static bool isDark(BuildContext context) => Theme.of(context).brightness == Brightness.dark;
-  static Color textPrimary(BuildContext context) => isDark(context) ? const Color(0xFFF8FAFC) : textDark;
-  static Color textSecondary(BuildContext context) => isDark(context) ? const Color(0xFFCBD5E1) : textMuted;
-  static Color surfaceColor(BuildContext context) => isDark(context) ? const Color(0xFF0F172A) : surfaceLight;
-  static Color cardColor(BuildContext context) => isDark(context) ? const Color(0xFF1E293B) : cardLight;
-  static Color primaryColor(BuildContext context) => isDark(context) ? const Color(0xFF60A5FA) : primaryBlue;
-  static Color subtleBorder(BuildContext context) => isDark(context) ? const Color(0xFF334155) : const Color(0xFFCBD5E1);
-  static Color subtleContainer(BuildContext context) => isDark(context) ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+  static bool isDark(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark;
+  static Color textPrimary(BuildContext context) =>
+      isDark(context) ? const Color(0xFFF8FAFC) : textDark;
+  static Color textSecondary(BuildContext context) =>
+      isDark(context) ? const Color(0xFFCBD5E1) : textMuted;
+  static Color surfaceColor(BuildContext context) =>
+      isDark(context) ? const Color(0xFF0F172A) : surfaceLight;
+  static Color cardColor(BuildContext context) =>
+      isDark(context) ? const Color(0xFF1E293B) : cardLight;
+  static Color primaryColor(BuildContext context) =>
+      isDark(context) ? const Color(0xFF60A5FA) : primaryBlue;
+  static Color subtleBorder(BuildContext context) =>
+      isDark(context) ? const Color(0xFF334155) : const Color(0xFFCBD5E1);
+  static Color subtleContainer(BuildContext context) =>
+      isDark(context) ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
 
   static ThemeData get lightTheme {
     return ThemeData(
@@ -61,13 +69,8 @@ class AppTheme {
           foregroundColor: Colors.white,
           minimumSize: const Size(48, 48), // Mínimo 48dp para toque de campo
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
-          textStyle: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -76,15 +79,16 @@ class AppTheme {
           minimumSize: const Size(48, 48),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           side: const BorderSide(color: primaryBlue, width: 1.5),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.5),
@@ -97,7 +101,10 @@ class AppTheme {
           borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: primaryBlue, width: 2),
         ),
-        labelStyle: const TextStyle(color: textMuted, fontWeight: FontWeight.w500),
+        labelStyle: const TextStyle(
+          color: textMuted,
+          fontWeight: FontWeight.w500,
+        ),
       ),
     );
   }
@@ -139,13 +146,8 @@ class AppTheme {
           foregroundColor: Colors.white,
           minimumSize: const Size(48, 48),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
-          textStyle: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -154,15 +156,16 @@ class AppTheme {
           minimumSize: const Size(48, 48),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           side: const BorderSide(color: Color(0xFF60A5FA), width: 1.5),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: const Color(0xFF1E293B),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: Color(0xFF475569), width: 1.5),
@@ -175,18 +178,30 @@ class AppTheme {
           borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: Color(0xFF60A5FA), width: 2),
         ),
-        labelStyle: const TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.w500),
+        labelStyle: const TextStyle(
+          color: Color(0xFF94A3B8),
+          fontWeight: FontWeight.w500,
+        ),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: const Color(0xFF1E293B),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        titleTextStyle: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-        contentTextStyle: const TextStyle(color: Color(0xFFF1F5F9), fontSize: 14),
+        titleTextStyle: const TextStyle(
+          color: Colors.white,
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+        ),
+        contentTextStyle: const TextStyle(
+          color: Color(0xFFF1F5F9),
+          fontSize: 14,
+        ),
       ),
       bottomSheetTheme: const BottomSheetThemeData(
         backgroundColor: Color(0xFF1E293B),
         modalBackgroundColor: Color(0xFF1E293B),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
       ),
       dividerTheme: const DividerThemeData(
         color: Color(0xFF334155),
@@ -201,7 +216,10 @@ class AppTheme {
         bodyMedium: TextStyle(color: Color(0xFFF1F5F9)),
         bodySmall: TextStyle(color: Color(0xFFCBD5E1)),
         titleLarge: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        titleMedium: TextStyle(color: Color(0xFFF8FAFC), fontWeight: FontWeight.w600),
+        titleMedium: TextStyle(
+          color: Color(0xFFF8FAFC),
+          fontWeight: FontWeight.w600,
+        ),
         titleSmall: TextStyle(color: Color(0xFFE2E8F0)),
         labelLarge: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
         labelMedium: TextStyle(color: Color(0xFFCBD5E1)),
@@ -277,8 +295,14 @@ class AppTheme {
         selectedColor: const Color(0xFF000000),
         secondarySelectedColor: const Color(0xFF000000),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        labelStyle: const TextStyle(color: Color(0xFF000000), fontWeight: FontWeight.w800),
-        secondaryLabelStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+        labelStyle: const TextStyle(
+          color: Color(0xFF000000),
+          fontWeight: FontWeight.w800,
+        ),
+        secondaryLabelStyle: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w800,
+        ),
         side: const BorderSide(color: Color(0xFF000000), width: 2),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
@@ -298,24 +322,53 @@ class AppTheme {
           borderRadius: BorderRadius.all(Radius.circular(8)),
           borderSide: BorderSide(color: Color(0xFF000000), width: 3),
         ),
-        labelStyle: TextStyle(color: Color(0xFF000000), fontWeight: FontWeight.w800),
+        labelStyle: TextStyle(
+          color: Color(0xFF000000),
+          fontWeight: FontWeight.w800,
+        ),
       ),
       dividerTheme: const DividerThemeData(
         color: Color(0xFF000000),
         thickness: 2,
       ),
       textTheme: const TextTheme(
-        bodyLarge: TextStyle(color: Color(0xFF000000), fontWeight: FontWeight.w700),
-        bodyMedium: TextStyle(color: Color(0xFF000000), fontWeight: FontWeight.w600),
-        bodySmall: TextStyle(color: Color(0xFF1E293B), fontWeight: FontWeight.w600),
-        titleLarge: TextStyle(color: Color(0xFF000000), fontWeight: FontWeight.w900),
-        titleMedium: TextStyle(color: Color(0xFF000000), fontWeight: FontWeight.w800),
-        titleSmall: TextStyle(color: Color(0xFF000000), fontWeight: FontWeight.w800),
-        labelLarge: TextStyle(color: Color(0xFF000000), fontWeight: FontWeight.w800),
-        labelMedium: TextStyle(color: Color(0xFF000000), fontWeight: FontWeight.w700),
-        labelSmall: TextStyle(color: Color(0xFF000000), fontWeight: FontWeight.w700),
+        bodyLarge: TextStyle(
+          color: Color(0xFF000000),
+          fontWeight: FontWeight.w700,
+        ),
+        bodyMedium: TextStyle(
+          color: Color(0xFF000000),
+          fontWeight: FontWeight.w600,
+        ),
+        bodySmall: TextStyle(
+          color: Color(0xFF1E293B),
+          fontWeight: FontWeight.w600,
+        ),
+        titleLarge: TextStyle(
+          color: Color(0xFF000000),
+          fontWeight: FontWeight.w900,
+        ),
+        titleMedium: TextStyle(
+          color: Color(0xFF000000),
+          fontWeight: FontWeight.w800,
+        ),
+        titleSmall: TextStyle(
+          color: Color(0xFF000000),
+          fontWeight: FontWeight.w800,
+        ),
+        labelLarge: TextStyle(
+          color: Color(0xFF000000),
+          fontWeight: FontWeight.w800,
+        ),
+        labelMedium: TextStyle(
+          color: Color(0xFF000000),
+          fontWeight: FontWeight.w700,
+        ),
+        labelSmall: TextStyle(
+          color: Color(0xFF000000),
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
 }
-

@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:drift/native.dart';
 import 'package:ministerio_pessoal/database/app_database.dart';
@@ -58,10 +59,11 @@ void main() {
       expect(appt.personId, equals(person.id));
 
       // 3. Formata anotações com contagem de presentes
-      final formattedNotes = DashboardCalculator.formatSessionNotesWithAttendance(
-        'Excelente progresso na lição sobre a criação.',
-        attendance,
-      );
+      final formattedNotes =
+          DashboardCalculator.formatSessionNotesWithAttendance(
+            'Excelente progresso na lição sobre a criação.',
+            attendance,
+          );
       expect(formattedNotes, contains('[Assistência: 2]'));
 
       // 4. Cria visita atômica vinculando o appointmentId
@@ -138,7 +140,10 @@ void main() {
 
       expect(conflictCheck.isAvailable, isFalse);
       expect(conflictCheck.conflictingAppointments.length, equals(1));
-      expect(conflictCheck.conflictingAppointments.first.title, equals('Reunião Congregacional'));
+      expect(
+        conflictCheck.conflictingAppointments.first.title,
+        equals('Reunião Congregacional'),
+      );
       expect(conflictCheck.suggestedAlternativeSlots.isNotEmpty, isTrue);
 
       // Horário alternativo sugerido deve estar livre
@@ -195,10 +200,11 @@ void main() {
       );
 
       // 2. Cria visita registrando o contato
-      final formattedNotes = DashboardCalculator.formatSessionNotesWithAttendance(
-        'Iniciamos a brochura Seja Feliz para Sempre.',
-        attendance,
-      );
+      final formattedNotes =
+          DashboardCalculator.formatSessionNotesWithAttendance(
+            'Iniciamos a brochura Seja Feliz para Sempre.',
+            attendance,
+          );
 
       final visit = await repo.createVisit(
         personId: person.id,
@@ -289,7 +295,10 @@ void main() {
       }).toList();
 
       expect(sameDay.length, equals(2));
-      expect(sameDay.map((a) => a.id), containsAll([apptMorning.id, apptAfternoon.id]));
+      expect(
+        sameDay.map((a) => a.id),
+        containsAll([apptMorning.id, apptAfternoon.id]),
+      );
 
       // Verifica disponibilidade para agendar às 14:15 (deve detectar conflito com apptAfternoon)
       final avail = AvailabilityEngine.checkAvailability(
@@ -299,8 +308,14 @@ void main() {
       );
 
       expect(avail.isAvailable, isFalse);
-      expect(avail.conflictingAppointments.any((c) => c.id == apptAfternoon.id), isTrue);
-      expect(avail.conflictingAppointments.any((c) => c.id == apptMorning.id), isFalse);
+      expect(
+        avail.conflictingAppointments.any((c) => c.id == apptAfternoon.id),
+        isTrue,
+      );
+      expect(
+        avail.conflictingAppointments.any((c) => c.id == apptMorning.id),
+        isFalse,
+      );
     });
 
     test('Contatos sem coordenadas geográficas são excluídos dos pinos georreferenciados no mapa', () {
@@ -331,29 +346,46 @@ void main() {
       );
 
       final allContacts = [contactWithCoords, contactWithoutCoords];
-      final geoContacts = allContacts.where((p) => p.latitude != null && p.longitude != null).toList();
+      final geoContacts = allContacts
+          .where((p) => p.latitude != null && p.longitude != null)
+          .toList();
 
       expect(geoContacts.length, equals(1));
       expect(geoContacts.first.id, equals('c1'));
-      expect(allContacts.length - geoContacts.length, equals(1)); // 1 não mapeado
+      expect(
+        allContacts.length - geoContacts.length,
+        equals(1),
+      ); // 1 não mapeado
     });
   });
 
   group('Geometria e Reprojeção do Mapa de Contatos (Sem Ballooning)', () {
     const double tileSize = 256.0;
 
-    int lon2tileX(double lon, int z) => ((lon + 180.0) / 360.0 * (1 << z)).floor();
+    int lon2tileX(double lon, int z) =>
+        ((lon + 180.0) / 360.0 * (1 << z)).floor();
     int lat2tileY(double lat, int z) {
       final latRad = lat.clamp(-85.0511, 85.0511) * math.pi / 180.0;
-      return ((1.0 - math.log(math.tan(latRad) + 1.0 / math.cos(latRad)) / math.pi) / 2.0 * (1 << z)).floor();
+      return ((1.0 -
+                  math.log(math.tan(latRad) + 1.0 / math.cos(latRad)) /
+                      math.pi) /
+              2.0 *
+              (1 << z))
+          .floor();
     }
-    double lon2pixelX(double lon, int z) => (lon + 180.0) / 360.0 * (tileSize * (1 << z));
+
+    double lon2pixelX(double lon, int z) =>
+        (lon + 180.0) / 360.0 * (tileSize * (1 << z));
     double lat2pixelY(double lat, int z) {
       final latRad = lat.clamp(-85.0511, 85.0511) * math.pi / 180.0;
       final sinLat = math.sin(latRad).clamp(-0.9999, 0.9999);
-      return (0.5 - math.log((1.0 + sinLat) / (1.0 - sinLat)) / (4.0 * math.pi)) * (tileSize * (1 << z));
+      return (0.5 -
+              math.log((1.0 + sinLat) / (1.0 - sinLat)) / (4.0 * math.pi)) *
+          (tileSize * (1 << z));
     }
-    double pixelX2lon(double px, int z) => (px / (tileSize * (1 << z))) * 360.0 - 180.0;
+
+    double pixelX2lon(double px, int z) =>
+        (px / (tileSize * (1 << z))) * 360.0 - 180.0;
     double pixelY2lat(double py, int z) {
       final n = math.pi - (2.0 * math.pi * py) / (tileSize * (1 << z));
       return 180.0 / math.pi * math.atan(0.5 * (math.exp(n) - math.exp(-n)));
@@ -370,8 +402,16 @@ void main() {
         final recoveredLon = pixelX2lon(px, z);
         final recoveredLat = pixelY2lat(py, z);
 
-        expect(recoveredLon, closeTo(lon, 0.0001), reason: 'Falha no zoom $z para longitude');
-        expect(recoveredLat, closeTo(lat, 0.0001), reason: 'Falha no zoom $z para latitude');
+        expect(
+          recoveredLon,
+          closeTo(lon, 0.0001),
+          reason: 'Falha no zoom $z para longitude',
+        );
+        expect(
+          recoveredLat,
+          closeTo(lat, 0.0001),
+          reason: 'Falha no zoom $z para latitude',
+        );
 
         // Tiles adjacentes são positivos e finitos
         final tx = lon2tileX(lon, z);

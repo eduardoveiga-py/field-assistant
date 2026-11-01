@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../database/app_database.dart';
 import '../database/repository.dart';
 import '../settings/backup_service.dart';
@@ -33,29 +34,42 @@ final studiesStreamProvider = StreamProvider<List<BibleStudyEntry>>((ref) {
   return repo.watchAllStudies();
 });
 
-final appointmentsStreamProvider = StreamProvider<List<AppointmentEntry>>((ref) {
+final appointmentsStreamProvider = StreamProvider<List<AppointmentEntry>>((
+  ref,
+) {
   final repo = ref.watch(repositoryProvider);
   return repo.watchAppointments();
 });
 
-final activitiesStreamProvider = StreamProvider<List<ActivityRecordEntry>>((ref) {
+final activitiesStreamProvider = StreamProvider<List<ActivityRecordEntry>>((
+  ref,
+) {
   final repo = ref.watch(repositoryProvider);
   return repo.watchActivities();
 });
 
-final studyParticipantsStreamProvider = StreamProvider<List<StudyParticipantEntry>>((ref) {
-  final repo = ref.watch(repositoryProvider);
-  return (repo.db.select(repo.db.studyParticipants)..where((t) => t.deletedAt.isNull())).watch();
-});
+final studyParticipantsStreamProvider =
+    StreamProvider<List<StudyParticipantEntry>>((ref) {
+      final repo = ref.watch(repositoryProvider);
+      return (repo.db.select(
+        repo.db.studyParticipants,
+      )..where((t) => t.deletedAt.isNull())).watch();
+    });
 
-final studySessionsStreamProvider = StreamProvider<List<StudySessionEntry>>((ref) {
+final studySessionsStreamProvider = StreamProvider<List<StudySessionEntry>>((
+  ref,
+) {
   final repo = ref.watch(repositoryProvider);
-  return (repo.db.select(repo.db.studySessions)..where((t) => t.deletedAt.isNull())).watch();
+  return (repo.db.select(
+    repo.db.studySessions,
+  )..where((t) => t.deletedAt.isNull())).watch();
 });
 
 final visitsStreamProvider = StreamProvider<List<VisitEntry>>((ref) {
   final repo = ref.watch(repositoryProvider);
-  return (repo.db.select(repo.db.visits)..where((t) => t.deletedAt.isNull())).watch();
+  return (repo.db.select(
+    repo.db.visits,
+  )..where((t) => t.deletedAt.isNull())).watch();
 });
 
 /// Notifier e Provider do Modo Sol Intenso & Alto Contraste
@@ -71,6 +85,6 @@ class SunModeNotifier extends Notifier<bool> {
   void toggle() => state = !state;
 }
 
-final sunModeProvider = NotifierProvider<SunModeNotifier, bool>(SunModeNotifier.new);
-
-
+final sunModeProvider = NotifierProvider<SunModeNotifier, bool>(
+  SunModeNotifier.new,
+);

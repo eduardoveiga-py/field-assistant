@@ -27,15 +27,21 @@ void main() {
       await db.close();
     });
 
-    test('Auto-inicialização insere setores padrão: Betânia, Lago Grande e Cidade', () async {
-      final sectors = await sectorManager.getSectors();
-      expect(sectors.length, equals(3));
-      final names = sectors.map((s) => s.name).toList();
-      expect(names, containsAll(['Betânia', 'Lago Grande', 'Cidade']));
-    });
+    test(
+      'Auto-inicialização insere setores padrão: Betânia, Lago Grande e Cidade',
+      () async {
+        final sectors = await sectorManager.getSectors();
+        expect(sectors.length, equals(3));
+        final names = sectors.map((s) => s.name).toList();
+        expect(names, containsAll(['Betânia', 'Lago Grande', 'Cidade']));
+      },
+    );
 
     test('Adiciona novo setor personalizado com sucesso', () async {
-      final sec = await sectorManager.addSector('Vila Nova', description: 'Próximo à rodovia');
+      final sec = await sectorManager.addSector(
+        'Vila Nova',
+        description: 'Próximo à rodovia',
+      );
       expect(sec.name, equals('Vila Nova'));
       expect(sec.description, equals('Próximo à rodovia'));
 
@@ -98,26 +104,29 @@ void main() {
       await db.close();
     });
 
-    test('Adiciona ponto de referência com coordenadas e categoria válidas', () async {
-      final landmark = await landmarkManager.addLandmark(
-        name: 'Padaria Estrela',
-        category: 'padaria',
-        address: 'Av. Principal, 500',
-        latitude: -23.551,
-        longitude: -46.634,
-        notes: 'Ponto de encontro da saída de campo',
-      );
+    test(
+      'Adiciona ponto de referência com coordenadas e categoria válidas',
+      () async {
+        final landmark = await landmarkManager.addLandmark(
+          name: 'Padaria Estrela',
+          category: 'padaria',
+          address: 'Av. Principal, 500',
+          latitude: -23.551,
+          longitude: -46.634,
+          notes: 'Ponto de encontro da saída de campo',
+        );
 
-      expect(landmark.id, isNotEmpty);
-      expect(landmark.name, equals('Padaria Estrela'));
-      expect(landmark.category, equals('padaria'));
-      expect(landmark.categoryLabel, equals('Padaria / Comércio'));
-      expect(landmark.latitude, equals(-23.551));
+        expect(landmark.id, isNotEmpty);
+        expect(landmark.name, equals('Padaria Estrela'));
+        expect(landmark.category, equals('padaria'));
+        expect(landmark.categoryLabel, equals('Padaria / Comércio'));
+        expect(landmark.latitude, equals(-23.551));
 
-      final all = await landmarkManager.getLandmarks();
-      expect(all.length, equals(4)); // 3 padrão + 1 novo
-      expect(all.any((l) => l.name == 'Padaria Estrela'), isTrue);
-    });
+        final all = await landmarkManager.getLandmarks();
+        expect(all.length, equals(4)); // 3 padrão + 1 novo
+        expect(all.any((l) => l.name == 'Padaria Estrela'), isTrue);
+      },
+    );
 
     test('Atualização e exclusão de ponto de referência', () async {
       final lm = await landmarkManager.addLandmark(
@@ -137,26 +146,43 @@ void main() {
 
       await landmarkManager.updateLandmark(updated);
       var all = await landmarkManager.getLandmarks();
-      expect(all.any((l) => l.name == 'Escola Municipal Central' && l.address == 'Rua da Educação, 10'), isTrue);
+      expect(
+        all.any(
+          (l) =>
+              l.name == 'Escola Municipal Central' &&
+              l.address == 'Rua da Educação, 10',
+        ),
+        isTrue,
+      );
 
       await landmarkManager.deleteLandmark(lm.id);
       all = await landmarkManager.getLandmarks();
       expect(all.any((l) => l.id == lm.id), isFalse);
     });
 
-    test('watchLandmarks() emite os marcos existentes imediatamente na inscrição', () async {
-      await landmarkManager.addLandmark(name: 'Escola Municipal Teste', category: 'escola');
-      final landmarks = await landmarkManager.watchLandmarks().first;
-      expect(landmarks.any((l) => l.name == 'Escola Municipal Teste'), isTrue);
-    });
+    test(
+      'watchLandmarks() emite os marcos existentes imediatamente na inscrição',
+      () async {
+        await landmarkManager.addLandmark(
+          name: 'Escola Municipal Teste',
+          category: 'escola',
+        );
+        final landmarks = await landmarkManager.watchLandmarks().first;
+        expect(
+          landmarks.any((l) => l.name == 'Escola Municipal Teste'),
+          isTrue,
+        );
+      },
+    );
   });
 
   group('Contagem de Assistência e Presentes (DashboardCalculator)', () {
     test('Formata e extrai contagem de assistência em visitas', () {
-      final notesWithAttendance = DashboardCalculator.formatVisitNotesWithAttendance(
-        'Conversa bíblica agradável',
-        3,
-      );
+      final notesWithAttendance =
+          DashboardCalculator.formatVisitNotesWithAttendance(
+            'Conversa bíblica agradável',
+            3,
+          );
       expect(notesWithAttendance, contains('[Assistência: 3]'));
       expect(notesWithAttendance, contains('Conversa bíblica agradável'));
 

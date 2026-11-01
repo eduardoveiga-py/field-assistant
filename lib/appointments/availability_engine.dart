@@ -45,7 +45,9 @@ class AvailabilityEngine {
       if (status == 'cancelado' ||
           status == 'nao_realizado' ||
           status == 'reagendado' ||
-          status == 'realizado') {
+          status == 'realizado' ||
+          status == 'concluido' ||
+          status == 'concluído') {
         continue;
       }
 
@@ -54,7 +56,8 @@ class AvailabilityEngine {
 
       final bool hasOverlap;
       if (bufferMinutes > 0) {
-        hasOverlap = effectiveStart.isBefore(apptEnd) && effectiveEnd.isAfter(apptStart);
+        hasOverlap =
+            effectiveStart.isBefore(apptEnd) && effectiveEnd.isAfter(apptStart);
       } else {
         hasOverlap = start.isBefore(apptEnd) && end.isAfter(apptStart);
       }
@@ -72,7 +75,8 @@ class AvailabilityEngine {
 
       final bool hasOverlap;
       if (bufferMinutes > 0) {
-        hasOverlap = effectiveStart.isBefore(extEnd) && effectiveEnd.isAfter(extStart);
+        hasOverlap =
+            effectiveStart.isBefore(extEnd) && effectiveEnd.isAfter(extStart);
       } else {
         hasOverlap = start.isBefore(extEnd) && end.isAfter(extStart);
       }
@@ -112,7 +116,9 @@ class AvailabilityEngine {
       if (status == 'cancelado' ||
           status == 'nao_realizado' ||
           status == 'reagendado' ||
-          status == 'realizado') {
+          status == 'realizado' ||
+          status == 'concluido' ||
+          status == 'concluído') {
         continue;
       }
 
@@ -121,7 +127,8 @@ class AvailabilityEngine {
 
       final bool hasOverlap;
       if (bufferMinutes > 0) {
-        hasOverlap = effectiveStart.isBefore(apptEnd) && effectiveEnd.isAfter(apptStart);
+        hasOverlap =
+            effectiveStart.isBefore(apptEnd) && effectiveEnd.isAfter(apptStart);
       } else {
         hasOverlap = startTime.isBefore(apptEnd) && endTime.isAfter(apptStart);
       }
@@ -140,7 +147,8 @@ class AvailabilityEngine {
 
       final bool hasOverlap;
       if (bufferMinutes > 0) {
-        hasOverlap = effectiveStart.isBefore(extEnd) && effectiveEnd.isAfter(extStart);
+        hasOverlap =
+            effectiveStart.isBefore(extEnd) && effectiveEnd.isAfter(extStart);
       } else {
         hasOverlap = startTime.isBefore(extEnd) && endTime.isAfter(extStart);
       }
@@ -166,9 +174,16 @@ class AvailabilityEngine {
       ...extConflicts.map((c) => c.endTime),
     ]..sort();
 
-    DateTime candidateAfter = allEndTimes.last.add(Duration(minutes: bufferMinutes));
+    DateTime candidateAfter = allEndTimes.last.add(
+      Duration(minutes: bufferMinutes),
+    );
     for (int i = 0; i < 5; i++) {
-      candidateAfter = _adjustToWorkingHours(candidateAfter, durationMinutes, dayStartHour, dayEndHour);
+      candidateAfter = _adjustToWorkingHours(
+        candidateAfter,
+        durationMinutes,
+        dayStartHour,
+        dayEndHour,
+      );
       final candEnd = candidateAfter.add(Duration(minutes: durationMinutes));
       if (!hasCollision(
         start: candidateAfter,
@@ -181,13 +196,20 @@ class AvailabilityEngine {
         suggestions.add(candidateAfter);
         break;
       }
-      candidateAfter = candidateAfter.add(Duration(minutes: durationMinutes + bufferMinutes));
+      candidateAfter = candidateAfter.add(
+        Duration(minutes: durationMinutes + bufferMinutes),
+      );
     }
 
     // Candidato 2: 1 hora ou 2 horas após o horário proposto
     for (int offsetHours in [1, 2, 3]) {
       var cand = startTime.add(Duration(hours: offsetHours));
-      cand = _adjustToWorkingHours(cand, durationMinutes, dayStartHour, dayEndHour);
+      cand = _adjustToWorkingHours(
+        cand,
+        durationMinutes,
+        dayStartHour,
+        dayEndHour,
+      );
       final candEnd = cand.add(Duration(minutes: durationMinutes));
       if (!hasCollision(
         start: cand,
@@ -207,7 +229,12 @@ class AvailabilityEngine {
     // Candidato 3: Mesmo horário no dia seguinte
     for (int dayOffset in [1, 2, 3]) {
       var nextDay = startTime.add(Duration(days: dayOffset));
-      nextDay = _adjustToWorkingHours(nextDay, durationMinutes, dayStartHour, dayEndHour);
+      nextDay = _adjustToWorkingHours(
+        nextDay,
+        durationMinutes,
+        dayStartHour,
+        dayEndHour,
+      );
       final nextDayEnd = nextDay.add(Duration(minutes: durationMinutes));
       if (!hasCollision(
         start: nextDay,
@@ -230,7 +257,8 @@ class AvailabilityEngine {
       conflictingAppointments: conflicts,
       conflictingExternalEvents: extConflicts,
       suggestedAlternativeSlots: suggestions,
-      message: 'Conflito detectado com $totalConflicts compromisso(s) ou evento(s) externo(s).',
+      message:
+          'Conflito detectado com $totalConflicts compromisso(s) ou evento(s) externo(s).',
     );
   }
 

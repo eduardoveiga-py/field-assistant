@@ -1,7 +1,9 @@
 import 'dart:io';
 import 'dart:typed_data';
+
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
+
 import 'tile_cache_interface.dart';
 
 TileCacheBackend getTileBackend() => TileCacheNative();
@@ -42,9 +44,12 @@ class TileCacheNative implements TileCacheBackend {
 
       // Download online if not cached
       final uri = Uri.parse('https://tile.openstreetmap.org/$z/$x/$y.png');
-      final res = await http.get(uri, headers: {
-        'User-Agent': 'MinisterioPessoalOfflineTerritorio/1.0',
-      }).timeout(const Duration(seconds: 8));
+      final res = await http
+          .get(
+            uri,
+            headers: {'User-Agent': 'MinisterioPessoalOfflineTerritorio/1.0'},
+          )
+          .timeout(const Duration(seconds: 8));
 
       if (res.statusCode == 200) {
         await saveTile(z, x, y, res.bodyBytes);
@@ -85,7 +90,10 @@ class TileCacheNative implements TileCacheBackend {
       final dir = await _getDir();
       if (!await dir.exists()) return 0;
       int count = 0;
-      await for (final entity in dir.list(recursive: true, followLinks: false)) {
+      await for (final entity in dir.list(
+        recursive: true,
+        followLinks: false,
+      )) {
         if (entity is File && entity.path.endsWith('.png')) {
           count++;
         }

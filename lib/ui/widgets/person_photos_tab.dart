@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../../database/app_database.dart';
@@ -39,7 +40,9 @@ class _PersonPhotosTabState extends ConsumerState<PersonPhotosTab> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Foto adicionada com sucesso à galeria!')),
+          const SnackBar(
+            content: Text('Foto adicionada com sucesso à galeria!'),
+          ),
         );
       }
     }
@@ -86,11 +89,19 @@ class _PersonPhotosTabState extends ConsumerState<PersonPhotosTab> {
                   ),
                   child: const Icon(Icons.person, color: AppTheme.primaryBlue),
                 ),
-                title: const Text('Foto do Estudante / Morador', style: TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: const Text('Foto para identificar visualmente a pessoa'),
+                title: const Text(
+                  'Foto do Estudante / Morador',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: const Text(
+                  'Foto para identificar visualmente a pessoa',
+                ),
                 onTap: () {
                   Navigator.pop(ctx);
-                  _addNewPhoto('person', defaultTitle: 'Foto do Estudante / Morador');
+                  _addNewPhoto(
+                    'person',
+                    defaultTitle: 'Foto do Estudante / Morador',
+                  );
                 },
               ),
               const Divider(height: 1),
@@ -103,11 +114,19 @@ class _PersonPhotosTabState extends ConsumerState<PersonPhotosTab> {
                   ),
                   child: const Icon(Icons.home, color: AppTheme.accentTeal),
                 ),
-                title: const Text('Fachada da Casa / Residência', style: TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: const Text('Ajuda a localizar o endereço no território'),
+                title: const Text(
+                  'Fachada da Casa / Residência',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: const Text(
+                  'Ajuda a localizar o endereço no território',
+                ),
                 onTap: () {
                   Navigator.pop(ctx);
-                  _addNewPhoto('house', defaultTitle: 'Foto da Fachada / Residência');
+                  _addNewPhoto(
+                    'house',
+                    defaultTitle: 'Foto da Fachada / Residência',
+                  );
                 },
               ),
               const Divider(height: 1),
@@ -120,11 +139,19 @@ class _PersonPhotosTabState extends ConsumerState<PersonPhotosTab> {
                   ),
                   child: const Icon(Icons.menu_book, color: Colors.purple),
                 ),
-                title: const Text('Anotação de Estudo / Publicação', style: TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: const Text('Registro de parágrafos, dúvidas ou esboços'),
+                title: const Text(
+                  'Anotação de Estudo / Publicação',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: const Text(
+                  'Registro de parágrafos, dúvidas ou esboços',
+                ),
                 onTap: () {
                   Navigator.pop(ctx);
-                  _addNewPhoto('study', defaultTitle: 'Foto de Anotação ou Lição');
+                  _addNewPhoto(
+                    'study',
+                    defaultTitle: 'Foto de Anotação ou Lição',
+                  );
                 },
               ),
             ],
@@ -163,7 +190,9 @@ class _PersonPhotosTabState extends ConsumerState<PersonPhotosTab> {
   @override
   Widget build(BuildContext context) {
     final allPhotos = ref.watch(personPhotosStreamProvider).value ?? [];
-    final personPhotos = allPhotos.where((p) => p.personId == widget.person.id).toList();
+    final personPhotos = allPhotos
+        .where((p) => p.personId == widget.person.id)
+        .toList();
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -181,7 +210,11 @@ class _PersonPhotosTabState extends ConsumerState<PersonPhotosTab> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.photo_library_outlined, size: 72, color: Colors.grey.shade400),
+                    Icon(
+                      Icons.photo_library_outlined,
+                      size: 72,
+                      color: Colors.grey.shade400,
+                    ),
                     const SizedBox(height: 16),
                     Text(
                       'Nenhuma foto anexada ainda',
@@ -197,7 +230,9 @@ class _PersonPhotosTabState extends ConsumerState<PersonPhotosTab> {
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 13,
-                        color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted,
+                        color: isDark
+                            ? const Color(0xFFCBD5E1)
+                            : AppTheme.textMuted,
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -228,7 +263,12 @@ class _PersonPhotosTabState extends ConsumerState<PersonPhotosTab> {
                       ),
                       Text(
                         'Toque para ampliar com zoom',
-                        style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : AppTheme.textMuted),
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: isDark
+                              ? const Color(0xFF94A3B8)
+                              : AppTheme.textMuted,
+                        ),
                       ),
                     ],
                   ),
@@ -239,45 +279,59 @@ class _PersonPhotosTabState extends ConsumerState<PersonPhotosTab> {
                         final crossAxisCount = constraints.maxWidth > 800
                             ? 4
                             : constraints.maxWidth > 500
-                                ? 3
-                                : 2;
+                            ? 3
+                            : 2;
 
                         return GridView.builder(
-                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: crossAxisCount,
-                            crossAxisSpacing: 10,
-                            mainAxisSpacing: 10,
-                            childAspectRatio: 0.85,
-                          ),
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: crossAxisCount,
+                                crossAxisSpacing: 10,
+                                mainAxisSpacing: 10,
+                                childAspectRatio: 0.85,
+                              ),
                           itemCount: personPhotos.length,
                           itemBuilder: (context, index) {
                             final photo = personPhotos[index];
                             final badgeColor = _getBadgeColor(photo.photoType);
-                            final badgeLabel = _formatPhotoTypeLabel(photo.photoType);
+                            final badgeLabel = _formatPhotoTypeLabel(
+                              photo.photoType,
+                            );
 
                             return Card(
                               clipBehavior: Clip.antiAlias,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                               elevation: 2,
                               child: InkWell(
                                 onTap: () {
                                   MediaPickerHelper.showFullScreenImage(
                                     context,
                                     imageSource: photo.imageData,
-                                    title: '${widget.person.name} • $badgeLabel',
+                                    title:
+                                        '${widget.person.name} • $badgeLabel',
                                     onDelete: () async {
-                                      final mgr = ref.read(personPhotosManagerProvider);
+                                      final mgr = ref.read(
+                                        personPhotosManagerProvider,
+                                      );
                                       await mgr.deletePhotoById(photo.id);
                                       if (context.mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(content: Text('Foto removida com sucesso.')),
-                                        );
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  'Foto removida com sucesso.',
+                                                ),
+                                              ),
+                                            );
                                       }
                                     },
                                   );
                                 },
                                 child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
                                   children: [
                                     Expanded(
                                       child: Stack(
@@ -291,10 +345,17 @@ class _PersonPhotosTabState extends ConsumerState<PersonPhotosTab> {
                                             top: 6,
                                             left: 6,
                                             child: Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 8,
+                                                    vertical: 3,
+                                                  ),
                                               decoration: BoxDecoration(
-                                                color: badgeColor.withValues(alpha: 0.85),
-                                                borderRadius: BorderRadius.circular(12),
+                                                color: badgeColor.withValues(
+                                                  alpha: 0.85,
+                                                ),
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
                                               ),
                                               child: Text(
                                                 badgeLabel,
@@ -312,7 +373,9 @@ class _PersonPhotosTabState extends ConsumerState<PersonPhotosTab> {
                                             child: Container(
                                               padding: const EdgeInsets.all(4),
                                               decoration: BoxDecoration(
-                                                color: Colors.black.withValues(alpha: 0.5),
+                                                color: Colors.black.withValues(
+                                                  alpha: 0.5,
+                                                ),
                                                 shape: BoxShape.circle,
                                               ),
                                               child: const Icon(
@@ -326,19 +389,31 @@ class _PersonPhotosTabState extends ConsumerState<PersonPhotosTab> {
                                       ),
                                     ),
                                     Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 6,
+                                      ),
                                       child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
                                         children: [
                                           Text(
-                                            AppDateUtils.formatDate(photo.createdAt),
+                                            AppDateUtils.formatDate(
+                                              photo.createdAt,
+                                            ),
                                             style: TextStyle(
                                               fontSize: 11,
-                                              color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted,
+                                              color: isDark
+                                                  ? const Color(0xFFCBD5E1)
+                                                  : AppTheme.textMuted,
                                             ),
                                           ),
                                           IconButton(
-                                            icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                                            icon: const Icon(
+                                              Icons.delete_outline,
+                                              size: 18,
+                                              color: Colors.red,
+                                            ),
                                             padding: EdgeInsets.zero,
                                             constraints: const BoxConstraints(),
                                             tooltip: 'Excluir foto',
@@ -346,21 +421,50 @@ class _PersonPhotosTabState extends ConsumerState<PersonPhotosTab> {
                                               final confirmed = await showDialog<bool>(
                                                 context: context,
                                                 builder: (dCtx) => AlertDialog(
-                                                  title: const Text('Excluir Foto'),
-                                                  content: const Text('Tem certeza de que deseja remover esta foto?'),
+                                                  title: const Text(
+                                                    'Excluir Foto',
+                                                  ),
+                                                  content: const Text(
+                                                    'Tem certeza de que deseja remover esta foto?',
+                                                  ),
                                                   actions: [
-                                                    TextButton(onPressed: () => Navigator.pop(dCtx, false), child: const Text('Cancelar')),
+                                                    TextButton(
+                                                      onPressed: () =>
+                                                          Navigator.pop(
+                                                            dCtx,
+                                                            false,
+                                                          ),
+                                                      child: const Text(
+                                                        'Cancelar',
+                                                      ),
+                                                    ),
                                                     ElevatedButton(
-                                                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-                                                      onPressed: () => Navigator.pop(dCtx, true),
-                                                      child: const Text('Excluir'),
+                                                      style:
+                                                          ElevatedButton.styleFrom(
+                                                            backgroundColor:
+                                                                Colors.red,
+                                                            foregroundColor:
+                                                                Colors.white,
+                                                          ),
+                                                      onPressed: () =>
+                                                          Navigator.pop(
+                                                            dCtx,
+                                                            true,
+                                                          ),
+                                                      child: const Text(
+                                                        'Excluir',
+                                                      ),
                                                     ),
                                                   ],
                                                 ),
                                               );
                                               if (confirmed == true) {
-                                                final mgr = ref.read(personPhotosManagerProvider);
-                                                await mgr.deletePhotoById(photo.id);
+                                                final mgr = ref.read(
+                                                  personPhotosManagerProvider,
+                                                );
+                                                await mgr.deletePhotoById(
+                                                  photo.id,
+                                                );
                                               }
                                             },
                                           ),

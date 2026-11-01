@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import '../database/app_database.dart';
 import '../publications/publication_catalog.dart';
 import '../publications/publication_link_resolver.dart';
@@ -45,14 +46,19 @@ class DoorstepBriefingData {
     this.voiceNoteDurationSeconds,
   });
 
-  bool get hasLessonOrTopic => lessonAndPoint != null && lessonAndPoint!.trim().isNotEmpty;
+  bool get hasLessonOrTopic =>
+      lessonAndPoint != null && lessonAndPoint!.trim().isNotEmpty;
   bool get hasJwLibraryLink => jwLibraryUri != null;
-  bool get hasPendingDoubt => pendingDoubt != null && pendingDoubt!.trim().isNotEmpty;
-  bool get hasSpiritualGoal => spiritualGoal != null && spiritualGoal!.trim().isNotEmpty;
-  bool get hasEmpathyNote => empathyNote != null && empathyNote!.trim().isNotEmpty;
+  bool get hasPendingDoubt =>
+      pendingDoubt != null && pendingDoubt!.trim().isNotEmpty;
+  bool get hasSpiritualGoal =>
+      spiritualGoal != null && spiritualGoal!.trim().isNotEmpty;
+  bool get hasEmpathyNote =>
+      empathyNote != null && empathyNote!.trim().isNotEmpty;
   bool get hasVoiceNote =>
       (audioFilePath != null && audioFilePath!.trim().isNotEmpty) ||
-      (voiceNoteTranscription != null && voiceNoteTranscription!.trim().isNotEmpty);
+      (voiceNoteTranscription != null &&
+          voiceNoteTranscription!.trim().isNotEmpty);
 
   /// Indica se há pelo menos um dado relevante para exibição no card
   bool get hasAnyData =>
@@ -106,8 +112,17 @@ class DoorstepBriefingHelper {
     VisitEntry? latestVisit,
     VoiceNoteItem? latestVoiceNote,
   }) {
-    final lessonInfo = _extractLessonAndPoint(linkedStudy, latestVisit, latestVoiceNote);
-    final pendingDoubt = _extractPendingDoubt(latestVisit, linkedStudy, person, latestVoiceNote);
+    final lessonInfo = _extractLessonAndPoint(
+      linkedStudy,
+      latestVisit,
+      latestVoiceNote,
+    );
+    final pendingDoubt = _extractPendingDoubt(
+      latestVisit,
+      linkedStudy,
+      person,
+      latestVoiceNote,
+    );
     final spiritualGoal = _extractSpiritualGoal(person, linkedStudy);
     final empathyNote = _extractEmpathyNote(person, latestVoiceNote);
 
@@ -124,7 +139,8 @@ class DoorstepBriefingHelper {
     );
   }
 
-  static ({String? lessonAndPoint, Uri? jwLibraryUri, String? publicationTitle}) _extractLessonAndPoint(
+  static ({String? lessonAndPoint, Uri? jwLibraryUri, String? publicationTitle})
+  _extractLessonAndPoint(
     BibleStudyEntry? linkedStudy,
     VisitEntry? latestVisit, [
     VoiceNoteItem? latestVoiceNote,
@@ -143,13 +159,15 @@ class DoorstepBriefingHelper {
 
       if (hasLesson && hasParagraph) {
         final lessonPad = linkedStudy.currentLesson.toString().padLeft(2, '0');
-        lessonAndPoint = 'Lição $lessonPad, Ponto ${linkedStudy.currentParagraph}';
+        lessonAndPoint =
+            'Lição $lessonPad, Ponto ${linkedStudy.currentParagraph}';
       } else if (hasLesson) {
         final lessonPad = linkedStudy.currentLesson.toString().padLeft(2, '0');
         lessonAndPoint = 'Lição $lessonPad';
       } else if (hasParagraph) {
         lessonAndPoint = 'Ponto ${linkedStudy.currentParagraph}';
-      } else if (linkedStudy.manualReference != null && linkedStudy.manualReference!.trim().isNotEmpty) {
+      } else if (linkedStudy.manualReference != null &&
+          linkedStudy.manualReference!.trim().isNotEmpty) {
         lessonAndPoint = linkedStudy.manualReference!.trim();
       } else if (publicationTitle != null) {
         lessonAndPoint = publicationTitle;
@@ -168,7 +186,8 @@ class DoorstepBriefingHelper {
         );
         if (resolved.url != null && resolved.url!.trim().isNotEmpty) {
           jwLibraryUri = Uri.tryParse(resolved.url!.trim());
-        } else if (resolved.fallbackUrl != null && resolved.fallbackUrl!.trim().isNotEmpty) {
+        } else if (resolved.fallbackUrl != null &&
+            resolved.fallbackUrl!.trim().isNotEmpty) {
           jwLibraryUri = Uri.tryParse(resolved.fallbackUrl!.trim());
         }
       } catch (_) {
@@ -176,7 +195,8 @@ class DoorstepBriefingHelper {
       }
     }
 
-    if ((lessonAndPoint == null || lessonAndPoint.isEmpty) && latestVisit != null) {
+    if ((lessonAndPoint == null || lessonAndPoint.isEmpty) &&
+        latestVisit != null) {
       final scripture = latestVisit.scriptureOrPub?.trim();
       final topic = latestVisit.topicsDiscussed?.trim();
 
@@ -192,8 +212,10 @@ class DoorstepBriefingHelper {
       }
     }
 
-    if ((lessonAndPoint == null || lessonAndPoint.isEmpty) && latestVoiceNote != null) {
-      if (latestVoiceNote.detectedLesson != null && latestVoiceNote.detectedPoint != null) {
+    if ((lessonAndPoint == null || lessonAndPoint.isEmpty) &&
+        latestVoiceNote != null) {
+      if (latestVoiceNote.detectedLesson != null &&
+          latestVoiceNote.detectedPoint != null) {
         final pad = latestVoiceNote.detectedLesson.toString().padLeft(2, '0');
         lessonAndPoint = 'Lição $pad, Ponto ${latestVoiceNote.detectedPoint}';
       } else if (latestVoiceNote.detectedLesson != null) {
@@ -205,7 +227,9 @@ class DoorstepBriefingHelper {
     }
 
     return (
-      lessonAndPoint: lessonAndPoint != null && lessonAndPoint.trim().isNotEmpty ? lessonAndPoint.trim() : null,
+      lessonAndPoint: lessonAndPoint != null && lessonAndPoint.trim().isNotEmpty
+          ? lessonAndPoint.trim()
+          : null,
       jwLibraryUri: jwLibraryUri,
       publicationTitle: publicationTitle,
     );
@@ -239,7 +263,8 @@ class DoorstepBriefingHelper {
     }
 
     final personNextAction = person.nextActionNote?.trim();
-    if (personNextAction != null && personNextAction.isNotEmpty) return personNextAction;
+    if (personNextAction != null && personNextAction.isNotEmpty)
+      return personNextAction;
 
     if (latestVoiceNote != null) {
       final voiceDoubt = latestVoiceNote.extractedPendingDoubt?.trim();
@@ -249,10 +274,14 @@ class DoorstepBriefingHelper {
     return null;
   }
 
-  static String? _extractSpiritualGoal(PersonEntry person, BibleStudyEntry? linkedStudy) {
+  static String? _extractSpiritualGoal(
+    PersonEntry person,
+    BibleStudyEntry? linkedStudy,
+  ) {
     final targets = parseTargets(person.contactRestrictions);
     for (final target in targets) {
-      final isCompleted = target['isCompleted'] == true || target['isCompleted'] == 'true';
+      final isCompleted =
+          target['isCompleted'] == true || target['isCompleted'] == 'true';
       if (!isCompleted) {
         final title = target['title']?.toString().trim();
         if (title != null && title.isNotEmpty) {
@@ -269,7 +298,10 @@ class DoorstepBriefingHelper {
     return null;
   }
 
-  static String? _extractEmpathyNote(PersonEntry person, [VoiceNoteItem? latestVoiceNote]) {
+  static String? _extractEmpathyNote(
+    PersonEntry person, [
+    VoiceNoteItem? latestVoiceNote,
+  ]) {
     final notes = parseNotes(person.generalNotes);
     if (notes.isEmpty) {
       final voiceEmpathy = latestVoiceNote?.extractedEmpathyNote?.trim();
@@ -322,7 +354,7 @@ class DoorstepBriefingHelper {
         'id': 'legacy-note',
         'text': trimmed,
         'createdAt': DateTime.now().toIso8601String(),
-      }
+      },
     ];
   }
 
@@ -352,7 +384,7 @@ class DoorstepBriefingHelper {
         'isCompleted': false,
         'createdAt': DateTime.now().toIso8601String(),
         'completedAt': null,
-      }
+      },
     ];
   }
 }

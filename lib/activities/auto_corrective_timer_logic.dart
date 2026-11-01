@@ -58,13 +58,21 @@ class AutoCorrectiveTimerLogic {
 
     final now = nowOverride ?? DateTime.now();
     final currentSessionDuration = now.difference(startedAt);
-    final totalElapsed = accumulatedDuration + (currentSessionDuration.isNegative ? Duration.zero : currentSessionDuration);
+    final totalElapsed =
+        accumulatedDuration +
+        (currentSessionDuration.isNegative
+            ? Duration.zero
+            : currentSessionDuration);
 
     // Caso 1: Reabertura após longo período de inatividade
-    if (lastHeartbeat != null && now.difference(lastHeartbeat) >= inactiveHeartbeatGap) {
+    if (lastHeartbeat != null &&
+        now.difference(lastHeartbeat) >= inactiveHeartbeatGap) {
       final hbDiff = lastHeartbeat.difference(startedAt);
-      final activePortion = accumulatedDuration + (hbDiff.isNegative ? Duration.zero : hbDiff);
-      final suggested = activePortion.inMinutes > 15 ? activePortion : defaultSuggestedSession;
+      final activePortion =
+          accumulatedDuration + (hbDiff.isNegative ? Duration.zero : hbDiff);
+      final suggested = activePortion.inMinutes > 15
+          ? activePortion
+          : defaultSuggestedSession;
 
       final h = totalElapsed.inHours;
       final m = totalElapsed.inMinutes.remainder(60);

@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import 'package:drift/drift.dart';
+
 import '../database/app_database.dart';
 import '../database/repository.dart';
 import '../ui/providers.dart';
@@ -55,26 +57,29 @@ class VoiceNotesManager {
     required Map<String, dynamic> payload,
   }) async {
     try {
-      await db.into(db.syncQueue).insert(
-        SyncQueueCompanion.insert(
-          id: _uuid.v4(),
-          entityType: 'voice_notes',
-          entityId: entityId,
-          operation: operation,
-          payload: jsonEncode(payload),
-          createdAt: DateTime.now(),
-          status: const Value('pending'),
-        ),
-      );
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: _uuid.v4(),
+              entityType: 'voice_notes',
+              entityId: entityId,
+              operation: operation,
+              payload: jsonEncode(payload),
+              createdAt: DateTime.now(),
+              status: const Value('pending'),
+            ),
+          );
     } catch (_) {}
   }
 
   Future<List<VoiceNoteItem>> getAllVoiceNotes() async {
     try {
-      final rows = await (db.select(db.voiceNotes)
-            ..where((tbl) => tbl.deletedAt.isNull())
-            ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
-          .get();
+      final rows =
+          await (db.select(db.voiceNotes)
+                ..where((tbl) => tbl.deletedAt.isNull())
+                ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+              .get();
       return rows.map(_entryToItem).toList();
     } catch (_) {
       return [];
@@ -83,10 +88,14 @@ class VoiceNotesManager {
 
   Future<List<VoiceNoteItem>> getVoiceNotesForPerson(String personId) async {
     try {
-      final rows = await (db.select(db.voiceNotes)
-            ..where((tbl) => tbl.personId.equals(personId) & tbl.deletedAt.isNull())
-            ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
-          .get();
+      final rows =
+          await (db.select(db.voiceNotes)
+                ..where(
+                  (tbl) =>
+                      tbl.personId.equals(personId) & tbl.deletedAt.isNull(),
+                )
+                ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+              .get();
       return rows.map(_entryToItem).toList();
     } catch (_) {
       return [];
@@ -95,7 +104,9 @@ class VoiceNotesManager {
 
   Stream<List<VoiceNoteItem>> watchVoiceNotesForPerson(String personId) {
     return (db.select(db.voiceNotes)
-          ..where((tbl) => tbl.personId.equals(personId) & tbl.deletedAt.isNull())
+          ..where(
+            (tbl) => tbl.personId.equals(personId) & tbl.deletedAt.isNull(),
+          )
           ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
         .watch()
         .map((rows) => rows.map(_entryToItem).toList());
@@ -103,11 +114,15 @@ class VoiceNotesManager {
 
   Future<VoiceNoteItem?> getLatestVoiceNoteForPerson(String personId) async {
     try {
-      final rows = await (db.select(db.voiceNotes)
-            ..where((tbl) => tbl.personId.equals(personId) & tbl.deletedAt.isNull())
-            ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
-            ..limit(1))
-          .get();
+      final rows =
+          await (db.select(db.voiceNotes)
+                ..where(
+                  (tbl) =>
+                      tbl.personId.equals(personId) & tbl.deletedAt.isNull(),
+                )
+                ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
+                ..limit(1))
+              .get();
       if (rows.isEmpty) return null;
       return _entryToItem(rows.first);
     } catch (_) {
@@ -119,7 +134,9 @@ class VoiceNotesManager {
     final existing = await getVoiceNoteById(item.id);
     final now = DateTime.now();
     if (existing != null) {
-      await (db.update(db.voiceNotes)..where((tbl) => tbl.id.equals(item.id))).write(
+      await (db.update(
+        db.voiceNotes,
+      )..where((tbl) => tbl.id.equals(item.id))).write(
         VoiceNotesCompanion(
           visitId: Value(item.visitId),
           studyId: Value(item.studyId),
@@ -141,25 +158,27 @@ class VoiceNotesManager {
         payload: item.toMap(),
       );
     } else {
-      await db.into(db.voiceNotes).insert(
-        VoiceNotesCompanion.insert(
-          id: item.id,
-          personId: item.personId,
-          visitId: Value(item.visitId),
-          studyId: Value(item.studyId),
-          audioFilePath: Value(item.audioFilePath),
-          audioDurationSeconds: Value(item.audioDurationSeconds),
-          transcription: item.transcription,
-          detectedLesson: Value(item.detectedLesson),
-          detectedPoint: Value(item.detectedPoint),
-          extractedPendingDoubt: Value(item.extractedPendingDoubt),
-          extractedEmpathyNote: Value(item.extractedEmpathyNote),
-          createdAt: item.createdAt,
-          updatedAt: item.updatedAt,
-          deletedAt: Value(item.deletedAt),
-          revision: Value(item.revision),
-        ),
-      );
+      await db
+          .into(db.voiceNotes)
+          .insert(
+            VoiceNotesCompanion.insert(
+              id: item.id,
+              personId: item.personId,
+              visitId: Value(item.visitId),
+              studyId: Value(item.studyId),
+              audioFilePath: Value(item.audioFilePath),
+              audioDurationSeconds: Value(item.audioDurationSeconds),
+              transcription: item.transcription,
+              detectedLesson: Value(item.detectedLesson),
+              detectedPoint: Value(item.detectedPoint),
+              extractedPendingDoubt: Value(item.extractedPendingDoubt),
+              extractedEmpathyNote: Value(item.extractedEmpathyNote),
+              createdAt: item.createdAt,
+              updatedAt: item.updatedAt,
+              deletedAt: Value(item.deletedAt),
+              revision: Value(item.revision),
+            ),
+          );
       await _recordSyncOperation(
         entityId: item.id,
         operation: 'INSERT',
@@ -171,7 +190,9 @@ class VoiceNotesManager {
 
   Future<VoiceNoteItem?> getVoiceNoteById(String id) async {
     try {
-      final row = await (db.select(db.voiceNotes)..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
+      final row = await (db.select(
+        db.voiceNotes,
+      )..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
       if (row == null) return null;
       return _entryToItem(row);
     } catch (_) {
@@ -182,10 +203,7 @@ class VoiceNotesManager {
   Future<void> deleteVoiceNote(String id) async {
     final now = DateTime.now();
     await (db.update(db.voiceNotes)..where((tbl) => tbl.id.equals(id))).write(
-      VoiceNotesCompanion(
-        deletedAt: Value(now),
-        updatedAt: Value(now),
-      ),
+      VoiceNotesCompanion(deletedAt: Value(now), updatedAt: Value(now)),
     );
     await _recordSyncOperation(
       entityId: id,
@@ -196,7 +214,8 @@ class VoiceNotesManager {
   }
 
   /// Salva a nota rápida, cria a visita de forma atômica dentro de uma única transação e atualiza o Briefing.
-  Future<({VoiceNoteItem voiceNote, VisitEntry? visit})> saveQuickVisitFromVoiceNote({
+  Future<({VoiceNoteItem voiceNote, VisitEntry? visit})>
+  saveQuickVisitFromVoiceNote({
     required String personId,
     required ParsedVoiceNote parsedNote,
     String? audioFilePath,
@@ -219,14 +238,19 @@ class VoiceNotesManager {
         studyId = linkedStudy?.id;
 
         // 1. Determina tópico e próximo passo a partir da extração teocrática
-        final topics = parsedNote.formattedProgress ??
-            (parsedNote.lesson != null ? 'Lição ${parsedNote.lesson}' : 'Nota rápida de voz');
+        final topics =
+            parsedNote.formattedProgress ??
+            (parsedNote.lesson != null
+                ? 'Lição ${parsedNote.lesson}'
+                : 'Nota rápida de voz');
         final nextStep = parsedNote.pendingDoubt;
 
         final String effectiveContactType;
         if (contactType != null && contactType.isNotEmpty) {
           effectiveContactType = contactType;
-        } else if (parsedNote.rawText.toLowerCase().contains(RegExp(r'\bestudo\b')) &&
+        } else if (parsedNote.rawText.toLowerCase().contains(
+              RegExp(r'\bestudo\b'),
+            ) &&
             (parsedNote.lesson != null || parsedNote.point != null)) {
           // Apenas classifica como estudo se a fala explicitamente mencionar estudo e progresso
           effectiveContactType = 'estudo';
@@ -261,20 +285,34 @@ class VoiceNotesManager {
             updateStudyProgress &&
             linkedStudy != null &&
             (parsedNote.lesson != null || parsedNote.point != null)) {
-          final maxLessons = linkedStudy.publicationId == 'lff-brochure' ? 3 : 60;
-          final validLesson = (parsedNote.lesson != null && parsedNote.lesson! >= 1 && parsedNote.lesson! <= maxLessons)
+          final maxLessons = linkedStudy.publicationId == 'lff-brochure'
+              ? 3
+              : 60;
+          final validLesson =
+              (parsedNote.lesson != null &&
+                  parsedNote.lesson! >= 1 &&
+                  parsedNote.lesson! <= maxLessons)
               ? parsedNote.lesson
               : null;
-          final validPoint = (parsedNote.point != null && parsedNote.point! >= 1 && parsedNote.point! <= 10)
+          final validPoint =
+              (parsedNote.point != null &&
+                  parsedNote.point! >= 1 &&
+                  parsedNote.point! <= 10)
               ? parsedNote.point
               : null;
 
           if (validLesson != null || validPoint != null) {
             await repo!.updateStudy(
               linkedStudy.copyWith(
-                currentLesson: validLesson != null ? Value(validLesson) : const Value.absent(),
-                currentParagraph: validPoint != null ? Value(validPoint) : const Value.absent(),
-                pendingDoubts: parsedNote.pendingDoubt != null ? Value(parsedNote.pendingDoubt) : const Value.absent(),
+                currentLesson: validLesson != null
+                    ? Value(validLesson)
+                    : const Value.absent(),
+                currentParagraph: validPoint != null
+                    ? Value(validPoint)
+                    : const Value.absent(),
+                pendingDoubts: parsedNote.pendingDoubt != null
+                    ? Value(parsedNote.pendingDoubt)
+                    : const Value.absent(),
                 lastSessionAt: Value(now),
                 updatedAt: now,
               ),
@@ -284,8 +322,12 @@ class VoiceNotesManager {
 
         // 3. Se gatilho empático detectado, salva em person.generalNotes no formato JSON suportado pelo briefing
         final freshPerson = await repo!.getPersonById(personId);
-        if (freshPerson != null && parsedNote.empathyNote != null && parsedNote.empathyNote!.trim().isNotEmpty) {
-          final currentNotes = DoorstepBriefingHelper.parseNotes(freshPerson.generalNotes);
+        if (freshPerson != null &&
+            parsedNote.empathyNote != null &&
+            parsedNote.empathyNote!.trim().isNotEmpty) {
+          final currentNotes = DoorstepBriefingHelper.parseNotes(
+            freshPerson.generalNotes,
+          );
           final newNote = {
             'id': _uuid.v4(),
             'text': parsedNote.empathyNote!.trim(),
@@ -328,37 +370,41 @@ class VoiceNotesManager {
         revision: 1,
       );
 
-      await db.into(db.voiceNotes).insert(
-        VoiceNotesCompanion.insert(
-          id: voiceNote.id,
-          personId: voiceNote.personId,
-          visitId: Value(voiceNote.visitId),
-          studyId: Value(voiceNote.studyId),
-          audioFilePath: Value(voiceNote.audioFilePath),
-          audioDurationSeconds: Value(voiceNote.audioDurationSeconds),
-          transcription: voiceNote.transcription,
-          detectedLesson: Value(voiceNote.detectedLesson),
-          detectedPoint: Value(voiceNote.detectedPoint),
-          extractedPendingDoubt: Value(voiceNote.extractedPendingDoubt),
-          extractedEmpathyNote: Value(voiceNote.extractedEmpathyNote),
-          createdAt: voiceNote.createdAt,
-          updatedAt: voiceNote.updatedAt,
-          deletedAt: const Value.absent(),
-          revision: const Value(1),
-        ),
-      );
+      await db
+          .into(db.voiceNotes)
+          .insert(
+            VoiceNotesCompanion.insert(
+              id: voiceNote.id,
+              personId: voiceNote.personId,
+              visitId: Value(voiceNote.visitId),
+              studyId: Value(voiceNote.studyId),
+              audioFilePath: Value(voiceNote.audioFilePath),
+              audioDurationSeconds: Value(voiceNote.audioDurationSeconds),
+              transcription: voiceNote.transcription,
+              detectedLesson: Value(voiceNote.detectedLesson),
+              detectedPoint: Value(voiceNote.detectedPoint),
+              extractedPendingDoubt: Value(voiceNote.extractedPendingDoubt),
+              extractedEmpathyNote: Value(voiceNote.extractedEmpathyNote),
+              createdAt: voiceNote.createdAt,
+              updatedAt: voiceNote.updatedAt,
+              deletedAt: const Value.absent(),
+              revision: const Value(1),
+            ),
+          );
 
-      await db.into(db.syncQueue).insert(
-        SyncQueueCompanion.insert(
-          id: _uuid.v4(),
-          entityType: 'voice_notes',
-          entityId: voiceNote.id,
-          operation: 'INSERT',
-          payload: jsonEncode(voiceNote.toMap()),
-          createdAt: now,
-          status: const Value('pending'),
-        ),
-      );
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: _uuid.v4(),
+              entityType: 'voice_notes',
+              entityId: voiceNote.id,
+              operation: 'INSERT',
+              payload: jsonEncode(voiceNote.toMap()),
+              createdAt: now,
+              status: const Value('pending'),
+            ),
+          );
     });
 
     await _refresh();
@@ -375,6 +421,6 @@ final voiceNotesManagerProvider = Provider<VoiceNotesManager>((ref) {
 /// Stream provider das notas de voz de uma pessoa específica.
 final voiceNotesStreamProvider =
     StreamProvider.family<List<VoiceNoteItem>, String>((ref, personId) {
-  final mgr = ref.watch(voiceNotesManagerProvider);
-  return mgr.watchVoiceNotesForPerson(personId);
-});
+      final mgr = ref.watch(voiceNotesManagerProvider);
+      return mgr.watchVoiceNotesForPerson(personId);
+    });

@@ -161,43 +161,46 @@ void main() {
       expect(metrics.scheduledVisitsCount, equals(1));
     });
 
-    test('TC-COUNT-05: Tentativa sem contato NÃO conta como conversa realizada', () {
-      final visits = [
-        VisitEntry(
-          id: 'visit-1',
-          personId: 'p1',
-          dateTimeField: DateTime(2026, 10, 8, 10, 0),
-          contactType: 'tentativa_sem_contato',
-          result: 'Ninguém atendeu',
-          createdAt: now,
-          updatedAt: now,
-          revision: 1,
-        ),
-        VisitEntry(
-          id: 'visit-2',
-          personId: 'p1',
-          dateTimeField: DateTime(2026, 10, 12, 10, 0),
-          contactType: 'revisita',
-          result: 'Atendeu e conversou',
-          createdAt: now,
-          updatedAt: now,
-          revision: 1,
-        ),
-      ];
+    test(
+      'TC-COUNT-05: Tentativa sem contato NÃO conta como conversa realizada',
+      () {
+        final visits = [
+          VisitEntry(
+            id: 'visit-1',
+            personId: 'p1',
+            dateTimeField: DateTime(2026, 10, 8, 10, 0),
+            contactType: 'tentativa_sem_contato',
+            result: 'Ninguém atendeu',
+            createdAt: now,
+            updatedAt: now,
+            revision: 1,
+          ),
+          VisitEntry(
+            id: 'visit-2',
+            personId: 'p1',
+            dateTimeField: DateTime(2026, 10, 12, 10, 0),
+            contactType: 'revisita',
+            result: 'Atendeu e conversou',
+            createdAt: now,
+            updatedAt: now,
+            revision: 1,
+          ),
+        ];
 
-      final metrics = DashboardCalculator.calculate(
-        studies: [],
-        sessions: [],
-        visits: visits,
-        appointments: [],
-        activities: [],
-        periodStart: periodStart,
-        periodEnd: periodEnd,
-        nowOverride: now,
-      );
+        final metrics = DashboardCalculator.calculate(
+          studies: [],
+          sessions: [],
+          visits: visits,
+          appointments: [],
+          activities: [],
+          periodStart: periodStart,
+          periodEnd: periodEnd,
+          nowOverride: now,
+        );
 
-      expect(metrics.heldVisitsCount, equals(1));
-    });
+        expect(metrics.heldVisitsCount, equals(1));
+      },
+    );
 
     test('TC-COUNT-06: Contagem de Ações Pendentes e Contatos sem Contato Recente (> 30 dias)', () {
       final people = [
@@ -207,7 +210,9 @@ void main() {
           firstContactAt: now.subtract(const Duration(days: 40)),
           status: 'interessado',
           tags: '[]',
-          nextActionAt: now.subtract(const Duration(hours: 2)), // Ação vencida há 2 horas
+          nextActionAt: now.subtract(
+            const Duration(hours: 2),
+          ), // Ação vencida há 2 horas
           lastContactAt: now.subtract(const Duration(days: 5)),
           createdAt: now,
           updatedAt: now,
@@ -219,7 +224,9 @@ void main() {
           firstContactAt: now.subtract(const Duration(days: 60)),
           status: 'revisita',
           tags: '[]',
-          lastContactAt: now.subtract(const Duration(days: 35)), // 35 dias sem contato
+          lastContactAt: now.subtract(
+            const Duration(days: 35),
+          ), // 35 dias sem contato
           nextActionAt: now.add(const Duration(days: 5)),
           createdAt: now,
           updatedAt: now,
@@ -409,7 +416,10 @@ void main() {
         nowOverride: now,
       );
 
-      expect(metrics.totalPlacements, equals(4)); // 3 de atividades + 1 de visita
+      expect(
+        metrics.totalPlacements,
+        equals(4),
+      ); // 3 de atividades + 1 de visita
       expect(metrics.totalVideos, equals(2));
     });
   });

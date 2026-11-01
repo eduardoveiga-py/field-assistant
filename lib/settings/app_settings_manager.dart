@@ -6,12 +6,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../database/app_database.dart';
 import '../ui/providers.dart';
 
+enum AppSettingsStatus { initializing, ready, persisting, error }
+
 /// Gerenciador de configurações persistentes com inicialização aguardável,
 /// fila serializada de gravações (FIFO), cache em memória e garantia de integridade contra condições de corrida.
 class AppSettingsManager {
   final AppDatabase db;
   Future<void>? _initFuture;
   bool _isInitComplete = false;
+  AppSettingsStatus _status = AppSettingsStatus.initializing;
   final Map<String, String> _memoryCache = {};
   final Set<String> _dirtyKeys = {};
   Future<void> _writeQueue = Future.value();
@@ -23,6 +26,7 @@ class AppSettingsManager {
   }
 
   bool get isInitialized => _isInitComplete;
+  AppSettingsStatus get status => _status;
   String? get lastError => _lastError;
 
   void addListener(void Function(Map<String, String>) listener) {
@@ -56,10 +60,13 @@ class AppSettingsManager {
           }
         }
         _isInitComplete = true;
+        _status = AppSettingsStatus.ready;
         _notifyListeners();
       } catch (e) {
         _lastError = e.toString();
         _isInitComplete = true;
+        _status = AppSettingsStatus.error;
+        _notifyListeners();
       }
     }();
     return _initFuture!;
@@ -82,6 +89,7 @@ class AppSettingsManager {
     // 1. Marca chave como modificada para proteger contra corridas de inicialização
     _dirtyKeys.add(key);
     _memoryCache[key] = value;
+    _status = AppSettingsStatus.persisting;
     _notifyListeners();
 
     // 2. Enfileira gravação determinística na fila serializada
@@ -98,8 +106,11 @@ class AppSettingsManager {
               ),
             );
         _lastError = null;
+        _status = AppSettingsStatus.ready;
       } catch (e) {
         _lastError = e.toString();
+        _status = AppSettingsStatus.error;
+        _notifyListeners();
         rethrow;
       }
     }
@@ -113,6 +124,7 @@ class AppSettingsManager {
   Future<void> remove(String key) async {
     _dirtyKeys.add(key);
     _memoryCache.remove(key);
+    _status = AppSettingsStatus.persisting;
     _notifyListeners();
 
     Future<void> deleteOp() async {
@@ -120,8 +132,11 @@ class AppSettingsManager {
         await init();
         await (db.delete(db.appKvStore)..where((t) => t.key.equals(key))).go();
         _lastError = null;
+        _status = AppSettingsStatus.ready;
       } catch (e) {
         _lastError = e.toString();
+        _status = AppSettingsStatus.error;
+        _notifyListeners();
         rethrow;
       }
     }
@@ -184,6 +199,10 @@ class AppSettingsNotifier extends Notifier<Map<String, String>> {
     return Map<String, String>.from(manager._memoryCache);
   }
 
+  AppSettingsStatus get status =>
+      _manager?.status ?? AppSettingsStatus.initializing;
+  String? get lastError => _manager?.lastError;
+
   Future<void> setString(String key, String value) async {
     final manager = ref.read(appSettingsManagerProvider);
     await manager.setString(key, value);
@@ -202,4 +221,43 @@ class AppSettingsNotifier extends Notifier<Map<String, String>> {
 final appSettingsNotifierProvider =
     NotifierProvider<AppSettingsNotifier, Map<String, String>>(
       AppSettingsNotifier.new,
+    );
+
+/// AsyncNotifier para clientes que necessitam de AsyncValue explícito para tratamento de carregamento e erro
+class AsyncAppSettingsNotifier extends AsyncNotifier<Map<String, String>> {
+  @override
+  Future<Map<String, String>> build() async {
+    final manager = ref.watch(appSettingsManagerProvider);
+    await manager.init();
+    return manager.getAllSettings();
+  }
+
+  Future<void> setString(String key, String value) async {
+    final manager = ref.read(appSettingsManagerProvider);
+    state = const AsyncLoading();
+    try {
+      await manager.setString(key, value);
+      state = AsyncData(await manager.getAllSettings());
+    } catch (e, st) {
+      state = AsyncError(e, st);
+      rethrow;
+    }
+  }
+
+  Future<void> remove(String key) async {
+    final manager = ref.read(appSettingsManagerProvider);
+    state = const AsyncLoading();
+    try {
+      await manager.remove(key);
+      state = AsyncData(await manager.getAllSettings());
+    } catch (e, st) {
+      state = AsyncError(e, st);
+      rethrow;
+    }
+  }
+}
+
+final asyncAppSettingsNotifierProvider =
+    AsyncNotifierProvider<AsyncAppSettingsNotifier, Map<String, String>>(
+      AsyncAppSettingsNotifier.new,
     );

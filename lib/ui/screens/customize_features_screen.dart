@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../core/app_theme.dart';
 import '../../core/feature_registry.dart';
 
@@ -9,9 +10,7 @@ class CustomizeFeaturesScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Personalizar Aplicativo'),
-      ),
+      appBar: AppBar(title: const Text('Personalizar Aplicativo')),
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         children: [
@@ -21,12 +20,18 @@ class CustomizeFeaturesScreen extends ConsumerWidget {
             decoration: BoxDecoration(
               color: AppTheme.primaryBlue.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppTheme.primaryBlue.withValues(alpha: 0.25)),
+              border: Border.all(
+                color: AppTheme.primaryBlue.withValues(alpha: 0.25),
+              ),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.shield_outlined, color: AppTheme.primaryBlue, size: 26),
+                const Icon(
+                  Icons.shield_outlined,
+                  color: AppTheme.primaryBlue,
+                  size: 26,
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -45,7 +50,8 @@ class CustomizeFeaturesScreen extends ConsumerWidget {
                         'Escolha quais recursos deseja manter visíveis no aplicativo. Você pode alterar essas opções a qualquer momento. Desativar um recurso não exclui seus dados, nem seu histórico ou relacionamentos.',
                         style: TextStyle(
                           fontSize: 13,
-                          color: Theme.of(context).textTheme.bodyMedium?.color?.withValues(alpha: 0.85),
+                          color: Theme.of(context).textTheme.bodyMedium?.color
+                              ?.withValues(alpha: 0.85),
                           height: 1.35,
                         ),
                       ),
@@ -67,8 +73,14 @@ class CustomizeFeaturesScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildCategorySection(BuildContext context, WidgetRef ref, FeatureCategory category) {
-    final features = AppFeature.values.where((f) => f.category == category).toList();
+  Widget _buildCategorySection(
+    BuildContext context,
+    WidgetRef ref,
+    FeatureCategory category,
+  ) {
+    final features = AppFeature.values
+        .where((f) => f.category == category)
+        .toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -96,7 +108,11 @@ class CustomizeFeaturesScreen extends ConsumerWidget {
               for (int i = 0; i < features.length; i++) ...[
                 _buildFeatureTile(context, ref, features[i]),
                 if (i < features.length - 1)
-                  Divider(height: 1, indent: 56, color: Colors.grey.withValues(alpha: 0.15)),
+                  Divider(
+                    height: 1,
+                    indent: 56,
+                    color: Colors.grey.withValues(alpha: 0.15),
+                  ),
               ],
             ],
           ),
@@ -105,14 +121,20 @@ class CustomizeFeaturesScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildFeatureTile(BuildContext context, WidgetRef ref, AppFeature feature) {
+  Widget _buildFeatureTile(
+    BuildContext context,
+    WidgetRef ref,
+    AppFeature feature,
+  ) {
     final isEnabled = ref.watch(isFeatureEnabledProvider(feature));
 
     return SwitchListTile(
       secondary: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: (isEnabled ? AppTheme.primaryBlue : Colors.grey).withValues(alpha: 0.12),
+          color: (isEnabled ? AppTheme.primaryBlue : Colors.grey).withValues(
+            alpha: 0.12,
+          ),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Icon(
@@ -140,7 +162,11 @@ class CustomizeFeaturesScreen extends ConsumerWidget {
               ),
               child: const Text(
                 'Essencial',
-                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blueGrey),
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blueGrey,
+                ),
               ),
             ),
           ],

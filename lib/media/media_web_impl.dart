@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:js_interop';
+
 import 'package:web/web.dart' as web;
 
 Future<String?> pickImageFromBrowser({bool useCamera = false}) async {

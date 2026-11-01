@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:drift/native.dart';
@@ -239,6 +237,41 @@ void main() {
         expect(all['pioneer_monthly_goal_hours'], equals('42.5'));
         expect(all['pioneer_weekdays'], equals('1,3,5'));
         expect(all['pioneer_designated_weekdays'], equals('1,3,5'));
+      },
+    );
+
+    test(
+      '12. AppSettingsStatus transições de estado e AsyncAppSettingsNotifier',
+      () async {
+        final manager = AppSettingsManager(db);
+        expect(manager.status, equals(AppSettingsStatus.initializing));
+        await manager.init();
+        expect(manager.status, equals(AppSettingsStatus.ready));
+
+        final container = ProviderContainer(
+          overrides: [
+            databaseProvider.overrideWithValue(db),
+            appSettingsManagerProvider.overrideWithValue(manager),
+          ],
+        );
+
+        final initialAsync = await container.read(
+          asyncAppSettingsNotifierProvider.future,
+        );
+        expect(initialAsync, isA<Map<String, String>>());
+
+        await container
+            .read(asyncAppSettingsNotifierProvider.notifier)
+            .setString('status_key', 'ok');
+        expect(manager.status, equals(AppSettingsStatus.ready));
+        expect(await manager.getString('status_key'), equals('ok'));
+
+        final updatedAsync = container
+            .read(asyncAppSettingsNotifierProvider)
+            .value;
+        expect(updatedAsync?['status_key'], equals('ok'));
+
+        container.dispose();
       },
     );
   });

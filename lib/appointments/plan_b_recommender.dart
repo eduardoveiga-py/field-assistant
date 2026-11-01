@@ -64,7 +64,16 @@ class PlanBRecommender {
     if (candidates.isEmpty) return [];
 
     final hasGps = currentLat != null && currentLng != null;
-    final List<({PersonEntry person, double? dist, double score, String reason, String? pending})> scored = [];
+    final List<
+      ({
+        PersonEntry person,
+        double? dist,
+        double score,
+        String reason,
+        String? pending,
+      })
+    >
+    scored = [];
 
     for (final person in candidates) {
       double score = 0.0;
@@ -103,20 +112,26 @@ class PlanBRecommender {
       }
 
       // 3. Semente Recente (urgência de retorno nos primeiros 7 dias)
-      final isSeed = RecentSeedsHelper.isRecentSeed(person: person, visits: allVisits, nowOverride: target);
+      final isSeed = RecentSeedsHelper.isRecentSeed(
+        person: person,
+        visits: allVisits,
+        nowOverride: target,
+      );
       if (isSeed) {
         score += 45.0;
         reasons.add('Semente Recente aguardando 1ª revisita');
       }
 
       // 4. Última pendência ou próximo passo registrado
-      final personVisits = allVisits
-          .where((v) => v.personId == person.id && v.deletedAt == null)
-          .toList()
-        ..sort((a, b) => b.dateTimeField.compareTo(a.dateTimeField));
+      final personVisits =
+          allVisits
+              .where((v) => v.personId == person.id && v.deletedAt == null)
+              .toList()
+            ..sort((a, b) => b.dateTimeField.compareTo(a.dateTimeField));
 
       final latestVisit = personVisits.firstOrNull;
-      final pending = latestVisit?.nextStep ??
+      final pending =
+          latestVisit?.nextStep ??
           latestVisit?.expressedQuestion ??
           person.nextActionNote ??
           latestVisit?.topicsDiscussed;

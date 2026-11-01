@@ -1,7 +1,9 @@
 import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import 'package:drift/drift.dart';
+
 import '../database/app_database.dart';
 import '../ui/providers.dart';
 
@@ -23,28 +25,29 @@ class FamilyTieItem {
   });
 
   Map<String, dynamic> toMap() => {
-        'id': id,
-        'person_id': personId,
-        'related_person_id': relatedPersonId,
-        'related_person_name': relatedPersonName,
-        'relationship_type': relationshipType,
-        'created_at': createdAt.toIso8601String(),
-      };
+    'id': id,
+    'person_id': personId,
+    'related_person_id': relatedPersonId,
+    'related_person_name': relatedPersonName,
+    'relationship_type': relationshipType,
+    'created_at': createdAt.toIso8601String(),
+  };
 
   factory FamilyTieItem.fromMap(Map<String, dynamic> map) => FamilyTieItem(
-        id: map['id'] as String,
-        personId: map['person_id'] as String,
-        relatedPersonId: map['related_person_id'] as String?,
-        relatedPersonName: map['related_person_name'] as String,
-        relationshipType: map['relationship_type'] as String,
-        createdAt: DateTime.parse(map['created_at'] as String),
-      );
+    id: map['id'] as String,
+    personId: map['person_id'] as String,
+    relatedPersonId: map['related_person_id'] as String?,
+    relatedPersonName: map['related_person_name'] as String,
+    relationshipType: map['relationship_type'] as String,
+    createdAt: DateTime.parse(map['created_at'] as String),
+  );
 }
 
 class FamilyTiesManager {
   final AppDatabase db;
   final Uuid _uuid = const Uuid();
-  final StreamController<List<FamilyTieItem>> _tiesController = StreamController<List<FamilyTieItem>>.broadcast();
+  final StreamController<List<FamilyTieItem>> _tiesController =
+      StreamController<List<FamilyTieItem>>.broadcast();
   Future<void>? _initFuture;
 
   FamilyTiesManager(this.db) {
@@ -99,10 +102,12 @@ class FamilyTiesManager {
   Future<List<FamilyTieItem>> getTiesForPerson(String personId) async {
     await _initTable();
     try {
-      final list = await db.customSelect(
-        'SELECT * FROM family_ties WHERE person_id = ? ORDER BY relationship_type ASC',
-        variables: [Variable.withString(personId)],
-      ).get();
+      final list = await db
+          .customSelect(
+            'SELECT * FROM family_ties WHERE person_id = ? ORDER BY relationship_type ASC',
+            variables: [Variable.withString(personId)],
+          )
+          .get();
       return list.map((r) => FamilyTieItem.fromMap(r.data)).toList();
     } catch (_) {
       return [];
@@ -188,12 +193,19 @@ class FamilyTiesManager {
 
     // VÍNCULO RECÍPROCO AUTOMÁTICO
     // Se a outra pessoa for cadastrada no app, cria ou atualiza automaticamente o vínculo nela também!
-    if (relatedPersonId != null && relatedPersonId.isNotEmpty && relatedPersonId != personId) {
+    if (relatedPersonId != null &&
+        relatedPersonId.isNotEmpty &&
+        relatedPersonId != personId) {
       final reciprocalType = getReciprocalRelationship(relationshipType);
-      final existingReciprocal = await db.customSelect(
-        'SELECT id FROM family_ties WHERE person_id = ? AND related_person_id = ?',
-        variables: [Variable.withString(relatedPersonId), Variable.withString(personId)],
-      ).getSingleOrNull();
+      final existingReciprocal = await db
+          .customSelect(
+            'SELECT id FROM family_ties WHERE person_id = ? AND related_person_id = ?',
+            variables: [
+              Variable.withString(relatedPersonId),
+              Variable.withString(personId),
+            ],
+          )
+          .getSingleOrNull();
 
       if (existingReciprocal != null) {
         await db.customUpdate(
@@ -238,10 +250,12 @@ class FamilyTiesManager {
     String? newRelatedPersonName,
   }) async {
     await _initTable();
-    final existing = await db.customSelect(
-      'SELECT * FROM family_ties WHERE id = ?',
-      variables: [Variable.withString(id)],
-    ).getSingleOrNull();
+    final existing = await db
+        .customSelect(
+          'SELECT * FROM family_ties WHERE id = ?',
+          variables: [Variable.withString(id)],
+        )
+        .getSingleOrNull();
 
     if (existing == null) return;
     final item = FamilyTieItem.fromMap(existing.data);
@@ -250,7 +264,9 @@ class FamilyTiesManager {
       'UPDATE family_ties SET relationship_type = ?, related_person_name = ? WHERE id = ?',
       variables: [
         Variable.withString(newRelationshipType.trim()),
-        Variable.withString(newRelatedPersonName?.trim() ?? item.relatedPersonName),
+        Variable.withString(
+          newRelatedPersonName?.trim() ?? item.relatedPersonName,
+        ),
         Variable.withString(id),
       ],
     );
@@ -271,21 +287,34 @@ class FamilyTiesManager {
     await _refresh();
   }
 
-  Future<void> deleteFamilyTie(String id, {bool deleteReciprocal = true}) async {
+  Future<void> deleteFamilyTie(
+    String id, {
+    bool deleteReciprocal = true,
+  }) async {
     await _initTable();
-    final existing = await db.customSelect(
-      'SELECT * FROM family_ties WHERE id = ?',
-      variables: [Variable.withString(id)],
-    ).getSingleOrNull();
+    final existing = await db
+        .customSelect(
+          'SELECT * FROM family_ties WHERE id = ?',
+          variables: [Variable.withString(id)],
+        )
+        .getSingleOrNull();
 
     if (existing != null) {
       final item = FamilyTieItem.fromMap(existing.data);
-      await db.customUpdate('DELETE FROM family_ties WHERE id = ?', variables: [Variable.withString(id)]);
+      await db.customUpdate(
+        'DELETE FROM family_ties WHERE id = ?',
+        variables: [Variable.withString(id)],
+      );
 
-      if (deleteReciprocal && item.relatedPersonId != null && item.relatedPersonId!.isNotEmpty) {
+      if (deleteReciprocal &&
+          item.relatedPersonId != null &&
+          item.relatedPersonId!.isNotEmpty) {
         await db.customUpdate(
           'DELETE FROM family_ties WHERE person_id = ? AND related_person_id = ?',
-          variables: [Variable.withString(item.relatedPersonId!), Variable.withString(item.personId)],
+          variables: [
+            Variable.withString(item.relatedPersonId!),
+            Variable.withString(item.personId),
+          ],
         );
       }
     }

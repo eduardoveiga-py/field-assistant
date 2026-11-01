@@ -13,6 +13,20 @@ import 'package:uuid/uuid.dart';
 import '../database/app_database.dart';
 import '../database/repository.dart';
 
+class RestoreResult {
+  final bool isIntegral;
+  final List<String> corruptedFiles;
+  final List<String> missingFiles;
+  final int restoredRecordsCount;
+
+  RestoreResult({
+    required this.isIntegral,
+    this.corruptedFiles = const [],
+    this.missingFiles = const [],
+    required this.restoredRecordsCount,
+  });
+}
+
 class RestorePreview {
   final int peopleToAdd;
   final int peopleToUpdate;
@@ -36,7 +50,10 @@ class RestorePreview {
   final int calendarEventsToAdd;
   final int calendarLinksToAdd;
   final List<String> inventoryTables;
+  final List<String> corruptedAudioIds;
   final Map<String, dynamic> rawDecryptedData;
+
+  bool get isIntegral => corruptedAudioIds.isEmpty;
 
   RestorePreview({
     required this.peopleToAdd,
@@ -61,6 +78,7 @@ class RestorePreview {
     this.calendarEventsToAdd = 0,
     this.calendarLinksToAdd = 0,
     this.inventoryTables = const [],
+    this.corruptedAudioIds = const [],
     required this.rawDecryptedData,
   });
 }
@@ -515,6 +533,25 @@ class BackupService {
       if (!existingSyncQueueIds.contains(item['id'] as String)) sqAdd++;
     }
 
+    final voiceNoteAudios =
+        (data['voiceNoteAudios'] as Map<String, dynamic>?) ?? {};
+    final voiceNoteAudioHashes =
+        (data['voiceNoteAudioHashes'] as Map<String, dynamic>?) ?? {};
+    final corruptedAudioIds = <String>[];
+    for (final entry in voiceNoteAudios.entries) {
+      if (voiceNoteAudioHashes.containsKey(entry.key)) {
+        try {
+          final bytes = base64Decode(entry.value as String);
+          final actualHash = sha256.convert(bytes).toString();
+          if (actualHash != voiceNoteAudioHashes[entry.key]) {
+            corruptedAudioIds.add(entry.key);
+          }
+        } catch (_) {
+          corruptedAudioIds.add(entry.key);
+        }
+      }
+    }
+
     final tableList =
         (data['exported_tables'] as List<dynamic>?)
             ?.map((e) => e.toString())
@@ -544,9 +581,12 @@ class BackupService {
       calendarEventsToAdd: calEventAdd,
       calendarLinksToAdd: calLinkAdd,
       inventoryTables: tableList,
+      corruptedAudioIds: corruptedAudioIds,
       rawDecryptedData: data,
     );
   }
+
+  bool _shouldReconstituteSyncQueue = false;
 
   Future<void> _reconstituteSyncQueue(
     String entityType,
@@ -554,6 +594,7 @@ class BackupService {
     String operation,
     Map<String, dynamic> payload,
   ) async {
+    if (!_shouldReconstituteSyncQueue) return;
     try {
       await repository.db
           .into(repository.db.syncQueue)
@@ -573,14 +614,18 @@ class BackupService {
 
   /// Aplica a restauração de forma transacional e idempotente,
   /// garantindo que registros locais mais recentes nunca sejam sobrescritos por backups obsoletos.
-  Future<void> commitRestore(RestorePreview preview) async {
+  Future<RestoreResult> commitRestore(RestorePreview preview) async {
     final db = repository.db;
     final data = preview.rawDecryptedData;
+    _shouldReconstituteSyncQueue = !data.containsKey('syncQueue');
+    final corruptedFiles = <String>[];
+    int totalRestoredCount = 0;
 
-    // Preserva backup de segurança automático do estado anterior à restauração
+    // Preserva backup de segurança automático do estado anterior à restauração com chave vinculada ao dispositivo
     try {
+      final safetyKey = await _getOrCreateSilentBackupKey();
       _lastPreRestoreSafetyBackup = await exportEncryptedBackup(
-        'safety_pre_restore_backup',
+        safetyKey,
         iterations: 1000,
       );
     } catch (_) {}
@@ -768,6 +813,12 @@ class BackupService {
         try {
           final docsDir = await getApplicationDocumentsDirectory();
           restoredAudioDir = Directory('${docsDir.path}/restored_audio');
+        } catch (_) {
+          restoredAudioDir = Directory(
+            '${Directory.systemTemp.path}/fa_restored_audio',
+          );
+        }
+        try {
           if (!restoredAudioDir.existsSync()) {
             await restoredAudioDir.create(recursive: true);
           }
@@ -778,7 +829,7 @@ class BackupService {
           (data['voiceNoteAudioHashes'] as Map<String, dynamic>?) ?? {};
       for (final item in voiceNotes) {
         var entry = VoiceNoteEntry.fromJson(item as Map<String, dynamic>);
-        if (restoredAudioDir != null && voiceNoteAudios.containsKey(entry.id)) {
+        if (voiceNoteAudios.containsKey(entry.id)) {
           try {
             final audioBytes = base64Decode(
               voiceNoteAudios[entry.id] as String,
@@ -788,16 +839,21 @@ class BackupService {
               final expectedHash = voiceNoteAudioHashes[entry.id] as String;
               final actualHash = sha256.convert(audioBytes).toString();
               if (actualHash != expectedHash) {
-                // Arquivo corrompido, pula gravação do arquivo corrompido
+                // Arquivo corrompido, registra falha de integridade e não grava arquivo inválido
+                corruptedFiles.add(entry.id);
                 continue;
               }
             }
-            final targetFile = File(
-              '${restoredAudioDir.path}/vn_${entry.id}.m4a',
-            );
-            await targetFile.writeAsBytes(audioBytes, flush: true);
-            entry = entry.copyWith(audioFilePath: Value(targetFile.path));
-          } catch (_) {}
+            if (restoredAudioDir != null) {
+              final targetFile = File(
+                '${restoredAudioDir.path}/vn_${entry.id}.m4a',
+              );
+              await targetFile.writeAsBytes(audioBytes, flush: true);
+              entry = entry.copyWith(audioFilePath: Value(targetFile.path));
+            }
+          } catch (_) {
+            corruptedFiles.add(entry.id);
+          }
         }
 
         final existing = await (db.select(
@@ -1070,6 +1126,12 @@ class BackupService {
         }
       }
     });
+
+    return RestoreResult(
+      isIntegral: corruptedFiles.isEmpty,
+      corruptedFiles: corruptedFiles,
+      restoredRecordsCount: totalRestoredCount,
+    );
   }
 
   static const String _silentBackupKey = 'last_silent_backup_timestamp';

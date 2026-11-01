@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../core/app_theme.dart';
 import '../../database/app_database.dart';
 import '../../appointments/plan_b_recommender.dart';
@@ -53,7 +54,11 @@ class PlanBDialog extends StatelessWidget {
                     color: AppTheme.accentTeal.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(Icons.alt_route, color: AppTheme.accentTeal, size: 24),
+                  child: const Icon(
+                    Icons.alt_route,
+                    color: AppTheme.accentTeal,
+                    size: 24,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -72,7 +77,9 @@ class PlanBDialog extends StatelessWidget {
                       Text(
                         'Visita com ${cancelledPerson.name} desmarcada. Veja alternativas:',
                         style: TextStyle(
-                          color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted,
+                          color: isDark
+                              ? const Color(0xFFCBD5E1)
+                              : AppTheme.textMuted,
                           fontSize: 12,
                         ),
                       ),
@@ -80,7 +87,10 @@ class PlanBDialog extends StatelessWidget {
                   ),
                 ),
                 IconButton(
-                  icon: Icon(Icons.close, color: isDark ? Colors.white70 : AppTheme.textMuted),
+                  icon: Icon(
+                    Icons.close,
+                    color: isDark ? Colors.white70 : AppTheme.textMuted,
+                  ),
                   onPressed: () => Navigator.pop(context),
                 ),
               ],
@@ -90,14 +100,18 @@ class PlanBDialog extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1E293B) : Colors.grey.shade100,
+                  color: isDark
+                      ? const Color(0xFF1E293B)
+                      : Colors.grey.shade100,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Center(
                   child: Text(
                     'Nenhum outro contato ativo com localização cadastrada nas proximidades.',
                     style: TextStyle(
-                      color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted,
+                      color: isDark
+                          ? const Color(0xFFCBD5E1)
+                          : AppTheme.textMuted,
                       fontSize: 13,
                     ),
                     textAlign: TextAlign.center,
@@ -112,7 +126,9 @@ class PlanBDialog extends StatelessWidget {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                     side: BorderSide(
-                      color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                      color: isDark
+                          ? const Color(0xFF334155)
+                          : const Color(0xFFE2E8F0),
                     ),
                   ),
                   child: Padding(
@@ -127,7 +143,9 @@ class PlanBDialog extends StatelessWidget {
                               child: Text(
                                 sug.person.name,
                                 style: TextStyle(
-                                  color: isDark ? Colors.white : AppTheme.textDark,
+                                  color: isDark
+                                      ? Colors.white
+                                      : AppTheme.textDark,
                                   fontSize: 15,
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -135,9 +153,14 @@ class PlanBDialog extends StatelessWidget {
                             ),
                             if (sug.distanceKm != null)
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: AppTheme.accentTeal.withValues(alpha: 0.15),
+                                  color: AppTheme.accentTeal.withValues(
+                                    alpha: 0.15,
+                                  ),
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Text(
@@ -154,36 +177,54 @@ class PlanBDialog extends StatelessWidget {
                         const SizedBox(height: 4),
                         Row(
                           children: [
-                            const Icon(Icons.info_outline, size: 14, color: AppTheme.accentTeal),
+                            const Icon(
+                              Icons.info_outline,
+                              size: 14,
+                              color: AppTheme.accentTeal,
+                            ),
                             const SizedBox(width: 6),
                             Expanded(
                               child: Text(
                                 sug.reason,
                                 style: TextStyle(
-                                  color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted,
+                                  color: isDark
+                                      ? const Color(0xFFCBD5E1)
+                                      : AppTheme.textMuted,
                                   fontSize: 12,
                                 ),
                               ),
                             ),
                           ],
                         ),
-                        if (sug.pendingStep != null && sug.pendingStep!.isNotEmpty) ...[
+                        if (sug.pendingStep != null &&
+                            sug.pendingStep!.isNotEmpty) ...[
                           const SizedBox(height: 6),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
                             decoration: BoxDecoration(
-                              color: isDark ? Colors.white10 : const Color(0xFFFEF3C7),
+                              color: isDark
+                                  ? Colors.white10
+                                  : const Color(0xFFFEF3C7),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.pending_actions, size: 13, color: Color(0xFFD97706)),
+                                const Icon(
+                                  Icons.pending_actions,
+                                  size: 13,
+                                  color: Color(0xFFD97706),
+                                ),
                                 const SizedBox(width: 6),
                                 Expanded(
                                   child: Text(
                                     'Pendente: ${sug.pendingStep!}',
                                     style: TextStyle(
-                                      color: isDark ? Colors.amberAccent : const Color(0xFF92400E),
+                                      color: isDark
+                                          ? Colors.amberAccent
+                                          : const Color(0xFF92400E),
                                       fontSize: 11,
                                     ),
                                     maxLines: 1,
@@ -199,17 +240,25 @@ class PlanBDialog extends StatelessWidget {
                           alignment: Alignment.centerRight,
                           child: FilledButton.tonalIcon(
                             style: FilledButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
                               visualDensity: VisualDensity.compact,
                             ),
                             icon: const Icon(Icons.arrow_forward, size: 14),
-                            label: const Text('Ver Perfil & Briefing', style: TextStyle(fontSize: 12)),
+                            label: const Text(
+                              'Ver Perfil & Briefing',
+                              style: TextStyle(fontSize: 12),
+                            ),
                             onPressed: () {
                               Navigator.pop(context);
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (_) => PersonDetailScreen(personId: sug.person.id),
+                                  builder: (_) => PersonDetailScreen(
+                                    personId: sug.person.id,
+                                  ),
                                 ),
                               );
                             },

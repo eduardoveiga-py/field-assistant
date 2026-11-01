@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../database/app_database.dart';
 
 enum CalendarProviderType {
@@ -88,8 +89,5 @@ abstract class CalendarProvider {
   );
 
   /// Exclui evento no calendário externo
-  Future<bool> deleteExternalEvent(
-    AppDatabase db,
-    String externalEventId,
-  );
+  Future<bool> deleteExternalEvent(AppDatabase db, String externalEventId);
 }

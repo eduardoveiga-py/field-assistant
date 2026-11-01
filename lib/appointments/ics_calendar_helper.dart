@@ -81,15 +81,24 @@ class IcsCalendarHelper {
     if (rawIcs.trim().isEmpty) return events;
 
     // Desdobra linhas dobradas segundo a RFC 5545 (quebras seguidas de espaço ou tab)
-    final unfolded = rawIcs.replaceAll(RegExp(r'\r?\n[ \t]'), '').replaceAll('\r\n', '\n');
+    final unfolded = rawIcs
+        .replaceAll(RegExp(r'\r?\n[ \t]'), '')
+        .replaceAll('\r\n', '\n');
 
-    final eventMatches = RegExp(r'BEGIN:VEVENT([\s\S]*?)END:VEVENT', caseSensitive: false).allMatches(unfolded);
+    final eventMatches = RegExp(
+      r'BEGIN:VEVENT([\s\S]*?)END:VEVENT',
+      caseSensitive: false,
+    ).allMatches(unfolded);
 
     for (final match in eventMatches) {
       final block = match.group(1)!;
 
       // 1. Extrai e valida DTSTART obrigatório (rejeita evento se ausente ou inválido)
-      final startMatch = RegExp(r'^DTSTART(?:;[^:\r\n]+)?:([0-9TZ]+)', multiLine: true, caseSensitive: false).firstMatch(block);
+      final startMatch = RegExp(
+        r'^DTSTART(?:;[^:\r\n]+)?:([0-9TZ]+)',
+        multiLine: true,
+        caseSensitive: false,
+      ).firstMatch(block);
       if (startMatch == null) {
         // Evento inválido segundo RFC 5545: DTSTART é obrigatório
         continue;
@@ -104,7 +113,11 @@ class IcsCalendarHelper {
       final isAllDay = !rawStart.contains('T');
 
       // 2. Extrai DTEND ou calcula por duração
-      final endMatch = RegExp(r'^DTEND(?:;[^:\r\n]+)?:([0-9TZ]+)', multiLine: true, caseSensitive: false).firstMatch(block);
+      final endMatch = RegExp(
+        r'^DTEND(?:;[^:\r\n]+)?:([0-9TZ]+)',
+        multiLine: true,
+        caseSensitive: false,
+      ).firstMatch(block);
       DateTime? parsedEnd;
       if (endMatch != null) {
         parsedEnd = parseIcsDateTime(endMatch.group(1)!);
@@ -126,7 +139,11 @@ class IcsCalendarHelper {
       }
 
       // 3. Extrai Summary
-      final summaryMatch = RegExp(r'^SUMMARY(?:;[^:\r\n]+)?:(.*)$', multiLine: true, caseSensitive: false).firstMatch(block);
+      final summaryMatch = RegExp(
+        r'^SUMMARY(?:;[^:\r\n]+)?:(.*)$',
+        multiLine: true,
+        caseSensitive: false,
+      ).firstMatch(block);
       var summary = summaryMatch?.group(1)?.trim() ?? 'Compromisso Importado';
       summary = summary
           .replaceAll(r'\,', ',')
@@ -138,7 +155,11 @@ class IcsCalendarHelper {
       if (summary.isEmpty) summary = 'Compromisso Importado';
 
       // 4. Extrai Location
-      final locMatch = RegExp(r'^LOCATION(?:;[^:\r\n]+)?:(.*)$', multiLine: true, caseSensitive: false).firstMatch(block);
+      final locMatch = RegExp(
+        r'^LOCATION(?:;[^:\r\n]+)?:(.*)$',
+        multiLine: true,
+        caseSensitive: false,
+      ).firstMatch(block);
       var loc = locMatch?.group(1)?.trim();
       if (loc != null) {
         loc = loc
@@ -152,10 +173,16 @@ class IcsCalendarHelper {
       }
 
       // 5. Extrai UID
-      final uidMatch = RegExp(r'^UID(?:;[^:\r\n]+)?:(.*)$', multiLine: true, caseSensitive: false).firstMatch(block);
+      final uidMatch = RegExp(
+        r'^UID(?:;[^:\r\n]+)?:(.*)$',
+        multiLine: true,
+        caseSensitive: false,
+      ).firstMatch(block);
       final rawUid = uidMatch?.group(1)?.trim();
       String? apptId;
-      if (rawUid != null && (rawUid.endsWith('@territorio.app') || rawUid.endsWith('@ministeriopessoal.app'))) {
+      if (rawUid != null &&
+          (rawUid.endsWith('@territorio.app') ||
+              rawUid.endsWith('@ministeriopessoal.app'))) {
         apptId = rawUid
             .replaceAll('@territorio.app', '')
             .replaceAll('@ministeriopessoal.app', '')
@@ -163,26 +190,36 @@ class IcsCalendarHelper {
       }
 
       // 6. Extrai STATUS
-      final statusMatch = RegExp(r'^STATUS(?:;[^:\r\n]+)?:(.*)$', multiLine: true, caseSensitive: false).firstMatch(block);
+      final statusMatch = RegExp(
+        r'^STATUS(?:;[^:\r\n]+)?:(.*)$',
+        multiLine: true,
+        caseSensitive: false,
+      ).firstMatch(block);
       final rawStatus = statusMatch?.group(1)?.trim().toUpperCase();
       final status = rawStatus == 'CANCELLED' ? 'cancelado' : 'confirmado';
 
       // 7. Extrai RRULE (Regra de Recorrência)
-      final rruleMatch = RegExp(r'^RRULE(?:;[^:\r\n]+)?:(.*)$', multiLine: true, caseSensitive: false).firstMatch(block);
+      final rruleMatch = RegExp(
+        r'^RRULE(?:;[^:\r\n]+)?:(.*)$',
+        multiLine: true,
+        caseSensitive: false,
+      ).firstMatch(block);
       final rrule = rruleMatch?.group(1)?.trim();
 
-      events.add(ParsedIcsEvent(
-        summary: summary,
-        location: loc,
-        rawUid: rawUid,
-        apptId: apptId,
-        startTime: startTime,
-        endTime: endTime,
-        durationMinutes: duration,
-        status: status,
-        isAllDay: isAllDay,
-        recurrenceRule: rrule,
-      ));
+      events.add(
+        ParsedIcsEvent(
+          summary: summary,
+          location: loc,
+          rawUid: rawUid,
+          apptId: apptId,
+          startTime: startTime,
+          endTime: endTime,
+          durationMinutes: duration,
+          status: status,
+          isAllDay: isAllDay,
+          recurrenceRule: rrule,
+        ),
+      );
     }
 
     return events;
@@ -211,7 +248,9 @@ class IcsCalendarHelper {
       if (a.locationNotes != null && a.locationNotes!.isNotEmpty) {
         buffer.writeln('LOCATION:${a.locationNotes}');
       }
-      buffer.writeln('STATUS:${a.status == "cancelado" ? "CANCELLED" : "CONFIRMED"}');
+      buffer.writeln(
+        'STATUS:${a.status == "cancelado" ? "CANCELLED" : "CONFIRMED"}',
+      );
       buffer.writeln('END:VEVENT');
     }
 

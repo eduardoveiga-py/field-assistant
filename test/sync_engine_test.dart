@@ -76,20 +76,11 @@ void main() {
     });
 
     test('TC-SYNC-03: Alterações idênticas em ambos os dispositivos mesclam sem conflito', () {
-      final baseData = {
-        'id': 'study-1',
-        'currentLesson': 3,
-      };
+      final baseData = {'id': 'study-1', 'currentLesson': 3};
 
-      final localData = {
-        'id': 'study-1',
-        'currentLesson': 4,
-      };
+      final localData = {'id': 'study-1', 'currentLesson': 4};
 
-      final remoteData = {
-        'id': 'study-1',
-        'currentLesson': 4,
-      };
+      final remoteData = {'id': 'study-1', 'currentLesson': 4};
 
       final result = SyncEngine.mergeEntities(
         entityType: 'bible_studies',

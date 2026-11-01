@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../../database/app_database.dart';
@@ -47,7 +48,8 @@ class NextActionsScreen extends ConsumerStatefulWidget {
   ConsumerState<NextActionsScreen> createState() => _NextActionsScreenState();
 }
 
-class _NextActionsScreenState extends ConsumerState<NextActionsScreen> with SingleTickerProviderStateMixin {
+class _NextActionsScreenState extends ConsumerState<NextActionsScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
   @override
@@ -70,7 +72,9 @@ class _NextActionsScreenState extends ConsumerState<NextActionsScreen> with Sing
     final items = <CategorizedNextActionItem>[];
 
     for (final p in people) {
-      if (p.deletedAt != null || p.status == 'revisita_passada' || p.status == 'revisita_encerrada') {
+      if (p.deletedAt != null ||
+          p.status == 'revisita_passada' ||
+          p.status == 'revisita_encerrada') {
         continue;
       }
 
@@ -130,10 +134,18 @@ class _NextActionsScreenState extends ConsumerState<NextActionsScreen> with Sing
     return peopleAsync.when(
       data: (people) {
         final allItems = categorize(people);
-        final overdueList = allItems.where((i) => i.category == NextActionCategory.overdue).toList();
-        final todayList = allItems.where((i) => i.category == NextActionCategory.today).toList();
-        final upcomingList = allItems.where((i) => i.category == NextActionCategory.upcoming).toList();
-        final unscheduledList = allItems.where((i) => i.category == NextActionCategory.unscheduled).toList();
+        final overdueList = allItems
+            .where((i) => i.category == NextActionCategory.overdue)
+            .toList();
+        final todayList = allItems
+            .where((i) => i.category == NextActionCategory.today)
+            .toList();
+        final upcomingList = allItems
+            .where((i) => i.category == NextActionCategory.upcoming)
+            .toList();
+        final unscheduledList = allItems
+            .where((i) => i.category == NextActionCategory.unscheduled)
+            .toList();
 
         return Scaffold(
           appBar: AppBar(
@@ -148,7 +160,11 @@ class _NextActionsScreenState extends ConsumerState<NextActionsScreen> with Sing
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.warning_amber_rounded, size: 16, color: AppTheme.alertRed),
+                      const Icon(
+                        Icons.warning_amber_rounded,
+                        size: 16,
+                        color: AppTheme.alertRed,
+                      ),
                       const SizedBox(width: 6),
                       Text('Atrasadas (${overdueList.length})'),
                     ],
@@ -158,7 +174,11 @@ class _NextActionsScreenState extends ConsumerState<NextActionsScreen> with Sing
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.today, size: 16, color: AppTheme.accentTeal),
+                      const Icon(
+                        Icons.today,
+                        size: 16,
+                        color: AppTheme.accentTeal,
+                      ),
                       const SizedBox(width: 6),
                       Text('Hoje (${todayList.length})'),
                     ],
@@ -168,7 +188,11 @@ class _NextActionsScreenState extends ConsumerState<NextActionsScreen> with Sing
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.calendar_month, size: 16, color: AppTheme.primaryBlue),
+                      const Icon(
+                        Icons.calendar_month,
+                        size: 16,
+                        color: AppTheme.primaryBlue,
+                      ),
                       const SizedBox(width: 6),
                       Text('Próximos dias (${upcomingList.length})'),
                     ],
@@ -178,7 +202,11 @@ class _NextActionsScreenState extends ConsumerState<NextActionsScreen> with Sing
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.help_outline, size: 16, color: Color(0xFFD97706)),
+                      const Icon(
+                        Icons.help_outline,
+                        size: 16,
+                        color: Color(0xFFD97706),
+                      ),
                       const SizedBox(width: 6),
                       Text('Sem data (${unscheduledList.length})'),
                     ],
@@ -190,10 +218,30 @@ class _NextActionsScreenState extends ConsumerState<NextActionsScreen> with Sing
           body: TabBarView(
             controller: _tabController,
             children: [
-              _buildCategoryList(context, overdueList, NextActionCategory.overdue, isDark),
-              _buildCategoryList(context, todayList, NextActionCategory.today, isDark),
-              _buildCategoryList(context, upcomingList, NextActionCategory.upcoming, isDark),
-              _buildCategoryList(context, unscheduledList, NextActionCategory.unscheduled, isDark),
+              _buildCategoryList(
+                context,
+                overdueList,
+                NextActionCategory.overdue,
+                isDark,
+              ),
+              _buildCategoryList(
+                context,
+                todayList,
+                NextActionCategory.today,
+                isDark,
+              ),
+              _buildCategoryList(
+                context,
+                upcomingList,
+                NextActionCategory.upcoming,
+                isDark,
+              ),
+              _buildCategoryList(
+                context,
+                unscheduledList,
+                NextActionCategory.unscheduled,
+                isDark,
+              ),
             ],
           ),
         );
@@ -222,11 +270,18 @@ class _NextActionsScreenState extends ConsumerState<NextActionsScreen> with Sing
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(category.icon, size: 56, color: category.color.withValues(alpha: 0.5)),
+              Icon(
+                category.icon,
+                size: 56,
+                color: category.color.withValues(alpha: 0.5),
+              ),
               const SizedBox(height: 12),
               Text(
                 'Nenhuma ação em "${category.label}"',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
               ),
               const SizedBox(height: 6),
               const Text(
@@ -252,7 +307,10 @@ class _NextActionsScreenState extends ConsumerState<NextActionsScreen> with Sing
               backgroundColor: category.color.withValues(alpha: 0.12),
               child: Icon(category.icon, color: category.color, size: 20),
             ),
-            title: Text(item.personName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            title: Text(
+              item.personName,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+            ),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -269,20 +327,35 @@ class _NextActionsScreenState extends ConsumerState<NextActionsScreen> with Sing
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
-                          color: category == NextActionCategory.overdue ? AppTheme.alertRed : AppTheme.textMuted,
+                          color: category == NextActionCategory.overdue
+                              ? AppTheme.alertRed
+                              : AppTheme.textMuted,
                         ),
                       )
                     else
                       const Text(
                         'Sem data definida',
-                        style: TextStyle(fontSize: 11, color: Color(0xFFD97706), fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFFD97706),
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     if (item.address != null && item.address!.isNotEmpty) ...[
-                      const Text(' • ', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                      const Text(
+                        ' • ',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.textMuted,
+                        ),
+                      ),
                       Expanded(
                         child: Text(
                           item.address!,
-                          style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppTheme.textMuted,
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -296,7 +369,9 @@ class _NextActionsScreenState extends ConsumerState<NextActionsScreen> with Sing
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => PersonDetailScreen(personId: item.personId)),
+                MaterialPageRoute(
+                  builder: (_) => PersonDetailScreen(personId: item.personId),
+                ),
               );
             },
           ),

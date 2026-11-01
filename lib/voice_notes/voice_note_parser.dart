@@ -412,34 +412,181 @@ class VoiceNoteParser {
   ];
 
   static const Set<String> _nameStopWords = {
-    'paramos', 'ficou', 'ficamos', 'comentou', 'falou', 'disse', 'mencionou',
-    'ontem', 'hoje', 'amanha', 'amanhã', 'casa', 'rua', 'bairro', 'parte',
-    'manha', 'manhã', 'tarde', 'noite', 'semana', 'livro', 'revista', 'folheto',
-    'brochura', 'licao', 'lição', 'ponto', 'capitulo', 'capítulo', 'biblia',
-    'bíblia', 'texto', 'video', 'vídeo', 'estudo', 'visita', 'revisita',
-    'que', 'para', 'com', 'sem', 'foi', 'estava', 'sobre', 'na', 'no', 'da', 'do',
-    'segunda', 'terça', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'sábado', 'domingo',
-    'dona', 'seu', 'senhor', 'senhora', 'sr', 'sra', 'irmão', 'irmao', 'irmã', 'irma',
-    'morador', 'moradora', 'estudante', 'campo', 'territorio', 'território',
-    'publicador', 'pioneiro', 'pioneira',
+    'paramos',
+    'ficou',
+    'ficamos',
+    'comentou',
+    'falou',
+    'disse',
+    'mencionou',
+    'ontem',
+    'hoje',
+    'amanha',
+    'amanhã',
+    'casa',
+    'rua',
+    'bairro',
+    'parte',
+    'manha',
+    'manhã',
+    'tarde',
+    'noite',
+    'semana',
+    'livro',
+    'revista',
+    'folheto',
+    'brochura',
+    'licao',
+    'lição',
+    'ponto',
+    'capitulo',
+    'capítulo',
+    'biblia',
+    'bíblia',
+    'texto',
+    'video',
+    'vídeo',
+    'estudo',
+    'visita',
+    'revisita',
+    'que',
+    'para',
+    'com',
+    'sem',
+    'foi',
+    'estava',
+    'sobre',
+    'na',
+    'no',
+    'da',
+    'do',
+    'segunda',
+    'terça',
+    'terca',
+    'quarta',
+    'quinta',
+    'sexta',
+    'sabado',
+    'sábado',
+    'domingo',
+    'dona',
+    'seu',
+    'senhor',
+    'senhora',
+    'sr',
+    'sra',
+    'irmão',
+    'irmao',
+    'irmã',
+    'irma',
+    'morador',
+    'moradora',
+    'estudante',
+    'campo',
+    'territorio',
+    'território',
+    'publicador',
+    'pioneiro',
+    'pioneira',
   };
 
   static const Set<String> _bibleBooks = {
-    'gênesis', 'genesis', 'êxodo', 'exodo', 'levítico', 'levitico', 'números', 'numeros',
-    'deuteronômio', 'deuteronomio', 'josué', 'josue', 'juízes', 'juizes', 'rute',
-    '1 samuel', '2 samuel', '1 reis', '2 reis', '1 crônicas', '2 crônicas',
-    '1 cronicas', '2 cronicas', 'esdras', 'neemias', 'ester', 'jó', 'jo',
-    'salmos', 'salmo', 'provérbios', 'proverbios', 'eclesiastes', 'cântico de salomão',
-    'cantico de salomao', 'isaías', 'isaias', 'jeremias', 'lamentações', 'lamentacoes',
-    'ezequiel', 'daniel', 'oseias', 'oséias', 'joel', 'amós', 'amos', 'obadias',
-    'jonas', 'miqueias', 'miquéias', 'naum', 'habacuque', 'sofonias', 'ageu',
-    'zacarias', 'malaquias', 'mateus', 'marcos', 'lucas', 'joão', 'joao',
-    'atos', 'romanos', '1 coríntios', '2 coríntios', '1 corintios', '2 corintios',
-    'gálatas', 'galatas', 'efésios', 'efesios', 'filipenses', 'colossenses',
-    '1 tessalonicenses', '2 tessalonicenses', '1 timóteo', '2 timóteo',
-    '1 timoteo', '2 timoteo', 'tito', 'filemom', 'hebreus', 'tiago',
-    '1 pedro', '2 pedro', '1 joão', '2 joão', '3 joão', '1 joao', '2 joao', '3 joao',
-    'judas', 'apocalipse', 'revelação', 'revelacao',
+    'gênesis',
+    'genesis',
+    'êxodo',
+    'exodo',
+    'levítico',
+    'levitico',
+    'números',
+    'numeros',
+    'deuteronômio',
+    'deuteronomio',
+    'josué',
+    'josue',
+    'juízes',
+    'juizes',
+    'rute',
+    '1 samuel',
+    '2 samuel',
+    '1 reis',
+    '2 reis',
+    '1 crônicas',
+    '2 crônicas',
+    '1 cronicas',
+    '2 cronicas',
+    'esdras',
+    'neemias',
+    'ester',
+    'jó',
+    'jo',
+    'salmos',
+    'salmo',
+    'provérbios',
+    'proverbios',
+    'eclesiastes',
+    'cântico de salomão',
+    'cantico de salomao',
+    'isaías',
+    'isaias',
+    'jeremias',
+    'lamentações',
+    'lamentacoes',
+    'ezequiel',
+    'daniel',
+    'oseias',
+    'oséias',
+    'joel',
+    'amós',
+    'amos',
+    'obadias',
+    'jonas',
+    'miqueias',
+    'miquéias',
+    'naum',
+    'habacuque',
+    'sofonias',
+    'ageu',
+    'zacarias',
+    'malaquias',
+    'mateus',
+    'marcos',
+    'lucas',
+    'joão',
+    'joao',
+    'atos',
+    'romanos',
+    '1 coríntios',
+    '2 coríntios',
+    '1 corintios',
+    '2 corintios',
+    'gálatas',
+    'galatas',
+    'efésios',
+    'efesios',
+    'filipenses',
+    'colossenses',
+    '1 tessalonicenses',
+    '2 tessalonicenses',
+    '1 timóteo',
+    '2 timóteo',
+    '1 timoteo',
+    '2 timoteo',
+    'tito',
+    'filemom',
+    'hebreus',
+    'tiago',
+    '1 pedro',
+    '2 pedro',
+    '1 joão',
+    '2 joão',
+    '3 joão',
+    '1 joao',
+    '2 joao',
+    '3 joao',
+    'judas',
+    'apocalipse',
+    'revelação',
+    'revelacao',
   };
 
   /// Analisa um texto ditado ou transcrito e retorna a estrutura extraída determinística.
@@ -457,7 +604,11 @@ class VoiceNoteParser {
     final studentName = _extractStudentName(text);
     final rawLesson = _extractLesson(text);
     final rawPoint = _extractPoint(text);
-    final lesson = _validateLesson(rawLesson, publicationId: publicationId, maxLessons: maxLessons);
+    final lesson = _validateLesson(
+      rawLesson,
+      publicationId: publicationId,
+      maxLessons: maxLessons,
+    );
     final point = _validatePoint(rawPoint, maxPoints: maxPoints ?? 50);
     final pendingDoubt = _extractPendingDoubt(text);
     final empathyNote = _extractEmpathyNote(text, pendingDoubt);
@@ -472,7 +623,11 @@ class VoiceNoteParser {
     );
   }
 
-  static int? _validateLesson(int? lesson, {String? publicationId, int? maxLessons}) {
+  static int? _validateLesson(
+    int? lesson, {
+    String? publicationId,
+    int? maxLessons,
+  }) {
     if (lesson == null) return null;
     final int limit;
     if (maxLessons != null) {
@@ -509,14 +664,17 @@ class VoiceNoteParser {
     // 2. Se antes de "capítulo" houver um livro da Bíblia
     for (final book in _bibleBooks) {
       if (before.trimRight().endsWith(book) ||
-          RegExp(r'\b' + RegExp.escape(book) + r'\s*(?:do\s+livro\s+de\s+)?$').hasMatch(before.trim())) {
+          RegExp(r'\b' + RegExp.escape(book) + r'\s*(?:do\s+livro\s+de\s+)?$')
+              .hasMatch(before.trim())) {
         return true;
       }
     }
 
     // 3. Se a expressão combinou "capítulo" mas o contexto anterior indica texto bíblico sem lição/estudo
     if (matchedText.contains('cap') &&
-        RegExp(r'\b(?:lemos|lendo|leu|abrimos|texto\s+de|livro\s+de|carta\s+de|evangelho\s+de)\b').hasMatch(before) &&
+        RegExp(
+          r'\b(?:lemos|lendo|leu|abrimos|texto\s+de|livro\s+de|carta\s+de|evangelho\s+de)\b',
+        ).hasMatch(before) &&
         !before.contains('lição') &&
         !before.contains('licao') &&
         !before.contains('estudo')) {
@@ -547,7 +705,9 @@ class VoiceNoteParser {
       return true;
     }
 
-    if (RegExp(r'^\s*(?:pessoas|horas|minutos|dias|vezes|visitas|casas|moradores|revisitas)\b').hasMatch(after)) {
+    if (RegExp(
+      r'^\s*(?:pessoas|horas|minutos|dias|vezes|visitas|casas|moradores|revisitas)\b',
+    ).hasMatch(after)) {
       return true;
     }
 
@@ -603,8 +763,18 @@ class VoiceNoteParser {
   }
 
   static const Set<String> _titleWords = {
-    'dona', 'seu', 'senhor', 'senhora', 'sr', 'sr.', 'sra', 'sra.',
-    'irmão', 'irmao', 'irmã', 'irma',
+    'dona',
+    'seu',
+    'senhor',
+    'senhora',
+    'sr',
+    'sr.',
+    'sra',
+    'sra.',
+    'irmão',
+    'irmao',
+    'irmã',
+    'irma',
   };
 
   static String? _cleanExtractedName(String? raw) {
@@ -615,7 +785,9 @@ class VoiceNoteParser {
     // Remove eventuais títulos no início (ex.: "senhora Lúcia", "dona Maria", "irmão Carlos")
     var remainingWords = words.toList();
     while (remainingWords.isNotEmpty &&
-        _titleWords.contains(remainingWords.first.toLowerCase().replaceAll('.', ''))) {
+        _titleWords.contains(
+          remainingWords.first.toLowerCase().replaceAll('.', ''),
+        )) {
       remainingWords.removeAt(0);
     }
     if (remainingWords.isEmpty) return null;
@@ -847,7 +1019,8 @@ class VoiceNoteParser {
 
     for (final clause in clauses) {
       final cleanClause = clause.trim();
-      if (cleanPending != null && cleanPending.contains(cleanClause.toLowerCase())) {
+      if (cleanPending != null &&
+          cleanPending.contains(cleanClause.toLowerCase())) {
         continue;
       }
 
@@ -880,7 +1053,8 @@ class VoiceNoteParser {
 
       // Se o bloco contém transições internas de oração sem pontuação, segmenta nos limites
       final matches = transitionPattern.allMatches(trimmed).toList();
-      if (matches.length > 1 || (matches.isNotEmpty && matches.first.start > 15)) {
+      if (matches.length > 1 ||
+          (matches.isNotEmpty && matches.first.start > 15)) {
         int lastIdx = 0;
         for (final m in matches) {
           if (m.start > lastIdx) {
@@ -914,7 +1088,10 @@ class VoiceNoteParser {
   }
 
   static bool _containsWord(String text, String word) {
-    final pattern = RegExp(r'\b' + RegExp.escape(word) + r'\b', caseSensitive: false);
+    final pattern = RegExp(
+      r'\b' + RegExp.escape(word) + r'\b',
+      caseSensitive: false,
+    );
     return pattern.hasMatch(text);
   }
 
@@ -928,9 +1105,12 @@ class VoiceNoteParser {
   }
 
   static String _capitalizeWords(String str) {
-    return str.split(' ').map((word) {
-      if (word.isEmpty) return word;
-      return word[0].toUpperCase() + word.substring(1).toLowerCase();
-    }).join(' ');
+    return str
+        .split(' ')
+        .map((word) {
+          if (word.isEmpty) return word;
+          return word[0].toUpperCase() + word.substring(1).toLowerCase();
+        })
+        .join(' ');
   }
 }

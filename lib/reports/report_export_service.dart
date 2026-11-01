@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+
 import '../core/date_utils.dart';
 import '../dashboard/counting_rules.dart';
 import '../database/app_database.dart';
@@ -39,21 +40,39 @@ class ReportExportService {
     final pdf = pw.Document();
 
     final monthNames = [
-      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+      'Janeiro',
+      'Fevereiro',
+      'Março',
+      'Abril',
+      'Maio',
+      'Junho',
+      'Julho',
+      'Agosto',
+      'Setembro',
+      'Outubro',
+      'Novembro',
+      'Dezembro',
     ];
     final periodTitle = periodMode == 'Ano de Serviço'
         ? 'Ano de Serviço (01/09 a 31/08)'
         : '${monthNames[period.month - 1]} de ${period.year}';
 
-    final totalHoursStr = AppDateUtils.formatDuration(metrics.totalActivitySeconds);
+    final totalHoursStr = AppDateUtils.formatDuration(
+      metrics.totalActivitySeconds,
+    );
     final int goal = personalGoalHours ?? 50;
     final modalityLabel = _getPioneerModalityLabel(goal);
     final isYearMode = periodMode == 'Ano de Serviço';
     final effectiveGoal = isYearMode ? goal * 12 : goal;
-    final totalActualHours = actualHours ?? (metrics.totalActivitySeconds / 3600.0);
-    final goalProgressPct = effectiveGoal > 0 ? (totalActualHours / effectiveGoal) : 0.0;
-    final remainingHours = (effectiveGoal - totalActualHours).clamp(0.0, effectiveGoal.toDouble());
+    final totalActualHours =
+        actualHours ?? (metrics.totalActivitySeconds / 3600.0);
+    final goalProgressPct = effectiveGoal > 0
+        ? (totalActualHours / effectiveGoal)
+        : 0.0;
+    final remainingHours = (effectiveGoal - totalActualHours).clamp(
+      0.0,
+      effectiveGoal.toDouble(),
+    );
 
     pdf.addPage(
       pw.MultiPage(
@@ -70,20 +89,40 @@ class ReportExportService {
                   children: [
                     pw.Text(
                       'RELATÓRIO DO MINISTÉRIO PESSOAL',
-                      style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900),
+                      style: pw.TextStyle(
+                        fontSize: 18,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.blue900,
+                      ),
                     ),
                     pw.SizedBox(height: 4),
                     pw.Text(
                       'Período: $periodTitle',
-                      style: const pw.TextStyle(fontSize: 13, color: PdfColors.grey800),
+                      style: const pw.TextStyle(
+                        fontSize: 13,
+                        color: PdfColors.grey800,
+                      ),
                     ),
                   ],
                 ),
                 pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.end,
                   children: [
-                    pw.Text(modalityLabel, style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900)),
-                    pw.Text('Emissão: ${AppDateUtils.formatDate(DateTime.now())}', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
+                    pw.Text(
+                      modalityLabel,
+                      style: pw.TextStyle(
+                        fontSize: 11,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.blue900,
+                      ),
+                    ),
+                    pw.Text(
+                      'Emissão: ${AppDateUtils.formatDate(DateTime.now())}',
+                      style: const pw.TextStyle(
+                        fontSize: 9,
+                        color: PdfColors.grey600,
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -104,53 +143,131 @@ class ReportExportService {
                 children: [
                   pw.Column(
                     children: [
-                      pw.Text('MODALIDADE / META', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900)),
-                      pw.SizedBox(height: 3),
-                      pw.Text('$effectiveGoal h', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900)),
-                      pw.Text(modalityLabel, style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
-                    ],
-                  ),
-                  pw.Container(width: 1, height: 32, color: PdfColors.blue200),
-                  pw.Column(
-                    children: [
-                      pw.Text('HORAS REALIZADAS', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.teal900)),
-                      pw.SizedBox(height: 3),
-                      pw.Text('${totalActualHours.toStringAsFixed(1)} h', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: PdfColors.teal800)),
-                      pw.Text(totalHoursStr, style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
-                    ],
-                  ),
-                  pw.Container(width: 1, height: 32, color: PdfColors.blue200),
-                  pw.Column(
-                    children: [
-                      pw.Text('HORAS PROGRAMADAS', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900)),
-                      pw.SizedBox(height: 3),
-                      pw.Text('${(scheduledHours ?? 0.0).toStringAsFixed(1)} h', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900)),
                       pw.Text(
-                        scheduledHours != null && scheduledHours > 0
-                            ? (totalActualHours >= scheduledHours
-                                ? (((totalActualHours - scheduledHours) * 60).round() >= 1
-                                    ? '100% cumprido (+${AppDateUtils.formatDuration(((totalActualHours - scheduledHours) * 3600).round())})'
-                                    : '100% cumprido')
-                                : '${((totalActualHours / scheduledHours) * 100).toStringAsFixed(0)}% cumprido')
-                            : 'Sem agendamentos',
-                        style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700),
+                        'MODALIDADE / META',
+                        style: pw.TextStyle(
+                          fontSize: 8,
+                          fontWeight: pw.FontWeight.bold,
+                          color: PdfColors.blue900,
+                        ),
+                      ),
+                      pw.SizedBox(height: 3),
+                      pw.Text(
+                        '$effectiveGoal h',
+                        style: pw.TextStyle(
+                          fontSize: 13,
+                          fontWeight: pw.FontWeight.bold,
+                          color: PdfColors.blue900,
+                        ),
+                      ),
+                      pw.Text(
+                        modalityLabel,
+                        style: const pw.TextStyle(
+                          fontSize: 8,
+                          color: PdfColors.grey700,
+                        ),
                       ),
                     ],
                   ),
                   pw.Container(width: 1, height: 32, color: PdfColors.blue200),
                   pw.Column(
                     children: [
-                      pw.Text('COMPARAÇÃO COM META', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.indigo900)),
+                      pw.Text(
+                        'HORAS REALIZADAS',
+                        style: pw.TextStyle(
+                          fontSize: 8,
+                          fontWeight: pw.FontWeight.bold,
+                          color: PdfColors.teal900,
+                        ),
+                      ),
+                      pw.SizedBox(height: 3),
+                      pw.Text(
+                        '${totalActualHours.toStringAsFixed(1)} h',
+                        style: pw.TextStyle(
+                          fontSize: 13,
+                          fontWeight: pw.FontWeight.bold,
+                          color: PdfColors.teal800,
+                        ),
+                      ),
+                      pw.Text(
+                        totalHoursStr,
+                        style: const pw.TextStyle(
+                          fontSize: 8,
+                          color: PdfColors.grey700,
+                        ),
+                      ),
+                    ],
+                  ),
+                  pw.Container(width: 1, height: 32, color: PdfColors.blue200),
+                  pw.Column(
+                    children: [
+                      pw.Text(
+                        'HORAS PROGRAMADAS',
+                        style: pw.TextStyle(
+                          fontSize: 8,
+                          fontWeight: pw.FontWeight.bold,
+                          color: PdfColors.blue900,
+                        ),
+                      ),
+                      pw.SizedBox(height: 3),
+                      pw.Text(
+                        '${(scheduledHours ?? 0.0).toStringAsFixed(1)} h',
+                        style: pw.TextStyle(
+                          fontSize: 13,
+                          fontWeight: pw.FontWeight.bold,
+                          color: PdfColors.blue900,
+                        ),
+                      ),
+                      pw.Text(
+                        scheduledHours != null && scheduledHours > 0
+                            ? (totalActualHours >= scheduledHours
+                                  ? (((totalActualHours - scheduledHours) * 60)
+                                                .round() >=
+                                            1
+                                        ? '100% cumprido (+${AppDateUtils.formatDuration(((totalActualHours - scheduledHours) * 3600).round())})'
+                                        : '100% cumprido')
+                                  : '${((totalActualHours / scheduledHours) * 100).toStringAsFixed(0)}% cumprido')
+                            : 'Sem agendamentos',
+                        style: const pw.TextStyle(
+                          fontSize: 8,
+                          color: PdfColors.grey700,
+                        ),
+                      ),
+                    ],
+                  ),
+                  pw.Container(width: 1, height: 32, color: PdfColors.blue200),
+                  pw.Column(
+                    children: [
+                      pw.Text(
+                        'COMPARAÇÃO COM META',
+                        style: pw.TextStyle(
+                          fontSize: 8,
+                          fontWeight: pw.FontWeight.bold,
+                          color: PdfColors.indigo900,
+                        ),
+                      ),
                       pw.SizedBox(height: 3),
                       pw.Text(
                         '${(goalProgressPct * 100).toStringAsFixed(0)}%',
-                        style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: totalActualHours >= effectiveGoal ? PdfColors.green800 : PdfColors.indigo900),
+                        style: pw.TextStyle(
+                          fontSize: 13,
+                          fontWeight: pw.FontWeight.bold,
+                          color: totalActualHours >= effectiveGoal
+                              ? PdfColors.green800
+                              : PdfColors.indigo900,
+                        ),
                       ),
                       pw.Text(
                         totalActualHours >= effectiveGoal
                             ? '+${(totalActualHours - effectiveGoal).toStringAsFixed(1)} h excedentes'
                             : 'Faltam ${remainingHours.toStringAsFixed(1)} h',
-                        style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: totalActualHours >= effectiveGoal ? PdfColors.green800 : PdfColors.orange900),
+                        style: pw.TextStyle(
+                          fontSize: 8,
+                          fontWeight: pw.FontWeight.bold,
+                          color: totalActualHours >= effectiveGoal
+                              ? PdfColors.green800
+                              : PdfColors.orange900,
+                        ),
                       ),
                     ],
                   ),
@@ -160,7 +277,14 @@ class ReportExportService {
             pw.SizedBox(height: 14),
 
             // Indicadores Principais e Estatísticas Completas do Ministério
-            pw.Text('Ficha Estatística do Ministério (Witness Work)', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900)),
+            pw.Text(
+              'Ficha Estatística do Ministério (Witness Work)',
+              style: pw.TextStyle(
+                fontSize: 13,
+                fontWeight: pw.FontWeight.bold,
+                color: PdfColors.blue900,
+              ),
+            ),
             pw.SizedBox(height: 6),
             pw.Table(
               border: pw.TableBorder.all(color: PdfColors.grey300),
@@ -195,10 +319,23 @@ class ReportExportService {
             pw.SizedBox(height: 16),
 
             // Tabela Detalhada de Lançamentos de Atividade
-            pw.Text('Registro de Atividades de Campo (${activities.length} lançamentos)', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900)),
+            pw.Text(
+              'Registro de Atividades de Campo (${activities.length} lançamentos)',
+              style: pw.TextStyle(
+                fontSize: 13,
+                fontWeight: pw.FontWeight.bold,
+                color: PdfColors.blue900,
+              ),
+            ),
             pw.SizedBox(height: 6),
             if (activities.isEmpty)
-              pw.Text('Nenhuma atividade avulsa registrada no período.', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700))
+              pw.Text(
+                'Nenhuma atividade avulsa registrada no período.',
+                style: const pw.TextStyle(
+                  fontSize: 10,
+                  color: PdfColors.grey700,
+                ),
+              )
             else
               pw.Table(
                 border: pw.TableBorder.all(color: PdfColors.grey300),
@@ -210,7 +347,9 @@ class ReportExportService {
                 },
                 children: [
                   pw.TableRow(
-                    decoration: const pw.BoxDecoration(color: PdfColors.grey100),
+                    decoration: const pw.BoxDecoration(
+                      color: PdfColors.grey100,
+                    ),
                     children: [
                       _buildPdfHeaderCell('Data'),
                       _buildPdfHeaderCell('Duração'),
@@ -236,10 +375,23 @@ class ReportExportService {
             pw.SizedBox(height: 16),
 
             // Tabela de Estudos Bíblicos Ativos
-            pw.Text('Estudos Bíblicos Cadastrados (${studies.length})', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900)),
+            pw.Text(
+              'Estudos Bíblicos Cadastrados (${studies.length})',
+              style: pw.TextStyle(
+                fontSize: 13,
+                fontWeight: pw.FontWeight.bold,
+                color: PdfColors.blue900,
+              ),
+            ),
             pw.SizedBox(height: 6),
             if (studies.isEmpty)
-              pw.Text('Nenhum estudo bíblico ativo cadastrado.', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700))
+              pw.Text(
+                'Nenhum estudo bíblico ativo cadastrado.',
+                style: const pw.TextStyle(
+                  fontSize: 10,
+                  color: PdfColors.grey700,
+                ),
+              )
             else
               pw.Table(
                 border: pw.TableBorder.all(color: PdfColors.grey300),
@@ -252,7 +404,9 @@ class ReportExportService {
                 },
                 children: [
                   pw.TableRow(
-                    decoration: const pw.BoxDecoration(color: PdfColors.grey100),
+                    decoration: const pw.BoxDecoration(
+                      color: PdfColors.grey100,
+                    ),
                     children: [
                       _buildPdfHeaderCell('Estudante / Título'),
                       _buildPdfHeaderCell('Lição'),
@@ -261,15 +415,17 @@ class ReportExportService {
                       _buildPdfHeaderCell('Situação'),
                     ],
                   ),
-                  ...studies.map((s) => pw.TableRow(
-                    children: [
-                      _buildPdfCell(s.title),
-                      _buildPdfCell('Lição ${s.currentLesson ?? 1}'),
-                      _buildPdfCell(s.publicationId),
-                      _buildPdfCell(s.frequency),
-                      _buildPdfCell(s.status),
-                    ],
-                  )),
+                  ...studies.map(
+                    (s) => pw.TableRow(
+                      children: [
+                        _buildPdfCell(s.title),
+                        _buildPdfCell('Lição ${s.currentLesson ?? 1}'),
+                        _buildPdfCell(s.publicationId),
+                        _buildPdfCell(s.frequency),
+                        _buildPdfCell(s.status),
+                      ],
+                    ),
+                  ),
                 ],
               ),
           ];
@@ -294,8 +450,12 @@ class ReportExportService {
 
     final activePeople = people.where((p) => p.deletedAt == null).toList();
     final estudos = activePeople.where((p) => p.status == 'estudo').toList();
-    final revisitas = activePeople.where((p) => p.status == 'revisita').toList();
-    final interessados = activePeople.where((p) => p.status == 'interessado').toList();
+    final revisitas = activePeople
+        .where((p) => p.status == 'revisita')
+        .toList();
+    final interessados = activePeople
+        .where((p) => p.status == 'interessado')
+        .toList();
 
     pdf.addPage(
       pw.MultiPage(
@@ -310,16 +470,42 @@ class ReportExportService {
                 pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    pw.Text('MAPA GERAL DO TERRITÓRIO E CONTATOS', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900)),
+                    pw.Text(
+                      'MAPA GERAL DO TERRITÓRIO E CONTATOS',
+                      style: pw.TextStyle(
+                        fontSize: 18,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.blue900,
+                      ),
+                    ),
                     pw.SizedBox(height: 4),
-                    pw.Text('Visão completa de Estudos, Revisitas e Interessados', style: const pw.TextStyle(fontSize: 12, color: PdfColors.grey800)),
+                    pw.Text(
+                      'Visão completa de Estudos, Revisitas e Interessados',
+                      style: const pw.TextStyle(
+                        fontSize: 12,
+                        color: PdfColors.grey800,
+                      ),
+                    ),
                   ],
                 ),
                 pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.end,
                   children: [
-                    pw.Text('Relatório Territorial', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: PdfColors.grey700)),
-                    pw.Text('Emissão: ${AppDateUtils.formatDate(DateTime.now())}', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
+                    pw.Text(
+                      'Relatório Territorial',
+                      style: pw.TextStyle(
+                        fontSize: 11,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.grey700,
+                      ),
+                    ),
+                    pw.Text(
+                      'Emissão: ${AppDateUtils.formatDate(DateTime.now())}',
+                      style: const pw.TextStyle(
+                        fontSize: 9,
+                        color: PdfColors.grey600,
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -338,18 +524,55 @@ class ReportExportService {
               child: pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
                 children: [
-                  pw.Text('Total de Contatos: ${activePeople.length}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
-                  pw.Text('Estudos: ${estudos.length}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.purple800, fontSize: 11)),
-                  pw.Text('Revisitas: ${revisitas.length}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.teal800, fontSize: 11)),
-                  pw.Text('Interessados: ${interessados.length}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.blue800, fontSize: 11)),
-                  pw.Text('Marcos: ${landmarks.length}', style: const pw.TextStyle(fontSize: 11)),
+                  pw.Text(
+                    'Total de Contatos: ${activePeople.length}',
+                    style: pw.TextStyle(
+                      fontWeight: pw.FontWeight.bold,
+                      fontSize: 11,
+                    ),
+                  ),
+                  pw.Text(
+                    'Estudos: ${estudos.length}',
+                    style: pw.TextStyle(
+                      fontWeight: pw.FontWeight.bold,
+                      color: PdfColors.purple800,
+                      fontSize: 11,
+                    ),
+                  ),
+                  pw.Text(
+                    'Revisitas: ${revisitas.length}',
+                    style: pw.TextStyle(
+                      fontWeight: pw.FontWeight.bold,
+                      color: PdfColors.teal800,
+                      fontSize: 11,
+                    ),
+                  ),
+                  pw.Text(
+                    'Interessados: ${interessados.length}',
+                    style: pw.TextStyle(
+                      fontWeight: pw.FontWeight.bold,
+                      color: PdfColors.blue800,
+                      fontSize: 11,
+                    ),
+                  ),
+                  pw.Text(
+                    'Marcos: ${landmarks.length}',
+                    style: const pw.TextStyle(fontSize: 11),
+                  ),
                 ],
               ),
             ),
             pw.SizedBox(height: 14),
 
             // Lista de Contatos Mapeados
-            pw.Text('Lista Detalhada de Contatos do Território (${activePeople.length})', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900)),
+            pw.Text(
+              'Lista Detalhada de Contatos do Território (${activePeople.length})',
+              style: pw.TextStyle(
+                fontSize: 13,
+                fontWeight: pw.FontWeight.bold,
+                color: PdfColors.blue900,
+              ),
+            ),
             pw.SizedBox(height: 6),
             pw.Table(
               border: pw.TableBorder.all(color: PdfColors.grey300),
@@ -371,22 +594,31 @@ class ReportExportService {
                     _buildPdfHeaderCell('Horário Habitual'),
                   ],
                 ),
-                ...activePeople.map((p) => pw.TableRow(
-                  children: [
-                    _buildPdfCell(p.name, bold: true),
-                    _buildPdfCell(p.status.toUpperCase()),
-                    _buildPdfCell(p.phone ?? '-'),
-                    _buildPdfCell(p.address ?? '-'),
-                    _buildPdfCell(p.preferredSchedule ?? '-'),
-                  ],
-                )),
+                ...activePeople.map(
+                  (p) => pw.TableRow(
+                    children: [
+                      _buildPdfCell(p.name, bold: true),
+                      _buildPdfCell(p.status.toUpperCase()),
+                      _buildPdfCell(p.phone ?? '-'),
+                      _buildPdfCell(p.address ?? '-'),
+                      _buildPdfCell(p.preferredSchedule ?? '-'),
+                    ],
+                  ),
+                ),
               ],
             ),
             pw.SizedBox(height: 16),
 
             // Marcos e Pontos de Referência
             if (landmarks.isNotEmpty) ...[
-              pw.Text('Marcos e Pontos de Referência do Território (${landmarks.length})', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900)),
+              pw.Text(
+                'Marcos e Pontos de Referência do Território (${landmarks.length})',
+                style: pw.TextStyle(
+                  fontSize: 13,
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.blue900,
+                ),
+              ),
               pw.SizedBox(height: 6),
               pw.Table(
                 border: pw.TableBorder.all(color: PdfColors.grey300),
@@ -398,7 +630,9 @@ class ReportExportService {
                 },
                 children: [
                   pw.TableRow(
-                    decoration: const pw.BoxDecoration(color: PdfColors.grey100),
+                    decoration: const pw.BoxDecoration(
+                      color: PdfColors.grey100,
+                    ),
                     children: [
                       _buildPdfHeaderCell('Nome do Marco'),
                       _buildPdfHeaderCell('Categoria'),
@@ -406,14 +640,20 @@ class ReportExportService {
                       _buildPdfHeaderCell('Coordenadas GPS'),
                     ],
                   ),
-                  ...landmarks.map((l) => pw.TableRow(
-                    children: [
-                      _buildPdfCell(l.name, bold: true),
-                      _buildPdfCell(l.category.toUpperCase()),
-                      _buildPdfCell(l.address ?? '-'),
-                      _buildPdfCell(l.latitude != null ? '${l.latitude!.toStringAsFixed(4)}, ${l.longitude!.toStringAsFixed(4)}' : '-'),
-                    ],
-                  )),
+                  ...landmarks.map(
+                    (l) => pw.TableRow(
+                      children: [
+                        _buildPdfCell(l.name, bold: true),
+                        _buildPdfCell(l.category.toUpperCase()),
+                        _buildPdfCell(l.address ?? '-'),
+                        _buildPdfCell(
+                          l.latitude != null
+                              ? '${l.latitude!.toStringAsFixed(4)}, ${l.longitude!.toStringAsFixed(4)}'
+                              : '-',
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -450,19 +690,42 @@ class ReportExportService {
                 pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    pw.Text('LISTA PARA TESTEMUNHO POR TELEFONE', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900)),
+                    pw.Text(
+                      'LISTA PARA TESTEMUNHO POR TELEFONE',
+                      style: pw.TextStyle(
+                        fontSize: 18,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.blue900,
+                      ),
+                    ),
                     pw.SizedBox(height: 4),
                     pw.Text(
                       'Filtros: Situação: $filterStatus | Bairro: $filterNeighborhood (${contacts.length} contatos)',
-                      style: const pw.TextStyle(fontSize: 11, color: PdfColors.grey800),
+                      style: const pw.TextStyle(
+                        fontSize: 11,
+                        color: PdfColors.grey800,
+                      ),
                     ),
                   ],
                 ),
                 pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.end,
                   children: [
-                    pw.Text('Testemunho Pessoal', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.grey700)),
-                    pw.Text('Data: ${AppDateUtils.formatDate(DateTime.now())}', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
+                    pw.Text(
+                      'Testemunho Pessoal',
+                      style: pw.TextStyle(
+                        fontSize: 10,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.grey700,
+                      ),
+                    ),
+                    pw.Text(
+                      'Data: ${AppDateUtils.formatDate(DateTime.now())}',
+                      style: const pw.TextStyle(
+                        fontSize: 9,
+                        color: PdfColors.grey600,
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -494,8 +757,13 @@ class ReportExportService {
                   ],
                 ),
                 ...contacts.map((c) {
-                  final phoneStr = (c.phone != null && c.phone!.trim().isNotEmpty) ? c.phone! : 'Sem telefone';
-                  final lastContactStr = c.lastContactAt != null ? AppDateUtils.formatDate(c.lastContactAt) : 'Sem registro';
+                  final phoneStr =
+                      (c.phone != null && c.phone!.trim().isNotEmpty)
+                      ? c.phone!
+                      : 'Sem telefone';
+                  final lastContactStr = c.lastContactAt != null
+                      ? AppDateUtils.formatDate(c.lastContactAt)
+                      : 'Sem registro';
 
                   return pw.TableRow(
                     children: [
@@ -504,9 +772,21 @@ class ReportExportService {
                         child: pw.Column(
                           crossAxisAlignment: pw.CrossAxisAlignment.start,
                           children: [
-                            pw.Text(c.name, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                            pw.Text(
+                              c.name,
+                              style: pw.TextStyle(
+                                fontWeight: pw.FontWeight.bold,
+                                fontSize: 10,
+                              ),
+                            ),
                             if (c.preferredSchedule != null)
-                              pw.Text('Pref: ${c.preferredSchedule}', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+                              pw.Text(
+                                'Pref: ${c.preferredSchedule}',
+                                style: const pw.TextStyle(
+                                  fontSize: 8,
+                                  color: PdfColors.grey700,
+                                ),
+                              ),
                           ],
                         ),
                       ),
@@ -517,7 +797,9 @@ class ReportExportService {
                           style: pw.TextStyle(
                             fontSize: 10,
                             fontWeight: pw.FontWeight.bold,
-                            color: c.phone != null ? PdfColors.blue900 : PdfColors.grey600,
+                            color: c.phone != null
+                                ? PdfColors.blue900
+                                : PdfColors.grey600,
                           ),
                         ),
                       ),
@@ -531,17 +813,47 @@ class ReportExportService {
                           children: [
                             pw.Row(
                               children: [
-                                pw.Container(width: 8, height: 8, decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey700))),
+                                pw.Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: pw.BoxDecoration(
+                                    border: pw.Border.all(
+                                      color: PdfColors.grey700,
+                                    ),
+                                  ),
+                                ),
                                 pw.SizedBox(width: 3),
-                                pw.Text('Atendeu  ', style: const pw.TextStyle(fontSize: 7)),
-                                pw.Container(width: 8, height: 8, decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey700))),
+                                pw.Text(
+                                  'Atendeu  ',
+                                  style: const pw.TextStyle(fontSize: 7),
+                                ),
+                                pw.Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: pw.BoxDecoration(
+                                    border: pw.Border.all(
+                                      color: PdfColors.grey700,
+                                    ),
+                                  ),
+                                ),
                                 pw.SizedBox(width: 3),
-                                pw.Text('Não atendeu', style: const pw.TextStyle(fontSize: 7)),
+                                pw.Text(
+                                  'Não atendeu',
+                                  style: const pw.TextStyle(fontSize: 7),
+                                ),
                               ],
                             ),
                             pw.SizedBox(height: 3),
-                            if (c.generalNotes != null && c.generalNotes!.isNotEmpty)
-                              pw.Text('Obs: ${c.generalNotes}', style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey600), maxLines: 1),
+                            if (c.generalNotes != null &&
+                                c.generalNotes!.isNotEmpty)
+                              pw.Text(
+                                'Obs: ${c.generalNotes}',
+                                style: const pw.TextStyle(
+                                  fontSize: 7,
+                                  color: PdfColors.grey600,
+                                ),
+                                maxLines: 1,
+                              ),
                           ],
                         ),
                       ),
@@ -568,7 +880,9 @@ class ReportExportService {
     buffer.write('\uFEFF');
 
     // Cabeçalho CSV separado por ponto e vírgula
-    buffer.writeln('Nome;Telefone;Situação;Bairro/Endereço;Horário Habitual;Último Contato;Próxima Ação;Latitude;Longitude;Anotações');
+    buffer.writeln(
+      'Nome;Telefone;Situação;Bairro/Endereço;Horário Habitual;Último Contato;Próxima Ação;Latitude;Longitude;Anotações',
+    );
 
     for (final c in contacts) {
       if (c.deletedAt != null) continue;
@@ -577,13 +891,19 @@ class ReportExportService {
       final status = _cleanCsv(c.status);
       final address = _cleanCsv(c.address ?? '');
       final schedule = _cleanCsv(c.preferredSchedule ?? '');
-      final lastContact = c.lastContactAt != null ? AppDateUtils.formatDate(c.lastContactAt) : '';
-      final nextAction = c.nextActionAt != null ? AppDateUtils.formatDate(c.nextActionAt) : '';
+      final lastContact = c.lastContactAt != null
+          ? AppDateUtils.formatDate(c.lastContactAt)
+          : '';
+      final nextAction = c.nextActionAt != null
+          ? AppDateUtils.formatDate(c.nextActionAt)
+          : '';
       final lat = c.latitude?.toString() ?? '';
       final lng = c.longitude?.toString() ?? '';
       final notes = _cleanCsv(c.generalNotes ?? '');
 
-      buffer.writeln('$name;$phone;$status;$address;$schedule;$lastContact;$nextAction;$lat;$lng;$notes');
+      buffer.writeln(
+        '$name;$phone;$status;$address;$schedule;$lastContact;$nextAction;$lat;$lng;$notes',
+      );
     }
 
     return buffer.toString();
@@ -595,7 +915,10 @@ class ReportExportService {
   }
 
   static String _cleanCsv(String text) {
-    final clean = text.replaceAll('"', '""').replaceAll('\n', ' ').replaceAll('\r', '');
+    final clean = text
+        .replaceAll('"', '""')
+        .replaceAll('\n', ' ')
+        .replaceAll('\r', '');
     return '"$clean"';
   }
 
@@ -604,7 +927,11 @@ class ReportExportService {
       padding: const pw.EdgeInsets.all(5),
       child: pw.Text(
         text,
-        style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9, color: PdfColors.grey900),
+        style: pw.TextStyle(
+          fontWeight: pw.FontWeight.bold,
+          fontSize: 9,
+          color: PdfColors.grey900,
+        ),
       ),
     );
   }
@@ -614,7 +941,10 @@ class ReportExportService {
       padding: const pw.EdgeInsets.all(5),
       child: pw.Text(
         text,
-        style: pw.TextStyle(fontSize: 8.5, fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal),
+        style: pw.TextStyle(
+          fontSize: 8.5,
+          fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
+        ),
       ),
     );
   }
@@ -625,7 +955,11 @@ class ReportExportService {
       child: pw.Center(
         child: pw.Text(
           text,
-          style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11, color: PdfColors.blue900),
+          style: pw.TextStyle(
+            fontWeight: pw.FontWeight.bold,
+            fontSize: 11,
+            color: PdfColors.blue900,
+          ),
           textAlign: pw.TextAlign.center,
         ),
       ),

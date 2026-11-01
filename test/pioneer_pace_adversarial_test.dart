@@ -18,14 +18,14 @@ void main() {
         expect(result.goalHours, equals(0.0));
         expect(result.completedHours, equals(0.0));
         expect(result.remainingHours, equals(0.0));
-        expect(result.isGoalReached, isFalse,
-            reason: 'Goal of 0h should not trigger goal reached celebration if goal is 0');
+        expect(
+          result.isGoalReached,
+          isFalse,
+          reason: 'Goal of 0h should not trigger goal reached celebration if goal is 0',
+        );
         expect(result.idealPacePerOuting, equals(Duration.zero));
         expect(result.idealPaceFormatted, equals('0h00m'));
-        expect(
-          result.formattedPaceText,
-          startsWith('Faltam 0h em '),
-        );
+        expect(result.formattedPaceText, startsWith('Faltam 0h em '));
         expect(result.formattedPaceText.endsWith('por saída'), isTrue);
         expect(result.formattedPaceText.endsWith('.'), isFalse);
       });
@@ -71,11 +71,16 @@ void main() {
 
         expect(resultSingleOuting.remainingHours, closeTo(0.1, 0.0001));
         expect(resultSingleOuting.remainingOutings, equals(1));
-        expect(resultSingleOuting.idealPacePerOuting, equals(const Duration(minutes: 6)));
+        expect(
+          resultSingleOuting.idealPacePerOuting,
+          equals(const Duration(minutes: 6)),
+        );
         expect(resultSingleOuting.idealPaceFormatted, equals('0h06m'));
         expect(
           resultSingleOuting.formattedPaceText,
-          equals('Faltam 0.1h em 1 saídas. Seu ritmo ideal é de 0h06m por saída'),
+          equals(
+            'Faltam 0.1h em 1 saídas. Seu ritmo ideal é de 0h06m por saída',
+          ),
         );
         expect(resultSingleOuting.formattedPaceText.endsWith('.'), isFalse);
 
@@ -84,14 +89,23 @@ void main() {
           goalHours: 0.1,
           designatedWeekdays: [2, 4, 6],
           completedHours: 0.0,
-          currentDate: DateTime(2026, 10, 25), // 27(Ter), 29(Qui), 31(Sab) = 3 saídas
+          currentDate: DateTime(
+            2026,
+            10,
+            25,
+          ), // 27(Ter), 29(Qui), 31(Sab) = 3 saídas
         );
         expect(resultThreeOutings.remainingOutings, equals(3));
-        expect(resultThreeOutings.idealPacePerOuting, equals(const Duration(minutes: 2)));
+        expect(
+          resultThreeOutings.idealPacePerOuting,
+          equals(const Duration(minutes: 2)),
+        );
         expect(resultThreeOutings.idealPaceFormatted, equals('0h02m'));
         expect(
           resultThreeOutings.formattedPaceText,
-          equals('Faltam 0.1h em 3 saídas. Seu ritmo ideal é de 0h02m por saída'),
+          equals(
+            'Faltam 0.1h em 3 saídas. Seu ritmo ideal é de 0h02m por saída',
+          ),
         );
       });
 
@@ -99,17 +113,30 @@ void main() {
         // 1000h in 10 outings = 100h per outing
         final result1000 = PioneerPaceCalculator.calculate(
           goalHours: 1000.0,
-          designatedWeekdays: [1, 2, 3, 4, 5, 6, 7], // all 7 days from Oct 22 to 31 = 10 days
+          designatedWeekdays: [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+          ], // all 7 days from Oct 22 to 31 = 10 days
           completedHours: 0.0,
           currentDate: DateTime(2026, 10, 22),
         );
         expect(result1000.remainingOutings, equals(10));
         expect(result1000.remainingHours, equals(1000.0));
-        expect(result1000.idealPacePerOuting, equals(const Duration(hours: 100)));
+        expect(
+          result1000.idealPacePerOuting,
+          equals(const Duration(hours: 100)),
+        );
         expect(result1000.idealPaceFormatted, equals('100h00m'));
         expect(
           result1000.formattedPaceText,
-          equals('Faltam 1000h em 10 saídas. Seu ritmo ideal é de 100h00m por saída'),
+          equals(
+            'Faltam 1000h em 10 saídas. Seu ritmo ideal é de 100h00m por saída',
+          ),
         );
       });
     });
@@ -134,7 +161,9 @@ void main() {
         expect(result.idealPaceFormatted, equals('10h00m'));
         expect(
           result.formattedPaceText,
-          equals('Faltam 50h em 5 saídas. Seu ritmo ideal é de 10h00m por saída'),
+          equals(
+            'Faltam 50h em 5 saídas. Seu ritmo ideal é de 10h00m por saída',
+          ),
         );
       });
 
@@ -153,59 +182,71 @@ void main() {
         expect(result.idealPaceFormatted, equals('0h06m'));
         expect(
           result.formattedPaceText,
-          equals('Faltam 0.1h em 1 saídas. Seu ritmo ideal é de 0h06m por saída'),
+          equals(
+            'Faltam 0.1h em 1 saídas. Seu ritmo ideal é de 0h06m por saída',
+          ),
         );
       });
 
-      test('Exact completed hours (completed == goal) triggers celebration format', () {
-        for (final goal in [0.5, 15.0, 30.0, 50.0, 70.0, 1000.0]) {
+      test(
+        'Exact completed hours (completed == goal) triggers celebration format',
+        () {
+          for (final goal in [0.5, 15.0, 30.0, 50.0, 70.0, 1000.0]) {
+            final result = PioneerPaceCalculator.calculate(
+              goalHours: goal,
+              designatedWeekdays: [1, 2, 3, 4, 5, 6, 7],
+              completedHours: goal,
+              currentDate: DateTime(2026, 10, 15),
+            );
+
+            expect(
+              result.isGoalReached,
+              isTrue,
+              reason: 'Failed for goal=$goal',
+            );
+            expect(result.remainingHours, equals(0.0));
+            expect(result.idealPacePerOuting, equals(Duration.zero));
+            expect(result.idealPaceFormatted, equals('0h00m'));
+            expect(
+              result.formattedPaceText,
+              equals('Meta atingida! Parabéns pelo empenho no ministério.'),
+            );
+          }
+        },
+      );
+
+      test(
+        'Overachieved goal (completed > goal) does not produce negative values',
+        () {
           final result = PioneerPaceCalculator.calculate(
-            goalHours: goal,
-            designatedWeekdays: [1, 2, 3, 4, 5, 6, 7],
-            completedHours: goal,
+            goalHours: 50.0,
+            designatedWeekdays: [2, 4, 6],
+            completedHours: 50.001,
             currentDate: DateTime(2026, 10, 15),
           );
 
-          expect(result.isGoalReached, isTrue, reason: 'Failed for goal=$goal');
+          expect(result.isGoalReached, isTrue);
           expect(result.remainingHours, equals(0.0));
           expect(result.idealPacePerOuting, equals(Duration.zero));
-          expect(result.idealPaceFormatted, equals('0h00m'));
           expect(
             result.formattedPaceText,
             equals('Meta atingida! Parabéns pelo empenho no ministério.'),
           );
-        }
-      });
 
-      test('Overachieved goal (completed > goal) does not produce negative values', () {
-        final result = PioneerPaceCalculator.calculate(
-          goalHours: 50.0,
-          designatedWeekdays: [2, 4, 6],
-          completedHours: 50.001,
-          currentDate: DateTime(2026, 10, 15),
-        );
-
-        expect(result.isGoalReached, isTrue);
-        expect(result.remainingHours, equals(0.0));
-        expect(result.idealPacePerOuting, equals(Duration.zero));
-        expect(
-          result.formattedPaceText,
-          equals('Meta atingida! Parabéns pelo empenho no ministério.'),
-        );
-
-        final hugeOverachievement = PioneerPaceCalculator.calculate(
-          goalHours: 30.0,
-          designatedWeekdays: [1, 2, 3, 4, 5, 6, 7],
-          completedHours: 999.0,
-          currentDate: DateTime(2026, 10, 1),
-        );
-        expect(hugeOverachievement.isGoalReached, isTrue);
-        expect(hugeOverachievement.remainingHours, equals(0.0));
-        expect(
-          hugeOverachievement.formattedPaceText,
-          equals('Meta atingida! Parabéns pelo empenho no ministério.'),
-        );
-      });
+          final hugeOverachievement = PioneerPaceCalculator.calculate(
+            goalHours: 30.0,
+            designatedWeekdays: [1, 2, 3, 4, 5, 6, 7],
+            completedHours: 999.0,
+            currentDate: DateTime(2026, 10, 1),
+          );
+          expect(hugeOverachievement.isGoalReached, isTrue);
+          expect(hugeOverachievement.remainingHours, equals(0.0));
+          expect(
+            hugeOverachievement.formattedPaceText,
+            equals('Meta atingida! Parabéns pelo empenho no ministério.'),
+          );
+        },
+      );
 
       test('Negative completed hours (-15.0h) clamped to 0.0h', () {
         final result = PioneerPaceCalculator.calculate(
@@ -240,7 +281,9 @@ void main() {
         expect(result.idealPaceFormatted, equals('18h00m'));
         expect(
           result.formattedPaceText,
-          equals('Faltam 18h em 0 saídas. Seu ritmo ideal é de 18h00m por saída'),
+          equals(
+            'Faltam 18h em 0 saídas. Seu ritmo ideal é de 18h00m por saída',
+          ),
         );
         expect(result.formattedPaceText.endsWith('.'), isFalse);
       });
@@ -254,10 +297,15 @@ void main() {
           currentDate: DateTime(2026, 10, 1),
         );
         expect(resultAllMonth.remainingOutings, equals(31));
-        expect(resultAllMonth.idealPacePerOuting, equals(const Duration(hours: 1)));
+        expect(
+          resultAllMonth.idealPacePerOuting,
+          equals(const Duration(hours: 1)),
+        );
         expect(
           resultAllMonth.formattedPaceText,
-          equals('Faltam 31h em 31 saídas. Seu ritmo ideal é de 1h00m por saída'),
+          equals(
+            'Faltam 31h em 31 saídas. Seu ritmo ideal é de 1h00m por saída',
+          ),
         );
 
         final resultEndOfMonth = PioneerPaceCalculator.calculate(
@@ -267,60 +315,81 @@ void main() {
           currentDate: DateTime(2026, 10, 20),
         );
         expect(resultEndOfMonth.remainingOutings, equals(12));
-        expect(resultEndOfMonth.idealPacePerOuting, equals(const Duration(hours: 1)));
+        expect(
+          resultEndOfMonth.idealPacePerOuting,
+          equals(const Duration(hours: 1)),
+        );
       });
 
-      test('Duplicate weekdays in list do not inflate remainingOutings count', () {
-        // Duplicate Tuesday (2), Thursday (4), Saturday (6)
-        final withDuplicates = PioneerPaceCalculator.calculate(
-          goalHours: 50.0,
-          designatedWeekdays: [2, 2, 2, 4, 4, 6, 6, 6, 6],
-          completedHours: 32.0,
-          currentDate: DateTime(2026, 10, 20),
-        );
+      test(
+        'Duplicate weekdays in list do not inflate remainingOutings count',
+        () {
+          // Duplicate Tuesday (2), Thursday (4), Saturday (6)
+          final withDuplicates = PioneerPaceCalculator.calculate(
+            goalHours: 50.0,
+            designatedWeekdays: [2, 2, 2, 4, 4, 6, 6, 6, 6],
+            completedHours: 32.0,
+            currentDate: DateTime(2026, 10, 20),
+          );
 
-        final withoutDuplicates = PioneerPaceCalculator.calculate(
-          goalHours: 50.0,
-          designatedWeekdays: [2, 4, 6],
-          completedHours: 32.0,
-          currentDate: DateTime(2026, 10, 20),
-        );
+          final withoutDuplicates = PioneerPaceCalculator.calculate(
+            goalHours: 50.0,
+            designatedWeekdays: [2, 4, 6],
+            completedHours: 32.0,
+            currentDate: DateTime(2026, 10, 20),
+          );
 
-        expect(withDuplicates.remainingOutings, equals(withoutDuplicates.remainingOutings));
-        expect(withDuplicates.idealPacePerOuting, equals(withoutDuplicates.idealPacePerOuting));
-        expect(withDuplicates.formattedPaceText, equals(withoutDuplicates.formattedPaceText));
-      });
+          expect(
+            withDuplicates.remainingOutings,
+            equals(withoutDuplicates.remainingOutings),
+          );
+          expect(
+            withDuplicates.idealPacePerOuting,
+            equals(withoutDuplicates.idealPacePerOuting),
+          );
+          expect(
+            withDuplicates.formattedPaceText,
+            equals(withoutDuplicates.formattedPaceText),
+          );
+        },
+      );
 
-      test('Unordered and mixed weekdays calculate identically to sorted weekdays', () {
-        final reversed = PioneerPaceCalculator.calculate(
-          goalHours: 50.0,
-          designatedWeekdays: [6, 4, 2],
-          completedHours: 20.0,
-          currentDate: DateTime(2026, 10, 10),
-        );
+      test(
+        'Unordered and mixed weekdays calculate identically to sorted weekdays',
+        () {
+          final reversed = PioneerPaceCalculator.calculate(
+            goalHours: 50.0,
+            designatedWeekdays: [6, 4, 2],
+            completedHours: 20.0,
+            currentDate: DateTime(2026, 10, 10),
+          );
 
-        final sorted = PioneerPaceCalculator.calculate(
-          goalHours: 50.0,
-          designatedWeekdays: [2, 4, 6],
-          completedHours: 20.0,
-          currentDate: DateTime(2026, 10, 10),
-        );
+          final sorted = PioneerPaceCalculator.calculate(
+            goalHours: 50.0,
+            designatedWeekdays: [2, 4, 6],
+            completedHours: 20.0,
+            currentDate: DateTime(2026, 10, 10),
+          );
 
-        expect(reversed.remainingOutings, equals(sorted.remainingOutings));
-        expect(reversed.formattedPaceText, equals(sorted.formattedPaceText));
-      });
+          expect(reversed.remainingOutings, equals(sorted.remainingOutings));
+          expect(reversed.formattedPaceText, equals(sorted.formattedPaceText));
+        },
+      );
 
-      test('Invalid weekday integers outside [1..7] return 0 outings gracefully', () {
-        final result = PioneerPaceCalculator.calculate(
-          goalHours: 50.0,
-          designatedWeekdays: [-1, 0, 8, 99],
-          completedHours: 20.0,
-          currentDate: DateTime(2026, 10, 10),
-        );
+      test(
+        'Invalid weekday integers outside [1..7] return 0 outings gracefully',
+        () {
+          final result = PioneerPaceCalculator.calculate(
+            goalHours: 50.0,
+            designatedWeekdays: [-1, 0, 8, 99],
+            completedHours: 20.0,
+            currentDate: DateTime(2026, 10, 10),
+          );
 
-        expect(result.remainingOutings, equals(0));
-        expect(result.remainingHours, equals(30.0));
-      });
+          expect(result.remainingOutings, equals(0));
+          expect(result.remainingHours, equals(30.0));
+        },
+      );
     });
 
     // ========================================================================
@@ -337,7 +406,8 @@ void main() {
 
       for (final year in yearsToTest) {
         test('Exhaustive day-by-day test for year $year', () {
-          final isLeapYear = (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
+          final isLeapYear =
+              (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
 
           for (int month = 1; month <= 12; month++) {
             final expectedDaysInMonth = DateTime(year, month + 1, 0).day;
@@ -381,18 +451,28 @@ void main() {
                 expect(
                   resFixed.remainingOutings <= previousOutings,
                   isTrue,
-                  reason: 'Outings count must be monotonically non-increasing within month. Day $day had ${resFixed.remainingOutings} vs previous $previousOutings',
+                  reason:
+                      'Outings count must be monotonically non-increasing within month. Day $day had ${resFixed.remainingOutings} vs previous $previousOutings',
                 );
               }
               previousOutings = resFixed.remainingOutings;
 
               // 3. String structure invariant check on every single day
-              expect(resFixed.formattedPaceText.endsWith('.'), isFalse,
-                  reason: 'Pace text must never end with a period: "${resFixed.formattedPaceText}" on $year-$month-$day');
+              expect(
+                resFixed.formattedPaceText.endsWith('.'),
+                isFalse,
+                reason:
+                    'Pace text must never end with a period: "${resFixed.formattedPaceText}" on $year-$month-$day',
+              );
               expect(
                 resFixed.formattedPaceText,
-                matches(RegExp(r'^Faltam \d+(\.\d+)?h em \d+ saídas\. Seu ritmo ideal é de \d+h\d{2}m por saída$')),
-                reason: 'String format failed on $year-$month-$day: "${resFixed.formattedPaceText}"',
+                matches(
+                  RegExp(
+                    r'^Faltam \d+(\.\d+)?h em \d+ saídas\. Seu ritmo ideal é de \d+h\d{2}m por saída$',
+                  ),
+                ),
+                reason:
+                    'String format failed on $year-$month-$day: "${resFixed.formattedPaceText}"',
               );
 
               // 4. Invariant check on remaining hours and pace
@@ -415,7 +495,9 @@ void main() {
         expect(leap2024.idealPacePerOuting, equals(const Duration(hours: 10)));
         expect(
           leap2024.formattedPaceText,
-          equals('Faltam 10h em 1 saídas. Seu ritmo ideal é de 10h00m por saída'),
+          equals(
+            'Faltam 10h em 1 saídas. Seu ritmo ideal é de 10h00m por saída',
+          ),
         );
 
         // 2028-02-29 is Tuesday (weekday 2)
@@ -451,47 +533,55 @@ void main() {
     // 5. String Assertion & Decimal Formatting Rigor
     // ========================================================================
     group('5. Exact String Assertion Matching & Formatting Contract', () {
-      test('No trailing period on standard, fractional, and zero outings messages', () {
-        final cases = [
-          PioneerPaceCalculator.calculate(
+      test(
+        'No trailing period on standard, fractional, and zero outings messages',
+        () {
+          final cases = [
+            PioneerPaceCalculator.calculate(
+              goalHours: 50.0,
+              designatedWeekdays: [6],
+              completedHours: 32.0,
+              currentDate: DateTime(2026, 5, 2),
+            ),
+            PioneerPaceCalculator.calculate(
+              goalHours: 50.0,
+              designatedWeekdays: [6],
+              completedHours: 31.5,
+              currentDate: DateTime(2026, 5, 2),
+            ),
+            PioneerPaceCalculator.calculate(
+              goalHours: 50.0,
+              designatedWeekdays: [],
+              completedHours: 32.0,
+              currentDate: DateTime(2026, 5, 2),
+            ),
+          ];
+
+          for (final c in cases) {
+            expect(c.formattedPaceText.endsWith('.'), isFalse);
+            expect(c.formattedPaceText.endsWith('por saída'), isTrue);
+          }
+        },
+      );
+
+      test(
+        'Exact match for milestone example: 50h, 32h completed, 5 outings',
+        () {
+          final result = PioneerPaceCalculator.calculate(
             goalHours: 50.0,
             designatedWeekdays: [6],
             completedHours: 32.0,
             currentDate: DateTime(2026, 5, 2),
-          ),
-          PioneerPaceCalculator.calculate(
-            goalHours: 50.0,
-            designatedWeekdays: [6],
-            completedHours: 31.5,
-            currentDate: DateTime(2026, 5, 2),
-          ),
-          PioneerPaceCalculator.calculate(
-            goalHours: 50.0,
-            designatedWeekdays: [],
-            completedHours: 32.0,
-            currentDate: DateTime(2026, 5, 2),
-          ),
-        ];
+          );
 
-        for (final c in cases) {
-          expect(c.formattedPaceText.endsWith('.'), isFalse);
-          expect(c.formattedPaceText.endsWith('por saída'), isTrue);
-        }
-      });
-
-      test('Exact match for milestone example: 50h, 32h completed, 5 outings', () {
-        final result = PioneerPaceCalculator.calculate(
-          goalHours: 50.0,
-          designatedWeekdays: [6],
-          completedHours: 32.0,
-          currentDate: DateTime(2026, 5, 2),
-        );
-
-        expect(
-          result.formattedPaceText,
-          equals('Faltam 18h em 5 saídas. Seu ritmo ideal é de 3h36m por saída'),
-        );
-      });
+          expect(
+            result.formattedPaceText,
+            equals(
+              'Faltam 18h em 5 saídas. Seu ritmo ideal é de 3h36m por saída',
+            ),
+          );
+        },
+      );
 
       test('Integer vs Decimal hours string format', () {
         // Integer remaining: 18.0 -> "18h"
@@ -531,7 +621,10 @@ void main() {
           currentDate: DateTime(2026, 10, 31),
         );
 
-        expect(result.idealPacePerOuting, equals(const Duration(hours: 2, minutes: 5)));
+        expect(
+          result.idealPacePerOuting,
+          equals(const Duration(hours: 2, minutes: 5)),
+        );
         expect(result.idealPaceFormatted, equals('2h05m'));
         expect(result.formattedPaceText, contains('de 2h05m por saída'));
       });
@@ -579,8 +672,12 @@ void main() {
         final elapsedMs = stopwatch.elapsedMilliseconds;
         expect(checksum, greaterThan(0));
         // Requirement: 10,000 calculations executed within 100ms budget.
-        expect(elapsedMs, lessThan(100),
-            reason: 'High throughput failure: 10,000 calculations took ${elapsedMs}ms, exceeding 100ms budget');
+        expect(
+          elapsedMs,
+          lessThan(100),
+          reason:
+              'High throughput failure: 10,000 calculations took ${elapsedMs}ms, exceeding 100ms budget',
+        );
       });
     });
   });

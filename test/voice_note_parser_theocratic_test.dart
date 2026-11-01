@@ -14,33 +14,47 @@ void main() {
   group('VoiceNoteParser Theocratic Enhancements & Negative Tests', () {
     test('TC-PARSER-NEG-01: Não confunde capítulos e referências bíblicas com lições de estudo', () {
       // "João 3:16" não deve virar lição 3 nem 16
-      final note1 = VoiceNoteParser.parse('Lemos o texto de João capítulo 3 versículo 16 com o morador.');
+      final note1 = VoiceNoteParser.parse(
+        'Lemos o texto de João capítulo 3 versículo 16 com o morador.',
+      );
       expect(note1.lesson, isNull);
 
       // "Salmo capítulo 23"
-      final note2 = VoiceNoteParser.parse('Consideramos o Salmo capítulo 23 sobre consolo.');
+      final note2 = VoiceNoteParser.parse(
+        'Consideramos o Salmo capítulo 23 sobre consolo.',
+      );
       expect(note2.lesson, isNull);
 
       // "Romanos capítulo 8 versículo 28"
-      final note3 = VoiceNoteParser.parse('Lemos Romanos capítulo 8 versículo 28.');
+      final note3 = VoiceNoteParser.parse(
+        'Lemos Romanos capítulo 8 versículo 28.',
+      );
       expect(note3.lesson, isNull);
 
       // "Mateus 24:14"
-      final note4 = VoiceNoteParser.parse('Abrimos em Mateus capítulo 24 versículo 14.');
+      final note4 = VoiceNoteParser.parse(
+        'Abrimos em Mateus capítulo 24 versículo 14.',
+      );
       expect(note4.lesson, isNull);
     });
 
     test('TC-PARSER-NEG-02: Não confunde expressões idiomáticas de ponto ou quantidades com pontos de estudo', () {
       // "ponto de ônibus"
-      final note1 = VoiceNoteParser.parse('Encontrei a dona Maria no ponto de ônibus às 15 horas.');
+      final note1 = VoiceNoteParser.parse(
+        'Encontrei a dona Maria no ponto de ônibus às 15 horas.',
+      );
       expect(note1.point, isNull);
 
       // "ponto de encontro"
-      final note2 = VoiceNoteParser.parse('Marcamos saída no ponto de encontro para o campo.');
+      final note2 = VoiceNoteParser.parse(
+        'Marcamos saída no ponto de encontro para o campo.',
+      );
       expect(note2.point, isNull);
 
       // Quantidades seguidas de unidades ("ponto 2 pessoas", "ponto 3 horas")
-      final note3 = VoiceNoteParser.parse('No ponto 2 pessoas estavam aguardando atendimento.');
+      final note3 = VoiceNoteParser.parse(
+        'No ponto 2 pessoas estavam aguardando atendimento.',
+      );
       expect(note3.point, isNull);
     });
 
@@ -80,20 +94,28 @@ void main() {
       final n2 = VoiceNoteParser.parse('Visita ao senhor José da Silva.');
       expect(n2.studentName, equals('José'));
 
-      final n3 = VoiceNoteParser.parse('Conversamos com a senhora Lúcia sobre a Bíblia.');
+      final n3 = VoiceNoteParser.parse(
+        'Conversamos com a senhora Lúcia sobre a Bíblia.',
+      );
       expect(n3.studentName, equals('Lúcia'));
     });
 
     test('TC-PARSER-POS-05: Gatilhos empáticos expandidos de saúde e vida', () {
-      final n1 = VoiceNoteParser.parse('Ela comentou que está com internação marcada.');
+      final n1 = VoiceNoteParser.parse(
+        'Ela comentou que está com internação marcada.',
+      );
       expect(n1.empathyNote, isNotNull);
       expect(n1.empathyNote!.toLowerCase(), contains('internação'));
 
-      final n2 = VoiceNoteParser.parse('Ele está com crise de coluna e dor forte.');
+      final n2 = VoiceNoteParser.parse(
+        'Ele está com crise de coluna e dor forte.',
+      );
       expect(n2.empathyNote, isNotNull);
       expect(n2.empathyNote!.toLowerCase(), contains('coluna'));
 
-      final n3 = VoiceNoteParser.parse('Ela mencionou gravidez recente e bebê a caminho.');
+      final n3 = VoiceNoteParser.parse(
+        'Ela mencionou gravidez recente e bebê a caminho.',
+      );
       expect(n3.empathyNote, isNotNull);
       expect(n3.empathyNote!.toLowerCase(), contains('gravidez'));
     });
@@ -129,7 +151,9 @@ void main() {
       );
 
       // Nota rápida de visita regular/revisita na porta (sem menção explícita de estudo e sem contactType fornecido)
-      final note = VoiceNoteParser.parse('Passei para deixar o convite com o Carlos. Ficou de confirmar a ida.');
+      final note = VoiceNoteParser.parse(
+        'Passei para deixar o convite com o Carlos. Ficou de confirmar a ida.',
+      );
       final result = await manager.saveQuickVisitFromVoiceNote(
         personId: person.id,
         parsedNote: note,
@@ -159,7 +183,9 @@ void main() {
         participantPersonIds: [person.id],
       );
 
-      final note = VoiceNoteParser.parse('Estudo com a Mariana, lição 6 ponto 3. Ficou de ler o texto.');
+      final note = VoiceNoteParser.parse(
+        'Estudo com a Mariana, lição 6 ponto 3. Ficou de ler o texto.',
+      );
       final result = await manager.saveQuickVisitFromVoiceNote(
         personId: person.id,
         parsedNote: note,
@@ -199,9 +225,13 @@ void main() {
       );
 
       // Confirma que foi enfileirado INSERT
-      final queueInsert = await (db.select(db.syncQueue)
-            ..where((t) => t.entityId.equals(contact.id) & t.operation.equals('INSERT')))
-          .get();
+      final queueInsert =
+          await (db.select(db.syncQueue)..where(
+                (t) =>
+                    t.entityId.equals(contact.id) &
+                    t.operation.equals('INSERT'),
+              ))
+              .get();
       expect(queueInsert.length, equals(1));
 
       // Executa exclusão
@@ -212,13 +242,19 @@ void main() {
       expect(activeContacts.any((c) => c.id == contact.id), isFalse);
 
       // Registro continua no banco SQLite com deletedAt preenchido (soft delete)
-      final rawRow = await (db.select(db.phoneContacts)..where((t) => t.id.equals(contact.id))).getSingle();
+      final rawRow = await (db.select(
+        db.phoneContacts,
+      )..where((t) => t.id.equals(contact.id))).getSingle();
       expect(rawRow.deletedAt, isNotNull);
 
       // Enfileirou DELETE na sync_queue
-      final queueDelete = await (db.select(db.syncQueue)
-            ..where((t) => t.entityId.equals(contact.id) & t.operation.equals('DELETE')))
-          .get();
+      final queueDelete =
+          await (db.select(db.syncQueue)..where(
+                (t) =>
+                    t.entityId.equals(contact.id) &
+                    t.operation.equals('DELETE'),
+              ))
+              .get();
       expect(queueDelete.length, equals(1));
     });
 
@@ -230,9 +266,13 @@ void main() {
       );
 
       // Confirma enfileiramento INSERT
-      final queueInsert = await (db.select(db.syncQueue)
-            ..where((t) => t.entityId.equals(landmark.id) & t.operation.equals('INSERT')))
-          .get();
+      final queueInsert =
+          await (db.select(db.syncQueue)..where(
+                (t) =>
+                    t.entityId.equals(landmark.id) &
+                    t.operation.equals('INSERT'),
+              ))
+              .get();
       expect(queueInsert.length, equals(1));
 
       // Executa exclusão
@@ -243,13 +283,19 @@ void main() {
       expect(activeLandmarks.any((l) => l.id == landmark.id), isFalse);
 
       // Registro preservado com deletedAt
-      final rawRow = await (db.select(db.territoryLandmarks)..where((t) => t.id.equals(landmark.id))).getSingle();
+      final rawRow = await (db.select(
+        db.territoryLandmarks,
+      )..where((t) => t.id.equals(landmark.id))).getSingle();
       expect(rawRow.deletedAt, isNotNull);
 
       // Enfileirou DELETE na sync_queue
-      final queueDelete = await (db.select(db.syncQueue)
-            ..where((t) => t.entityId.equals(landmark.id) & t.operation.equals('DELETE')))
-          .get();
+      final queueDelete =
+          await (db.select(db.syncQueue)..where(
+                (t) =>
+                    t.entityId.equals(landmark.id) &
+                    t.operation.equals('DELETE'),
+              ))
+              .get();
       expect(queueDelete.length, equals(1));
     });
   });

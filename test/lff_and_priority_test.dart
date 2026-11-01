@@ -15,9 +15,15 @@ void main() {
       final units = LffBookCatalog.getAllStudyUnits();
       expect(units.length, equals(71));
 
-      final lessonsUnits = units.where((u) => u.category.contains('Lições do Livro')).toList();
-      final reviewUnits = units.where((u) => u.category.contains('Revisões')).toList();
-      final endnoteUnits = units.where((u) => u.category.contains('Entenda Melhor')).toList();
+      final lessonsUnits = units
+          .where((u) => u.category.contains('Lições do Livro'))
+          .toList();
+      final reviewUnits = units
+          .where((u) => u.category.contains('Revisões'))
+          .toList();
+      final endnoteUnits = units
+          .where((u) => u.category.contains('Entenda Melhor'))
+          .toList();
 
       expect(lessonsUnits.length, equals(60));
       expect(reviewUnits.length, equals(4));
@@ -33,7 +39,10 @@ void main() {
       expect(l1, isNotNull);
       expect(l1!.title, contains('Bíblia pode ajudar'));
       expect(l1.section, equals(1));
-      expect(l1.pointTitles.length, equals(6)); // No livro completo, Lição 1 tem 6 pontos
+      expect(
+        l1.pointTitles.length,
+        equals(6),
+      ); // No livro completo, Lição 1 tem 6 pontos
 
       final l5 = LffBookCatalog.getLesson(5);
       expect(l5, isNotNull);
@@ -43,9 +52,15 @@ void main() {
       final l7 = LffBookCatalog.getLesson(7);
       expect(l7, isNotNull);
       expect(l7!.pointTitles.length, equals(7));
-      expect(l7.pointTitles[0], equals('1. Por que não conseguimos ver a Deus?'));
+      expect(
+        l7.pointTitles[0],
+        equals('1. Por que não conseguimos ver a Deus?'),
+      );
       expect(l7.pointTitles[1], equals('2. Que qualidades Jeová tem?'));
-      expect(l7.pointTitles[6], equals('7. A natureza nos ensina sobre as qualidades de Jeová'));
+      expect(
+        l7.pointTitles[6],
+        equals('7. A natureza nos ensina sobre as qualidades de Jeová'),
+      );
 
       // Seção 4: Lições 48 a 60
       final l60 = LffBookCatalog.getLesson(60);
@@ -56,202 +71,428 @@ void main() {
     });
 
     test('Cálculo de progresso percentual (0.0% a 100.0%)', () {
-      final p0 = LffBookCatalog.calculateProgressPercentage(lesson: 1, point: 0);
+      final p0 = LffBookCatalog.calculateProgressPercentage(
+        lesson: 1,
+        point: 0,
+      );
       expect(p0, closeTo(0.0, 0.5));
 
-      final pMid = LffBookCatalog.calculateProgressPercentage(lesson: 30, point: 3);
+      final pMid = LffBookCatalog.calculateProgressPercentage(
+        lesson: 30,
+        point: 3,
+      );
       expect(pMid, greaterThan(45.0));
       expect(pMid, lessThan(55.0));
 
-      final p100 = LffBookCatalog.calculateProgressPercentage(lesson: 60, point: 6);
+      final p100 = LffBookCatalog.calculateProgressPercentage(
+        lesson: 60,
+        point: 6,
+      );
       expect(p100, equals(100.0));
     });
 
     test('getNextProgression calcula avanço de ponto e lição subsequente', () {
       // Ponto 2 avança para Ponto 3
-      final next1 = LffBookCatalog.getNextProgression(currentLesson: 5, currentPoint: 2);
+      final next1 = LffBookCatalog.getNextProgression(
+        currentLesson: 5,
+        currentPoint: 2,
+      );
       expect(next1.nextLesson, equals(5));
       expect(next1.nextPoint, equals(3));
       expect(next1.label, contains('Lição 5, Ponto 3'));
 
       // Último ponto da lição 5 (ponto 6) avança para lição 6, ponto 1
-      final next2 = LffBookCatalog.getNextProgression(currentLesson: 5, currentPoint: 6);
+      final next2 = LffBookCatalog.getNextProgression(
+        currentLesson: 5,
+        currentPoint: 6,
+      );
       expect(next2.nextLesson, equals(6));
       expect(next2.nextPoint, equals(1));
       expect(next2.label, contains('Lição 6, Ponto 1'));
 
       // Fim do livro
-      final nextEnd = LffBookCatalog.getNextProgression(currentLesson: 60, currentPoint: 6);
+      final nextEnd = LffBookCatalog.getNextProgression(
+        currentLesson: 60,
+        currentPoint: 6,
+      );
       expect(nextEnd.label.toLowerCase(), contains('concluído'));
     });
   });
 
-  group('Motor de Prioridade e Interesse Espiritual (StudentPriorityEngine)', () {
-    test('Estudante com frequência 2x/semana e avanço rápido pontua mais que estudante esporádico', () {
-      final now = DateTime(2026, 10, 15);
+  group(
+    'Motor de Prioridade e Interesse Espiritual (StudentPriorityEngine)',
+    () {
+      test('Estudante com frequência 2x/semana e avanço rápido pontua mais que estudante esporádico', () {
+        final now = DateTime(2026, 10, 15);
 
-      final personFast = PersonEntry(
-        id: 'p-fast',
-        name: 'Carlos Oliveira',
-        firstContactAt: now.subtract(const Duration(days: 30)),
-        createdAt: now.subtract(const Duration(days: 30)),
-        updatedAt: now,
-        status: 'estudo',
-        tags: '[]',
-        revision: 1,
-      );
+        final personFast = PersonEntry(
+          id: 'p-fast',
+          name: 'Carlos Oliveira',
+          firstContactAt: now.subtract(const Duration(days: 30)),
+          createdAt: now.subtract(const Duration(days: 30)),
+          updatedAt: now,
+          status: 'estudo',
+          tags: '[]',
+          revision: 1,
+        );
 
-      final personSlow = PersonEntry(
-        id: 'p-slow',
-        name: 'Roberto Santos',
-        firstContactAt: now.subtract(const Duration(days: 90)),
-        createdAt: now.subtract(const Duration(days: 90)),
-        updatedAt: now,
-        status: 'estudo',
-        tags: '[]',
-        revision: 1,
-      );
+        final personSlow = PersonEntry(
+          id: 'p-slow',
+          name: 'Roberto Santos',
+          firstContactAt: now.subtract(const Duration(days: 90)),
+          createdAt: now.subtract(const Duration(days: 90)),
+          updatedAt: now,
+          status: 'estudo',
+          tags: '[]',
+          revision: 1,
+        );
 
-      final studyFast = BibleStudyEntry(
-        id: 's-fast',
-        title: 'Estudo Carlos',
-        ownerId: 'user1',
-        startedAt: now.subtract(const Duration(days: 30)),
-        status: 'ativo',
-        publicationId: 'lff-book',
-        language: 'pt',
-        frequency: 'duas_vezes_semana',
-        currentLesson: 12,
-        currentParagraph: 3,
-        lastSessionAt: now.subtract(const Duration(days: 2)),
-        createdAt: now.subtract(const Duration(days: 30)),
-        updatedAt: now,
-        revision: 1,
-      );
+        final studyFast = BibleStudyEntry(
+          id: 's-fast',
+          title: 'Estudo Carlos',
+          ownerId: 'user1',
+          startedAt: now.subtract(const Duration(days: 30)),
+          status: 'ativo',
+          publicationId: 'lff-book',
+          language: 'pt',
+          frequency: 'duas_vezes_semana',
+          currentLesson: 12,
+          currentParagraph: 3,
+          lastSessionAt: now.subtract(const Duration(days: 2)),
+          createdAt: now.subtract(const Duration(days: 30)),
+          updatedAt: now,
+          revision: 1,
+        );
 
-      final studySlow = BibleStudyEntry(
-        id: 's-slow',
-        title: 'Estudo Roberto',
-        ownerId: 'user1',
-        startedAt: now.subtract(const Duration(days: 90)),
-        status: 'ativo',
-        publicationId: 'lff-book',
-        language: 'pt',
-        frequency: 'semanal',
-        currentLesson: 2,
-        currentParagraph: 1,
-        lastSessionAt: now.subtract(const Duration(days: 25)),
-        createdAt: now.subtract(const Duration(days: 90)),
-        updatedAt: now,
-        revision: 1,
-      );
+        final studySlow = BibleStudyEntry(
+          id: 's-slow',
+          title: 'Estudo Roberto',
+          ownerId: 'user1',
+          startedAt: now.subtract(const Duration(days: 90)),
+          status: 'ativo',
+          publicationId: 'lff-book',
+          language: 'pt',
+          frequency: 'semanal',
+          currentLesson: 2,
+          currentParagraph: 1,
+          lastSessionAt: now.subtract(const Duration(days: 25)),
+          createdAt: now.subtract(const Duration(days: 90)),
+          updatedAt: now,
+          revision: 1,
+        );
 
-      final parts = [
-        StudyParticipantEntry(id: 'part-1', studyId: 's-fast', personId: 'p-fast', isPrimary: true, createdAt: now, updatedAt: now, revision: 1),
-        StudyParticipantEntry(id: 'part-2', studyId: 's-slow', personId: 'p-slow', isPrimary: true, createdAt: now, updatedAt: now, revision: 1),
-      ];
+        final parts = [
+          StudyParticipantEntry(
+            id: 'part-1',
+            studyId: 's-fast',
+            personId: 'p-fast',
+            isPrimary: true,
+            createdAt: now,
+            updatedAt: now,
+            revision: 1,
+          ),
+          StudyParticipantEntry(
+            id: 'part-2',
+            studyId: 's-slow',
+            personId: 'p-slow',
+            isPrimary: true,
+            createdAt: now,
+            updatedAt: now,
+            revision: 1,
+          ),
+        ];
 
-      final sessions = [
-        StudySessionEntry(id: 'sess-1', studyId: 's-fast', dateTimeField: now.subtract(const Duration(days: 5)), status: 'realizada', participantIds: '[]', createdAt: now, updatedAt: now, revision: 1),
-        StudySessionEntry(id: 'sess-2', studyId: 's-fast', dateTimeField: now.subtract(const Duration(days: 2)), status: 'realizada', participantIds: '[]', createdAt: now, updatedAt: now, revision: 1),
-        StudySessionEntry(id: 'sess-3', studyId: 's-slow', dateTimeField: now.subtract(const Duration(days: 25)), status: 'cancelada', participantIds: '[]', createdAt: now, updatedAt: now, revision: 1),
-      ];
+        final sessions = [
+          StudySessionEntry(
+            id: 'sess-1',
+            studyId: 's-fast',
+            dateTimeField: now.subtract(const Duration(days: 5)),
+            status: 'realizada',
+            participantIds: '[]',
+            createdAt: now,
+            updatedAt: now,
+            revision: 1,
+          ),
+          StudySessionEntry(
+            id: 'sess-2',
+            studyId: 's-fast',
+            dateTimeField: now.subtract(const Duration(days: 2)),
+            status: 'realizada',
+            participantIds: '[]',
+            createdAt: now,
+            updatedAt: now,
+            revision: 1,
+          ),
+          StudySessionEntry(
+            id: 'sess-3',
+            studyId: 's-slow',
+            dateTimeField: now.subtract(const Duration(days: 25)),
+            status: 'cancelada',
+            participantIds: '[]',
+            createdAt: now,
+            updatedAt: now,
+            revision: 1,
+          ),
+        ];
 
-      final prioritized = StudentPriorityEngine.calculatePriorities(
-        studies: [studyFast, studySlow],
-        participants: parts,
-        people: [personFast, personSlow],
-        sessions: sessions,
-        nowOverride: now,
-      );
+        final prioritized = StudentPriorityEngine.calculatePriorities(
+          studies: [studyFast, studySlow],
+          participants: parts,
+          people: [personFast, personSlow],
+          sessions: sessions,
+          nowOverride: now,
+        );
 
-      expect(prioritized.length, equals(2));
-      expect(prioritized.first.study.id, equals('s-fast'));
-      expect(prioritized.first.internalScore, greaterThan(prioritized.last.internalScore));
-      expect(prioritized.first.priorityTier, anyOf(equals('Muito Alta'), equals('Alta')));
-      expect(prioritized.first.frequency, equals('duas_vezes_semana'));
-    });
+        expect(prioritized.length, equals(2));
+        expect(prioritized.first.study.id, equals('s-fast'));
+        expect(
+          prioritized.first.internalScore,
+          greaterThan(prioritized.last.internalScore),
+        );
+        expect(
+          prioritized.first.priorityTier,
+          anyOf(equals('Muito Alta'), equals('Alta')),
+        );
+        expect(prioritized.first.frequency, equals('duas_vezes_semana'));
+      });
 
-    test('Reordenação manual (applyManualReorder) sobrescreve a ordem calculada automaticamente', () {
-      final now = DateTime(2026, 10, 15);
-      final personA = PersonEntry(id: 'p-a', name: 'Ana', firstContactAt: now, createdAt: now, updatedAt: now, status: 'estudo', tags: '[]', revision: 1);
-      final personB = PersonEntry(id: 'p-b', name: 'Bruno', firstContactAt: now, createdAt: now, updatedAt: now, status: 'estudo', tags: '[]', revision: 1);
-      final studyA = BibleStudyEntry(id: 's-a', title: 'Ana', ownerId: 'u', startedAt: now, status: 'ativo', publicationId: 'lff-book', language: 'pt', frequency: 'semanal', currentLesson: 10, createdAt: now, updatedAt: now, revision: 1);
-      final studyB = BibleStudyEntry(id: 's-b', title: 'Bruno', ownerId: 'u', startedAt: now, status: 'ativo', publicationId: 'lff-book', language: 'pt', frequency: 'semanal', currentLesson: 2, createdAt: now, updatedAt: now, revision: 1);
+      test('Reordenação manual (applyManualReorder) sobrescreve a ordem calculada automaticamente', () {
+        final now = DateTime(2026, 10, 15);
+        final personA = PersonEntry(
+          id: 'p-a',
+          name: 'Ana',
+          firstContactAt: now,
+          createdAt: now,
+          updatedAt: now,
+          status: 'estudo',
+          tags: '[]',
+          revision: 1,
+        );
+        final personB = PersonEntry(
+          id: 'p-b',
+          name: 'Bruno',
+          firstContactAt: now,
+          createdAt: now,
+          updatedAt: now,
+          status: 'estudo',
+          tags: '[]',
+          revision: 1,
+        );
+        final studyA = BibleStudyEntry(
+          id: 's-a',
+          title: 'Ana',
+          ownerId: 'u',
+          startedAt: now,
+          status: 'ativo',
+          publicationId: 'lff-book',
+          language: 'pt',
+          frequency: 'semanal',
+          currentLesson: 10,
+          createdAt: now,
+          updatedAt: now,
+          revision: 1,
+        );
+        final studyB = BibleStudyEntry(
+          id: 's-b',
+          title: 'Bruno',
+          ownerId: 'u',
+          startedAt: now,
+          status: 'ativo',
+          publicationId: 'lff-book',
+          language: 'pt',
+          frequency: 'semanal',
+          currentLesson: 2,
+          createdAt: now,
+          updatedAt: now,
+          revision: 1,
+        );
 
-      final parts = [
-        StudyParticipantEntry(id: 'pt-1', studyId: 's-a', personId: 'p-a', isPrimary: true, createdAt: now, updatedAt: now, revision: 1),
-        StudyParticipantEntry(id: 'pt-2', studyId: 's-b', personId: 'p-b', isPrimary: true, createdAt: now, updatedAt: now, revision: 1),
-      ];
+        final parts = [
+          StudyParticipantEntry(
+            id: 'pt-1',
+            studyId: 's-a',
+            personId: 'p-a',
+            isPrimary: true,
+            createdAt: now,
+            updatedAt: now,
+            revision: 1,
+          ),
+          StudyParticipantEntry(
+            id: 'pt-2',
+            studyId: 's-b',
+            personId: 'p-b',
+            isPrimary: true,
+            createdAt: now,
+            updatedAt: now,
+            revision: 1,
+          ),
+        ];
 
-      final Map<String, int> manualMap = {};
-      var items = StudentPriorityEngine.calculatePriorities(
-        studies: [studyA, studyB],
-        participants: parts,
-        people: [personA, personB],
-        sessions: const [],
-        manualOrderMap: manualMap,
-        nowOverride: now,
-      );
+        final Map<String, int> manualMap = {};
+        var items = StudentPriorityEngine.calculatePriorities(
+          studies: [studyA, studyB],
+          participants: parts,
+          people: [personA, personB],
+          sessions: const [],
+          manualOrderMap: manualMap,
+          nowOverride: now,
+        );
 
-      expect(items.first.study.id, equals('s-a'));
+        expect(items.first.study.id, equals('s-a'));
 
-      // Move o segundo para o primeiro lugar
-      StudentPriorityEngine.applyManualReorder(
-        items: items,
-        oldIndex: 1,
-        newIndex: 0,
-        manualOrderMap: manualMap,
-      );
+        // Move o segundo para o primeiro lugar
+        StudentPriorityEngine.applyManualReorder(
+          items: items,
+          oldIndex: 1,
+          newIndex: 0,
+          manualOrderMap: manualMap,
+        );
 
-      final reordered = StudentPriorityEngine.calculatePriorities(
-        studies: [studyA, studyB],
-        participants: parts,
-        people: [personA, personB],
-        sessions: const [],
-        manualOrderMap: manualMap,
-        nowOverride: now,
-      );
+        final reordered = StudentPriorityEngine.calculatePriorities(
+          studies: [studyA, studyB],
+          participants: parts,
+          people: [personA, personB],
+          sessions: const [],
+          manualOrderMap: manualMap,
+          nowOverride: now,
+        );
 
-      expect(reordered.first.study.id, equals('s-b'));
-      expect(reordered.first.manualRank, equals(1));
-    });
+        expect(reordered.first.study.id, equals('s-b'));
+        expect(reordered.first.manualRank, equals(1));
+      });
 
-    test('Sessões falhas ou canceladas penalizam pontuação interna em relação a sessões realizadas', () {
-      final now = DateTime(2026, 10, 20);
-      final person1 = PersonEntry(id: 'p-1', name: 'Estudante A', firstContactAt: now, createdAt: now, updatedAt: now, status: 'estudo', tags: '[]', revision: 1);
-      final person2 = PersonEntry(id: 'p-2', name: 'Estudante B', firstContactAt: now, createdAt: now, updatedAt: now, status: 'estudo', tags: '[]', revision: 1);
+      test('Sessões falhas ou canceladas penalizam pontuação interna em relação a sessões realizadas', () {
+        final now = DateTime(2026, 10, 20);
+        final person1 = PersonEntry(
+          id: 'p-1',
+          name: 'Estudante A',
+          firstContactAt: now,
+          createdAt: now,
+          updatedAt: now,
+          status: 'estudo',
+          tags: '[]',
+          revision: 1,
+        );
+        final person2 = PersonEntry(
+          id: 'p-2',
+          name: 'Estudante B',
+          firstContactAt: now,
+          createdAt: now,
+          updatedAt: now,
+          status: 'estudo',
+          tags: '[]',
+          revision: 1,
+        );
 
-      final study1 = BibleStudyEntry(id: 's-1', title: 'Estudo A', ownerId: 'u', startedAt: now, status: 'ativo', publicationId: 'lff-book', language: 'pt', frequency: 'semanal', currentLesson: 5, createdAt: now, updatedAt: now, revision: 1);
-      final study2 = BibleStudyEntry(id: 's-2', title: 'Estudo B', ownerId: 'u', startedAt: now, status: 'ativo', publicationId: 'lff-book', language: 'pt', frequency: 'semanal', currentLesson: 5, createdAt: now, updatedAt: now, revision: 1);
+        final study1 = BibleStudyEntry(
+          id: 's-1',
+          title: 'Estudo A',
+          ownerId: 'u',
+          startedAt: now,
+          status: 'ativo',
+          publicationId: 'lff-book',
+          language: 'pt',
+          frequency: 'semanal',
+          currentLesson: 5,
+          createdAt: now,
+          updatedAt: now,
+          revision: 1,
+        );
+        final study2 = BibleStudyEntry(
+          id: 's-2',
+          title: 'Estudo B',
+          ownerId: 'u',
+          startedAt: now,
+          status: 'ativo',
+          publicationId: 'lff-book',
+          language: 'pt',
+          frequency: 'semanal',
+          currentLesson: 5,
+          createdAt: now,
+          updatedAt: now,
+          revision: 1,
+        );
 
-      final parts = [
-        StudyParticipantEntry(id: 'pt-1', studyId: 's-1', personId: 'p-1', isPrimary: true, createdAt: now, updatedAt: now, revision: 1),
-        StudyParticipantEntry(id: 'pt-2', studyId: 's-2', personId: 'p-2', isPrimary: true, createdAt: now, updatedAt: now, revision: 1),
-      ];
+        final parts = [
+          StudyParticipantEntry(
+            id: 'pt-1',
+            studyId: 's-1',
+            personId: 'p-1',
+            isPrimary: true,
+            createdAt: now,
+            updatedAt: now,
+            revision: 1,
+          ),
+          StudyParticipantEntry(
+            id: 'pt-2',
+            studyId: 's-2',
+            personId: 'p-2',
+            isPrimary: true,
+            createdAt: now,
+            updatedAt: now,
+            revision: 1,
+          ),
+        ];
 
-      final sessions = [
-        StudySessionEntry(id: 'sess-ok-1', studyId: 's-1', dateTimeField: now.subtract(const Duration(days: 7)), status: 'realizada', participantIds: '[]', createdAt: now, updatedAt: now, revision: 1),
-        StudySessionEntry(id: 'sess-ok-2', studyId: 's-1', dateTimeField: now.subtract(const Duration(days: 1)), status: 'realizada', participantIds: '[]', createdAt: now, updatedAt: now, revision: 1),
-        StudySessionEntry(id: 'sess-fail-1', studyId: 's-2', dateTimeField: now.subtract(const Duration(days: 7)), status: 'cancelada', participantIds: '[]', createdAt: now, updatedAt: now, revision: 1),
-        StudySessionEntry(id: 'sess-fail-2', studyId: 's-2', dateTimeField: now.subtract(const Duration(days: 1)), status: 'cancelada', participantIds: '[]', createdAt: now, updatedAt: now, revision: 1),
-      ];
+        final sessions = [
+          StudySessionEntry(
+            id: 'sess-ok-1',
+            studyId: 's-1',
+            dateTimeField: now.subtract(const Duration(days: 7)),
+            status: 'realizada',
+            participantIds: '[]',
+            createdAt: now,
+            updatedAt: now,
+            revision: 1,
+          ),
+          StudySessionEntry(
+            id: 'sess-ok-2',
+            studyId: 's-1',
+            dateTimeField: now.subtract(const Duration(days: 1)),
+            status: 'realizada',
+            participantIds: '[]',
+            createdAt: now,
+            updatedAt: now,
+            revision: 1,
+          ),
+          StudySessionEntry(
+            id: 'sess-fail-1',
+            studyId: 's-2',
+            dateTimeField: now.subtract(const Duration(days: 7)),
+            status: 'cancelada',
+            participantIds: '[]',
+            createdAt: now,
+            updatedAt: now,
+            revision: 1,
+          ),
+          StudySessionEntry(
+            id: 'sess-fail-2',
+            studyId: 's-2',
+            dateTimeField: now.subtract(const Duration(days: 1)),
+            status: 'cancelada',
+            participantIds: '[]',
+            createdAt: now,
+            updatedAt: now,
+            revision: 1,
+          ),
+        ];
 
-      final results = StudentPriorityEngine.calculatePriorities(
-        studies: [study1, study2],
-        participants: parts,
-        people: [person1, person2],
-        sessions: sessions,
-        nowOverride: now,
-      );
+        final results = StudentPriorityEngine.calculatePriorities(
+          studies: [study1, study2],
+          participants: parts,
+          people: [person1, person2],
+          sessions: sessions,
+          nowOverride: now,
+        );
 
-      final itemA = results.firstWhere((i) => i.study.id == 's-1');
-      final itemB = results.firstWhere((i) => i.study.id == 's-2');
+        final itemA = results.firstWhere((i) => i.study.id == 's-1');
+        final itemB = results.firstWhere((i) => i.study.id == 's-2');
 
-      expect(itemA.internalScore, greaterThan(itemB.internalScore));
-      expect(results.first.study.id, equals('s-1'));
-    });
-  });
+        expect(itemA.internalScore, greaterThan(itemB.internalScore));
+        expect(results.first.study.id, equals('s-1'));
+      });
+    },
+  );
 
   group('Persistência Estatística Histórica e Encerramento de Revisitas', () {
     late AppDatabase db;
@@ -267,7 +508,10 @@ void main() {
     });
 
     test('Visitas realizadas em um mês não são perdidas quando a pessoa é repassada ou encerrada', () async {
-      final p = await repo.createPerson(name: 'Maria Silva', status: 'revisita');
+      final p = await repo.createPerson(
+        name: 'Maria Silva',
+        status: 'revisita',
+      );
 
       // Registra 2 visitas no mês de outubro
       await repo.createVisit(
@@ -304,73 +548,103 @@ void main() {
       expect(metrics.heldVisitsCount, equals(2));
     });
 
-    test('Encerramento de revisita com motivo contabiliza em endedVisitsByReason', () async {
-      await repo.createPerson(
-        name: 'José Souza',
-        status: 'revisita_encerrada',
-        contactRestrictions: '{"endReason":"Mudou-se de território"}',
-      );
-      await repo.createPerson(
-        name: 'Lucas Ferreira',
-        status: 'revisita_encerrada',
-        contactRestrictions: '{"endReason":"Falta de interesse / tempo"}',
-      );
+    test(
+      'Encerramento de revisita com motivo contabiliza em endedVisitsByReason',
+      () async {
+        await repo.createPerson(
+          name: 'José Souza',
+          status: 'revisita_encerrada',
+          contactRestrictions: '{"endReason":"Mudou-se de território"}',
+        );
+        await repo.createPerson(
+          name: 'Lucas Ferreira',
+          status: 'revisita_encerrada',
+          contactRestrictions: '{"endReason":"Falta de interesse / tempo"}',
+        );
 
-      final allPeople = await repo.getAllPeople();
+        final allPeople = await repo.getAllPeople();
 
-      final metrics = DashboardCalculator.calculate(
-        visits: [],
-        studies: [],
-        sessions: [],
-        appointments: [],
-        activities: [],
-        people: allPeople,
-        periodStart: DateTime(2026, 10, 1),
-        periodEnd: DateTime(2026, 10, 31, 23, 59, 59),
-      );
+        final metrics = DashboardCalculator.calculate(
+          visits: [],
+          studies: [],
+          sessions: [],
+          appointments: [],
+          activities: [],
+          people: allPeople,
+          periodStart: DateTime(2026, 10, 1),
+          periodEnd: DateTime(2026, 10, 31, 23, 59, 59),
+        );
 
-      expect(metrics.endedVisitsCount, equals(2));
-      expect(metrics.endedVisitsByReason['Mudou-se de território'], equals(1));
-      expect(metrics.endedVisitsByReason['Falta de interesse / tempo'], equals(1));
-    });
+        expect(metrics.endedVisitsCount, equals(2));
+        expect(
+          metrics.endedVisitsByReason['Mudou-se de território'],
+          equals(1),
+        );
+        expect(
+          metrics.endedVisitsByReason['Falta de interesse / tempo'],
+          equals(1),
+        );
+      },
+    );
 
-    test('Cadastro de Evento Teocrático insere compromisso no calendário oficial', () async {
-      final start = DateTime(2026, 11, 14, 9, 0);
-      final end = DateTime(2026, 11, 14, 16, 30);
+    test(
+      'Cadastro de Evento Teocrático insere compromisso no calendário oficial',
+      () async {
+        final start = DateTime(2026, 11, 14, 9, 0);
+        final end = DateTime(2026, 11, 14, 16, 30);
 
-      final appt = await repo.createAppointment(
-        title: '[Evento Teocrático] Assembleia de Circuito: Entre no Descanso de Deus',
-        startTime: start,
-        endTime: end,
-        durationMinutes: 450,
-        locationNotes: 'Salão de Assembleias',
-        status: 'confirmado',
-      );
+        final appt = await repo.createAppointment(
+          title: '[Evento Teocrático] Assembleia de Circuito: Entre no Descanso de Deus',
+          startTime: start,
+          endTime: end,
+          durationMinutes: 450,
+          locationNotes: 'Salão de Assembleias',
+          status: 'confirmado',
+        );
 
-      expect(appt.id, isNotEmpty);
-      expect(appt.title, contains('[Evento Teocrático] Assembleia'));
-      expect(appt.status, equals('confirmado'));
+        expect(appt.id, isNotEmpty);
+        expect(appt.title, contains('[Evento Teocrático] Assembleia'));
+        expect(appt.status, equals('confirmado'));
 
-      final all = await repo.getAllAppointments();
-      expect(all.length, equals(1));
-      expect(all.first.locationNotes, equals('Salão de Assembleias'));
-    });
+        final all = await repo.getAllAppointments();
+        expect(all.length, equals(1));
+        expect(all.first.locationNotes, equals('Salão de Assembleias'));
+      },
+    );
   });
 
   group('Geolocalização e Proximidade (GeolocationHelper)', () {
     test('calculateHaversineDistanceKm calcula distâncias com precisão e detecta limiar de 1.2km', () {
       // Mesmas coordenadas -> 0.0 km
-      final dZero = GeolocationHelper.calculateHaversineDistanceKm(-23.5505, -46.6333, -23.5505, -46.6333);
+      final dZero = GeolocationHelper.calculateHaversineDistanceKm(
+        -23.5505,
+        -46.6333,
+        -23.5505,
+        -46.6333,
+      );
       expect(dZero, closeTo(0.0, 0.001));
 
       // Coordenadas próximas (~500m) em São Paulo
-      final dNear = GeolocationHelper.calculateHaversineDistanceKm(-23.5505, -46.6333, -23.5550, -46.6333);
+      final dNear = GeolocationHelper.calculateHaversineDistanceKm(
+        -23.5505,
+        -46.6333,
+        -23.5550,
+        -46.6333,
+      );
       expect(dNear, greaterThan(0.4));
       expect(dNear, lessThan(0.6));
-      expect(dNear, lessThan(1.2)); // Dentro do raio de 1.2km para alerta de proximidade
+      expect(
+        dNear,
+        lessThan(1.2),
+      ); // Dentro do raio de 1.2km para alerta de proximidade
 
       // Coordenadas distantes (São Paulo até Rio de Janeiro ~360km)
-      final dFar = GeolocationHelper.calculateHaversineDistanceKm(-23.5505, -46.6333, -22.9068, -43.1729);
+      final dFar = GeolocationHelper.calculateHaversineDistanceKm(
+        -23.5505,
+        -46.6333,
+        -22.9068,
+        -43.1729,
+      );
       expect(dFar, greaterThan(350.0));
       expect(dFar, lessThan(380.0));
       expect(dFar, greaterThan(1.2));
@@ -410,7 +684,9 @@ void main() {
       expect(didRun2, isFalse);
 
       // 4. Execução com force: true executa mesmo antes de 24h
-      final didRunForce = await backupService.performSilentBackupIfNeeded(force: true);
+      final didRunForce = await backupService.performSilentBackupIfNeeded(
+        force: true,
+      );
       expect(didRunForce, isTrue);
     });
   });
@@ -437,7 +713,10 @@ void main() {
       expect(futuro.coverTheme, equals('Como você vê o futuro?'));
 
       final familia = folhetos.firstWhere((f) => f.title == 'Folheto: Família');
-      expect(familia.coverTheme, equals('O que pode ajudar sua família a ser feliz?'));
+      expect(
+        familia.coverTheme,
+        equals('O que pode ajudar sua família a ser feliz?'),
+      );
 
       // Não possui os códigos antigos T-30 a T-37
       expect(titles.any((t) => t.contains('T-30')), isFalse);
@@ -446,7 +725,9 @@ void main() {
 
     test('Brochura Escute a Deus e Viva para Sempre possui contagens reais variadas de parágrafos', () {
       expect(ListenToGodCatalog.lessons.length, equals(14));
-      final paragraphs = ListenToGodCatalog.lessons.map((l) => l.paragraphs).toList();
+      final paragraphs = ListenToGodCatalog.lessons
+          .map((l) => l.paragraphs)
+          .toList();
 
       // Não são todos padronizados em 4
       expect(paragraphs.toSet().length, greaterThan(1));
@@ -456,20 +737,41 @@ void main() {
     });
 
     test('LffBookCatalog possui contagens reais variadas e não-padronizadas (4 a 7 pontos)', () {
-      final pointCounts = LffBookCatalog.lessons.map((l) => l.totalPoints).toList();
+      final pointCounts = LffBookCatalog.lessons
+          .map((l) => l.totalPoints)
+          .toList();
       final distinctCounts = pointCounts.toSet();
 
       // Contagens reais variam entre 4 e 7 pontos (nunca padronizadas artificialmente)
       expect(distinctCounts, containsAll([4, 5, 6, 7]));
-      expect(LffBookCatalog.getLesson(45)!.totalPoints, equals(4)); // Lição 45 tem 4 pontos
-      expect(LffBookCatalog.getLesson(4)!.totalPoints, equals(5));  // Lição 4 tem 5 pontos
-      expect(LffBookCatalog.getLesson(1)!.totalPoints, equals(6));  // Lição 1 tem 6 pontos
-      expect(LffBookCatalog.getLesson(7)!.totalPoints, equals(7));  // Lição 7 tem 7 pontos
-      expect(LffBookCatalog.getLesson(50)!.totalPoints, equals(7)); // Lição 50 tem 7 pontos
+      expect(
+        LffBookCatalog.getLesson(45)!.totalPoints,
+        equals(4),
+      ); // Lição 45 tem 4 pontos
+      expect(
+        LffBookCatalog.getLesson(4)!.totalPoints,
+        equals(5),
+      ); // Lição 4 tem 5 pontos
+      expect(
+        LffBookCatalog.getLesson(1)!.totalPoints,
+        equals(6),
+      ); // Lição 1 tem 6 pontos
+      expect(
+        LffBookCatalog.getLesson(7)!.totalPoints,
+        equals(7),
+      ); // Lição 7 tem 7 pontos
+      expect(
+        LffBookCatalog.getLesson(50)!.totalPoints,
+        equals(7),
+      ); // Lição 50 tem 7 pontos
 
       for (final l in LffBookCatalog.lessons) {
-        expect(l.totalPoints, inInclusiveRange(4, 7),
-            reason: 'Lição ${l.number} possui ${l.totalPoints} pontos fora da faixa esperada 4-7');
+        expect(
+          l.totalPoints,
+          inInclusiveRange(4, 7),
+          reason:
+              'Lição ${l.number} possui ${l.totalPoints} pontos fora da faixa esperada 4-7',
+        );
         expect(l.title.isNotEmpty, isTrue);
         expect(l.summary, isNotNull);
         expect(l.reviewQuestions.isNotEmpty, isTrue);
@@ -486,7 +788,8 @@ void main() {
 
   group('Composição e Decomposição de Endereço com Bairro e Setor', () {
     test('Decompõe endereço unificado com Bairro e Ref corretamente', () {
-      const rawAddr = 'Rua das Flores, 120 - Bairro: Betânia - Ref: Próximo à padaria';
+      const rawAddr =
+          'Rua das Flores, 120 - Bairro: Betânia - Ref: Próximo à padaria';
       final parts = rawAddr.split(' - ');
       String street = '';
       String neighborhood = '';
@@ -518,4 +821,3 @@ void main() {
     });
   });
 }
-

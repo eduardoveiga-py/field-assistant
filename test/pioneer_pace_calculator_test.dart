@@ -8,6 +8,7 @@ import 'package:ministerio_pessoal/ui/widgets/pioneer_pace_card.dart';
 import 'package:ministerio_pessoal/database/app_database.dart';
 import 'package:ministerio_pessoal/settings/app_settings_manager.dart';
 import 'package:ministerio_pessoal/ui/providers.dart';
+
 class _TestSunModeNotifier extends SunModeNotifier {
   final bool initial;
   _TestSunModeNotifier(this.initial);
@@ -57,7 +58,10 @@ void main() {
       expect(result.remainingHours, equals(18.0));
       expect(result.isGoalReached, isFalse);
       expect(result.remainingOutings, equals(5));
-      expect(result.idealPacePerOuting, equals(const Duration(hours: 3, minutes: 36)));
+      expect(
+        result.idealPacePerOuting,
+        equals(const Duration(hours: 3, minutes: 36)),
+      );
       expect(result.idealPaceFormatted, equals('3h36m'));
       expect(
         result.formattedPaceText,
@@ -78,7 +82,10 @@ void main() {
       expect(result.goalHours, equals(30.0));
       expect(result.remainingHours, equals(20.0));
       expect(result.remainingOutings, equals(8));
-      expect(result.idealPacePerOuting, equals(const Duration(hours: 2, minutes: 30)));
+      expect(
+        result.idealPacePerOuting,
+        equals(const Duration(hours: 2, minutes: 30)),
+      );
       expect(result.idealPaceFormatted, equals('2h30m'));
       expect(
         result.formattedPaceText,
@@ -86,40 +93,46 @@ void main() {
       );
     });
 
-    test('Meta atingida exatamente exibe string canônica sem horas restantes', () {
-      final date = DateTime(2026, 10, 25);
-      final result = PioneerPaceCalculator.calculate(
-        goalHours: 50.0,
-        designatedWeekdays: [2, 4, 6],
-        completedHours: 50.0,
-        currentDate: date,
-      );
+    test(
+      'Meta atingida exatamente exibe string canônica sem horas restantes',
+      () {
+        final date = DateTime(2026, 10, 25);
+        final result = PioneerPaceCalculator.calculate(
+          goalHours: 50.0,
+          designatedWeekdays: [2, 4, 6],
+          completedHours: 50.0,
+          currentDate: date,
+        );
 
-      expect(result.isGoalReached, isTrue);
-      expect(result.remainingHours, equals(0.0));
-      expect(result.idealPacePerOuting, equals(Duration.zero));
-      expect(
-        result.formattedPaceText,
-        equals('Meta atingida! Parabéns pelo empenho no ministério.'),
-      );
-    });
+        expect(result.isGoalReached, isTrue);
+        expect(result.remainingHours, equals(0.0));
+        expect(result.idealPacePerOuting, equals(Duration.zero));
+        expect(
+          result.formattedPaceText,
+          equals('Meta atingida! Parabéns pelo empenho no ministério.'),
+        );
+      },
+    );
 
-    test('Meta superada evita horas negativas e mantém mensagem comemorativa', () {
-      final date = DateTime(2026, 10, 25);
-      final result = PioneerPaceCalculator.calculate(
-        goalHours: 50.0,
-        designatedWeekdays: [2, 4, 6],
-        completedHours: 55.5,
-        currentDate: date,
-      );
+    test(
+      'Meta superada evita horas negativas e mantém mensagem comemorativa',
+      () {
+        final date = DateTime(2026, 10, 25);
+        final result = PioneerPaceCalculator.calculate(
+          goalHours: 50.0,
+          designatedWeekdays: [2, 4, 6],
+          completedHours: 55.5,
+          currentDate: date,
+        );
 
-      expect(result.isGoalReached, isTrue);
-      expect(result.remainingHours, equals(0.0));
-      expect(
-        result.formattedPaceText,
-        equals('Meta atingida! Parabéns pelo empenho no ministério.'),
-      );
-    });
+        expect(result.isGoalReached, isTrue);
+        expect(result.remainingHours, equals(0.0));
+        expect(
+          result.formattedPaceText,
+          equals('Meta atingida! Parabéns pelo empenho no ministério.'),
+        );
+      },
+    );
 
     test('0 saídas restantes com horas pendentes calcula duração total e mensagem canônica', () {
       // 31 de Outubro de 2026 é Sábado (6). Se apenas Segundas (1) estiverem configuradas:
@@ -141,23 +154,28 @@ void main() {
       );
     });
 
-    test('Lista vazia de dias habituais ([]) retorna 0 saídas com segurança', () {
-      final date = DateTime(2026, 10, 10);
-      final result = PioneerPaceCalculator.calculate(
-        goalHours: 50.0,
-        designatedWeekdays: [],
-        completedHours: 30.0,
-        currentDate: date,
-      );
+    test(
+      'Lista vazia de dias habituais ([]) retorna 0 saídas com segurança',
+      () {
+        final date = DateTime(2026, 10, 10);
+        final result = PioneerPaceCalculator.calculate(
+          goalHours: 50.0,
+          designatedWeekdays: [],
+          completedHours: 30.0,
+          currentDate: date,
+        );
 
-      expect(result.remainingOutings, equals(0));
-      expect(result.remainingHours, equals(20.0));
-      expect(result.isGoalReached, isFalse);
-      expect(
-        result.formattedPaceText,
-        equals('Faltam 20h em 0 saídas. Seu ritmo ideal é de 20h00m por saída'),
-      );
-    });
+        expect(result.remainingOutings, equals(0));
+        expect(result.remainingHours, equals(20.0));
+        expect(result.isGoalReached, isFalse);
+        expect(
+          result.formattedPaceText,
+          equals(
+            'Faltam 20h em 0 saídas. Seu ritmo ideal é de 20h00m por saída',
+          ),
+        );
+      },
+    );
 
     test('Lida com anos bissextos (Fev/2028: 29 dias) vs ano comum (Fev/2027: 28 dias)', () {
       // Fev 2028: Terças nos dias 1, 8, 15, 22, 29 (5 terças)
@@ -191,42 +209,53 @@ void main() {
       expect(result.remainingHours, equals(18.5));
       expect(result.remainingOutings, equals(5));
       // 18.5 * 60 / 5 = 1110 / 5 = 222 min = 3h42m
-      expect(result.idealPacePerOuting, equals(const Duration(hours: 3, minutes: 42)));
+      expect(
+        result.idealPacePerOuting,
+        equals(const Duration(hours: 3, minutes: 42)),
+      );
       expect(result.idealPaceFormatted, equals('3h42m'));
       expect(
         result.formattedPaceText,
-        equals('Faltam 18.5h em 5 saídas. Seu ritmo ideal é de 3h42m por saída'),
+        equals(
+          'Faltam 18.5h em 5 saídas. Seu ritmo ideal é de 3h42m por saída',
+        ),
       );
     });
 
-    test('Protege contra valores negativos de entrada via math.max(0.0, ...)', () {
-      final date = DateTime(2026, 10, 1);
-      final result = PioneerPaceCalculator.calculate(
-        goalHours: -20.0,
-        designatedWeekdays: [1],
-        completedHours: -10.0,
-        currentDate: date,
-      );
+    test(
+      'Protege contra valores negativos de entrada via math.max(0.0, ...)',
+      () {
+        final date = DateTime(2026, 10, 1);
+        final result = PioneerPaceCalculator.calculate(
+          goalHours: -20.0,
+          designatedWeekdays: [1],
+          completedHours: -10.0,
+          currentDate: date,
+        );
 
-      expect(result.goalHours, equals(0.0));
-      expect(result.completedHours, equals(0.0));
-      expect(result.remainingHours, equals(0.0));
-    });
+        expect(result.goalHours, equals(0.0));
+        expect(result.completedHours, equals(0.0));
+        expect(result.remainingHours, equals(0.0));
+      },
+    );
 
-    test('Rollover de final de ano (Dezembro) calcula corretamente até o dia 31', () {
-      final date = DateTime(2026, 12, 28); // Segunda
-      // Dias restantes em dez/2026: 28(Seg), 29(Ter), 30(Qua), 31(Qui)
-      final result = PioneerPaceCalculator.calculate(
-        goalHours: 50.0,
-        designatedWeekdays: [4], // Quinta-feira (dia 31)
-        completedHours: 46.0,
-        currentDate: date,
-      );
+    test(
+      'Rollover de final de ano (Dezembro) calcula corretamente até o dia 31',
+      () {
+        final date = DateTime(2026, 12, 28); // Segunda
+        // Dias restantes em dez/2026: 28(Seg), 29(Ter), 30(Qua), 31(Qui)
+        final result = PioneerPaceCalculator.calculate(
+          goalHours: 50.0,
+          designatedWeekdays: [4], // Quinta-feira (dia 31)
+          completedHours: 46.0,
+          currentDate: date,
+        );
 
-      expect(result.remainingOutings, equals(1));
-      expect(result.remainingHours, equals(4.0));
-      expect(result.idealPacePerOuting, equals(const Duration(hours: 4)));
-    });
+        expect(result.remainingOutings, equals(1));
+        expect(result.remainingHours, equals(4.0));
+        expect(result.idealPacePerOuting, equals(const Duration(hours: 4)));
+      },
+    );
   });
 
   group('PioneerPaceCard (Widget Tests - R2)', () {
@@ -242,7 +271,6 @@ void main() {
       await db.close();
     });
 
-
     Widget createTestWidget({
       double? completedHours = 20.0,
       DateTime? dateOverride,
@@ -256,7 +284,9 @@ void main() {
           sunModeProvider.overrideWith(() => _TestSunModeNotifier(isSunMode)),
         ],
         child: MaterialApp(
-          theme: ThemeData(brightness: isDark ? Brightness.dark : Brightness.light),
+          theme: ThemeData(
+            brightness: isDark ? Brightness.dark : Brightness.light,
+          ),
           home: Scaffold(
             body: SingleChildScrollView(
               child: PioneerPaceCard(
@@ -269,124 +299,148 @@ void main() {
       );
     }
 
-    testWidgets('Renderiza card de ritmo com barra de progresso, percentual e saídas restantes', (tester) async {
-      await tester.pumpWidget(createTestWidget(
-        completedHours: 20.0,
-        dateOverride: DateTime(2026, 10, 15),
-      ));
-      await tester.pumpAndSettle();
+    testWidgets(
+      'Renderiza card de ritmo com barra de progresso, percentual e saídas restantes',
+      (tester) async {
+        await tester.pumpWidget(
+          createTestWidget(
+            completedHours: 20.0,
+            dateOverride: DateTime(2026, 10, 15),
+          ),
+        );
+        await tester.pumpAndSettle();
 
-      expect(find.text('Ritmo Real de Campo'), findsOneWidget);
-      expect(find.byType(LinearProgressIndicator), findsOneWidget);
-      // 20h de 50h = 40%
-      expect(find.text('Feitas: 20h de 50h (40%)'), findsOneWidget);
-      expect(find.textContaining('saída(s) restante(s)'), findsOneWidget);
-      expect(find.byIcon(Icons.tune), findsOneWidget);
-      expect(find.textContaining('Faltam 30h'), findsOneWidget);
-    });
+        expect(find.text('Ritmo Real de Campo'), findsOneWidget);
+        expect(find.byType(LinearProgressIndicator), findsOneWidget);
+        // 20h de 50h = 40%
+        expect(find.text('Feitas: 20h de 50h (40%)'), findsOneWidget);
+        expect(find.textContaining('saída(s) restante(s)'), findsOneWidget);
+        expect(find.byIcon(Icons.tune), findsOneWidget);
+        expect(find.textContaining('Faltam 30h'), findsOneWidget);
+      },
+    );
 
-    testWidgets('Renderiza visual comemorativo quando meta é atingida', (tester) async {
-      await tester.pumpWidget(createTestWidget(
-        completedHours: 50.0,
-        dateOverride: DateTime(2026, 10, 20),
-      ));
+    testWidgets('Renderiza visual comemorativo quando meta é atingida', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        createTestWidget(
+          completedHours: 50.0,
+          dateOverride: DateTime(2026, 10, 20),
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('Feitas: 50h de 50h (100%)'), findsOneWidget);
       expect(find.byIcon(Icons.check_circle), findsOneWidget);
       expect(find.byIcon(Icons.celebration), findsOneWidget);
-      expect(find.text('Meta atingida! Parabéns pelo empenho no ministério.'), findsOneWidget);
+      expect(
+        find.text('Meta atingida! Parabéns pelo empenho no ministério.'),
+        findsOneWidget,
+      );
     });
 
-    testWidgets('Alvo de toque do botão de configurações respeita >= 48x48 dp', (tester) async {
-      await tester.pumpWidget(createTestWidget());
-      await tester.pumpAndSettle();
+    testWidgets(
+      'Alvo de toque do botão de configurações respeita >= 48x48 dp',
+      (tester) async {
+        await tester.pumpWidget(createTestWidget());
+        await tester.pumpAndSettle();
 
-      final tuneFinder = find.byTooltip('Configurar Meta e Dias de Campo');
-      expect(tuneFinder, findsOneWidget);
-      final size = tester.getSize(tuneFinder);
-      expect(size.width, greaterThanOrEqualTo(48.0));
-      expect(size.height, greaterThanOrEqualTo(48.0));
-    });
+        final tuneFinder = find.byTooltip('Configurar Meta e Dias de Campo');
+        expect(tuneFinder, findsOneWidget);
+        final size = tester.getSize(tuneFinder);
+        expect(size.width, greaterThanOrEqualTo(48.0));
+        expect(size.height, greaterThanOrEqualTo(48.0));
+      },
+    );
 
-    testWidgets('Abre diálogo modal de configuração rápida ao tocar no ícone tune', (tester) async {
-      await tester.pumpWidget(createTestWidget());
-      await tester.pumpAndSettle();
+    testWidgets(
+      'Abre diálogo modal de configuração rápida ao tocar no ícone tune',
+      (tester) async {
+        await tester.pumpWidget(createTestWidget());
+        await tester.pumpAndSettle();
 
-      await tester.tap(find.byIcon(Icons.tune));
-      await tester.pumpAndSettle();
+        await tester.tap(find.byIcon(Icons.tune));
+        await tester.pumpAndSettle();
 
-      expect(find.text('Configurar Ritmo de Campo'), findsOneWidget);
-      expect(find.text('Meta Mensal de Horas:'), findsOneWidget);
-      expect(find.text('50h (Regular)'), findsOneWidget);
-      expect(find.text('30h (Auxiliar)'), findsOneWidget);
-      expect(find.text('15h (Reduzida)'), findsOneWidget);
-      expect(find.text('Dias habituais de campo na semana:'), findsOneWidget);
-      expect(find.text('Seg'), findsOneWidget);
-      expect(find.text('Sáb'), findsOneWidget);
-      expect(find.text('Cancelar'), findsOneWidget);
-      expect(find.text('Salvar'), findsOneWidget);
-    });
+        expect(find.text('Configurar Ritmo de Campo'), findsOneWidget);
+        expect(find.text('Meta Mensal de Horas:'), findsOneWidget);
+        expect(find.text('50h (Regular)'), findsOneWidget);
+        expect(find.text('30h (Auxiliar)'), findsOneWidget);
+        expect(find.text('15h (Reduzida)'), findsOneWidget);
+        expect(find.text('Dias habituais de campo na semana:'), findsOneWidget);
+        expect(find.text('Seg'), findsOneWidget);
+        expect(find.text('Sáb'), findsOneWidget);
+        expect(find.text('Cancelar'), findsOneWidget);
+        expect(find.text('Salvar'), findsOneWidget);
+      },
+    );
 
-    testWidgets('Seleciona preset 30h, alterna dias e salva com dual-write no AppSettingsManager', (tester) async {
-      await tester.pumpWidget(createTestWidget(
-        completedHours: 10.0,
-        dateOverride: DateTime(2026, 10, 6),
-      ));
-      await tester.pumpAndSettle();
+    testWidgets(
+      'Seleciona preset 30h, alterna dias e salva com dual-write no AppSettingsManager',
+      (tester) async {
+        await tester.pumpWidget(
+          createTestWidget(
+            completedHours: 10.0,
+            dateOverride: DateTime(2026, 10, 6),
+          ),
+        );
+        await tester.pumpAndSettle();
 
-      // Abre diálogo
-      await tester.tap(find.byIcon(Icons.tune));
-      await tester.pumpAndSettle();
+        // Abre diálogo
+        await tester.tap(find.byIcon(Icons.tune));
+        await tester.pumpAndSettle();
 
-      // Seleciona 30h (Auxiliar)
-      await tester.tap(find.text('30h (Auxiliar)'));
-      await tester.pumpAndSettle();
+        // Seleciona 30h (Auxiliar)
+        await tester.tap(find.text('30h (Auxiliar)'));
+        await tester.pumpAndSettle();
 
-      // Salva
-      await tester.tap(find.text('Salvar'));
-      await tester.pumpAndSettle();
+        // Salva
+        await tester.tap(find.text('Salvar'));
+        await tester.pumpAndSettle();
 
-      // Verifica dual-write em AppSettingsManager
-      final goal1 = await settings.getString('pioneer_goal_hours');
-      final goal2 = await settings.getString('pioneer_monthly_goal_hours');
-      final days1 = await settings.getString('pioneer_weekdays');
-      final days2 = await settings.getString('pioneer_designated_weekdays');
+        // Verifica dual-write em AppSettingsManager
+        final goal1 = await settings.getString('pioneer_goal_hours');
+        final goal2 = await settings.getString('pioneer_monthly_goal_hours');
+        final days1 = await settings.getString('pioneer_weekdays');
+        final days2 = await settings.getString('pioneer_designated_weekdays');
 
-      expect(goal1, equals('30.0'));
-      expect(goal2, equals('30.0'));
-      expect(days1, isNotNull);
-      expect(days2, isNotNull);
-      expect(days1, equals(days2));
+        expect(goal1, equals('30.0'));
+        expect(goal2, equals('30.0'));
+        expect(days1, isNotNull);
+        expect(days2, isNotNull);
+        expect(days1, equals(days2));
 
-      // Verifica atualização reativa no card (10h de 30h = 33%)
-      expect(find.text('Feitas: 10h de 30h (33%)'), findsOneWidget);
-    });
+        // Verifica atualização reativa no card (10h de 30h = 33%)
+        expect(find.text('Feitas: 10h de 30h (33%)'), findsOneWidget);
+      },
+    );
 
-    testWidgets('Adaptação ao SunMode aplica borda sólida preta de 2.0dp e alto contraste', (tester) async {
-      await tester.pumpWidget(createTestWidget(
-        completedHours: 15.0,
-        isSunMode: true,
-      ));
-      await tester.pumpAndSettle();
+    testWidgets(
+      'Adaptação ao SunMode aplica borda sólida preta de 2.0dp e alto contraste',
+      (tester) async {
+        await tester.pumpWidget(
+          createTestWidget(completedHours: 15.0, isSunMode: true),
+        );
+        await tester.pumpAndSettle();
 
-      // Localiza o Container do card principal
-      final containerFinder = find.byType(Container).first;
-      final containerWidget = tester.widget<Container>(containerFinder);
-      final decoration = containerWidget.decoration as BoxDecoration;
+        // Localiza o Container do card principal
+        final containerFinder = find.byType(Container).first;
+        final containerWidget = tester.widget<Container>(containerFinder);
+        final decoration = containerWidget.decoration as BoxDecoration;
 
-      expect(decoration.color, equals(Colors.white));
-      expect(decoration.border, isNotNull);
-      final border = decoration.border as Border;
-      expect(border.top.color, equals(Colors.black));
-      expect(border.top.width, equals(2.0));
-    });
+        expect(decoration.color, equals(Colors.white));
+        expect(decoration.border, isNotNull);
+        final border = decoration.border as Border;
+        expect(border.top.color, equals(Colors.black));
+        expect(border.top.width, equals(2.0));
+      },
+    );
 
     testWidgets('Adaptação ao Dark Mode renderiza sem erros', (tester) async {
-      await tester.pumpWidget(createTestWidget(
-        completedHours: 25.0,
-        isDark: true,
-      ));
+      await tester.pumpWidget(
+        createTestWidget(completedHours: 25.0, isDark: true),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('Ritmo Real de Campo'), findsOneWidget);

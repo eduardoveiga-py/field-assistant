@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:drift/native.dart';
 import 'package:drift/drift.dart' show Value;
@@ -45,7 +46,9 @@ void main() {
       ];
 
       // Salva no banco via repository
-      await repo.updatePerson(person.copyWith(generalNotes: Value(jsonEncode(notes))));
+      await repo.updatePerson(
+        person.copyWith(generalNotes: Value(jsonEncode(notes))),
+      );
 
       // Lê do banco e valida integridade estruturada
       final savedPerson = await repo.getPersonById(person.id);
@@ -58,7 +61,10 @@ void main() {
       expect(decoded[0]['createdAt'], equals(createdAt1.toIso8601String()));
 
       final parsedDt = DateTime.parse(decoded[0]['createdAt'] as String);
-      expect(AppDateUtils.formatDateTimeWithAt(parsedDt), equals('28/10/2026 às 14:35'));
+      expect(
+        AppDateUtils.formatDateTimeWithAt(parsedDt),
+        equals('28/10/2026 às 14:35'),
+      );
     });
 
     test('Migração e compatibilidade reversa para notas e alvos em texto puro legado ou primitivos', () {
@@ -85,14 +91,19 @@ void main() {
             'id': 'legacy-note',
             'text': trimmed,
             'createdAt': DateTime(2026, 10, 28, 10, 0).toIso8601String(),
-          }
+          },
         ];
       }
 
       // 1. Texto puro normal
-      final parsedText = parseNotes('Anotação simples legada sem formatação JSON');
+      final parsedText = parseNotes(
+        'Anotação simples legada sem formatação JSON',
+      );
       expect(parsedText.length, equals(1));
-      expect(parsedText[0]['text'], equals('Anotação simples legada sem formatação JSON'));
+      expect(
+        parsedText[0]['text'],
+        equals('Anotação simples legada sem formatação JSON'),
+      );
       expect(parsedText[0]['id'], equals('legacy-note'));
 
       // 2. Primitivo número que não deve sumir (ex: "123")
@@ -135,7 +146,9 @@ void main() {
       ];
 
       // Salva alvo pendente
-      await repo.updatePerson(person.copyWith(contactRestrictions: Value(jsonEncode(targets))));
+      await repo.updatePerson(
+        person.copyWith(contactRestrictions: Value(jsonEncode(targets))),
+      );
 
       var current = await repo.getPersonById(person.id);
       var currentTargets = (jsonDecode(current!.contactRestrictions!) as List)
@@ -149,41 +162,56 @@ void main() {
       currentTargets[0]['isCompleted'] = true;
       currentTargets[0]['completedAt'] = completedTime.toIso8601String();
 
-      await repo.updatePerson(current.copyWith(contactRestrictions: Value(jsonEncode(currentTargets))));
+      await repo.updatePerson(
+        current.copyWith(
+          contactRestrictions: Value(jsonEncode(currentTargets)),
+        ),
+      );
 
       // Valida que foi salvo como concluído com data e hora
       final finished = await repo.getPersonById(person.id);
-      final finishedTargets = (jsonDecode(finished!.contactRestrictions!) as List)
-          .map((e) => Map<String, dynamic>.from(e as Map))
-          .toList();
+      final finishedTargets = (jsonDecode(
+        finished!.contactRestrictions!,
+      ) as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
 
       expect(finishedTargets.first['isCompleted'], isTrue);
-      expect(finishedTargets.first['completedAt'], equals(completedTime.toIso8601String()));
       expect(
-        AppDateUtils.formatDateTimeWithAt(DateTime.parse(finishedTargets.first['completedAt'] as String)),
+        finishedTargets.first['completedAt'],
+        equals(completedTime.toIso8601String()),
+      );
+      expect(
+        AppDateUtils.formatDateTimeWithAt(
+          DateTime.parse(finishedTargets.first['completedAt'] as String),
+        ),
         equals('28/10/2026 às 16:30'),
       );
     });
 
-    test('Persistência de Horário Habitual específico (ex: "Sábado às 09:00")', () async {
-      final person = await repo.createPerson(
-        name: 'Ana Carolina',
-        status: 'estudo',
-      );
+    test(
+      'Persistência de Horário Habitual específico (ex: "Sábado às 09:00")',
+      () async {
+        final person = await repo.createPerson(
+          name: 'Ana Carolina',
+          status: 'estudo',
+        );
 
-      const habitualSchedule = 'Sábado às 09:00';
-      await repo.updatePerson(person.copyWith(preferredSchedule: const Value(habitualSchedule)));
+        const habitualSchedule = 'Sábado às 09:00';
+        await repo.updatePerson(
+          person.copyWith(preferredSchedule: const Value(habitualSchedule)),
+        );
 
-      final updated = await repo.getPersonById(person.id);
-      expect(updated!.preferredSchedule, equals('Sábado às 09:00'));
-    });
+        final updated = await repo.getPersonById(person.id);
+        expect(updated!.preferredSchedule, equals('Sábado às 09:00'));
+      },
+    );
 
     test('Lógica de Throttle e Clamping do Zoom por Roda do Mouse (PointerScrollEvent)', () {
       int zoom = 15;
       DateTime? lastZoomChangeTime;
 
       bool handleScroll(double deltaY, DateTime now) {
-        if (lastZoomChangeTime == null || now.difference(lastZoomChangeTime!).inMilliseconds > 200) {
+        if (lastZoomChangeTime == null ||
+            now.difference(lastZoomChangeTime!).inMilliseconds > 200) {
           lastZoomChangeTime = now;
           if (deltaY < 0 && zoom < 18) {
             zoom++;

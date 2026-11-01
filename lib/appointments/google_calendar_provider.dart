@@ -4,6 +4,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:googleapis/calendar/v3.dart' as gcal;
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
+
 import '../database/app_database.dart';
 import 'calendar_provider.dart';
 
@@ -31,7 +32,8 @@ class GoogleCalendarProvider implements CalendarProvider {
   final FlutterSecureStorage _secureStorage;
   final Uuid _uuid = const Uuid();
 
-  static const String _calendarScope = 'https://www.googleapis.com/auth/calendar.events';
+  static const String _calendarScope =
+      'https://www.googleapis.com/auth/calendar.events';
   static const String _keySelectedCalendarId = 'google_calendar_selected_id';
   static const String _keySyncTokenPrefix = 'google_calendar_synctoken_';
 
@@ -41,8 +43,8 @@ class GoogleCalendarProvider implements CalendarProvider {
   GoogleCalendarProvider({
     GoogleSignIn? googleSignIn,
     FlutterSecureStorage? secureStorage,
-  })  : _googleSignIn = googleSignIn ?? GoogleSignIn.instance,
-        _secureStorage = secureStorage ?? const FlutterSecureStorage();
+  }) : _googleSignIn = googleSignIn ?? GoogleSignIn.instance,
+       _secureStorage = secureStorage ?? const FlutterSecureStorage();
 
   Future<void> _ensureInitialized() async {
     if (_initialized) return;
@@ -97,10 +99,8 @@ class GoogleCalendarProvider implements CalendarProvider {
     }
 
     try {
-      final headers = await _currentUser!.authorizationClient.authorizationHeaders(
-        [_calendarScope],
-        promptIfNecessary: true,
-      );
+      final headers = await _currentUser!.authorizationClient
+          .authorizationHeaders([_calendarScope], promptIfNecessary: true);
       if (headers == null) return null;
       final authClient = _AuthenticatedClient(headers);
       return gcal.CalendarApi(authClient);
@@ -118,7 +118,8 @@ class GoogleCalendarProvider implements CalendarProvider {
       final list = await api.calendarList.list();
       final items = list.items ?? [];
       return items.map((c) {
-        final isReadOnly = c.accessRole == 'reader' || c.accessRole == 'freeBusyReader';
+        final isReadOnly =
+            c.accessRole == 'reader' || c.accessRole == 'freeBusyReader';
         return ExternalCalendarItem(
           id: c.id ?? 'primary',
           name: c.summary ?? 'Google Agenda',
@@ -173,7 +174,9 @@ class GoogleCalendarProvider implements CalendarProvider {
     final calendarId = await getSelectedCalendarId() ?? 'primary';
     String? syncToken;
     if (!fullSync) {
-      syncToken = await _secureStorage.read(key: '$_keySyncTokenPrefix$calendarId');
+      syncToken = await _secureStorage.read(
+        key: '$_keySyncTokenPrefix$calendarId',
+      );
     }
 
     int downloaded = 0;
@@ -196,7 +199,9 @@ class GoogleCalendarProvider implements CalendarProvider {
           );
         } else {
           // Sincronização completa (janela de 90 dias atrás até 180 dias à frente)
-          final timeMin = DateTime.now().subtract(const Duration(days: 90)).toUtc();
+          final timeMin = DateTime.now()
+              .subtract(const Duration(days: 90))
+              .toUtc();
           final timeMax = DateTime.now().add(const Duration(days: 180)).toUtc();
           events = await api.events.list(
             calendarId,
@@ -217,18 +222,28 @@ class GoogleCalendarProvider implements CalendarProvider {
           if (eventId == null) continue;
 
           final isCancelled = item.status == 'cancelled';
-          final startDt = item.start?.dateTime ?? item.start?.date ?? DateTime.now();
-          final endDt = item.end?.dateTime ?? item.end?.date ?? startDt.add(const Duration(minutes: 30));
+          final startDt =
+              item.start?.dateTime ?? item.start?.date ?? DateTime.now();
+          final endDt =
+              item.end?.dateTime ??
+              item.end?.date ??
+              startDt.add(const Duration(minutes: 30));
 
           // Atualiza ou insere na tabela tipada ExternalCalendarEvents
-          final existing = await (db.select(db.externalCalendarEvents)
-                ..where((t) => t.provider.equals('google') & t.externalEventId.equals(eventId)))
-              .getSingleOrNull();
+          final existing =
+              await (db.select(db.externalCalendarEvents)..where(
+                    (t) =>
+                        t.provider.equals('google') &
+                        t.externalEventId.equals(eventId),
+                  ))
+                  .getSingleOrNull();
 
           final now = DateTime.now();
           if (existing == null) {
             if (!isCancelled) {
-              await db.into(db.externalCalendarEvents).insert(
+              await db
+                  .into(db.externalCalendarEvents)
+                  .insert(
                     ExternalCalendarEventsCompanion.insert(
                       id: _uuid.v4(),
                       provider: 'google',
@@ -254,7 +269,9 @@ class GoogleCalendarProvider implements CalendarProvider {
               downloaded++;
             }
           } else {
-            await (db.update(db.externalCalendarEvents)..where((t) => t.id.equals(existing.id))).write(
+            await (db.update(
+              db.externalCalendarEvents,
+            )..where((t) => t.id.equals(existing.id))).write(
               ExternalCalendarEventsCompanion(
                 title: drift.Value(item.summary ?? existing.title),
                 location: drift.Value(item.location),
@@ -321,20 +338,21 @@ class GoogleCalendarProvider implements CalendarProvider {
     final calendarId = await getSelectedCalendarId() ?? 'primary';
 
     // Verifica se já existe vínculo
-    final link = await (db.select(db.calendarEventLinks)
-          ..where((t) => t.appointmentId.equals(appointment.id) & t.provider.equals('google') & t.deletedAt.isNull()))
-        .getSingleOrNull();
+    final link =
+        await (db.select(db.calendarEventLinks)..where(
+              (t) =>
+                  t.appointmentId.equals(appointment.id) &
+                  t.provider.equals('google') &
+                  t.deletedAt.isNull(),
+            ))
+            .getSingleOrNull();
 
     final gEvent = gcal.Event(
       summary: appointment.title,
       description: 'Sincronizado via Field Assistant Ministerial',
       location: appointment.locationNotes,
-      start: gcal.EventDateTime(
-        dateTime: appointment.startTime.toUtc(),
-      ),
-      end: gcal.EventDateTime(
-        dateTime: appointment.endTime.toUtc(),
-      ),
+      start: gcal.EventDateTime(dateTime: appointment.startTime.toUtc()),
+      end: gcal.EventDateTime(dateTime: appointment.endTime.toUtc()),
     );
 
     try {
@@ -345,7 +363,9 @@ class GoogleCalendarProvider implements CalendarProvider {
           link.externalEventId,
         );
         final now = DateTime.now();
-        await (db.update(db.calendarEventLinks)..where((t) => t.id.equals(link.id))).write(
+        await (db.update(
+          db.calendarEventLinks,
+        )..where((t) => t.id.equals(link.id))).write(
           CalendarEventLinksCompanion(
             externalETagAtSync: drift.Value(updated.etag),
             localRevisionAtSync: drift.Value(appointment.revision),
@@ -355,13 +375,12 @@ class GoogleCalendarProvider implements CalendarProvider {
         );
         return updated.id;
       } else {
-        final created = await api.events.insert(
-          gEvent,
-          calendarId,
-        );
+        final created = await api.events.insert(gEvent, calendarId);
         final now = DateTime.now();
         final linkId = _uuid.v4();
-        await db.into(db.calendarEventLinks).insert(
+        await db
+            .into(db.calendarEventLinks)
+            .insert(
               CalendarEventLinksCompanion.insert(
                 id: linkId,
                 appointmentId: appointment.id,
@@ -393,16 +412,38 @@ class GoogleCalendarProvider implements CalendarProvider {
     try {
       await api.events.delete(calendarId, externalEventId);
       final now = DateTime.now();
-      await (db.update(db.calendarEventLinks)
-            ..where((t) => t.externalEventId.equals(externalEventId) & t.provider.equals('google')))
+      await (db.update(db.calendarEventLinks)..where(
+            (t) =>
+                t.externalEventId.equals(externalEventId) &
+                t.provider.equals('google'),
+          ))
           .write(
-        CalendarEventLinksCompanion(
-          deletedAt: drift.Value(now),
-          syncStatus: const drift.Value('synced'),
-          updatedAt: drift.Value(now),
-        ),
-      );
+            CalendarEventLinksCompanion(
+              deletedAt: drift.Value(now),
+              syncStatus: const drift.Value('synced'),
+              updatedAt: drift.Value(now),
+            ),
+          );
       return true;
+    } on gcal.DetailedApiRequestError catch (e) {
+      if (e.status == 404 || e.status == 410) {
+        // Evento já foi removido no Google Calendar remotamente (idempotência)
+        final now = DateTime.now();
+        await (db.update(db.calendarEventLinks)..where(
+              (t) =>
+                  t.externalEventId.equals(externalEventId) &
+                  t.provider.equals('google'),
+            ))
+            .write(
+              CalendarEventLinksCompanion(
+                deletedAt: drift.Value(now),
+                syncStatus: const drift.Value('synced'),
+                updatedAt: drift.Value(now),
+              ),
+            );
+        return true;
+      }
+      return false;
     } catch (_) {
       return false;
     }

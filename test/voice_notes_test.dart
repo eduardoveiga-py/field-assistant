@@ -33,30 +33,37 @@ void main() {
       expect(parsed.hasAnyExtraction, isTrue);
     });
 
-    test('TC-PARSER-02: Números por extenso em português para lição e parágrafo', () {
-      const text =
-          'Paramos na lição dezoito, ponto três. '
-          'Ficou de ler o texto de Isaías. '
-          'Ela comentou sobre a saúde da família.';
+    test(
+      'TC-PARSER-02: Números por extenso em português para lição e parágrafo',
+      () {
+        const text =
+            'Paramos na lição dezoito, ponto três. '
+            'Ficou de ler o texto de Isaías. '
+            'Ela comentou sobre a saúde da família.';
 
-      final parsed = VoiceNoteParser.parse(text);
+        final parsed = VoiceNoteParser.parse(text);
 
-      expect(parsed.lesson, equals(18));
-      expect(parsed.point, equals(3));
-      expect(parsed.formattedProgress, equals('Lição 18, Ponto 3'));
-      expect(parsed.pendingDoubt, contains('ler o texto de Isaías'));
-      expect(parsed.empathyNote, contains('saúde da família'));
-    });
+        expect(parsed.lesson, equals(18));
+        expect(parsed.point, equals(3));
+        expect(parsed.formattedProgress, equals('Lição 18, Ponto 3'));
+        expect(parsed.pendingDoubt, contains('ler o texto de Isaías'));
+        expect(parsed.empathyNote, contains('saúde da família'));
+      },
+    );
 
     test('TC-PARSER-03: Dezenas compostas por extenso (vinte e quatro, ponto cinco)', () {
-      const text = 'Estudo na lição vinte e quatro, ponto cinco. Combinamos de assistir o vídeo na próxima visita.';
+      const text =
+          'Estudo na lição vinte e quatro, ponto cinco. Combinamos de assistir o vídeo na próxima visita.';
 
       final parsed = VoiceNoteParser.parse(text);
 
       expect(parsed.lesson, equals(24));
       expect(parsed.point, equals(5));
       expect(parsed.formattedProgress, equals('Lição 24, Ponto 5'));
-      expect(parsed.pendingDoubt, contains('assistir o vídeo na próxima visita'));
+      expect(
+        parsed.pendingDoubt,
+        contains('assistir o vídeo na próxima visita'),
+      );
     });
 
     test('TC-PARSER-04: Variações de termos teocráticos (capítulo, seção, parágrafo, estudo)', () {
@@ -66,7 +73,8 @@ void main() {
       expect(p1.point, equals(4));
       expect(p1.pendingDoubt, contains('levar a brochura'));
 
-      const t2 = 'Estudo 12 seção 2. Próximo passo responder à pergunta sobre sofrimento.';
+      const t2 =
+          'Estudo 12 seção 2. Próximo passo responder à pergunta sobre sofrimento.';
       final p2 = VoiceNoteParser.parse(t2);
       expect(p2.lesson, equals(12));
       expect(p2.point, equals(2));
@@ -92,26 +100,42 @@ void main() {
       expect(p3.empathyNote, contains('luto devido ao falecimento'));
     });
 
-    test('TC-PARSER-06: Robustez com entradas vazias, nulas, espaços e pontuação', () {
-      expect(VoiceNoteParser.parse(null).hasAnyExtraction, isFalse);
-      expect(VoiceNoteParser.parse('').hasAnyExtraction, isFalse);
-      expect(VoiceNoteParser.parse('   ').hasAnyExtraction, isFalse);
-      expect(VoiceNoteParser.parse('... ,,, ;;;').hasAnyExtraction, isFalse);
-    });
+    test(
+      'TC-PARSER-06: Robustez com entradas vazias, nulas, espaços e pontuação',
+      () {
+        expect(VoiceNoteParser.parse(null).hasAnyExtraction, isFalse);
+        expect(VoiceNoteParser.parse('').hasAnyExtraction, isFalse);
+        expect(VoiceNoteParser.parse('   ').hasAnyExtraction, isFalse);
+        expect(VoiceNoteParser.parse('... ,,, ;;;').hasAnyExtraction, isFalse);
+      },
+    );
 
     test('TC-PARSER-07: Conversão isolada de números em português (parsePortugueseNumber)', () {
       expect(VoiceNoteParser.parsePortugueseNumber('18'), equals(18));
       expect(VoiceNoteParser.parsePortugueseNumber('dezoito'), equals(18));
-      expect(VoiceNoteParser.parsePortugueseNumber('trinta e cinco'), equals(35));
-      expect(VoiceNoteParser.parsePortugueseNumber('quarenta e dois'), equals(42));
-      expect(VoiceNoteParser.parsePortugueseNumber('cinquenta e nove'), equals(59));
+      expect(
+        VoiceNoteParser.parsePortugueseNumber('trinta e cinco'),
+        equals(35),
+      );
+      expect(
+        VoiceNoteParser.parsePortugueseNumber('quarenta e dois'),
+        equals(42),
+      );
+      expect(
+        VoiceNoteParser.parsePortugueseNumber('cinquenta e nove'),
+        equals(59),
+      );
       expect(VoiceNoteParser.parsePortugueseNumber('primeiro'), equals(1));
       expect(VoiceNoteParser.parsePortugueseNumber('segundo'), equals(2));
       expect(VoiceNoteParser.parsePortugueseNumber('invalido'), isNull);
     });
 
     test('TC-PARSER-08: Model ParsedVoiceNote copyWith e equals', () {
-      const p1 = ParsedVoiceNote(lesson: 5, point: 2, rawText: 'Lição 5 ponto 2');
+      const p1 = ParsedVoiceNote(
+        lesson: 5,
+        point: 2,
+        rawText: 'Lição 5 ponto 2',
+      );
       final p2 = p1.copyWith(pendingDoubt: 'Levar livro');
 
       expect(p2.lesson, equals(5));
@@ -149,7 +173,8 @@ void main() {
     });
 
     test('TC-PARSER-11: Ordem inversa com sufixos ordinais e cardinais (18ª lição, 3º ponto)', () {
-      const t1 = 'Na 18ª lição paramos no 3º ponto. Ficou combinado de levar a brochura.';
+      const t1 =
+          'Na 18ª lição paramos no 3º ponto. Ficou combinado de levar a brochura.';
       final p1 = VoiceNoteParser.parse(t1);
       expect(p1.lesson, equals(18));
       expect(p1.point, equals(3));
@@ -162,10 +187,24 @@ void main() {
     });
 
     test('TC-PARSER-12: Extração robusta de nomes de estudantes sem capturar verbos ou locais', () {
-      expect(VoiceNoteParser.parse('Visita na parte da manhã com o Carlos').studentName, equals('Carlos'));
-      expect(VoiceNoteParser.parse('Estudo na casa do Marcos').studentName, equals('Marcos'));
-      expect(VoiceNoteParser.parse('Estudo com o Marcos paramos na lição 18').studentName, equals('Marcos'));
-      expect(VoiceNoteParser.parse('Estudo no livro Seja Feliz').studentName, isNull);
+      expect(
+        VoiceNoteParser.parse('Visita na parte da manhã com o Carlos')
+            .studentName,
+        equals('Carlos'),
+      );
+      expect(
+        VoiceNoteParser.parse('Estudo na casa do Marcos').studentName,
+        equals('Marcos'),
+      );
+      expect(
+        VoiceNoteParser.parse('Estudo com o Marcos paramos na lição 18')
+            .studentName,
+        equals('Marcos'),
+      );
+      expect(
+        VoiceNoteParser.parse('Estudo no livro Seja Feliz').studentName,
+        isNull,
+      );
     });
   });
 
@@ -184,34 +223,37 @@ void main() {
       await db.close();
     });
 
-    test('TC-DB-01: Criação de nota de voz e recuperação pelo personId', () async {
-      final now = DateTime.now();
-      final item = VoiceNoteItem(
-        id: 'vn-101',
-        personId: 'p-1',
-        transcription: 'Estudo lição 18 ponto 3',
-        detectedLesson: 18,
-        detectedPoint: 3,
-        extractedPendingDoubt: 'Mostrar vídeo',
-        extractedEmpathyNote: 'Turno de trabalho',
-        audioFilePath: '/data/audio/vn-101.m4a',
-        audioDurationSeconds: 15,
-        createdAt: now,
-        updatedAt: now,
-      );
+    test(
+      'TC-DB-01: Criação de nota de voz e recuperação pelo personId',
+      () async {
+        final now = DateTime.now();
+        final item = VoiceNoteItem(
+          id: 'vn-101',
+          personId: 'p-1',
+          transcription: 'Estudo lição 18 ponto 3',
+          detectedLesson: 18,
+          detectedPoint: 3,
+          extractedPendingDoubt: 'Mostrar vídeo',
+          extractedEmpathyNote: 'Turno de trabalho',
+          audioFilePath: '/data/audio/vn-101.m4a',
+          audioDurationSeconds: 15,
+          createdAt: now,
+          updatedAt: now,
+        );
 
-      await manager.saveVoiceNote(item);
+        await manager.saveVoiceNote(item);
 
-      final list = await manager.getVoiceNotesForPerson('p-1');
-      expect(list.length, equals(1));
-      expect(list.first.id, equals('vn-101'));
-      expect(list.first.detectedLesson, equals(18));
-      expect(list.first.formattedDuration, equals('00:15'));
+        final list = await manager.getVoiceNotesForPerson('p-1');
+        expect(list.length, equals(1));
+        expect(list.first.id, equals('vn-101'));
+        expect(list.first.detectedLesson, equals(18));
+        expect(list.first.formattedDuration, equals('00:15'));
 
-      final latest = await manager.getLatestVoiceNoteForPerson('p-1');
-      expect(latest, isNotNull);
-      expect(latest!.extractedPendingDoubt, equals('Mostrar vídeo'));
-    });
+        final latest = await manager.getLatestVoiceNoteForPerson('p-1');
+        expect(latest, isNotNull);
+        expect(latest!.extractedPendingDoubt, equals('Mostrar vídeo'));
+      },
+    );
 
     test('TC-DB-02: Exclusão lógica (soft delete) da nota de voz', () async {
       final now = DateTime.now();
@@ -268,12 +310,17 @@ void main() {
       final updatedStudy = await repo.getStudyById(study.id);
       expect(updatedStudy!.currentLesson, equals(18));
       expect(updatedStudy.currentParagraph, equals(3));
-      expect(updatedStudy.pendingDoubts, contains('mostrar o vídeo de batismo'));
+      expect(
+        updatedStudy.pendingDoubts,
+        contains('mostrar o vídeo de batismo'),
+      );
 
       // 4. Verifica se a pessoa recebeu a nota empática no formato JSON de anotações
       final updatedPerson = await repo.getPersonById(person.id);
       expect(updatedPerson!.generalNotes, contains('cirurgia'));
-      final notes = DoorstepBriefingHelper.parseNotes(updatedPerson.generalNotes);
+      final notes = DoorstepBriefingHelper.parseNotes(
+        updatedPerson.generalNotes,
+      );
       expect(notes.isNotEmpty, isTrue);
       expect(notes.first['text'], contains('cirurgia'));
 
@@ -321,94 +368,114 @@ void main() {
     });
   });
 
-  group('DoorstepBriefingCard com Suporte a Nota de Voz (Testes de Widget)', () {
-    testWidgets('TC-W-VN01: Renderiza seção de última nota de voz quando hasVoiceNote é true', (tester) async {
-      String? playedPath;
-      final data = DoorstepBriefingData(
-        lessonAndPoint: 'Lição 18, Ponto 3',
-        pendingDoubt: 'Mostrar vídeo sobre batismo',
-        empathyNote: 'Turno de trabalho vai mudar',
-        audioFilePath: '/audio/marcos_18.m4a',
-        voiceNoteTranscription: 'Estudo com o Marcos, lição 18 ponto 3...',
-        voiceNoteDurationSeconds: 15,
-      );
+  group(
+    'DoorstepBriefingCard com Suporte a Nota de Voz (Testes de Widget)',
+    () {
+      testWidgets(
+        'TC-W-VN01: Renderiza seção de última nota de voz quando hasVoiceNote é true',
+        (tester) async {
+          String? playedPath;
+          final data = DoorstepBriefingData(
+            lessonAndPoint: 'Lição 18, Ponto 3',
+            pendingDoubt: 'Mostrar vídeo sobre batismo',
+            empathyNote: 'Turno de trabalho vai mudar',
+            audioFilePath: '/audio/marcos_18.m4a',
+            voiceNoteTranscription: 'Estudo com o Marcos, lição 18 ponto 3...',
+            voiceNoteDurationSeconds: 15,
+          );
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: DoorstepBriefingCard(
-              data: data,
-              onPlayVoiceNote: (path) {
-                playedPath = path;
-              },
-            ),
-          ),
-        ),
-      );
-
-      expect(find.text('ÚLTIMA NOTA DE VOZ (DITADO RÁPIDO)'), findsOneWidget);
-      expect(find.text('"Estudo com o Marcos, lição 18 ponto 3..."'), findsOneWidget);
-      expect(find.text('Ouvir Nota (0:15)'), findsOneWidget);
-
-      // Clica no botão de ouvir áudio
-      await tester.tap(find.text('Ouvir Nota (0:15)'));
-      await tester.pump();
-
-      expect(playedPath, equals('/audio/marcos_18.m4a'));
-    });
-
-    testWidgets('TC-W-VN02: Alvo de toque mínimo >= 48dp no botão de ouvir nota', (tester) async {
-      final data = const DoorstepBriefingData(
-        lessonAndPoint: 'Lição 04',
-        audioFilePath: '/audio/test.m4a',
-        voiceNoteTranscription: 'Nota de áudio rápida',
-        voiceNoteDurationSeconds: 12,
-      );
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: DoorstepBriefingCard(data: data),
-          ),
-        ),
-      );
-
-      final buttonFinder = find.widgetWithText(ElevatedButton, 'Ouvir Nota (0:12)');
-      expect(buttonFinder, findsOneWidget);
-      final size = tester.getSize(buttonFinder);
-      expect(size.height, greaterThanOrEqualTo(48.0));
-    });
-
-    testWidgets('TC-W-VN03: Visual sob SunMode (alto contraste com bordas pretas)', (tester) async {
-      final data = const DoorstepBriefingData(
-        lessonAndPoint: 'Lição 18',
-        audioFilePath: '/audio/test.m4a',
-        voiceNoteTranscription: 'Transcrição SunMode',
-        voiceNoteDurationSeconds: 15,
-      );
-
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: ThemeData(
-            brightness: Brightness.light,
-            scaffoldBackgroundColor: Colors.white,
-            colorScheme: const ColorScheme.light(primary: Colors.black),
-            cardTheme: const CardThemeData(
-              shape: RoundedRectangleBorder(
-                side: BorderSide(color: Colors.black, width: 2.0),
+          await tester.pumpWidget(
+            MaterialApp(
+              home: Scaffold(
+                body: DoorstepBriefingCard(
+                  data: data,
+                  onPlayVoiceNote: (path) {
+                    playedPath = path;
+                  },
+                ),
               ),
             ),
-          ),
-          home: Scaffold(
-            body: DoorstepBriefingCard(data: data),
-          ),
-        ),
+          );
+
+          expect(
+            find.text('ÚLTIMA NOTA DE VOZ (DITADO RÁPIDO)'),
+            findsOneWidget,
+          );
+          expect(
+            find.text('"Estudo com o Marcos, lição 18 ponto 3..."'),
+            findsOneWidget,
+          );
+          expect(find.text('Ouvir Nota (0:15)'), findsOneWidget);
+
+          // Clica no botão de ouvir áudio
+          await tester.tap(find.text('Ouvir Nota (0:15)'));
+          await tester.pump();
+
+          expect(playedPath, equals('/audio/marcos_18.m4a'));
+        },
       );
 
-      expect(find.text('Briefing na Porta'), findsOneWidget);
-      expect(find.text('ÚLTIMA NOTA DE VOZ (DITADO RÁPIDO)'), findsOneWidget);
-    });
-  });
+      testWidgets(
+        'TC-W-VN02: Alvo de toque mínimo >= 48dp no botão de ouvir nota',
+        (tester) async {
+          final data = const DoorstepBriefingData(
+            lessonAndPoint: 'Lição 04',
+            audioFilePath: '/audio/test.m4a',
+            voiceNoteTranscription: 'Nota de áudio rápida',
+            voiceNoteDurationSeconds: 12,
+          );
+
+          await tester.pumpWidget(
+            MaterialApp(
+              home: Scaffold(body: DoorstepBriefingCard(data: data)),
+            ),
+          );
+
+          final buttonFinder = find.widgetWithText(
+            ElevatedButton,
+            'Ouvir Nota (0:12)',
+          );
+          expect(buttonFinder, findsOneWidget);
+          final size = tester.getSize(buttonFinder);
+          expect(size.height, greaterThanOrEqualTo(48.0));
+        },
+      );
+
+      testWidgets(
+        'TC-W-VN03: Visual sob SunMode (alto contraste com bordas pretas)',
+        (tester) async {
+          final data = const DoorstepBriefingData(
+            lessonAndPoint: 'Lição 18',
+            audioFilePath: '/audio/test.m4a',
+            voiceNoteTranscription: 'Transcrição SunMode',
+            voiceNoteDurationSeconds: 15,
+          );
+
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: ThemeData(
+                brightness: Brightness.light,
+                scaffoldBackgroundColor: Colors.white,
+                colorScheme: const ColorScheme.light(primary: Colors.black),
+                cardTheme: const CardThemeData(
+                  shape: RoundedRectangleBorder(
+                    side: BorderSide(color: Colors.black, width: 2.0),
+                  ),
+                ),
+              ),
+              home: Scaffold(body: DoorstepBriefingCard(data: data)),
+            ),
+          );
+
+          expect(find.text('Briefing na Porta'), findsOneWidget);
+          expect(
+            find.text('ÚLTIMA NOTA DE VOZ (DITADO RÁPIDO)'),
+            findsOneWidget,
+          );
+        },
+      );
+    },
+  );
 
   group('QuickVoiceNoteDialog (Testes de Modal de Gravação / Ditado 15s)', () {
     late AppDatabase db;
@@ -428,228 +495,263 @@ void main() {
       await db.close();
     });
 
-    testWidgets('TC-W-MODAL-01: Modal abre, grava, dita e preenche cards estruturados', (tester) async {
-      final mockRecordService = LocalAudioRecordingService();
-      final mockDictationService = LocalVoiceDictationService();
+    testWidgets(
+      'TC-W-MODAL-01: Modal abre, grava, dita e preenche cards estruturados',
+      (tester) async {
+        final mockRecordService = LocalAudioRecordingService();
+        final mockDictationService = LocalVoiceDictationService();
 
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            databaseProvider.overrideWithValue(db),
-            repositoryProvider.overrideWithValue(repo),
-          ],
-          child: MaterialApp(
-            home: Scaffold(
-              body: Builder(
-                builder: (context) => ElevatedButton(
-                  onPressed: () {
-                    QuickVoiceNoteDialog.show(
-                      context: context,
-                      person: testPerson,
-                      recordingService: mockRecordService,
-                      dictationService: mockDictationService,
-                    );
-                  },
-                  child: const Text('Abrir Modal'),
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              databaseProvider.overrideWithValue(db),
+              repositoryProvider.overrideWithValue(repo),
+            ],
+            child: MaterialApp(
+              home: Scaffold(
+                body: Builder(
+                  builder: (context) => ElevatedButton(
+                    onPressed: () {
+                      QuickVoiceNoteDialog.show(
+                        context: context,
+                        person: testPerson,
+                        recordingService: mockRecordService,
+                        dictationService: mockDictationService,
+                      );
+                    },
+                    child: const Text('Abrir Modal'),
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-      );
+        );
 
-      // Abre o diálogo
-      await tester.tap(find.text('Abrir Modal'));
-      await tester.pumpAndSettle();
+        // Abre o diálogo
+        await tester.tap(find.text('Abrir Modal'));
+        await tester.pumpAndSettle();
 
-      expect(find.text('Registro Rápido (15s)'), findsOneWidget);
-      expect(find.text('Roberto Silva'), findsOneWidget);
-      expect(find.text('Iniciar Gravação'), findsOneWidget);
+        expect(find.text('Registro Rápido (15s)'), findsOneWidget);
+        expect(find.text('Roberto Silva'), findsOneWidget);
+        expect(find.text('Iniciar Gravação'), findsOneWidget);
 
-      // Clica em iniciar gravação
-      await tester.tap(find.text('Iniciar Gravação'));
-      await tester.pumpAndSettle();
+        // Clica em iniciar gravação
+        await tester.tap(find.text('Iniciar Gravação'));
+        await tester.pumpAndSettle();
 
-      expect(find.text('Concluir Gravação'), findsOneWidget);
-      expect(mockRecordService.isRecording, isTrue);
+        expect(find.text('Concluir Gravação'), findsOneWidget);
+        expect(mockRecordService.isRecording, isTrue);
 
-      // Emite transcrição durante o ditado
-      mockDictationService.emitTranscription(
-        'Estudo com o Roberto, lição 18 ponto 3. Ficou pendente mostrar vídeo sobre batismo. Ele comentou que o trabalho vai mudar.',
-      );
-      await tester.pumpAndSettle();
+        // Emite transcrição durante o ditado
+        mockDictationService.emitTranscription(
+          'Estudo com o Roberto, lição 18 ponto 3. Ficou pendente mostrar vídeo sobre batismo. Ele comentou que o trabalho vai mudar.',
+        );
+        await tester.pumpAndSettle();
 
-      // Finaliza a gravação
-      await tester.tap(find.text('Concluir Gravação'));
-      await tester.pumpAndSettle();
+        // Finaliza a gravação
+        await tester.tap(find.text('Concluir Gravação'));
+        await tester.pumpAndSettle();
 
-      // Verifica preenchimento dos campos da pré-visualização estruturada
-      expect(find.text('📖 Progresso: Lição 18, Ponto 3'), findsOneWidget);
-      expect(find.text('Salvar Visita & Atualizar Briefing'), findsOneWidget);
+        // Verifica preenchimento dos campos da pré-visualização estruturada
+        expect(find.text('📖 Progresso: Lição 18, Ponto 3'), findsOneWidget);
+        expect(find.text('Salvar Visita & Atualizar Briefing'), findsOneWidget);
 
-      // Salva em 1 toque
-      await tester.ensureVisible(find.text('Salvar Visita & Atualizar Briefing'));
-      await tester.tap(find.text('Salvar Visita & Atualizar Briefing'));
-      await tester.pumpAndSettle();
+        // Salva em 1 toque
+        await tester.ensureVisible(
+          find.text('Salvar Visita & Atualizar Briefing'),
+        );
+        await tester.tap(find.text('Salvar Visita & Atualizar Briefing'));
+        await tester.pumpAndSettle();
 
-      // Diálogo fechou e snackbar apareceu
-      expect(find.text('Registro Rápido (15s)'), findsNothing);
-      expect(find.text('Visita salva e Briefing na Porta atualizado com sucesso!'), findsOneWidget);
+        // Diálogo fechou e snackbar apareceu
+        expect(find.text('Registro Rápido (15s)'), findsNothing);
+        expect(
+          find.text('Visita salva e Briefing na Porta atualizado com sucesso!'),
+          findsOneWidget,
+        );
 
-      // Confere persistência no banco
-      final vnList = await VoiceNotesManager(db, repo).getVoiceNotesForPerson(testPerson.id);
-      expect(vnList.length, equals(1));
-      expect(vnList.first.detectedLesson, equals(18));
-      expect(vnList.first.detectedPoint, equals(3));
-    });
+        // Confere persistência no banco
+        final vnList = await VoiceNotesManager(
+          db,
+          repo,
+        ).getVoiceNotesForPerson(testPerson.id);
+        expect(vnList.length, equals(1));
+        expect(vnList.first.detectedLesson, equals(18));
+        expect(vnList.first.detectedPoint, equals(3));
+      },
+    );
 
-    testWidgets('TC-W-MODAL-02: Robustez sob Dynamic Text Scaling 2.0x (sem RenderFlex overflow)', (tester) async {
-      tester.view.physicalSize = const Size(800, 1200);
-      tester.view.devicePixelRatio = 2.0;
-      addTearDown(() {
-        tester.view.resetPhysicalSize();
-        tester.view.resetDevicePixelRatio();
-      });
+    testWidgets(
+      'TC-W-MODAL-02: Robustez sob Dynamic Text Scaling 2.0x (sem RenderFlex overflow)',
+      (tester) async {
+        tester.view.physicalSize = const Size(800, 1200);
+        tester.view.devicePixelRatio = 2.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
 
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            databaseProvider.overrideWithValue(db),
-            repositoryProvider.overrideWithValue(repo),
-          ],
-          child: MaterialApp(
-            home: MediaQuery(
-              data: const MediaQueryData(
-                textScaler: TextScaler.linear(2.0),
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              databaseProvider.overrideWithValue(db),
+              repositoryProvider.overrideWithValue(repo),
+            ],
+            child: MaterialApp(
+              home: MediaQuery(
+                data: const MediaQueryData(textScaler: TextScaler.linear(2.0)),
+                child: Scaffold(
+                  body: QuickVoiceNoteDialog(
+                    person: testPerson,
+                    initialTranscription:
+                        'Lição 18 ponto 3. Ficou pendente mostrar vídeo.',
+                  ),
+                ),
               ),
-              child: Scaffold(
+            ),
+          ),
+        );
+
+        await tester.pumpAndSettle();
+
+        final err = tester.takeException();
+        expect(err, isNull);
+        expect(find.text('Registro Rápido (15s)'), findsOneWidget);
+        expect(find.text('📖 Progresso: Lição 18, Ponto 3'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'TC-W-MODAL-03: Edição manual de campos estruturados não é apagada por alterações na transcrição',
+      (tester) async {
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              databaseProvider.overrideWithValue(db),
+              repositoryProvider.overrideWithValue(repo),
+            ],
+            child: MaterialApp(
+              home: Scaffold(
                 body: QuickVoiceNoteDialog(
                   person: testPerson,
-                  initialTranscription: 'Lição 18 ponto 3. Ficou pendente mostrar vídeo.',
+                  initialTranscription:
+                      'Lição 18 ponto 3. Ficou de mostrar vídeo.',
                 ),
               ),
             ),
           ),
-        ),
-      );
+        );
 
-      await tester.pumpAndSettle();
+        await tester.pumpAndSettle();
 
-      final err = tester.takeException();
-      expect(err, isNull);
-      expect(find.text('Registro Rápido (15s)'), findsOneWidget);
-      expect(find.text('📖 Progresso: Lição 18, Ponto 3'), findsOneWidget);
-    });
+        // Edita manualmente o campo de pendência
+        final pendingFinder = find.widgetWithText(
+          TextFormField,
+          '📌 Pendência / Próximo Passo',
+        );
+        await tester.enterText(pendingFinder, 'Comprar publicação especial');
+        await tester.pumpAndSettle();
 
-    testWidgets('TC-W-MODAL-03: Edição manual de campos estruturados não é apagada por alterações na transcrição', (tester) async {
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            databaseProvider.overrideWithValue(db),
-            repositoryProvider.overrideWithValue(repo),
-          ],
-          child: MaterialApp(
-            home: Scaffold(
-              body: QuickVoiceNoteDialog(
-                person: testPerson,
-                initialTranscription: 'Lição 18 ponto 3. Ficou de mostrar vídeo.',
-              ),
-            ),
-          ),
-        ),
-      );
+        // Altera o campo de transcrição
+        final transcriptionFinder = find.byType(TextFormField).last;
+        await tester.enterText(
+          transcriptionFinder,
+          'Lição 18 ponto 3. Ficou de mostrar vídeo sobre fé.',
+        );
+        await tester.pumpAndSettle();
 
-      await tester.pumpAndSettle();
+        // Verifica se a edição manual foi estritamente preservada
+        expect(find.text('Comprar publicação especial'), findsOneWidget);
+      },
+    );
 
-      // Edita manualmente o campo de pendência
-      final pendingFinder = find.widgetWithText(TextFormField, '📌 Pendência / Próximo Passo');
-      await tester.enterText(pendingFinder, 'Comprar publicação especial');
-      await tester.pumpAndSettle();
-
-      // Altera o campo de transcrição
-      final transcriptionFinder = find.byType(TextFormField).last;
-      await tester.enterText(transcriptionFinder, 'Lição 18 ponto 3. Ficou de mostrar vídeo sobre fé.');
-      await tester.pumpAndSettle();
-
-      // Verifica se a edição manual foi estritamente preservada
-      expect(find.text('Comprar publicação especial'), findsOneWidget);
-    });
-
-    testWidgets('TC-W-MODAL-04: Edição direta de Lição e Ponto nos text fields dedicados reflete no salvamento', (tester) async {
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            databaseProvider.overrideWithValue(db),
-            repositoryProvider.overrideWithValue(repo),
-          ],
-          child: MaterialApp(
-            home: Scaffold(
-              body: QuickVoiceNoteDialog(
-                person: testPerson,
-                initialTranscription: 'Conversa boa sobre esperança.',
-              ),
-            ),
-          ),
-        ),
-      );
-
-      await tester.pumpAndSettle();
-
-      // Digita lição 25 e ponto 4 diretamente
-      final lessonFinder = find.widgetWithText(TextFormField, 'Lição');
-      final pointFinder = find.widgetWithText(TextFormField, 'Ponto / Parágrafo');
-
-      await tester.enterText(lessonFinder, '25');
-      await tester.enterText(pointFinder, '4');
-      await tester.pumpAndSettle();
-
-      expect(find.text('📖 Progresso: Lição 25, Ponto 4'), findsOneWidget);
-
-      // Salva a visita
-      await tester.ensureVisible(find.text('Salvar Visita & Atualizar Briefing'));
-      await tester.tap(find.text('Salvar Visita & Atualizar Briefing'));
-      await tester.pumpAndSettle();
-
-      final vnList = await VoiceNotesManager(db, repo).getVoiceNotesForPerson(testPerson.id);
-      expect(vnList.length, equals(1));
-      expect(vnList.first.detectedLesson, equals(25));
-      expect(vnList.first.detectedPoint, equals(4));
-    });
-
-    testWidgets('TC-W-MODAL-05: Tela estreita (320px) sob TextScaler 2.0x sem nenhum RenderFlex overflow', (tester) async {
-      tester.view.physicalSize = const Size(320 * 2.0, 640 * 2.0);
-      tester.view.devicePixelRatio = 2.0;
-      addTearDown(() {
-        tester.view.resetPhysicalSize();
-        tester.view.resetDevicePixelRatio();
-      });
-
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            databaseProvider.overrideWithValue(db),
-            repositoryProvider.overrideWithValue(repo),
-          ],
-          child: MaterialApp(
-            home: MediaQuery(
-              data: const MediaQueryData(
-                textScaler: TextScaler.linear(2.0),
-              ),
-              child: Scaffold(
+    testWidgets(
+      'TC-W-MODAL-04: Edição direta de Lição e Ponto nos text fields dedicados reflete no salvamento',
+      (tester) async {
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              databaseProvider.overrideWithValue(db),
+              repositoryProvider.overrideWithValue(repo),
+            ],
+            child: MaterialApp(
+              home: Scaffold(
                 body: QuickVoiceNoteDialog(
                   person: testPerson,
-                  initialTranscription: 'Lição 18 ponto 3. Ficou de mostrar vídeo sobre batismo.',
+                  initialTranscription: 'Conversa boa sobre esperança.',
                 ),
               ),
             ),
           ),
-        ),
-      );
+        );
 
-      await tester.pumpAndSettle();
+        await tester.pumpAndSettle();
 
-      final err = tester.takeException();
-      expect(err, isNull);
-    });
+        // Digita lição 25 e ponto 4 diretamente
+        final lessonFinder = find.widgetWithText(TextFormField, 'Lição');
+        final pointFinder = find.widgetWithText(
+          TextFormField,
+          'Ponto / Parágrafo',
+        );
+
+        await tester.enterText(lessonFinder, '25');
+        await tester.enterText(pointFinder, '4');
+        await tester.pumpAndSettle();
+
+        expect(find.text('📖 Progresso: Lição 25, Ponto 4'), findsOneWidget);
+
+        // Salva a visita
+        await tester.ensureVisible(
+          find.text('Salvar Visita & Atualizar Briefing'),
+        );
+        await tester.tap(find.text('Salvar Visita & Atualizar Briefing'));
+        await tester.pumpAndSettle();
+
+        final vnList = await VoiceNotesManager(
+          db,
+          repo,
+        ).getVoiceNotesForPerson(testPerson.id);
+        expect(vnList.length, equals(1));
+        expect(vnList.first.detectedLesson, equals(25));
+        expect(vnList.first.detectedPoint, equals(4));
+      },
+    );
+
+    testWidgets(
+      'TC-W-MODAL-05: Tela estreita (320px) sob TextScaler 2.0x sem nenhum RenderFlex overflow',
+      (tester) async {
+        tester.view.physicalSize = const Size(320 * 2.0, 640 * 2.0);
+        tester.view.devicePixelRatio = 2.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              databaseProvider.overrideWithValue(db),
+              repositoryProvider.overrideWithValue(repo),
+            ],
+            child: MaterialApp(
+              home: MediaQuery(
+                data: const MediaQueryData(textScaler: TextScaler.linear(2.0)),
+                child: Scaffold(
+                  body: QuickVoiceNoteDialog(
+                    person: testPerson,
+                    initialTranscription: 'Lição 18 ponto 3. Ficou de mostrar vídeo sobre batismo.',
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        await tester.pumpAndSettle();
+
+        final err = tester.takeException();
+        expect(err, isNull);
+      },
+    );
   });
 }

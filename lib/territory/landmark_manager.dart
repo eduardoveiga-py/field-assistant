@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import 'package:drift/drift.dart';
+
 import '../database/app_database.dart';
 import '../ui/providers.dart';
 
@@ -176,7 +178,9 @@ class LandmarkManager {
               name: 'Padaria Central Betânia',
               category: 'padaria',
               address: const Value('Rua Principal, 50 - Betânia'),
-              notes: const Value('Ponto de encontro da saída de campo no setor Betânia'),
+              notes: const Value(
+                'Ponto de encontro da saída de campo no setor Betânia',
+              ),
               createdAt: now,
               updatedAt: now,
             ),
@@ -185,7 +189,9 @@ class LandmarkManager {
               name: 'Posto de Saúde Lago Grande',
               category: 'saude',
               address: const Value('Av. das Águas, 300 - Lago Grande'),
-              notes: const Value('Referência para as revisitas próximas à represa'),
+              notes: const Value(
+                'Referência para as revisitas próximas à represa',
+              ),
               createdAt: now.add(const Duration(seconds: 1)),
               updatedAt: now.add(const Duration(seconds: 1)),
             ),
@@ -194,7 +200,9 @@ class LandmarkManager {
               name: 'Escola Municipal Cidade',
               category: 'escola',
               address: const Value('Praça Central, s/n - Cidade'),
-              notes: const Value('Referência excelente para encontrar os endereços do centro'),
+              notes: const Value(
+                'Referência excelente para encontrar os endereços do centro',
+              ),
               createdAt: now.add(const Duration(seconds: 2)),
               updatedAt: now.add(const Duration(seconds: 2)),
             ),
@@ -217,21 +225,27 @@ class LandmarkManager {
   Future<List<TerritoryLandmark>> getLandmarks() async {
     await _initSeeding();
     try {
-      final rows = await (db.select(db.territoryLandmarks)
-            ..where((t) => t.deletedAt.isNull())
-            ..orderBy([(t) => OrderingTerm(expression: t.name, mode: OrderingMode.asc)]))
-          .get();
+      final rows =
+          await (db.select(db.territoryLandmarks)
+                ..where((t) => t.deletedAt.isNull())
+                ..orderBy([
+                  (t) =>
+                      OrderingTerm(expression: t.name, mode: OrderingMode.asc),
+                ]))
+              .get();
       return rows
-          .map((r) => TerritoryLandmark(
-                id: r.id,
-                name: r.name,
-                category: r.category,
-                address: r.address,
-                latitude: r.latitude,
-                longitude: r.longitude,
-                notes: r.notes,
-                createdAt: r.createdAt,
-              ))
+          .map(
+            (r) => TerritoryLandmark(
+              id: r.id,
+              name: r.name,
+              category: r.category,
+              address: r.address,
+              latitude: r.latitude,
+              longitude: r.longitude,
+              notes: r.notes,
+              createdAt: r.createdAt,
+            ),
+          )
           .toList();
     } catch (_) {
       return [];
@@ -255,11 +269,16 @@ class LandmarkManager {
     final id = _uuid.v4();
     final now = DateTime.now();
 
-    final validCoords = TerritoryLandmark.isValidCoordinate(latitude, longitude);
+    final validCoords = TerritoryLandmark.isValidCoordinate(
+      latitude,
+      longitude,
+    );
     final cleanLat = validCoords ? latitude : null;
     final cleanLng = validCoords ? longitude : null;
 
-    await db.into(db.territoryLandmarks).insert(
+    await db
+        .into(db.territoryLandmarks)
+        .insert(
           TerritoryLandmarksCompanion.insert(
             id: id,
             name: name.trim(),
@@ -285,17 +304,19 @@ class LandmarkManager {
     );
 
     try {
-      await db.into(db.syncQueue).insert(
-        SyncQueueCompanion.insert(
-          id: _uuid.v4(),
-          entityType: 'territory_landmarks',
-          entityId: id,
-          operation: 'INSERT',
-          payload: jsonEncode(landmark.toMap()),
-          createdAt: now,
-          status: const Value('pending'),
-        ),
-      );
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: _uuid.v4(),
+              entityType: 'territory_landmarks',
+              entityId: id,
+              operation: 'INSERT',
+              payload: jsonEncode(landmark.toMap()),
+              createdAt: now,
+              status: const Value('pending'),
+            ),
+          );
     } catch (_) {}
 
     await _refresh();
@@ -304,12 +325,17 @@ class LandmarkManager {
 
   Future<void> updateLandmark(TerritoryLandmark landmark) async {
     await _initSeeding();
-    final validCoords = TerritoryLandmark.isValidCoordinate(landmark.latitude, landmark.longitude);
+    final validCoords = TerritoryLandmark.isValidCoordinate(
+      landmark.latitude,
+      landmark.longitude,
+    );
     final cleanLat = validCoords ? landmark.latitude : null;
     final cleanLng = validCoords ? landmark.longitude : null;
     final now = DateTime.now();
 
-    await (db.update(db.territoryLandmarks)..where((t) => t.id.equals(landmark.id))).write(
+    await (db.update(
+      db.territoryLandmarks,
+    )..where((t) => t.id.equals(landmark.id))).write(
       TerritoryLandmarksCompanion(
         name: Value(landmark.name.trim()),
         category: Value(landmark.category),
@@ -322,17 +348,19 @@ class LandmarkManager {
     );
 
     try {
-      await db.into(db.syncQueue).insert(
-        SyncQueueCompanion.insert(
-          id: _uuid.v4(),
-          entityType: 'territory_landmarks',
-          entityId: landmark.id,
-          operation: 'UPDATE',
-          payload: jsonEncode(landmark.toMap()),
-          createdAt: now,
-          status: const Value('pending'),
-        ),
-      );
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: _uuid.v4(),
+              entityType: 'territory_landmarks',
+              entityId: landmark.id,
+              operation: 'UPDATE',
+              payload: jsonEncode(landmark.toMap()),
+              createdAt: now,
+              status: const Value('pending'),
+            ),
+          );
     } catch (_) {}
 
     await _refresh();
@@ -341,25 +369,29 @@ class LandmarkManager {
   Future<void> deleteLandmark(String id) async {
     await _initSeeding();
     final now = DateTime.now();
-    await (db.update(db.territoryLandmarks)..where((t) => t.id.equals(id))).write(
-      TerritoryLandmarksCompanion(
-        deletedAt: Value(now),
-        updatedAt: Value(now),
-      ),
+    await (db.update(
+      db.territoryLandmarks,
+    )..where((t) => t.id.equals(id))).write(
+      TerritoryLandmarksCompanion(deletedAt: Value(now), updatedAt: Value(now)),
     );
 
     try {
-      await db.into(db.syncQueue).insert(
-        SyncQueueCompanion.insert(
-          id: _uuid.v4(),
-          entityType: 'territory_landmarks',
-          entityId: id,
-          operation: 'DELETE',
-          payload: jsonEncode({'id': id, 'deleted_at': now.toIso8601String()}),
-          createdAt: now,
-          status: const Value('pending'),
-        ),
-      );
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: _uuid.v4(),
+              entityType: 'territory_landmarks',
+              entityId: id,
+              operation: 'DELETE',
+              payload: jsonEncode({
+                'id': id,
+                'deleted_at': now.toIso8601String(),
+              }),
+              createdAt: now,
+              status: const Value('pending'),
+            ),
+          );
     } catch (_) {}
 
     await _refresh();

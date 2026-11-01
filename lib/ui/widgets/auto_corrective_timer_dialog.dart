@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../core/app_theme.dart';
 import '../../activities/auto_corrective_timer_logic.dart';
 
@@ -74,7 +75,9 @@ class AutoCorrectiveTimerDialog extends StatelessWidget {
                 color: isDark ? const Color(0xFF0F172A) : Colors.grey.shade100,
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
-                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                  color: isDark
+                      ? const Color(0xFF334155)
+                      : const Color(0xFFE2E8F0),
                 ),
               ),
               child: Row(
@@ -82,22 +85,42 @@ class AutoCorrectiveTimerDialog extends StatelessWidget {
                 children: [
                   Column(
                     children: [
-                      const Text('Tempo Atual', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                      const Text(
+                        'Tempo Atual',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.textMuted,
+                        ),
+                      ),
                       const SizedBox(height: 4),
                       Text(
                         state.elapsedFormatted,
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.orange),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.orange,
+                        ),
                       ),
                     ],
                   ),
                   Container(width: 1, height: 32, color: Colors.grey.shade300),
                   Column(
                     children: [
-                      const Text('Sugerido', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                      const Text(
+                        'Sugerido',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.textMuted,
+                        ),
+                      ),
                       const SizedBox(height: 4),
                       Text(
                         state.suggestedFormatted,
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.greenAccent),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.greenAccent,
+                        ),
                       ),
                     ],
                   ),

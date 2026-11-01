@@ -239,8 +239,17 @@ class AppleEventKitProvider implements CalendarProvider {
     AppointmentEntry appointment,
   ) async {
     try {
+      if (!await isAuthorized()) return null;
       final calendarId = await getSelectedCalendarId();
       if (calendarId == null) return null;
+
+      final calendars = await getAvailableCalendars();
+      final selectedCal = calendars
+          .where((c) => c.id == calendarId)
+          .firstOrNull;
+      if (selectedCal != null && selectedCal.isReadOnly) {
+        return null;
+      }
 
       final link =
           await (db.select(db.calendarEventLinks)..where(

@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import 'package:drift/drift.dart';
+
 import '../database/app_database.dart';
 import '../ui/providers.dart';
 
@@ -28,15 +30,15 @@ class ResearchArticleItem {
   });
 
   Map<String, dynamic> toMap() => {
-        'id': id,
-        'title': title,
-        'summary': summary,
-        'content': content,
-        'tags': jsonEncode(tags),
-        'attachments': jsonEncode(attachments),
-        'created_at': createdAt.toIso8601String(),
-        'updated_at': updatedAt.toIso8601String(),
-      };
+    'id': id,
+    'title': title,
+    'summary': summary,
+    'content': content,
+    'tags': jsonEncode(tags),
+    'attachments': jsonEncode(attachments),
+    'created_at': createdAt.toIso8601String(),
+    'updated_at': updatedAt.toIso8601String(),
+  };
 
   factory ResearchArticleItem.fromMap(Map<String, dynamic> map) {
     List<String> parsedTags = [];
@@ -86,17 +88,19 @@ class ResearchTagItem {
   });
 
   factory ResearchTagItem.fromMap(Map<String, dynamic> map) => ResearchTagItem(
-        id: map['id'] as String,
-        name: map['name'] as String,
-        createdAt: DateTime.parse(map['created_at'] as String),
-      );
+    id: map['id'] as String,
+    name: map['name'] as String,
+    createdAt: DateTime.parse(map['created_at'] as String),
+  );
 }
 
 class ResearchManager {
   final AppDatabase db;
   final Uuid _uuid = const Uuid();
-  final StreamController<List<ResearchArticleItem>> _articlesController = StreamController<List<ResearchArticleItem>>.broadcast();
-  final StreamController<List<ResearchTagItem>> _tagsController = StreamController<List<ResearchTagItem>>.broadcast();
+  final StreamController<List<ResearchArticleItem>> _articlesController =
+      StreamController<List<ResearchArticleItem>>.broadcast();
+  final StreamController<List<ResearchTagItem>> _tagsController =
+      StreamController<List<ResearchTagItem>>.broadcast();
   Future<void>? _initFuture;
 
   ResearchManager(this.db) {
@@ -132,7 +136,9 @@ class ResearchManager {
       ''');
 
       // Inicializa tags padrão se a tabela estiver vazia
-      final existingCount = await db.customSelect('SELECT COUNT(*) AS count FROM research_tags').getSingle();
+      final existingCount = await db
+          .customSelect('SELECT COUNT(*) AS count FROM research_tags')
+          .getSingle();
       if (existingCount.read<int>('count') == 0) {
         final now = DateTime.now();
         final defaultTags = [
@@ -147,7 +153,11 @@ class ResearchManager {
         for (final tag in defaultTags) {
           await db.customInsert(
             'INSERT INTO research_tags (id, name, created_at) VALUES (?, ?, ?)',
-            variables: [Variable.withString(_uuid.v4()), Variable.withString(tag), Variable.withString(now.toIso8601String())],
+            variables: [
+              Variable.withString(_uuid.v4()),
+              Variable.withString(tag),
+              Variable.withString(now.toIso8601String()),
+            ],
           );
         }
       }
@@ -178,7 +188,11 @@ class ResearchManager {
   Future<List<ResearchArticleItem>> getAllArticles() async {
     await _initTable();
     try {
-      final rows = await db.customSelect('SELECT * FROM research_articles ORDER BY created_at DESC').get();
+      final rows = await db
+          .customSelect(
+            'SELECT * FROM research_articles ORDER BY created_at DESC',
+          )
+          .get();
       return rows.map((r) => ResearchArticleItem.fromMap(r.data)).toList();
     } catch (_) {
       return [];
@@ -193,7 +207,9 @@ class ResearchManager {
   Future<List<ResearchTagItem>> getAllTags() async {
     await _initTable();
     try {
-      final rows = await db.customSelect('SELECT * FROM research_tags ORDER BY name ASC').get();
+      final rows = await db
+          .customSelect('SELECT * FROM research_tags ORDER BY name ASC')
+          .get();
       return rows.map((r) => ResearchTagItem.fromMap(r.data)).toList();
     } catch (_) {
       return [];
@@ -265,7 +281,10 @@ class ResearchManager {
 
   Future<void> deleteArticle(String id) async {
     await _initTable();
-    await db.customUpdate('DELETE FROM research_articles WHERE id = ?', variables: [Variable.withString(id)]);
+    await db.customUpdate(
+      'DELETE FROM research_articles WHERE id = ?',
+      variables: [Variable.withString(id)],
+    );
     await _refreshArticles();
   }
 
@@ -278,7 +297,11 @@ class ResearchManager {
 
     await db.customInsert(
       'INSERT OR IGNORE INTO research_tags (id, name, created_at) VALUES (?, ?, ?)',
-      variables: [Variable.withString(id), Variable.withString(trimmed), Variable.withString(now.toIso8601String())],
+      variables: [
+        Variable.withString(id),
+        Variable.withString(trimmed),
+        Variable.withString(now.toIso8601String()),
+      ],
     );
 
     final item = ResearchTagItem(id: id, name: trimmed, createdAt: now);
@@ -289,7 +312,12 @@ class ResearchManager {
   Future<void> updateTag(String id, String newName) async {
     await _initTable();
     final trimmed = newName.trim();
-    final old = await db.customSelect('SELECT name FROM research_tags WHERE id = ?', variables: [Variable.withString(id)]).getSingleOrNull();
+    final old = await db
+        .customSelect(
+          'SELECT name FROM research_tags WHERE id = ?',
+          variables: [Variable.withString(id)],
+        )
+        .getSingleOrNull();
     final oldName = old?.read<String>('name');
 
     await db.customUpdate(
@@ -302,17 +330,21 @@ class ResearchManager {
       final articles = await getAllArticles();
       for (final a in articles) {
         if (a.tags.contains(oldName)) {
-          final newTags = a.tags.map((t) => t == oldName ? trimmed : t).toList();
-          await updateArticle(ResearchArticleItem(
-            id: a.id,
-            title: a.title,
-            summary: a.summary,
-            content: a.content,
-            tags: newTags,
-            attachments: a.attachments,
-            createdAt: a.createdAt,
-            updatedAt: a.updatedAt,
-          ));
+          final newTags = a.tags
+              .map((t) => t == oldName ? trimmed : t)
+              .toList();
+          await updateArticle(
+            ResearchArticleItem(
+              id: a.id,
+              title: a.title,
+              summary: a.summary,
+              content: a.content,
+              tags: newTags,
+              attachments: a.attachments,
+              createdAt: a.createdAt,
+              updatedAt: a.updatedAt,
+            ),
+          );
         }
       }
     }
@@ -322,26 +354,36 @@ class ResearchManager {
 
   Future<void> deleteTag(String id) async {
     await _initTable();
-    final old = await db.customSelect('SELECT name FROM research_tags WHERE id = ?', variables: [Variable.withString(id)]).getSingleOrNull();
+    final old = await db
+        .customSelect(
+          'SELECT name FROM research_tags WHERE id = ?',
+          variables: [Variable.withString(id)],
+        )
+        .getSingleOrNull();
     final oldName = old?.read<String>('name');
 
-    await db.customUpdate('DELETE FROM research_tags WHERE id = ?', variables: [Variable.withString(id)]);
+    await db.customUpdate(
+      'DELETE FROM research_tags WHERE id = ?',
+      variables: [Variable.withString(id)],
+    );
 
     if (oldName != null) {
       final articles = await getAllArticles();
       for (final a in articles) {
         if (a.tags.contains(oldName)) {
           final newTags = a.tags.where((t) => t != oldName).toList();
-          await updateArticle(ResearchArticleItem(
-            id: a.id,
-            title: a.title,
-            summary: a.summary,
-            content: a.content,
-            tags: newTags,
-            attachments: a.attachments,
-            createdAt: a.createdAt,
-            updatedAt: a.updatedAt,
-          ));
+          await updateArticle(
+            ResearchArticleItem(
+              id: a.id,
+              title: a.title,
+              summary: a.summary,
+              content: a.content,
+              tags: newTags,
+              attachments: a.attachments,
+              createdAt: a.createdAt,
+              updatedAt: a.updatedAt,
+            ),
+          );
         }
       }
     }
@@ -355,10 +397,11 @@ final researchManagerProvider = Provider<ResearchManager>((ref) {
   return ResearchManager(repo.db);
 });
 
-final researchArticlesStreamProvider = StreamProvider<List<ResearchArticleItem>>((ref) {
-  final mgr = ref.watch(researchManagerProvider);
-  return mgr.watchArticles();
-});
+final researchArticlesStreamProvider =
+    StreamProvider<List<ResearchArticleItem>>((ref) {
+      final mgr = ref.watch(researchManagerProvider);
+      return mgr.watchArticles();
+    });
 
 final researchTagsStreamProvider = StreamProvider<List<ResearchTagItem>>((ref) {
   final mgr = ref.watch(researchManagerProvider);

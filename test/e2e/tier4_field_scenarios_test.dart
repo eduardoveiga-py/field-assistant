@@ -6,6 +6,7 @@ import 'package:ministerio_pessoal/database/repository.dart';
 import 'package:ministerio_pessoal/settings/app_settings_manager.dart';
 import 'package:ministerio_pessoal/appointments/availability_engine.dart';
 import 'package:ministerio_pessoal/dashboard/counting_rules.dart';
+
 import 'e2e_contracts.dart';
 
 void main() {
@@ -36,7 +37,10 @@ void main() {
 
       // 1. Configuração do Ritmo de Pioneiro (R2)
       await settings.setString('pioneer_goal_hours', '50.0');
-      await settings.setString('pioneer_weekdays', '2,4,6'); // Terça, Quinta, Sábado
+      await settings.setString(
+        'pioneer_weekdays',
+        '2,4,6',
+      ); // Terça, Quinta, Sábado
 
       const goalHours = 50.0;
       final designatedDays = [2, 4, 6];
@@ -68,7 +72,13 @@ void main() {
         nowOverride: saturday,
       );
       expect(isSeed, isTrue);
-      expect(RecentSeedsHelper.getElapsedText(firstContactAt: recentPerson.firstContactAt, nowOverride: saturday), equals('há 3 dias'));
+      expect(
+        RecentSeedsHelper.getElapsedText(
+          firstContactAt: recentPerson.firstContactAt,
+          nowOverride: saturday,
+        ),
+        equals('há 3 dias'),
+      );
 
       // 3. Chegada à porta e Briefing na Porta (R1)
       final study = await repo.createStudy(
@@ -89,7 +99,10 @@ void main() {
       expect(briefing.lessonAndPoint, equals('Lição 02, Ponto 1'));
       expect(briefing.jwLibraryUri, isNotNull);
       expect(briefing.spiritualGoal, equals('Conhecer quem é Jeová'));
-      expect(briefing.empathyNote, equals('Trabalha com marcenaria, tem 2 filhos'));
+      expect(
+        briefing.empathyNote,
+        equals('Trabalha com marcenaria, tem 2 filhos'),
+      );
 
       // 4. Execução e registro da visita no banco
       final visit = await repo.createVisit(
@@ -113,7 +126,10 @@ void main() {
       );
 
       expect(timerState.shouldShowWarning, isFalse);
-      expect(timerState.elapsedDuration, equals(const Duration(hours: 2, minutes: 30)));
+      expect(
+        timerState.elapsedDuration,
+        equals(const Duration(hours: 2, minutes: 30)),
+      );
 
       // Registro da atividade e atualização do ritmo
       await repo.createActivityRecord(
@@ -132,7 +148,10 @@ void main() {
 
       expect(updatedPace.completedHours, equals(40.5));
       expect(updatedPace.remainingHours, equals(9.5));
-      expect(updatedPace.idealPacePerOuting < initialPace.idealPacePerOuting, isTrue);
+      expect(
+        updatedPace.idealPacePerOuting < initialPace.idealPacePerOuting,
+        isTrue,
+      );
     });
 
     // ========================================================================
@@ -156,7 +175,8 @@ void main() {
       );
 
       // 2. Estudante cancela o estudo às 09:55
-      await (db.update(db.appointments)..where((t) => t.id.equals(originalAppt.id)))
+      await (db.update(db.appointments)
+            ..where((t) => t.id.equals(originalAppt.id)))
           .write(const AppointmentsCompanion(status: Value('cancelado')));
 
       final cancelledAppt = await repo.getAppointmentById(originalAppt.id);
@@ -190,7 +210,10 @@ void main() {
       final briefingPlanB = DoorstepBriefingHelper.build(
         person: planBCandidate,
       );
-      expect(briefingPlanB.spiritualGoal, equals('Mostrar vídeo sobre o Reino'));
+      expect(
+        briefingPlanB.spiritualGoal,
+        equals('Mostrar vídeo sobre o Reino'),
+      );
 
       // Realiza a visita substituta
       await repo.createVisit(
@@ -232,8 +255,20 @@ void main() {
     // ========================================================================
     test('TC-SCENARIO-03: Forgotten Timer Recovery prevents report distortion and maintains accurate monthly dashboard metrics', () async {
       final morningStart = DateTime(2026, 10, 20, 8, 30);
-      final morningLastHeartbeat = DateTime(2026, 10, 20, 11, 30); // 3h de campo
-      final eveningReopen = DateTime(2026, 10, 20, 19, 30); // Reabriu 11h depois
+      final morningLastHeartbeat = DateTime(
+        2026,
+        10,
+        20,
+        11,
+        30,
+      ); // 3h de campo
+      final eveningReopen = DateTime(
+        2026,
+        10,
+        20,
+        19,
+        30,
+      ); // Reabriu 11h depois
 
       // 1. Cronômetro rodando e esquecido (R5)
       final timerEvaluation = AutoCorrectiveTimerLogic.evaluate(
@@ -247,14 +282,21 @@ void main() {
       expect(timerEvaluation.shouldShowWarning, isTrue);
       expect(timerEvaluation.warningReason, equals('reopened_inactive'));
       // Duração total inflada foi de 11h
-      expect(timerEvaluation.elapsedDuration, equals(const Duration(hours: 11)));
+      expect(
+        timerEvaluation.elapsedDuration,
+        equals(const Duration(hours: 11)),
+      );
       // Ajuste inteligente sugere o tempo real de uso ativo (3h)
-      expect(timerEvaluation.suggestedAdjustment, equals(const Duration(hours: 3)));
+      expect(
+        timerEvaluation.suggestedAdjustment,
+        equals(const Duration(hours: 3)),
+      );
 
       // 2. Usuário aceita o ajuste de 3h e persiste a atividade real
       await repo.createActivityRecord(
         date: morningStart,
-        durationSeconds: timerEvaluation.suggestedAdjustment.inSeconds, // 10.800s (3 horas)
+        durationSeconds:
+            timerEvaluation.suggestedAdjustment.inSeconds, // 10.800s (3 horas)
         modality: 'campo',
         notes: 'Ajustado de 11h para 3h pelo Cronômetro Auto-Corretivo',
       );
@@ -286,7 +328,9 @@ void main() {
       // Data: 30 de Outubro de 2026 (Sexta-feira)
       final sprintDate = DateTime(2026, 10, 30);
       const double goalHours = 50.0;
-      final designatedDays = [6]; // Apenas sábados (Outubro 31 é o único restante)
+      final designatedDays = [
+        6,
+      ]; // Apenas sábados (Outubro 31 é o único restante)
       double completedHours = 46.0;
 
       // 1. Cálculo da meta na véspera do encerramento do mês
@@ -297,11 +341,17 @@ void main() {
         currentDate: sprintDate,
       );
 
-      expect(sprintPace.remainingOutings, equals(1)); // Exatamente 1 saída restante (dia 31)
+      expect(
+        sprintPace.remainingOutings,
+        equals(1),
+      ); // Exatamente 1 saída restante (dia 31)
       expect(sprintPace.remainingHours, equals(4.0)); // Faltam 4h
       expect(sprintPace.idealPacePerOuting, equals(const Duration(hours: 4)));
       expect(sprintPace.isGoalReached, isFalse);
-      expect(sprintPace.formattedPaceText, equals('Faltam 4h em 1 saídas. Seu ritmo ideal é de 4h00m por saída'));
+      expect(
+        sprintPace.formattedPaceText,
+        equals('Faltam 4h em 1 saídas. Seu ritmo ideal é de 4h00m por saída'),
+      );
 
       // 2. Última saída realizada no dia 31 (Sábado)
       final finalOutingStart = DateTime(2026, 10, 31, 8, 0);
@@ -339,7 +389,10 @@ void main() {
       expect(finalPace.completedHours, equals(50.0));
       expect(finalPace.remainingHours, equals(0.0));
       expect(finalPace.isGoalReached, isTrue);
-      expect(finalPace.formattedPaceText, equals('Meta atingida! Parabéns pelo empenho no ministério.'));
+      expect(
+        finalPace.formattedPaceText,
+        equals('Meta atingida! Parabéns pelo empenho no ministério.'),
+      );
     });
   });
 }

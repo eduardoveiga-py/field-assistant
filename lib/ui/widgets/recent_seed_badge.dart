@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../contacts/recent_seeds_helper.dart';
 
 /// Badge visual de alto contraste e acessibilidade para contatos identificados
@@ -25,7 +26,8 @@ class RecentSeedBadge extends StatelessWidget {
     final BorderSide? borderSide = cardShape is RoundedRectangleBorder
         ? cardShape.side
         : null;
-    final isSunMode = (borderSide?.color == const Color(0xFF000000) &&
+    final isSunMode =
+        (borderSide?.color == const Color(0xFF000000) &&
             (borderSide?.width ?? 0) >= 2.0) ||
         (theme.colorScheme.primary == const Color(0xFF000000) &&
             theme.scaffoldBackgroundColor == Colors.white &&
@@ -72,11 +74,7 @@ class RecentSeedBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.eco,
-            size: 14,
-            color: contentColor,
-          ),
+          Icon(Icons.eco, size: 14, color: contentColor),
           const SizedBox(width: 5),
           Flexible(
             child: Text(

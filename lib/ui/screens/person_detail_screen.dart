@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -6,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:uuid/uuid.dart';
 import 'package:url_launcher/url_launcher.dart';
+
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../../database/app_database.dart';
@@ -86,7 +88,10 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                 ),
                 child: Text(
                   resolved.note!,
-                  style: const TextStyle(fontSize: 13, color: Color(0xFF1E3A8A)),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF1E3A8A),
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -94,12 +99,19 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
             if (resolved.url != null) ...[
               Text(
                 'Link Oficial Verificado:',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade700),
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey.shade700,
+                ),
               ),
               const SizedBox(height: 4),
               SelectableText(
                 resolved.url!,
-                style: const TextStyle(fontSize: 12, color: AppTheme.accentTeal),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppTheme.accentTeal,
+                ),
               ),
             ],
           ],
@@ -109,10 +121,16 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
             icon: const Icon(Icons.copy, size: 16),
             label: const Text('Copiar'),
             onPressed: () {
-              Clipboard.setData(ClipboardData(text: resolved.url ?? resolved.displayText));
+              Clipboard.setData(
+                ClipboardData(text: resolved.url ?? resolved.displayText),
+              );
               Navigator.pop(ctx);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Referência copiada para a área de transferência!')),
+                const SnackBar(
+                  content: Text(
+                    'Referência copiada para a área de transferência!',
+                  ),
+                ),
               );
             },
           ),
@@ -125,7 +143,10 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                 if (await canLaunchUrl(uri)) {
                   await launchUrl(uri, mode: LaunchMode.externalApplication);
                 } else if (resolved.fallbackUrl != null) {
-                  await launchUrl(Uri.parse(resolved.fallbackUrl!), mode: LaunchMode.externalApplication);
+                  await launchUrl(
+                    Uri.parse(resolved.fallbackUrl!),
+                    mode: LaunchMode.externalApplication,
+                  );
                 }
                 if (ctx.mounted) Navigator.pop(ctx);
               },
@@ -137,7 +158,9 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
 
   // Modal para Iniciar Estudo Bíblico diretamente do perfil da pessoa
   void _showStartStudyDialog(BuildContext context, PersonEntry person) {
-    final titleController = TextEditingController(text: 'Estudo de ${person.name}');
+    final titleController = TextEditingController(
+      text: 'Estudo de ${person.name}',
+    );
     final lessonController = TextEditingController(text: '1');
     final paragraphController = TextEditingController(text: '1');
     String selectedPublicationId = 'lff-book';
@@ -184,28 +207,41 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                   DropdownButtonFormField<String>(
                     initialValue: selectedPublicationId,
                     isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Publicação Principal'),
+                    decoration: const InputDecoration(
+                      labelText: 'Publicação Principal',
+                    ),
                     items: PublicationCatalog.allPublications.map((p) {
                       return DropdownMenuItem(
                         value: p.id,
-                        child: Text(p.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                        child: Text(
+                          p.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       );
                     }).toList(),
                     onChanged: (val) {
-                      if (val != null) setDialogState(() => selectedPublicationId = val);
+                      if (val != null)
+                        setDialogState(() => selectedPublicationId = val);
                     },
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     initialValue: selectedLanguage,
-                    decoration: const InputDecoration(labelText: 'Idioma do estudo'),
+                    decoration: const InputDecoration(
+                      labelText: 'Idioma do estudo',
+                    ),
                     items: const [
                       DropdownMenuItem(value: 'pt', child: Text('Português')),
-                      DropdownMenuItem(value: 'bzs', child: Text('Libras (Língua de Sinais)')),
+                      DropdownMenuItem(
+                        value: 'bzs',
+                        child: Text('Libras (Língua de Sinais)'),
+                      ),
                       DropdownMenuItem(value: 'tca', child: Text('Ticuna')),
                     ],
                     onChanged: (val) {
-                      if (val != null) setDialogState(() => selectedLanguage = val);
+                      if (val != null)
+                        setDialogState(() => selectedLanguage = val);
                     },
                   ),
                   const SizedBox(height: 12),
@@ -214,7 +250,9 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                       Expanded(
                         child: TextField(
                           controller: lessonController,
-                          decoration: const InputDecoration(labelText: 'Lição Inicial'),
+                          decoration: const InputDecoration(
+                            labelText: 'Lição Inicial',
+                          ),
                           keyboardType: TextInputType.number,
                         ),
                       ),
@@ -222,7 +260,9 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                       Expanded(
                         child: TextField(
                           controller: paragraphController,
-                          decoration: const InputDecoration(labelText: 'Parágrafo Inicial'),
+                          decoration: const InputDecoration(
+                            labelText: 'Parágrafo Inicial',
+                          ),
                           keyboardType: TextInputType.number,
                         ),
                       ),
@@ -231,15 +271,30 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     initialValue: selectedFrequency,
-                    decoration: const InputDecoration(labelText: 'Frequência do estudo'),
+                    decoration: const InputDecoration(
+                      labelText: 'Frequência do estudo',
+                    ),
                     items: const [
-                      DropdownMenuItem(value: 'semanal', child: Text('Semanal (1x por semana)')),
-                      DropdownMenuItem(value: 'duas_vezes_semana', child: Text('Intensivo (2x por semana)')),
-                      DropdownMenuItem(value: 'quinzenal', child: Text('Quinzenal')),
-                      DropdownMenuItem(value: 'variavel', child: Text('Variável / Flexível')),
+                      DropdownMenuItem(
+                        value: 'semanal',
+                        child: Text('Semanal (1x por semana)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'duas_vezes_semana',
+                        child: Text('Intensivo (2x por semana)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'quinzenal',
+                        child: Text('Quinzenal'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'variavel',
+                        child: Text('Variável / Flexível'),
+                      ),
                     ],
                     onChanged: (val) {
-                      if (val != null) setDialogState(() => selectedFrequency = val);
+                      if (val != null)
+                        setDialogState(() => selectedFrequency = val);
                     },
                   ),
                   const SizedBox(height: 12),
@@ -251,14 +306,20 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.info_outline, size: 16, color: Color(0xFF7C3AED)),
+                        const Icon(
+                          Icons.info_outline,
+                          size: 16,
+                          color: Color(0xFF7C3AED),
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             'O status de ${person.name} será automaticamente atualizado para "Estudo Bíblico" e integrado aos relatórios mensais.',
                             style: TextStyle(
                               fontSize: 12,
-                              color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF5B21B6),
+                              color: isDark
+                                  ? const Color(0xFFCBD5E1)
+                                  : const Color(0xFF5B21B6),
                             ),
                           ),
                         ),
@@ -269,12 +330,16 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                   GlobalAppointmentSchedulingSection(
                     title: 'Agendar Primeiro Estudo na Agenda',
                     isEnabled: scheduleFirstStudy,
-                    onToggle: (v) => setDialogState(() => scheduleFirstStudy = v),
+                    onToggle: (v) =>
+                        setDialogState(() => scheduleFirstStudy = v),
                     selectedDateTime: firstStudyDateTime,
-                    onDateTimeChanged: (dt) => setDialogState(() => firstStudyDateTime = dt),
+                    onDateTimeChanged: (dt) =>
+                        setDialogState(() => firstStudyDateTime = dt),
                     durationMinutes: firstStudyDuration,
-                    onDurationChanged: (d) => setDialogState(() => firstStudyDuration = d),
-                    existingAppointments: ref.read(appointmentsStreamProvider).value ?? [],
+                    onDurationChanged: (d) =>
+                        setDialogState(() => firstStudyDuration = d),
+                    existingAppointments:
+                        ref.read(appointmentsStreamProvider).value ?? [],
                   ),
                 ],
               ),
@@ -294,21 +359,25 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                   if (title.isEmpty) return;
 
                   if (scheduleFirstStudy) {
-                    final allAppts = ref.read(appointmentsStreamProvider).value ?? [];
+                    final allAppts =
+                        ref.read(appointmentsStreamProvider).value ?? [];
                     final avail = AvailabilityEngine.checkAvailability(
                       startTime: firstStudyDateTime,
                       durationMinutes: firstStudyDuration,
                       existingAppointments: allAppts,
                     );
-                    final canProceed = await GlobalAppointmentSchedulingSection.confirmConflictIfNeeded(
-                      context: context,
-                      availability: avail,
-                    );
+                    final canProceed =
+                        await GlobalAppointmentSchedulingSection.confirmConflictIfNeeded(
+                          context: context,
+                          availability: avail,
+                        );
                     if (!canProceed) return;
                   }
 
-                  final initialLesson = int.tryParse(lessonController.text.trim()) ?? 1;
-                  final initialPara = int.tryParse(paragraphController.text.trim()) ?? 1;
+                  final initialLesson =
+                      int.tryParse(lessonController.text.trim()) ?? 1;
+                  final initialPara =
+                      int.tryParse(paragraphController.text.trim()) ?? 1;
 
                   final repo = ref.read(repositoryProvider);
                   await repo.createStudy(
@@ -331,17 +400,25 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                       personId: person.id,
                       title: 'Estudo Bíblico: ${person.name}',
                       startTime: firstStudyDateTime,
-                      endTime: firstStudyDateTime.add(Duration(minutes: firstStudyDuration)),
+                      endTime: firstStudyDateTime.add(
+                        Duration(minutes: firstStudyDuration),
+                      ),
                       durationMinutes: firstStudyDuration,
                       status: 'confirmado',
-                      locationNotes: person.address != null ? 'Local: ${person.address}' : null,
+                      locationNotes: person.address != null
+                          ? 'Local: ${person.address}'
+                          : null,
                     );
                   }
 
                   if (ctx.mounted) Navigator.pop(ctx);
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Estudo Bíblico iniciado com sucesso com ${person.name}!')),
+                      SnackBar(
+                        content: Text(
+                          'Estudo Bíblico iniciado com sucesso com ${person.name}!',
+                        ),
+                      ),
                     );
                   }
                 },
@@ -354,16 +431,27 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
     );
   }
 
-  void _showEditPersonTagsDialog(BuildContext context, AppRepository repo, PersonEntry person) {
+  void _showEditPersonTagsDialog(
+    BuildContext context,
+    AppRepository repo,
+    PersonEntry person,
+  ) {
     List<String> currentTags = [];
     if (person.tags.isNotEmpty && person.tags != '[]') {
       if (person.tags.startsWith('[')) {
         try {
           final decoded = jsonDecode(person.tags) as List;
-          currentTags = decoded.map((e) => e.toString().trim()).where((s) => s.isNotEmpty).toList();
+          currentTags = decoded
+              .map((e) => e.toString().trim())
+              .where((s) => s.isNotEmpty)
+              .toList();
         } catch (_) {}
       } else {
-        currentTags = person.tags.split(',').map((e) => e.trim()).where((s) => s.isNotEmpty).toList();
+        currentTags = person.tags
+            .split(',')
+            .map((e) => e.trim())
+            .where((s) => s.isNotEmpty)
+            .toList();
       }
     }
 
@@ -386,7 +474,10 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Gerencie tags para organizar contatos por afinidade, idioma ou situação:', style: TextStyle(fontSize: 12)),
+                  const Text(
+                    'Gerencie tags para organizar contatos por afinidade, idioma ou situação:',
+                    style: TextStyle(fontSize: 12),
+                  ),
                   const SizedBox(height: 12),
                   Row(
                     children: [
@@ -411,7 +502,10 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                       ),
                       const SizedBox(width: 8),
                       IconButton(
-                        icon: const Icon(Icons.add_circle, color: AppTheme.primaryBlue),
+                        icon: const Icon(
+                          Icons.add_circle,
+                          color: AppTheme.primaryBlue,
+                        ),
                         onPressed: () {
                           final t = tagController.text.trim();
                           if (t.isNotEmpty && !currentTags.contains(t)) {
@@ -426,27 +520,42 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                   ),
                   const SizedBox(height: 14),
                   if (currentTags.isEmpty)
-                    const Text('Nenhuma tag cadastrada ainda.', style: TextStyle(color: AppTheme.textMuted, fontSize: 13))
+                    const Text(
+                      'Nenhuma tag cadastrada ainda.',
+                      style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                    )
                   else
                     Wrap(
                       spacing: 6,
                       runSpacing: 6,
-                      children: currentTags.map((t) => Chip(
-                        label: Text(t, style: const TextStyle(fontSize: 12)),
-                        deleteIcon: const Icon(Icons.close, size: 14),
-                        onDeleted: () {
-                          setDialogState(() => currentTags.remove(t));
-                        },
-                      )).toList(),
+                      children: currentTags
+                          .map(
+                            (t) => Chip(
+                              label: Text(
+                                t,
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                              deleteIcon: const Icon(Icons.close, size: 14),
+                              onDeleted: () {
+                                setDialogState(() => currentTags.remove(t));
+                              },
+                            ),
+                          )
+                          .toList(),
                     ),
                 ],
               ),
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancelar'),
+              ),
               ElevatedButton(
                 onPressed: () async {
-                  await repo.updatePerson(person.copyWith(tags: jsonEncode(currentTags)));
+                  await repo.updatePerson(
+                    person.copyWith(tags: jsonEncode(currentTags)),
+                  );
                   if (ctx.mounted) Navigator.pop(ctx);
                 },
                 child: const Text('Salvar Tags'),
@@ -458,7 +567,12 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
     );
   }
 
-  void _showEndStudyDialog(BuildContext context, AppRepository repo, BibleStudyEntry study, PersonEntry person) {
+  void _showEndStudyDialog(
+    BuildContext context,
+    AppRepository repo,
+    BibleStudyEntry study,
+    PersonEntry person,
+  ) {
     String selectedReason = 'Falta de interesse / tempo';
     final notesController = TextEditingController();
 
@@ -486,14 +600,34 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                 DropdownButtonFormField<String>(
                   initialValue: selectedReason,
                   isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'Motivo do Encerramento *'),
+                  decoration: const InputDecoration(
+                    labelText: 'Motivo do Encerramento *',
+                  ),
                   items: const [
-                    DropdownMenuItem(value: 'Falta de interesse / tempo', child: Text('Falta de interesse / tempo')),
-                    DropdownMenuItem(value: 'Mudou-se de território', child: Text('Mudou-se de território')),
-                    DropdownMenuItem(value: 'Oposição familiar', child: Text('Oposição familiar')),
-                    DropdownMenuItem(value: 'Estudo concluído / Batizado', child: Text('Estudo concluído / Batizado')),
-                    DropdownMenuItem(value: 'Problemas de saúde', child: Text('Problemas de saúde')),
-                    DropdownMenuItem(value: 'Outro', child: Text('Outro motivo')),
+                    DropdownMenuItem(
+                      value: 'Falta de interesse / tempo',
+                      child: Text('Falta de interesse / tempo'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Mudou-se de território',
+                      child: Text('Mudou-se de território'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Oposição familiar',
+                      child: Text('Oposição familiar'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Estudo concluído / Batizado',
+                      child: Text('Estudo concluído / Batizado'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Problemas de saúde',
+                      child: Text('Problemas de saúde'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Outro',
+                      child: Text('Outro motivo'),
+                    ),
                   ],
                   onChanged: (val) {
                     if (val != null) setDialogState(() => selectedReason = val);
@@ -512,9 +646,15 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar'),
+            ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.alertAmber, foregroundColor: Colors.black),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.alertAmber,
+                foregroundColor: Colors.black,
+              ),
               onPressed: () async {
                 final reasonPayload = jsonEncode({
                   'endReason': selectedReason,
@@ -523,7 +663,9 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                 });
                 await repo.updateStudy(
                   study.copyWith(
-                    status: selectedReason == 'Estudo concluído / Batizado' ? 'concluido' : 'encerrado',
+                    status: selectedReason == 'Estudo concluído / Batizado'
+                        ? 'concluido'
+                        : 'encerrado',
                     pauseOrCloseReason: Value(reasonPayload),
                   ),
                 );
@@ -531,7 +673,11 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                 if (ctx.mounted) Navigator.pop(ctx);
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Estudo encerrado ($selectedReason). Contato mantido no território!')),
+                    SnackBar(
+                      content: Text(
+                        'Estudo encerrado ($selectedReason). Contato mantido no território!',
+                      ),
+                    ),
                   );
                 }
               },
@@ -543,22 +689,32 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
     );
   }
 
-  Future<void> _reactivateStudy(BuildContext context, AppRepository repo, BibleStudyEntry study, PersonEntry person) async {
+  Future<void> _reactivateStudy(
+    BuildContext context,
+    AppRepository repo,
+    BibleStudyEntry study,
+    PersonEntry person,
+  ) async {
     await repo.updateStudy(
-      study.copyWith(
-        status: 'ativo',
-        pauseOrCloseReason: const Value(null),
-      ),
+      study.copyWith(status: 'ativo', pauseOrCloseReason: const Value(null)),
     );
     await repo.updatePerson(person.copyWith(status: 'estudo'));
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Estudo bíblico com "${person.name}" reativado com sucesso!')),
+        SnackBar(
+          content: Text(
+            'Estudo bíblico com "${person.name}" reativado com sucesso!',
+          ),
+        ),
       );
     }
   }
 
-  void _showEndReturnVisitDialog(BuildContext context, PersonEntry person, AppRepository repo) {
+  void _showEndReturnVisitDialog(
+    BuildContext context,
+    PersonEntry person,
+    AppRepository repo,
+  ) {
     String selectedReason = 'Falta de interesse / tempo';
     final notesController = TextEditingController();
 
@@ -586,15 +742,38 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                 DropdownButtonFormField<String>(
                   initialValue: selectedReason,
                   isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'Motivo do Encerramento *'),
+                  decoration: const InputDecoration(
+                    labelText: 'Motivo do Encerramento *',
+                  ),
                   items: const [
-                    DropdownMenuItem(value: 'Falta de interesse / tempo', child: Text('Falta de interesse / tempo')),
-                    DropdownMenuItem(value: 'Mudou-se de território', child: Text('Mudou-se de território')),
-                    DropdownMenuItem(value: 'Pediu para não ser visitado', child: Text('Pediu para não ser visitado')),
-                    DropdownMenuItem(value: 'Oposição familiar', child: Text('Oposição familiar')),
-                    DropdownMenuItem(value: 'Problemas de saúde / Falecido', child: Text('Problemas de saúde / Falecido')),
-                    DropdownMenuItem(value: 'Repassada para outro publicador', child: Text('Repassada para outro publicador')),
-                    DropdownMenuItem(value: 'Outro', child: Text('Outro motivo')),
+                    DropdownMenuItem(
+                      value: 'Falta de interesse / tempo',
+                      child: Text('Falta de interesse / tempo'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Mudou-se de território',
+                      child: Text('Mudou-se de território'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Pediu para não ser visitado',
+                      child: Text('Pediu para não ser visitado'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Oposição familiar',
+                      child: Text('Oposição familiar'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Problemas de saúde / Falecido',
+                      child: Text('Problemas de saúde / Falecido'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Repassada para outro publicador',
+                      child: Text('Repassada para outro publicador'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Outro',
+                      child: Text('Outro motivo'),
+                    ),
                   ],
                   onChanged: (val) {
                     if (val != null) setDialogState(() => selectedReason = val);
@@ -605,7 +784,8 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                   controller: notesController,
                   decoration: const InputDecoration(
                     labelText: 'Observação complementar (opcional)',
-                    hintText: 'Ex: Deixou portas abertas para uma ocasião futura...',
+                    hintText:
+                        'Ex: Deixou portas abertas para uma ocasião futura...',
                   ),
                   maxLines: 2,
                 ),
@@ -613,26 +793,43 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar'),
+            ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.alertAmber, foregroundColor: Colors.black),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.alertAmber,
+                foregroundColor: Colors.black,
+              ),
               onPressed: () async {
                 final reasonPayload = jsonEncode({
                   'endReason': selectedReason,
                   'notes': notesController.text.trim(),
                   'endedAt': DateTime.now().toIso8601String(),
                 });
-                await repo.updatePerson(person.copyWith(
-                  status: 'revisita_encerrada',
-                  nextActionNote: Value('Revisita encerrada: $selectedReason${notesController.text.trim().isNotEmpty ? " - ${notesController.text.trim()}" : ""}'),
-                  contactRestrictions: Value(person.contactRestrictions == null || person.contactRestrictions!.isEmpty
-                      ? reasonPayload
-                      : person.contactRestrictions),
-                ));
+                await repo.updatePerson(
+                  person.copyWith(
+                    status: 'revisita_encerrada',
+                    nextActionNote: Value(
+                      'Revisita encerrada: $selectedReason${notesController.text.trim().isNotEmpty ? " - ${notesController.text.trim()}" : ""}',
+                    ),
+                    contactRestrictions: Value(
+                      person.contactRestrictions == null ||
+                              person.contactRestrictions!.isEmpty
+                          ? reasonPayload
+                          : person.contactRestrictions,
+                    ),
+                  ),
+                );
                 if (ctx.mounted) Navigator.pop(ctx);
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Revisita encerrada ($selectedReason). Registro mantido no histórico!')),
+                    SnackBar(
+                      content: Text(
+                        'Revisita encerrada ($selectedReason). Registro mantido no histórico!',
+                      ),
+                    ),
                   );
                 }
               },
@@ -644,19 +841,28 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
     );
   }
 
-  Future<void> _reactivateReturnVisit(BuildContext context, AppRepository repo, PersonEntry person) async {
-    await repo.updatePerson(person.copyWith(
-      status: 'revisita',
-      nextActionNote: const Value(null),
-    ));
+  Future<void> _reactivateReturnVisit(
+    BuildContext context,
+    AppRepository repo,
+    PersonEntry person,
+  ) async {
+    await repo.updatePerson(
+      person.copyWith(status: 'revisita', nextActionNote: const Value(null)),
+    );
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Revisita com "${person.name}" reativada com sucesso!')),
+        SnackBar(
+          content: Text('Revisita com "${person.name}" reativada com sucesso!'),
+        ),
       );
     }
   }
 
-  Future<void> _openLocationPickerForPerson(BuildContext context, AppRepository repo, PersonEntry person) async {
+  Future<void> _openLocationPickerForPerson(
+    BuildContext context,
+    AppRepository repo,
+    PersonEntry person,
+  ) async {
     final res = await showDialog<ReverseGeocodingResult>(
       context: context,
       builder: (_) => MapLocationPickerDialog(
@@ -665,33 +871,50 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
       ),
     );
     if (res != null) {
-      final updatedAddr = (person.address == null || person.address!.isEmpty) && res.streetAndNumber.isNotEmpty
+      final updatedAddr =
+          (person.address == null || person.address!.isEmpty) &&
+              res.streetAndNumber.isNotEmpty
           ? res.streetAndNumber
           : person.address;
-      await repo.updatePerson(person.copyWith(
-        latitude: Value(res.latitude),
-        longitude: Value(res.longitude),
-        address: Value(updatedAddr),
-      ));
+      await repo.updatePerson(
+        person.copyWith(
+          latitude: Value(res.latitude),
+          longitude: Value(res.longitude),
+          address: Value(updatedAddr),
+        ),
+      );
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Localização de "${person.name}" atualizada com sucesso no mapa!')),
+          SnackBar(
+            content: Text(
+              'Localização de "${person.name}" atualizada com sucesso no mapa!',
+            ),
+          ),
         );
       }
     }
   }
 
   Future<void> _openExternalGoogleMaps(PersonEntry person) async {
-    final query = (person.latitude != null && person.longitude != null && (person.latitude != 0.0 || person.longitude != 0.0))
+    final query =
+        (person.latitude != null &&
+            person.longitude != null &&
+            (person.latitude != 0.0 || person.longitude != 0.0))
         ? '${person.latitude},${person.longitude}'
         : Uri.encodeComponent(person.address ?? person.name);
-    final uri = Uri.parse('https://www.google.com/maps/search/?api=1&query=$query');
+    final uri = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=$query',
+    );
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
 
-  void _showEditPersonDialog(BuildContext context, AppRepository repo, PersonEntry person) {
+  void _showEditPersonDialog(
+    BuildContext context,
+    AppRepository repo,
+    PersonEntry person,
+  ) {
     String initialStreet = '';
     String initialNeighborhood = '';
     String initialRef = '';
@@ -712,7 +935,8 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
       initialStreet = streetParts.join(' - ');
     } else if (rawAddr.contains(' - ')) {
       final parts = rawAddr.split(' - ');
-      if (parts.length >= 2 && parts[1].trim().toLowerCase().startsWith('bairro ')) {
+      if (parts.length >= 2 &&
+          parts[1].trim().toLowerCase().startsWith('bairro ')) {
         initialStreet = parts[0].trim();
         initialNeighborhood = parts[1].trim().substring(7).trim();
         if (parts.length >= 3) {
@@ -730,9 +954,19 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
     final addrCtrl = TextEditingController(text: initialStreet);
     final neighborhoodCtrl = TextEditingController(text: initialNeighborhood);
     final refCtrl = TextEditingController(text: initialRef);
-    final latCtrl = TextEditingController(text: person.latitude != null && person.latitude != 0.0 ? person.latitude!.toStringAsFixed(6) : '');
-    final lngCtrl = TextEditingController(text: person.longitude != null && person.longitude != 0.0 ? person.longitude!.toStringAsFixed(6) : '');
-    final scheduleCtrl = TextEditingController(text: person.preferredSchedule ?? '');
+    final latCtrl = TextEditingController(
+      text: person.latitude != null && person.latitude != 0.0
+          ? person.latitude!.toStringAsFixed(6)
+          : '',
+    );
+    final lngCtrl = TextEditingController(
+      text: person.longitude != null && person.longitude != 0.0
+          ? person.longitude!.toStringAsFixed(6)
+          : '',
+    );
+    final scheduleCtrl = TextEditingController(
+      text: person.preferredSchedule ?? '',
+    );
     String currentStatus = person.status;
     final sectors = ref.read(sectorsStreamProvider).value ?? [];
 
@@ -743,7 +977,9 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
           final isDark = Theme.of(ctx).brightness == Brightness.dark;
           return Dialog(
             backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 540, maxHeight: 680),
               child: Padding(
@@ -757,12 +993,25 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                       children: [
                         const Row(
                           children: [
-                            Icon(Icons.edit, color: AppTheme.primaryBlue, size: 24),
+                            Icon(
+                              Icons.edit,
+                              color: AppTheme.primaryBlue,
+                              size: 24,
+                            ),
                             SizedBox(width: 8),
-                            Text('Editar Dados do Contato', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                            Text(
+                              'Editar Dados do Contato',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ],
                         ),
-                        IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(ctx),
+                        ),
                       ],
                     ),
                     const Divider(height: 20),
@@ -773,33 +1022,60 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                           children: [
                             TextField(
                               controller: nameCtrl,
-                              decoration: const InputDecoration(labelText: 'Nome Completo *'),
+                              decoration: const InputDecoration(
+                                labelText: 'Nome Completo *',
+                              ),
                             ),
                             const SizedBox(height: 12),
                             TextField(
                               controller: phoneCtrl,
-                              decoration: const InputDecoration(labelText: 'Telefone / WhatsApp', hintText: '(11) 98765-4321'),
+                              decoration: const InputDecoration(
+                                labelText: 'Telefone / WhatsApp',
+                                hintText: '(11) 98765-4321',
+                              ),
                               keyboardType: TextInputType.phone,
                             ),
                             const SizedBox(height: 12),
                             DropdownButtonFormField<String>(
                               initialValue: currentStatus,
-                              decoration: const InputDecoration(labelText: 'Situação / Classificação'),
+                              decoration: const InputDecoration(
+                                labelText: 'Situação / Classificação',
+                              ),
                               items: const [
-                                DropdownMenuItem(value: 'interessado', child: Text('👤 Interessado')),
-                                DropdownMenuItem(value: 'revisita', child: Text('🔄 Revisita Ativa')),
-                                DropdownMenuItem(value: 'estudo', child: Text('📖 Estudo Bíblico')),
-                                DropdownMenuItem(value: 'revisita_passada', child: Text('📦 Revisita Repassada')),
-                                DropdownMenuItem(value: 'revisita_encerrada', child: Text('⛔ Revisita Encerrada')),
+                                DropdownMenuItem(
+                                  value: 'interessado',
+                                  child: Text('👤 Interessado'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'revisita',
+                                  child: Text('🔄 Revisita Ativa'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'estudo',
+                                  child: Text('📖 Estudo Bíblico'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'revisita_passada',
+                                  child: Text('📦 Revisita Repassada'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'revisita_encerrada',
+                                  child: Text('⛔ Revisita Encerrada'),
+                                ),
                               ],
                               onChanged: (val) {
-                                if (val != null) setDialogState(() => currentStatus = val);
+                                if (val != null)
+                                  setDialogState(() => currentStatus = val);
                               },
                             ),
                             const SizedBox(height: 16),
                             const Text(
                               'Localização & Bairro / Setor',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.primaryBlue),
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                color: AppTheme.primaryBlue,
+                              ),
                             ),
                             const SizedBox(height: 8),
                             TextField(
@@ -839,13 +1115,33 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                                 scrollDirection: Axis.horizontal,
                                 child: Row(
                                   children: sectors.map((sec) {
-                                    final isChosen = neighborhoodCtrl.text.trim().toLowerCase() == sec.name.toLowerCase();
+                                    final isChosen =
+                                        neighborhoodCtrl.text
+                                            .trim()
+                                            .toLowerCase() ==
+                                        sec.name.toLowerCase();
                                     return Padding(
                                       padding: const EdgeInsets.only(right: 6),
                                       child: ActionChip(
-                                        avatar: Icon(Icons.location_city, size: 14, color: isChosen ? Colors.white : AppTheme.primaryBlue),
-                                        label: Text(sec.name, style: TextStyle(fontSize: 11, color: isChosen ? Colors.white : null)),
-                                        backgroundColor: isChosen ? AppTheme.primaryBlue : null,
+                                        avatar: Icon(
+                                          Icons.location_city,
+                                          size: 14,
+                                          color: isChosen
+                                              ? Colors.white
+                                              : AppTheme.primaryBlue,
+                                        ),
+                                        label: Text(
+                                          sec.name,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: isChosen
+                                                ? Colors.white
+                                                : null,
+                                          ),
+                                        ),
+                                        backgroundColor: isChosen
+                                            ? AppTheme.primaryBlue
+                                            : null,
                                         onPressed: () {
                                           setDialogState(() {
                                             neighborhoodCtrl.text = sec.name;
@@ -863,16 +1159,30 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                                 Expanded(
                                   child: TextField(
                                     controller: latCtrl,
-                                    decoration: const InputDecoration(labelText: 'Latitude GPS', hintText: '-23.5505'),
-                                    keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                                    decoration: const InputDecoration(
+                                      labelText: 'Latitude GPS',
+                                      hintText: '-23.5505',
+                                    ),
+                                    keyboardType:
+                                        const TextInputType.numberWithOptions(
+                                          decimal: true,
+                                          signed: true,
+                                        ),
                                   ),
                                 ),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: TextField(
                                     controller: lngCtrl,
-                                    decoration: const InputDecoration(labelText: 'Longitude GPS', hintText: '-46.6333'),
-                                    keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                                    decoration: const InputDecoration(
+                                      labelText: 'Longitude GPS',
+                                      hintText: '-46.6333',
+                                    ),
+                                    keyboardType:
+                                        const TextInputType.numberWithOptions(
+                                          decimal: true,
+                                          signed: true,
+                                        ),
                                   ),
                                 ),
                               ],
@@ -884,22 +1194,37 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                               children: [
                                 OutlinedButton.icon(
                                   icon: const Icon(Icons.my_location, size: 16),
-                                  label: const Text('🧭 GPS Atual', style: TextStyle(fontSize: 12)),
+                                  label: const Text(
+                                    '🧭 GPS Atual',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
                                   onPressed: () async {
-                                    final pos = await GeolocationHelper.getCurrentLocation();
+                                    final pos =
+                                        await GeolocationHelper.getCurrentLocation();
                                     if (pos != null) {
                                       setDialogState(() {
-                                        latCtrl.text = pos.latitude.toStringAsFixed(6);
-                                        lngCtrl.text = pos.longitude.toStringAsFixed(6);
+                                        latCtrl.text = pos.latitude
+                                            .toStringAsFixed(6);
+                                        lngCtrl.text = pos.longitude
+                                            .toStringAsFixed(6);
                                       });
-                                      final geo = await GeocodingService.reverseGeocode(pos.latitude, pos.longitude);
+                                      final geo =
+                                          await GeocodingService.reverseGeocode(
+                                            pos.latitude,
+                                            pos.longitude,
+                                          );
                                       if (geo != null) {
                                         setDialogState(() {
-                                          if (addrCtrl.text.trim().isEmpty && geo.streetAndNumber.isNotEmpty) {
+                                          if (addrCtrl.text.trim().isEmpty &&
+                                              geo.streetAndNumber.isNotEmpty) {
                                             addrCtrl.text = geo.streetAndNumber;
                                           }
-                                          if (neighborhoodCtrl.text.trim().isEmpty && geo.neighborhood != null) {
-                                            neighborhoodCtrl.text = geo.neighborhood!;
+                                          if (neighborhoodCtrl.text
+                                                  .trim()
+                                                  .isEmpty &&
+                                              geo.neighborhood != null) {
+                                            neighborhoodCtrl.text =
+                                                geo.neighborhood!;
                                           }
                                         });
                                       }
@@ -908,26 +1233,48 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                                 ),
                                 ElevatedButton.icon(
                                   icon: const Icon(Icons.map, size: 16),
-                                  label: const Text('🗺️ Escolher no Mapa', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                  label: const Text(
+                                    '🗺️ Escolher no Mapa',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
                                   onPressed: () async {
-                                    final curLat = double.tryParse(latCtrl.text.trim());
-                                    final curLng = double.tryParse(lngCtrl.text.trim());
-                                    final res = await showDialog<ReverseGeocodingResult>(
-                                      context: context,
-                                      builder: (_) => MapLocationPickerDialog(
-                                        initialLat: curLat,
-                                        initialLng: curLng,
-                                      ),
+                                    final curLat = double.tryParse(
+                                      latCtrl.text.trim(),
                                     );
+                                    final curLng = double.tryParse(
+                                      lngCtrl.text.trim(),
+                                    );
+                                    final res =
+                                        await showDialog<
+                                          ReverseGeocodingResult
+                                        >(
+                                          context: context,
+                                          builder: (_) =>
+                                              MapLocationPickerDialog(
+                                                initialLat: curLat,
+                                                initialLng: curLng,
+                                              ),
+                                        );
                                     if (res != null) {
                                       setDialogState(() {
-                                        latCtrl.text = res.latitude.toStringAsFixed(6);
-                                        lngCtrl.text = res.longitude.toStringAsFixed(6);
-                                        if (res.streetAndNumber.isNotEmpty && addrCtrl.text.trim().isEmpty) {
+                                        latCtrl.text = res.latitude
+                                            .toStringAsFixed(6);
+                                        lngCtrl.text = res.longitude
+                                            .toStringAsFixed(6);
+                                        if (res.streetAndNumber.isNotEmpty &&
+                                            addrCtrl.text.trim().isEmpty) {
                                           addrCtrl.text = res.streetAndNumber;
                                         }
-                                        if (res.neighborhood != null && res.neighborhood!.isNotEmpty && neighborhoodCtrl.text.trim().isEmpty) {
-                                          neighborhoodCtrl.text = res.neighborhood!;
+                                        if (res.neighborhood != null &&
+                                            res.neighborhood!.isNotEmpty &&
+                                            neighborhoodCtrl.text
+                                                .trim()
+                                                .isEmpty) {
+                                          neighborhoodCtrl.text =
+                                              res.neighborhood!;
                                         }
                                       });
                                     }
@@ -938,7 +1285,10 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                             const SizedBox(height: 12),
                             TextField(
                               controller: scheduleCtrl,
-                              decoration: const InputDecoration(labelText: 'Dia e Horário Habitual', hintText: 'Ex: Sábado às 09:00'),
+                              decoration: const InputDecoration(
+                                labelText: 'Dia e Horário Habitual',
+                                hintText: 'Ex: Sábado às 09:00',
+                              ),
                             ),
                           ],
                         ),
@@ -948,7 +1298,10 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('Cancelar'),
+                        ),
                         const SizedBox(width: 8),
                         ElevatedButton.icon(
                           icon: const Icon(Icons.check, size: 18),
@@ -957,36 +1310,55 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                             final name = nameCtrl.text.trim();
                             if (name.isEmpty) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('O nome do contato é obrigatório.')),
+                                const SnackBar(
+                                  content: Text(
+                                    'O nome do contato é obrigatório.',
+                                  ),
+                                ),
                               );
                               return;
                             }
                             final phone = phoneCtrl.text.trim();
                             final addrParts = <String>[];
-                            if (addrCtrl.text.trim().isNotEmpty) addrParts.add(addrCtrl.text.trim());
-                            if (neighborhoodCtrl.text.trim().isNotEmpty) addrParts.add('Bairro: ${neighborhoodCtrl.text.trim()}');
-                            if (refCtrl.text.trim().isNotEmpty) addrParts.add('Ref: ${refCtrl.text.trim()}');
-                            final fullAddress = addrParts.isNotEmpty ? addrParts.join(' - ') : null;
+                            if (addrCtrl.text.trim().isNotEmpty)
+                              addrParts.add(addrCtrl.text.trim());
+                            if (neighborhoodCtrl.text.trim().isNotEmpty)
+                              addrParts.add(
+                                'Bairro: ${neighborhoodCtrl.text.trim()}',
+                              );
+                            if (refCtrl.text.trim().isNotEmpty)
+                              addrParts.add('Ref: ${refCtrl.text.trim()}');
+                            final fullAddress = addrParts.isNotEmpty
+                                ? addrParts.join(' - ')
+                                : null;
 
                             final lat = double.tryParse(latCtrl.text.trim());
                             final lng = double.tryParse(lngCtrl.text.trim());
                             final sched = scheduleCtrl.text.trim();
 
-                            await repo.updatePerson(person.copyWith(
-                              name: name,
-                              phone: Value(phone.isNotEmpty ? phone : null),
-                              address: Value(fullAddress),
-                              latitude: Value(lat),
-                              longitude: Value(lng),
-                              preferredSchedule: Value(sched.isNotEmpty ? sched : null),
-                              status: currentStatus,
-                              updatedAt: DateTime.now(),
-                            ));
+                            await repo.updatePerson(
+                              person.copyWith(
+                                name: name,
+                                phone: Value(phone.isNotEmpty ? phone : null),
+                                address: Value(fullAddress),
+                                latitude: Value(lat),
+                                longitude: Value(lng),
+                                preferredSchedule: Value(
+                                  sched.isNotEmpty ? sched : null,
+                                ),
+                                status: currentStatus,
+                                updatedAt: DateTime.now(),
+                              ),
+                            );
 
                             if (ctx.mounted) Navigator.pop(ctx);
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Dados do contato atualizados com sucesso!')),
+                                const SnackBar(
+                                  content: Text(
+                                    'Dados do contato atualizados com sucesso!',
+                                  ),
+                                ),
                               );
                             }
                           },
@@ -1003,19 +1375,28 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
     );
   }
 
-  void _showRecordStudySessionDialog(BuildContext context, BibleStudyEntry study, PersonEntry person) {
+  void _showRecordStudySessionDialog(
+    BuildContext context,
+    BibleStudyEntry study,
+    PersonEntry person,
+  ) {
     final allAppts = ref.read(appointmentsStreamProvider).value ?? [];
 
     // Busca agendamento futuro existente para este estudante para evitar duplicatas
     AppointmentEntry? existingUpcomingAppt;
-    final upcoming = allAppts
-        .where((a) =>
-            a.personId == person.id &&
-            a.startTime.isAfter(DateTime.now().subtract(const Duration(hours: 1))) &&
-            a.status != 'cancelado' &&
-            a.deletedAt == null)
-        .toList()
-      ..sort((a, b) => a.startTime.compareTo(b.startTime));
+    final upcoming =
+        allAppts
+            .where(
+              (a) =>
+                  a.personId == person.id &&
+                  a.startTime.isAfter(
+                    DateTime.now().subtract(const Duration(hours: 1)),
+                  ) &&
+                  a.status != 'cancelado' &&
+                  a.deletedAt == null,
+            )
+            .toList()
+          ..sort((a, b) => a.startTime.compareTo(b.startTime));
     if (upcoming.isNotEmpty) {
       existingUpcomingAppt = upcoming.first;
     }
@@ -1028,11 +1409,22 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
     String selectedUnitId = 'lesson_$selectedLesson';
     final allUnits = LffBookCatalog.getAllStudyUnits();
 
-    final initialNext = LffBookCatalog.getNextProgression(currentLesson: selectedLesson, currentPoint: selectedEndPoint);
-    final lessonController = TextEditingController(text: selectedLesson.toString());
-    final paragraphsController = TextEditingController(text: selectedStartPoint == selectedEndPoint ? '$selectedStartPoint' : '$selectedStartPoint-$selectedEndPoint');
+    final initialNext = LffBookCatalog.getNextProgression(
+      currentLesson: selectedLesson,
+      currentPoint: selectedEndPoint,
+    );
+    final lessonController = TextEditingController(
+      text: selectedLesson.toString(),
+    );
+    final paragraphsController = TextEditingController(
+      text: selectedStartPoint == selectedEndPoint
+          ? '$selectedStartPoint'
+          : '$selectedStartPoint-$selectedEndPoint',
+    );
     final notesController = TextEditingController();
-    final nextStepController = TextEditingController(text: study.nextTopic ?? initialNext.label);
+    final nextStepController = TextEditingController(
+      text: study.nextTopic ?? initialNext.label,
+    );
     int attendanceCount = 1;
     bool scheduleNextStudy = true;
 
@@ -1073,18 +1465,29 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
         builder: (ctx, setDialogState) {
           final isDark = Theme.of(ctx).brightness == Brightness.dark;
           final lessonInfo = LffBookCatalog.getLesson(selectedLesson);
-          final progressPercent = LffBookCatalog.calculateProgressPercentage(lesson: selectedLesson, point: selectedEndPoint);
+          final progressPercent = LffBookCatalog.calculateProgressPercentage(
+            lesson: selectedLesson,
+            point: selectedEndPoint,
+          );
 
           int currentUnitMaxPoints = 6;
-          final foundUnit = allUnits.where((u) => u.id == selectedUnitId).firstOrNull;
-          currentUnitMaxPoints = foundUnit?.totalPoints ?? (lessonInfo?.totalPoints ?? 6);
+          final foundUnit = allUnits
+              .where((u) => u.id == selectedUnitId)
+              .firstOrNull;
+          currentUnitMaxPoints =
+              foundUnit?.totalPoints ?? (lessonInfo?.totalPoints ?? 6);
 
           void updatePoints(int startP, int endP) {
             setDialogState(() {
               selectedStartPoint = startP;
               selectedEndPoint = endP;
-              paragraphsController.text = startP == endP ? '$startP' : '$startP-$endP';
-              final nextProg = LffBookCatalog.getNextProgression(currentLesson: selectedLesson, currentPoint: endP);
+              paragraphsController.text = startP == endP
+                  ? '$startP'
+                  : '$startP-$endP';
+              final nextProg = LffBookCatalog.getNextProgression(
+                currentLesson: selectedLesson,
+                currentPoint: endP,
+              );
               nextStepController.text = nextProg.label;
             });
           }
@@ -1103,17 +1506,28 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                       children: [
                         Expanded(
                           child: InkWell(
-                            onTap: () => setDialogState(() => sessionOutcome = 'realizada'),
+                            onTap: () => setDialogState(
+                              () => sessionOutcome = 'realizada',
+                            ),
                             borderRadius: BorderRadius.circular(8),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 10,
+                                horizontal: 8,
+                              ),
                               decoration: BoxDecoration(
                                 color: sessionOutcome == 'realizada'
-                                    ? AppTheme.successGreen.withValues(alpha: 0.15)
-                                    : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
+                                    ? AppTheme.successGreen.withValues(
+                                        alpha: 0.15,
+                                      )
+                                    : (isDark
+                                          ? const Color(0xFF1E293B)
+                                          : const Color(0xFFF1F5F9)),
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
-                                  color: sessionOutcome == 'realizada' ? AppTheme.successGreen : Colors.transparent,
+                                  color: sessionOutcome == 'realizada'
+                                      ? AppTheme.successGreen
+                                      : Colors.transparent,
                                   width: 1.5,
                                 ),
                               ),
@@ -1123,7 +1537,9 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                                   Icon(
                                     Icons.check_circle,
                                     size: 16,
-                                    color: sessionOutcome == 'realizada' ? AppTheme.successGreen : Colors.grey,
+                                    color: sessionOutcome == 'realizada'
+                                        ? AppTheme.successGreen
+                                        : Colors.grey,
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
@@ -1131,7 +1547,9 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                                     style: TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.bold,
-                                      color: sessionOutcome == 'realizada' ? AppTheme.successGreen : Colors.grey,
+                                      color: sessionOutcome == 'realizada'
+                                          ? AppTheme.successGreen
+                                          : Colors.grey,
                                     ),
                                   ),
                                 ],
@@ -1142,17 +1560,26 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: InkWell(
-                            onTap: () => setDialogState(() => sessionOutcome = 'cancelada'),
+                            onTap: () => setDialogState(
+                              () => sessionOutcome = 'cancelada',
+                            ),
                             borderRadius: BorderRadius.circular(8),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 10,
+                                horizontal: 8,
+                              ),
                               decoration: BoxDecoration(
                                 color: sessionOutcome == 'cancelada'
                                     ? AppTheme.alertRed.withValues(alpha: 0.15)
-                                    : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
+                                    : (isDark
+                                          ? const Color(0xFF1E293B)
+                                          : const Color(0xFFF1F5F9)),
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
-                                  color: sessionOutcome == 'cancelada' ? AppTheme.alertRed : Colors.transparent,
+                                  color: sessionOutcome == 'cancelada'
+                                      ? AppTheme.alertRed
+                                      : Colors.transparent,
                                   width: 1.5,
                                 ),
                               ),
@@ -1162,7 +1589,9 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                                   Icon(
                                     Icons.cancel,
                                     size: 16,
-                                    color: sessionOutcome == 'cancelada' ? AppTheme.alertRed : Colors.grey,
+                                    color: sessionOutcome == 'cancelada'
+                                        ? AppTheme.alertRed
+                                        : Colors.grey,
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
@@ -1170,7 +1599,9 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                                     style: TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.bold,
-                                      color: sessionOutcome == 'cancelada' ? AppTheme.alertRed : Colors.grey,
+                                      color: sessionOutcome == 'cancelada'
+                                          ? AppTheme.alertRed
+                                          : Colors.grey,
                                     ),
                                   ),
                                 ],
@@ -1195,15 +1626,29 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                         children: [
                           const Row(
                             children: [
-                              Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 18),
+                              Icon(
+                                Icons.warning_amber_rounded,
+                                color: Color(0xFFDC2626),
+                                size: 18,
+                              ),
                               SizedBox(width: 6),
-                              Text('Registrar Falha / Não Realização', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF991B1B), fontSize: 13)),
+                              Text(
+                                'Registrar Falha / Não Realização',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF991B1B),
+                                  fontSize: 13,
+                                ),
+                              ),
                             ],
                           ),
                           const SizedBox(height: 6),
                           const Text(
                             'O registro da falha é contabilizado no histórico e na prioridade de atenção do estudante.',
-                            style: TextStyle(fontSize: 11, color: Color(0xFF7F1D1D)),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF7F1D1D),
+                            ),
                           ),
                           const SizedBox(height: 10),
                           DropdownButtonFormField<String>(
@@ -1215,14 +1660,30 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                               fillColor: Colors.white,
                             ),
                             items: const [
-                              DropdownMenuItem(value: 'Cancelado pelo estudante', child: Text('Cancelado pelo estudante')),
-                              DropdownMenuItem(value: 'Estudante ausente / Não atendeu', child: Text('Estudante ausente / Não atendeu')),
-                              DropdownMenuItem(value: 'Imprevisto pessoal do publicador', child: Text('Imprevisto pessoal do publicador')),
-                              DropdownMenuItem(value: 'Desmarcado com antecedência', child: Text('Desmarcado com antecedência')),
-                              DropdownMenuItem(value: 'Outro motivo', child: Text('Outro motivo')),
+                              DropdownMenuItem(
+                                value: 'Cancelado pelo estudante',
+                                child: Text('Cancelado pelo estudante'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'Estudante ausente / Não atendeu',
+                                child: Text('Estudante ausente / Não atendeu'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'Imprevisto pessoal do publicador',
+                                child: Text('Imprevisto pessoal do publicador'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'Desmarcado com antecedência',
+                                child: Text('Desmarcado com antecedência'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'Outro motivo',
+                                child: Text('Outro motivo'),
+                              ),
                             ],
                             onChanged: (val) {
-                              if (val != null) setDialogState(() => failureMotive = val);
+                              if (val != null)
+                                setDialogState(() => failureMotive = val);
                             },
                           ),
                         ],
@@ -1236,7 +1697,10 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                       decoration: BoxDecoration(
                         color: const Color(0xFF7C3AED).withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFF7C3AED).withValues(alpha: 0.25)),
+                        border: Border.all(
+                          color: const Color(0xFF7C3AED)
+                              .withValues(alpha: 0.25),
+                        ),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1244,8 +1708,22 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text('Progresso no Livro:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED))),
-                              Text('${progressPercent.toStringAsFixed(1)}%', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED))),
+                              const Text(
+                                'Progresso no Livro:',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF7C3AED),
+                                ),
+                              ),
+                              Text(
+                                '${progressPercent.toStringAsFixed(1)}%',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF7C3AED),
+                                ),
+                              ),
                             ],
                           ),
                           const SizedBox(height: 6),
@@ -1255,7 +1733,9 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                               value: progressPercent / 100.0,
                               minHeight: 8,
                               backgroundColor: Colors.purple.shade100,
-                              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF7C3AED)),
+                              valueColor: const AlwaysStoppedAnimation<Color>(
+                                Color(0xFF7C3AED),
+                              ),
                             ),
                           ),
                         ],
@@ -1267,7 +1747,9 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                     DropdownButtonFormField<String>(
                       initialValue: selectedUnitId,
                       isExpanded: true,
-                      decoration: const InputDecoration(labelText: 'Unidade / Lição Estudada (lff) *'),
+                      decoration: const InputDecoration(
+                        labelText: 'Unidade / Lição Estudada (lff) *',
+                      ),
                       items: allUnits.map((u) {
                         return DropdownMenuItem<String>(
                           value: u.id,
@@ -1284,9 +1766,15 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                           setDialogState(() {
                             selectedUnitId = val;
                             if (val.startsWith('lesson_')) {
-                              selectedLesson = int.parse(val.replaceFirst('lesson_', ''));
+                              selectedLesson = int.parse(
+                                val.replaceFirst('lesson_', ''),
+                              );
                               lessonController.text = selectedLesson.toString();
-                              final nextProg = LffBookCatalog.getNextProgression(currentLesson: selectedLesson, currentPoint: selectedEndPoint);
+                              final nextProg =
+                                  LffBookCatalog.getNextProgression(
+                                    currentLesson: selectedLesson,
+                                    currentPoint: selectedEndPoint,
+                                  );
                               nextStepController.text = nextProg.label;
                             } else {
                               nextStepController.text = val;
@@ -1300,7 +1788,10 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                     // Seletor dos Pontos da Lição
                     Text(
                       'Pontos Cobertos:',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 6),
                     Wrap(
@@ -1308,11 +1799,14 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                       runSpacing: 4,
                       children: List.generate(currentUnitMaxPoints, (idx) {
                         final pNum = idx + 1;
-                        final isSelected = pNum >= selectedStartPoint && pNum <= selectedEndPoint;
+                        final isSelected =
+                            pNum >= selectedStartPoint &&
+                            pNum <= selectedEndPoint;
                         return FilterChip(
                           label: Text('Ponto $pNum'),
                           selected: isSelected,
-                          selectedColor: const Color(0xFF7C3AED).withValues(alpha: 0.25),
+                          selectedColor: const Color(0xFF7C3AED)
+                              .withValues(alpha: 0.25),
                           checkmarkColor: const Color(0xFF7C3AED),
                           onSelected: (val) {
                             if (val) {
@@ -1325,7 +1819,9 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                               if (selectedStartPoint == selectedEndPoint) {
                                 // Mínimo 1 selecionado
                               } else if (pNum == selectedEndPoint) {
-                                final newEnd = pNum - 1 < selectedStartPoint ? selectedStartPoint : pNum - 1;
+                                final newEnd = pNum - 1 < selectedStartPoint
+                                    ? selectedStartPoint
+                                    : pNum - 1;
                                 updatePoints(selectedStartPoint, newEnd);
                               } else {
                                 updatePoints(pNum, pNum);
@@ -1339,16 +1835,22 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                     TextField(
                       controller: paragraphsController,
                       decoration: const InputDecoration(
-                        labelText: 'Parágrafos / Pontos Estudados (livre para editar)',
+                        labelText:
+                            'Parágrafos / Pontos Estudados (livre para editar)',
                         hintText: 'Ex: 1, 2-3, 1-6 ou anotação personalizada',
                       ),
                       onChanged: (text) {
                         final parsed = int.tryParse(text.trim());
-                        if (parsed != null && parsed >= 1 && parsed <= currentUnitMaxPoints) {
+                        if (parsed != null &&
+                            parsed >= 1 &&
+                            parsed <= currentUnitMaxPoints) {
                           setDialogState(() {
                             selectedStartPoint = parsed;
                             selectedEndPoint = parsed;
-                            final nextProg = LffBookCatalog.getNextProgression(currentLesson: selectedLesson, currentPoint: parsed);
+                            final nextProg = LffBookCatalog.getNextProgression(
+                              currentLesson: selectedLesson,
+                              currentPoint: parsed,
+                            );
                             nextStepController.text = nextProg.label;
                           });
                         }
@@ -1358,11 +1860,16 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
 
                     // Seletor de Contagem de Presentes / Assistência
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFF7C3AED).withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFF7C3AED).withValues(alpha: 0.3)),
+                        border: Border.all(
+                          color: const Color(0xFF7C3AED).withValues(alpha: 0.3),
+                        ),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1373,11 +1880,20 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                               children: [
                                 const Text(
                                   'Número de Presentes',
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF7C3AED)),
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                    color: Color(0xFF7C3AED),
+                                  ),
                                 ),
                                 Text(
                                   'Estudante e acompanhantes',
-                                  style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: isDark
+                                        ? const Color(0xFFCBD5E1)
+                                        : AppTheme.textMuted,
+                                  ),
                                 ),
                               ],
                             ),
@@ -1385,7 +1901,10 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                           Row(
                             children: [
                               IconButton(
-                                icon: const Icon(Icons.remove_circle_outline, color: Color(0xFF7C3AED)),
+                                icon: const Icon(
+                                  Icons.remove_circle_outline,
+                                  color: Color(0xFF7C3AED),
+                                ),
                                 onPressed: () {
                                   if (attendanceCount > 1) {
                                     setDialogState(() => attendanceCount--);
@@ -1394,10 +1913,17 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                               ),
                               Text(
                                 '$attendanceCount',
-                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED)),
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF7C3AED),
+                                ),
                               ),
                               IconButton(
-                                icon: const Icon(Icons.add_circle_outline, color: Color(0xFF7C3AED)),
+                                icon: const Icon(
+                                  Icons.add_circle_outline,
+                                  color: Color(0xFF7C3AED),
+                                ),
                                 onPressed: () {
                                   setDialogState(() => attendanceCount++);
                                 },
@@ -1413,7 +1939,9 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                   TextField(
                     controller: notesController,
                     decoration: InputDecoration(
-                      labelText: sessionOutcome == 'cancelada' ? 'Observações da falha' : 'Observações da sessão',
+                      labelText: sessionOutcome == 'cancelada'
+                          ? 'Observações da falha'
+                          : 'Observações da sessão',
                       hintText: sessionOutcome == 'cancelada'
                           ? 'Descreva o que houve ou motivo de contato...'
                           : 'Dúvidas esclarecidas, pontos de interesse...',
@@ -1432,12 +1960,16 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                   GlobalAppointmentSchedulingSection(
                     title: 'Agendar Próximo Estudo',
                     isEnabled: scheduleNextStudy,
-                    onToggle: (v) => setDialogState(() => scheduleNextStudy = v),
+                    onToggle: (v) =>
+                        setDialogState(() => scheduleNextStudy = v),
                     selectedDateTime: nextStudyDateTime,
-                    onDateTimeChanged: (dt) => setDialogState(() => nextStudyDateTime = dt),
+                    onDateTimeChanged: (dt) =>
+                        setDialogState(() => nextStudyDateTime = dt),
                     durationMinutes: nextStudyDuration,
-                    onDurationChanged: (d) => setDialogState(() => nextStudyDuration = d),
-                    existingAppointments: ref.read(appointmentsStreamProvider).value ?? [],
+                    onDurationChanged: (d) =>
+                        setDialogState(() => nextStudyDuration = d),
+                    existingAppointments:
+                        ref.read(appointmentsStreamProvider).value ?? [],
                     existingPersonAppointment: existingUpcomingAppt,
                     frequencyText: freqLabel,
                   ),
@@ -1445,24 +1977,31 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
               ),
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancelar'),
+              ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: sessionOutcome == 'cancelada' ? AppTheme.alertRed : const Color(0xFF7C3AED),
+                  backgroundColor: sessionOutcome == 'cancelada'
+                      ? AppTheme.alertRed
+                      : const Color(0xFF7C3AED),
                   foregroundColor: Colors.white,
                 ),
                 onPressed: () async {
                   if (scheduleNextStudy) {
-                    final allAppts = ref.read(appointmentsStreamProvider).value ?? [];
+                    final allAppts =
+                        ref.read(appointmentsStreamProvider).value ?? [];
                     final avail = AvailabilityEngine.checkAvailability(
                       startTime: nextStudyDateTime,
                       durationMinutes: nextStudyDuration,
                       existingAppointments: allAppts,
                     );
-                    final canProceed = await GlobalAppointmentSchedulingSection.confirmConflictIfNeeded(
-                      context: context,
-                      availability: avail,
-                    );
+                    final canProceed =
+                        await GlobalAppointmentSchedulingSection.confirmConflictIfNeeded(
+                          context: context,
+                          availability: avail,
+                        );
                     if (!canProceed) return;
                   }
 
@@ -1479,7 +2018,9 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                       lessonCovered: study.currentLesson,
                       paragraphsCovered: null,
                       sessionNotes: formattedNotes,
-                      nextStep: nextStepController.text.trim().isEmpty ? null : nextStepController.text.trim(),
+                      nextStep: nextStepController.text.trim().isEmpty
+                          ? null
+                          : nextStepController.text.trim(),
                       status: 'cancelada',
                       participantIds: [person.id],
                     );
@@ -1492,19 +2033,29 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                       );
                     }
                   } else {
-                    final lesson = int.tryParse(lessonController.text.trim()) ?? selectedLesson;
-                    final formattedNotes = DashboardCalculator.formatSessionNotesWithAttendance(
-                      notesController.text.trim().isEmpty ? null : notesController.text.trim(),
-                      attendanceCount,
-                    );
+                    final lesson =
+                        int.tryParse(lessonController.text.trim()) ??
+                        selectedLesson;
+                    final formattedNotes =
+                        DashboardCalculator.formatSessionNotesWithAttendance(
+                          notesController.text.trim().isEmpty
+                              ? null
+                              : notesController.text.trim(),
+                          attendanceCount,
+                        );
 
                     await repo.createStudySession(
                       studyId: study.id,
                       dateTime: DateTime.now(),
                       lessonCovered: lesson,
-                      paragraphsCovered: paragraphsController.text.trim().isEmpty ? null : paragraphsController.text.trim(),
+                      paragraphsCovered:
+                          paragraphsController.text.trim().isEmpty
+                          ? null
+                          : paragraphsController.text.trim(),
                       sessionNotes: formattedNotes,
-                      nextStep: nextStepController.text.trim().isEmpty ? null : nextStepController.text.trim(),
+                      nextStep: nextStepController.text.trim().isEmpty
+                          ? null
+                          : nextStepController.text.trim(),
                       status: 'realizada',
                       participantIds: [person.id],
                     );
@@ -1512,8 +2063,15 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                     await repo.updateStudy(
                       study.copyWith(
                         currentLesson: Value(lesson),
-                        currentParagraph: Value(int.tryParse(paragraphsController.text.trim()) ?? selectedEndPoint),
-                        nextTopic: Value(nextStepController.text.trim().isEmpty ? null : nextStepController.text.trim()),
+                        currentParagraph: Value(
+                          int.tryParse(paragraphsController.text.trim()) ??
+                              selectedEndPoint,
+                        ),
+                        nextTopic: Value(
+                          nextStepController.text.trim().isEmpty
+                              ? null
+                              : nextStepController.text.trim(),
+                        ),
                         lastSessionAt: Value(DateTime.now()),
                       ),
                     );
@@ -1521,21 +2079,26 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
 
                   if (scheduleNextStudy) {
                     // Prevenção de duplicidade: atualiza compromisso existente na mesma data ou cria novo
-                    final existingAppts = ref.read(appointmentsStreamProvider).value ?? [];
-                    final existingOnDate = existingAppts.firstWhereOrNull((a) =>
-                        a.deletedAt == null &&
-                        a.status != 'cancelado' &&
-                        a.personId == person.id &&
-                        a.startTime.year == nextStudyDateTime.year &&
-                        a.startTime.month == nextStudyDateTime.month &&
-                        a.startTime.day == nextStudyDateTime.day);
+                    final existingAppts =
+                        ref.read(appointmentsStreamProvider).value ?? [];
+                    final existingOnDate = existingAppts.firstWhereOrNull(
+                      (a) =>
+                          a.deletedAt == null &&
+                          a.status != 'cancelado' &&
+                          a.personId == person.id &&
+                          a.startTime.year == nextStudyDateTime.year &&
+                          a.startTime.month == nextStudyDateTime.month &&
+                          a.startTime.day == nextStudyDateTime.day,
+                    );
 
                     if (existingOnDate != null) {
                       await repo.updateAppointment(
                         existingOnDate.copyWith(
                           studyId: Value(study.id),
                           startTime: nextStudyDateTime,
-                          endTime: nextStudyDateTime.add(Duration(minutes: nextStudyDuration)),
+                          endTime: nextStudyDateTime.add(
+                            Duration(minutes: nextStudyDuration),
+                          ),
                           durationMinutes: nextStudyDuration,
                           status: 'confirmado',
                         ),
@@ -1546,10 +2109,14 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                         studyId: study.id,
                         title: 'Estudo Bíblico: ${person.name}',
                         startTime: nextStudyDateTime,
-                        endTime: nextStudyDateTime.add(Duration(minutes: nextStudyDuration)),
+                        endTime: nextStudyDateTime.add(
+                          Duration(minutes: nextStudyDuration),
+                        ),
                         durationMinutes: nextStudyDuration,
                         status: 'confirmado',
-                        locationNotes: person.address != null ? 'Local: ${person.address}' : null,
+                        locationNotes: person.address != null
+                            ? 'Local: ${person.address}'
+                            : null,
                       );
                     }
                   }
@@ -1558,9 +2125,11 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text(sessionOutcome == 'cancelada'
-                            ? 'Falha no estudo registrada ($failureMotive).'
-                            : 'Sessão registrada com sucesso! ($attendanceCount presentes computados)'),
+                        content: Text(
+                          sessionOutcome == 'cancelada'
+                              ? 'Falha no estudo registrada ($failureMotive).'
+                              : 'Sessão registrada com sucesso! ($attendanceCount presentes computados)',
+                        ),
                       ),
                     );
                   }
@@ -1575,17 +2144,29 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
   }
 
   // Modal Unificado: Registro de Visita, Estudo Bíblico e Agendamento Global (Fluxo Rápido Atômico)
-  void _showQuickVisitDialog(BuildContext context, PersonEntry person, BibleStudyEntry? existingStudy) {
-    final isStudiesEnabled = ref.read(isFeatureEnabledProvider(AppFeature.studies));
+  void _showQuickVisitDialog(
+    BuildContext context,
+    PersonEntry person,
+    BibleStudyEntry? existingStudy,
+  ) {
+    final isStudiesEnabled = ref.read(
+      isFeatureEnabledProvider(AppFeature.studies),
+    );
     final draft = _quickVisitDrafts[person.id];
 
-    final notesController = TextEditingController(text: draft?['notes'] as String? ?? '');
-    final topicsController = TextEditingController(text: draft?['topics'] as String? ?? '');
+    final notesController = TextEditingController(
+      text: draft?['notes'] as String? ?? '',
+    );
+    final topicsController = TextEditingController(
+      text: draft?['topics'] as String? ?? '',
+    );
     final nextStepController = TextEditingController(
       text: draft?['nextStep'] as String? ?? existingStudy?.nextTopic ?? '',
     );
     String selectedType = draft?['type'] as String? ?? 'revisita';
-    bool recordStudy = isStudiesEnabled && (draft?['recordStudy'] as bool? ?? (selectedType == 'estudo'));
+    bool recordStudy =
+        isStudiesEnabled &&
+        (draft?['recordStudy'] as bool? ?? (selectedType == 'estudo'));
     String selectedResult = 'Conversa receptiva';
     DateTime selectedDate = DateTime.now();
 
@@ -1605,9 +2186,13 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
 
     // Campos do Estudo Bíblico
     String selectedPublicationId = existingStudy?.publicationId ?? 'lff-book';
-    final lessonController = TextEditingController(text: existingStudy?.currentLesson?.toString() ?? '1');
+    final lessonController = TextEditingController(
+      text: existingStudy?.currentLesson?.toString() ?? '1',
+    );
     final paragraphsController = TextEditingController(
-      text: existingStudy?.currentParagraph != null ? '${existingStudy!.currentParagraph}' : '1-5',
+      text: existingStudy?.currentParagraph != null
+          ? '${existingStudy!.currentParagraph}'
+          : '1-5',
     );
     int attendanceCount = 1;
 
@@ -1615,14 +2200,19 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
     bool scheduleReturn = true;
     final allApptsList = ref.read(appointmentsStreamProvider).value ?? [];
     AppointmentEntry? existingUpcomingAppt;
-    final upcomingList = allApptsList
-        .where((a) =>
-            a.personId == person.id &&
-            a.startTime.isAfter(DateTime.now().subtract(const Duration(hours: 1))) &&
-            a.status != 'cancelado' &&
-            a.deletedAt == null)
-        .toList()
-      ..sort((a, b) => a.startTime.compareTo(b.startTime));
+    final upcomingList =
+        allApptsList
+            .where(
+              (a) =>
+                  a.personId == person.id &&
+                  a.startTime.isAfter(
+                    DateTime.now().subtract(const Duration(hours: 1)),
+                  ) &&
+                  a.status != 'cancelado' &&
+                  a.deletedAt == null,
+            )
+            .toList()
+          ..sort((a, b) => a.startTime.compareTo(b.startTime));
     if (upcomingList.isNotEmpty) {
       existingUpcomingAppt = upcomingList.first;
     }
@@ -1642,21 +2232,16 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
     }
 
     DateTime returnDateTime;
-    int returnDuration = existingUpcomingAppt?.durationMinutes ?? ((selectedType == 'estudo' || recordStudy) ? 60 : 30);
+    int returnDuration =
+        existingUpcomingAppt?.durationMinutes ??
+        ((selectedType == 'estudo' || recordStudy) ? 60 : 30);
 
     if (existingUpcomingAppt != null) {
       returnDateTime = existingUpcomingAppt.startTime;
     } else {
       final target = DateTime.now().add(Duration(days: daysToAdd));
-      returnDateTime = DateTime(
-        target.year,
-        target.month,
-        target.day,
-        10,
-        0,
-      );
+      returnDateTime = DateTime(target.year, target.month, target.day, 10, 0);
     }
-
 
     showModalBottomSheet(
       context: context,
@@ -1687,7 +2272,10 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                       Expanded(
                         child: Text(
                           'Registrar Conversa com ${person.name}',
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                       IconButton(
@@ -1702,47 +2290,68 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                     child: SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF4F46E5),
-                        side: const BorderSide(color: Color(0xFF4F46E5), width: 1.5),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF4F46E5),
+                          side: const BorderSide(
+                            color: Color(0xFF4F46E5),
+                            width: 1.5,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        icon: const Icon(Icons.mic, size: 20),
+                        label: const Text(
+                          'Preencher via Registro Rápido / Ditado (15s)',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          QuickVoiceNoteDialog.show(
+                            context: context,
+                            person: person,
+                            linkedStudy: existingStudy,
+                          );
+                        },
                       ),
-                      icon: const Icon(Icons.mic, size: 20),
-                      label: const Text(
-                        'Preencher via Registro Rápido / Ditado (15s)',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                      ),
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        QuickVoiceNoteDialog.show(
-                          context: context,
-                          person: person,
-                          linkedStudy: existingStudy,
-                        );
-                      },
                     ),
                   ),
-                ),
                   if (draft != null) ...[
                     Container(
                       margin: const EdgeInsets.only(bottom: 10),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: AppTheme.accentTeal.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.history_toggle_off, size: 16, color: AppTheme.accentTeal),
+                          const Icon(
+                            Icons.history_toggle_off,
+                            size: 16,
+                            color: AppTheme.accentTeal,
+                          ),
                           const SizedBox(width: 8),
                           const Expanded(
                             child: Text(
                               'Rascunho recuperado automaticamente.',
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.accentTeal),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.accentTeal,
+                              ),
                             ),
                           ),
                           TextButton(
-                            style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                            style: TextButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                            ),
                             onPressed: () {
                               _quickVisitDrafts.remove(person.id);
                               setSheetState(() {
@@ -1751,7 +2360,10 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                                 nextStepController.clear();
                               });
                             },
-                            child: const Text('Limpar', style: TextStyle(fontSize: 11)),
+                            child: const Text(
+                              'Limpar',
+                              style: TextStyle(fontSize: 11),
+                            ),
                           ),
                         ],
                       ),
@@ -1759,14 +2371,31 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                   ],
                   DropdownButtonFormField<String>(
                     initialValue: selectedType,
-                    decoration: const InputDecoration(labelText: 'Tipo de Contato'),
+                    decoration: const InputDecoration(
+                      labelText: 'Tipo de Contato',
+                    ),
                     items: [
-                      const DropdownMenuItem(value: 'revisita', child: Text('Revisita Presencial')),
+                      const DropdownMenuItem(
+                        value: 'revisita',
+                        child: Text('Revisita Presencial'),
+                      ),
                       if (isStudiesEnabled)
-                        const DropdownMenuItem(value: 'estudo', child: Text('Estudo Bíblico')),
-                      const DropdownMenuItem(value: 'conversa_inicial', child: Text('Conversa Inicial')),
-                      const DropdownMenuItem(value: 'contato_telefonico', child: Text('Contato Telefônico / Carta')),
-                      const DropdownMenuItem(value: 'tentativa_sem_contato', child: Text('Tentativa sem Contato (Não contou)')),
+                        const DropdownMenuItem(
+                          value: 'estudo',
+                          child: Text('Estudo Bíblico'),
+                        ),
+                      const DropdownMenuItem(
+                        value: 'conversa_inicial',
+                        child: Text('Conversa Inicial'),
+                      ),
+                      const DropdownMenuItem(
+                        value: 'contato_telefonico',
+                        child: Text('Contato Telefônico / Carta'),
+                      ),
+                      const DropdownMenuItem(
+                        value: 'tentativa_sem_contato',
+                        child: Text('Tentativa sem Contato (Não contou)'),
+                      ),
                     ],
                     onChanged: (val) {
                       if (val != null) {
@@ -1775,7 +2404,8 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                           if (val == 'estudo') {
                             recordStudy = true;
                             returnDuration = 60;
-                          } else if (existingStudy == null && person.status != 'estudo') {
+                          } else if (existingStudy == null &&
+                              person.status != 'estudo') {
                             returnDuration = 30;
                           }
                           updateDraft();
@@ -1810,7 +2440,11 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                           const Expanded(
                             child: Text(
                               'Considerou matéria de estudo bíblico nesta conversa',
-                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF7C3AED)),
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF7C3AED),
+                              ),
                             ),
                           ),
                         ],
@@ -1819,7 +2453,6 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                     const SizedBox(height: 8),
                   ],
 
-
                   // Seção Especial de Estudo Bíblico (Unificação de fluxo)
                   if (selectedType == 'estudo' || recordStudy) ...[
                     Container(
@@ -1827,18 +2460,31 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                       decoration: BoxDecoration(
                         color: const Color(0xFF7C3AED).withValues(alpha: 0.06),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFF7C3AED).withValues(alpha: 0.25)),
+                        border: Border.all(
+                          color: const Color(0xFF7C3AED)
+                              .withValues(alpha: 0.25),
+                        ),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.menu_book, size: 18, color: Color(0xFF7C3AED)),
+                              const Icon(
+                                Icons.menu_book,
+                                size: 18,
+                                color: Color(0xFF7C3AED),
+                              ),
                               const SizedBox(width: 8),
                               Text(
-                                existingStudy != null ? 'Progresso do Estudo Bíblico' : 'Novo Estudo Bíblico Integrado',
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF7C3AED)),
+                                existingStudy != null
+                                    ? 'Progresso do Estudo Bíblico'
+                                    : 'Novo Estudo Bíblico Integrado',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                  color: Color(0xFF7C3AED),
+                                ),
                               ),
                             ],
                           ),
@@ -1846,12 +2492,24 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                           DropdownButtonFormField<String>(
                             initialValue: selectedPublicationId,
                             isExpanded: true,
-                            decoration: const InputDecoration(labelText: 'Publicação'),
+                            decoration: const InputDecoration(
+                              labelText: 'Publicação',
+                            ),
                             items: PublicationCatalog.allPublications.map((p) {
-                              return DropdownMenuItem(value: p.id, child: Text(p.title, maxLines: 1, overflow: TextOverflow.ellipsis));
+                              return DropdownMenuItem(
+                                value: p.id,
+                                child: Text(
+                                  p.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              );
                             }).toList(),
                             onChanged: (val) {
-                              if (val != null) setSheetState(() => selectedPublicationId = val);
+                              if (val != null)
+                                setSheetState(
+                                  () => selectedPublicationId = val,
+                                );
                             },
                           ),
                           const SizedBox(height: 10),
@@ -1860,7 +2518,9 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                               Expanded(
                                 child: TextField(
                                   controller: lessonController,
-                                  decoration: const InputDecoration(labelText: 'Lição estudada'),
+                                  decoration: const InputDecoration(
+                                    labelText: 'Lição estudada',
+                                  ),
                                   keyboardType: TextInputType.number,
                                 ),
                               ),
@@ -1868,7 +2528,9 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                               Expanded(
                                 child: TextField(
                                   controller: paragraphsController,
-                                  decoration: const InputDecoration(labelText: 'Parágrafos considerados'),
+                                  decoration: const InputDecoration(
+                                    labelText: 'Parágrafos considerados',
+                                  ),
                                 ),
                               ),
                             ],
@@ -1883,24 +2545,52 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text('Assistência / Ouvintes', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF7C3AED))),
-                                    Text('Estudante e acompanhantes', style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted)),
+                                    const Text(
+                                      'Assistência / Ouvintes',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                        color: Color(0xFF7C3AED),
+                                      ),
+                                    ),
+                                    Text(
+                                      'Estudante e acompanhantes',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: isDark
+                                            ? const Color(0xFFCBD5E1)
+                                            : AppTheme.textMuted,
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),
                               Row(
                                 children: [
                                   IconButton(
-                                    icon: const Icon(Icons.remove_circle_outline, color: Color(0xFF7C3AED)),
+                                    icon: const Icon(
+                                      Icons.remove_circle_outline,
+                                      color: Color(0xFF7C3AED),
+                                    ),
                                     onPressed: () {
                                       if (attendanceCount > 1) {
                                         setSheetState(() => attendanceCount--);
                                       }
                                     },
                                   ),
-                                  Text('$attendanceCount', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED))),
+                                  Text(
+                                    '$attendanceCount',
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF7C3AED),
+                                    ),
+                                  ),
                                   IconButton(
-                                    icon: const Icon(Icons.add_circle_outline, color: Color(0xFF7C3AED)),
+                                    icon: const Icon(
+                                      Icons.add_circle_outline,
+                                      color: Color(0xFF7C3AED),
+                                    ),
                                     onPressed: () {
                                       setSheetState(() => attendanceCount++);
                                     },
@@ -1927,7 +2617,8 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                     controller: notesController,
                     decoration: const InputDecoration(
                       labelText: 'Anotações da conversa',
-                      hintText: 'Dúvidas expressas pelo morador, comentários...',
+                      hintText:
+                          'Dúvidas expressas pelo morador, comentários...',
                     ),
                     maxLines: 2,
                   ),
@@ -1936,7 +2627,8 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                     controller: nextStepController,
                     decoration: const InputDecoration(
                       labelText: 'Próximo passo / Próximo estudo combinado',
-                      hintText: 'Ex: Responder por que Deus permite o sofrimento',
+                      hintText:
+                          'Ex: Responder por que Deus permite o sofrimento',
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -1947,11 +2639,14 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                         ? 'Agendar Próximo Estudo'
                         : 'Agendar Próximo Retorno',
                     isEnabled: scheduleReturn,
-                    onToggle: (val) => setSheetState(() => scheduleReturn = val),
+                    onToggle: (val) =>
+                        setSheetState(() => scheduleReturn = val),
                     selectedDateTime: returnDateTime,
-                    onDateTimeChanged: (dt) => setSheetState(() => returnDateTime = dt),
+                    onDateTimeChanged: (dt) =>
+                        setSheetState(() => returnDateTime = dt),
                     durationMinutes: returnDuration,
-                    onDurationChanged: (dur) => setSheetState(() => returnDuration = dur),
+                    onDurationChanged: (dur) =>
+                        setSheetState(() => returnDuration = dur),
                     existingAppointments: allAppts,
                     existingPersonAppointment: existingUpcomingAppt,
                     frequencyText: freqLabel,
@@ -1962,25 +2657,31 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                     width: double.infinity,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: (selectedType == 'estudo' || recordStudy) ? const Color(0xFF7C3AED) : AppTheme.primaryBlue,
+                        backgroundColor:
+                            (selectedType == 'estudo' || recordStudy)
+                            ? const Color(0xFF7C3AED)
+                            : AppTheme.primaryBlue,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
                       onPressed: () async {
                         if (scheduleReturn) {
-                          final availability = AvailabilityEngine.checkAvailability(
-                            startTime: returnDateTime,
-                            durationMinutes: returnDuration,
-                            existingAppointments: allAppts,
-                          );
-                          final proceed = await GlobalAppointmentSchedulingSection.confirmConflictIfNeeded(
-                            context: context,
-                            availability: availability,
-                          );
+                          final availability =
+                              AvailabilityEngine.checkAvailability(
+                                startTime: returnDateTime,
+                                durationMinutes: returnDuration,
+                                existingAppointments: allAppts,
+                              );
+                          final proceed =
+                              await GlobalAppointmentSchedulingSection.confirmConflictIfNeeded(
+                                context: context,
+                                availability: availability,
+                              );
                           if (!proceed) return;
                         }
 
-                        final isStudyConsidered = selectedType == 'estudo' || recordStudy;
+                        final isStudyConsidered =
+                            selectedType == 'estudo' || recordStudy;
                         final repo = ref.read(repositoryProvider);
                         String? appointmentId;
 
@@ -1991,21 +2692,28 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                               : 'Revisita: ${person.name}';
 
                           // Prevenção de duplicidade: atualiza compromisso existente na mesma data ou cria novo
-                          final existingAppts = ref.read(appointmentsStreamProvider).value ?? [];
-                          final existingOnDate = existingAppts.firstWhereOrNull((a) =>
-                              a.deletedAt == null &&
-                              a.status != 'cancelado' &&
-                              a.personId == person.id &&
-                              a.startTime.year == returnDateTime.year &&
-                              a.startTime.month == returnDateTime.month &&
-                              a.startTime.day == returnDateTime.day);
+                          final existingAppts =
+                              ref.read(appointmentsStreamProvider).value ?? [];
+                          final existingOnDate = existingAppts.firstWhereOrNull(
+                            (a) =>
+                                a.deletedAt == null &&
+                                a.status != 'cancelado' &&
+                                a.personId == person.id &&
+                                a.startTime.year == returnDateTime.year &&
+                                a.startTime.month == returnDateTime.month &&
+                                a.startTime.day == returnDateTime.day,
+                          );
 
                           if (existingOnDate != null) {
                             await repo.updateAppointment(
                               existingOnDate.copyWith(
-                                studyId: existingStudy != null ? Value(existingStudy.id) : const Value.absent(),
+                                studyId: existingStudy != null
+                                    ? Value(existingStudy.id)
+                                    : const Value.absent(),
                                 startTime: returnDateTime,
-                                endTime: returnDateTime.add(Duration(minutes: returnDuration)),
+                                endTime: returnDateTime.add(
+                                  Duration(minutes: returnDuration),
+                                ),
                                 durationMinutes: returnDuration,
                                 status: 'confirmado',
                               ),
@@ -2017,10 +2725,14 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                               studyId: existingStudy?.id,
                               title: apptTitle,
                               startTime: returnDateTime,
-                              endTime: returnDateTime.add(Duration(minutes: returnDuration)),
+                              endTime: returnDateTime.add(
+                                Duration(minutes: returnDuration),
+                              ),
                               durationMinutes: returnDuration,
                               status: 'confirmado',
-                              locationNotes: person.address != null ? 'Local: ${person.address}' : null,
+                              locationNotes: person.address != null
+                                  ? 'Local: ${person.address}'
+                                  : null,
                             );
                             appointmentId = appt.id;
                           }
@@ -2029,27 +2741,41 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                         // 2. Registro da Visita (Atômico)
                         final formattedNotes = isStudyConsidered
                             ? DashboardCalculator.formatSessionNotesWithAttendance(
-                                notesController.text.trim().isEmpty ? null : notesController.text.trim(),
+                                notesController.text.trim().isEmpty
+                                    ? null
+                                    : notesController.text.trim(),
                                 attendanceCount,
                               )
-                            : (notesController.text.trim().isEmpty ? null : notesController.text.trim());
+                            : (notesController.text.trim().isEmpty
+                                  ? null
+                                  : notesController.text.trim());
 
                         await repo.createVisit(
                           personId: person.id,
                           dateTime: selectedDate,
                           contactType: selectedType,
                           result: selectedResult,
-                          topicsDiscussed: topicsController.text.trim().isEmpty ? null : topicsController.text.trim(),
+                          topicsDiscussed: topicsController.text.trim().isEmpty
+                              ? null
+                              : topicsController.text.trim(),
                           notes: formattedNotes,
-                          nextStep: nextStepController.text.trim().isEmpty ? null : nextStepController.text.trim(),
-                          suggestedReturnDate: scheduleReturn ? returnDateTime : null,
+                          nextStep: nextStepController.text.trim().isEmpty
+                              ? null
+                              : nextStepController.text.trim(),
+                          suggestedReturnDate: scheduleReturn
+                              ? returnDateTime
+                              : null,
                           appointmentId: appointmentId,
                         );
 
                         // 3. Registro do Estudo e Sessão (se tipo Estudo ou matéria considerada)
                         if (isStudyConsidered) {
-                          final lesson = int.tryParse(lessonController.text.trim()) ?? 1;
-                          final paraText = paragraphsController.text.trim().isEmpty ? '1-5' : paragraphsController.text.trim();
+                          final lesson =
+                              int.tryParse(lessonController.text.trim()) ?? 1;
+                          final paraText =
+                              paragraphsController.text.trim().isEmpty
+                              ? '1-5'
+                              : paragraphsController.text.trim();
 
                           String studyId;
                           if (existingStudy != null) {
@@ -2074,13 +2800,17 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                             lessonCovered: lesson,
                             paragraphsCovered: paraText,
                             sessionNotes: formattedNotes,
-                            nextStep: nextStepController.text.trim().isEmpty ? null : nextStepController.text.trim(),
+                            nextStep: nextStepController.text.trim().isEmpty
+                                ? null
+                                : nextStepController.text.trim(),
                             status: 'realizada',
                             participantIds: [person.id],
                           );
 
                           if (person.status != 'estudo') {
-                            await repo.updatePerson(person.copyWith(status: 'estudo'));
+                            await repo.updatePerson(
+                              person.copyWith(status: 'estudo'),
+                            );
                           }
                         }
 
@@ -2103,7 +2833,10 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                         (selectedType == 'estudo' || recordStudy)
                             ? 'Salvar Visita & Estudo Bíblico'
                             : 'Salvar Visita',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
                       ),
                     ),
                   ),
@@ -2118,7 +2851,9 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
 
   // Modal de Agendamento Tipo Consultório (com Verificação Instantânea de Conflitos)
   void _showScheduleDialog(BuildContext context, PersonEntry person) {
-    DateTime selectedDateTime = DateTime.now().add(const Duration(days: 1, hours: 2));
+    DateTime selectedDateTime = DateTime.now().add(
+      const Duration(days: 1, hours: 2),
+    );
     selectedDateTime = DateTime(
       selectedDateTime.year,
       selectedDateTime.month,
@@ -2144,9 +2879,11 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                 showHeaderToggle: false,
                 onToggle: (_) {},
                 selectedDateTime: selectedDateTime,
-                onDateTimeChanged: (dt) => setDialogState(() => selectedDateTime = dt),
+                onDateTimeChanged: (dt) =>
+                    setDialogState(() => selectedDateTime = dt),
                 durationMinutes: durationMinutes,
-                onDurationChanged: (dur) => setDialogState(() => durationMinutes = dur),
+                onDurationChanged: (dur) =>
+                    setDialogState(() => durationMinutes = dur),
                 existingAppointments: allAppts,
               ),
             ),
@@ -2166,10 +2903,11 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                     durationMinutes: durationMinutes,
                     existingAppointments: allAppts,
                   );
-                  final proceed = await GlobalAppointmentSchedulingSection.confirmConflictIfNeeded(
-                    context: context,
-                    availability: availability,
-                  );
+                  final proceed =
+                      await GlobalAppointmentSchedulingSection.confirmConflictIfNeeded(
+                        context: context,
+                        availability: availability,
+                      );
                   if (!proceed) return;
 
                   final repo = ref.read(repositoryProvider);
@@ -2177,16 +2915,24 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                     personId: person.id,
                     title: 'Retorno: ${person.name}',
                     startTime: selectedDateTime,
-                    endTime: selectedDateTime.add(Duration(minutes: durationMinutes)),
+                    endTime: selectedDateTime.add(
+                      Duration(minutes: durationMinutes),
+                    ),
                     durationMinutes: durationMinutes,
                     status: 'confirmado',
-                    locationNotes: person.address != null ? 'Local: ${person.address}' : null,
+                    locationNotes: person.address != null
+                        ? 'Local: ${person.address}'
+                        : null,
                   );
 
                   if (ctx.mounted) Navigator.pop(ctx);
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Compromisso agendado na agenda com sucesso!')),
+                      const SnackBar(
+                        content: Text(
+                          'Compromisso agendado na agenda com sucesso!',
+                        ),
+                      ),
                     );
                   }
                 },
@@ -2218,7 +2964,13 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
             );
           }
           final fallbackPerson = snapshot.data!;
-          return _buildMainScaffold(context, repo, fallbackPerson, studies, participants);
+          return _buildMainScaffold(
+            context,
+            repo,
+            fallbackPerson,
+            studies,
+            participants,
+          );
         },
       );
     }
@@ -2234,7 +2986,11 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
     return DoorstepBriefingHelper.parseNotes(raw);
   }
 
-  Future<void> _saveNotes(AppRepository repo, PersonEntry person, List<Map<String, dynamic>> notes) async {
+  Future<void> _saveNotes(
+    AppRepository repo,
+    PersonEntry person,
+    List<Map<String, dynamic>> notes,
+  ) async {
     final jsonStr = notes.isEmpty ? null : jsonEncode(notes);
     await repo.updatePerson(person.copyWith(generalNotes: Value(jsonStr)));
   }
@@ -2243,13 +2999,22 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
     return DoorstepBriefingHelper.parseTargets(raw);
   }
 
-  Future<void> _saveTargets(AppRepository repo, PersonEntry person, List<Map<String, dynamic>> targets) async {
+  Future<void> _saveTargets(
+    AppRepository repo,
+    PersonEntry person,
+    List<Map<String, dynamic>> targets,
+  ) async {
     final jsonStr = targets.isEmpty ? null : jsonEncode(targets);
-    await repo.updatePerson(person.copyWith(contactRestrictions: Value(jsonStr)));
+    await repo.updatePerson(
+      person.copyWith(contactRestrictions: Value(jsonStr)),
+    );
   }
 
   // Dialog para definir Dia e Horário Habitual (ex: "Sábado às 09:00")
-  void _showEditPreferredScheduleDialog(BuildContext context, PersonEntry person) {
+  void _showEditPreferredScheduleDialog(
+    BuildContext context,
+    PersonEntry person,
+  ) {
     final daysOfWeek = [
       'Segunda-feira',
       'Terça-feira',
@@ -2263,14 +3028,18 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
 
     String selectedDay = 'Sábado';
     TimeOfDay selectedTime = const TimeOfDay(hour: 9, minute: 0);
-    final customController = TextEditingController(text: person.preferredSchedule ?? 'Sábado às 09:00');
+    final customController = TextEditingController(
+      text: person.preferredSchedule ?? 'Sábado às 09:00',
+    );
     bool isCustom = false;
 
-    if (person.preferredSchedule != null && person.preferredSchedule!.contains(' às ')) {
+    if (person.preferredSchedule != null &&
+        person.preferredSchedule!.contains(' às ')) {
       final parts = person.preferredSchedule!.split(' às ');
       final dayCandidate = parts[0].trim();
       final timeCandidate = parts[1].trim();
-      if (daysOfWeek.contains(dayCandidate) && dayCandidate != 'Personalizado') {
+      if (daysOfWeek.contains(dayCandidate) &&
+          dayCandidate != 'Personalizado') {
         selectedDay = dayCandidate;
       } else {
         isCustom = true;
@@ -2283,7 +3052,8 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
           selectedTime = TimeOfDay(hour: h, minute: m);
         }
       }
-    } else if (person.preferredSchedule != null && person.preferredSchedule!.isNotEmpty) {
+    } else if (person.preferredSchedule != null &&
+        person.preferredSchedule!.isNotEmpty) {
       isCustom = true;
     }
 
@@ -2291,8 +3061,11 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) {
-          final formattedTime = '${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}';
-          final previewText = isCustom ? customController.text : '$selectedDay às $formattedTime';
+          final formattedTime =
+              '${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}';
+          final previewText = isCustom
+              ? customController.text
+              : '$selectedDay às $formattedTime';
 
           return AlertDialog(
             title: const Row(
@@ -2315,8 +3088,14 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                   if (!isCustom) ...[
                     DropdownButtonFormField<String>(
                       initialValue: selectedDay,
-                      decoration: const InputDecoration(labelText: 'Dia da Semana'),
-                      items: daysOfWeek.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
+                      decoration: const InputDecoration(
+                        labelText: 'Dia da Semana',
+                      ),
+                      items: daysOfWeek
+                          .map(
+                            (d) => DropdownMenuItem(value: d, child: Text(d)),
+                          )
+                          .toList(),
                       onChanged: (val) {
                         if (val != null) {
                           if (val == 'Personalizado') {
@@ -2334,10 +3113,20 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('Horário Específico', style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+                            const Text(
+                              'Horário Específico',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppTheme.textMuted,
+                              ),
+                            ),
                             Text(
                               formattedTime,
-                              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED)),
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF7C3AED),
+                              ),
                             ),
                           ],
                         ),
@@ -2359,20 +3148,25 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                     const SizedBox(height: 12),
                     TextButton(
                       onPressed: () => setDialogState(() => isCustom = true),
-                      child: const Text('Escrever texto livre personalizado...'),
+                      child: const Text(
+                        'Escrever texto livre personalizado...',
+                      ),
                     ),
                   ] else ...[
                     TextField(
                       controller: customController,
                       decoration: const InputDecoration(
                         labelText: 'Horário habitual personalizado',
-                        hintText: 'Ex: Sábado às 09:00 ou Domingos após reunião',
+                        hintText:
+                            'Ex: Sábado às 09:00 ou Domingos após reunião',
                       ),
                     ),
                     const SizedBox(height: 8),
                     TextButton(
                       onPressed: () => setDialogState(() => isCustom = false),
-                      child: const Text('Voltar para seleção de dia e hora padrão'),
+                      child: const Text(
+                        'Voltar para seleção de dia e hora padrão',
+                      ),
                     ),
                   ],
                   const SizedBox(height: 12),
@@ -2384,12 +3178,20 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.info_outline, size: 16, color: Color(0xFF7C3AED)),
+                        const Icon(
+                          Icons.info_outline,
+                          size: 16,
+                          color: Color(0xFF7C3AED),
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             'Será salvo como: "$previewText"',
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED)),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF7C3AED),
+                            ),
                           ),
                         ),
                       ],
@@ -2409,13 +3211,21 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                   foregroundColor: Colors.white,
                 ),
                 onPressed: () async {
-                  final textToSave = isCustom ? customController.text.trim() : '$selectedDay às $formattedTime';
+                  final textToSave = isCustom
+                      ? customController.text.trim()
+                      : '$selectedDay às $formattedTime';
                   final repo = ref.read(repositoryProvider);
-                  await repo.updatePerson(person.copyWith(preferredSchedule: Value(textToSave)));
+                  await repo.updatePerson(
+                    person.copyWith(preferredSchedule: Value(textToSave)),
+                  );
                   if (ctx.mounted) Navigator.pop(ctx);
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Horário habitual atualizado para "$textToSave"')),
+                      SnackBar(
+                        content: Text(
+                          'Horário habitual atualizado para "$textToSave"',
+                        ),
+                      ),
                     );
                   }
                 },
@@ -2429,8 +3239,15 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
   }
 
   // Dialog para adicionar ou editar Necessidade / Observação
-  void _showAddOrEditNoteDialog(BuildContext context, AppRepository repo, PersonEntry person, [Map<String, dynamic>? noteToEdit]) {
-    final textController = TextEditingController(text: noteToEdit?['text'] ?? '');
+  void _showAddOrEditNoteDialog(
+    BuildContext context,
+    AppRepository repo,
+    PersonEntry person, [
+    Map<String, dynamic>? noteToEdit,
+  ]) {
+    final textController = TextEditingController(
+      text: noteToEdit?['text'] ?? '',
+    );
     final isEditing = noteToEdit != null;
 
     showDialog(
@@ -2440,7 +3257,11 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
           children: [
             const Icon(Icons.note_alt_outlined, color: AppTheme.accentTeal),
             const SizedBox(width: 8),
-            Text(isEditing ? 'Editar Necessidade / Obs.' : 'Nova Necessidade / Obs.'),
+            Text(
+              isEditing
+                  ? 'Editar Necessidade / Obs.'
+                  : 'Nova Necessidade / Obs.',
+            ),
           ],
         ),
         content: SingleChildScrollView(
@@ -2465,13 +3286,20 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
               const SizedBox(height: 10),
               Row(
                 children: [
-                  const Icon(Icons.access_time, size: 14, color: AppTheme.textMuted),
+                  const Icon(
+                    Icons.access_time,
+                    size: 14,
+                    color: AppTheme.textMuted,
+                  ),
                   const SizedBox(width: 6),
                   Text(
                     isEditing
                         ? 'Criado em: ${AppDateUtils.formatDateTimeWithAt(DateTime.tryParse(noteToEdit['createdAt'] ?? ''))}'
                         : 'Registro de data e hora automático.',
-                    style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppTheme.textMuted,
+                    ),
                   ),
                 ],
               ),
@@ -2479,16 +3307,24 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.accentTeal, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.accentTeal,
+              foregroundColor: Colors.white,
+            ),
             onPressed: () async {
               final text = textController.text.trim();
               if (text.isEmpty) return;
 
               final currentNotes = _parseNotes(person.generalNotes);
               if (isEditing) {
-                final idx = currentNotes.indexWhere((n) => n['id'] == noteToEdit['id']);
+                final idx = currentNotes.indexWhere(
+                  (n) => n['id'] == noteToEdit['id'],
+                );
                 if (idx != -1) {
                   currentNotes[idx] = {
                     ...currentNotes[idx],
@@ -2508,7 +3344,11 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
               if (ctx.mounted) Navigator.pop(ctx);
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(isEditing ? 'Anotação atualizada!' : 'Necessidade/observação registrada com data e hora!')),
+                  SnackBar(
+                    content: Text(
+                      isEditing ? 'Anotação atualizada!' : 'Necessidade/observação registrada com data e hora!',
+                    ),
+                  ),
                 );
               }
             },
@@ -2520,8 +3360,15 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
   }
 
   // Dialog para adicionar ou editar Alvo ou Tarefa
-  void _showAddOrEditTargetDialog(BuildContext context, AppRepository repo, PersonEntry person, [Map<String, dynamic>? targetToEdit]) {
-    final titleController = TextEditingController(text: targetToEdit?['title'] ?? '');
+  void _showAddOrEditTargetDialog(
+    BuildContext context,
+    AppRepository repo,
+    PersonEntry person, [
+    Map<String, dynamic>? targetToEdit,
+  ]) {
+    final titleController = TextEditingController(
+      text: targetToEdit?['title'] ?? '',
+    );
     final isEditing = targetToEdit != null;
 
     showDialog(
@@ -2531,7 +3378,11 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
           children: [
             const Icon(Icons.track_changes, color: Color(0xFF7C3AED)),
             const SizedBox(width: 8),
-            Text(isEditing ? 'Editar Alvo / Tarefa' : 'Novo Alvo ou Tarefa Espiritual'),
+            Text(
+              isEditing
+                  ? 'Editar Alvo / Tarefa'
+                  : 'Novo Alvo ou Tarefa Espiritual',
+            ),
           ],
         ),
         content: SingleChildScrollView(
@@ -2556,13 +3407,20 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
               const SizedBox(height: 10),
               Row(
                 children: [
-                  const Icon(Icons.access_time, size: 14, color: AppTheme.textMuted),
+                  const Icon(
+                    Icons.access_time,
+                    size: 14,
+                    color: AppTheme.textMuted,
+                  ),
                   const SizedBox(width: 6),
                   Text(
                     isEditing
                         ? 'Criado em: ${AppDateUtils.formatDateTimeWithAt(DateTime.tryParse(targetToEdit['createdAt'] ?? ''))}'
                         : 'Data e hora da criação gravadas automaticamente.',
-                    style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppTheme.textMuted,
+                    ),
                   ),
                 ],
               ),
@@ -2570,16 +3428,24 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7C3AED), foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF7C3AED),
+              foregroundColor: Colors.white,
+            ),
             onPressed: () async {
               final title = titleController.text.trim();
               if (title.isEmpty) return;
 
               final currentTargets = _parseTargets(person.contactRestrictions);
               if (isEditing) {
-                final idx = currentTargets.indexWhere((t) => t['id'] == targetToEdit['id']);
+                final idx = currentTargets.indexWhere(
+                  (t) => t['id'] == targetToEdit['id'],
+                );
                 if (idx != -1) {
                   currentTargets[idx] = {
                     ...currentTargets[idx],
@@ -2600,7 +3466,13 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
               if (ctx.mounted) Navigator.pop(ctx);
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(isEditing ? 'Alvo atualizado!' : 'Novo alvo cadastrado com sucesso!')),
+                  SnackBar(
+                    content: Text(
+                      isEditing
+                          ? 'Alvo atualizado!'
+                          : 'Novo alvo cadastrado com sucesso!',
+                    ),
+                  ),
                 );
               }
             },
@@ -2619,29 +3491,53 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
     List<StudyParticipantEntry> participants,
   ) {
     // Localiza estudo bíblico vinculado a esta pessoa
-    final linkedParticipant = participants.where((p) => p.personId == person.id && p.deletedAt == null).firstOrNull;
+    final linkedParticipant = participants
+        .where((p) => p.personId == person.id && p.deletedAt == null)
+        .firstOrNull;
     final linkedStudy = linkedParticipant != null
-        ? studies.where((s) => s.id == linkedParticipant.studyId && s.deletedAt == null).firstOrNull
+        ? studies
+              .where(
+                (s) => s.id == linkedParticipant.studyId && s.deletedAt == null,
+              )
+              .firstOrNull
         : null;
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isStudiesEnabled = ref.watch(isFeatureEnabledProvider(AppFeature.studies));
-    final isAgendaEnabled = ref.watch(isFeatureEnabledProvider(AppFeature.agenda));
+    final isStudiesEnabled = ref.watch(
+      isFeatureEnabledProvider(AppFeature.studies),
+    );
+    final isAgendaEnabled = ref.watch(
+      isFeatureEnabledProvider(AppFeature.agenda),
+    );
 
     final tabs = <Widget>[
-      const Tab(icon: Icon(Icons.history_edu), text: 'Visitas & Linha do Tempo'),
+      const Tab(
+        icon: Icon(Icons.history_edu),
+        text: 'Visitas & Linha do Tempo',
+      ),
       if (isStudiesEnabled)
         const Tab(icon: Icon(Icons.school), text: 'Estudo Bíblico'),
       const Tab(icon: Icon(Icons.photo_library), text: 'Fotos'),
       const Tab(icon: Icon(Icons.auto_stories), text: 'Publicações & Pedidos'),
       const Tab(icon: Icon(Icons.family_restroom), text: 'Família & Vínculos'),
-      const Tab(icon: Icon(Icons.note_alt_outlined), text: 'Necessidades & Obs.'),
+      const Tab(
+        icon: Icon(Icons.note_alt_outlined),
+        text: 'Necessidades & Obs.',
+      ),
       const Tab(icon: Icon(Icons.track_changes), text: 'Alvos & Tarefas'),
     ];
 
     final tabViews = <Widget>[
       // TAB 1: VISITAS & CONTATO
-      _buildVisitsAndContactTab(context, repo, person, isStudiesEnabled ? linkedStudy : null, isDark, isStudiesEnabled, isAgendaEnabled),
+      _buildVisitsAndContactTab(
+        context,
+        repo,
+        person,
+        isStudiesEnabled ? linkedStudy : null,
+        isDark,
+        isStudiesEnabled,
+        isAgendaEnabled,
+      ),
 
       // TAB 2: ESTUDO BÍBLICO (Progresso, Publicações, JW Library e Sessões)
       if (isStudiesEnabled)
@@ -2682,9 +3578,7 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
             tabs: tabs,
           ),
         ),
-        body: TabBarView(
-          children: tabViews,
-        ),
+        body: TabBarView(children: tabViews),
       ),
     );
   }
@@ -2698,11 +3592,14 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
     bool isStudiesEnabled,
     bool isAgendaEnabled,
   ) {
-
     final isSunMode = ref.watch(sunModeProvider);
     final allPhotos = ref.watch(personPhotosStreamProvider).value ?? [];
-    final personPhoto = allPhotos.where((p) => p.personId == person.id && p.photoType == 'person').firstOrNull;
-    final housePhoto = allPhotos.where((p) => p.personId == person.id && p.photoType == 'house').firstOrNull;
+    final personPhoto = allPhotos
+        .where((p) => p.personId == person.id && p.photoType == 'person')
+        .firstOrNull;
+    final housePhoto = allPhotos
+        .where((p) => p.personId == person.id && p.photoType == 'house')
+        .firstOrNull;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -2721,7 +3618,11 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                 padding: const EdgeInsets.all(14),
                 child: Row(
                   children: [
-                    const Icon(Icons.outbox, color: Color(0xFFB45309), size: 28),
+                    const Icon(
+                      Icons.outbox,
+                      color: Color(0xFFB45309),
+                      size: 28,
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -2729,12 +3630,19 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                         children: [
                           const Text(
                             'Revisita Repassada para Outro Publicador',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF92400E)),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: Color(0xFF92400E),
+                            ),
                           ),
                           const SizedBox(height: 2),
                           const Text(
                             'Esta revisita está oculta da agenda e estatísticas ativas. Se você voltou a atendê-la, pode reativá-la com 1 toque.',
-                            style: TextStyle(fontSize: 12, color: Color(0xFF78350F)),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF78350F),
+                            ),
                           ),
                         ],
                       ),
@@ -2744,7 +3652,11 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                         backgroundColor: const Color(0xFFB45309),
                         foregroundColor: Colors.white,
                       ),
-                      onPressed: () => PersonHandOffHelper.reactivatePerson(context: context, ref: ref, person: person),
+                      onPressed: () => PersonHandOffHelper.reactivatePerson(
+                        context: context,
+                        ref: ref,
+                        person: person,
+                      ),
                       child: const Text('Reativar'),
                     ),
                   ],
@@ -2766,7 +3678,11 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                 padding: const EdgeInsets.all(14),
                 child: Row(
                   children: [
-                    const Icon(Icons.person_off_outlined, color: Color(0xFFB45309), size: 28),
+                    const Icon(
+                      Icons.person_off_outlined,
+                      color: Color(0xFFB45309),
+                      size: 28,
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -2774,12 +3690,19 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                         children: [
                           const Text(
                             'Revisita Encerrada (com motivo)',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF92400E)),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: Color(0xFF92400E),
+                            ),
                           ),
                           const SizedBox(height: 2),
                           Text(
                             person.nextActionNote ?? 'Esta revisita foi encerrada, mas todo o histórico está preservado.',
-                            style: const TextStyle(fontSize: 12, color: Color(0xFF78350F)),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF78350F),
+                            ),
                           ),
                         ],
                       ),
@@ -2789,7 +3712,8 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                         backgroundColor: const Color(0xFFB45309),
                         foregroundColor: Colors.white,
                       ),
-                      onPressed: () => _reactivateReturnVisit(context, repo, person),
+                      onPressed: () =>
+                          _reactivateReturnVisit(context, repo, person),
                       child: const Text('Reativar'),
                     ),
                   ],
@@ -2810,7 +3734,8 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                     children: [
                       InkWell(
                         onTap: () async {
-                          if (personPhoto != null && personPhoto.imageData.isNotEmpty) {
+                          if (personPhoto != null &&
+                              personPhoto.imageData.isNotEmpty) {
                             showModalBottomSheet(
                               context: context,
                               builder: (bCtx) => SafeArea(
@@ -2818,8 +3743,13 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     ListTile(
-                                      leading: const Icon(Icons.fullscreen, color: AppTheme.primaryBlue),
-                                      title: const Text('Ver Foto em Tela Cheia'),
+                                      leading: const Icon(
+                                        Icons.fullscreen,
+                                        color: AppTheme.primaryBlue,
+                                      ),
+                                      title: const Text(
+                                        'Ver Foto em Tela Cheia',
+                                      ),
                                       onTap: () {
                                         Navigator.pop(bCtx);
                                         MediaPickerHelper.showFullScreenImage(
@@ -2827,28 +3757,51 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                                           imageSource: personPhoto.imageData,
                                           title: 'Foto: ${person.name}',
                                           onDelete: () async {
-                                            await ref.read(personPhotosManagerProvider).deletePhoto(person.id, 'person');
+                                            await ref
+                                                .read(
+                                                  personPhotosManagerProvider,
+                                                )
+                                                .deletePhoto(
+                                                  person.id,
+                                                  'person',
+                                                );
                                           },
                                         );
                                       },
                                     ),
                                     ListTile(
-                                      leading: const Icon(Icons.add_a_photo, color: AppTheme.accentTeal),
+                                      leading: const Icon(
+                                        Icons.add_a_photo,
+                                        color: AppTheme.accentTeal,
+                                      ),
                                       title: const Text('Trocar Foto'),
                                       onTap: () async {
                                         Navigator.pop(bCtx);
-                                        final img = await MediaPickerHelper.pickImageOrCapture(context);
+                                        final img =
+                                            await MediaPickerHelper.pickImageOrCapture(
+                                              context,
+                                            );
                                         if (img != null) {
-                                          await ref.read(personPhotosManagerProvider).savePersonPhoto(person.id, img);
+                                          await ref
+                                              .read(personPhotosManagerProvider)
+                                              .savePersonPhoto(person.id, img);
                                         }
                                       },
                                     ),
                                     ListTile(
-                                      leading: const Icon(Icons.delete_outline, color: Colors.red),
-                                      title: const Text('Remover Foto', style: TextStyle(color: Colors.red)),
+                                      leading: const Icon(
+                                        Icons.delete_outline,
+                                        color: Colors.red,
+                                      ),
+                                      title: const Text(
+                                        'Remover Foto',
+                                        style: TextStyle(color: Colors.red),
+                                      ),
                                       onTap: () async {
                                         Navigator.pop(bCtx);
-                                        await ref.read(personPhotosManagerProvider).deletePhoto(person.id, 'person');
+                                        await ref
+                                            .read(personPhotosManagerProvider)
+                                            .deletePhoto(person.id, 'person');
                                       },
                                     ),
                                   ],
@@ -2856,16 +3809,22 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                               ),
                             );
                           } else {
-                            final img = await MediaPickerHelper.pickImageOrCapture(context);
+                            final img =
+                                await MediaPickerHelper.pickImageOrCapture(
+                                  context,
+                                );
                             if (img != null) {
-                              await ref.read(personPhotosManagerProvider).savePersonPhoto(person.id, img);
+                              await ref
+                                  .read(personPhotosManagerProvider)
+                                  .savePersonPhoto(person.id, img);
                             }
                           }
                         },
                         borderRadius: BorderRadius.circular(30),
                         child: Stack(
                           children: [
-                            if (personPhoto != null && personPhoto.imageData.isNotEmpty)
+                            if (personPhoto != null &&
+                                personPhoto.imageData.isNotEmpty)
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(30),
                                 child: MediaPickerHelper.buildThumbnail(
@@ -2878,10 +3837,17 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                             else
                               CircleAvatar(
                                 radius: 30,
-                                backgroundColor: AppTheme.primaryBlue.withValues(alpha: 0.1),
+                                backgroundColor: AppTheme.primaryBlue
+                                    .withValues(alpha: 0.1),
                                 child: Text(
-                                  person.name.isNotEmpty ? person.name[0].toUpperCase() : '?',
-                                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.primaryBlue),
+                                  person.name.isNotEmpty
+                                      ? person.name[0].toUpperCase()
+                                      : '?',
+                                  style: const TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.primaryBlue,
+                                  ),
                                 ),
                               ),
                             Positioned(
@@ -2889,8 +3855,15 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                               right: 0,
                               child: Container(
                                 padding: const EdgeInsets.all(4),
-                                decoration: const BoxDecoration(color: AppTheme.primaryBlue, shape: BoxShape.circle),
-                                child: const Icon(Icons.camera_alt, size: 12, color: Colors.white),
+                                decoration: const BoxDecoration(
+                                  color: AppTheme.primaryBlue,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.camera_alt,
+                                  size: 12,
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
                           ],
@@ -2903,27 +3876,39 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                           children: [
                             Text(
                               person.name,
-                              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                             Row(
                               children: [
                                 Chip(
                                   label: Text(
                                     person.status.toUpperCase(),
-                                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                   backgroundColor: person.status == 'estudo'
-                                      ? const Color(0xFF7C3AED).withValues(alpha: 0.15)
+                                      ? const Color(0xFF7C3AED)
+                                            .withValues(alpha: 0.15)
                                       : person.status == 'revisita_passada'
-                                          ? const Color(0xFFFEF3C7)
-                                          : AppTheme.primaryBlue.withValues(alpha: 0.1),
+                                      ? const Color(0xFFFEF3C7)
+                                      : AppTheme.primaryBlue.withValues(
+                                          alpha: 0.1,
+                                        ),
                                   padding: EdgeInsets.zero,
                                   visualDensity: VisualDensity.compact,
                                 ),
                                 const SizedBox(width: 8),
                                 Text(
                                   'Primeiro: ${AppDateUtils.formatDate(person.firstContactAt)}',
-                                  style: const TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                                  style: const TextStyle(
+                                    color: AppTheme.textMuted,
+                                    fontSize: 12,
+                                  ),
                                 ),
                               ],
                             ),
@@ -2932,14 +3917,23 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                             Builder(
                               builder: (context) {
                                 List<String> personTags = [];
-                                if (person.tags.isNotEmpty && person.tags != '[]') {
+                                if (person.tags.isNotEmpty &&
+                                    person.tags != '[]') {
                                   if (person.tags.startsWith('[')) {
                                     try {
-                                      final decoded = jsonDecode(person.tags) as List;
-                                      personTags = decoded.map((e) => e.toString().trim()).where((s) => s.isNotEmpty).toList();
+                                      final decoded =
+                                          jsonDecode(person.tags) as List;
+                                      personTags = decoded
+                                          .map((e) => e.toString().trim())
+                                          .where((s) => s.isNotEmpty)
+                                          .toList();
                                     } catch (_) {}
                                   } else {
-                                    personTags = person.tags.split(',').map((e) => e.trim()).where((s) => s.isNotEmpty).toList();
+                                    personTags = person.tags
+                                        .split(',')
+                                        .map((e) => e.trim())
+                                        .where((s) => s.isNotEmpty)
+                                        .toList();
                                   }
                                 }
 
@@ -2948,28 +3942,61 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                                   runSpacing: 4,
                                   crossAxisAlignment: WrapCrossAlignment.center,
                                   children: [
-                                    ...personTags.map((t) => Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: isDark ? Colors.white10 : Colors.grey.shade200,
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: Text('#$t', style: const TextStyle(fontSize: 10)),
-                                    )),
-                                    InkWell(
-                                      onTap: () => _showEditPersonTagsDialog(context, repo, person),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    ...personTags.map(
+                                      (t) => Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
                                         decoration: BoxDecoration(
-                                          color: AppTheme.primaryBlue.withValues(alpha: 0.1),
-                                          borderRadius: BorderRadius.circular(4),
+                                          color: isDark
+                                              ? Colors.white10
+                                              : Colors.grey.shade200,
+                                          borderRadius: BorderRadius.circular(
+                                            4,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          '#$t',
+                                          style: const TextStyle(fontSize: 10),
+                                        ),
+                                      ),
+                                    ),
+                                    InkWell(
+                                      onTap: () => _showEditPersonTagsDialog(
+                                        context,
+                                        repo,
+                                        person,
+                                      ),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.primaryBlue
+                                              .withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(
+                                            4,
+                                          ),
                                         ),
                                         child: const Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            Icon(Icons.label_outline, size: 12, color: AppTheme.primaryBlue),
+                                            Icon(
+                                              Icons.label_outline,
+                                              size: 12,
+                                              color: AppTheme.primaryBlue,
+                                            ),
                                             SizedBox(width: 3),
-                                            Text('Tags', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primaryBlue)),
+                                            Text(
+                                              'Tags',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold,
+                                                color: AppTheme.primaryBlue,
+                                              ),
+                                            ),
                                           ],
                                         ),
                                       ),
@@ -2987,11 +4014,24 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                   if (person.phone != null && person.phone!.isNotEmpty) ...[
                     Row(
                       children: [
-                        const Icon(Icons.phone, size: 18, color: AppTheme.textMuted),
+                        const Icon(
+                          Icons.phone,
+                          size: 18,
+                          color: AppTheme.textMuted,
+                        ),
                         const SizedBox(width: 8),
-                        Expanded(child: Text(person.phone!, style: const TextStyle(fontSize: 15))),
+                        Expanded(
+                          child: Text(
+                            person.phone!,
+                            style: const TextStyle(fontSize: 15),
+                          ),
+                        ),
                         IconButton(
-                          icon: const Icon(Icons.call, size: 20, color: AppTheme.primaryBlue),
+                          icon: const Icon(
+                            Icons.call,
+                            size: 20,
+                            color: AppTheme.primaryBlue,
+                          ),
                           tooltip: 'Ligar',
                           visualDensity: VisualDensity.compact,
                           onPressed: () async {
@@ -3002,14 +4042,24 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                           },
                         ),
                         IconButton(
-                          icon: const Icon(Icons.chat, size: 20, color: Color(0xFF25D366)),
+                          icon: const Icon(
+                            Icons.chat,
+                            size: 20,
+                            color: Color(0xFF25D366),
+                          ),
                           tooltip: 'WhatsApp',
                           visualDensity: VisualDensity.compact,
                           onPressed: () async {
-                            final cleanPhone = person.phone!.replaceAll(RegExp(r'\D'), '');
+                            final cleanPhone = person.phone!.replaceAll(
+                              RegExp(r'\D'),
+                              '',
+                            );
                             final uri = Uri.parse('https://wa.me/$cleanPhone');
                             if (await canLaunchUrl(uri)) {
-                              await launchUrl(uri, mode: LaunchMode.externalApplication);
+                              await launchUrl(
+                                uri,
+                                mode: LaunchMode.externalApplication,
+                              );
                             }
                           },
                         ),
@@ -3019,44 +4069,74 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                   ],
                   Row(
                     children: [
-                      const Icon(Icons.location_on, size: 18, color: AppTheme.textMuted),
+                      const Icon(
+                        Icons.location_on,
+                        size: 18,
+                        color: AppTheme.textMuted,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           person.address != null && person.address!.isNotEmpty
                               ? person.address!
-                              : (person.latitude != null && person.longitude != null
-                                  ? 'GPS: ${person.latitude!.toStringAsFixed(4)}, ${person.longitude!.toStringAsFixed(4)}'
-                                  : 'Endereço não cadastrado (toque no mapa para definir)'),
+                              : (person.latitude != null &&
+                                        person.longitude != null
+                                    ? 'GPS: ${person.latitude!.toStringAsFixed(4)}, ${person.longitude!.toStringAsFixed(4)}'
+                                    : 'Endereço não cadastrado (toque no mapa para definir)'),
                           style: TextStyle(
                             fontSize: 14,
-                            color: (person.address == null || person.address!.isEmpty) ? AppTheme.textMuted : null,
-                            fontStyle: (person.address == null || person.address!.isEmpty) ? FontStyle.italic : null,
+                            color:
+                                (person.address == null ||
+                                    person.address!.isEmpty)
+                                ? AppTheme.textMuted
+                                : null,
+                            fontStyle:
+                                (person.address == null ||
+                                    person.address!.isEmpty)
+                                ? FontStyle.italic
+                                : null,
                           ),
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.map, size: 20, color: AppTheme.primaryBlue),
+                        icon: const Icon(
+                          Icons.map,
+                          size: 20,
+                          color: AppTheme.primaryBlue,
+                        ),
                         tooltip: 'Ver no Mapa do Território',
                         visualDensity: VisualDensity.compact,
                         onPressed: () {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => ContactsMapScreen(highlightPersonId: person.id),
+                              builder: (_) => ContactsMapScreen(
+                                highlightPersonId: person.id,
+                              ),
                             ),
                           );
                         },
                       ),
                       IconButton(
-                        icon: const Icon(Icons.edit_location_alt, size: 20, color: AppTheme.accentTeal),
+                        icon: const Icon(
+                          Icons.edit_location_alt,
+                          size: 20,
+                          color: AppTheme.accentTeal,
+                        ),
                         tooltip: 'Ajustar Localização / Escolher no Mapa',
                         visualDensity: VisualDensity.compact,
-                        onPressed: () => _openLocationPickerForPerson(context, repo, person),
+                        onPressed: () =>
+                            _openLocationPickerForPerson(context, repo, person),
                       ),
-                      if ((person.address != null && person.address!.isNotEmpty) || (person.latitude != null && person.longitude != null))
+                      if ((person.address != null &&
+                              person.address!.isNotEmpty) ||
+                          (person.latitude != null && person.longitude != null))
                         IconButton(
-                          icon: const Icon(Icons.open_in_new, size: 20, color: Colors.blueGrey),
+                          icon: const Icon(
+                            Icons.open_in_new,
+                            size: 20,
+                            color: Colors.blueGrey,
+                          ),
                           tooltip: 'Abrir no Google Maps',
                           visualDensity: VisualDensity.compact,
                           onPressed: () => _openExternalGoogleMaps(person),
@@ -3070,13 +4150,20 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                     margin: const EdgeInsets.only(top: 4, bottom: 8),
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                      color: isDark
+                          ? const Color(0xFF1E293B)
+                          : const Color(0xFFF8FAFC),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                      border: Border.all(
+                        color: isDark
+                            ? const Color(0xFF334155)
+                            : const Color(0xFFE2E8F0),
+                      ),
                     ),
                     child: Row(
                       children: [
-                        if (housePhoto != null && housePhoto.imageData.isNotEmpty)
+                        if (housePhoto != null &&
+                            housePhoto.imageData.isNotEmpty)
                           InkWell(
                             onTap: () {
                               MediaPickerHelper.showFullScreenImage(
@@ -3087,7 +4174,8 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                             },
                             borderRadius: BorderRadius.circular(6),
                             child: Tooltip(
-                              message: 'Toque para ampliar foto em alta resolução',
+                              message:
+                                  'Toque para ampliar foto em alta resolução',
                               child: Stack(
                                 children: [
                                   MediaPickerHelper.buildThumbnail(
@@ -3101,8 +4189,15 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                                     right: 2,
                                     child: Container(
                                       padding: const EdgeInsets.all(2),
-                                      decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(4)),
-                                      child: const Icon(Icons.zoom_in, size: 12, color: Colors.white),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black54,
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: const Icon(
+                                        Icons.zoom_in,
+                                        size: 12,
+                                        color: Colors.white,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -3114,23 +4209,38 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                             width: 72,
                             height: 54,
                             decoration: BoxDecoration(
-                              color: isDark ? Colors.white10 : Colors.grey.shade200,
+                              color: isDark
+                                  ? Colors.white10
+                                  : Colors.grey.shade200,
                               borderRadius: BorderRadius.circular(6),
                             ),
-                            child: const Icon(Icons.home, color: Colors.grey, size: 28),
+                            child: const Icon(
+                              Icons.home,
+                              color: Colors.grey,
+                              size: 28,
+                            ),
                           ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Foto da Residência / Fachada', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                              const Text(
+                                'Foto da Residência / Fachada',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
                               const SizedBox(height: 2),
                               Text(
                                 housePhoto != null
                                     ? 'Foto cadastrada. Toque para ver em tela cheia.'
                                     : 'Facilita localizar a residência no território.',
-                                style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: AppTheme.textMuted,
+                                ),
                               ),
                             ],
                           ),
@@ -3138,29 +4248,49 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                         OutlinedButton.icon(
                           style: OutlinedButton.styleFrom(
                             visualDensity: VisualDensity.compact,
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
                           ),
                           icon: const Icon(Icons.add_a_photo, size: 14),
-                          label: Text(housePhoto != null ? 'Trocar' : 'Tirar Foto', style: const TextStyle(fontSize: 11)),
+                          label: Text(
+                            housePhoto != null ? 'Trocar' : 'Tirar Foto',
+                            style: const TextStyle(fontSize: 11),
+                          ),
                           onPressed: () async {
-                            final img = await MediaPickerHelper.pickImageOrCapture(context);
+                            final img =
+                                await MediaPickerHelper.pickImageOrCapture(
+                                  context,
+                                );
                             if (img != null) {
-                              await ref.read(personPhotosManagerProvider).saveHousePhoto(person.id, img);
+                              await ref
+                                  .read(personPhotosManagerProvider)
+                                  .saveHousePhoto(person.id, img);
                             }
                           },
                         ),
                       ],
                     ),
                   ),
-                  if (person.preferredSchedule != null && person.preferredSchedule!.isNotEmpty) ...[
+                  if (person.preferredSchedule != null &&
+                      person.preferredSchedule!.isNotEmpty) ...[
                     Row(
                       children: [
-                        const Icon(Icons.alarm, size: 18, color: Color(0xFF7C3AED)),
+                        const Icon(
+                          Icons.alarm,
+                          size: 18,
+                          color: Color(0xFF7C3AED),
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             'Horário habitual: ${person.preferredSchedule!}',
-                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED)),
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF7C3AED),
+                            ),
                           ),
                         ),
                       ],
@@ -3174,12 +4304,20 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                       return Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.note_alt_outlined, size: 18, color: AppTheme.accentTeal),
+                          const Icon(
+                            Icons.note_alt_outlined,
+                            size: 18,
+                            color: AppTheme.accentTeal,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               '${notes.length} ${notes.length == 1 ? "anotação/necessidade registrada" : "anotações/necessidades registradas"} (ver aba Necessidades & Obs.)',
-                              style: const TextStyle(fontSize: 13, color: AppTheme.accentTeal, fontWeight: FontWeight.w500),
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: AppTheme.accentTeal,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ),
                         ],
@@ -3200,9 +4338,12 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
             builder: (context, visitSnapshot) {
               final latestVisit = (visitSnapshot.data ?? []).firstOrNull;
               return StreamBuilder<List<VoiceNoteItem>>(
-                stream: ref.watch(voiceNotesManagerProvider).watchVoiceNotesForPerson(person.id),
+                stream: ref
+                    .watch(voiceNotesManagerProvider)
+                    .watchVoiceNotesForPerson(person.id),
                 builder: (context, voiceSnapshot) {
-                  final latestVoiceNote = (voiceSnapshot.data ?? []).firstOrNull;
+                  final latestVoiceNote =
+                      (voiceSnapshot.data ?? []).firstOrNull;
                   final briefingData = DoorstepBriefingHelper.build(
                     person: person,
                     linkedStudy: linkedStudy,
@@ -3228,33 +4369,39 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
 
           // Botão Rápido de Áudio / Ditado (15s) - Nível 3
           ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 48), // Alvo de toque mínimo >= 48dp
+            constraints: const BoxConstraints(
+              minHeight: 48,
+            ), // Alvo de toque mínimo >= 48dp
             child: SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: isSunMode ? Colors.black : const Color(0xFF4F46E5),
-                foregroundColor: Colors.white,
-                elevation: isSunMode ? 0 : 2,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  side: isSunMode ? const BorderSide(color: Colors.black, width: 2) : BorderSide.none,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isSunMode
+                      ? Colors.black
+                      : const Color(0xFF4F46E5),
+                  foregroundColor: Colors.white,
+                  elevation: isSunMode ? 0 : 2,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    side: isSunMode
+                        ? const BorderSide(color: Colors.black, width: 2)
+                        : BorderSide.none,
+                  ),
                 ),
-              ),
-              icon: const Icon(Icons.mic, size: 20),
-              label: const Text(
-                'Registro Rápido por Áudio / Ditado (15s)',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-              ),
-              onPressed: () => QuickVoiceNoteDialog.show(
-                context: context,
-                person: person,
-                linkedStudy: linkedStudy,
+                icon: const Icon(Icons.mic, size: 20),
+                label: const Text(
+                  'Registro Rápido por Áudio / Ditado (15s)',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                onPressed: () => QuickVoiceNoteDialog.show(
+                  context: context,
+                  person: person,
+                  linkedStudy: linkedStudy,
+                ),
               ),
             ),
           ),
-        ),
-        const SizedBox(height: 12),
+          const SizedBox(height: 12),
 
           // Alerta e Botão Proeminente se pessoa tem status 'estudo' sem estudo iniciado
           if (person.status == 'estudo' && linkedStudy == null) ...[
@@ -3276,7 +4423,11 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                         Expanded(
                           child: Text(
                             'Contato classificado como Estudo Bíblico',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF7C3AED)),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: Color(0xFF7C3AED),
+                            ),
                           ),
                         ),
                       ],
@@ -3284,7 +4435,12 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                     const SizedBox(height: 6),
                     Text(
                       '${person.name} ainda não possui um livro ou brochura vinculado para registro de lições.',
-                      style: TextStyle(fontSize: 13, color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569)),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: isDark
+                            ? const Color(0xFFCBD5E1)
+                            : const Color(0xFF475569),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     SizedBox(
@@ -3296,7 +4452,9 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                           padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
                         icon: const Icon(Icons.add_circle_outline),
-                        label: Text('+ Iniciar Estudo Bíblico com ${person.name}'),
+                        label: Text(
+                          '+ Iniciar Estudo Bíblico com ${person.name}',
+                        ),
                         onPressed: () => _showStartStudyDialog(context, person),
                       ),
                     ),
@@ -3317,7 +4475,8 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                   ),
                   icon: const Icon(Icons.rate_review_outlined),
                   label: const Text('Registrar Conversa'),
-                  onPressed: () => _showQuickVisitDialog(context, person, linkedStudy),
+                  onPressed: () =>
+                      _showQuickVisitDialog(context, person, linkedStudy),
                 ),
               ),
               const SizedBox(width: 12),
@@ -3343,11 +4502,20 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 11),
               ),
               icon: const Icon(Icons.send_rounded, size: 18),
-              label: const Text('Passar Revisita para Outro Publicador (WhatsApp / GPS)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-              onPressed: () => PersonHandOffHelper.showHandOffDialog(context: context, ref: ref, person: person, linkedStudy: linkedStudy),
+              label: const Text(
+                'Passar Revisita para Outro Publicador (WhatsApp / GPS)',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+              onPressed: () => PersonHandOffHelper.showHandOffDialog(
+                context: context,
+                ref: ref,
+                person: person,
+                linkedStudy: linkedStudy,
+              ),
             ),
           ),
-          if (person.status == 'revisita' || person.status == 'interessado') ...[
+          if (person.status == 'revisita' ||
+              person.status == 'interessado') ...[
             const SizedBox(height: 8),
             SizedBox(
               width: double.infinity,
@@ -3358,8 +4526,12 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 11),
                 ),
                 icon: const Icon(Icons.person_off_outlined, size: 18),
-                label: const Text('Encerrar Revisita (com motivo)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                onPressed: () => _showEndReturnVisitDialog(context, person, repo),
+                label: const Text(
+                  'Encerrar Revisita (com motivo)',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+                onPressed: () =>
+                    _showEndReturnVisitDialog(context, person, repo),
               ),
             ),
           ],
@@ -3372,7 +4544,11 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
           // Linha do Tempo Unificada do Contato (Visitas, Estudos, Telefones, Agenda e Áudios)
           const Text(
             'Linha do Tempo Unificada do Contato',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textDark),
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.textDark,
+            ),
           ),
           const SizedBox(height: 8),
 
@@ -3386,7 +4562,6 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
       ),
     );
   }
-
 
   Widget _buildBibleStudyTab(
     BuildContext context,
@@ -3419,7 +4594,10 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF7C3AED),
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
                 ),
                 icon: const Icon(Icons.add_circle_outline),
                 label: Text('+ Iniciar Estudo Bíblico com ${person.name}'),
@@ -3435,18 +4613,32 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                       Expanded(
                         child: Row(
                           children: [
-                            const Icon(Icons.alarm, size: 20, color: Color(0xFF7C3AED)),
+                            const Icon(
+                              Icons.alarm,
+                              size: 20,
+                              color: Color(0xFF7C3AED),
+                            ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text('Dia e Horário Habitual', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                                  const Text(
+                                    'Dia e Horário Habitual',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: AppTheme.textMuted,
+                                    ),
+                                  ),
                                   Text(
-                                    person.preferredSchedule != null && person.preferredSchedule!.isNotEmpty
+                                    person.preferredSchedule != null &&
+                                            person.preferredSchedule!.isNotEmpty
                                         ? person.preferredSchedule!
                                         : 'Não definido (ex: Sábado às 09:00)',
-                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -3458,8 +4650,14 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                       ),
                       const SizedBox(width: 8),
                       TextButton(
-                        onPressed: () => _showEditPreferredScheduleDialog(context, person),
-                        child: Text(person.preferredSchedule == null || person.preferredSchedule!.isEmpty ? 'Definir' : 'Alterar'),
+                        onPressed: () =>
+                            _showEditPreferredScheduleDialog(context, person),
+                        child: Text(
+                          person.preferredSchedule == null ||
+                                  person.preferredSchedule!.isEmpty
+                              ? 'Definir'
+                              : 'Alterar',
+                        ),
                       ),
                     ],
                   ),
@@ -3493,7 +4691,11 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                           color: const Color(0xFF7C3AED).withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: const Icon(Icons.menu_book, color: Color(0xFF7C3AED), size: 28),
+                        child: const Icon(
+                          Icons.menu_book,
+                          color: Color(0xFF7C3AED),
+                          size: 28,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -3502,11 +4704,17 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                           children: [
                             Text(
                               linkedStudy.title,
-                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                             Text(
                               pub?.title ?? linkedStudy.publicationId,
-                              style: const TextStyle(fontSize: 13, color: AppTheme.textMuted),
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: AppTheme.textMuted,
+                              ),
                             ),
                           ],
                         ),
@@ -3515,7 +4723,10 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                       Chip(
                         label: Text(
                           linkedStudy.status.toUpperCase(),
-                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         backgroundColor: linkedStudy.status == 'ativo'
                             ? const Color(0xFF059669).withValues(alpha: 0.15)
@@ -3537,10 +4748,22 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Lição Atual', style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+                          const Text(
+                            'Lição Atual',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.textMuted,
+                            ),
+                          ),
                           Text(
-                            linkedStudy.currentLesson != null ? 'Lição ${linkedStudy.currentLesson}' : 'Não definida',
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED)),
+                            linkedStudy.currentLesson != null
+                                ? 'Lição ${linkedStudy.currentLesson}'
+                                : 'Não definida',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF7C3AED),
+                            ),
                           ),
                         ],
                       ),
@@ -3548,27 +4771,48 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            linkedStudy.publicationId == 'lff-book' || linkedStudy.publicationId == 'lff-brochure'
+                            linkedStudy.publicationId == 'lff-book' ||
+                                    linkedStudy.publicationId == 'lff-brochure'
                                 ? 'Ponto Atual'
                                 : 'Parágrafo',
-                            style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.textMuted,
+                            ),
                           ),
                           Text(
                             linkedStudy.currentParagraph != null
-                                ? (linkedStudy.publicationId == 'lff-book' || linkedStudy.publicationId == 'lff-brochure'
-                                    ? 'Ponto ${linkedStudy.currentParagraph}'
-                                    : 'Parágrafo ${linkedStudy.currentParagraph}')
+                                ? (linkedStudy.publicationId == 'lff-book' ||
+                                          linkedStudy.publicationId ==
+                                              'lff-brochure'
+                                      ? 'Ponto ${linkedStudy.currentParagraph}'
+                                      : 'Parágrafo ${linkedStudy.currentParagraph}')
                                 : 'Início',
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ],
                       ),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Frequência', style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+                          const Text(
+                            'Frequência',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.textMuted,
+                            ),
+                          ),
                           Chip(
-                            label: Text(linkedStudy.frequency.toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                            label: Text(
+                              linkedStudy.frequency.toUpperCase(),
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                             padding: EdgeInsets.zero,
                             visualDensity: VisualDensity.compact,
                           ),
@@ -3578,11 +4822,16 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                   ),
                   const SizedBox(height: 14),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF7C3AED).withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFF7C3AED).withValues(alpha: 0.2)),
+                      border: Border.all(
+                        color: const Color(0xFF7C3AED).withValues(alpha: 0.2),
+                      ),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -3590,7 +4839,11 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                         Expanded(
                           child: Row(
                             children: [
-                              const Icon(Icons.alarm, size: 20, color: Color(0xFF7C3AED)),
+                              const Icon(
+                                Icons.alarm,
+                                size: 20,
+                                color: Color(0xFF7C3AED),
+                              ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Column(
@@ -3598,13 +4851,23 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                                   children: [
                                     const Text(
                                       'Dia e Horário Habitual do Estudo',
-                                      style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: AppTheme.textMuted,
+                                      ),
                                     ),
                                     Text(
-                                      person.preferredSchedule != null && person.preferredSchedule!.isNotEmpty
+                                      person.preferredSchedule != null &&
+                                              person
+                                                  .preferredSchedule!
+                                                  .isNotEmpty
                                           ? person.preferredSchedule!
                                           : 'Não definido (ex: Sábado às 09:00)',
-                                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED)),
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF7C3AED),
+                                      ),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                     ),
@@ -3618,10 +4881,14 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                         TextButton.icon(
                           icon: const Icon(Icons.edit, size: 16),
                           label: Text(
-                            person.preferredSchedule == null || person.preferredSchedule!.isEmpty ? 'Definir' : 'Alterar',
+                            person.preferredSchedule == null ||
+                                    person.preferredSchedule!.isEmpty
+                                ? 'Definir'
+                                : 'Alterar',
                             style: const TextStyle(fontSize: 12),
                           ),
-                          onPressed: () => _showEditPreferredScheduleDialog(context, person),
+                          onPressed: () =>
+                              _showEditPreferredScheduleDialog(context, person),
                         ),
                       ],
                     ),
@@ -3636,12 +4903,20 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.flag_outlined, size: 16, color: Color(0xFF7C3AED)),
+                          const Icon(
+                            Icons.flag_outlined,
+                            size: 16,
+                            color: Color(0xFF7C3AED),
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               'Próximo assunto: ${linkedStudy.nextTopic}',
-                              style: const TextStyle(fontSize: 12, color: Color(0xFF7C3AED), fontWeight: FontWeight.bold),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF7C3AED),
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         ],
@@ -3654,8 +4929,12 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                       Expanded(
                         child: OutlinedButton.icon(
                           icon: const Icon(Icons.open_in_new, size: 16),
-                          label: const Text('Abrir no JW Library', style: TextStyle(fontSize: 12)),
-                          onPressed: () => _openPublicationLink(context, linkedStudy),
+                          label: const Text(
+                            'Abrir no JW Library',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                          onPressed: () =>
+                              _openPublicationLink(context, linkedStudy),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -3666,8 +4945,15 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                             foregroundColor: Colors.white,
                           ),
                           icon: const Icon(Icons.add_task, size: 16),
-                          label: const Text('Registrar Sessão', style: TextStyle(fontSize: 12)),
-                          onPressed: () => _showRecordStudySessionDialog(context, linkedStudy, person),
+                          label: const Text(
+                            'Registrar Sessão',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                          onPressed: () => _showRecordStudySessionDialog(
+                            context,
+                            linkedStudy,
+                            person,
+                          ),
                         ),
                       ),
                     ],
@@ -3680,134 +4966,210 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
 
           // Card de Progresso Individual 0–100% no Livro LFF
           if (linkedStudy.publicationId == 'lff-book') ...[
-            Builder(builder: (context) {
-              final lesson = linkedStudy.currentLesson ?? 1;
-              final point = linkedStudy.currentParagraph ?? 1;
-              final progressPct = LffBookCatalog.calculateProgressPercentage(lesson: lesson, point: point);
-              final section = LffBookCatalog.getSectionForLesson(lesson);
-              final lessonInfo = LffBookCatalog.getLesson(lesson);
-              final pointsCovered = (lesson - 1) * 6 + point.clamp(1, 6);
+            Builder(
+              builder: (context) {
+                final lesson = linkedStudy.currentLesson ?? 1;
+                final point = linkedStudy.currentParagraph ?? 1;
+                final progressPct = LffBookCatalog.calculateProgressPercentage(
+                  lesson: lesson,
+                  point: point,
+                );
+                final section = LffBookCatalog.getSectionForLesson(lesson);
+                final lessonInfo = LffBookCatalog.getLesson(lesson);
+                final pointsCovered = (lesson - 1) * 6 + point.clamp(1, 6);
 
-              final studyAgeDays = DateTime.now().difference(linkedStudy.startedAt).inDays;
-              final effectiveDays = studyAgeDays < 1 ? 1 : studyAgeDays;
-              final studyAgeWeeks = (effectiveDays / 7.0) < 0.5 ? 0.5 : (effectiveDays / 7.0);
-              final velocity = (lesson - 1 + (point / 6.0)) / studyAgeWeeks;
-              final String velocityText;
-              final Color velocityColor;
-              if (velocity >= 1.2) {
-                velocityText = '⚡ Ritmo Acelerado (${velocity.toStringAsFixed(1)} lições/sem)';
-                velocityColor = const Color(0xFF059669);
-              } else if (velocity >= 0.8) {
-                velocityText = '🎯 Ritmo Ideal (~1 lição/sem)';
-                velocityColor = const Color(0xFF2563EB);
-              } else if (velocity >= 0.4) {
-                velocityText = '🌱 Ritmo Constante (${velocity.toStringAsFixed(1)} lições/sem)';
-                velocityColor = const Color(0xFFD97706);
-              } else {
-                velocityText = '🐢 Ritmo Calmo / Pausado';
-                velocityColor = const Color(0xFF64748B);
-              }
+                final studyAgeDays = DateTime.now()
+                    .difference(linkedStudy.startedAt)
+                    .inDays;
+                final effectiveDays = studyAgeDays < 1 ? 1 : studyAgeDays;
+                final studyAgeWeeks = (effectiveDays / 7.0) < 0.5
+                    ? 0.5
+                    : (effectiveDays / 7.0);
+                final velocity = (lesson - 1 + (point / 6.0)) / studyAgeWeeks;
+                final String velocityText;
+                final Color velocityColor;
+                if (velocity >= 1.2) {
+                  velocityText =
+                      '⚡ Ritmo Acelerado (${velocity.toStringAsFixed(1)} lições/sem)';
+                  velocityColor = const Color(0xFF059669);
+                } else if (velocity >= 0.8) {
+                  velocityText = '🎯 Ritmo Ideal (~1 lição/sem)';
+                  velocityColor = const Color(0xFF2563EB);
+                } else if (velocity >= 0.4) {
+                  velocityText =
+                      '🌱 Ritmo Constante (${velocity.toStringAsFixed(1)} lições/sem)';
+                  velocityColor = const Color(0xFFD97706);
+                } else {
+                  velocityText = '🐢 Ritmo Calmo / Pausado';
+                  velocityColor = const Color(0xFF64748B);
+                }
 
-              return Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  side: const BorderSide(color: Color(0xFF7C3AED), width: 1.5),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF7C3AED).withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Icon(Icons.speed_rounded, color: Color(0xFF7C3AED), size: 22),
-                              ),
-                              const SizedBox(width: 10),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text('Progresso Oficial do Livro', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                                  Text('Seção ${section.sectionNumber}: ${section.title}', style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
-                                ],
-                              ),
-                            ],
-                          ),
-                          Text(
-                            '${progressPct.toStringAsFixed(1)}%',
-                            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED)),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(6),
-                        child: LinearProgressIndicator(
-                          value: progressPct / 100.0,
-                          minHeight: 12,
-                          backgroundColor: Colors.purple.shade100,
-                          valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF7C3AED)),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('$pointsCovered de 360 pontos concluídos', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED))),
-                          Text('Lição $lesson de 60', style: const TextStyle(fontSize: 12, color: AppTheme.textMuted)),
-                        ],
-                      ),
-                      const Divider(height: 20),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                return Card(
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    side: const BorderSide(
+                      color: Color(0xFF7C3AED),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
                               children: [
-                                const Text('Lição Atual:', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
-                                Text(
-                                  lessonInfo != null ? 'Lição $lesson: ${lessonInfo.title}' : 'Lição $lesson',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF7C3AED)
+                                        .withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(
+                                    Icons.speed_rounded,
+                                    color: Color(0xFF7C3AED),
+                                    size: 22,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Progresso Oficial do Livro',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    Text(
+                                      'Seção ${section.sectionNumber}: ${section.title}',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: AppTheme.textMuted,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: velocityColor.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: velocityColor.withValues(alpha: 0.4)),
+                            Text(
+                              '${progressPct.toStringAsFixed(1)}%',
+                              style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF7C3AED),
+                              ),
                             ),
-                            child: Text(
-                              velocityText,
-                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: velocityColor),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: LinearProgressIndicator(
+                            value: progressPct / 100.0,
+                            minHeight: 12,
+                            backgroundColor: Colors.purple.shade100,
+                            valueColor: const AlwaysStoppedAnimation<Color>(
+                              Color(0xFF7C3AED),
                             ),
                           ),
-                        ],
-                      ),
-                    ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '$pointsCovered de 360 pontos concluídos',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF7C3AED),
+                              ),
+                            ),
+                            Text(
+                              'Lição $lesson de 60',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppTheme.textMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Divider(height: 20),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Lição Atual:',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: AppTheme.textMuted,
+                                    ),
+                                  ),
+                                  Text(
+                                    lessonInfo != null
+                                        ? 'Lição $lesson: ${lessonInfo.title}'
+                                        : 'Lição $lesson',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: velocityColor.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: velocityColor.withValues(alpha: 0.4),
+                                ),
+                              ),
+                              child: Text(
+                                velocityText,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: velocityColor,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              );
-            }),
+                );
+              },
+            ),
             const SizedBox(height: 14),
           ],
 
           // Ideia 5: Linha do Tempo Espiritual do Estudante
-          _buildSpiritualTimelineCard(context, person, linkedStudy, repo, isDark),
+          _buildSpiritualTimelineCard(
+            context,
+            person,
+            linkedStudy,
+            repo,
+            isDark,
+          ),
           const SizedBox(height: 14),
 
           // Card de Métricas do Estudante & Funil de Progresso
@@ -3835,9 +5197,19 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                         children: [
                           const Row(
                             children: [
-                              Icon(Icons.insights, color: Color(0xFF7C3AED), size: 20),
+                              Icon(
+                                Icons.insights,
+                                color: Color(0xFF7C3AED),
+                                size: 20,
+                              ),
                               SizedBox(width: 8),
-                              Text('Métricas e Regularidade do Estudante', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                              Text(
+                                'Métricas e Regularidade do Estudante',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
                             ],
                           ),
                           const SizedBox(height: 12),
@@ -3868,16 +5240,20 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                               Expanded(
                                 child: _MetricSmallCard(
                                   label: '% Regularidade',
-                                  value: '${progress.regularityPercent.toStringAsFixed(0)}%',
+                                  value:
+                                      '${progress.regularityPercent.toStringAsFixed(0)}%',
                                   icon: Icons.check_circle_outline,
-                                  color: progress.regularityPercent >= 70 ? AppTheme.successGreen : AppTheme.alertAmber,
+                                  color: progress.regularityPercent >= 70
+                                      ? AppTheme.successGreen
+                                      : AppTheme.alertAmber,
                                 ),
                               ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: _MetricSmallCard(
                                   label: 'Média Presentes',
-                                  value: progress.averageAttendees.toStringAsFixed(1),
+                                  value: progress.averageAttendees
+                                      .toStringAsFixed(1),
                                   icon: Icons.group,
                                   color: const Color(0xFF7C3AED),
                                 ),
@@ -3890,37 +5266,50 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
                               color: progress.isPart3Reached
-                                  ? AppTheme.successGreen.withValues(alpha: 0.08)
-                                  : const Color(0xFF7C3AED).withValues(alpha: 0.08),
+                                  ? AppTheme.successGreen.withValues(
+                                      alpha: 0.08,
+                                    )
+                                  : const Color(0xFF7C3AED)
+                                        .withValues(alpha: 0.08),
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
                                 color: progress.isPart3Reached
-                                    ? AppTheme.successGreen.withValues(alpha: 0.3)
-                                    : const Color(0xFF7C3AED).withValues(alpha: 0.2),
+                                    ? AppTheme.successGreen.withValues(
+                                        alpha: 0.3,
+                                      )
+                                    : const Color(0xFF7C3AED)
+                                          .withValues(alpha: 0.2),
                               ),
                             ),
                             child: Row(
                               children: [
                                 Icon(
-                                  progress.isPart3Reached ? Icons.check_circle : Icons.bookmark,
-                                  color: progress.isPart3Reached ? AppTheme.successGreen : const Color(0xFF7C3AED),
+                                  progress.isPart3Reached
+                                      ? Icons.check_circle
+                                      : Icons.bookmark,
+                                  color: progress.isPart3Reached
+                                      ? AppTheme.successGreen
+                                      : const Color(0xFF7C3AED),
                                   size: 22,
                                 ),
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         progress.isBookCompleted
                                             ? '🎉 Livro Seja Feliz Para Sempre! Concluído'
                                             : progress.isPart3Reached
-                                                ? '🎯 Atingiu a Parte 3 (Lição 34+) - Avançando no Livro!'
-                                                : 'Progresso: Lição ${progress.currentLesson} de 60',
+                                            ? '🎯 Atingiu a Parte 3 (Lição 34+) - Avançando no Livro!'
+                                            : 'Progresso: Lição ${progress.currentLesson} de 60',
                                         style: TextStyle(
                                           fontWeight: FontWeight.bold,
                                           fontSize: 13,
-                                          color: progress.isPart3Reached ? AppTheme.successGreen : const Color(0xFF7C3AED),
+                                          color: progress.isPart3Reached
+                                              ? AppTheme.successGreen
+                                              : const Color(0xFF7C3AED),
                                         ),
                                       ),
                                       const SizedBox(height: 2),
@@ -3938,22 +5327,33 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                           ),
                           const SizedBox(height: 12),
                           // Botão Encerrar Estudo ou Reativar Estudo
-                          if (linkedStudy.status == 'encerrado' || linkedStudy.status == 'concluido') ...[
+                          if (linkedStudy.status == 'encerrado' ||
+                              linkedStudy.status == 'concluido') ...[
                             Container(
                               padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFFEF3C7),
                                 borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: const Color(0xFFF59E0B)),
+                                border: Border.all(
+                                  color: const Color(0xFFF59E0B),
+                                ),
                               ),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.info, color: Color(0xFFB45309), size: 20),
+                                  const Icon(
+                                    Icons.info,
+                                    color: Color(0xFFB45309),
+                                    size: 20,
+                                  ),
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
                                       'Estudo encerrado: ${progress.endReason ?? "Sem motivo informado"}',
-                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF92400E)),
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF92400E),
+                                      ),
                                     ),
                                   ),
                                   ElevatedButton.icon(
@@ -3963,8 +5363,16 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                                       visualDensity: VisualDensity.compact,
                                     ),
                                     icon: const Icon(Icons.refresh, size: 14),
-                                    label: const Text('Reativar Estudo', style: TextStyle(fontSize: 11)),
-                                    onPressed: () => _reactivateStudy(context, repo, linkedStudy, person),
+                                    label: const Text(
+                                      'Reativar Estudo',
+                                      style: TextStyle(fontSize: 11),
+                                    ),
+                                    onPressed: () => _reactivateStudy(
+                                      context,
+                                      repo,
+                                      linkedStudy,
+                                      person,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -3975,12 +5383,26 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                               child: OutlinedButton.icon(
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: AppTheme.alertRed,
-                                  side: const BorderSide(color: AppTheme.alertRed),
-                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                  side: const BorderSide(
+                                    color: AppTheme.alertRed,
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 10,
+                                  ),
                                 ),
-                                icon: const Icon(Icons.stop_circle_outlined, size: 16),
-                                label: const Text('Encerrar Estudo Bíblico (com motivo)'),
-                                onPressed: () => _showEndStudyDialog(context, repo, linkedStudy, person),
+                                icon: const Icon(
+                                  Icons.stop_circle_outlined,
+                                  size: 16,
+                                ),
+                                label: const Text(
+                                  'Encerrar Estudo Bíblico (com motivo)',
+                                ),
+                                onPressed: () => _showEndStudyDialog(
+                                  context,
+                                  repo,
+                                  linkedStudy,
+                                  person,
+                                ),
                               ),
                             ),
                           ],
@@ -3997,7 +5419,11 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
           // Histórico das Sessões de Estudo
           const Text(
             'Histórico de Sessões Realizadas',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textDark),
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.textDark,
+            ),
           ),
           const SizedBox(height: 8),
 
@@ -4022,7 +5448,9 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
 
               return Column(
                 children: sessions.map((s) {
-                  final attendance = DashboardCalculator.parseSessionAttendance(s);
+                  final attendance = DashboardCalculator.parseSessionAttendance(
+                    s,
+                  );
 
                   return Card(
                     margin: const EdgeInsets.only(bottom: 10),
@@ -4036,13 +5464,20 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                             children: [
                               Text(
                                 AppDateUtils.formatDateTime(s.dateTimeField),
-                                style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF7C3AED)),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF7C3AED),
+                                ),
                               ),
                               Chip(
                                 avatar: Icon(
-                                  s.status == 'cancelada' ? Icons.cancel_outlined : Icons.group,
+                                  s.status == 'cancelada'
+                                      ? Icons.cancel_outlined
+                                      : Icons.group,
                                   size: 14,
-                                  color: s.status == 'cancelada' ? AppTheme.alertRed : const Color(0xFF7C3AED),
+                                  color: s.status == 'cancelada'
+                                      ? AppTheme.alertRed
+                                      : const Color(0xFF7C3AED),
                                 ),
                                 label: Text(
                                   s.status == 'cancelada'
@@ -4051,10 +5486,14 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
-                                    color: s.status == 'cancelada' ? AppTheme.alertRed : null,
+                                    color: s.status == 'cancelada'
+                                        ? AppTheme.alertRed
+                                        : null,
                                   ),
                                 ),
-                                backgroundColor: s.status == 'cancelada' ? AppTheme.alertRed.withValues(alpha: 0.1) : null,
+                                backgroundColor: s.status == 'cancelada'
+                                    ? AppTheme.alertRed.withValues(alpha: 0.1)
+                                    : null,
                                 padding: EdgeInsets.zero,
                                 visualDensity: VisualDensity.compact,
                               ),
@@ -4064,7 +5503,12 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                           Row(
                             children: [
                               if (s.lessonCovered != null)
-                                Text('Lição ${s.lessonCovered}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                Text(
+                                  'Lição ${s.lessonCovered}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               if (s.paragraphsCovered != null) ...[
                                 const Text(' • '),
                                 Text('Parágrafos: ${s.paragraphsCovered}'),
@@ -4073,19 +5517,29 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                           ),
                           if (s.sessionNotes != null) ...[
                             const SizedBox(height: 4),
-                            Text(s.sessionNotes!, style: const TextStyle(color: AppTheme.textMuted, fontSize: 13)),
+                            Text(
+                              s.sessionNotes!,
+                              style: const TextStyle(
+                                color: AppTheme.textMuted,
+                                fontSize: 13,
+                              ),
+                            ),
                           ],
                           if (s.nextStep != null) ...[
                             const SizedBox(height: 6),
                             Container(
                               padding: const EdgeInsets.all(6),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF7C3AED).withValues(alpha: 0.08),
+                                color: const Color(0xFF7C3AED)
+                                    .withValues(alpha: 0.08),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(
                                 'Próximo passo: ${s.nextStep}',
-                                style: const TextStyle(fontSize: 12, color: Color(0xFF7C3AED)),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF7C3AED),
+                                ),
                               ),
                             ),
                           ],
@@ -4127,11 +5581,17 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                   children: [
                     const Text(
                       'Necessidades & Observações',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     Text(
                       '${notes.length} ${notes.length == 1 ? "registro com data e hora" : "registros com data e hora"}',
-                      style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textMuted,
+                      ),
                     ),
                   ],
                 ),
@@ -4143,7 +5603,8 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                 ),
                 icon: const Icon(Icons.add, size: 18),
                 label: const Text('+ Nova Observação'),
-                onPressed: () => _showAddOrEditNoteDialog(context, repo, person),
+                onPressed: () =>
+                    _showAddOrEditNoteDialog(context, repo, person),
               ),
             ],
           ),
@@ -4156,18 +5617,28 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                 child: Center(
                   child: Column(
                     children: [
-                      Icon(Icons.note_alt_outlined, size: 56, color: Colors.grey.shade400),
+                      Icon(
+                        Icons.note_alt_outlined,
+                        size: 56,
+                        color: Colors.grey.shade400,
+                      ),
                       const SizedBox(height: 12),
                       Text(
                         'Nenhuma necessidade ou observação registrada para ${person.name}.',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 6),
                       const Text(
                         'Toque no botão "+ Nova Observação" para registrar circunstâncias familiares, pontos de interesse ou dúvidas bíblicas.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                        style: TextStyle(
+                          color: AppTheme.textMuted,
+                          fontSize: 13,
+                        ),
                       ),
                       const SizedBox(height: 16),
                       ElevatedButton.icon(
@@ -4177,7 +5648,8 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                         ),
                         icon: const Icon(Icons.add),
                         label: const Text('+ Registrar Primeira Observação'),
-                        onPressed: () => _showAddOrEditNoteDialog(context, repo, person),
+                        onPressed: () =>
+                            _showAddOrEditNoteDialog(context, repo, person),
                       ),
                     ],
                   ),
@@ -4188,7 +5660,9 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
             Column(
               children: notes.map((note) {
                 final createdAt = DateTime.tryParse(note['createdAt'] ?? '');
-                final updatedAt = note['updatedAt'] != null ? DateTime.tryParse(note['updatedAt']) : null;
+                final updatedAt = note['updatedAt'] != null
+                    ? DateTime.tryParse(note['updatedAt'])
+                    : null;
                 final text = note['text'] ?? '';
 
                 return Card(
@@ -4203,17 +5677,29 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                           children: [
                             Row(
                               children: [
-                                const Icon(Icons.calendar_today, size: 14, color: AppTheme.accentTeal),
+                                const Icon(
+                                  Icons.calendar_today,
+                                  size: 14,
+                                  color: AppTheme.accentTeal,
+                                ),
                                 const SizedBox(width: 6),
                                 Text(
                                   AppDateUtils.formatDateTimeWithAt(createdAt),
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppTheme.accentTeal),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                    color: AppTheme.accentTeal,
+                                  ),
                                 ),
                                 if (updatedAt != null) ...[
                                   const SizedBox(width: 6),
                                   Text(
                                     '(editado)',
-                                    style: TextStyle(fontSize: 10, color: Colors.grey.shade500, fontStyle: FontStyle.italic),
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.grey.shade500,
+                                      fontStyle: FontStyle.italic,
+                                    ),
                                   ),
                                 ],
                               ],
@@ -4221,13 +5707,25 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                             Row(
                               children: [
                                 IconButton(
-                                  icon: const Icon(Icons.edit_outlined, size: 18),
+                                  icon: const Icon(
+                                    Icons.edit_outlined,
+                                    size: 18,
+                                  ),
                                   tooltip: 'Editar',
                                   visualDensity: VisualDensity.compact,
-                                  onPressed: () => _showAddOrEditNoteDialog(context, repo, person, note),
+                                  onPressed: () => _showAddOrEditNoteDialog(
+                                    context,
+                                    repo,
+                                    person,
+                                    note,
+                                  ),
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.delete_outline, size: 18, color: AppTheme.alertRed),
+                                  icon: const Icon(
+                                    Icons.delete_outline,
+                                    size: 18,
+                                    color: AppTheme.alertRed,
+                                  ),
                                   tooltip: 'Excluir',
                                   visualDensity: VisualDensity.compact,
                                   onPressed: () async {
@@ -4235,19 +5733,32 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                                       context: context,
                                       builder: (c) => AlertDialog(
                                         title: const Text('Excluir Observação'),
-                                        content: const Text('Tem certeza que deseja excluir esta anotação?'),
+                                        content: const Text(
+                                          'Tem certeza que deseja excluir esta anotação?',
+                                        ),
                                         actions: [
-                                          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancelar')),
+                                          TextButton(
+                                            onPressed: () =>
+                                                Navigator.pop(c, false),
+                                            child: const Text('Cancelar'),
+                                          ),
                                           ElevatedButton(
-                                            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.alertRed, foregroundColor: Colors.white),
-                                            onPressed: () => Navigator.pop(c, true),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor:
+                                                  AppTheme.alertRed,
+                                              foregroundColor: Colors.white,
+                                            ),
+                                            onPressed: () =>
+                                                Navigator.pop(c, true),
                                             child: const Text('Excluir'),
                                           ),
                                         ],
                                       ),
                                     );
                                     if (confirm == true) {
-                                      final updated = notes.where((n) => n['id'] != note['id']).toList();
+                                      final updated = notes
+                                          .where((n) => n['id'] != note['id'])
+                                          .toList();
                                       await _saveNotes(repo, person, updated);
                                     }
                                   },
@@ -4282,7 +5793,9 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
     bool isDark,
   ) {
     final targets = _parseTargets(person.contactRestrictions);
-    final completedCount = targets.where((t) => t['isCompleted'] == true).length;
+    final completedCount = targets
+        .where((t) => t['isCompleted'] == true)
+        .length;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -4298,11 +5811,17 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                   children: [
                     const Text(
                       'Alvos & Tarefas Espirituais',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     Text(
                       '$completedCount de ${targets.length} concluído(s)',
-                      style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textMuted,
+                      ),
                     ),
                   ],
                 ),
@@ -4314,7 +5833,8 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                 ),
                 icon: const Icon(Icons.add_task, size: 18),
                 label: const Text('+ Novo Alvo'),
-                onPressed: () => _showAddOrEditTargetDialog(context, repo, person),
+                onPressed: () =>
+                    _showAddOrEditTargetDialog(context, repo, person),
               ),
             ],
           ),
@@ -4327,18 +5847,28 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                 child: Center(
                   child: Column(
                     children: [
-                      Icon(Icons.track_changes, size: 56, color: Colors.grey.shade400),
+                      Icon(
+                        Icons.track_changes,
+                        size: 56,
+                        color: Colors.grey.shade400,
+                      ),
                       const SizedBox(height: 12),
                       Text(
                         'Nenhum alvo ou tarefa espiritual definido para ${person.name}.',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 6),
                       const Text(
                         'Defina alvos espirituais para a pessoa cumprir até a próxima visita (ex: ler um capítulo da Bíblia, baixar o JW Library, assistir ao vídeo da lição).',
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                        style: TextStyle(
+                          color: AppTheme.textMuted,
+                          fontSize: 13,
+                        ),
                       ),
                       const SizedBox(height: 16),
                       ElevatedButton.icon(
@@ -4348,7 +5878,8 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                         ),
                         icon: const Icon(Icons.add),
                         label: const Text('+ Cadastrar Primeiro Alvo'),
-                        onPressed: () => _showAddOrEditTargetDialog(context, repo, person),
+                        onPressed: () =>
+                            _showAddOrEditTargetDialog(context, repo, person),
                       ),
                     ],
                   ),
@@ -4363,7 +5894,9 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                 final isCompleted = target['isCompleted'] == true;
                 final title = target['title'] ?? '';
                 final createdAt = DateTime.tryParse(target['createdAt'] ?? '');
-                final completedAt = target['completedAt'] != null ? DateTime.tryParse(target['completedAt']) : null;
+                final completedAt = target['completedAt'] != null
+                    ? DateTime.tryParse(target['completedAt'])
+                    : null;
 
                 return Card(
                   margin: const EdgeInsets.only(bottom: 10),
@@ -4375,12 +5908,17 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                       updated[idx] = {
                         ...target,
                         'isCompleted': nextCompleted,
-                        'completedAt': nextCompleted ? DateTime.now().toIso8601String() : null,
+                        'completedAt': nextCompleted
+                            ? DateTime.now().toIso8601String()
+                            : null,
                       };
                       await _saveTargets(repo, person, updated);
                     },
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 10,
+                      ),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -4388,12 +5926,16 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                             value: isCompleted,
                             activeColor: const Color(0xFF059669),
                             onChanged: (val) async {
-                              final updated = List<Map<String, dynamic>>.from(targets);
+                              final updated = List<Map<String, dynamic>>.from(
+                                targets,
+                              );
                               final nextCompleted = val ?? false;
                               updated[idx] = {
                                 ...target,
                                 'isCompleted': nextCompleted,
-                                'completedAt': nextCompleted ? DateTime.now().toIso8601String() : null,
+                                'completedAt': nextCompleted
+                                    ? DateTime.now().toIso8601String()
+                                    : null,
                               };
                               await _saveTargets(repo, person, updated);
                             },
@@ -4409,20 +5951,33 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                                     style: TextStyle(
                                       fontSize: 15,
                                       fontWeight: FontWeight.w600,
-                                      decoration: isCompleted ? TextDecoration.lineThrough : null,
-                                      color: isCompleted ? (isDark ? const Color(0xFF94A3B8) : Colors.grey.shade600) : null,
+                                      decoration: isCompleted
+                                          ? TextDecoration.lineThrough
+                                          : null,
+                                      color: isCompleted
+                                          ? (isDark
+                                                ? const Color(0xFF94A3B8)
+                                                : Colors.grey.shade600)
+                                          : null,
                                     ),
                                   ),
                                   const SizedBox(height: 4),
                                   Row(
                                     children: [
-                                      Icon(Icons.schedule, size: 12, color: Colors.grey.shade500),
+                                      Icon(
+                                        Icons.schedule,
+                                        size: 12,
+                                        color: Colors.grey.shade500,
+                                      ),
                                       const SizedBox(width: 4),
                                       Text(
                                         createdAt != null
                                             ? 'Criado em: ${AppDateUtils.formatDateTimeWithAt(createdAt)}'
                                             : 'Criado em: data não disponível',
-                                        style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.grey.shade500,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -4430,13 +5985,21 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                                     const SizedBox(height: 2),
                                     Row(
                                       children: [
-                                        const Icon(Icons.check_circle, size: 12, color: Color(0xFF059669)),
+                                        const Icon(
+                                          Icons.check_circle,
+                                          size: 12,
+                                          color: Color(0xFF059669),
+                                        ),
                                         const SizedBox(width: 4),
                                         Text(
                                           completedAt != null
                                               ? 'Concluído em: ${AppDateUtils.formatDateTimeWithAt(completedAt)}'
                                               : 'Concluído (data não informada)',
-                                          style: const TextStyle(fontSize: 11, color: Color(0xFF059669), fontWeight: FontWeight.bold),
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            color: Color(0xFF059669),
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -4445,44 +6008,63 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                               ),
                             ),
                           ),
-                        IconButton(
-                          icon: const Icon(Icons.edit_outlined, size: 18),
-                          tooltip: 'Editar',
-                          visualDensity: VisualDensity.compact,
-                          onPressed: () => _showAddOrEditTargetDialog(context, repo, person, target),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline, size: 18, color: AppTheme.alertRed),
-                          tooltip: 'Excluir',
-                          visualDensity: VisualDensity.compact,
-                          onPressed: () async {
-                            final confirm = await showDialog<bool>(
-                              context: context,
-                              builder: (c) => AlertDialog(
-                                title: const Text('Excluir Alvo'),
-                                content: const Text('Tem certeza que deseja excluir este alvo espiritual?'),
-                                actions: [
-                                  TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancelar')),
-                                  ElevatedButton(
-                                    style: ElevatedButton.styleFrom(backgroundColor: AppTheme.alertRed, foregroundColor: Colors.white),
-                                    onPressed: () => Navigator.pop(c, true),
-                                    child: const Text('Excluir'),
+                          IconButton(
+                            icon: const Icon(Icons.edit_outlined, size: 18),
+                            tooltip: 'Editar',
+                            visualDensity: VisualDensity.compact,
+                            onPressed: () => _showAddOrEditTargetDialog(
+                              context,
+                              repo,
+                              person,
+                              target,
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.delete_outline,
+                              size: 18,
+                              color: AppTheme.alertRed,
+                            ),
+                            tooltip: 'Excluir',
+                            visualDensity: VisualDensity.compact,
+                            onPressed: () async {
+                              final confirm = await showDialog<bool>(
+                                context: context,
+                                builder: (c) => AlertDialog(
+                                  title: const Text('Excluir Alvo'),
+                                  content: const Text(
+                                    'Tem certeza que deseja excluir este alvo espiritual?',
                                   ),
-                                ],
-                              ),
-                            );
-                            if (confirm == true) {
-                              final updated = targets.where((t) => t['id'] != target['id']).toList();
-                              await _saveTargets(repo, person, updated);
-                            }
-                          },
-                        ),
-                      ],
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(c, false),
+                                      child: const Text('Cancelar'),
+                                    ),
+                                    ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppTheme.alertRed,
+                                        foregroundColor: Colors.white,
+                                      ),
+                                      onPressed: () => Navigator.pop(c, true),
+                                      child: const Text('Excluir'),
+                                    ),
+                                  ],
+                                ),
+                              );
+                              if (confirm == true) {
+                                final updated = targets
+                                    .where((t) => t['id'] != target['id'])
+                                    .toList();
+                                await _saveTargets(repo, person, updated);
+                              }
+                            },
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              );
-            }).toList(),
+                );
+              }).toList(),
             ),
         ],
       ),
@@ -4514,7 +6096,8 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
       );
 
       if (distKm <= 1.2) {
-        final isEnded = other.status == 'revisita_encerrada' || other.status == 'encerrado';
+        final isEnded =
+            other.status == 'revisita_encerrada' || other.status == 'encerrado';
         nearby.add((contact: other, distanceKm: distKm, isEnded: isEnded));
       }
     }
@@ -4540,18 +6123,29 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                 const Expanded(
                   child: Text(
                     'Alerta de Proximidade: Vizinhos Próximos (< 1.2 km)',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.accentTeal),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: AppTheme.accentTeal,
+                    ),
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: AppTheme.accentTeal.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
                     '${nearby.length} contato(s)',
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.accentTeal),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.accentTeal,
+                    ),
                   ),
                 ),
               ],
@@ -4570,7 +6164,9 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                   onTap: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => PersonDetailScreen(personId: c.id)),
+                      MaterialPageRoute(
+                        builder: (_) => PersonDetailScreen(personId: c.id),
+                      ),
                     );
                   },
                   child: Padding(
@@ -4578,33 +6174,72 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                     child: Row(
                       children: [
                         Icon(
-                          item.isEnded ? Icons.replay_outlined : Icons.location_on,
+                          item.isEnded
+                              ? Icons.replay_outlined
+                              : Icons.location_on,
                           size: 16,
-                          color: item.isEnded ? Colors.orange : AppTheme.primaryBlue,
+                          color: item.isEnded
+                              ? Colors.orange
+                              : AppTheme.primaryBlue,
                         ),
                         const SizedBox(width: 6),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(c.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                              Text(
+                                c.name,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
                               if (c.address != null && c.address!.isNotEmpty)
-                                Text(c.address!, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                                Text(
+                                  c.address!,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: AppTheme.textMuted,
+                                  ),
+                                ),
                             ],
                           ),
                         ),
                         if (item.isEnded)
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             margin: const EdgeInsets.only(right: 6),
                             decoration: BoxDecoration(
                               color: Colors.amber.shade100,
                               borderRadius: BorderRadius.circular(4),
                             ),
-                            child: const Text('Reativar?', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFB45309))),
+                            child: const Text(
+                              'Reativar?',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFFB45309),
+                              ),
+                            ),
                           ),
-                        Text('~${distMeters}m', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.accentTeal)),
-                        const Icon(Icons.chevron_right, size: 16, color: Colors.grey),
+                        Text(
+                          '~${distMeters}m',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.accentTeal,
+                          ),
+                        ),
+                        const Icon(
+                          Icons.chevron_right,
+                          size: 16,
+                          color: Colors.grey,
+                        ),
                       ],
                     ),
                   ),
@@ -4625,12 +6260,15 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
     bool isDark,
   ) {
     final List<String> completedGoals = [];
-    if (person.contactRestrictions != null && person.contactRestrictions!.isNotEmpty) {
+    if (person.contactRestrictions != null &&
+        person.contactRestrictions!.isNotEmpty) {
       try {
         final decoded = jsonDecode(person.contactRestrictions!);
         if (decoded is List) {
           for (final item in decoded) {
-            if (item is Map && item['isCompleted'] == true && item['title'] != null) {
+            if (item is Map &&
+                item['isCompleted'] == true &&
+                item['title'] != null) {
               completedGoals.add(item['title'].toString());
             }
           }
@@ -4654,7 +6292,11 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                     color: Colors.amber.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.timeline, color: Color(0xFFD97706), size: 20),
+                  child: const Icon(
+                    Icons.timeline,
+                    color: Color(0xFFD97706),
+                    size: 20,
+                  ),
                 ),
                 const SizedBox(width: 10),
                 const Text(
@@ -4676,22 +6318,30 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
 
             _TimelineStep(
               icon: Icons.menu_book,
-              iconColor: currentLesson >= 1 ? const Color(0xFF0284C7) : Colors.grey,
+              iconColor: currentLesson >= 1
+                  ? const Color(0xFF0284C7)
+                  : Colors.grey,
               title: 'Brochura Inicial (Lições 01 a 03)',
               date: currentLesson > 3
                   ? 'Concluída'
-                  : (currentLesson >= 1 ? 'Em andamento (Lição $currentLesson)' : 'Início'),
+                  : (currentLesson >= 1
+                        ? 'Em andamento (Lição $currentLesson)'
+                        : 'Início'),
               subtitle: 'Brochura "Seja Feliz para Sempre!": 3 lições introdutórias da Bíblia',
               isCompleted: currentLesson >= 3,
             ),
 
             _TimelineStep(
               icon: Icons.handshake_outlined,
-              iconColor: currentLesson >= 4 ? AppTheme.successGreen : (currentLesson == 3 ? AppTheme.alertAmber : Colors.grey),
+              iconColor: currentLesson >= 4
+                  ? AppTheme.successGreen
+                  : (currentLesson == 3 ? AppTheme.alertAmber : Colors.grey),
               title: 'Aceitou Continuar com o Livro Completo',
               date: currentLesson >= 4
                   ? 'Recebeu o livro (Lição 4+)'
-                  : (currentLesson == 3 ? 'Consideração da Lição 3' : 'Pendente'),
+                  : (currentLesson == 3
+                        ? 'Consideração da Lição 3'
+                        : 'Pendente'),
               subtitle: currentLesson >= 4
                   ? 'Estudante aceitou o curso completo e recebeu o livro "Seja Feliz para Sempre!"'
                   : 'No final da lição 3: Consideração sobre continuar no livro a partir da Lição 4',
@@ -4703,13 +6353,16 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
               iconColor: const Color(0xFF7C3AED),
               title: 'Curso Completo no Livro',
               date: currentLesson >= 4 ? 'Em andamento' : 'Aguardando Lição 4',
-              subtitle: 'Publicação: Livro "Seja Feliz para Sempre!" (60 lições)',
+              subtitle:
+                  'Publicação: Livro "Seja Feliz para Sempre!" (60 lições)',
               isCompleted: currentLesson >= 4,
             ),
 
             _TimelineStep(
               icon: Icons.military_tech_outlined,
-              iconColor: currentLesson >= 12 ? AppTheme.successGreen : Colors.grey,
+              iconColor: currentLesson >= 12
+                  ? AppTheme.successGreen
+                  : Colors.grey,
               title: 'Marco 1: Conclusão da Seção 1 (Lições 01 a 12)',
               date: currentLesson >= 12 ? 'Concluída' : 'Em andamento',
               subtitle: 'Fundamentos da Bíblia e aproximação de Deus',
@@ -4718,27 +6371,39 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
 
             _TimelineStep(
               icon: Icons.verified_outlined,
-              iconColor: currentLesson >= 33 ? AppTheme.successGreen : Colors.grey,
+              iconColor: currentLesson >= 33
+                  ? AppTheme.successGreen
+                  : Colors.grey,
               title: 'Marco 2: Conclusão da Seção 2 (Lições 13 a 33)',
-              date: currentLesson >= 33 ? 'Concluída' : (currentLesson >= 12 ? 'Em andamento' : 'Pendente'),
+              date: currentLesson >= 33
+                  ? 'Concluída'
+                  : (currentLesson >= 12 ? 'Em andamento' : 'Pendente'),
               subtitle: 'O Reino de Deus e a vida de Jesus Cristo',
               isCompleted: currentLesson >= 33,
             ),
 
             _TimelineStep(
               icon: Icons.shield_outlined,
-              iconColor: currentLesson >= 47 ? AppTheme.successGreen : Colors.grey,
+              iconColor: currentLesson >= 47
+                  ? AppTheme.successGreen
+                  : Colors.grey,
               title: 'Marco 3: Conclusão da Seção 3 (Lições 34 a 47)',
-              date: currentLesson >= 47 ? 'Concluída' : (currentLesson >= 33 ? 'Em andamento' : 'Pendente'),
+              date: currentLesson >= 47
+                  ? 'Concluída'
+                  : (currentLesson >= 33 ? 'Em andamento' : 'Pendente'),
               subtitle: 'Aplicação das leis divinas, conduta moral e dedicação a Deus',
               isCompleted: currentLesson >= 47,
             ),
 
             _TimelineStep(
               icon: Icons.flag_outlined,
-              iconColor: currentLesson >= 60 ? AppTheme.successGreen : Colors.grey,
+              iconColor: currentLesson >= 60
+                  ? AppTheme.successGreen
+                  : Colors.grey,
               title: 'Marco 4: Conclusão da Seção 4 (Lições 48 a 60)',
-              date: currentLesson >= 60 ? 'Concluída' : (currentLesson >= 47 ? 'Em andamento' : 'Pendente'),
+              date: currentLesson >= 60
+                  ? 'Concluída'
+                  : (currentLesson >= 47 ? 'Em andamento' : 'Pendente'),
               subtitle: 'Amizades, congregação, perseverança e amizade eterna com Jeová',
               isCompleted: currentLesson >= 60,
             ),
@@ -4756,10 +6421,13 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
 
             _TimelineStep(
               icon: Icons.workspace_premium,
-              iconColor: currentLesson >= 60 ? AppTheme.successGreen : Colors.grey,
+              iconColor: currentLesson >= 60
+                  ? AppTheme.successGreen
+                  : Colors.grey,
               title: 'Alvo Final: Conclusão do Livro "Seja Feliz Para Sempre!"',
               date: currentLesson >= 60 ? '🎉 Livro Concluído!' : 'Alvo Final',
-              subtitle: 'Preparo espiritual completo para continuar crescendo na fé',
+              subtitle:
+                  'Preparo espiritual completo para continuar crescendo na fé',
               isCompleted: currentLesson >= 60,
               isLast: true,
             ),
@@ -4811,7 +6479,9 @@ class _TimelineStep extends StatelessWidget {
                 Expanded(
                   child: Container(
                     width: 2,
-                    color: isCompleted ? iconColor.withValues(alpha: 0.4) : Colors.grey.shade300,
+                    color: isCompleted
+                        ? iconColor.withValues(alpha: 0.4)
+                        : Colors.grey.shade300,
                     margin: const EdgeInsets.symmetric(vertical: 4),
                   ),
                 ),
@@ -4838,9 +6508,14 @@ class _TimelineStep extends StatelessWidget {
                         ),
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
-                          color: isCompleted ? iconColor.withValues(alpha: 0.1) : Colors.grey.shade100,
+                          color: isCompleted
+                              ? iconColor.withValues(alpha: 0.1)
+                              : Colors.grey.shade100,
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
@@ -4859,7 +6534,9 @@ class _TimelineStep extends StatelessWidget {
                     subtitle,
                     style: TextStyle(
                       fontSize: 11,
-                      color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF94A3B8) : AppTheme.textMuted,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? const Color(0xFF94A3B8)
+                          : AppTheme.textMuted,
                     ),
                   ),
                 ],
@@ -4871,7 +6548,6 @@ class _TimelineStep extends StatelessWidget {
     );
   }
 }
-
 
 class _MetricSmallCard extends StatelessWidget {
   final String label;
@@ -4903,10 +6579,20 @@ class _MetricSmallCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: const TextStyle(fontSize: 10, color: AppTheme.textMuted)),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: AppTheme.textMuted,
+                  ),
+                ),
                 Text(
                   value,
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: color),
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -4939,8 +6625,8 @@ class PersonUnifiedTimelineSection extends ConsumerWidget {
     final voiceNotesManager = ref.watch(voiceNotesManagerProvider);
     final appointments = isAgendaEnabled
         ? (ref.watch(appointmentsStreamProvider).value ?? [])
-            .where((a) => a.personId == person.id && a.deletedAt == null)
-            .toList()
+              .where((a) => a.personId == person.id && a.deletedAt == null)
+              .toList()
         : <AppointmentEntry>[];
 
     return StreamBuilder<List<VisitEntry>>(
@@ -4966,19 +6652,30 @@ class PersonUnifiedTimelineSection extends ConsumerWidget {
                 final items = <_UnifiedTimelineEvent>[];
 
                 for (final v in visits) {
-                  final isPhone = v.contactType.toLowerCase().contains('telefon') ||
+                  final isPhone =
+                      v.contactType.toLowerCase().contains('telefon') ||
                       v.contactType.toLowerCase().contains('chamada') ||
                       v.contactType.toLowerCase().contains('ligação');
                   items.add(
                     _UnifiedTimelineEvent(
                       date: v.dateTimeField,
-                      title: v.topicsDiscussed ?? (isPhone ? 'Contato Telefônico' : 'Visita Presencial'),
+                      title:
+                          v.topicsDiscussed ??
+                          (isPhone
+                              ? 'Contato Telefônico'
+                              : 'Visita Presencial'),
                       subtitle: 'Resultado: ${v.result}',
                       notes: v.notes,
                       nextStep: v.nextStep,
-                      tag: isPhone ? 'Telefone / Chamada' : (v.contactType == 'estudo' ? 'Estudo' : 'Visita'),
-                      icon: isPhone ? Icons.phone_in_talk : Icons.chat_bubble_outline,
-                      color: isPhone ? const Color(0xFF0D9488) : AppTheme.primaryBlue,
+                      tag: isPhone
+                          ? 'Telefone / Chamada'
+                          : (v.contactType == 'estudo' ? 'Estudo' : 'Visita'),
+                      icon: isPhone
+                          ? Icons.phone_in_talk
+                          : Icons.chat_bubble_outline,
+                      color: isPhone
+                          ? const Color(0xFF0D9488)
+                          : AppTheme.primaryBlue,
                       attendance: DashboardCalculator.parseVisitAttendance(v),
                     ),
                   );
@@ -4988,7 +6685,8 @@ class PersonUnifiedTimelineSection extends ConsumerWidget {
                   items.add(
                     _UnifiedTimelineEvent(
                       date: s.dateTimeField,
-                      title: 'Sessão de Estudo Bíblico • Lição ${s.lessonCovered ?? 1}',
+                      title:
+                          'Sessão de Estudo Bíblico • Lição ${s.lessonCovered ?? 1}',
                       subtitle: s.paragraphsCovered != null
                           ? 'Parágrafos: ${s.paragraphsCovered} • Status: ${s.status}'
                           : 'Status: ${s.status}',
@@ -5019,7 +6717,8 @@ class PersonUnifiedTimelineSection extends ConsumerWidget {
                   items.add(
                     _UnifiedTimelineEvent(
                       date: vn.createdAt,
-                      title: 'Nota de Áudio / Ditado (${vn.audioDurationSeconds}s)',
+                      title:
+                          'Nota de Áudio / Ditado (${vn.audioDurationSeconds}s)',
                       subtitle: 'Gravação de voz',
                       notes: vn.transcription,
                       tag: 'Nota de Voz',
@@ -5028,7 +6727,6 @@ class PersonUnifiedTimelineSection extends ConsumerWidget {
                     ),
                   );
                 }
-
 
                 items.sort((a, b) => b.date.compareTo(a.date));
 
@@ -5064,35 +6762,58 @@ class PersonUnifiedTimelineSection extends ConsumerWidget {
                                     Container(
                                       padding: const EdgeInsets.all(6),
                                       decoration: BoxDecoration(
-                                        color: item.color.withValues(alpha: 0.12),
+                                        color: item.color.withValues(
+                                          alpha: 0.12,
+                                        ),
                                         borderRadius: BorderRadius.circular(6),
                                       ),
-                                      child: Icon(item.icon, size: 16, color: item.color),
+                                      child: Icon(
+                                        item.icon,
+                                        size: 16,
+                                        color: item.color,
+                                      ),
                                     ),
                                     const SizedBox(width: 8),
                                     Text(
                                       AppDateUtils.formatDateTime(item.date),
-                                      style: TextStyle(fontWeight: FontWeight.bold, color: item.color, fontSize: 13),
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: item.color,
+                                        fontSize: 13,
+                                      ),
                                     ),
                                   ],
                                 ),
                                 Row(
                                   children: [
-                                    if (item.attendance != null && item.attendance! > 0)
+                                    if (item.attendance != null &&
+                                        item.attendance! > 0)
                                       Padding(
-                                        padding: const EdgeInsets.only(right: 6),
+                                        padding: const EdgeInsets.only(
+                                          right: 6,
+                                        ),
                                         child: Chip(
-                                          avatar: const Icon(Icons.group, size: 14, color: AppTheme.primaryBlue),
+                                          avatar: const Icon(
+                                            Icons.group,
+                                            size: 14,
+                                            color: AppTheme.primaryBlue,
+                                          ),
                                           label: Text(
                                             '${item.attendance} ${item.attendance == 1 ? "ouvinte" : "ouvintes"}',
-                                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                                            style: const TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                            ),
                                           ),
                                           padding: EdgeInsets.zero,
                                           visualDensity: VisualDensity.compact,
                                         ),
                                       ),
                                     Chip(
-                                      label: Text(item.tag, style: const TextStyle(fontSize: 11)),
+                                      label: Text(
+                                        item.tag,
+                                        style: const TextStyle(fontSize: 11),
+                                      ),
                                       padding: EdgeInsets.zero,
                                       visualDensity: VisualDensity.compact,
                                     ),
@@ -5103,17 +6824,31 @@ class PersonUnifiedTimelineSection extends ConsumerWidget {
                             const SizedBox(height: 8),
                             Text(
                               item.title,
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
                             ),
                             if (item.subtitle != null) ...[
                               const SizedBox(height: 2),
-                              Text(item.subtitle!, style: const TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+                              Text(
+                                item.subtitle!,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppTheme.textMuted,
+                                ),
+                              ),
                             ],
-                            if (item.notes != null && item.notes!.isNotEmpty) ...[
+                            if (item.notes != null &&
+                                item.notes!.isNotEmpty) ...[
                               const SizedBox(height: 6),
-                              Text(item.notes!, style: const TextStyle(fontSize: 13)),
+                              Text(
+                                item.notes!,
+                                style: const TextStyle(fontSize: 13),
+                              ),
                             ],
-                            if (item.nextStep != null && item.nextStep!.isNotEmpty) ...[
+                            if (item.nextStep != null &&
+                                item.nextStep!.isNotEmpty) ...[
                               const SizedBox(height: 8),
                               Container(
                                 padding: const EdgeInsets.all(8),
@@ -5123,12 +6858,20 @@ class PersonUnifiedTimelineSection extends ConsumerWidget {
                                 ),
                                 child: Row(
                                   children: [
-                                    const Icon(Icons.arrow_forward, size: 14, color: AppTheme.primaryBlue),
+                                    const Icon(
+                                      Icons.arrow_forward,
+                                      size: 14,
+                                      color: AppTheme.primaryBlue,
+                                    ),
                                     const SizedBox(width: 6),
                                     Expanded(
                                       child: Text(
                                         'Próximo passo: ${item.nextStep}',
-                                        style: const TextStyle(fontSize: 12, color: AppTheme.primaryBlue, fontWeight: FontWeight.w500),
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: AppTheme.primaryBlue,
+                                          fontWeight: FontWeight.w500,
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -5173,5 +6916,3 @@ class _UnifiedTimelineEvent {
     this.attendance,
   });
 }
-
-

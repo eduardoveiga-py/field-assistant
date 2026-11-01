@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../core/app_theme.dart';
 import '../../core/feature_registry.dart';
 import '../providers.dart';
@@ -45,10 +46,10 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
   final WidgetRef ref;
 
   GlobalSearchDelegate({required this.ref})
-      : super(
-          searchFieldLabel: 'Buscar pessoas, telefones, notas, estudos...',
-          searchFieldStyle: const TextStyle(fontSize: 15),
-        );
+    : super(
+        searchFieldLabel: 'Buscar pessoas, telefones, notas, estudos...',
+        searchFieldStyle: const TextStyle(fontSize: 15),
+      );
 
   @override
   List<Widget>? buildActions(BuildContext context) {
@@ -113,11 +114,18 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
 
     final repo = ref.watch(repositoryProvider);
     final db = repo.db;
-    final isStudiesEnabled = ref.watch(isFeatureEnabledProvider(AppFeature.studies));
-    final isAgendaEnabled = ref.watch(isFeatureEnabledProvider(AppFeature.agenda));
-    final isResearchEnabled = ref.watch(isFeatureEnabledProvider(AppFeature.notesResearch));
-    final isPhonesEnabled = ref.watch(isFeatureEnabledProvider(AppFeature.phones));
-
+    final isStudiesEnabled = ref.watch(
+      isFeatureEnabledProvider(AppFeature.studies),
+    );
+    final isAgendaEnabled = ref.watch(
+      isFeatureEnabledProvider(AppFeature.agenda),
+    );
+    final isResearchEnabled = ref.watch(
+      isFeatureEnabledProvider(AppFeature.notesResearch),
+    );
+    final isPhonesEnabled = ref.watch(
+      isFeatureEnabledProvider(AppFeature.phones),
+    );
 
     return FutureBuilder<List<GlobalSearchResultItem>>(
       future: _performSearch(
@@ -147,7 +155,10 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
                   const SizedBox(height: 12),
                   Text(
                     'Nenhum resultado para "$query"',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
                   ),
                   const SizedBox(height: 6),
                   const Text(
@@ -175,16 +186,31 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
                 ),
                 child: Icon(item.type.icon, color: item.type.color, size: 20),
               ),
-              title: Text(item.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              title: Text(
+                item.title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
               subtitle: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(item.subtitle, style: const TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+                  Text(
+                    item.subtitle,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textMuted,
+                    ),
+                  ),
                   if (item.snippet != null && item.snippet!.isNotEmpty) ...[
                     const SizedBox(height: 2),
                     Text(
                       item.snippet!,
-                      style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontStyle: FontStyle.italic,
+                      ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -192,7 +218,13 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
                 ],
               ),
               trailing: Chip(
-                label: Text(item.type.label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                label: Text(
+                  item.type.label,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 padding: EdgeInsets.zero,
                 visualDensity: VisualDensity.compact,
               ),
@@ -227,7 +259,8 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
         final nameMatch = p.name.toLowerCase().contains(query);
         final addrMatch = p.address?.toLowerCase().contains(query) ?? false;
         final noteMatch = p.notes?.toLowerCase().contains(query) ?? false;
-        final nextMatch = p.nextActionNote?.toLowerCase().contains(query) ?? false;
+        final nextMatch =
+            p.nextActionNote?.toLowerCase().contains(query) ?? false;
 
         if (nameMatch || addrMatch || noteMatch || nextMatch) {
           results.add(
@@ -235,10 +268,17 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
               id: p.id,
               title: p.name,
               subtitle: p.address ?? 'Sem endereço cadastrado',
-              snippet: noteMatch ? p.notes : (nextMatch ? p.nextActionNote : null),
+              snippet: noteMatch
+                  ? p.notes
+                  : (nextMatch ? p.nextActionNote : null),
               type: GlobalSearchResultType.person,
               onTap: () {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => PersonDetailScreen(personId: p.id)));
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => PersonDetailScreen(personId: p.id),
+                  ),
+                );
               },
             ),
           );
@@ -253,7 +293,9 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
         for (final ph in phones) {
           if (ph.deletedAt != null) continue;
           final nameMatch = ph.name.toLowerCase().contains(query);
-          final phoneMatch = ph.phone.replaceAll(RegExp(r'\D'), '').contains(query) || ph.phone.contains(query);
+          final phoneMatch =
+              ph.phone.replaceAll(RegExp(r'\D'), '').contains(query) ||
+              ph.phone.contains(query);
           final notesMatch = ph.notes?.toLowerCase().contains(query) ?? false;
 
           if (nameMatch || phoneMatch || notesMatch) {
@@ -265,7 +307,12 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
                 snippet: notesMatch ? ph.notes : null,
                 type: GlobalSearchResultType.phone,
                 onTap: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const PhoneContactsScreen()));
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const PhoneContactsScreen(),
+                    ),
+                  );
                 },
               ),
             );
@@ -280,7 +327,8 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
       for (final vn in voiceNotes) {
         if (vn.deletedAt != null) continue;
         final textMatch = vn.transcription.toLowerCase().contains(query);
-        final doubtMatch = vn.extractedPendingDoubt?.toLowerCase().contains(query) ?? false;
+        final doubtMatch =
+            vn.extractedPendingDoubt?.toLowerCase().contains(query) ?? false;
 
         if (textMatch || doubtMatch) {
           results.add(
@@ -291,7 +339,12 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
               snippet: vn.transcription,
               type: GlobalSearchResultType.voiceNote,
               onTap: () {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => PersonDetailScreen(personId: vn.personId)));
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => PersonDetailScreen(personId: vn.personId),
+                  ),
+                );
               },
             ),
           );
@@ -306,7 +359,8 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
         for (final a in articles) {
           if (a.deletedAt != null) continue;
           final titleMatch = a.title.toLowerCase().contains(query);
-          final scriptMatch = a.scriptures?.toLowerCase().contains(query) ?? false;
+          final scriptMatch =
+              a.scriptures?.toLowerCase().contains(query) ?? false;
           final notesMatch = a.notes?.toLowerCase().contains(query) ?? false;
 
           if (titleMatch || scriptMatch || notesMatch) {
@@ -314,11 +368,15 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
               GlobalSearchResultItem(
                 id: a.id,
                 title: a.title,
-                subtitle: 'Categoria: ${a.category} • Textos: ${a.scriptures ?? ""}',
+                subtitle:
+                    'Categoria: ${a.category} • Textos: ${a.scriptures ?? ""}',
                 snippet: notesMatch ? a.notes : null,
                 type: GlobalSearchResultType.research,
                 onTap: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const ResearchScreen()));
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ResearchScreen()),
+                  );
                 },
               ),
             );
@@ -334,18 +392,25 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
         for (final a in appts) {
           if (a.deletedAt != null) continue;
           final titleMatch = a.title.toLowerCase().contains(query);
-          final notesMatch = a.locationNotes?.toLowerCase().contains(query) ?? false;
+          final notesMatch =
+              a.locationNotes?.toLowerCase().contains(query) ?? false;
 
           if (titleMatch || notesMatch) {
             results.add(
               GlobalSearchResultItem(
                 id: a.id,
                 title: a.title,
-                subtitle: 'Compromisso em ${a.startTime.day}/${a.startTime.month} • Status: ${a.status}',
+                subtitle:
+                    'Compromisso em ${a.startTime.day}/${a.startTime.month} • Status: ${a.status}',
                 snippet: notesMatch ? a.locationNotes : null,
                 type: GlobalSearchResultType.appointment,
                 onTap: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const AppointmentsScreen()));
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const AppointmentsScreen(),
+                    ),
+                  );
                 },
               ),
             );
@@ -361,18 +426,23 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
         for (final s in studies) {
           if (s.deletedAt != null) continue;
           final titleMatch = s.title.toLowerCase().contains(query);
-          final manualMatch = s.manualReference?.toLowerCase().contains(query) ?? false;
+          final manualMatch =
+              s.manualReference?.toLowerCase().contains(query) ?? false;
 
           if (titleMatch || manualMatch) {
             results.add(
               GlobalSearchResultItem(
                 id: s.id,
                 title: s.title,
-                subtitle: 'Publicação: ${s.publicationId} • Status: ${s.status}',
+                subtitle:
+                    'Publicação: ${s.publicationId} • Status: ${s.status}',
                 snippet: s.learningGoals,
                 type: GlobalSearchResultType.study,
                 onTap: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const StudiesScreen()));
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const StudiesScreen()),
+                  );
                 },
               ),
             );

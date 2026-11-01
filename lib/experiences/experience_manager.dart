@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import 'package:drift/drift.dart';
+
 import '../database/app_database.dart';
 import '../ui/providers.dart';
 
@@ -30,16 +32,16 @@ class MinistryExperienceItem {
   });
 
   Map<String, dynamic> toMap() => {
-        'id': id,
-        'title': title,
-        'content': content,
-        'media_urls': jsonEncode(mediaUrls),
-        'tags': jsonEncode(tags),
-        'date_time': dateTime.toIso8601String(),
-        'location_or_modality': locationOrModality,
-        'created_at': createdAt.toIso8601String(),
-        'updated_at': updatedAt.toIso8601String(),
-      };
+    'id': id,
+    'title': title,
+    'content': content,
+    'media_urls': jsonEncode(mediaUrls),
+    'tags': jsonEncode(tags),
+    'date_time': dateTime.toIso8601String(),
+    'location_or_modality': locationOrModality,
+    'created_at': createdAt.toIso8601String(),
+    'updated_at': updatedAt.toIso8601String(),
+  };
 
   factory MinistryExperienceItem.fromMap(Map<String, dynamic> map) {
     List<String> parsedMedia = [];
@@ -81,7 +83,8 @@ class MinistryExperienceItem {
 class ExperienceManager {
   final AppDatabase db;
   final Uuid _uuid = const Uuid();
-  final StreamController<List<MinistryExperienceItem>> _controller = StreamController<List<MinistryExperienceItem>>.broadcast();
+  final StreamController<List<MinistryExperienceItem>> _controller =
+      StreamController<List<MinistryExperienceItem>>.broadcast();
   Future<void>? _initFuture;
 
   ExperienceManager(this.db) {
@@ -124,7 +127,11 @@ class ExperienceManager {
   Future<List<MinistryExperienceItem>> getAllExperiences() async {
     await _initTable();
     try {
-      final rows = await db.customSelect('SELECT * FROM ministry_experiences ORDER BY date_time DESC').get();
+      final rows = await db
+          .customSelect(
+            'SELECT * FROM ministry_experiences ORDER BY date_time DESC',
+          )
+          .get();
       return rows.map((r) => MinistryExperienceItem.fromMap(r.data)).toList();
     } catch (_) {
       return [];
@@ -201,7 +208,10 @@ class ExperienceManager {
 
   Future<void> deleteExperience(String id) async {
     await _initTable();
-    await db.customUpdate('DELETE FROM ministry_experiences WHERE id = ?', variables: [Variable.withString(id)]);
+    await db.customUpdate(
+      'DELETE FROM ministry_experiences WHERE id = ?',
+      variables: [Variable.withString(id)],
+    );
     await _refresh();
   }
 }
@@ -211,7 +221,9 @@ final experienceManagerProvider = Provider<ExperienceManager>((ref) {
   return ExperienceManager(repo.db);
 });
 
-final experiencesStreamProvider = StreamProvider<List<MinistryExperienceItem>>((ref) {
+final experiencesStreamProvider = StreamProvider<List<MinistryExperienceItem>>((
+  ref,
+) {
   final mgr = ref.watch(experienceManagerProvider);
   return mgr.watchExperiences();
 });

@@ -1,7 +1,9 @@
 import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import 'package:drift/drift.dart';
+
 import '../database/app_database.dart';
 import '../database/repository.dart';
 import '../ui/providers.dart';
@@ -41,7 +43,8 @@ class TerritorySector {
 class SectorManager {
   final AppDatabase db;
   final Uuid _uuid = const Uuid();
-  final StreamController<List<TerritorySector>> _sectorsController = StreamController<List<TerritorySector>>.broadcast();
+  final StreamController<List<TerritorySector>> _sectorsController =
+      StreamController<List<TerritorySector>>.broadcast();
   Future<void>? _initFuture;
 
   SectorManager(this.db) {
@@ -65,7 +68,9 @@ class SectorManager {
       ''');
 
       // Verifica se há setores cadastrados; se vazio, cadastra os setores padrão pedidos: Betânia, Lago Grande, Cidade
-      final existing = await db.customSelect('SELECT COUNT(*) AS count FROM territory_sectors').getSingle();
+      final existing = await db
+          .customSelect('SELECT COUNT(*) AS count FROM territory_sectors')
+          .getSingle();
       final count = existing.read<int>('count');
       if (count == 0) {
         final now = DateTime.now();
@@ -84,7 +89,9 @@ class SectorManager {
             Variable.withString(_uuid.v4()),
             Variable.withString('Lago Grande'),
             Variable.withString('Região do Lago Grande'),
-            Variable.withString(now.add(const Duration(seconds: 1)).toIso8601String()),
+            Variable.withString(
+              now.add(const Duration(seconds: 1)).toIso8601String(),
+            ),
           ],
         );
         await db.customInsert(
@@ -93,7 +100,9 @@ class SectorManager {
             Variable.withString(_uuid.v4()),
             Variable.withString('Cidade'),
             Variable.withString('Centro urbano e área comercial'),
-            Variable.withString(now.add(const Duration(seconds: 2)).toIso8601String()),
+            Variable.withString(
+              now.add(const Duration(seconds: 2)).toIso8601String(),
+            ),
           ],
         );
       }
@@ -115,15 +124,32 @@ class SectorManager {
   Future<List<TerritorySector>> getSectors() async {
     await _initTable();
     try {
-      final rows = await db.customSelect('SELECT * FROM territory_sectors ORDER BY name ASC').get();
+      final rows = await db
+          .customSelect('SELECT * FROM territory_sectors ORDER BY name ASC')
+          .get();
       return rows.map((r) => TerritorySector.fromMap(r.data)).toList();
     } catch (_) {
       // Setores default de segurança caso haja exceção
       final now = DateTime.now();
       return [
-        TerritorySector(id: '1', name: 'Betânia', description: 'Setor residencial Betânia', createdAt: now),
-        TerritorySector(id: '2', name: 'Lago Grande', description: 'Região do Lago Grande', createdAt: now),
-        TerritorySector(id: '3', name: 'Cidade', description: 'Centro urbano e área comercial', createdAt: now),
+        TerritorySector(
+          id: '1',
+          name: 'Betânia',
+          description: 'Setor residencial Betânia',
+          createdAt: now,
+        ),
+        TerritorySector(
+          id: '2',
+          name: 'Lago Grande',
+          description: 'Região do Lago Grande',
+          createdAt: now,
+        ),
+        TerritorySector(
+          id: '3',
+          name: 'Cidade',
+          description: 'Centro urbano e área comercial',
+          createdAt: now,
+        ),
       ];
     }
   }
@@ -149,17 +175,32 @@ class SectorManager {
       ],
     );
 
-    final sector = TerritorySector(id: id, name: trimmed, description: description, createdAt: now);
+    final sector = TerritorySector(
+      id: id,
+      name: trimmed,
+      description: description,
+      createdAt: now,
+    );
     await _refresh();
     return sector;
   }
 
-  Future<void> updateSector(String id, String newName, {String? description, AppRepository? repo}) async {
+  Future<void> updateSector(
+    String id,
+    String newName, {
+    String? description,
+    AppRepository? repo,
+  }) async {
     await _initTable();
     final trimmed = newName.trim();
 
     // Obtém o nome antigo para atualizar contatos associados
-    final existingRow = await db.customSelect('SELECT name FROM territory_sectors WHERE id = ?', variables: [Variable.withString(id)]).getSingleOrNull();
+    final existingRow = await db
+        .customSelect(
+          'SELECT name FROM territory_sectors WHERE id = ?',
+          variables: [Variable.withString(id)],
+        )
+        .getSingleOrNull();
     final oldName = existingRow?.read<String>('name');
 
     await db.customUpdate(

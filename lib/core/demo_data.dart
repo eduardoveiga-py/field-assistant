@@ -158,7 +158,8 @@ class DemoDataGenerator {
       date: now.subtract(const Duration(days: 1)),
       durationSeconds: 7200, // 2 horas
       modality: 'campo',
-      notes: '[Publicações: 4] [Vídeos: 2] Manhã de campo no setor residencial.',
+      notes:
+          '[Publicações: 4] [Vídeos: 2] Manhã de campo no setor residencial.',
     );
 
     await repository.createActivityRecord(

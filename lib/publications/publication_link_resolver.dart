@@ -1,10 +1,6 @@
 import 'publication_catalog.dart';
 
-enum LinkPrecision {
-  directLesson,
-  publicationOnly,
-  referenceOnly,
-}
+enum LinkPrecision { directLesson, publicationOnly, referenceOnly }
 
 class ResolvedLink {
   final String? url;
@@ -44,7 +40,8 @@ class PublicationLinkResolver {
       );
     }
 
-    final lang = pub.languages[languageCode] ??
+    final lang =
+        pub.languages[languageCode] ??
         pub.languages['pt'] ??
         pub.languages.values.first;
 
@@ -66,7 +63,8 @@ class PublicationLinkResolver {
     // Se for Libras (Língua de Sinais):
     // Não força parágrafos textuais, direciona para a seção/vídeo da publicação oficial
     if (isLibras) {
-      final webUrl = lang.officialWebUrl ?? 'https://www.jw.org/bzs/biblioteca/livros/';
+      final webUrl =
+          lang.officialWebUrl ?? 'https://www.jw.org/bzs/biblioteca/livros/';
       return ResolvedLink(
         url: webUrl,
         fallbackUrl: webUrl,
@@ -84,8 +82,10 @@ class PublicationLinkResolver {
       // Exemplo de link canônico verificado: https://www.jw.org/finder?srcid=jwlshare&wtlocale=T&pub=lff&docid=1102021200 + lesson
       // URL web direta de acesso à lição em português:
       final lessonPad = lesson.toString().padLeft(2, '0');
-      final lessonWebUrl = 'https://www.jw.org/pt/biblioteca/livros/seja-feliz-para-sempre/licao-$lessonPad/';
-      final finderUrl = 'https://www.jw.org/finder?srcid=jwlshare&wtlocale=${lang.wtlocale}&pub=${pub.code}&lesson=$lesson';
+      final lessonWebUrl =
+          'https://www.jw.org/pt/biblioteca/livros/seja-feliz-para-sempre/licao-$lessonPad/';
+      final finderUrl =
+          'https://www.jw.org/finder?srcid=jwlshare&wtlocale=${lang.wtlocale}&pub=${pub.code}&lesson=$lesson';
 
       return ResolvedLink(
         url: finderUrl,
@@ -100,8 +100,12 @@ class PublicationLinkResolver {
       );
     }
 
-    if (pub.id == 'lff-brochure' && lesson != null && lesson >= 1 && lesson <= 3) {
-      final finderUrl = 'https://www.jw.org/finder?srcid=jwlshare&wtlocale=${lang.wtlocale}&pub=${pub.code}&lesson=$lesson';
+    if (pub.id == 'lff-brochure' &&
+        lesson != null &&
+        lesson >= 1 &&
+        lesson <= 3) {
+      final finderUrl =
+          'https://www.jw.org/finder?srcid=jwlshare&wtlocale=${lang.wtlocale}&pub=${pub.code}&lesson=$lesson';
       return ResolvedLink(
         url: finderUrl,
         fallbackUrl: lang.officialWebUrl,

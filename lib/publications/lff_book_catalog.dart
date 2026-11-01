@@ -47,10 +47,7 @@ class LffEndnoteInfo {
   final int number;
   final String title;
 
-  const LffEndnoteInfo({
-    required this.number,
-    required this.title,
-  });
+  const LffEndnoteInfo({required this.number, required this.title});
 }
 
 /// Catálogo Oficial Exato do Livro "Seja Feliz Para Sempre!"
@@ -90,13 +87,22 @@ class LffBookCatalog {
   ];
 
   static const List<LffEndnoteInfo> endnotes = [
-    LffEndnoteInfo(number: 1, title: 'O nome de Deus nas Escrituras Hebraicas e Gregas'),
+    LffEndnoteInfo(
+      number: 1,
+      title: 'O nome de Deus nas Escrituras Hebraicas e Gregas',
+    ),
     LffEndnoteInfo(number: 2, title: 'O que a Bíblia diz sobre a Trindade?'),
     LffEndnoteInfo(number: 3, title: 'Datas bíblicas e o ano de 1914'),
     LffEndnoteInfo(number: 4, title: 'Quem são o arcanjo Miguel e Abadom?'),
     LffEndnoteInfo(number: 5, title: 'Questões médicas envolvendo o sangue'),
-    LffEndnoteInfo(number: 6, title: 'O que a Bíblia diz sobre neutralidade cristã'),
-    LffEndnoteInfo(number: 7, title: 'Assuntos comerciais e legais entre cristãos'),
+    LffEndnoteInfo(
+      number: 6,
+      title: 'O que a Bíblia diz sobre neutralidade cristã',
+    ),
+    LffEndnoteInfo(
+      number: 7,
+      title: 'Assuntos comerciais e legais entre cristãos',
+    ),
   ];
 
   static const List<LffLessonInfo> lessons = [
@@ -154,7 +160,8 @@ class LffBookCatalog {
         '5. A Bíblia falou com antecedência sobre acontecimentos importantes',
         '6. A Bíblia já falava sobre as coisas que vemos hoje',
       ],
-      somePeopleSay: 'A Bíblia não passa de um livro de lendas e histórias inventadas.',
+      somePeopleSay:
+          'A Bíblia não passa de um livro de lendas e histórias inventadas.',
       summary: 'A História, a ciência e as profecias mostram que você pode acreditar na Bíblia.',
       reviewQuestions: [
         'Será que as histórias da Bíblia aconteceram mesmo?',
@@ -267,7 +274,8 @@ class LffBookCatalog {
         'Por que Jeová pede que seus amigos façam mudanças na vida?',
         'Você acha que é muito difícil ser amigo de Jeová? Por que você acha isso?',
       ],
-      tryThis: 'Contar para um amigo alguma coisa que você aprendeu sobre Jeová.',
+      tryThis:
+          'Contar para um amigo alguma coisa que você aprendeu sobre Jeová.',
     ),
     LffLessonInfo(
       number: 9,
@@ -429,7 +437,8 @@ class LffBookCatalog {
         '5. Jesus ensinou verdades muito importantes',
         '6. Jesus fez milagres',
       ],
-      somePeopleSay: 'Jesus não era o Filho de Deus; era apenas uma pessoa boa.',
+      somePeopleSay:
+          'Jesus não era o Filho de Deus; era apenas uma pessoa boa.',
       summary: 'Jesus pregou sobre o Reino de Deus, fez milagres e obedeceu a Jeová em tudo.',
       reviewQuestions: [
         'Qual foi o trabalho mais importante de Jesus na Terra?',
@@ -472,7 +481,8 @@ class LffBookCatalog {
         '6. Eles fazem o que ensinam',
         '7. O amor entre eles é verdadeiro',
       ],
-      somePeopleSay: 'Não importa a sua religião; o importante é acreditar em Jesus.',
+      somePeopleSay:
+          'Não importa a sua religião; o importante é acreditar em Jesus.',
       summary: 'Os cristãos verdadeiros obedecem ao que a Bíblia diz, mostram amor de verdade e pregam as boas novas da Bíblia.',
       reviewQuestions: [
         'Tudo o que os cristãos verdadeiros dizem e fazem está de acordo com o quê?',
@@ -514,7 +524,8 @@ class LffBookCatalog {
         '5. Os anciãos ensinam dando o exemplo',
         '6. Podemos ajudar os anciãos',
       ],
-      somePeopleSay: 'Você não precisa fazer parte de uma religião para adorar a Deus.',
+      somePeopleSay:
+          'Você não precisa fazer parte de uma religião para adorar a Deus.',
       summary: 'Jesus é o líder da congregação, e os anciãos seguem as orientações dele. Ficamos felizes de ajudar os anciãos porque eles são bondosos e nos ensinam pelo exemplo que dão.',
       reviewQuestions: [
         'Quem é o líder da congregação?',
@@ -622,7 +633,8 @@ class LffBookCatalog {
         'Como sabemos que a vontade de Deus para os humanos não mudou?',
         'Como a sua vida pode ter verdadeiro sentido?',
       ],
-      tryThis: 'Contar para alguém o futuro maravilhoso que Jeová promete para nós.',
+      tryThis:
+          'Contar para alguém o futuro maravilhoso que Jeová promete para nós.',
     ),
     LffLessonInfo(
       number: 26,
@@ -676,7 +688,8 @@ class LffBookCatalog {
         '4. Imite a Jesus',
         '5. Esteja presente na Celebração da morte de Cristo',
       ],
-      somePeopleSay: 'Tudo que você tem que fazer para ser salvo é acreditar em Jesus.',
+      somePeopleSay:
+          'Tudo que você tem que fazer para ser salvo é acreditar em Jesus.',
       summary: 'Mostramos que damos valor ao que Jesus fez por nós por exercer fé nele e por estar presentes na Celebração da sua morte.',
       reviewQuestions: [
         'O que significa exercer fé em Jesus?',
@@ -696,7 +709,8 @@ class LffBookCatalog {
         '4. Saber a verdade sobre a morte nos ajuda muito',
         '5. É um alívio saber a verdade sobre a morte',
       ],
-      somePeopleSay: 'Eu tenho medo do que vai acontecer comigo quando eu morrer.',
+      somePeopleSay:
+          'Eu tenho medo do que vai acontecer comigo quando eu morrer.',
       summary: 'Quando a pessoa morre, ela não sabe de mais nada. Os mortos não estão sofrendo nem podem prejudicar os vivos.',
       reviewQuestions: [
         'O que acontece quando a pessoa morre?',
@@ -717,7 +731,8 @@ class LffBookCatalog {
         '5. Muitas pessoas serão ressuscitadas!',
         '6. A ressurreição pode te dar consolo e esperança',
       ],
-      somePeopleSay: 'Essa história de ressurreição é muito boa para ser verdade.',
+      somePeopleSay:
+          'Essa história de ressurreição é muito boa para ser verdade.',
       summary: 'A Bíblia promete que bilhões de pessoas que morreram vão ser ressuscitadas. Jeová quer que elas voltem a viver e ele deu poder para Jesus fazer isso acontecer.',
       reviewQuestions: [
         'O que Jeová e Jesus querem fazer pelos que morreram?',
@@ -1043,7 +1058,8 @@ class LffBookCatalog {
         '5. Dedicar-se a Jeová traz muitas bênçãos',
       ],
       somePeopleSay: 'Eu sei que essa é a verdade, mas não quero assumir um compromisso desse.',
-      summary: 'O amor nos motiva a dedicar nossa vida a Jeová e ser batizados.',
+      summary:
+          'O amor nos motiva a dedicar nossa vida a Jeová e ser batizados.',
       reviewQuestions: [
         'Por que Jeová merece todo o nosso amor e adoração?',
         'Que bênçãos Jeová dá para seus servos batizados?',
@@ -1064,7 +1080,8 @@ class LffBookCatalog {
         '6. Confie na ajuda de Jeová',
         '7. Aumente sua gratidão pelo amor de Jeová',
       ],
-      somePeopleSay: 'Eu tenho medo de me batizar e depois fazer alguma coisa errada.',
+      somePeopleSay:
+          'Eu tenho medo de me batizar e depois fazer alguma coisa errada.',
       summary: 'Com a ajuda de Jeová, você pode vencer qualquer dificuldade para se batizar.',
       reviewQuestions: [
         'Será que você precisa saber tudo da Bíblia para se batizar?',
@@ -1086,7 +1103,8 @@ class LffBookCatalog {
         '5. Como ter boas amizades',
       ],
       somePeopleSay: 'O importante é ter amigos, não importa quem.',
-      summary: 'Ter cuidado ao escolher os amigos é bom para nós e agrada a Jeová.',
+      summary:
+          'Ter cuidado ao escolher os amigos é bom para nós e agrada a Jeová.',
       reviewQuestions: [
         'Por que nossa escolha de amigos é importante para Jeová?',
         'Que tipos de amizade nós devemos evitar?',
@@ -1106,7 +1124,8 @@ class LffBookCatalog {
         '5. A esposa precisa amar e respeitar o marido',
         '6. É possível vencer os problemas no casamento',
       ],
-      somePeopleSay: 'As coisas mudaram no meu casamento. A gente se afastou um do outro.',
+      somePeopleSay:
+          'As coisas mudaram no meu casamento. A gente se afastou um do outro.',
       summary: 'O marido e a esposa podem ser felizes quando os dois se amam, se respeitam e colocam em prática os conselhos da Bíblia.',
       reviewQuestions: [
         'Como o marido pode fazer a parte dele para ter um casamento feliz?',
@@ -1149,7 +1168,8 @@ class LffBookCatalog {
         '5. Fale bem de outros',
         '6. Seja bondoso ao falar com sua família',
       ],
-      somePeopleSay: 'Eu falo o que eu penso. Se a pessoa não gostar, o problema é dela.',
+      somePeopleSay:
+          'Eu falo o que eu penso. Se a pessoa não gostar, o problema é dela.',
       summary: 'As palavras têm poder. Precisamos tomar cuidado sobre o que falar, quando falar e como falar.',
       reviewQuestions: [
         'De que maneiras você pode usar a fala para ajudar outros?',
@@ -1353,13 +1373,11 @@ class LffBookCatalog {
     return sections[3];
   }
 
-  static LffSectionInfo getSectionForLesson(int lessonNumber) => getSection(lessonNumber);
+  static LffSectionInfo getSectionForLesson(int lessonNumber) =>
+      getSection(lessonNumber);
 
   /// Calcula o progresso percentual exato do livro (0.0% a 100.0%)
-  static double calculateProgressPercentage({
-    required int lesson,
-    int? point,
-  }) {
+  static double calculateProgressPercentage({required int lesson, int? point}) {
     if (lesson <= 0) return 0.0;
     if (lesson > totalLessons) return 100.0;
 
@@ -1369,7 +1387,8 @@ class LffBookCatalog {
     final currentPointClamped = (point ?? 0).clamp(0, maxPoints);
 
     final baseProgress = (lesson - 1) * lessonWeight;
-    final currentLessonProgress = (currentPointClamped / maxPoints) * lessonWeight;
+    final currentLessonProgress =
+        (currentPointClamped / maxPoints) * lessonWeight;
 
     final percent = baseProgress + currentLessonProgress;
     return percent.clamp(0.0, 100.0);
@@ -1413,17 +1432,15 @@ class LffBookCatalog {
         label = 'Próxima Lição: Lição $nextL, Ponto $nextP';
       }
 
-      return (
-        nextLesson: nextL,
-        nextPoint: nextP,
-        label: label,
-      );
+      return (nextLesson: nextL, nextPoint: nextP, label: label);
     }
   }
 
   /// Retorna todas as opções de estudo (60 Lições, 4 Revisões de Seção e 7 Notas de Apêndice)
-  static List<({String id, String title, String category, int totalPoints})> getAllStudyUnits() {
-    final List<({String id, String title, String category, int totalPoints})> list = [];
+  static List<({String id, String title, String category, int totalPoints})>
+  getAllStudyUnits() {
+    final List<({String id, String title, String category, int totalPoints})>
+    list = [];
 
     for (final l in lessons) {
       list.add((
@@ -1476,7 +1493,8 @@ class LffiBrochureCatalog {
         'Quais são algumas perguntas que a Bíblia responde?',
         'O que você gostaria de aprender na Bíblia?',
       ],
-      tryThis: 'Leia a primeira parte do programa de leitura da Bíblia desta lição.',
+      tryThis:
+          'Leia a primeira parte do programa de leitura da Bíblia desta lição.',
     ),
     LffLessonInfo(
       number: 2,
@@ -1527,16 +1545,36 @@ class ListenToGodCatalog {
     (number: 1, title: 'Como Deus fala com a gente?', paragraphs: 5),
     (number: 2, title: 'Quem é Deus?', paragraphs: 6),
     (number: 3, title: 'Como era a vida no começo?', paragraphs: 4),
-    (number: 4, title: 'O que aconteceu quando Adão e Eva escutaram Satanás?', paragraphs: 5),
+    (
+      number: 4,
+      title: 'O que aconteceu quando Adão e Eva escutaram Satanás?',
+      paragraphs: 5,
+    ),
     (number: 5, title: 'Como as pessoas eram nos dias de Noé?', paragraphs: 4),
     (number: 6, title: 'O que você pode aprender do Dilúvio?', paragraphs: 5),
     (number: 7, title: 'Quem era Jesus?', paragraphs: 7),
-    (number: 8, title: 'O que a morte de Jesus tem a ver com você?', paragraphs: 6),
-    (number: 9, title: 'Quando a Terra vai se tornar um paraíso?', paragraphs: 6),
-    (number: 10, title: 'Se você escutar a Deus, que bênçãos você vai ter?', paragraphs: 7),
+    (
+      number: 8,
+      title: 'O que a morte de Jesus tem a ver com você?',
+      paragraphs: 6,
+    ),
+    (
+      number: 9,
+      title: 'Quando a Terra vai se tornar um paraíso?',
+      paragraphs: 6,
+    ),
+    (
+      number: 10,
+      title: 'Se você escutar a Deus, que bênçãos você vai ter?',
+      paragraphs: 7,
+    ),
     (number: 11, title: 'Será que Jeová nos escuta?', paragraphs: 4),
     (number: 12, title: 'Como sua família pode ser feliz?', paragraphs: 6),
-    (number: 13, title: 'O que você precisa fazer para deixar Jeová feliz?', paragraphs: 5),
+    (
+      number: 13,
+      title: 'O que você precisa fazer para deixar Jeová feliz?',
+      paragraphs: 5,
+    ),
     (number: 14, title: 'Como você mostra que é fiel a Jeová?', paragraphs: 5),
   ];
 

@@ -3,6 +3,7 @@ import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:ministerio_pessoal/database/app_database.dart';
 import 'package:ministerio_pessoal/database/repository.dart';
+
 import 'e2e_contracts.dart';
 
 void main() {
@@ -112,8 +113,10 @@ void main() {
       });
 
       test('TC-R1-09: UTF-8, special characters, and multiline formatting in empathy and doubt fields', () async {
-        const specialDoubt = 'Dúvida: Deus se importa com 🐶 pets? & Por que sofremos? 🤔\nSegunda linha com acentos: áéíóú, ç, ñ.';
-        const specialEmpathy = 'Nota pessoal:\n- Filho fez cirurgia 🏥\n- Não bater na porta dos fundos!\n- "Cuidado com o cão"';
+        const specialDoubt =
+            'Dúvida: Deus se importa com 🐶 pets? & Por que sofremos? 🤔\nSegunda linha com acentos: áéíóú, ç, ñ.';
+        const specialEmpathy =
+            'Nota pessoal:\n- Filho fez cirurgia 🏥\n- Não bater na porta dos fundos!\n- "Cuidado com o cão"';
 
         final person = await repo.createPerson(
           name: 'João José da Conceição',
@@ -194,14 +197,24 @@ void main() {
           goalHours: 50.0,
           designatedWeekdays: [1], // Segundas
           completedHours: 45.0,
-          currentDate: DateTime(2026, 10, 31), // Sábado (nenhuma segunda restante)
+          currentDate: DateTime(
+            2026,
+            10,
+            31,
+          ), // Sábado (nenhuma segunda restante)
         );
 
         expect(resultNoOutings.remainingOutings, equals(0));
         expect(resultNoOutings.remainingHours, equals(5.0));
         expect(resultNoOutings.isGoalReached, isFalse);
-        expect(resultNoOutings.idealPacePerOuting, equals(const Duration(hours: 5)));
-        expect(resultNoOutings.formattedPaceText, contains('Faltam 5h em 0 saídas.'));
+        expect(
+          resultNoOutings.idealPacePerOuting,
+          equals(const Duration(hours: 5)),
+        );
+        expect(
+          resultNoOutings.formattedPaceText,
+          contains('Faltam 5h em 0 saídas.'),
+        );
       });
 
       test('TC-R2-09: Last day of month boundary (single outing remaining or 0 outings)', () {
@@ -214,7 +227,10 @@ void main() {
         );
         expect(onLastDayWithOuting.remainingOutings, equals(1));
         expect(onLastDayWithOuting.remainingHours, equals(4.0));
-        expect(onLastDayWithOuting.idealPacePerOuting, equals(const Duration(hours: 4)));
+        expect(
+          onLastDayWithOuting.idealPacePerOuting,
+          equals(const Duration(hours: 4)),
+        );
 
         // Se sábado NÃO está marcado no dia 31:
         final onLastDayWithoutOuting = PioneerPaceCalculator.calculate(
@@ -231,7 +247,9 @@ void main() {
         // 2028-02-01 até 2028-02-29
         final leapFeb = PioneerPaceCalculator.calculate(
           goalHours: 30.0,
-          designatedWeekdays: [2], // Terças-feiras em Fev 2028: 1, 8, 15, 22, 29 (5 terças!)
+          designatedWeekdays: [
+            2,
+          ], // Terças-feiras em Fev 2028: 1, 8, 15, 22, 29 (5 terças!)
           completedHours: 0.0,
           currentDate: DateTime(2028, 2, 1),
         );
@@ -241,7 +259,9 @@ void main() {
         // 2027-02-01 até 2027-02-28
         final regularFeb = PioneerPaceCalculator.calculate(
           goalHours: 30.0,
-          designatedWeekdays: [1], // Segundas em Fev 2027: 1, 8, 15, 22 (4 segundas)
+          designatedWeekdays: [
+            1,
+          ], // Segundas em Fev 2027: 1, 8, 15, 22 (4 segundas)
           completedHours: 0.0,
           currentDate: DateTime(2027, 2, 1),
         );
@@ -268,7 +288,9 @@ void main() {
     group('R3: Destaque de Sementes Recentes - Boundary & Corner', () {
       test('TC-R3-06: Exactly 7 days threshold (7 days 00:00:00) flags isRecentSeed = true', () async {
         final now = DateTime(2026, 10, 30, 12, 0, 0);
-        final firstContact = now.subtract(const Duration(days: 7)); // Exatamente 7 dias atrás
+        final firstContact = now.subtract(
+          const Duration(days: 7),
+        ); // Exatamente 7 dias atrás
 
         final person = await repo.createPerson(
           name: 'Semente Exata 7 Dias',
@@ -284,23 +306,28 @@ void main() {
         expect(isRecent, isTrue);
       });
 
-      test('TC-R3-07: 7 days and 1 minute / 8 days flags isRecentSeed = false', () async {
-        final now = DateTime(2026, 10, 30, 12, 0, 0);
-        final firstContact = now.subtract(const Duration(days: 7, minutes: 1)); // 7 dias e 1 minuto
+      test(
+        'TC-R3-07: 7 days and 1 minute / 8 days flags isRecentSeed = false',
+        () async {
+          final now = DateTime(2026, 10, 30, 12, 0, 0);
+          final firstContact = now.subtract(
+            const Duration(days: 7, minutes: 1),
+          ); // 7 dias e 1 minuto
 
-        final person = await repo.createPerson(
-          name: 'Semente Expirada',
-          firstContactAt: firstContact,
-        );
+          final person = await repo.createPerson(
+            name: 'Semente Expirada',
+            firstContactAt: firstContact,
+          );
 
-        final isRecent = RecentSeedsHelper.isRecentSeed(
-          person: person,
-          visits: [],
-          nowOverride: now,
-        );
+          final isRecent = RecentSeedsHelper.isRecentSeed(
+            person: person,
+            visits: [],
+            nowOverride: now,
+          );
 
-        expect(isRecent, isFalse);
-      });
+          expect(isRecent, isFalse);
+        },
+      );
 
       test('TC-R3-08: Contact attempt without contact (tentativa_sem_contato) preserves isRecentSeed = true', () async {
         final now = DateTime(2026, 10, 30, 10, 0);
@@ -346,23 +373,26 @@ void main() {
         expect(isRecent, isFalse);
       });
 
-      test('TC-R3-10: Clock skew / future contact date handled safely', () async {
-        final now = DateTime(2026, 10, 30, 10, 0);
-        final futureContact = now.add(const Duration(days: 1));
+      test(
+        'TC-R3-10: Clock skew / future contact date handled safely',
+        () async {
+          final now = DateTime(2026, 10, 30, 10, 0);
+          final futureContact = now.add(const Duration(days: 1));
 
-        final person = await repo.createPerson(
-          name: 'Data No Futuro',
-          firstContactAt: futureContact,
-        );
+          final person = await repo.createPerson(
+            name: 'Data No Futuro',
+            firstContactAt: futureContact,
+          );
 
-        final isRecent = RecentSeedsHelper.isRecentSeed(
-          person: person,
-          visits: [],
-          nowOverride: now,
-        );
+          final isRecent = RecentSeedsHelper.isRecentSeed(
+            person: person,
+            visits: [],
+            nowOverride: now,
+          );
 
-        expect(isRecent, isFalse);
-      });
+          expect(isRecent, isFalse);
+        },
+      );
     });
 
     // ========================================================================
@@ -386,17 +416,22 @@ void main() {
         expect(suggestions.first.person.id, equals(singleCandidate.id));
       });
 
-      test('TC-R4-07: Zero candidate pool returns empty list [] safely', () async {
-        final cancelled = await repo.createPerson(name: 'Cancelado Sem Opções');
+      test(
+        'TC-R4-07: Zero candidate pool returns empty list [] safely',
+        () async {
+          final cancelled = await repo.createPerson(
+            name: 'Cancelado Sem Opções',
+          );
 
-        final suggestions = await PlanBRecommender.getSuggestions(
-          cancelledPerson: cancelled,
-          allPeople: [cancelled],
-          allVisits: [],
-        );
+          final suggestions = await PlanBRecommender.getSuggestions(
+            cancelledPerson: cancelled,
+            allPeople: [cancelled],
+            allVisits: [],
+          );
 
-        expect(suggestions, isEmpty);
-      });
+          expect(suggestions, isEmpty);
+        },
+      );
 
       test('TC-R4-08: Candidate with null coordinates when user has GPS places candidate at end of ranked list', () async {
         final cancelled = await repo.createPerson(name: 'Cancelado');
@@ -452,9 +487,9 @@ void main() {
 
       test('TC-R4-10: Soft-deleted contacts are strictly excluded from Plan B suggestions', () async {
         final cancelled = await repo.createPerson(name: 'Cancelado');
-        final deletedCandidate = (await repo.createPerson(name: 'Contato Excluído')).copyWith(
-          deletedAt: Value(DateTime.now()),
-        );
+        final deletedCandidate = (await repo.createPerson(
+          name: 'Contato Excluído',
+        )).copyWith(deletedAt: Value(DateTime.now()));
 
         final activeCandidate = await repo.createPerson(name: 'Contato Ativo');
 
@@ -466,7 +501,10 @@ void main() {
 
         expect(suggestions.length, equals(1));
         expect(suggestions.first.person.id, equals(activeCandidate.id));
-        expect(suggestions.any((s) => s.person.id == deletedCandidate.id), isFalse);
+        expect(
+          suggestions.any((s) => s.person.id == deletedCandidate.id),
+          isFalse,
+        );
       });
     });
 
@@ -545,7 +583,13 @@ void main() {
 
       test('TC-R5-10: Negative time jump (system clock adjustment) safely clamped to zero', () {
         final startedAt = DateTime(2026, 10, 30, 12, 0);
-        final clockSkewPast = DateTime(2026, 10, 30, 11, 0); // Relógio atrasou 1h
+        final clockSkewPast = DateTime(
+          2026,
+          10,
+          30,
+          11,
+          0,
+        ); // Relógio atrasou 1h
 
         final state = AutoCorrectiveTimerLogic.evaluate(
           isRunning: true,

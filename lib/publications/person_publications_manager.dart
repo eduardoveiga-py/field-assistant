@@ -1,7 +1,9 @@
 import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import 'package:drift/drift.dart';
+
 import '../database/app_database.dart';
 import '../ui/providers.dart';
 
@@ -27,17 +29,18 @@ class PersonPublicationItem {
   });
 
   Map<String, dynamic> toMap() => {
-        'id': id,
-        'person_id': personId,
-        'publication_title': publicationTitle,
-        'item_type': itemType,
-        'status': status,
-        'date': date.toIso8601String(),
-        'notes': notes,
-        'created_at': createdAt.toIso8601String(),
-      };
+    'id': id,
+    'person_id': personId,
+    'publication_title': publicationTitle,
+    'item_type': itemType,
+    'status': status,
+    'date': date.toIso8601String(),
+    'notes': notes,
+    'created_at': createdAt.toIso8601String(),
+  };
 
-  factory PersonPublicationItem.fromMap(Map<String, dynamic> map) => PersonPublicationItem(
+  factory PersonPublicationItem.fromMap(Map<String, dynamic> map) =>
+      PersonPublicationItem(
         id: map['id'] as String,
         personId: map['person_id'] as String,
         publicationTitle: map['publication_title'] as String,
@@ -52,7 +55,8 @@ class PersonPublicationItem {
 class PersonPublicationsManager {
   final AppDatabase db;
   final Uuid _uuid = const Uuid();
-  final StreamController<List<PersonPublicationItem>> _controller = StreamController<List<PersonPublicationItem>>.broadcast();
+  final StreamController<List<PersonPublicationItem>> _controller =
+      StreamController<List<PersonPublicationItem>>.broadcast();
   Future<void>? _initFuture;
 
   PersonPublicationsManager(this.db) {
@@ -94,20 +98,26 @@ class PersonPublicationsManager {
   Future<List<PersonPublicationItem>> getAllPublications() async {
     await _initTable();
     try {
-      final rows = await db.customSelect('SELECT * FROM person_publications ORDER BY date DESC').get();
+      final rows = await db
+          .customSelect('SELECT * FROM person_publications ORDER BY date DESC')
+          .get();
       return rows.map((r) => PersonPublicationItem.fromMap(r.data)).toList();
     } catch (_) {
       return [];
     }
   }
 
-  Future<List<PersonPublicationItem>> getPublicationsForPerson(String personId) async {
+  Future<List<PersonPublicationItem>> getPublicationsForPerson(
+    String personId,
+  ) async {
     await _initTable();
     try {
-      final rows = await db.customSelect(
-        'SELECT * FROM person_publications WHERE person_id = ? ORDER BY date DESC',
-        variables: [Variable.withString(personId)],
-      ).get();
+      final rows = await db
+          .customSelect(
+            'SELECT * FROM person_publications WHERE person_id = ? ORDER BY date DESC',
+            variables: [Variable.withString(personId)],
+          )
+          .get();
       return rows.map((r) => PersonPublicationItem.fromMap(r.data)).toList();
     } catch (_) {
       return [];
@@ -124,13 +134,12 @@ class PersonPublicationsManager {
     required String title,
     DateTime? date,
     String? notes,
-  }) =>
-      addPlacedPublication(
-        personId: personId,
-        title: title,
-        date: date,
-        notes: notes,
-      );
+  }) => addPlacedPublication(
+    personId: personId,
+    title: title,
+    date: date,
+    notes: notes,
+  );
 
   Future<PersonPublicationItem> addPlacedPublication({
     required String personId,
@@ -230,10 +239,7 @@ class PersonPublicationsManager {
     } else {
       await db.customUpdate(
         'UPDATE person_publications SET status = ? WHERE id = ?',
-        variables: [
-          Variable.withString(newStatus),
-          Variable.withString(id),
-        ],
+        variables: [Variable.withString(newStatus), Variable.withString(id)],
       );
     }
     await _refresh();
@@ -249,12 +255,15 @@ class PersonPublicationsManager {
   }
 }
 
-final personPublicationsManagerProvider = Provider<PersonPublicationsManager>((ref) {
+final personPublicationsManagerProvider = Provider<PersonPublicationsManager>((
+  ref,
+) {
   final repo = ref.watch(repositoryProvider);
   return PersonPublicationsManager(repo.db);
 });
 
-final personPublicationsStreamProvider = StreamProvider<List<PersonPublicationItem>>((ref) {
-  final mgr = ref.watch(personPublicationsManagerProvider);
-  return mgr.watchAllPublications();
-});
+final personPublicationsStreamProvider =
+    StreamProvider<List<PersonPublicationItem>>((ref) {
+      final mgr = ref.watch(personPublicationsManagerProvider);
+      return mgr.watchAllPublications();
+    });

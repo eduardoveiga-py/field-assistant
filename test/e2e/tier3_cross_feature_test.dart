@@ -3,6 +3,7 @@ import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:ministerio_pessoal/database/app_database.dart';
 import 'package:ministerio_pessoal/database/repository.dart';
+
 import 'e2e_contracts.dart';
 
 void main() {
@@ -85,7 +86,10 @@ void main() {
       );
       expect(isSeed, isTrue);
       expect(
-        RecentSeedsHelper.getElapsedText(firstContactAt: topSuggestion.person.firstContactAt, nowOverride: now),
+        RecentSeedsHelper.getElapsedText(
+          firstContactAt: topSuggestion.person.firstContactAt,
+          nowOverride: now,
+        ),
         equals('há 2 dias'),
       );
     });
@@ -153,7 +157,10 @@ void main() {
       expect(paceAfter.completedHours, equals(22.0));
       expect(paceAfter.remainingHours, equals(28.0));
       expect(paceAfter.isGoalReached, isFalse);
-      expect(paceAfter.idealPacePerOuting < paceBefore.idealPacePerOuting, isTrue);
+      expect(
+        paceAfter.idealPacePerOuting < paceBefore.idealPacePerOuting,
+        isTrue,
+      );
     });
 
     test('TC-XF-03 [R4 + R1]: Plan B recommendation selection seamlessly prepares the Doorstep Briefing card for the recommended contact', () async {
@@ -216,7 +223,10 @@ void main() {
       expect(briefing.jwLibraryUri.toString(), contains('lesson=5'));
       expect(briefing.pendingDoubt, equals('Como orar a Deus de coração?'));
       expect(briefing.spiritualGoal, equals('Compreender o poder da oração'));
-      expect(briefing.empathyNote, equals('Sofia comentou que o marido está mostrando interesse'));
+      expect(
+        briefing.empathyNote,
+        equals('Sofia comentou que o marido está mostrando interesse'),
+      );
     });
 
     test('TC-XF-04 [R1 + R3]: Visiting a Recent Seed displays both the cooling warning badge and initial contact briefing notes', () async {
@@ -249,7 +259,10 @@ void main() {
       );
       expect(isSeed, isTrue);
       expect(
-        RecentSeedsHelper.getElapsedText(firstContactAt: recentPerson.firstContactAt, nowOverride: now),
+        RecentSeedsHelper.getElapsedText(
+          firstContactAt: recentPerson.firstContactAt,
+          nowOverride: now,
+        ),
         equals('há 4 dias'),
       );
 
@@ -260,9 +273,18 @@ void main() {
       );
 
       expect(briefing.lessonAndPoint, isNull);
-      expect(briefing.pendingDoubt, equals('O que a Bíblia diz sobre o futuro da Terra?'));
-      expect(briefing.spiritualGoal, equals('Levar a revista Despertai! sobre futuro'));
-      expect(briefing.empathyNote, equals('Primeira conversa receptiva na feira livre'));
+      expect(
+        briefing.pendingDoubt,
+        equals('O que a Bíblia diz sobre o futuro da Terra?'),
+      );
+      expect(
+        briefing.spiritualGoal,
+        equals('Levar a revista Despertai! sobre futuro'),
+      );
+      expect(
+        briefing.empathyNote,
+        equals('Primeira conversa receptiva na feira livre'),
+      );
     });
 
     test('TC-XF-05 [R2 + R5]: Live timer session completes and updates cumulative hours, driving monthly pioneer goal to completion', () async {
@@ -281,7 +303,10 @@ void main() {
 
       expect(paceBefore.remainingHours, equals(3.0));
       expect(paceBefore.remainingOutings, equals(2));
-      expect(paceBefore.idealPacePerOuting, equals(const Duration(hours: 1, minutes: 30)));
+      expect(
+        paceBefore.idealPacePerOuting,
+        equals(const Duration(hours: 1, minutes: 30)),
+      );
       expect(paceBefore.isGoalReached, isFalse);
 
       // Pioneiro faz uma saída normal de 3 horas
@@ -320,7 +345,10 @@ void main() {
       expect(paceAfter.completedHours, equals(30.0));
       expect(paceAfter.remainingHours, equals(0.0));
       expect(paceAfter.isGoalReached, isTrue);
-      expect(paceAfter.formattedPaceText, contains('Meta atingida! Parabéns pelo empenho no ministério.'));
+      expect(
+        paceAfter.formattedPaceText,
+        contains('Meta atingida! Parabéns pelo empenho no ministério.'),
+      );
     });
   });
 }

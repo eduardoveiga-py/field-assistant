@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+
 import '../../core/app_theme.dart';
 import '../../database/app_database.dart';
 import '../../territory/sector_manager.dart';
@@ -17,7 +18,8 @@ class SectorDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _SectorDetailScreenState extends ConsumerState<SectorDetailScreen> {
-  String _selectedFilter = 'Todos'; // 'Todos', 'Interessados', 'Revisitas', 'Estudos'
+  String _selectedFilter =
+      'Todos'; // 'Todos', 'Interessados', 'Revisitas', 'Estudos'
   late String _currentSectorName;
 
   @override
@@ -44,11 +46,21 @@ class _SectorDetailScreenState extends ConsumerState<SectorDetailScreen> {
   }
 
   Future<void> _openMultiContactRoute(List<PersonEntry> contacts) async {
-    final validContacts = contacts.where((c) => (c.address != null && c.address!.trim().isNotEmpty) || (c.latitude != null && c.longitude != null)).toList();
+    final validContacts = contacts
+        .where(
+          (c) =>
+              (c.address != null && c.address!.trim().isNotEmpty) ||
+              (c.latitude != null && c.longitude != null),
+        )
+        .toList();
     if (validContacts.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Nenhum contato com endereço neste setor para traçar rota.')),
+          const SnackBar(
+            content: Text(
+              'Nenhum contato com endereço neste setor para traçar rota.',
+            ),
+          ),
         );
       }
       return;
@@ -56,27 +68,41 @@ class _SectorDetailScreenState extends ConsumerState<SectorDetailScreen> {
 
     if (validContacts.length == 1) {
       final p = validContacts.first;
-      final q = (p.latitude != null && p.longitude != null) ? '${p.latitude},${p.longitude}' : Uri.encodeComponent(p.address ?? p.name);
-      final uri = Uri.parse('https://www.google.com/maps/search/?api=1&query=$q');
+      final q = (p.latitude != null && p.longitude != null)
+          ? '${p.latitude},${p.longitude}'
+          : Uri.encodeComponent(p.address ?? p.name);
+      final uri = Uri.parse(
+        'https://www.google.com/maps/search/?api=1&query=$q',
+      );
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       }
       return;
     }
 
-    final effective = validContacts.length > 10 ? validContacts.take(10).toList() : validContacts;
+    final effective = validContacts.length > 10
+        ? validContacts.take(10).toList()
+        : validContacts;
     final dest = effective.last;
     final destQuery = (dest.latitude != null && dest.longitude != null)
         ? '${dest.latitude},${dest.longitude}'
         : Uri.encodeComponent(dest.address ?? dest.name);
-    final waypointsList = effective.sublist(0, effective.length - 1).map((c) {
-      return (c.latitude != null && c.longitude != null)
-          ? '${c.latitude},${c.longitude}'
-          : Uri.encodeComponent(c.address ?? c.name);
-    }).where((w) => w.isNotEmpty).toList();
+    final waypointsList = effective
+        .sublist(0, effective.length - 1)
+        .map((c) {
+          return (c.latitude != null && c.longitude != null)
+              ? '${c.latitude},${c.longitude}'
+              : Uri.encodeComponent(c.address ?? c.name);
+        })
+        .where((w) => w.isNotEmpty)
+        .toList();
 
-    final waypointsParam = waypointsList.isNotEmpty ? '&waypoints=${waypointsList.join("|")}' : '';
-    final uri = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$destQuery$waypointsParam');
+    final waypointsParam = waypointsList.isNotEmpty
+        ? '&waypoints=${waypointsList.join("|")}'
+        : '';
+    final uri = Uri.parse(
+      'https://www.google.com/maps/dir/?api=1&destination=$destQuery$waypointsParam',
+    );
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
@@ -84,7 +110,9 @@ class _SectorDetailScreenState extends ConsumerState<SectorDetailScreen> {
 
   void _showEditSectorDialog() {
     final nameController = TextEditingController(text: _currentSectorName);
-    final descController = TextEditingController(text: widget.sector.description ?? '');
+    final descController = TextEditingController(
+      text: widget.sector.description ?? '',
+    );
 
     showDialog(
       context: context,
@@ -101,19 +129,29 @@ class _SectorDetailScreenState extends ConsumerState<SectorDetailScreen> {
             const SizedBox(height: 12),
             TextField(
               controller: descController,
-              decoration: const InputDecoration(labelText: 'Descrição / Limites'),
+              decoration: const InputDecoration(
+                labelText: 'Descrição / Limites',
+              ),
             ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
           ElevatedButton(
             onPressed: () async {
               final newName = nameController.text.trim();
               if (newName.isEmpty) return;
               final mgr = ref.read(sectorManagerProvider);
               final repo = ref.read(repositoryProvider);
-              await mgr.updateSector(widget.sector.id, newName, description: descController.text.trim(), repo: repo);
+              await mgr.updateSector(
+                widget.sector.id,
+                newName,
+                description: descController.text.trim(),
+                repo: repo,
+              );
               setState(() {
                 _currentSectorName = newName;
               });
@@ -131,9 +169,14 @@ class _SectorDetailScreenState extends ConsumerState<SectorDetailScreen> {
       context: context,
       builder: (c) => AlertDialog(
         title: const Text('Excluir Bairro / Setor'),
-        content: Text('Tem certeza que deseja remover o setor "$_currentSectorName"? Os contatos cadastrados não serão apagados.'),
+        content: Text(
+          'Tem certeza que deseja remover o setor "$_currentSectorName"? Os contatos cadastrados não serão apagados.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('Cancelar'),
+          ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.alertRed),
             onPressed: () => Navigator.pop(c, true),
@@ -162,14 +205,22 @@ class _SectorDetailScreenState extends ConsumerState<SectorDetailScreen> {
       final addr = (p.address ?? '').toLowerCase();
       final tags = p.tags.toLowerCase();
       final notes = (p.generalNotes ?? '').toLowerCase();
-      return addr.contains(sectorLower) || tags.contains(sectorLower) || notes.contains(sectorLower);
+      return addr.contains(sectorLower) ||
+          tags.contains(sectorLower) ||
+          notes.contains(sectorLower);
     }).toList();
 
     // Estatísticas da região (modalidades)
     final totalContacts = sectorContacts.length;
-    final totalInteressados = sectorContacts.where((p) => p.status == 'interessado').length;
-    final totalRevisitas = sectorContacts.where((p) => p.status == 'revisita').length;
-    final totalEstudos = sectorContacts.where((p) => p.status == 'estudo').length;
+    final totalInteressados = sectorContacts
+        .where((p) => p.status == 'interessado')
+        .length;
+    final totalRevisitas = sectorContacts
+        .where((p) => p.status == 'revisita')
+        .length;
+    final totalEstudos = sectorContacts
+        .where((p) => p.status == 'estudo')
+        .length;
 
     // Filtro ativo
     final displayedContacts = sectorContacts.where((p) {
@@ -213,11 +264,18 @@ class _SectorDetailScreenState extends ConsumerState<SectorDetailScreen> {
                       children: [
                         Row(
                           children: [
-                            const Icon(Icons.holiday_village, color: AppTheme.accentTeal, size: 22),
+                            const Icon(
+                              Icons.holiday_village,
+                              color: AppTheme.accentTeal,
+                              size: 22,
+                            ),
                             const SizedBox(width: 8),
                             Text(
                               'Estatísticas de $_currentSectorName',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
                             ),
                           ],
                         ),
@@ -226,12 +284,19 @@ class _SectorDetailScreenState extends ConsumerState<SectorDetailScreen> {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppTheme.accentTeal,
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
                               minimumSize: const Size(36, 36),
                             ),
                             icon: const Icon(Icons.directions, size: 16),
-                            label: const Text('Rota no Setor', style: TextStyle(fontSize: 12)),
-                            onPressed: () => _openMultiContactRoute(sectorContacts),
+                            label: const Text(
+                              'Rota no Setor',
+                              style: TextStyle(fontSize: 12),
+                            ),
+                            onPressed: () =>
+                                _openMultiContactRoute(sectorContacts),
                           ),
                       ],
                     ),
@@ -241,14 +306,18 @@ class _SectorDetailScreenState extends ConsumerState<SectorDetailScreen> {
                         _StatBox(
                           label: 'TOTAL',
                           count: '$totalContacts',
-                          color: isDark ? const Color(0xFF60A5FA) : AppTheme.primaryBlue,
+                          color: isDark
+                              ? const Color(0xFF60A5FA)
+                              : AppTheme.primaryBlue,
                           icon: Icons.people_alt,
                         ),
                         const SizedBox(width: 8),
                         _StatBox(
                           label: 'INTERESSADOS',
                           count: '$totalInteressados',
-                          color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8),
+                          color: isDark
+                              ? const Color(0xFF93C5FD)
+                              : const Color(0xFF1D4ED8),
                           icon: Icons.person_search,
                         ),
                         const SizedBox(width: 8),
@@ -278,7 +347,12 @@ class _SectorDetailScreenState extends ConsumerState<SectorDetailScreen> {
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  for (final filter in ['Todos', 'Interessados', 'Revisitas', 'Estudos'])
+                  for (final filter in [
+                    'Todos',
+                    'Interessados',
+                    'Revisitas',
+                    'Estudos',
+                  ])
                     Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: FilterChip(
@@ -287,7 +361,9 @@ class _SectorDetailScreenState extends ConsumerState<SectorDetailScreen> {
                         onSelected: (val) {
                           if (val) setState(() => _selectedFilter = filter);
                         },
-                        selectedColor: AppTheme.primaryBlue.withValues(alpha: 0.15),
+                        selectedColor: AppTheme.primaryBlue.withValues(
+                          alpha: 0.15,
+                        ),
                       ),
                     ),
                 ],
@@ -302,12 +378,21 @@ class _SectorDetailScreenState extends ConsumerState<SectorDetailScreen> {
                 child: Center(
                   child: Column(
                     children: [
-                      Icon(Icons.person_search, size: 56, color: Colors.grey.shade400),
+                      Icon(
+                        Icons.person_search,
+                        size: 56,
+                        color: Colors.grey.shade400,
+                      ),
                       const SizedBox(height: 10),
                       Text(
                         'Nenhum contato encontrado em "$_currentSectorName"${_selectedFilter != "Todos" ? " com status $_selectedFilter" : ""}.\n\nAo cadastrar um contato com o bairro "$_currentSectorName" no endereço, ele aparecerá aqui automaticamente.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted, fontSize: 14),
+                        style: TextStyle(
+                          color: isDark
+                              ? const Color(0xFFCBD5E1)
+                              : AppTheme.textMuted,
+                          fontSize: 14,
+                        ),
                       ),
                     ],
                   ),
@@ -334,8 +419,13 @@ class _SectorDetailScreenState extends ConsumerState<SectorDetailScreen> {
                               CircleAvatar(
                                 backgroundColor: color.withValues(alpha: 0.15),
                                 child: Text(
-                                  person.name.isNotEmpty ? person.name[0].toUpperCase() : '?',
-                                  style: TextStyle(fontWeight: FontWeight.bold, color: color),
+                                  person.name.isNotEmpty
+                                      ? person.name[0].toUpperCase()
+                                      : '?',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: color,
+                                  ),
                                 ),
                               ),
                               const SizedBox(width: 10),
@@ -348,57 +438,91 @@ class _SectorDetailScreenState extends ConsumerState<SectorDetailScreen> {
                                       style: TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.bold,
-                                        color: isDark ? Colors.white : AppTheme.textDark,
+                                        color: isDark
+                                            ? Colors.white
+                                            : AppTheme.textDark,
                                       ),
                                     ),
-                                    if (person.phone != null && person.phone!.isNotEmpty)
+                                    if (person.phone != null &&
+                                        person.phone!.isNotEmpty)
                                       Text(
                                         person.phone!,
-                                        style: TextStyle(fontSize: 13, color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted),
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: isDark
+                                              ? const Color(0xFFCBD5E1)
+                                              : AppTheme.textMuted,
+                                        ),
                                       ),
                                   ],
                                 ),
                               ),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
                                 decoration: BoxDecoration(
                                   color: color.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Text(
                                   person.status.toUpperCase(),
-                                  style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold),
+                                  style: TextStyle(
+                                    color: color,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                             ],
                           ),
-                          if (person.address != null && person.address!.isNotEmpty) ...[
+                          if (person.address != null &&
+                              person.address!.isNotEmpty) ...[
                             const SizedBox(height: 8),
                             Row(
                               children: [
-                                const Icon(Icons.location_on_outlined, size: 16, color: AppTheme.accentTeal),
+                                const Icon(
+                                  Icons.location_on_outlined,
+                                  size: 16,
+                                  color: AppTheme.accentTeal,
+                                ),
                                 const SizedBox(width: 4),
                                 Expanded(
                                   child: Text(
                                     person.address!,
-                                    style: TextStyle(fontSize: 13, color: isDark ? const Color(0xFFF1F5F9) : AppTheme.textDark),
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: isDark
+                                          ? const Color(0xFFF1F5F9)
+                                          : AppTheme.textDark,
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
                           ],
-                          if (person.preferredSchedule != null && person.preferredSchedule!.isNotEmpty) ...[
+                          if (person.preferredSchedule != null &&
+                              person.preferredSchedule!.isNotEmpty) ...[
                             const SizedBox(height: 6),
                             Row(
                               children: [
-                                Icon(Icons.calendar_today, size: 15, color: isDark ? const Color(0xFF60A5FA) : AppTheme.primaryBlue),
+                                Icon(
+                                  Icons.calendar_today,
+                                  size: 15,
+                                  color: isDark
+                                      ? const Color(0xFF60A5FA)
+                                      : AppTheme.primaryBlue,
+                                ),
                                 const SizedBox(width: 6),
                                 Text(
                                   'Dia Habitual do Estudo: ${person.preferredSchedule!}',
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600,
-                                    color: isDark ? const Color(0xFF93C5FD) : AppTheme.primaryBlue,
+                                    color: isDark
+                                        ? const Color(0xFF93C5FD)
+                                        : AppTheme.primaryBlue,
                                   ),
                                 ),
                               ],
@@ -408,14 +532,23 @@ class _SectorDetailScreenState extends ConsumerState<SectorDetailScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
-                              if (person.phone != null && person.phone!.isNotEmpty) ...[
+                              if (person.phone != null &&
+                                  person.phone!.isNotEmpty) ...[
                                 IconButton(
-                                  icon: const Icon(Icons.phone, size: 20, color: AppTheme.primaryBlue),
+                                  icon: const Icon(
+                                    Icons.phone,
+                                    size: 20,
+                                    color: AppTheme.primaryBlue,
+                                  ),
                                   tooltip: 'Ligar',
                                   onPressed: () => _makePhoneCall(person.phone),
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.chat, size: 20, color: Color(0xFF25D366)),
+                                  icon: const Icon(
+                                    Icons.chat,
+                                    size: 20,
+                                    color: Color(0xFF25D366),
+                                  ),
                                   tooltip: 'WhatsApp',
                                   onPressed: () => _openWhatsApp(person.phone),
                                 ),
@@ -426,7 +559,11 @@ class _SectorDetailScreenState extends ConsumerState<SectorDetailScreen> {
                                 onPressed: () {
                                   Navigator.push(
                                     context,
-                                    MaterialPageRoute(builder: (_) => PersonDetailScreen(personId: person.id)),
+                                    MaterialPageRoute(
+                                      builder: (_) => PersonDetailScreen(
+                                        personId: person.id,
+                                      ),
+                                    ),
                                   );
                                 },
                               ),
@@ -486,11 +623,19 @@ class _StatBox extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               count,
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: color),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: color,
+              ),
             ),
             Text(
               label,
-              style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: color),
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
               textAlign: TextAlign.center,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,

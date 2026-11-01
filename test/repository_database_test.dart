@@ -76,20 +76,23 @@ void main() {
       expect(byTag.first.name, contains('Clara'));
     });
 
-    test('Exclusão lógica preserva histórico e enfileira deleção sincronizada', () async {
-      final p = await repository.createPerson(name: 'Lucas');
-      expect((await repository.getAllPeople()).length, equals(1));
+    test(
+      'Exclusão lógica preserva histórico e enfileira deleção sincronizada',
+      () async {
+        final p = await repository.createPerson(name: 'Lucas');
+        expect((await repository.getAllPeople()).length, equals(1));
 
-      await repository.deletePerson(p.id);
+        await repository.deletePerson(p.id);
 
-      // Não aparece mais na listagem ativa
-      expect((await repository.getAllPeople()).length, equals(0));
+        // Não aparece mais na listagem ativa
+        expect((await repository.getAllPeople()).length, equals(0));
 
-      // Fila possui INSERT e DELETE
-      final pendingOps = await repository.getPendingSyncOperations();
-      expect(pendingOps.length, equals(2));
-      expect(pendingOps.last.operation, equals('DELETE'));
-    });
+        // Fila possui INSERT e DELETE
+        final pendingOps = await repository.getPendingSyncOperations();
+        expect(pendingOps.length, equals(2));
+        expect(pendingOps.last.operation, equals('DELETE'));
+      },
+    );
 
     test('Estudo com múltiplos participantes associa ambos e avança lição após sessão', () async {
       final p1 = await repository.createPerson(name: 'Mãe');
@@ -123,8 +126,18 @@ void main() {
 
       // Verifica enfileiramento na fila de sincronização para estudo e sessão
       final pending = await repository.getPendingSyncOperations();
-      final studyUpdate = pending.where((op) => op.entityType == 'bible_studies' && op.operation == 'UPDATE').toList();
-      final sessionInsert = pending.where((op) => op.entityType == 'study_sessions' && op.operation == 'INSERT').toList();
+      final studyUpdate = pending
+          .where(
+            (op) =>
+                op.entityType == 'bible_studies' && op.operation == 'UPDATE',
+          )
+          .toList();
+      final sessionInsert = pending
+          .where(
+            (op) =>
+                op.entityType == 'study_sessions' && op.operation == 'INSERT',
+          )
+          .toList();
 
       expect(studyUpdate.isNotEmpty, isTrue);
       expect(sessionInsert.isNotEmpty, isTrue);
@@ -164,13 +177,25 @@ void main() {
       expect(newAppt.startTime, equals(newStart));
       expect(newAppt.durationMinutes, equals(45));
 
-      final updatedOldAppt = await repository.getAppointmentById(originalAppt.id);
+      final updatedOldAppt = await repository.getAppointmentById(
+        originalAppt.id,
+      );
       expect(updatedOldAppt!.status, equals('reagendado'));
 
       // Verifica fila de sincronização: UPDATE para o antigo e INSERT para o novo
       final pendingOps = await repository.getPendingSyncOperations();
-      expect(pendingOps.any((op) => op.entityId == originalAppt.id && op.operation == 'UPDATE'), isTrue);
-      expect(pendingOps.any((op) => op.entityId == newAppt.id && op.operation == 'INSERT'), isTrue);
+      expect(
+        pendingOps.any(
+          (op) => op.entityId == originalAppt.id && op.operation == 'UPDATE',
+        ),
+        isTrue,
+      );
+      expect(
+        pendingOps.any(
+          (op) => op.entityId == newAppt.id && op.operation == 'INSERT',
+        ),
+        isTrue,
+      );
     });
 
     test('Atualização de visita altera anotações, incrementa revisão e enfileira UPDATE', () async {
@@ -198,7 +223,12 @@ void main() {
       expect(updatedVisit.revision, equals(2));
 
       final pendingOps = await repository.getPendingSyncOperations();
-      expect(pendingOps.any((op) => op.entityId == visit.id && op.operation == 'UPDATE'), isTrue);
+      expect(
+        pendingOps.any(
+          (op) => op.entityId == visit.id && op.operation == 'UPDATE',
+        ),
+        isTrue,
+      );
     });
 
     test('Lixeira permite listar itens excluídos, restaurá-los ou excluí-los definitivamente', () async {
@@ -207,7 +237,12 @@ void main() {
 
       // Listar itens na lixeira
       final deletedItems = await repository.getDeletedItems();
-      expect(deletedItems.any((item) => item['id'] == person.id && item['type'] == 'people'), isTrue);
+      expect(
+        deletedItems.any(
+          (item) => item['id'] == person.id && item['type'] == 'people',
+        ),
+        isTrue,
+      );
 
       // Restaurar item
       await repository.restoreDeletedItem('people', person.id);
@@ -223,7 +258,9 @@ void main() {
     });
 
     test('Inicialização via AppDatabaseConnection.connect(inMemory: true) persiste e lê dados', () async {
-      final defaultDb = AppDatabase(AppDatabaseConnection.connect(inMemory: true));
+      final defaultDb = AppDatabase(
+        AppDatabaseConnection.connect(inMemory: true),
+      );
       final defaultRepo = AppRepository(defaultDb);
       final p = await defaultRepo.createPerson(name: 'Teste Construtor Padrao');
       expect(p.name, equals('Teste Construtor Padrao'));

@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+
 import 'package:clock/clock.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -6,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:drift/drift.dart' as drift show Value;
+
 import '../../core/app_theme.dart';
 import '../../database/app_database.dart';
 import '../../reports/report_export_service.dart';
@@ -29,10 +31,12 @@ class ContactsMapScreen extends ConsumerStatefulWidget {
 }
 
 class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
-  final TransformationController _transformationController = TransformationController();
+  final TransformationController _transformationController =
+      TransformationController();
   bool _hasCenteredInitialView = false;
   String? _highlightPersonId;
-  String _selectedStatusFilter = 'Todos'; // 'Todos', 'Estudos', 'Revisitas', 'Interessados'
+  String _selectedStatusFilter =
+      'Todos'; // 'Todos', 'Estudos', 'Revisitas', 'Interessados'
   String _selectedDayFilter = 'Todos'; // 'Todos', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'
   String _selectedNeighborhood = 'Todos';
   String _viewMode = 'Mapa Interativo'; // 'Mapa Interativo', 'Lista / Bairros'
@@ -52,29 +56,44 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
     _highlightPersonId = widget.highlightPersonId;
   }
 
-  int _lon2tileX(double lon, int z) => ((lon + 180.0) / 360.0 * (1 << z)).floor();
+  int _lon2tileX(double lon, int z) =>
+      ((lon + 180.0) / 360.0 * (1 << z)).floor();
 
   int _lat2tileY(double lat, int z) {
     final latRad = lat.clamp(-85.0511, 85.0511) * math.pi / 180.0;
-    return ((1.0 - math.log(math.tan(latRad) + 1.0 / math.cos(latRad)) / math.pi) / 2.0 * (1 << z)).floor();
+    return ((1.0 -
+                math.log(math.tan(latRad) + 1.0 / math.cos(latRad)) / math.pi) /
+            2.0 *
+            (1 << z))
+        .floor();
   }
 
-  double _lon2pixelX(double lon, int z) => (lon + 180.0) / 360.0 * (_tileSize * (1 << z));
+  double _lon2pixelX(double lon, int z) =>
+      (lon + 180.0) / 360.0 * (_tileSize * (1 << z));
 
   double _lat2pixelY(double lat, int z) {
     final latRad = lat.clamp(-85.0511, 85.0511) * math.pi / 180.0;
     final sinLat = math.sin(latRad).clamp(-0.9999, 0.9999);
-    return (0.5 - math.log((1.0 + sinLat) / (1.0 - sinLat)) / (4.0 * math.pi)) * (_tileSize * (1 << z));
+    return (0.5 - math.log((1.0 + sinLat) / (1.0 - sinLat)) / (4.0 * math.pi)) *
+        (_tileSize * (1 << z));
   }
 
-  double _pixelX2lon(double px, int z) => (px / (_tileSize * (1 << z))) * 360.0 - 180.0;
+  double _pixelX2lon(double px, int z) =>
+      (px / (_tileSize * (1 << z))) * 360.0 - 180.0;
 
   double _pixelY2lat(double py, int z) {
     final n = math.pi - (2.0 * math.pi * py) / (_tileSize * (1 << z));
     return 180.0 / math.pi * math.atan(0.5 * (math.exp(n) - math.exp(-n)));
   }
 
-  void _changeZoom(int newZoom, BoxConstraints constraints, double originPx, double originPy, double centerLng, double centerLat) {
+  void _changeZoom(
+    int newZoom,
+    BoxConstraints constraints,
+    double originPx,
+    double originPy,
+    double centerLng,
+    double centerLat,
+  ) {
     final targetZoom = newZoom.clamp(10, 18);
     if (targetZoom == _zoom) return;
 
@@ -112,14 +131,24 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
 
     final canvasWidth = (gridHalfSize * 2 + 1) * _tileSize;
     final canvasHeight = (gridHalfSize * 2 + 1) * _tileSize;
-    final newDx = ((viewportW / 2.0) - newCanvasX).clamp(viewportW - canvasWidth, 0.0);
-    final newDy = ((viewportH / 2.0) - newCanvasY).clamp(viewportH - canvasHeight, 0.0);
+    final newDx = ((viewportW / 2.0) - newCanvasX).clamp(
+      viewportW - canvasWidth,
+      0.0,
+    );
+    final newDy = ((viewportH / 2.0) - newCanvasY).clamp(
+      viewportH - canvasHeight,
+      0.0,
+    );
 
     setState(() {
       _zoom = targetZoom;
     });
 
-    _transformationController.value = Matrix4.translationValues(newDx, newDy, 0.0);
+    _transformationController.value = Matrix4.translationValues(
+      newDx,
+      newDy,
+      0.0,
+    );
   }
 
   @override
@@ -128,15 +157,29 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
     super.dispose();
   }
 
-  double _calculateDistanceKm(double lat1, double lon1, double lat2, double lon2) {
+  double _calculateDistanceKm(
+    double lat1,
+    double lon1,
+    double lat2,
+    double lon2,
+  ) {
     const p = 0.017453292519943295; // pi / 180
-    final a = 0.5 - math.cos((lat2 - lat1) * p) / 2 +
-        math.cos(lat1 * p) * math.cos(lat2 * p) *
-        (1 - math.cos((lon2 - lon1) * p)) / 2;
+    final a =
+        0.5 -
+        math.cos((lat2 - lat1) * p) / 2 +
+        math.cos(lat1 * p) *
+            math.cos(lat2 * p) *
+            (1 - math.cos((lon2 - lon1) * p)) /
+            2;
     return 12742 * math.asin(math.sqrt(a));
   }
 
-  void _recenterMap(double viewportWidth, double viewportHeight, double centerPx, double centerPy) {
+  void _recenterMap(
+    double viewportWidth,
+    double viewportHeight,
+    double centerPx,
+    double centerPy,
+  ) {
     if (viewportWidth > 0 && viewportHeight > 0) {
       final dx = (viewportWidth / 2.0) - centerPx;
       final dy = (viewportHeight / 2.0) - centerPy;
@@ -145,31 +188,53 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
   }
 
   Future<void> _openSingleRoute(PersonEntry person) async {
-    final query = (person.latitude != null && person.longitude != null && (person.latitude != 0.0 || person.longitude != 0.0))
+    final query =
+        (person.latitude != null &&
+            person.longitude != null &&
+            (person.latitude != 0.0 || person.longitude != 0.0))
         ? '${person.latitude},${person.longitude}'
         : Uri.encodeComponent(person.address ?? person.name);
-    final uri = Uri.parse('https://www.google.com/maps/search/?api=1&query=$query');
+    final uri = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=$query',
+    );
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
 
   Future<void> _openLandmarkRoute(TerritoryLandmark landmark) async {
-    final query = (landmark.latitude != null && landmark.longitude != null && landmark.latitude != 0.0)
+    final query =
+        (landmark.latitude != null &&
+            landmark.longitude != null &&
+            landmark.latitude != 0.0)
         ? '${landmark.latitude},${landmark.longitude}'
         : Uri.encodeComponent(landmark.address ?? landmark.name);
-    final uri = Uri.parse('https://www.google.com/maps/search/?api=1&query=$query');
+    final uri = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=$query',
+    );
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
 
   Future<void> _openMultiContactRoute(List<PersonEntry> contacts) async {
-    final validContacts = contacts.where((c) => (c.address != null && c.address!.trim().isNotEmpty) || (c.latitude != null && c.longitude != null && (c.latitude != 0.0 || c.longitude != 0.0))).toList();
+    final validContacts = contacts
+        .where(
+          (c) =>
+              (c.address != null && c.address!.trim().isNotEmpty) ||
+              (c.latitude != null &&
+                  c.longitude != null &&
+                  (c.latitude != 0.0 || c.longitude != 0.0)),
+        )
+        .toList();
     if (validContacts.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Nenhum contato com endereço cadastrado para traçar rota.')),
+          const SnackBar(
+            content: Text(
+              'Nenhum contato com endereço cadastrado para traçar rota.',
+            ),
+          ),
         );
       }
       return;
@@ -184,7 +249,11 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
     final validLats = <double>[];
     final validLngs = <double>[];
     for (final c in validContacts) {
-      if (c.latitude != null && c.longitude != null && (c.latitude != 0.0 || c.longitude != 0.0) && c.latitude!.abs() <= 90 && c.longitude!.abs() <= 180) {
+      if (c.latitude != null &&
+          c.longitude != null &&
+          (c.latitude != 0.0 || c.longitude != 0.0) &&
+          c.latitude!.abs() <= 90 &&
+          c.longitude!.abs() <= 180) {
         validLats.add(c.latitude!);
         validLngs.add(c.longitude!);
       }
@@ -198,8 +267,15 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
       final medianLng = validLngs[validLngs.length ~/ 2];
 
       for (final c in validContacts) {
-        if (c.latitude != null && c.longitude != null && (c.latitude != 0.0 || c.longitude != 0.0)) {
-          final dist = _calculateDistanceKm(medianLat, medianLng, c.latitude!, c.longitude!);
+        if (c.latitude != null &&
+            c.longitude != null &&
+            (c.latitude != 0.0 || c.longitude != 0.0)) {
+          final dist = _calculateDistanceKm(
+            medianLat,
+            medianLng,
+            c.latitude!,
+            c.longitude!,
+          );
           if (dist <= 60.0) {
             nearbyContacts.add(c);
           }
@@ -220,49 +296,83 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
 
     if (nearbyContacts.length < validContacts.length && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Rota traçada apenas para os ${nearbyContacts.length} contatos próximos do território.')),
+        SnackBar(
+          content: Text(
+            'Rota traçada apenas para os ${nearbyContacts.length} contatos próximos do território.',
+          ),
+        ),
       );
     }
 
-    final effectiveContacts = nearbyContacts.length > 10 ? nearbyContacts.take(10).toList() : nearbyContacts;
+    final effectiveContacts = nearbyContacts.length > 10
+        ? nearbyContacts.take(10).toList()
+        : nearbyContacts;
     if (nearbyContacts.length > 10 && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Rota otimizada para os primeiros 10 contatos de ${nearbyContacts.length} (limite do Google Maps).')),
+        SnackBar(
+          content: Text(
+            'Rota otimizada para os primeiros 10 contatos de ${nearbyContacts.length} (limite do Google Maps).',
+          ),
+        ),
       );
     }
 
     final dest = effectiveContacts.last;
-    final destQuery = (dest.latitude != null && dest.longitude != null && (dest.latitude != 0.0 || dest.longitude != 0.0))
+    final destQuery =
+        (dest.latitude != null &&
+            dest.longitude != null &&
+            (dest.latitude != 0.0 || dest.longitude != 0.0))
         ? '${dest.latitude},${dest.longitude}'
         : Uri.encodeComponent(dest.address ?? dest.name);
 
-    final waypointsList = effectiveContacts.sublist(0, effectiveContacts.length - 1).map((c) {
-      return (c.latitude != null && c.longitude != null && (c.latitude != 0.0 || c.longitude != 0.0))
-          ? '${c.latitude},${c.longitude}'
-          : Uri.encodeComponent(c.address ?? c.name);
-    }).where((w) => w.isNotEmpty).toList();
+    final waypointsList = effectiveContacts
+        .sublist(0, effectiveContacts.length - 1)
+        .map((c) {
+          return (c.latitude != null &&
+                  c.longitude != null &&
+                  (c.latitude != 0.0 || c.longitude != 0.0))
+              ? '${c.latitude},${c.longitude}'
+              : Uri.encodeComponent(c.address ?? c.name);
+        })
+        .where((w) => w.isNotEmpty)
+        .toList();
 
-    final waypointsParam = waypointsList.isNotEmpty ? '&waypoints=${waypointsList.join("|")}' : '';
-    final uri = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$destQuery$waypointsParam');
+    final waypointsParam = waypointsList.isNotEmpty
+        ? '&waypoints=${waypointsList.join("|")}'
+        : '';
+    final uri = Uri.parse(
+      'https://www.google.com/maps/dir/?api=1&destination=$destQuery$waypointsParam',
+    );
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
 
   // Abre o Google Maps padrão com a visualização do mapa/localizações (NÃO rota de carro)
-  Future<void> _openStandardGoogleMaps(List<PersonEntry> contacts, [List<TerritoryLandmark>? landmarks]) async {
+  Future<void> _openStandardGoogleMaps(
+    List<PersonEntry> contacts, [
+    List<TerritoryLandmark>? landmarks,
+  ]) async {
     final validLats = <double>[];
     final validLngs = <double>[];
 
     for (final c in contacts) {
-      if (c.latitude != null && c.longitude != null && (c.latitude != 0.0 || c.longitude != 0.0) && c.latitude!.abs() <= 90 && c.longitude!.abs() <= 180) {
+      if (c.latitude != null &&
+          c.longitude != null &&
+          (c.latitude != 0.0 || c.longitude != 0.0) &&
+          c.latitude!.abs() <= 90 &&
+          c.longitude!.abs() <= 180) {
         validLats.add(c.latitude!);
         validLngs.add(c.longitude!);
       }
     }
     if (landmarks != null) {
       for (final l in landmarks) {
-        if (l.latitude != null && l.longitude != null && (l.latitude != 0.0 || l.longitude != 0.0) && l.latitude!.abs() <= 90 && l.longitude!.abs() <= 180) {
+        if (l.latitude != null &&
+            l.longitude != null &&
+            (l.latitude != 0.0 || l.longitude != 0.0) &&
+            l.latitude!.abs() <= 90 &&
+            l.longitude!.abs() <= 180) {
           validLats.add(l.latitude!);
           validLngs.add(l.longitude!);
         }
@@ -276,7 +386,9 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
       final medianLng = validLngs[validLngs.length ~/ 2];
 
       // Abre o Google Maps visualizando o ponto central do território
-      final uri = Uri.parse('https://www.google.com/maps/search/?api=1&query=$medianLat,$medianLng');
+      final uri = Uri.parse(
+        'https://www.google.com/maps/search/?api=1&query=$medianLat,$medianLng',
+      );
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
         return;
@@ -286,7 +398,9 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
     for (final c in contacts) {
       if (c.address != null && c.address!.trim().isNotEmpty) {
         final query = Uri.encodeComponent(c.address!);
-        final uri = Uri.parse('https://www.google.com/maps/search/?api=1&query=$query');
+        final uri = Uri.parse(
+          'https://www.google.com/maps/search/?api=1&query=$query',
+        );
         if (await canLaunchUrl(uri)) {
           await launchUrl(uri, mode: LaunchMode.externalApplication);
           return;
@@ -305,7 +419,10 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
     final parts = address.split(RegExp(r'[-–,]'));
     for (final part in parts) {
       final trimmed = part.trim();
-      if (trimmed.toLowerCase().startsWith('bairro') || trimmed.toLowerCase().startsWith('jd') || trimmed.toLowerCase().startsWith('jardim') || trimmed.toLowerCase().startsWith('centro')) {
+      if (trimmed.toLowerCase().startsWith('bairro') ||
+          trimmed.toLowerCase().startsWith('jd') ||
+          trimmed.toLowerCase().startsWith('jardim') ||
+          trimmed.toLowerCase().startsWith('centro')) {
         return trimmed;
       }
     }
@@ -333,190 +450,280 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
         builder: (ctx, setDialogState) {
           final dialogIsDark = Theme.of(ctx).brightness == Brightness.dark;
           return AlertDialog(
-          title: const Row(
-            children: [
-              Icon(Icons.add_location_alt, color: AppTheme.accentTeal),
-              SizedBox(width: 8),
-              Text('Novo Ponto de Referência'),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+            title: const Row(
               children: [
-                Text(
-                  'Crie marcos úteis para localizar endereços com facilidade ou orientar outros publicadores.',
-                  style: TextStyle(fontSize: 12, color: dialogIsDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Nome do Ponto de Referência *',
-                    hintText: 'Ex: Padaria Central Betânia, Escola Estadual...',
-                  ),
-                  autofocus: true,
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  initialValue: selectedCategory,
-                  decoration: const InputDecoration(labelText: 'Categoria / Tipo de Marco'),
-                  items: const [
-                    DropdownMenuItem(value: 'padaria', child: Text('🥖 Padaria / Comércio')),
-                    DropdownMenuItem(value: 'escola', child: Text('🏫 Escola / Colégio')),
-                    DropdownMenuItem(value: 'saude', child: Text('🏥 Posto de Saúde / Hospital')),
-                    DropdownMenuItem(value: 'transporte', child: Text('🚌 Ponto de Ônibus / Terminal')),
-                    DropdownMenuItem(value: 'mercado', child: Text('🛒 Supermercado')),
-                    DropdownMenuItem(value: 'praca', child: Text('🌳 Praça / Parque')),
-                    DropdownMenuItem(value: 'religioso', child: Text('⛪ Salão do Reino / Igreja')),
-                    DropdownMenuItem(value: 'combustivel', child: Text('⛽ Posto de Combustível')),
-                    DropdownMenuItem(value: 'outro', child: Text('📍 Outro Marco')),
-                  ],
-                  onChanged: (val) {
-                    if (val != null) setDialogState(() => selectedCategory = val);
-                  },
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: addressController,
-                  decoration: const InputDecoration(
-                    labelText: 'Endereço ou Localização',
-                    hintText: 'Ex: Av. Principal com Rua 3 - Betânia',
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: latController,
-                        decoration: const InputDecoration(labelText: 'Latitude GPS (opcional)'),
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        controller: lngController,
-                        decoration: const InputDecoration(labelText: 'Longitude GPS (opcional)'),
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 6,
-                  children: [
-                    TextButton.icon(
-                      icon: const Icon(Icons.my_location, size: 16),
-                      label: const Text('Capturar GPS Atual', style: TextStyle(fontSize: 12)),
-                      onPressed: () async {
-                        final pos = await GeolocationHelper.getCurrentLocation();
-                        if (pos != null) {
-                          setDialogState(() {
-                            latController.text = pos.latitude.toStringAsFixed(6);
-                            lngController.text = pos.longitude.toStringAsFixed(6);
-                          });
-                          final geo = await GeocodingService.reverseGeocode(pos.latitude, pos.longitude);
-                          if (geo != null && addressController.text.trim().isEmpty) {
-                            setDialogState(() {
-                              addressController.text = geo.formattedSummary;
-                            });
-                          }
-                        } else {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Não foi possível obter sinal GPS. Toque em "🗺️ Escolher no Mapa" para posicionar.')),
-                            );
-                          }
-                        }
-                      },
-                    ),
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppTheme.accentTeal,
-                        side: const BorderSide(color: AppTheme.accentTeal),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      ),
-                      icon: const Icon(Icons.map, size: 16),
-                      label: const Text('🗺️ Escolher no Mapa', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                      onPressed: () async {
-                        final initialLat = double.tryParse(latController.text.trim());
-                        final initialLng = double.tryParse(lngController.text.trim());
-                        final res = await showDialog<ReverseGeocodingResult>(
-                          context: context,
-                          builder: (_) => MapLocationPickerDialog(
-                            initialLat: initialLat,
-                            initialLng: initialLng,
-                            initialAddress: addressController.text.trim(),
-                          ),
-                        );
-                        if (res != null) {
-                          setDialogState(() {
-                            latController.text = res.latitude.toStringAsFixed(6);
-                            lngController.text = res.longitude.toStringAsFixed(6);
-                            if (addressController.text.trim().isEmpty && res.streetAndNumber.isNotEmpty) {
-                              addressController.text = res.formattedSummary;
-                            }
-                          });
-                        }
-                      },
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: notesController,
-                  decoration: const InputDecoration(
-                    labelText: 'Observações / Instruções para encontrar',
-                    hintText: 'Ex: Ponto de encontro da saída de campo no sábado às 9:00',
-                  ),
-                  maxLines: 2,
-                ),
+                Icon(Icons.add_location_alt, color: AppTheme.accentTeal),
+                SizedBox(width: 8),
+                Text('Novo Ponto de Referência'),
               ],
             ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-            ElevatedButton(
-              onPressed: () async {
-                final name = nameController.text.trim();
-                if (name.isEmpty) return;
-
-                final mgr = ref.read(landmarkManagerProvider);
-                final lat = double.tryParse(latController.text.trim());
-                final lng = double.tryParse(lngController.text.trim());
-
-                await mgr.addLandmark(
-                  name: name,
-                  category: selectedCategory,
-                  address: addressController.text.trim().isEmpty ? null : addressController.text.trim(),
-                  latitude: lat,
-                  longitude: lng,
-                  notes: notesController.text.trim().isEmpty ? null : notesController.text.trim(),
-                );
-
-                if (ctx.mounted) Navigator.pop(ctx);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Ponto de referência cadastrado no mapa!')),
-                  );
-                }
-              },
-              child: const Text('Salvar Marco'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Crie marcos úteis para localizar endereços com facilidade ou orientar outros publicadores.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: dialogIsDark
+                          ? const Color(0xFFCBD5E1)
+                          : AppTheme.textMuted,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: nameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Nome do Ponto de Referência *',
+                      hintText:
+                          'Ex: Padaria Central Betânia, Escola Estadual...',
+                    ),
+                    autofocus: true,
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    initialValue: selectedCategory,
+                    decoration: const InputDecoration(
+                      labelText: 'Categoria / Tipo de Marco',
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'padaria',
+                        child: Text('🥖 Padaria / Comércio'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'escola',
+                        child: Text('🏫 Escola / Colégio'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'saude',
+                        child: Text('🏥 Posto de Saúde / Hospital'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'transporte',
+                        child: Text('🚌 Ponto de Ônibus / Terminal'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'mercado',
+                        child: Text('🛒 Supermercado'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'praca',
+                        child: Text('🌳 Praça / Parque'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'religioso',
+                        child: Text('⛪ Salão do Reino / Igreja'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'combustivel',
+                        child: Text('⛽ Posto de Combustível'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'outro',
+                        child: Text('📍 Outro Marco'),
+                      ),
+                    ],
+                    onChanged: (val) {
+                      if (val != null)
+                        setDialogState(() => selectedCategory = val);
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: addressController,
+                    decoration: const InputDecoration(
+                      labelText: 'Endereço ou Localização',
+                      hintText: 'Ex: Av. Principal com Rua 3 - Betânia',
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: latController,
+                          decoration: const InputDecoration(
+                            labelText: 'Latitude GPS (opcional)',
+                          ),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                            signed: true,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: lngController,
+                          decoration: const InputDecoration(
+                            labelText: 'Longitude GPS (opcional)',
+                          ),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                            signed: true,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      TextButton.icon(
+                        icon: const Icon(Icons.my_location, size: 16),
+                        label: const Text(
+                          'Capturar GPS Atual',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                        onPressed: () async {
+                          final pos =
+                              await GeolocationHelper.getCurrentLocation();
+                          if (pos != null) {
+                            setDialogState(() {
+                              latController.text = pos.latitude.toStringAsFixed(
+                                6,
+                              );
+                              lngController.text = pos.longitude
+                                  .toStringAsFixed(6);
+                            });
+                            final geo = await GeocodingService.reverseGeocode(
+                              pos.latitude,
+                              pos.longitude,
+                            );
+                            if (geo != null &&
+                                addressController.text.trim().isEmpty) {
+                              setDialogState(() {
+                                addressController.text = geo.formattedSummary;
+                              });
+                            }
+                          } else {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Não foi possível obter sinal GPS. Toque em "🗺️ Escolher no Mapa" para posicionar.',
+                                  ),
+                                ),
+                              );
+                            }
+                          }
+                        },
+                      ),
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.accentTeal,
+                          side: const BorderSide(color: AppTheme.accentTeal),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                        ),
+                        icon: const Icon(Icons.map, size: 16),
+                        label: const Text(
+                          '🗺️ Escolher no Mapa',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        onPressed: () async {
+                          final initialLat = double.tryParse(
+                            latController.text.trim(),
+                          );
+                          final initialLng = double.tryParse(
+                            lngController.text.trim(),
+                          );
+                          final res = await showDialog<ReverseGeocodingResult>(
+                            context: context,
+                            builder: (_) => MapLocationPickerDialog(
+                              initialLat: initialLat,
+                              initialLng: initialLng,
+                              initialAddress: addressController.text.trim(),
+                            ),
+                          );
+                          if (res != null) {
+                            setDialogState(() {
+                              latController.text = res.latitude.toStringAsFixed(
+                                6,
+                              );
+                              lngController.text = res.longitude
+                                  .toStringAsFixed(6);
+                              if (addressController.text.trim().isEmpty &&
+                                  res.streetAndNumber.isNotEmpty) {
+                                addressController.text = res.formattedSummary;
+                              }
+                            });
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: notesController,
+                    decoration: const InputDecoration(
+                      labelText: 'Observações / Instruções para encontrar',
+                      hintText: 'Ex: Ponto de encontro da saída de campo no sábado às 9:00',
+                    ),
+                    maxLines: 2,
+                  ),
+                ],
+              ),
             ),
-          ],
-        );
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancelar'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  final name = nameController.text.trim();
+                  if (name.isEmpty) return;
+
+                  final mgr = ref.read(landmarkManagerProvider);
+                  final lat = double.tryParse(latController.text.trim());
+                  final lng = double.tryParse(lngController.text.trim());
+
+                  await mgr.addLandmark(
+                    name: name,
+                    category: selectedCategory,
+                    address: addressController.text.trim().isEmpty
+                        ? null
+                        : addressController.text.trim(),
+                    latitude: lat,
+                    longitude: lng,
+                    notes: notesController.text.trim().isEmpty
+                        ? null
+                        : notesController.text.trim(),
+                  );
+
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Ponto de referência cadastrado no mapa!',
+                        ),
+                      ),
+                    );
+                  }
+                },
+                child: const Text('Salvar Marco'),
+              ),
+            ],
+          );
         },
       ),
     );
   }
 
   void _shareLandmark(TerritoryLandmark landmark) async {
-    final text = '📍 Ponto de Referência no Território: ${landmark.name}\n'
+    final text =
+        '📍 Ponto de Referência no Território: ${landmark.name}\n'
         'Categoria: ${landmark.categoryLabel}\n'
         '${landmark.address != null ? "Endereço: ${landmark.address}\n" : ""}'
         '${landmark.notes != null ? "Observações: ${landmark.notes}\n" : ""}'
@@ -524,22 +731,38 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
 
     Clipboard.setData(ClipboardData(text: text));
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Informações do ponto de referência copiadas para compartilhar!')),
+      const SnackBar(
+        content: Text(
+          'Informações do ponto de referência copiadas para compartilhar!',
+        ),
+      ),
     );
   }
 
-  Future<void> _downloadOfflineTiles(BuildContext context, List<PersonEntry> people, List<TerritoryLandmark> landmarks) async {
+  Future<void> _downloadOfflineTiles(
+    BuildContext context,
+    List<PersonEntry> people,
+    List<TerritoryLandmark> landmarks,
+  ) async {
     final validLats = <double>[];
     final validLngs = <double>[];
 
     for (final c in people) {
-      if (c.latitude != null && c.longitude != null && (c.latitude != 0.0 || c.longitude != 0.0) && c.latitude!.abs() <= 90 && c.longitude!.abs() <= 180) {
+      if (c.latitude != null &&
+          c.longitude != null &&
+          (c.latitude != 0.0 || c.longitude != 0.0) &&
+          c.latitude!.abs() <= 90 &&
+          c.longitude!.abs() <= 180) {
         validLats.add(c.latitude!);
         validLngs.add(c.longitude!);
       }
     }
     for (final l in landmarks) {
-      if (l.latitude != null && l.longitude != null && (l.latitude != 0.0 || l.longitude != 0.0) && l.latitude!.abs() <= 90 && l.longitude!.abs() <= 180) {
+      if (l.latitude != null &&
+          l.longitude != null &&
+          (l.latitude != 0.0 || l.longitude != 0.0) &&
+          l.latitude!.abs() <= 90 &&
+          l.longitude!.abs() <= 180) {
         validLats.add(l.latitude!);
         validLngs.add(l.longitude!);
       }
@@ -576,12 +799,16 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
             content: ValueListenableBuilder<int>(
               valueListenable: progressNotifier,
               builder: (ctx, progress, _) {
-                final pct = totalExpected > 0 ? (progress / totalExpected).clamp(0.0, 1.0) : 0.0;
+                final pct = totalExpected > 0
+                    ? (progress / totalExpected).clamp(0.0, 1.0)
+                    : 0.0;
                 return Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Salvando blocos do território no dispositivo para uso sem internet no campo...'),
+                    const Text(
+                      'Salvando blocos do território no dispositivo para uso sem internet no campo...',
+                    ),
                     const SizedBox(height: 14),
                     LinearProgressIndicator(
                       value: pct,
@@ -594,8 +821,21 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('$progress de $totalExpected blocos', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                        Text('${(pct * 100).toStringAsFixed(0)}%', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.accentTeal)),
+                        Text(
+                          '$progress de $totalExpected blocos',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          '${(pct * 100).toStringAsFixed(0)}%',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.accentTeal,
+                          ),
+                        ),
                       ],
                     ),
                   ],
@@ -630,7 +870,9 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
       Navigator.of(context, rootNavigator: true).pop();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Sucesso! $totalSaved blocos salvos para uso offline no ministério.'),
+          content: Text(
+            'Sucesso! $totalSaved blocos salvos para uso offline no ministério.',
+          ),
           backgroundColor: AppTheme.successGreen,
         ),
       );
@@ -751,23 +993,31 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
 
           final filtered = people.where((p) {
             // Se for o contato em destaque vindo do perfil individual, nunca exclui por filtros
-            if (_highlightPersonId != null && p.id == _highlightPersonId) return true;
+            if (_highlightPersonId != null && p.id == _highlightPersonId)
+              return true;
 
-            final hasLoc = (p.address != null && p.address!.trim().isNotEmpty) || (p.latitude != null && p.longitude != null);
+            final hasLoc =
+                (p.address != null && p.address!.trim().isNotEmpty) ||
+                (p.latitude != null && p.longitude != null);
             if (!hasLoc) return false;
 
             if (_selectedStatusFilter == 'Todos') {
-              if (p.status == 'revisita_encerrada' || p.status == 'encerrado') return false;
-            } else if (_selectedStatusFilter == 'Estudos' && p.status != 'estudo') {
+              if (p.status == 'revisita_encerrada' || p.status == 'encerrado')
+                return false;
+            } else if (_selectedStatusFilter == 'Estudos' &&
+                p.status != 'estudo') {
               return false;
-            } else if (_selectedStatusFilter == 'Revisitas' && p.status != 'revisita') {
+            } else if (_selectedStatusFilter == 'Revisitas' &&
+                p.status != 'revisita') {
               return false;
-            } else if (_selectedStatusFilter == 'Interessados' && p.status != 'interessado') {
+            } else if (_selectedStatusFilter == 'Interessados' &&
+                p.status != 'interessado') {
               return false;
             } else if (_selectedStatusFilter == 'Estrangeiros') {
               final tags = p.tags.toLowerCase();
               final notes = (p.generalNotes ?? '').toLowerCase();
-              final isForeign = tags.contains('estrangeiro') ||
+              final isForeign =
+                  tags.contains('estrangeiro') ||
                   notes.contains('idioma') ||
                   notes.contains('língua') ||
                   notes.contains('estrangeir') ||
@@ -780,7 +1030,9 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                   notes.contains('árabe');
               if (!isForeign) return false;
             } else if (_selectedStatusFilter == 'Encerrados' &&
-                !(p.status == 'revisita_encerrada' || p.status == 'encerrado' || p.status == 'concluido')) {
+                !(p.status == 'revisita_encerrada' ||
+                    p.status == 'encerrado' ||
+                    p.status == 'concluido')) {
               return false;
             }
 
@@ -803,23 +1055,38 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
               // Barra de filtros superior
               Container(
                 color: isDark ? const Color(0xFF0F172A) : Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 child: Column(
                   children: [
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: Row(
                         children: [
-                          for (final status in ['Todos', 'Estudos', 'Revisitas', 'Interessados', 'Estrangeiros', 'Encerrados'])
+                          for (final status in [
+                            'Todos',
+                            'Estudos',
+                            'Revisitas',
+                            'Interessados',
+                            'Estrangeiros',
+                            'Encerrados',
+                          ])
                             Padding(
                               padding: const EdgeInsets.only(right: 6),
                               child: ChoiceChip(
                                 label: Text(status),
                                 selected: _selectedStatusFilter == status,
                                 onSelected: (sel) {
-                                  if (sel) setState(() => _selectedStatusFilter = status);
+                                  if (sel)
+                                    setState(
+                                      () => _selectedStatusFilter = status,
+                                    );
                                 },
-                                selectedColor: AppTheme.primaryBlue.withValues(alpha: 0.15),
+                                selectedColor: AppTheme.primaryBlue.withValues(
+                                  alpha: 0.15,
+                                ),
                               ),
                             ),
                           const VerticalDivider(width: 12),
@@ -827,33 +1094,69 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                             value: _selectedDayFilter,
                             underline: const SizedBox.shrink(),
                             hint: const Text('Dia da Visita'),
-                            items: ['Todos', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'].map((d) {
-                              return DropdownMenuItem(value: d, child: Text(d == 'Todos' ? 'Qualquer Dia' : d, style: const TextStyle(fontSize: 13)));
-                            }).toList(),
+                            items:
+                                [
+                                  'Todos',
+                                  'Segunda',
+                                  'Terça',
+                                  'Quarta',
+                                  'Quinta',
+                                  'Sexta',
+                                  'Sábado',
+                                  'Domingo',
+                                ].map((d) {
+                                  return DropdownMenuItem(
+                                    value: d,
+                                    child: Text(
+                                      d == 'Todos' ? 'Qualquer Dia' : d,
+                                      style: const TextStyle(fontSize: 13),
+                                    ),
+                                  );
+                                }).toList(),
                             onChanged: (val) {
-                              if (val != null) setState(() => _selectedDayFilter = val);
+                              if (val != null)
+                                setState(() => _selectedDayFilter = val);
                             },
                           ),
                           const SizedBox(width: 8),
                           if (neighborhoods.length > 2)
                             DropdownButton<String>(
-                              value: neighborhoods.contains(_selectedNeighborhood) ? _selectedNeighborhood : 'Todos',
+                              value:
+                                  neighborhoods.contains(_selectedNeighborhood)
+                                  ? _selectedNeighborhood
+                                  : 'Todos',
                               underline: const SizedBox.shrink(),
                               items: neighborhoods.map((b) {
-                                return DropdownMenuItem(value: b, child: Text(b == 'Todos' ? 'Todos os Bairros' : b, style: const TextStyle(fontSize: 13)));
+                                return DropdownMenuItem(
+                                  value: b,
+                                  child: Text(
+                                    b == 'Todos' ? 'Todos os Bairros' : b,
+                                    style: const TextStyle(fontSize: 13),
+                                  ),
+                                );
                               }).toList(),
                               onChanged: (val) {
-                                if (val != null) setState(() => _selectedNeighborhood = val);
+                                if (val != null)
+                                  setState(() => _selectedNeighborhood = val);
                               },
                             ),
                           const SizedBox(width: 8),
                           FilterChip(
-                            avatar: Icon(Icons.place, size: 16, color: _showLandmarks ? Colors.white : AppTheme.accentTeal),
+                            avatar: Icon(
+                              Icons.place,
+                              size: 16,
+                              color: _showLandmarks
+                                  ? Colors.white
+                                  : AppTheme.accentTeal,
+                            ),
                             label: Text('Pontos Ref. (${landmarks.length})'),
                             selected: _showLandmarks,
-                            onSelected: (val) => setState(() => _showLandmarks = val),
+                            onSelected: (val) =>
+                                setState(() => _showLandmarks = val),
                             selectedColor: AppTheme.accentTeal,
-                            labelStyle: TextStyle(color: _showLandmarks ? Colors.white : null),
+                            labelStyle: TextStyle(
+                              color: _showLandmarks ? Colors.white : null,
+                            ),
                           ),
                         ],
                       ),
@@ -867,19 +1170,28 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
-                            color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted,
+                            color: isDark
+                                ? const Color(0xFFCBD5E1)
+                                : AppTheme.textMuted,
                           ),
                         ),
                         Row(
                           children: [
                             OutlinedButton.icon(
                               style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
                                 minimumSize: const Size(36, 36),
                               ),
                               icon: const Icon(Icons.public, size: 16),
-                              label: const Text('Mapa Padrão', style: TextStyle(fontSize: 12)),
-                              onPressed: () => _openStandardGoogleMaps(filtered, landmarks),
+                              label: const Text(
+                                'Mapa Padrão',
+                                style: TextStyle(fontSize: 12),
+                              ),
+                              onPressed: () =>
+                                  _openStandardGoogleMaps(filtered, landmarks),
                             ),
                             const SizedBox(width: 6),
                             if (filtered.isNotEmpty)
@@ -887,12 +1199,19 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: AppTheme.accentTeal,
                                   foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 4,
+                                  ),
                                   minimumSize: const Size(36, 36),
                                 ),
                                 icon: const Icon(Icons.directions, size: 16),
-                                label: const Text('Traçar Rota', style: TextStyle(fontSize: 12)),
-                                onPressed: () => _openMultiContactRoute(filtered),
+                                label: const Text(
+                                  'Traçar Rota',
+                                  style: TextStyle(fontSize: 12),
+                                ),
+                                onPressed: () =>
+                                    _openMultiContactRoute(filtered),
                               ),
                           ],
                         ),
@@ -908,62 +1227,93 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                 child: _viewMode == 'Mapa Interativo'
                     ? _buildInteractiveVisualMap(filtered, landmarks)
                     : filtered.isEmpty
-                        ? Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(24),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.location_off_outlined, size: 56, color: Colors.grey.shade400),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    'Nenhum contato com endereço cadastrado coincide com os filtros selecionados.',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted, fontSize: 15),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  OutlinedButton.icon(
-                                    icon: const Icon(Icons.filter_alt_off),
-                                    label: const Text('Limpar Filtros'),
-                                    onPressed: () {
-                                      setState(() {
-                                        _selectedStatusFilter = 'Todos';
-                                        _selectedDayFilter = 'Todos';
-                                        _selectedNeighborhood = 'Todos';
-                                      });
-                                    },
-                                  ),
-                                ],
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.location_off_outlined,
+                                size: 56,
+                                color: Colors.grey.shade400,
                               ),
-                            ),
-                          )
-                        : _buildGroupedNeighborhoodList(filtered, studies),
+                              const SizedBox(height: 12),
+                              Text(
+                                'Nenhum contato com endereço cadastrado coincide com os filtros selecionados.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: isDark
+                                      ? const Color(0xFFCBD5E1)
+                                      : AppTheme.textMuted,
+                                  fontSize: 15,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              OutlinedButton.icon(
+                                icon: const Icon(Icons.filter_alt_off),
+                                label: const Text('Limpar Filtros'),
+                                onPressed: () {
+                                  setState(() {
+                                    _selectedStatusFilter = 'Todos';
+                                    _selectedDayFilter = 'Todos';
+                                    _selectedNeighborhood = 'Todos';
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : _buildGroupedNeighborhoodList(filtered, studies),
               ),
             ],
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(child: Text('Erro ao carregar contatos: $err')),
+        error: (err, _) =>
+            Center(child: Text('Erro ao carregar contatos: $err')),
       ),
     );
   }
 
   // Visualizador geográfico com mapa real OpenStreetMap (tiles raster com cache offline) e zoom interativo
-  Widget _buildInteractiveVisualMap(List<PersonEntry> contacts, List<TerritoryLandmark> landmarks) {
+  Widget _buildInteractiveVisualMap(
+    List<PersonEntry> contacts,
+    List<TerritoryLandmark> landmarks,
+  ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final geoContacts = contacts.where((c) =>
-        c.latitude != null && c.longitude != null &&
-        (c.latitude != 0.0 || c.longitude != 0.0) &&
-        c.latitude!.abs() <= 90 && c.longitude!.abs() <= 180).toList();
+    final geoContacts = contacts
+        .where(
+          (c) =>
+              c.latitude != null &&
+              c.longitude != null &&
+              (c.latitude != 0.0 || c.longitude != 0.0) &&
+              c.latitude!.abs() <= 90 &&
+              c.longitude!.abs() <= 180,
+        )
+        .toList();
     final geoLandmarks = _showLandmarks
-        ? landmarks.where((l) =>
-            l.latitude != null && l.longitude != null &&
-            (l.latitude != 0.0 || l.longitude != 0.0) &&
-            l.latitude!.abs() <= 90 && l.longitude!.abs() <= 180).toList()
+        ? landmarks
+              .where(
+                (l) =>
+                    l.latitude != null &&
+                    l.longitude != null &&
+                    (l.latitude != 0.0 || l.longitude != 0.0) &&
+                    l.latitude!.abs() <= 90 &&
+                    l.longitude!.abs() <= 180,
+              )
+              .toList()
         : <TerritoryLandmark>[];
 
-    final allLats = [...geoContacts.map((c) => c.latitude!), ...geoLandmarks.map((l) => l.latitude!)]..sort();
-    final allLngs = [...geoContacts.map((c) => c.longitude!), ...geoLandmarks.map((l) => l.longitude!)]..sort();
+    final allLats = [
+      ...geoContacts.map((c) => c.latitude!),
+      ...geoLandmarks.map((l) => l.latitude!),
+    ]..sort();
+    final allLngs = [
+      ...geoContacts.map((c) => c.longitude!),
+      ...geoLandmarks.map((l) => l.longitude!),
+    ]..sort();
 
     PersonEntry? highlightPerson;
     if (_highlightPersonId != null) {
@@ -975,7 +1325,8 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
       }
     }
 
-    final hasHighlightCoords = highlightPerson != null &&
+    final hasHighlightCoords =
+        highlightPerson != null &&
         highlightPerson.latitude != null &&
         highlightPerson.longitude != null &&
         (highlightPerson.latitude != 0.0 || highlightPerson.longitude != 0.0) &&
@@ -992,12 +1343,18 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
       final personToGeocode = highlightPerson;
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!mounted) return;
-        final res = await GeocodingService.geocodeAddress(personToGeocode.address!);
+        final res = await GeocodingService.geocodeAddress(
+          personToGeocode.address!,
+        );
         if (res != null && mounted) {
-          await ref.read(repositoryProvider).updatePerson(personToGeocode.copyWith(
-            latitude: drift.Value(res.latitude),
-            longitude: drift.Value(res.longitude),
-          ));
+          await ref
+              .read(repositoryProvider)
+              .updatePerson(
+                personToGeocode.copyWith(
+                  latitude: drift.Value(res.latitude),
+                  longitude: drift.Value(res.longitude),
+                ),
+              );
         }
       });
     }
@@ -1046,23 +1403,36 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (!_hasCenteredInitialView && constraints.maxWidth > 0 && constraints.maxHeight > 0) {
+        if (!_hasCenteredInitialView &&
+            constraints.maxWidth > 0 &&
+            constraints.maxHeight > 0) {
           _hasCenteredInitialView = true;
           if (hasHighlightCoords) _hasCenteredHighlightPerson = true;
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) {
               final dx = (constraints.maxWidth / 2.0) - centerPx;
               final dy = (constraints.maxHeight / 2.0) - centerPy;
-              _transformationController.value = Matrix4.translationValues(dx, dy, 0.0);
+              _transformationController.value = Matrix4.translationValues(
+                dx,
+                dy,
+                0.0,
+              );
             }
           });
-        } else if (hasHighlightCoords && !_hasCenteredHighlightPerson && constraints.maxWidth > 0 && constraints.maxHeight > 0) {
+        } else if (hasHighlightCoords &&
+            !_hasCenteredHighlightPerson &&
+            constraints.maxWidth > 0 &&
+            constraints.maxHeight > 0) {
           _hasCenteredHighlightPerson = true;
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) {
               final dx = (constraints.maxWidth / 2.0) - centerPx;
               final dy = (constraints.maxHeight / 2.0) - centerPy;
-              _transformationController.value = Matrix4.translationValues(dx, dy, 0.0);
+              _transformationController.value = Matrix4.translationValues(
+                dx,
+                dy,
+                0.0,
+              );
             }
           });
         }
@@ -1075,13 +1445,30 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                 onPointerSignal: (pointerSignal) {
                   if (pointerSignal is PointerScrollEvent) {
                     final now = clock.now();
-                    if (_lastZoomChangeTime == null || now.difference(_lastZoomChangeTime!).inMilliseconds >= 100) {
+                    if (_lastZoomChangeTime == null ||
+                        now.difference(_lastZoomChangeTime!).inMilliseconds >=
+                            100) {
                       if (pointerSignal.scrollDelta.dy < -2 && _zoom < 18) {
                         _lastZoomChangeTime = now;
-                        _changeZoom(_zoom + 1, constraints, originPx, originPy, centerLng, centerLat);
-                      } else if (pointerSignal.scrollDelta.dy > 2 && _zoom > 10) {
+                        _changeZoom(
+                          _zoom + 1,
+                          constraints,
+                          originPx,
+                          originPy,
+                          centerLng,
+                          centerLat,
+                        );
+                      } else if (pointerSignal.scrollDelta.dy > 2 &&
+                          _zoom > 10) {
                         _lastZoomChangeTime = now;
-                        _changeZoom(_zoom - 1, constraints, originPx, originPy, centerLng, centerLat);
+                        _changeZoom(
+                          _zoom - 1,
+                          constraints,
+                          originPx,
+                          originPy,
+                          centerLng,
+                          centerLat,
+                        );
                       }
                     }
                   }
@@ -1090,13 +1477,22 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                   behavior: HitTestBehavior.translucent,
                   onDoubleTap: () {
                     if (_zoom < 18) {
-                      _changeZoom(_zoom + 1, constraints, originPx, originPy, centerLng, centerLat);
+                      _changeZoom(
+                        _zoom + 1,
+                        constraints,
+                        originPx,
+                        originPy,
+                        centerLng,
+                        centerLat,
+                      );
                     }
                   },
                   child: InteractiveViewer(
                     transformationController: _transformationController,
                     constrained: false, // Permite que o mapa ocupe 100% da área sem distorção ou cortes pretos
-                    boundaryMargin: const EdgeInsets.all(250), // Margem segura para zoom fluido sem travamento
+                    boundaryMargin: const EdgeInsets.all(
+                      250,
+                    ), // Margem segura para zoom fluido sem travamento
                     panEnabled: true,
                     scaleEnabled: true, // Habilita zoom fluido por gesto de pinça na tela e trackpad
                     trackpadScrollCausesScale: true, // Garante que pinça de trackpad aplique ZOOM em vez de deslizar para os lados
@@ -1106,19 +1502,36 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                       final m = _transformationController.value;
                       final currentScale = m.getMaxScaleOnAxis();
                       if (currentScale >= 1.25 && _zoom < 18) {
-                        _changeZoom(_zoom + 1, constraints, originPx, originPy, centerLng, centerLat);
+                        _changeZoom(
+                          _zoom + 1,
+                          constraints,
+                          originPx,
+                          originPy,
+                          centerLng,
+                          centerLat,
+                        );
                       } else if (currentScale <= 0.8 && _zoom > 10) {
-                        _changeZoom(_zoom - 1, constraints, originPx, originPy, centerLng, centerLat);
+                        _changeZoom(
+                          _zoom - 1,
+                          constraints,
+                          originPx,
+                          originPy,
+                          centerLng,
+                          centerLat,
+                        );
                       } else if ((currentScale - 1.0).abs() > 0.05) {
                         final dx = m.storage[12];
                         final dy = m.storage[13];
-                        _transformationController.value = Matrix4.translationValues(dx, dy, 0.0);
+                        _transformationController.value =
+                            Matrix4.translationValues(dx, dy, 0.0);
                       }
                     },
                     child: Container(
                       width: canvasWidth,
                       height: canvasHeight,
-                      color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                      color: isDark
+                          ? const Color(0xFF0F172A)
+                          : const Color(0xFFF1F5F9),
                       child: Stack(
                         children: [
                           // Camada de Tiles do OpenStreetMap com suporte a cache offline móvel
@@ -1186,22 +1599,39 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                       });
                     },
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFFF59E0B), width: 1.5),
+                        border: Border.all(
+                          color: const Color(0xFFF59E0B),
+                          width: 1.5,
+                        ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.star, color: Color(0xFFD97706), size: 16),
+                          const Icon(
+                            Icons.star,
+                            color: Color(0xFFD97706),
+                            size: 16,
+                          ),
                           const SizedBox(width: 6),
                           Text(
                             'Destacado: ${highlightPerson.name.split(' ').first}',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
                           ),
                           const SizedBox(width: 6),
-                          const Icon(Icons.close, size: 14, color: AppTheme.textMuted),
+                          const Icon(
+                            Icons.close,
+                            size: 14,
+                            color: AppTheme.textMuted,
+                          ),
                         ],
                       ),
                     ),
@@ -1222,21 +1652,35 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                     tooltip: 'Aproximar Zoom',
                     onPressed: () {
                       if (_zoom < 18) {
-                        _changeZoom(_zoom + 1, constraints, originPx, originPy, centerLng, centerLat);
+                        _changeZoom(
+                          _zoom + 1,
+                          constraints,
+                          originPx,
+                          originPy,
+                          centerLng,
+                          centerLat,
+                        );
                       }
                     },
                     child: const Icon(Icons.add),
                   ),
                   const SizedBox(height: 6),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.black87,
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
                       'Z: $_zoom',
-                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -1247,7 +1691,14 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                     tooltip: 'Afastar Zoom',
                     onPressed: () {
                       if (_zoom > 10) {
-                        _changeZoom(_zoom - 1, constraints, originPx, originPy, centerLng, centerLat);
+                        _changeZoom(
+                          _zoom - 1,
+                          constraints,
+                          originPx,
+                          originPy,
+                          centerLng,
+                          centerLat,
+                        );
                       }
                     },
                     child: const Icon(Icons.remove),
@@ -1258,277 +1709,373 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                     backgroundColor: AppTheme.primaryBlue,
                     foregroundColor: Colors.white,
                     tooltip: 'Centralizar Território',
-                    onPressed: () => _recenterMap(constraints.maxWidth, constraints.maxHeight, centerPx, centerPy),
+                    onPressed: () => _recenterMap(
+                      constraints.maxWidth,
+                      constraints.maxHeight,
+                      centerPx,
+                      centerPy,
+                    ),
                     child: const Icon(Icons.my_location, size: 18),
                   ),
                 ],
               ),
             ),
 
-        // Selo de Atribuição OpenStreetMap
-        Positioned(
-          bottom: 8,
-          left: 8,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.85),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: const Text(
-                  '© OpenStreetMap contributors',
-                  style: TextStyle(fontSize: 10, color: Colors.black87),
-                ),
+            // Selo de Atribuição OpenStreetMap
+            Positioned(
+              bottom: 8,
+              left: 8,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.85),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
+                      '© OpenStreetMap contributors',
+                      style: TextStyle(fontSize: 10, color: Colors.black87),
+                    ),
+                  ),
+                  if (contacts.length > geoContacts.length) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.shade100.withValues(alpha: 0.9),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: Colors.amber.shade600,
+                          width: 0.8,
+                        ),
+                      ),
+                      child: Text(
+                        '${contacts.length - geoContacts.length} contatos sem GPS',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.amber.shade900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
-              if (contacts.length > geoContacts.length) ...[
-                const SizedBox(width: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.shade100.withValues(alpha: 0.9),
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: Colors.amber.shade600, width: 0.8),
-                  ),
-                  child: Text(
-                    '${contacts.length - geoContacts.length} contatos sem GPS',
-                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.amber.shade900),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
+            ),
 
-        // Painel inferior flutuante ao tocar em um Ponto de Referência
-        if (_selectedPinLandmark != null)
-          Positioned(
-            left: 16,
-            right: 16,
-            bottom: 16,
-            child: Card(
-              elevation: 6,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            // Painel inferior flutuante ao tocar em um Ponto de Referência
+            if (_selectedPinLandmark != null)
+              Positioned(
+                left: 16,
+                right: 16,
+                bottom: 16,
+                child: Card(
+                  elevation: 6,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            CircleAvatar(
-                              backgroundColor: _selectedPinLandmark!.color.withValues(alpha: 0.15),
-                              child: Icon(_selectedPinLandmark!.icon, color: _selectedPinLandmark!.color, size: 20),
+                            Row(
+                              children: [
+                                CircleAvatar(
+                                  backgroundColor: _selectedPinLandmark!.color
+                                      .withValues(alpha: 0.15),
+                                  child: Icon(
+                                    _selectedPinLandmark!.icon,
+                                    color: _selectedPinLandmark!.color,
+                                    size: 20,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Text(
+                                  _selectedPinLandmark!.name,
+                                  style: const TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 10),
-                            Text(
-                              _selectedPinLandmark!.name,
-                              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                            IconButton(
+                              icon: const Icon(Icons.close, size: 20),
+                              onPressed: () =>
+                                  setState(() => _selectedPinLandmark = null),
                             ),
                           ],
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.close, size: 20),
-                          onPressed: () => setState(() => _selectedPinLandmark = null),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: _selectedPinLandmark!.color.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        _selectedPinLandmark!.categoryLabel,
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: _selectedPinLandmark!.color),
-                      ),
-                    ),
-                    if (_selectedPinLandmark!.address != null) ...[
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          Icon(Icons.location_on, size: 16, color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              _selectedPinLandmark!.address!,
-                              style: const TextStyle(fontSize: 13),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                    if (_selectedPinLandmark!.notes != null && _selectedPinLandmark!.notes!.isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        _selectedPinLandmark!.notes!,
-                        style: TextStyle(fontSize: 13, color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted),
-                      ),
-                    ],
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(backgroundColor: _selectedPinLandmark!.color),
-                            icon: const Icon(Icons.directions, size: 16),
-                            label: const Text('Rota até esta Referência'),
-                            onPressed: () => _openLandmarkRoute(_selectedPinLandmark!),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        OutlinedButton.icon(
-                          icon: const Icon(Icons.share, size: 16),
-                          label: const Text('Compartilhar'),
-                          onPressed: () => _shareLandmark(_selectedPinLandmark!),
-                        ),
-                        const SizedBox(width: 8),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline, color: AppTheme.alertRed),
-                          tooltip: 'Excluir marco',
-                          onPressed: () async {
-                            final mgr = ref.read(landmarkManagerProvider);
-                            await mgr.deleteLandmark(_selectedPinLandmark!.id);
-                            setState(() => _selectedPinLandmark = null);
-                          },
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-        // Painel inferior flutuante ao tocar em um pino de contato
-        if (_selectedPinPerson != null)
-          Positioned(
-            left: 16,
-            right: 16,
-            bottom: 16,
-            child: Card(
-              elevation: 4,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            _selectedPinPerson!.name,
-                            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-                          ),
-                        ),
+                        const SizedBox(height: 6),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
-                            color: _getStatusColor(_selectedPinPerson!.status).withValues(alpha: 0.15),
+                            color: _selectedPinLandmark!.color.withValues(
+                              alpha: 0.12,
+                            ),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
-                            _selectedPinPerson!.status.toUpperCase(),
+                            _selectedPinLandmark!.categoryLabel,
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
-                              color: _getStatusColor(_selectedPinPerson!.status),
+                              color: _selectedPinLandmark!.color,
                             ),
                           ),
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.close, size: 20),
-                          onPressed: () => setState(() => _selectedPinPerson = null),
-                        ),
-                      ],
-                    ),
-                    if (_selectedPinPerson!.address != null) ...[
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          Icon(Icons.location_on, size: 16, color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              _selectedPinPerson!.address!,
-                              style: const TextStyle(fontSize: 13),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                    if (_selectedPinPerson!.preferredSchedule != null) ...[
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(Icons.schedule, size: 16, color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted),
-                          const SizedBox(width: 6),
-                          Text(
-                            _selectedPinPerson!.preferredSchedule!,
-                            style: const TextStyle(fontSize: 13, color: AppTheme.accentTeal, fontWeight: FontWeight.w600),
-                          ),
-                        ],
-                      ),
-                    ],
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            icon: const Icon(Icons.directions, size: 16),
-                            label: const Text('Abrir Rota no Mapa'),
-                            onPressed: () => _openSingleRoute(_selectedPinPerson!),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        OutlinedButton.icon(
-                          icon: const Icon(Icons.person, size: 16),
-                          label: const Text('Ver Perfil'),
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => PersonDetailScreen(personId: _selectedPinPerson!.id),
+                        if (_selectedPinLandmark!.address != null) ...[
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.location_on,
+                                size: 16,
+                                color: isDark
+                                    ? const Color(0xFFCBD5E1)
+                                    : AppTheme.textMuted,
                               ),
-                            );
-                          },
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  _selectedPinLandmark!.address!,
+                                  style: const TextStyle(fontSize: 13),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                        if (_selectedPinLandmark!.notes != null &&
+                            _selectedPinLandmark!.notes!.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            _selectedPinLandmark!.notes!,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: isDark
+                                  ? const Color(0xFFCBD5E1)
+                                  : AppTheme.textMuted,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: _selectedPinLandmark!.color,
+                                ),
+                                icon: const Icon(Icons.directions, size: 16),
+                                label: const Text('Rota até esta Referência'),
+                                onPressed: () =>
+                                    _openLandmarkRoute(_selectedPinLandmark!),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            OutlinedButton.icon(
+                              icon: const Icon(Icons.share, size: 16),
+                              label: const Text('Compartilhar'),
+                              onPressed: () =>
+                                  _shareLandmark(_selectedPinLandmark!),
+                            ),
+                            const SizedBox(width: 8),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.delete_outline,
+                                color: AppTheme.alertRed,
+                              ),
+                              tooltip: 'Excluir marco',
+                              onPressed: () async {
+                                final mgr = ref.read(landmarkManagerProvider);
+                                await mgr.deleteLandmark(
+                                  _selectedPinLandmark!.id,
+                                );
+                                setState(() => _selectedPinLandmark = null);
+                              },
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF059669),
-                          side: const BorderSide(color: Color(0xFF059669)),
-                        ),
-                        icon: const Icon(Icons.share_outlined, size: 16),
-                        label: const Text('Passar Contato para Irmão Responsável (WhatsApp)'),
-                        onPressed: () => PersonHandOffHelper.sendViaWhatsApp(person: _selectedPinPerson!),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ),
-      ],
+
+            // Painel inferior flutuante ao tocar em um pino de contato
+            if (_selectedPinPerson != null)
+              Positioned(
+                left: 16,
+                right: 16,
+                bottom: 16,
+                child: Card(
+                  elevation: 4,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                _selectedPinPerson!.name,
+                                style: const TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: _getStatusColor(
+                                  _selectedPinPerson!.status,
+                                ).withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                _selectedPinPerson!.status.toUpperCase(),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: _getStatusColor(
+                                    _selectedPinPerson!.status,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.close, size: 20),
+                              onPressed: () =>
+                                  setState(() => _selectedPinPerson = null),
+                            ),
+                          ],
+                        ),
+                        if (_selectedPinPerson!.address != null) ...[
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.location_on,
+                                size: 16,
+                                color: isDark
+                                    ? const Color(0xFFCBD5E1)
+                                    : AppTheme.textMuted,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  _selectedPinPerson!.address!,
+                                  style: const TextStyle(fontSize: 13),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                        if (_selectedPinPerson!.preferredSchedule != null) ...[
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.schedule,
+                                size: 16,
+                                color: isDark
+                                    ? const Color(0xFFCBD5E1)
+                                    : AppTheme.textMuted,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                _selectedPinPerson!.preferredSchedule!,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: AppTheme.accentTeal,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                icon: const Icon(Icons.directions, size: 16),
+                                label: const Text('Abrir Rota no Mapa'),
+                                onPressed: () =>
+                                    _openSingleRoute(_selectedPinPerson!),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            OutlinedButton.icon(
+                              icon: const Icon(Icons.person, size: 16),
+                              label: const Text('Ver Perfil'),
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => PersonDetailScreen(
+                                      personId: _selectedPinPerson!.id,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF059669),
+                              side: const BorderSide(color: Color(0xFF059669)),
+                            ),
+                            icon: const Icon(Icons.share_outlined, size: 16),
+                            label: const Text(
+                              'Passar Contato para Irmão Responsável (WhatsApp)',
+                            ),
+                            onPressed: () =>
+                                PersonHandOffHelper.sendViaWhatsApp(
+                                  person: _selectedPinPerson!,
+                                ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
     );
-  },
-);
-}
+  }
 
   Widget _buildLandmarkPin(
     TerritoryLandmark landmark,
@@ -1542,7 +2089,8 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
     double x;
     double y;
 
-    final hasGeo = landmark.latitude != null &&
+    final hasGeo =
+        landmark.latitude != null &&
         landmark.longitude != null &&
         (landmark.latitude != 0.0 || landmark.longitude != 0.0) &&
         landmark.latitude!.abs() <= 90 &&
@@ -1577,15 +2125,27 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
               constraints: const BoxConstraints(maxWidth: 120),
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: isSelected ? landmark.color : (isDark ? const Color(0xFF1E293B) : Colors.white),
+                color: isSelected
+                    ? landmark.color
+                    : (isDark ? const Color(0xFF1E293B) : Colors.white),
                 borderRadius: BorderRadius.circular(12),
-                boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2))],
+                boxShadow: const [
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 4,
+                    offset: Offset(0, 2),
+                  ),
+                ],
                 border: Border.all(color: landmark.color, width: 2),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(landmark.icon, size: 14, color: isSelected ? Colors.white : landmark.color),
+                  Icon(
+                    landmark.icon,
+                    size: 14,
+                    color: isSelected ? Colors.white : landmark.color,
+                  ),
                   const SizedBox(width: 4),
                   Flexible(
                     child: Text(
@@ -1593,7 +2153,9 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
-                        color: isSelected ? Colors.white : (isDark ? Colors.white : AppTheme.textDark),
+                        color: isSelected
+                            ? Colors.white
+                            : (isDark ? Colors.white : AppTheme.textDark),
                       ),
                       overflow: TextOverflow.ellipsis,
                       maxLines: 1,
@@ -1625,7 +2187,8 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
     double x;
     double y;
 
-    final hasGeo = person.latitude != null &&
+    final hasGeo =
+        person.latitude != null &&
         person.longitude != null &&
         (person.latitude != 0.0 || person.longitude != 0.0) &&
         person.latitude!.abs() <= 90 &&
@@ -1640,11 +2203,13 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
       y = (canvasHeight / 2) + radius * math.sin(angle);
     }
 
-    final isHighlighted = _highlightPersonId != null && person.id == _highlightPersonId;
+    final isHighlighted =
+        _highlightPersonId != null && person.id == _highlightPersonId;
     final isSelected = _selectedPinPerson?.id == person.id;
     final statusColor = _getStatusColor(person.status);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isForeign = person.tags.toLowerCase().contains('estrangeiro') ||
+    final isForeign =
+        person.tags.toLowerCase().contains('estrangeiro') ||
         (person.generalNotes ?? '').toLowerCase().contains('idioma') ||
         (person.generalNotes ?? '').toLowerCase().contains('língua') ||
         (person.generalNotes ?? '').toLowerCase().contains('estrangeir');
@@ -1676,11 +2241,16 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
           children: [
             Container(
               constraints: BoxConstraints(maxWidth: isHighlighted ? 140 : 110),
-              padding: EdgeInsets.symmetric(horizontal: isHighlighted ? 10 : 8, vertical: isHighlighted ? 5 : 4),
+              padding: EdgeInsets.symmetric(
+                horizontal: isHighlighted ? 10 : 8,
+                vertical: isHighlighted ? 5 : 4,
+              ),
               decoration: BoxDecoration(
                 color: isHighlighted
                     ? const Color(0xFFD97706)
-                    : (isSelected ? Colors.black87 : (isDark ? const Color(0xFF1E293B) : Colors.white)),
+                    : (isSelected
+                          ? Colors.black87
+                          : (isDark ? const Color(0xFF1E293B) : Colors.white)),
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   if (isHighlighted)
@@ -1690,7 +2260,11 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                       spreadRadius: 3,
                     )
                   else
-                    const BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2)),
+                    const BoxShadow(
+                      color: Colors.black26,
+                      blurRadius: 4,
+                      offset: Offset(0, 2),
+                    ),
                 ],
                 border: Border.all(
                   color: isHighlighted ? Colors.white : pinColor,
@@ -1713,7 +2287,9 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                       style: TextStyle(
                         fontSize: isHighlighted ? 12 : 11,
                         fontWeight: FontWeight.bold,
-                        color: (isHighlighted || isSelected) ? Colors.white : (isDark ? Colors.white : AppTheme.textDark),
+                        color: (isHighlighted || isSelected)
+                            ? Colors.white
+                            : (isDark ? Colors.white : AppTheme.textDark),
                       ),
                       overflow: TextOverflow.ellipsis,
                       maxLines: 1,
@@ -1723,16 +2299,13 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
               ),
             ),
             Icon(
-              isHighlighted ? Icons.stars : (isForeign ? Icons.public : Icons.location_on),
+              isHighlighted
+                  ? Icons.stars
+                  : (isForeign ? Icons.public : Icons.location_on),
               color: isHighlighted ? const Color(0xFFD97706) : pinColor,
               size: isHighlighted ? 44 : (isSelected ? 38 : 30),
               shadows: isHighlighted
-                  ? [
-                      Shadow(
-                        color: Colors.amber.shade300,
-                        blurRadius: 12,
-                      ),
-                    ]
+                  ? [Shadow(color: Colors.amber.shade300, blurRadius: 12)]
                   : null,
             ),
           ],
@@ -1741,7 +2314,10 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
     );
   }
 
-  Widget _buildGroupedNeighborhoodList(List<PersonEntry> contacts, List<BibleStudyEntry> studies) {
+  Widget _buildGroupedNeighborhoodList(
+    List<PersonEntry> contacts,
+    List<BibleStudyEntry> studies,
+  ) {
     final Map<String, List<PersonEntry>> byNeighborhood = {};
     for (final c in contacts) {
       final n = _extractNeighborhood(c.address);
@@ -1762,12 +2338,17 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
           margin: const EdgeInsets.only(bottom: 12),
           child: ExpansionTile(
             initiallyExpanded: true,
-            leading: Icon(Icons.holiday_village_outlined, color: isDark ? const Color(0xFF60A5FA) : AppTheme.primaryBlue),
+            leading: Icon(
+              Icons.holiday_village_outlined,
+              color: isDark ? const Color(0xFF60A5FA) : AppTheme.primaryBlue,
+            ),
             title: Text(
               neighborhood,
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
-            subtitle: Text('${neighborhoodContacts.length} contato(s) nesta região'),
+            subtitle: Text(
+              '${neighborhoodContacts.length} contato(s) nesta região',
+            ),
             trailing: IconButton(
               icon: const Icon(Icons.directions, color: AppTheme.accentTeal),
               tooltip: 'Traçar rota neste bairro',
@@ -1778,7 +2359,13 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
 
               return Container(
                 decoration: BoxDecoration(
-                  border: Border(top: BorderSide(color: isDark ? const Color(0xFF334155) : Colors.grey.shade100)),
+                  border: Border(
+                    top: BorderSide(
+                      color: isDark
+                          ? const Color(0xFF334155)
+                          : Colors.grey.shade100,
+                    ),
+                  ),
                 ),
                 child: ListTile(
                   leading: CircleAvatar(
@@ -1787,25 +2374,38 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                       person.status == 'estudo'
                           ? Icons.menu_book
                           : person.status == 'revisita'
-                              ? Icons.repeat
-                              : Icons.person_outline,
+                          ? Icons.repeat
+                          : Icons.person_outline,
                       color: color,
                       size: 20,
                     ),
                   ),
-                  title: Text(person.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  title: Text(
+                    person.name,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       if (person.address != null)
                         Text(
                           person.address!,
-                          style: TextStyle(fontSize: 13, color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted),
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: isDark
+                                ? const Color(0xFFCBD5E1)
+                                : AppTheme.textMuted,
+                          ),
                         ),
-                      if (person.preferredSchedule != null && person.preferredSchedule!.isNotEmpty)
+                      if (person.preferredSchedule != null &&
+                          person.preferredSchedule!.isNotEmpty)
                         Text(
                           'Horário: ${person.preferredSchedule!}',
-                          style: const TextStyle(fontSize: 12, color: AppTheme.accentTeal, fontWeight: FontWeight.w600),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.accentTeal,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                     ],
                   ),
@@ -1813,7 +2413,13 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
-                        icon: Icon(Icons.navigation, color: isDark ? const Color(0xFF60A5FA) : AppTheme.primaryBlue, size: 20),
+                        icon: Icon(
+                          Icons.navigation,
+                          color: isDark
+                              ? const Color(0xFF60A5FA)
+                              : AppTheme.primaryBlue,
+                          size: 20,
+                        ),
                         tooltip: 'Abrir no Google Maps',
                         onPressed: () => _openSingleRoute(person),
                       ),
@@ -1823,7 +2429,8 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => PersonDetailScreen(personId: person.id),
+                              builder: (_) =>
+                                  PersonDetailScreen(personId: person.id),
                             ),
                           );
                         },

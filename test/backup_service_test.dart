@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -322,7 +323,6 @@ void main() {
     });
 
     test('TC-BAK-08: Não sobrescreve registros locais mais recentes com dados antigos do backup', () async {
-      final now = DateTime.now();
       final pOld = await repository.createPerson(
         id: 'person_shared_1',
         name: 'Nome Antigo no Backup',
@@ -403,5 +403,77 @@ void main() {
         );
       },
     );
+
+    test('TC-BAK-11: Detecção explícita de áudio corrompido com validação SHA-256 e RestoreResult.isIntegral == false', () async {
+      final p = await repository.createPerson(
+        name: 'Irmão com Áudio Corrompido',
+      );
+      final tempDir = await Directory.systemTemp.createTemp('bak_corrupt_test');
+      final audioFile = File('${tempDir.path}/audio_original.m4a');
+      await audioFile.writeAsBytes([10, 20, 30, 40, 50]);
+
+      await repository.db
+          .into(repository.db.voiceNotes)
+          .insert(
+            VoiceNotesCompanion.insert(
+              id: 'vn_corrupt_1',
+              personId: p.id,
+              transcription: 'Nota com áudio para corromper',
+              audioFilePath: Value(audioFile.path),
+              createdAt: DateTime.now(),
+              updatedAt: DateTime.now(),
+            ),
+          );
+
+      final encrypted = await backupService.exportEncryptedBackup(
+        'corrupt_pwd',
+      );
+      final preview = await backupService.previewBackup(
+        encryptedDataString: encrypted,
+        password: 'corrupt_pwd',
+      );
+
+      // Simula corrupção adulterando os bytes do áudio no payload mantendo o hash antigo esperado
+      final rawData = Map<String, dynamic>.from(preview.rawDecryptedData);
+      final rawAudios = Map<String, dynamic>.from(
+        rawData['voiceNoteAudios'] as Map<String, dynamic>,
+      );
+      rawAudios['vn_corrupt_1'] = base64Encode([
+        99,
+        99,
+        99,
+        99,
+      ]); // bytes adulterados
+      rawData['voiceNoteAudios'] = rawAudios;
+
+      final corruptedPreview = RestorePreview(
+        peopleToAdd: preview.peopleToAdd,
+        peopleToUpdate: preview.peopleToUpdate,
+        peopleUnchanged: preview.peopleUnchanged,
+        visitsToAdd: preview.visitsToAdd,
+        visitsToUpdate: preview.visitsToUpdate,
+        studiesToAdd: preview.studiesToAdd,
+        sessionsToAdd: preview.sessionsToAdd,
+        appointmentsToAdd: preview.appointmentsToAdd,
+        activitiesToAdd: preview.activitiesToAdd,
+        inventoryTables: preview.inventoryTables,
+        corruptedAudioIds: ['vn_corrupt_1'],
+        rawDecryptedData: rawData,
+      );
+
+      expect(corruptedPreview.isIntegral, isFalse);
+      expect(corruptedPreview.corruptedAudioIds, contains('vn_corrupt_1'));
+
+      final dbNew = AppDatabase.forTesting(NativeDatabase.memory());
+      final repoNew = AppRepository(dbNew);
+      final serviceNew = BackupService(repoNew);
+
+      final result = await serviceNew.commitRestore(corruptedPreview);
+      expect(result.isIntegral, isFalse);
+      expect(result.corruptedFiles, contains('vn_corrupt_1'));
+
+      await tempDir.delete(recursive: true);
+      await dbNew.close();
+    });
   });
 }

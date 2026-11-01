@@ -1,5 +1,7 @@
 import 'dart:typed_data';
+
 import 'package:http/http.dart' as http;
+
 import 'tile_cache_interface.dart';
 
 TileCacheBackend getTileBackend() => TileCacheWeb();
@@ -16,9 +18,12 @@ class TileCacheWeb implements TileCacheBackend {
 
     try {
       final uri = Uri.parse('https://tile.openstreetmap.org/$z/$x/$y.png');
-      final res = await http.get(uri, headers: {
-        'User-Agent': 'MinisterioPessoalOfflineTerritorio/1.0',
-      }).timeout(const Duration(seconds: 8));
+      final res = await http
+          .get(
+            uri,
+            headers: {'User-Agent': 'MinisterioPessoalOfflineTerritorio/1.0'},
+          )
+          .timeout(const Duration(seconds: 8));
 
       if (res.statusCode == 200) {
         _cache[key] = res.bodyBytes;

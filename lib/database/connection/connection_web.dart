@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:developer' as developer;
 import 'dart:js_interop';
+
 import 'package:drift/drift.dart';
 import 'package:drift/wasm.dart';
 import 'package:sqlite3/wasm.dart';
@@ -62,9 +63,12 @@ QueryExecutor constructDb({bool inMemory = false}) {
     // 'application/octet-stream' ou páginas 404 'text/html'.
     bool streamingWasmSupported = false;
     try {
-      final probeResponse = await web.window.fetch(wasmUri.toString().toJS).toDart;
+      final probeResponse = await web.window
+          .fetch(wasmUri.toString().toJS)
+          .toDart;
       final contentType = probeResponse.headers.get('content-type') ?? '';
-      if (probeResponse.ok && contentType.toLowerCase().contains('application/wasm')) {
+      if (probeResponse.ok &&
+          contentType.toLowerCase().contains('application/wasm')) {
         streamingWasmSupported = true;
       } else {
         developer.log(
@@ -118,7 +122,10 @@ QueryExecutor constructDb({bool inMemory = false}) {
         loader: _MimeResilientWasmLoader(),
       );
       if (inMemory) {
-        sqlite3.registerVirtualFileSystem(InMemoryFileSystem(), makeDefault: true);
+        sqlite3.registerVirtualFileSystem(
+          InMemoryFileSystem(),
+          makeDefault: true,
+        );
         return WasmDatabase.inMemory(sqlite3);
       } else {
         try {
@@ -135,7 +142,10 @@ QueryExecutor constructDb({bool inMemory = false}) {
             name: 'DriftWeb',
             error: fsErr,
           );
-          sqlite3.registerVirtualFileSystem(InMemoryFileSystem(), makeDefault: true);
+          sqlite3.registerVirtualFileSystem(
+            InMemoryFileSystem(),
+            makeDefault: true,
+          );
           return WasmDatabase.inMemory(sqlite3);
         }
       }
@@ -179,7 +189,10 @@ class _FallbackWebQueryExecutor extends QueryExecutor {
   Future<int> runInsert(String statement, List<Object?> args) async => 0;
 
   @override
-  Future<List<Map<String, Object?>>> runSelect(String statement, List<Object?> args) async => [];
+  Future<List<Map<String, Object?>>> runSelect(
+    String statement,
+    List<Object?> args,
+  ) async => [];
 
   @override
   Future<int> runUpdate(String statement, List<Object?> args) async => 0;
@@ -191,13 +204,15 @@ class _FallbackWebQueryExecutor extends QueryExecutor {
   Future<void> close() async {}
 
   @override
-  TransactionExecutor beginTransaction() => _FallbackWebTransactionExecutor(this);
+  TransactionExecutor beginTransaction() =>
+      _FallbackWebTransactionExecutor(this);
 
   @override
   QueryExecutor beginExclusive() => this;
 }
 
-class _FallbackWebTransactionExecutor extends QueryExecutor implements TransactionExecutor {
+class _FallbackWebTransactionExecutor extends QueryExecutor
+    implements TransactionExecutor {
   final _FallbackWebQueryExecutor _parent;
   _FallbackWebTransactionExecutor(this._parent);
 
@@ -208,22 +223,30 @@ class _FallbackWebTransactionExecutor extends QueryExecutor implements Transacti
   Future<bool> ensureOpen(QueryExecutorUser user) => _parent.ensureOpen(user);
 
   @override
-  Future<void> runCustom(String statement, [List<Object?>? args]) => _parent.runCustom(statement, args);
+  Future<void> runCustom(String statement, [List<Object?>? args]) =>
+      _parent.runCustom(statement, args);
 
   @override
-  Future<int> runDelete(String statement, List<Object?> args) => _parent.runDelete(statement, args);
+  Future<int> runDelete(String statement, List<Object?> args) =>
+      _parent.runDelete(statement, args);
 
   @override
-  Future<int> runInsert(String statement, List<Object?> args) => _parent.runInsert(statement, args);
+  Future<int> runInsert(String statement, List<Object?> args) =>
+      _parent.runInsert(statement, args);
 
   @override
-  Future<List<Map<String, Object?>>> runSelect(String statement, List<Object?> args) => _parent.runSelect(statement, args);
+  Future<List<Map<String, Object?>>> runSelect(
+    String statement,
+    List<Object?> args,
+  ) => _parent.runSelect(statement, args);
 
   @override
-  Future<int> runUpdate(String statement, List<Object?> args) => _parent.runUpdate(statement, args);
+  Future<int> runUpdate(String statement, List<Object?> args) =>
+      _parent.runUpdate(statement, args);
 
   @override
-  Future<void> runBatched(BatchedStatements statements) => _parent.runBatched(statements);
+  Future<void> runBatched(BatchedStatements statements) =>
+      _parent.runBatched(statements);
 
   @override
   Future<void> close() => _parent.close();

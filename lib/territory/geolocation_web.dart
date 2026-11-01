@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:js_interop';
+
 import 'package:web/web.dart' as web;
 
 Future<({double latitude, double longitude})?> getBrowserCoordinates() async {

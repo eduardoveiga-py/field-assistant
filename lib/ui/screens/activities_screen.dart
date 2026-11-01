@@ -1,6 +1,8 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../providers.dart';
@@ -16,7 +18,8 @@ class ActivitiesScreen extends ConsumerStatefulWidget {
 }
 
 class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
-  String _selectedPeriod = 'Este Mês'; // 'Hoje', 'Esta Semana', 'Este Mês', 'Ano de Serviço'
+  String _selectedPeriod =
+      'Este Mês'; // 'Hoje', 'Esta Semana', 'Este Mês', 'Ano de Serviço'
 
   // Cronômetro de Campo com Detecção de Parada e Modo Carrinho (Ideia 2)
   Timer? _fieldTimer;
@@ -95,7 +98,10 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
 
   bool get _detectPotentialStop {
     // Se o cronômetro está rodando há mais de 45 minutos ininterruptos, detecta eventual parada ou intervalo
-    if (!_stoppedNoticeDismissed && _isTimerRunning && _timerSeconds >= 2700 && (_timerSeconds - _lastInteractionSeconds) >= 1800) {
+    if (!_stoppedNoticeDismissed &&
+        _isTimerRunning &&
+        _timerSeconds >= 2700 &&
+        (_timerSeconds - _lastInteractionSeconds) >= 1800) {
       return true;
     }
     return false;
@@ -124,12 +130,23 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
       case 'Esta Semana':
         final monday = now.subtract(Duration(days: now.weekday - 1));
         final start = DateTime(monday.year, monday.month, monday.day);
-        final end = start.add(const Duration(days: 6, hours: 23, minutes: 59, seconds: 59));
+        final end = start.add(
+          const Duration(days: 6, hours: 23, minutes: 59, seconds: 59),
+        );
         return DateTimeRange(start: start, end: end);
       case 'Ano de Serviço':
         // Ano de serviço de Testemunhas de Jeová: 1 de Setembro do ano anterior a 31 de Agosto do ano corrente
-        final serviceYearStart = now.month >= 9 ? DateTime(now.year, 9, 1) : DateTime(now.year - 1, 9, 1);
-        final serviceYearEnd = DateTime(serviceYearStart.year + 1, 8, 31, 23, 59, 59);
+        final serviceYearStart = now.month >= 9
+            ? DateTime(now.year, 9, 1)
+            : DateTime(now.year - 1, 9, 1);
+        final serviceYearEnd = DateTime(
+          serviceYearStart.year + 1,
+          8,
+          31,
+          23,
+          59,
+          59,
+        );
         return DateTimeRange(start: serviceYearStart, end: serviceYearEnd);
       case 'Este Mês':
       default:
@@ -156,7 +173,6 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
     String selectedModality = initialModality ?? 'campo';
 
     showDialog(
-
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
@@ -168,28 +184,40 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
               children: [
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.calendar_today, color: AppTheme.primaryBlue),
+                  leading: const Icon(
+                    Icons.calendar_today,
+                    color: AppTheme.primaryBlue,
+                  ),
                   title: Text(AppDateUtils.formatDate(selectedDate)),
                   trailing: const Icon(Icons.edit_calendar),
                   onTap: () async {
                     final picked = await showDatePicker(
                       context: context,
                       initialDate: selectedDate,
-                      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                      firstDate: DateTime.now().subtract(
+                        const Duration(days: 365),
+                      ),
                       lastDate: DateTime.now().add(const Duration(days: 1)),
                     );
-                    if (picked != null) setDialogState(() => selectedDate = picked);
+                    if (picked != null)
+                      setDialogState(() => selectedDate = picked);
                   },
                 ),
                 const SizedBox(height: 8),
-                const Text('Duração do Ministério:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                const Text(
+                  'Duração do Ministério:',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
                 const SizedBox(height: 6),
                 Row(
                   children: [
                     Expanded(
                       child: TextField(
                         controller: hoursController,
-                        decoration: const InputDecoration(labelText: 'Horas', suffixText: 'h'),
+                        decoration: const InputDecoration(
+                          labelText: 'Horas',
+                          suffixText: 'h',
+                        ),
                         keyboardType: TextInputType.number,
                       ),
                     ),
@@ -197,7 +225,10 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
                     Expanded(
                       child: TextField(
                         controller: minutesController,
-                        decoration: const InputDecoration(labelText: 'Minutos', suffixText: 'min'),
+                        decoration: const InputDecoration(
+                          labelText: 'Minutos',
+                          suffixText: 'min',
+                        ),
                         keyboardType: TextInputType.number,
                       ),
                     ),
@@ -208,14 +239,30 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
                   initialValue: selectedModality,
                   decoration: const InputDecoration(labelText: 'Modalidade'),
                   items: const [
-                    DropdownMenuItem(value: 'campo', child: Text('De Casa em Casa')),
-                    DropdownMenuItem(value: 'testemunho_publico', child: Text('Testemunho Público / Carrinho')),
-                    DropdownMenuItem(value: 'informal', child: Text('Testemunho Informal')),
-                    DropdownMenuItem(value: 'carta_telefone', child: Text('Cartas e Telefone')),
-                    DropdownMenuItem(value: 'outro', child: Text('Outra modalidade')),
+                    DropdownMenuItem(
+                      value: 'campo',
+                      child: Text('De Casa em Casa'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'testemunho_publico',
+                      child: Text('Testemunho Público / Carrinho'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'informal',
+                      child: Text('Testemunho Informal'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'carta_telefone',
+                      child: Text('Cartas e Telefone'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'outro',
+                      child: Text('Outra modalidade'),
+                    ),
                   ],
                   onChanged: (val) {
-                    if (val != null) setDialogState(() => selectedModality = val);
+                    if (val != null)
+                      setDialogState(() => selectedModality = val);
                   },
                 ),
                 const SizedBox(height: 12),
@@ -231,7 +278,10 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar'),
+            ),
             ElevatedButton(
               onPressed: () async {
                 final h = int.tryParse(hoursController.text.trim()) ?? 0;
@@ -240,7 +290,9 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
 
                 if (totalSeconds <= 0) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Informe ao menos 1 minuto de atividade.')),
+                    const SnackBar(
+                      content: Text('Informe ao menos 1 minuto de atividade.'),
+                    ),
                   );
                   return;
                 }
@@ -250,14 +302,18 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
                   date: selectedDate,
                   durationSeconds: totalSeconds,
                   modality: selectedModality,
-                  notes: notesController.text.trim().isEmpty ? null : notesController.text.trim(),
+                  notes: notesController.text.trim().isEmpty
+                      ? null
+                      : notesController.text.trim(),
                 );
 
                 if (onSavedCallback != null) onSavedCallback();
                 if (ctx.mounted) Navigator.pop(ctx);
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Atividade registrada com sucesso!')),
+                    const SnackBar(
+                      content: Text('Atividade registrada com sucesso!'),
+                    ),
                   );
                 }
               },
@@ -299,7 +355,9 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
               isSunMode ? Icons.wb_sunny : Icons.wb_sunny_outlined,
               color: isSunMode ? Colors.amber : Colors.white,
             ),
-            tooltip: isSunMode ? 'Desativar Modo Sol' : '☀️ Modo Sol Intenso (Alto Contraste)',
+            tooltip: isSunMode
+                ? 'Desativar Modo Sol'
+                : '☀️ Modo Sol Intenso (Alto Contraste)',
             onPressed: () {
               ref.read(sunModeProvider.notifier).state = !isSunMode;
             },
@@ -317,12 +375,21 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
       body: activitiesAsync.when(
         data: (allActivities) {
           final isDark = Theme.of(context).brightness == Brightness.dark;
-          final filteredActivities = allActivities.where((a) =>
-              a.deletedAt == null &&
-              a.date.isAfter(range.start.subtract(const Duration(seconds: 1))) &&
-              a.date.isBefore(range.end.add(const Duration(seconds: 1)))).toList();
+          final filteredActivities = allActivities
+              .where(
+                (a) =>
+                    a.deletedAt == null &&
+                    a.date.isAfter(
+                      range.start.subtract(const Duration(seconds: 1)),
+                    ) &&
+                    a.date.isBefore(range.end.add(const Duration(seconds: 1))),
+              )
+              .toList();
 
-          final totalSecondsInPeriod = filteredActivities.fold<int>(0, (sum, a) => sum + a.durationSeconds);
+          final totalSecondsInPeriod = filteredActivities.fold<int>(
+            0,
+            (sum, a) => sum + a.durationSeconds,
+          );
 
           // Totais calculados sem arredondamento prematuro (Seção 7)
           final hours = totalSecondsInPeriod ~/ 3600;
@@ -337,7 +404,11 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
                 color: isDark ? const Color(0xFF1E293B) : Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                  side: BorderSide(
+                    color: isDark
+                        ? const Color(0xFF334155)
+                        : const Color(0xFFE2E8F0),
+                  ),
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(12),
@@ -349,17 +420,25 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
                           Row(
                             children: [
                               Icon(
-                                _timerModality == 'testemunho_publico' ? Icons.storefront : Icons.timer,
-                                color: _timerModality == 'testemunho_publico' ? const Color(0xFF7C3AED) : AppTheme.primaryBlue,
+                                _timerModality == 'testemunho_publico'
+                                    ? Icons.storefront
+                                    : Icons.timer,
+                                color: _timerModality == 'testemunho_publico'
+                                    ? const Color(0xFF7C3AED)
+                                    : AppTheme.primaryBlue,
                                 size: 20,
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                _timerModality == 'testemunho_publico' ? 'Modo Carrinho / Público' : 'Cronômetro de Campo',
+                                _timerModality == 'testemunho_publico'
+                                    ? 'Modo Carrinho / Público'
+                                    : 'Cronômetro de Campo',
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 13,
-                                  color: isDark ? Colors.white : AppTheme.textDark,
+                                  color: isDark
+                                      ? Colors.white
+                                      : AppTheme.textDark,
                                 ),
                               ),
                             ],
@@ -367,16 +446,46 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
                           DropdownButton<String>(
                             value: _timerModality,
                             underline: const SizedBox.shrink(),
-                            dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                            dropdownColor: isDark
+                                ? const Color(0xFF1E293B)
+                                : Colors.white,
                             isDense: true,
                             items: const [
-                              DropdownMenuItem(value: 'campo', child: Text('De Casa em Casa', style: TextStyle(fontSize: 12))),
-                              DropdownMenuItem(value: 'testemunho_publico', child: Text('🛒 Modo Carrinho', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
-                              DropdownMenuItem(value: 'informal', child: Text('Informal', style: TextStyle(fontSize: 12))),
-                              DropdownMenuItem(value: 'carta_telefone', child: Text('Cartas/Telefone', style: TextStyle(fontSize: 12))),
+                              DropdownMenuItem(
+                                value: 'campo',
+                                child: Text(
+                                  'De Casa em Casa',
+                                  style: TextStyle(fontSize: 12),
+                                ),
+                              ),
+                              DropdownMenuItem(
+                                value: 'testemunho_publico',
+                                child: Text(
+                                  '🛒 Modo Carrinho',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              DropdownMenuItem(
+                                value: 'informal',
+                                child: Text(
+                                  'Informal',
+                                  style: TextStyle(fontSize: 12),
+                                ),
+                              ),
+                              DropdownMenuItem(
+                                value: 'carta_telefone',
+                                child: Text(
+                                  'Cartas/Telefone',
+                                  style: TextStyle(fontSize: 12),
+                                ),
+                              ),
                             ],
                             onChanged: (val) {
-                              if (val != null) setState(() => _timerModality = val);
+                              if (val != null)
+                                setState(() => _timerModality = val);
                             },
                           ),
                         ],
@@ -392,17 +501,30 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.coffee, color: Color(0xFFB45309), size: 18),
+                              const Icon(
+                                Icons.coffee,
+                                color: Color(0xFFB45309),
+                                size: 18,
+                              ),
                               const SizedBox(width: 8),
                               const Expanded(
                                 child: Text(
                                   'Parada detectada: Você fez um intervalo ou encerrou o campo?',
-                                  style: TextStyle(fontSize: 11, color: Color(0xFF92400E), fontWeight: FontWeight.bold),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Color(0xFF92400E),
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                               TextButton(
-                                onPressed: () => setState(() => _stoppedNoticeDismissed = true),
-                                child: const Text('Dispensar', style: TextStyle(fontSize: 11)),
+                                onPressed: () => setState(
+                                  () => _stoppedNoticeDismissed = true,
+                                ),
+                                child: const Text(
+                                  'Dispensar',
+                                  style: TextStyle(fontSize: 11),
+                                ),
                               ),
                             ],
                           ),
@@ -415,7 +537,9 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
                           fontSize: 30,
                           fontWeight: FontWeight.w900,
                           letterSpacing: 1.5,
-                          color: _isTimerRunning ? AppTheme.primaryBlue : (isDark ? Colors.white : AppTheme.textDark),
+                          color: _isTimerRunning
+                              ? AppTheme.primaryBlue
+                              : (isDark ? Colors.white : AppTheme.textDark),
                         ),
                       ),
                       const SizedBox(height: 6),
@@ -424,12 +548,27 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
                         children: [
                           ElevatedButton.icon(
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: _isTimerRunning ? Colors.orange : AppTheme.primaryBlue,
+                              backgroundColor: _isTimerRunning
+                                  ? Colors.orange
+                                  : AppTheme.primaryBlue,
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 6,
+                              ),
                             ),
-                            icon: Icon(_isTimerRunning ? Icons.pause : Icons.play_arrow, size: 18),
-                            label: Text(_isTimerRunning ? 'Pausar' : (_timerSeconds > 0 ? 'Continuar' : 'Iniciar Campo'), style: const TextStyle(fontSize: 12)),
+                            icon: Icon(
+                              _isTimerRunning ? Icons.pause : Icons.play_arrow,
+                              size: 18,
+                            ),
+                            label: Text(
+                              _isTimerRunning
+                                  ? 'Pausar'
+                                  : (_timerSeconds > 0
+                                        ? 'Continuar'
+                                        : 'Iniciar Campo'),
+                              style: const TextStyle(fontSize: 12),
+                            ),
                             onPressed: _toggleTimer,
                           ),
                           if (_timerSeconds > 0) ...[
@@ -438,10 +577,16 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppTheme.successGreen,
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
                               ),
                               icon: const Icon(Icons.check, size: 16),
-                              label: const Text('Salvar', style: TextStyle(fontSize: 12)),
+                              label: const Text(
+                                'Salvar',
+                                style: TextStyle(fontSize: 12),
+                              ),
                               onPressed: _saveTimerActivity,
                             ),
                             const SizedBox(width: 6),
@@ -463,13 +608,34 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
                 builder: (context) {
                   final now = DateTime.now();
                   final currentMonthStart = DateTime(now.year, now.month, 1);
-                  final currentMonthEnd = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
-                  final currentMonthActivities = allActivities.where((a) =>
-                      a.deletedAt == null &&
-                      a.date.isAfter(currentMonthStart.subtract(const Duration(seconds: 1))) &&
-                      a.date.isBefore(currentMonthEnd.add(const Duration(seconds: 1)))).toList();
-                  final currentMonthSeconds = currentMonthActivities.fold<int>(0, (sum, a) => sum + a.durationSeconds);
-                  final currentMonthCompletedHours = currentMonthSeconds / 3600.0;
+                  final currentMonthEnd = DateTime(
+                    now.year,
+                    now.month + 1,
+                    0,
+                    23,
+                    59,
+                    59,
+                  );
+                  final currentMonthActivities = allActivities
+                      .where(
+                        (a) =>
+                            a.deletedAt == null &&
+                            a.date.isAfter(
+                              currentMonthStart.subtract(
+                                const Duration(seconds: 1),
+                              ),
+                            ) &&
+                            a.date.isBefore(
+                              currentMonthEnd.add(const Duration(seconds: 1)),
+                            ),
+                      )
+                      .toList();
+                  final currentMonthSeconds = currentMonthActivities.fold<int>(
+                    0,
+                    (sum, a) => sum + a.durationSeconds,
+                  );
+                  final currentMonthCompletedHours =
+                      currentMonthSeconds / 3600.0;
 
                   return PioneerPaceCard(
                     currentMonthCompletedHours: currentMonthCompletedHours,
@@ -479,24 +645,46 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
 
               // Barra de seleção de período
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                color: isDark
+                    ? const Color(0xFF0F172A)
+                    : const Color(0xFFF1F5F9),
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
-                    children: ['Hoje', 'Esta Semana', 'Este Mês', 'Ano de Serviço'].map((p) {
-                      final isSelected = _selectedPeriod == p;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: FilterChip(
-                          label: Text(p, style: TextStyle(fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
-                          selected: isSelected,
-                          selectedColor: AppTheme.primaryBlue.withValues(alpha: 0.15),
-                          checkmarkColor: AppTheme.primaryBlue,
-                          onSelected: (_) => setState(() => _selectedPeriod = p),
-                        ),
-                      );
-                    }).toList(),
+                    children:
+                        [
+                          'Hoje',
+                          'Esta Semana',
+                          'Este Mês',
+                          'Ano de Serviço',
+                        ].map((p) {
+                          final isSelected = _selectedPeriod == p;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: FilterChip(
+                              label: Text(
+                                p,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: isSelected
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                ),
+                              ),
+                              selected: isSelected,
+                              selectedColor: AppTheme.primaryBlue.withValues(
+                                alpha: 0.15,
+                              ),
+                              checkmarkColor: AppTheme.primaryBlue,
+                              onSelected: (_) =>
+                                  setState(() => _selectedPeriod = p),
+                            ),
+                          );
+                        }).toList(),
                   ),
                 ),
               ),
@@ -506,11 +694,17 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                 child: Card(
-                  color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                  color: isDark
+                      ? const Color(0xFF1E293B)
+                      : const Color(0xFFF8FAFC),
                   elevation: isDark ? 0 : 1,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                    side: BorderSide(
+                      color: isDark
+                          ? const Color(0xFF334155)
+                          : const Color(0xFFE2E8F0),
+                    ),
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(14),
@@ -524,18 +718,29 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
                               'Total em $_selectedPeriod',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: isDark ? const Color(0xFF94A3B8) : AppTheme.textMuted,
+                                color: isDark
+                                    ? const Color(0xFF94A3B8)
+                                    : AppTheme.textMuted,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               '${hours}h ${minutes.toString().padLeft(2, '0')}m',
-                              style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: AppTheme.primaryBlue),
+                              style: const TextStyle(
+                                fontSize: 26,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.primaryBlue,
+                              ),
                             ),
                             Text(
                               '${filteredActivities.length} registro(s) de atividade',
-                              style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : AppTheme.textMuted),
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isDark
+                                    ? const Color(0xFF94A3B8)
+                                    : AppTheme.textMuted,
+                              ),
                             ),
                           ],
                         ),
@@ -545,7 +750,11 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
                             color: AppTheme.primaryBlue.withValues(alpha: 0.12),
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(Icons.timer_outlined, size: 30, color: AppTheme.primaryBlue),
+                          child: const Icon(
+                            Icons.timer_outlined,
+                            size: 30,
+                            color: AppTheme.primaryBlue,
+                          ),
                         ),
                       ],
                     ),
@@ -562,12 +771,19 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.history_toggle_off, size: 56, color: Colors.grey.shade400),
+                              Icon(
+                                Icons.history_toggle_off,
+                                size: 56,
+                                color: Colors.grey.shade400,
+                              ),
                               const SizedBox(height: 12),
                               Text(
                                 'Nenhuma atividade registrada para $_selectedPeriod.',
                                 textAlign: TextAlign.center,
-                                style: const TextStyle(color: AppTheme.textMuted, fontSize: 15),
+                                style: const TextStyle(
+                                  color: AppTheme.textMuted,
+                                  fontSize: 15,
+                                ),
                               ),
                             ],
                           ),
@@ -587,27 +803,45 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
                               leading: Container(
                                 padding: const EdgeInsets.all(10),
                                 decoration: BoxDecoration(
-                                  color: AppTheme.accentTeal.withValues(alpha: 0.1),
+                                  color: AppTheme.accentTeal.withValues(
+                                    alpha: 0.1,
+                                  ),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
                                   h > 0 ? '${h}h ${m}m' : '${m}m',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.accentTeal),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.accentTeal,
+                                  ),
                                 ),
                               ),
-                              title: Text(_formatModality(act.modality), style: const TextStyle(fontWeight: FontWeight.bold)),
+                              title: Text(
+                                _formatModality(act.modality),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                               subtitle: Text(
                                 '${AppDateUtils.formatDate(act.date)}${act.notes != null ? " • ${act.notes}" : ""}',
                                 style: const TextStyle(fontSize: 12),
                               ),
                               trailing: IconButton(
-                                icon: const Icon(Icons.delete_outline, size: 20, color: Colors.grey),
+                                icon: const Icon(
+                                  Icons.delete_outline,
+                                  size: 20,
+                                  color: Colors.grey,
+                                ),
                                 onPressed: () async {
                                   final repo = ref.read(repositoryProvider);
                                   await repo.deleteActivityRecord(act.id);
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Atividade removida com sucesso.')),
+                                      const SnackBar(
+                                        content: Text(
+                                          'Atividade removida com sucesso.',
+                                        ),
+                                      ),
                                     );
                                   }
                                 },

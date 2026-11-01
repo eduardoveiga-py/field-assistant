@@ -11,11 +11,14 @@ class People extends Table {
   RealColumn get latitude => real().nullable()();
   RealColumn get longitude => real().nullable()();
   DateTimeColumn get firstContactAt => dateTime()();
-  TextColumn get status => text().withDefault(const Constant('interessado'))(); // interessado, revisita, estudo, outro
+  TextColumn get status => text().withDefault(
+    const Constant('interessado'),
+  )(); // interessado, revisita, estudo, outro
   TextColumn get preferredSchedule => text().nullable()();
   TextColumn get generalNotes => text().nullable()();
   TextColumn get contactRestrictions => text().nullable()();
-  TextColumn get tags => text().withDefault(const Constant('[]'))(); // JSON array
+  TextColumn get tags =>
+      text().withDefault(const Constant('[]'))(); // JSON array
   DateTimeColumn get lastContactAt => dateTime().nullable()();
   DateTimeColumn get nextActionAt => dateTime().nullable()();
   TextColumn get nextActionNote => text().nullable()();
@@ -61,13 +64,18 @@ class BibleStudies extends Table {
   TextColumn get title => text()();
   TextColumn get ownerId => text().withDefault(const Constant('local_user'))();
   DateTimeColumn get startedAt => dateTime()();
-  TextColumn get status => text().withDefault(const Constant('ativo'))(); // ativo, pausado, concluido, encerrado
+  TextColumn get status => text().withDefault(
+    const Constant('ativo'),
+  )(); // ativo, pausado, concluido, encerrado
   TextColumn get publicationId => text()(); // lff-book, lff-brochure
-  TextColumn get language => text().withDefault(const Constant('pt'))(); // pt, tca, bzs
+  TextColumn get language =>
+      text().withDefault(const Constant('pt'))(); // pt, tca, bzs
   IntColumn get currentLesson => integer().nullable()();
   IntColumn get currentParagraph => integer().nullable()();
   TextColumn get manualReference => text().nullable()();
-  TextColumn get frequency => text().withDefault(const Constant('semanal'))(); // semanal, quinzenal, mensal, personalizada
+  TextColumn get frequency => text().withDefault(
+    const Constant('semanal'),
+  )(); // semanal, quinzenal, mensal, personalizada
   TextColumn get learningGoals => text().nullable()();
   TextColumn get pendingDoubts => text().nullable()();
   TextColumn get nextTopic => text().nullable()();
@@ -113,8 +121,11 @@ class StudySessions extends Table {
   TextColumn get sessionNotes => text().nullable()();
   TextColumn get pendingQuestions => text().nullable()();
   TextColumn get nextStep => text().nullable()();
-  TextColumn get status => text().withDefault(const Constant('realizada'))(); // realizada, cancelada, nao_realizada
-  TextColumn get participantIds => text().withDefault(const Constant('[]'))(); // JSON array
+  TextColumn get status => text().withDefault(
+    const Constant('realizada'),
+  )(); // realizada, cancelada, nao_realizada
+  TextColumn get participantIds =>
+      text().withDefault(const Constant('[]'))(); // JSON array
 
   // Auditoria e sincronização
   DateTimeColumn get createdAt => dateTime()();
@@ -140,7 +151,8 @@ class Appointments extends Table {
   TextColumn get locationNotes => text().nullable()();
   IntColumn get reminderMinutesBefore => integer().nullable()();
   IntColumn get secondReminderMinutesBefore => integer().nullable()();
-  BoolColumn get isProvisional => boolean().withDefault(const Constant(false))();
+  BoolColumn get isProvisional =>
+      boolean().withDefault(const Constant(false))();
 
   // Auditoria e sincronização
   DateTimeColumn get createdAt => dateTime()();
@@ -157,7 +169,8 @@ class ActivityRecords extends Table {
   TextColumn get id => text()(); // UUID v4
   DateTimeColumn get date => dateTime()();
   IntColumn get durationSeconds => integer()();
-  TextColumn get modality => text()(); // campo, testemunho_publico, informal, carta_telefone, outro
+  TextColumn get modality =>
+      text()(); // campo, testemunho_publico, informal, carta_telefone, outro
   TextColumn get notes => text().nullable()();
 
   // Auditoria e sincronização
@@ -180,7 +193,9 @@ class SyncQueue extends Table {
   DateTimeColumn get createdAt => dateTime()();
   IntColumn get attempts => integer().withDefault(const Constant(0))();
   TextColumn get lastError => text().nullable()();
-  TextColumn get status => text().withDefault(const Constant('pending'))(); // pending, in_progress, synced, conflict, failed
+  TextColumn get status => text().withDefault(
+    const Constant('pending'),
+  )(); // pending, in_progress, synced, conflict, failed
 
   @override
   Set<Column> get primaryKey => {id};
@@ -193,7 +208,8 @@ class VoiceNotes extends Table {
   TextColumn get visitId => text().nullable().references(Visits, #id)();
   TextColumn get studyId => text().nullable().references(BibleStudies, #id)();
   TextColumn get audioFilePath => text().nullable()();
-  IntColumn get audioDurationSeconds => integer().withDefault(const Constant(0))();
+  IntColumn get audioDurationSeconds =>
+      integer().withDefault(const Constant(0))();
   TextColumn get transcription => text()();
   IntColumn get detectedLesson => integer().nullable()();
   IntColumn get detectedPoint => integer().nullable()();
@@ -224,7 +240,8 @@ class PhoneContacts extends Table {
   TextColumn get notes => text().nullable()();
   TextColumn get tags => text().withDefault(const Constant('[]'))();
   TextColumn get origin => text().withDefault(const Constant('Informal'))();
-  TextColumn get convertedPersonId => text().nullable().references(People, #id)();
+  TextColumn get convertedPersonId =>
+      text().nullable().references(People, #id)();
 
   // Auditoria e sincronização
   DateTimeColumn get createdAt => dateTime()();
@@ -270,7 +287,8 @@ class AppKvStore extends Table {
 class FamilyTies extends Table {
   TextColumn get id => text()(); // UUID v4
   TextColumn get personId => text().named('person_id')();
-  TextColumn get relatedPersonId => text().nullable().named('related_person_id')();
+  TextColumn get relatedPersonId =>
+      text().nullable().named('related_person_id')();
   TextColumn get relatedPersonName => text().named('related_person_name')();
   TextColumn get relationshipType => text().named('relationship_type')();
 
@@ -289,10 +307,12 @@ class MinistryExperiences extends Table {
   TextColumn get id => text()(); // UUID v4
   TextColumn get title => text()();
   TextColumn get content => text()();
-  TextColumn get mediaUrls => text().withDefault(const Constant('[]')).named('media_urls')();
+  TextColumn get mediaUrls =>
+      text().withDefault(const Constant('[]')).named('media_urls')();
   TextColumn get tags => text().withDefault(const Constant('[]'))();
   DateTimeColumn get dateTimeField => dateTime().named('date_time')();
-  TextColumn get locationOrModality => text().nullable().named('location_or_modality')();
+  TextColumn get locationOrModality =>
+      text().nullable().named('location_or_modality')();
 
   // Auditoria e sincronização
   DateTimeColumn get createdAt => dateTime().named('created_at')();
@@ -409,7 +429,8 @@ class StudentManualOrder extends Table {
 class ExternalCalendarEvents extends Table {
   TextColumn get id => text()(); // UUID v4
   TextColumn get provider => text()(); // google, apple_eventkit, ical_url
-  TextColumn get externalAccount => text().nullable().named('external_account')();
+  TextColumn get externalAccount =>
+      text().nullable().named('external_account')();
   TextColumn get calendarId => text().named('calendar_id')();
   TextColumn get externalEventId => text().named('external_event_id')();
   TextColumn get iCalUid => text().nullable().named('ical_uid')();
@@ -419,11 +440,16 @@ class ExternalCalendarEvents extends Table {
   DateTimeColumn get startTime => dateTime().named('start_time')();
   DateTimeColumn get endTime => dateTime().named('end_time')();
   TextColumn get timeZone => text().nullable().named('time_zone')();
-  BoolColumn get isAllDay => boolean().withDefault(const Constant(false)).named('is_all_day')();
+  BoolColumn get isAllDay =>
+      boolean().withDefault(const Constant(false)).named('is_all_day')();
   TextColumn get externalStatus => text().nullable().named('external_status')();
-  DateTimeColumn get lastModifiedExternal => dateTime().nullable().named('last_modified_external')();
-  DateTimeColumn get lastSyncedAt => dateTime().nullable().named('last_synced_at')();
-  BoolColumn get isDeletedExternal => boolean().withDefault(const Constant(false)).named('is_deleted_external')();
+  DateTimeColumn get lastModifiedExternal =>
+      dateTime().nullable().named('last_modified_external')();
+  DateTimeColumn get lastSyncedAt =>
+      dateTime().nullable().named('last_synced_at')();
+  BoolColumn get isDeletedExternal => boolean()
+      .withDefault(const Constant(false))
+      .named('is_deleted_external')();
   TextColumn get metadata => text().nullable()(); // JSON
   TextColumn get etag => text().nullable()();
 
@@ -443,10 +469,17 @@ class CalendarEventLinks extends Table {
   TextColumn get appointmentId => text().named('appointment_id')();
   TextColumn get externalEventId => text().named('external_event_id')();
   TextColumn get provider => text()(); // google, apple_eventkit
-  TextColumn get syncStatus => text().withDefault(const Constant('synced')).named('sync_status')(); // synced, pending_upload, pending_download, conflict, failed
+  TextColumn get syncStatus => text()
+      .withDefault(const Constant('synced'))
+      .named(
+        'sync_status',
+      )(); // synced, pending_upload, pending_download, conflict, failed
   TextColumn get lastError => text().nullable().named('last_error')();
-  IntColumn get localRevisionAtSync => integer().withDefault(const Constant(1)).named('local_revision_at_sync')();
-  TextColumn get externalETagAtSync => text().nullable().named('external_etag_at_sync')();
+  IntColumn get localRevisionAtSync => integer()
+      .withDefault(const Constant(1))
+      .named('local_revision_at_sync')();
+  TextColumn get externalETagAtSync =>
+      text().nullable().named('external_etag_at_sync')();
 
   // Auditoria e sincronização
   DateTimeColumn get createdAt => dateTime().named('created_at')();

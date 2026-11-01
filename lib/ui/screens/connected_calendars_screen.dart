@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../../appointments/calendar_provider.dart';
@@ -9,10 +10,12 @@ class ConnectedCalendarsScreen extends ConsumerStatefulWidget {
   const ConnectedCalendarsScreen({super.key});
 
   @override
-  ConsumerState<ConnectedCalendarsScreen> createState() => _ConnectedCalendarsScreenState();
+  ConsumerState<ConnectedCalendarsScreen> createState() =>
+      _ConnectedCalendarsScreenState();
 }
 
-class _ConnectedCalendarsScreenState extends ConsumerState<ConnectedCalendarsScreen> {
+class _ConnectedCalendarsScreenState
+    extends ConsumerState<ConnectedCalendarsScreen> {
   bool _isSyncing = false;
   String? _syncMessage;
   bool _isGoogleAuthorized = false;
@@ -65,12 +68,14 @@ class _ConnectedCalendarsScreenState extends ConsumerState<ConnectedCalendarsScr
         _isGoogleAuthorized = gAuth;
         _googleAccount = gAcc;
         _googleCalendars = gCals;
-        _selectedGoogleCalId = gSelectedId ?? (gCals.isNotEmpty ? gCals.first.id : 'primary');
+        _selectedGoogleCalId =
+            gSelectedId ?? (gCals.isNotEmpty ? gCals.first.id : 'primary');
 
         _isAppleAuthorized = aAuth;
         _appleAccount = aAcc;
         _appleCalendars = aCals;
-        _selectedAppleCalId = aSelectedId ?? (aCals.isNotEmpty ? aCals.first.id : null);
+        _selectedAppleCalId =
+            aSelectedId ?? (aCals.isNotEmpty ? aCals.first.id : null);
 
         _conflicts = pendingConflicts;
       });
@@ -90,7 +95,8 @@ class _ConnectedCalendarsScreenState extends ConsumerState<ConnectedCalendarsScr
       setState(() {
         _isSyncing = false;
         if (result.success) {
-          _syncMessage = 'Sincronização concluída com sucesso! (${result.eventsDownloaded} recebidos, ${result.eventsUploaded} enviados)';
+          _syncMessage =
+              'Sincronização concluída com sucesso! (${result.eventsDownloaded} recebidos, ${result.eventsUploaded} enviados)';
         } else {
           _syncMessage = 'Aviso: ${result.errorMessage}';
         }
@@ -117,11 +123,17 @@ class _ConnectedCalendarsScreenState extends ConsumerState<ConnectedCalendarsScr
           'A desconexão remove o acesso à sua conta Google. Seus compromissos e históricos pastorais salvos no Field Assistant permanecerão 100% preservados.',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Desconectar', style: TextStyle(color: Colors.white)),
+            child: const Text(
+              'Desconectar',
+              style: TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),
@@ -178,8 +190,13 @@ class _ConnectedCalendarsScreenState extends ConsumerState<ConnectedCalendarsScr
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Versão Field Assistant:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                  Text('${conflict.localAppointment.title} (${AppDateUtils.formatDateTime(conflict.localAppointment.startTime)})'),
+                  const Text(
+                    'Versão Field Assistant:',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                  ),
+                  Text(
+                    '${conflict.localAppointment.title} (${AppDateUtils.formatDateTime(conflict.localAppointment.startTime)})',
+                  ),
                 ],
               ),
             ),
@@ -194,8 +211,16 @@ class _ConnectedCalendarsScreenState extends ConsumerState<ConnectedCalendarsScr
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Versão Calendário Externo:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                    Text('${conflict.externalEvent!.title} (${AppDateUtils.formatDateTime(conflict.externalEvent!.startTime)})'),
+                    const Text(
+                      'Versão Calendário Externo:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                    Text(
+                      '${conflict.externalEvent!.title} (${AppDateUtils.formatDateTime(conflict.externalEvent!.startTime)})',
+                    ),
                   ],
                 ),
               ),
@@ -235,7 +260,11 @@ class _ConnectedCalendarsScreenState extends ConsumerState<ConnectedCalendarsScr
         actions: [
           IconButton(
             icon: _isSyncing
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
                 : const Icon(Icons.sync),
             tooltip: 'Sincronizar Agora',
             onPressed: _isSyncing ? null : _syncNow,
@@ -251,12 +280,18 @@ class _ConnectedCalendarsScreenState extends ConsumerState<ConnectedCalendarsScr
             decoration: BoxDecoration(
               color: AppTheme.primaryBlue.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppTheme.primaryBlue.withValues(alpha: 0.2)),
+              border: Border.all(
+                color: AppTheme.primaryBlue.withValues(alpha: 0.2),
+              ),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.sync_alt, color: AppTheme.primaryBlue, size: 26),
+                const Icon(
+                  Icons.sync_alt,
+                  color: AppTheme.primaryBlue,
+                  size: 26,
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -264,14 +299,19 @@ class _ConnectedCalendarsScreenState extends ConsumerState<ConnectedCalendarsScr
                     children: [
                       const Text(
                         'Sincronização Bidirecional Automática',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppTheme.primaryBlue),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                          color: AppTheme.primaryBlue,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         'Conecte seu Google Calendar ou Apple Calendar uma única vez. As alterações feitas no Field Assistant serão enviadas aos calendários externos, e seus eventos externos aparecerão na sua agenda de forma contínua.',
                         style: TextStyle(
                           fontSize: 13,
-                          color: Theme.of(context).textTheme.bodyMedium?.color?.withValues(alpha: 0.85),
+                          color: Theme.of(context).textTheme.bodyMedium?.color
+                              ?.withValues(alpha: 0.85),
                           height: 1.35,
                         ),
                       ),
@@ -298,7 +338,9 @@ class _ConnectedCalendarsScreenState extends ConsumerState<ConnectedCalendarsScr
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
-                  color: _syncMessage!.startsWith('Aviso') ? Colors.orange[900] : Colors.green[900],
+                  color: _syncMessage!.startsWith('Aviso')
+                      ? Colors.orange[900]
+                      : Colors.green[900],
                 ),
               ),
             ),
@@ -322,18 +364,27 @@ class _ConnectedCalendarsScreenState extends ConsumerState<ConnectedCalendarsScr
                         const SizedBox(width: 8),
                         Text(
                           '${_conflicts.length} Conflito(s) Pendente(s)',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                          ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 8),
-                    const Text('Detectamos edições simultâneas que requerem sua escolha para evitar sobrescrita silenciosa:'),
+                    const Text(
+                      'Detectamos edições simultâneas que requerem sua escolha para evitar sobrescrita silenciosa:',
+                    ),
                     const SizedBox(height: 12),
                     for (final c in _conflicts)
                       ListTile(
                         contentPadding: EdgeInsets.zero,
                         title: Text(c.localAppointment.title),
-                        subtitle: Text(AppDateUtils.formatDateTime(c.localAppointment.startTime)),
+                        subtitle: Text(
+                          AppDateUtils.formatDateTime(
+                            c.localAppointment.startTime,
+                          ),
+                        ),
                         trailing: ElevatedButton(
                           onPressed: () => _showConflictDialog(c),
                           child: const Text('Resolver'),
@@ -348,7 +399,9 @@ class _ConnectedCalendarsScreenState extends ConsumerState<ConnectedCalendarsScr
 
           // CARD GOOGLE CALENDAR
           Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -362,7 +415,11 @@ class _ConnectedCalendarsScreenState extends ConsumerState<ConnectedCalendarsScr
                           color: Colors.red.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Icon(Icons.calendar_today, color: Colors.red, size: 24),
+                        child: const Icon(
+                          Icons.calendar_today,
+                          color: Colors.red,
+                          size: 24,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -371,14 +428,23 @@ class _ConnectedCalendarsScreenState extends ConsumerState<ConnectedCalendarsScr
                           children: [
                             const Text(
                               'Google Calendar',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
                             ),
                             Text(
-                              _isGoogleAuthorized ? (_googleAccount ?? 'Conta Conectada') : 'Não conectado',
+                              _isGoogleAuthorized
+                                  ? (_googleAccount ?? 'Conta Conectada')
+                                  : 'Não conectado',
                               style: TextStyle(
                                 fontSize: 13,
-                                color: _isGoogleAuthorized ? Colors.green[700] : Colors.grey,
-                                fontWeight: _isGoogleAuthorized ? FontWeight.w600 : FontWeight.normal,
+                                color: _isGoogleAuthorized
+                                    ? Colors.green[700]
+                                    : Colors.grey,
+                                fontWeight: _isGoogleAuthorized
+                                    ? FontWeight.w600
+                                    : FontWeight.normal,
                               ),
                             ),
                           ],
@@ -399,12 +465,24 @@ class _ConnectedCalendarsScreenState extends ConsumerState<ConnectedCalendarsScr
                   ),
                   if (_isGoogleAuthorized && _googleCalendars.isNotEmpty) ...[
                     const Divider(height: 24),
-                    const Text('Calendário de Destino:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                    const Text(
+                      'Calendário de Destino:',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(height: 6),
                     DropdownButtonFormField<String>(
                       initialValue: _selectedGoogleCalId,
                       isExpanded: true,
-                      decoration: const InputDecoration(border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                      ),
                       items: _googleCalendars.map((c) {
                         return DropdownMenuItem<String>(
                           value: c.id,
@@ -417,8 +495,11 @@ class _ConnectedCalendarsScreenState extends ConsumerState<ConnectedCalendarsScr
                       onChanged: (val) async {
                         if (val != null) {
                           setState(() => _selectedGoogleCalId = val);
-                          final coordinator = ref.read(calendarSyncCoordinatorProvider);
-                          await coordinator.googleProvider.setSelectedCalendarId(val);
+                          final coordinator = ref.read(
+                            calendarSyncCoordinatorProvider,
+                          );
+                          await coordinator.googleProvider
+                              .setSelectedCalendarId(val);
                         }
                       },
                     ),
@@ -431,7 +512,9 @@ class _ConnectedCalendarsScreenState extends ConsumerState<ConnectedCalendarsScr
 
           // CARD APPLE CALENDAR / EVENTKIT
           Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -442,10 +525,15 @@ class _ConnectedCalendarsScreenState extends ConsumerState<ConnectedCalendarsScr
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.12),
+                          color: (isDark ? Colors.white : Colors.black)
+                              .withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Icon(Icons.apple, color: isDark ? Colors.white : Colors.black, size: 24),
+                        child: Icon(
+                          Icons.apple,
+                          color: isDark ? Colors.white : Colors.black,
+                          size: 24,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -454,14 +542,23 @@ class _ConnectedCalendarsScreenState extends ConsumerState<ConnectedCalendarsScr
                           children: [
                             const Text(
                               'Apple Calendar / Dispositivo',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
                             ),
                             Text(
-                              _isAppleAuthorized ? (_appleAccount ?? 'Acesso Autorizado') : 'Não autorizado',
+                              _isAppleAuthorized
+                                  ? (_appleAccount ?? 'Acesso Autorizado')
+                                  : 'Não autorizado',
                               style: TextStyle(
                                 fontSize: 13,
-                                color: _isAppleAuthorized ? Colors.green[700] : Colors.grey,
-                                fontWeight: _isAppleAuthorized ? FontWeight.w600 : FontWeight.normal,
+                                color: _isAppleAuthorized
+                                    ? Colors.green[700]
+                                    : Colors.grey,
+                                fontWeight: _isAppleAuthorized
+                                    ? FontWeight.w600
+                                    : FontWeight.normal,
                               ),
                             ),
                           ],
@@ -482,12 +579,24 @@ class _ConnectedCalendarsScreenState extends ConsumerState<ConnectedCalendarsScr
                   ),
                   if (_isAppleAuthorized && _appleCalendars.isNotEmpty) ...[
                     const Divider(height: 24),
-                    const Text('Calendário Selecionado no Dispositivo:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                    const Text(
+                      'Calendário Selecionado no Dispositivo:',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(height: 6),
                     DropdownButtonFormField<String>(
                       initialValue: _selectedAppleCalId,
                       isExpanded: true,
-                      decoration: const InputDecoration(border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                      ),
                       items: _appleCalendars.map((c) {
                         return DropdownMenuItem<String>(
                           value: c.id,
@@ -500,8 +609,12 @@ class _ConnectedCalendarsScreenState extends ConsumerState<ConnectedCalendarsScr
                       onChanged: (val) async {
                         if (val != null) {
                           setState(() => _selectedAppleCalId = val);
-                          final coordinator = ref.read(calendarSyncCoordinatorProvider);
-                          await coordinator.appleProvider.setSelectedCalendarId(val);
+                          final coordinator = ref.read(
+                            calendarSyncCoordinatorProvider,
+                          );
+                          await coordinator.appleProvider.setSelectedCalendarId(
+                            val,
+                          );
                         }
                       },
                     ),
@@ -518,13 +631,26 @@ class _ConnectedCalendarsScreenState extends ConsumerState<ConnectedCalendarsScr
             height: 48,
             child: ElevatedButton.icon(
               icon: _isSyncing
-                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
                   : const Icon(Icons.sync),
-              label: Text(_isSyncing ? 'Sincronizando...' : 'Sincronizar Todos os Calendários Agora'),
+              label: Text(
+                _isSyncing
+                    ? 'Sincronizando...'
+                    : 'Sincronizar Todos os Calendários Agora',
+              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primaryBlue,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
               onPressed: _isSyncing ? null : _syncNow,
             ),

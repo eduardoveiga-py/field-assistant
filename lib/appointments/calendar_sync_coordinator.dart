@@ -19,6 +19,25 @@ class CalendarConflictItem {
     required this.localAppointment,
     this.externalEvent,
   });
+
+  List<String> get divergentFields {
+    final fields = <String>[];
+    if (externalEvent == null) return fields;
+    if (localAppointment.title != externalEvent!.title) {
+      fields.add('title');
+    }
+    if (localAppointment.startTime != externalEvent!.startTime) {
+      fields.add('startTime');
+    }
+    if (localAppointment.endTime != externalEvent!.endTime) {
+      fields.add('endTime');
+    }
+    if ((localAppointment.locationNotes ?? '') !=
+        (externalEvent!.location ?? '')) {
+      fields.add('location');
+    }
+    return fields;
+  }
 }
 
 class CalendarSyncCoordinator {
@@ -78,16 +97,25 @@ class CalendarSyncCoordinator {
         if (link.syncStatus == 'pending_upload' &&
             link.externalEventId.isNotEmpty &&
             isProvAuth) {
-          await provider.deleteExternalEvent(db, link.externalEventId);
-          totalUploaded++;
-          await (db.update(
-            db.calendarEventLinks,
-          )..where((t) => t.id.equals(link.id))).write(
-            CalendarEventLinksCompanion(
-              syncStatus: const drift.Value('synced'),
-              updatedAt: drift.Value(DateTime.now()),
-            ),
+          final ok = await provider.deleteExternalEvent(
+            db,
+            link.externalEventId,
           );
+          if (ok) {
+            totalUploaded++;
+            await (db.update(
+              db.calendarEventLinks,
+            )..where((t) => t.id.equals(link.id))).write(
+              CalendarEventLinksCompanion(
+                syncStatus: const drift.Value('synced'),
+                updatedAt: drift.Value(DateTime.now()),
+              ),
+            );
+          } else {
+            errors.add(
+              'Falha ao excluir evento externo ${link.externalEventId} no provedor ${provider.providerType.displayName}',
+            );
+          }
         }
         continue;
       }
@@ -99,19 +127,28 @@ class CalendarSyncCoordinator {
 
       // Caso 2: Compromisso local foi excluído no SQLite (soft delete)
       if (appt == null || appt.deletedAt != null) {
+        bool ok = true;
         if (link.externalEventId.isNotEmpty && isProvAuth) {
-          await provider.deleteExternalEvent(db, link.externalEventId);
-          totalUploaded++;
+          ok = await provider.deleteExternalEvent(db, link.externalEventId);
+          if (ok) {
+            totalUploaded++;
+          } else {
+            errors.add(
+              'Falha ao excluir evento externo ${link.externalEventId} no provedor ${provider.providerType.displayName}',
+            );
+          }
         }
-        await (db.update(
-          db.calendarEventLinks,
-        )..where((t) => t.id.equals(link.id))).write(
-          CalendarEventLinksCompanion(
-            deletedAt: drift.Value(DateTime.now()),
-            syncStatus: const drift.Value('synced'),
-            updatedAt: drift.Value(DateTime.now()),
-          ),
-        );
+        if (ok) {
+          await (db.update(
+            db.calendarEventLinks,
+          )..where((t) => t.id.equals(link.id))).write(
+            CalendarEventLinksCompanion(
+              deletedAt: drift.Value(DateTime.now()),
+              syncStatus: const drift.Value('synced'),
+              updatedAt: drift.Value(DateTime.now()),
+            ),
+          );
+        }
         continue;
       }
 
@@ -166,10 +203,16 @@ class CalendarSyncCoordinator {
       } else if (localChanged && !externalChanged) {
         // Apenas local mudou: Envia para o provedor externo
         if (isProvAuth) {
-          await provider.pushAppointmentToExternal(db, appt);
-          totalUploaded++;
+          final resId = await provider.pushAppointmentToExternal(db, appt);
+          if (resId != null) {
+            totalUploaded++;
+          } else {
+            errors.add(
+              'Falha ao enviar compromisso local ${appt.id} para ${provider.providerType.displayName}',
+            );
+          }
         }
-      } else if (!localChanged && externalChanged && ext != null) {
+      } else if (!localChanged && externalChanged) {
         // Apenas externo mudou: Atualiza dados de agenda no compromisso local preservando dados pastorais
         final now = DateTime.now();
         await (db.update(
@@ -226,8 +269,14 @@ class CalendarSyncCoordinator {
                 .getSingleOrNull();
 
         if (existingLink == null) {
-          await provider.pushAppointmentToExternal(db, appt);
-          totalUploaded++;
+          final resId = await provider.pushAppointmentToExternal(db, appt);
+          if (resId != null) {
+            totalUploaded++;
+          } else {
+            errors.add(
+              'Falha ao criar evento externo para compromisso ${appt.id} em ${provider.providerType.displayName}',
+            );
+          }
         }
       }
     }
