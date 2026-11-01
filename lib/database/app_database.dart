@@ -37,7 +37,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -72,8 +72,28 @@ class AppDatabase extends _$AppDatabase {
 
         await _migrateCustomTablesColumns();
       }
+      if (from < 4) {
+        // Migração incremental da versão 3 para a versão 4:
+        // Adiciona a coluna pending_resolution em calendar_event_links
+        await _createTableIfNotExists(m, calendarEventLinks);
+        await _migrateCalendarEventLinksPendingResolution();
+      }
     },
   );
+
+  Future<void> _migrateCalendarEventLinksPendingResolution() async {
+    try {
+      final columns = await customSelect(
+        "PRAGMA table_info(calendar_event_links)",
+      ).get();
+      final colNames = columns.map((c) => c.read<String>('name')).toSet();
+      if (!colNames.contains('pending_resolution')) {
+        await customStatement(
+          "ALTER TABLE calendar_event_links ADD COLUMN pending_resolution TEXT;",
+        );
+      }
+    } catch (_) {}
+  }
 
   Future<void> _migrateLandmarksColumns() async {
     try {

@@ -15278,6 +15278,18 @@ class $CalendarEventLinksTable extends CalendarEventLinks
         type: DriftSqlType.string,
         requiredDuringInsert: false,
       );
+  static const VerificationMeta _pendingResolutionMeta = const VerificationMeta(
+    'pendingResolution',
+  );
+  @override
+  late final GeneratedColumn<String> pendingResolution =
+      GeneratedColumn<String>(
+        'pending_resolution',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -15333,6 +15345,7 @@ class $CalendarEventLinksTable extends CalendarEventLinks
     lastError,
     localRevisionAtSync,
     externalETagAtSync,
+    pendingResolution,
     createdAt,
     updatedAt,
     deletedAt,
@@ -15415,6 +15428,15 @@ class $CalendarEventLinksTable extends CalendarEventLinks
         ),
       );
     }
+    if (data.containsKey('pending_resolution')) {
+      context.handle(
+        _pendingResolutionMeta,
+        pendingResolution.isAcceptableOrUnknown(
+          data['pending_resolution']!,
+          _pendingResolutionMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -15484,6 +15506,10 @@ class $CalendarEventLinksTable extends CalendarEventLinks
         DriftSqlType.string,
         data['${effectivePrefix}external_etag_at_sync'],
       ),
+      pendingResolution: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pending_resolution'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -15519,6 +15545,7 @@ class CalendarEventLinkEntry extends DataClass
   final String? lastError;
   final int localRevisionAtSync;
   final String? externalETagAtSync;
+  final String? pendingResolution;
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? deletedAt;
@@ -15532,6 +15559,7 @@ class CalendarEventLinkEntry extends DataClass
     this.lastError,
     required this.localRevisionAtSync,
     this.externalETagAtSync,
+    this.pendingResolution,
     required this.createdAt,
     required this.updatedAt,
     this.deletedAt,
@@ -15551,6 +15579,9 @@ class CalendarEventLinkEntry extends DataClass
     map['local_revision_at_sync'] = Variable<int>(localRevisionAtSync);
     if (!nullToAbsent || externalETagAtSync != null) {
       map['external_etag_at_sync'] = Variable<String>(externalETagAtSync);
+    }
+    if (!nullToAbsent || pendingResolution != null) {
+      map['pending_resolution'] = Variable<String>(pendingResolution);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
@@ -15575,6 +15606,9 @@ class CalendarEventLinkEntry extends DataClass
       externalETagAtSync: externalETagAtSync == null && nullToAbsent
           ? const Value.absent()
           : Value(externalETagAtSync),
+      pendingResolution: pendingResolution == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pendingResolution),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
       deletedAt: deletedAt == null && nullToAbsent
@@ -15602,6 +15636,9 @@ class CalendarEventLinkEntry extends DataClass
       externalETagAtSync: serializer.fromJson<String?>(
         json['externalETagAtSync'],
       ),
+      pendingResolution: serializer.fromJson<String?>(
+        json['pendingResolution'],
+      ),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
@@ -15620,6 +15657,7 @@ class CalendarEventLinkEntry extends DataClass
       'lastError': serializer.toJson<String?>(lastError),
       'localRevisionAtSync': serializer.toJson<int>(localRevisionAtSync),
       'externalETagAtSync': serializer.toJson<String?>(externalETagAtSync),
+      'pendingResolution': serializer.toJson<String?>(pendingResolution),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
@@ -15636,6 +15674,7 @@ class CalendarEventLinkEntry extends DataClass
     Value<String?> lastError = const Value.absent(),
     int? localRevisionAtSync,
     Value<String?> externalETagAtSync = const Value.absent(),
+    Value<String?> pendingResolution = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
     Value<DateTime?> deletedAt = const Value.absent(),
@@ -15651,6 +15690,9 @@ class CalendarEventLinkEntry extends DataClass
     externalETagAtSync: externalETagAtSync.present
         ? externalETagAtSync.value
         : this.externalETagAtSync,
+    pendingResolution: pendingResolution.present
+        ? pendingResolution.value
+        : this.pendingResolution,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
@@ -15676,6 +15718,9 @@ class CalendarEventLinkEntry extends DataClass
       externalETagAtSync: data.externalETagAtSync.present
           ? data.externalETagAtSync.value
           : this.externalETagAtSync,
+      pendingResolution: data.pendingResolution.present
+          ? data.pendingResolution.value
+          : this.pendingResolution,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
@@ -15694,6 +15739,7 @@ class CalendarEventLinkEntry extends DataClass
           ..write('lastError: $lastError, ')
           ..write('localRevisionAtSync: $localRevisionAtSync, ')
           ..write('externalETagAtSync: $externalETagAtSync, ')
+          ..write('pendingResolution: $pendingResolution, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
@@ -15712,6 +15758,7 @@ class CalendarEventLinkEntry extends DataClass
     lastError,
     localRevisionAtSync,
     externalETagAtSync,
+    pendingResolution,
     createdAt,
     updatedAt,
     deletedAt,
@@ -15729,6 +15776,7 @@ class CalendarEventLinkEntry extends DataClass
           other.lastError == this.lastError &&
           other.localRevisionAtSync == this.localRevisionAtSync &&
           other.externalETagAtSync == this.externalETagAtSync &&
+          other.pendingResolution == this.pendingResolution &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
           other.deletedAt == this.deletedAt &&
@@ -15745,6 +15793,7 @@ class CalendarEventLinksCompanion
   final Value<String?> lastError;
   final Value<int> localRevisionAtSync;
   final Value<String?> externalETagAtSync;
+  final Value<String?> pendingResolution;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<DateTime?> deletedAt;
@@ -15759,6 +15808,7 @@ class CalendarEventLinksCompanion
     this.lastError = const Value.absent(),
     this.localRevisionAtSync = const Value.absent(),
     this.externalETagAtSync = const Value.absent(),
+    this.pendingResolution = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
@@ -15774,6 +15824,7 @@ class CalendarEventLinksCompanion
     this.lastError = const Value.absent(),
     this.localRevisionAtSync = const Value.absent(),
     this.externalETagAtSync = const Value.absent(),
+    this.pendingResolution = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
     this.deletedAt = const Value.absent(),
@@ -15794,6 +15845,7 @@ class CalendarEventLinksCompanion
     Expression<String>? lastError,
     Expression<int>? localRevisionAtSync,
     Expression<String>? externalETagAtSync,
+    Expression<String>? pendingResolution,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? deletedAt,
@@ -15811,6 +15863,7 @@ class CalendarEventLinksCompanion
         'local_revision_at_sync': localRevisionAtSync,
       if (externalETagAtSync != null)
         'external_etag_at_sync': externalETagAtSync,
+      if (pendingResolution != null) 'pending_resolution': pendingResolution,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (deletedAt != null) 'deleted_at': deletedAt,
@@ -15828,6 +15881,7 @@ class CalendarEventLinksCompanion
     Value<String?>? lastError,
     Value<int>? localRevisionAtSync,
     Value<String?>? externalETagAtSync,
+    Value<String?>? pendingResolution,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<DateTime?>? deletedAt,
@@ -15843,6 +15897,7 @@ class CalendarEventLinksCompanion
       lastError: lastError ?? this.lastError,
       localRevisionAtSync: localRevisionAtSync ?? this.localRevisionAtSync,
       externalETagAtSync: externalETagAtSync ?? this.externalETagAtSync,
+      pendingResolution: pendingResolution ?? this.pendingResolution,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
@@ -15878,6 +15933,9 @@ class CalendarEventLinksCompanion
     if (externalETagAtSync.present) {
       map['external_etag_at_sync'] = Variable<String>(externalETagAtSync.value);
     }
+    if (pendingResolution.present) {
+      map['pending_resolution'] = Variable<String>(pendingResolution.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -15907,6 +15965,7 @@ class CalendarEventLinksCompanion
           ..write('lastError: $lastError, ')
           ..write('localRevisionAtSync: $localRevisionAtSync, ')
           ..write('externalETagAtSync: $externalETagAtSync, ')
+          ..write('pendingResolution: $pendingResolution, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
@@ -25326,6 +25385,7 @@ typedef $$CalendarEventLinksTableCreateCompanionBuilder =
       Value<String?> lastError,
       Value<int> localRevisionAtSync,
       Value<String?> externalETagAtSync,
+      Value<String?> pendingResolution,
       required DateTime createdAt,
       required DateTime updatedAt,
       Value<DateTime?> deletedAt,
@@ -25342,6 +25402,7 @@ typedef $$CalendarEventLinksTableUpdateCompanionBuilder =
       Value<String?> lastError,
       Value<int> localRevisionAtSync,
       Value<String?> externalETagAtSync,
+      Value<String?> pendingResolution,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<DateTime?> deletedAt,
@@ -25395,6 +25456,11 @@ class $$CalendarEventLinksTableFilterComposer
 
   ColumnFilters<String> get externalETagAtSync => $composableBuilder(
     column: $table.externalETagAtSync,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pendingResolution => $composableBuilder(
+    column: $table.pendingResolution,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -25468,6 +25534,11 @@ class $$CalendarEventLinksTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get pendingResolution => $composableBuilder(
+    column: $table.pendingResolution,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -25532,6 +25603,11 @@ class $$CalendarEventLinksTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get pendingResolution => $composableBuilder(
+    column: $table.pendingResolution,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
@@ -25593,6 +25669,7 @@ class $$CalendarEventLinksTableTableManager
                 Value<String?> lastError = const Value.absent(),
                 Value<int> localRevisionAtSync = const Value.absent(),
                 Value<String?> externalETagAtSync = const Value.absent(),
+                Value<String?> pendingResolution = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
@@ -25607,6 +25684,7 @@ class $$CalendarEventLinksTableTableManager
                 lastError: lastError,
                 localRevisionAtSync: localRevisionAtSync,
                 externalETagAtSync: externalETagAtSync,
+                pendingResolution: pendingResolution,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
@@ -25623,6 +25701,7 @@ class $$CalendarEventLinksTableTableManager
                 Value<String?> lastError = const Value.absent(),
                 Value<int> localRevisionAtSync = const Value.absent(),
                 Value<String?> externalETagAtSync = const Value.absent(),
+                Value<String?> pendingResolution = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
                 Value<DateTime?> deletedAt = const Value.absent(),
@@ -25637,6 +25716,7 @@ class $$CalendarEventLinksTableTableManager
                 lastError: lastError,
                 localRevisionAtSync: localRevisionAtSync,
                 externalETagAtSync: externalETagAtSync,
+                pendingResolution: pendingResolution,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,

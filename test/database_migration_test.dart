@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:sqlite3/sqlite3.dart' as sql;
 import 'package:ministerio_pessoal/database/app_database.dart';
@@ -71,7 +72,7 @@ void main() {
 
       // Dispara migração abrindo o banco e realizando query
       final ver = await appDb.customSelect('PRAGMA user_version;').getSingle();
-      expect(ver.read<int>('user_version'), equals(3));
+      expect(ver.read<int>('user_version'), equals(4));
 
       // 3. Valida migração de dados de app_settings_kv para app_kv_store
       final kvManager = AppSettingsManager(appDb);
@@ -180,7 +181,7 @@ void main() {
 
       // Dispara a migração
       final ver = await appDb.customSelect('PRAGMA user_version;').getSingle();
-      expect(ver.read<int>('user_version'), equals(3));
+      expect(ver.read<int>('user_version'), equals(4));
 
       // Verifica 100% de preservação dos dados legados de ministry_experiences
       final experiences = await appDb.select(appDb.ministryExperiences).get();
@@ -359,7 +360,7 @@ void main() {
       );
 
       final ver = await appDb.customSelect('PRAGMA user_version;').getSingle();
-      expect(ver.read<int>('user_version'), equals(3));
+      expect(ver.read<int>('user_version'), equals(4));
 
       // 3. Validação individual exaustiva de cada uma das 8 tabelas:
       // Tabela 1: family_ties
@@ -430,7 +431,7 @@ void main() {
       final verReopened = await appDbReopened
           .customSelect('PRAGMA user_version;')
           .getSingle();
-      expect(verReopened.read<int>('user_version'), equals(3));
+      expect(verReopened.read<int>('user_version'), equals(4));
       expect(
         (await appDbReopened.select(appDbReopened.familyTies).get()).length,
         equals(1),
@@ -443,6 +444,57 @@ void main() {
       );
       await appDbReopened.close();
       sqliteDb.close();
+    });
+
+    test('TC-MIG-04: Migração incremental v3 para v4 com pending_resolution em calendar_event_links', () async {
+      final sqliteDb = sql.sqlite3.openInMemory();
+
+      // Inicializa schema v3 com calendar_event_links sem a coluna pending_resolution
+      sqliteDb.execute('PRAGMA user_version = 3;');
+      sqliteDb.execute('''
+        CREATE TABLE calendar_event_links (
+          id TEXT NOT NULL PRIMARY KEY,
+          appointment_id TEXT NOT NULL,
+          external_event_id TEXT NOT NULL,
+          provider TEXT NOT NULL,
+          sync_status TEXT NOT NULL DEFAULT 'synced',
+          last_error TEXT,
+          local_revision_at_sync INTEGER NOT NULL DEFAULT 1,
+          external_etag_at_sync TEXT,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          deleted_at INTEGER,
+          revision INTEGER NOT NULL DEFAULT 1
+        );
+      ''');
+      sqliteDb.execute('''
+        INSERT INTO calendar_event_links (id, appointment_id, external_event_id, provider, sync_status, created_at, updated_at)
+        VALUES ('link_v3', 'appt_1', 'ext_1', 'google', 'conflict', 1700000000000, 1700000000000);
+      ''');
+
+      // Instancia AppDatabase que aplicará a migração v3 -> v4
+      final appDb = AppDatabase.forTesting(NativeDatabase.opened(sqliteDb));
+
+      final ver = await appDb.customSelect('PRAGMA user_version;').getSingle();
+      expect(ver.read<int>('user_version'), equals(4));
+
+      // Verifica que os dados foram preservados e a coluna pending_resolution existe e é acessível
+      final link = await (appDb.select(appDb.calendarEventLinks)..where((t) => t.id.equals('link_v3'))).getSingle();
+      expect(link.id, equals('link_v3'));
+      expect(link.syncStatus, equals('conflict'));
+      expect(link.pendingResolution, isNull);
+
+      // Testa escrita na nova coluna
+      await (appDb.update(appDb.calendarEventLinks)..where((t) => t.id.equals('link_v3'))).write(
+        const CalendarEventLinksCompanion(
+          pendingResolution: Value('keep_local'),
+        ),
+      );
+
+      final updated = await (appDb.select(appDb.calendarEventLinks)..where((t) => t.id.equals('link_v3'))).getSingle();
+      expect(updated.pendingResolution, equals('keep_local'));
+
+      await appDb.close();
     });
   });
 }

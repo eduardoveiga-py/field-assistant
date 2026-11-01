@@ -178,6 +178,44 @@ class CalendarSyncCoordinator {
       }
 
       // Avaliação de alterações:
+      final isPendingKeepLocal = link.pendingResolution == 'keep_local';
+
+      if (isPendingKeepLocal) {
+        // O usuário já resolveu explicitamente o conflito mantendo a versão local.
+        // Processa o envio pendente com segurança sem reabrir o conflito resolvido.
+        if (isProvAuth) {
+          final resId = await provider.pushAppointmentToExternal(db, appt);
+          if (resId != null) {
+            totalUploaded++;
+            final updatedExt =
+                await (db.select(db.externalCalendarEvents)..where(
+                      (t) =>
+                          t.externalEventId.equals(link.externalEventId) &
+                          t.provider.equals(link.provider),
+                    ))
+                    .getSingleOrNull();
+            final now = DateTime.now();
+            await (db.update(
+              db.calendarEventLinks,
+            )..where((t) => t.id.equals(link.id))).write(
+              CalendarEventLinksCompanion(
+                syncStatus: const drift.Value('synced'),
+                pendingResolution: const drift.Value(null),
+                localRevisionAtSync: drift.Value(appt.revision),
+                externalETagAtSync: drift.Value(updatedExt?.etag ?? ext?.etag),
+                updatedAt: drift.Value(now),
+              ),
+            );
+          } else {
+            // Falha ao enviar para o provedor: preserva a decisão persistida e mantém pending_upload
+            errors.add(
+              'Falha ao enviar resolução de conflito local para ${provider.providerType.displayName}',
+            );
+          }
+        }
+        continue;
+      }
+
       final localChanged =
           (appt.revision > link.localRevisionAtSync) ||
           (link.syncStatus == 'pending_upload');
@@ -333,7 +371,10 @@ class CalendarSyncCoordinator {
   Future<List<CalendarConflictItem>> getPendingConflicts() async {
     final conflictLinks =
         await (db.select(db.calendarEventLinks)..where(
-              (t) => t.syncStatus.equals('conflict') & t.deletedAt.isNull(),
+              (t) =>
+                  t.syncStatus.equals('conflict') &
+                  t.deletedAt.isNull() &
+                  t.pendingResolution.isNull(),
             ))
             .get();
 
@@ -380,7 +421,11 @@ class CalendarSyncCoordinator {
     )..where((t) => t.id.equals(conflict.link.id))).write(
       CalendarEventLinksCompanion(
         syncStatus: drift.Value(resId != null ? 'synced' : 'pending_upload'),
+        pendingResolution: drift.Value(resId != null ? null : 'keep_local'),
         localRevisionAtSync: drift.Value(conflict.localAppointment.revision),
+        externalETagAtSync: resId != null
+            ? drift.Value(conflict.externalEvent?.etag)
+            : const drift.Value.absent(),
         updatedAt: drift.Value(now),
       ),
     );
@@ -417,6 +462,7 @@ class CalendarSyncCoordinator {
     )..where((t) => t.id.equals(conflict.link.id))).write(
       CalendarEventLinksCompanion(
         syncStatus: const drift.Value('synced'),
+        pendingResolution: const drift.Value(null),
         localRevisionAtSync: drift.Value(
           conflict.localAppointment.revision + 1,
         ),

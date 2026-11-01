@@ -480,6 +480,8 @@ class CalendarEventLinks extends Table {
       .named('local_revision_at_sync')();
   TextColumn get externalETagAtSync =>
       text().nullable().named('external_etag_at_sync')();
+  TextColumn get pendingResolution =>
+      text().nullable().named('pending_resolution')();
 
   // Auditoria e sincronização
   DateTimeColumn get createdAt => dateTime().named('created_at')();
