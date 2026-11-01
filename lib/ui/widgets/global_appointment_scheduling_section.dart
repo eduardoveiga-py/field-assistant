@@ -90,8 +90,9 @@ class GlobalAppointmentSchedulingSection extends StatelessWidget {
     // Filtra os compromissos agendados no mesmo dia civil para o usuário "enxergar" a agenda
     final sameDayAppointments = existingAppointments.where((a) {
       if (a.deletedAt != null) return false;
-      if (excludeAppointmentId != null && a.id == excludeAppointmentId)
+      if (excludeAppointmentId != null && a.id == excludeAppointmentId) {
         return false;
+      }
       final status = a.status.toLowerCase();
       if (status == 'cancelado' || status == 'reagendado') return false;
 

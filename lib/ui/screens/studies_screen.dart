@@ -630,8 +630,9 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                               ),
                             ],
                             onChanged: (val) {
-                              if (val != null)
+                              if (val != null) {
                                 setDialogState(() => failureMotive = val);
+                              }
                             },
                           ),
                         ],
@@ -1170,8 +1171,9 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                       );
                     }).toList(),
                     onChanged: (val) {
-                      if (val != null)
+                      if (val != null) {
                         setDialogState(() => selectedPublicationId = val);
+                      }
                     },
                   ),
                   const SizedBox(height: 12),
@@ -1189,8 +1191,9 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                       DropdownMenuItem(value: 'tca', child: Text('Ticuna')),
                     ],
                     onChanged: (val) {
-                      if (val != null)
+                      if (val != null) {
                         setDialogState(() => selectedLanguage = val);
+                      }
                     },
                   ),
                   const SizedBox(height: 12),
@@ -1214,8 +1217,9 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                       ),
                     ],
                     onChanged: (val) {
-                      if (val != null)
+                      if (val != null) {
                         setDialogState(() => selectedFrequency = val);
+                      }
                     },
                   ),
                   const SizedBox(height: 14),
@@ -1741,8 +1745,9 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                         label: Text('Ativos (${activeStudies.length})'),
                         selected: _selectedStatusFilter == 'Ativos',
                         onSelected: (val) {
-                          if (val)
+                          if (val) {
                             setState(() => _selectedStatusFilter = 'Ativos');
+                          }
                         },
                       ),
                       const SizedBox(width: 8),
@@ -1753,11 +1758,12 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                         selected:
                             _selectedStatusFilter == 'Prioridade & Progresso',
                         onSelected: (val) {
-                          if (val)
+                          if (val) {
                             setState(
                               () => _selectedStatusFilter =
                                   'Prioridade & Progresso',
                             );
+                          }
                         },
                       ),
                       const SizedBox(width: 8),
@@ -1767,10 +1773,11 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                         ),
                         selected: _selectedStatusFilter == 'Encerrados',
                         onSelected: (val) {
-                          if (val)
+                          if (val) {
                             setState(
                               () => _selectedStatusFilter = 'Encerrados',
                             );
+                          }
                         },
                       ),
                     ],
@@ -1831,8 +1838,9 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                               study.pauseOrCloseReason!.isNotEmpty) {
                             try {
                               final d = jsonDecode(study.pauseOrCloseReason!);
-                              if (d is Map && d.containsKey('endReason'))
+                              if (d is Map && d.containsKey('endReason')) {
                                 endReason = d['endReason'];
+                              }
                             } catch (_) {
                               endReason = study.pauseOrCloseReason;
                             }
@@ -1938,8 +1946,9 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                                         .getParticipantsForStudy(study.id),
                                     builder: (context, partSnap) {
                                       final parts = partSnap.data ?? [];
-                                      if (parts.isEmpty)
+                                      if (parts.isEmpty) {
                                         return const SizedBox.shrink();
+                                      }
                                       final people =
                                           ref
                                               .watch(peopleStreamProvider)

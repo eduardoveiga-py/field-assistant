@@ -55,8 +55,9 @@ class SyncEngine {
     final allKeys = {...localData.keys, ...remoteData.keys};
 
     for (final key in allKeys) {
-      if (key == 'revision' || key == 'updated_at' || key == 'updatedAt')
+      if (key == 'revision' || key == 'updated_at' || key == 'updatedAt') {
         continue;
+      }
 
       final localVal = localData[key];
       final remoteVal = remoteData[key];

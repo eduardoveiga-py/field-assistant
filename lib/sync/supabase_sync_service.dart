@@ -60,8 +60,9 @@ class SupabaseSyncService {
     final url = supabaseUrl.trim();
     final key = supabaseAnonKey.trim();
     if (url.isEmpty || key.isEmpty) return false;
-    if (url.contains('your-supabase-url') || key.contains('your-anon-key'))
+    if (url.contains('your-supabase-url') || key.contains('your-anon-key')) {
       return false;
+    }
     return true;
   }
 

@@ -257,8 +257,9 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                           ),
                         ],
                         onChanged: (val) {
-                          if (val != null)
+                          if (val != null) {
                             setDialogState(() => selectedStatus = val);
+                          }
                         },
                       ),
                     ),
@@ -412,8 +413,9 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                         );
                         if (geo != null) {
                           setDialogState(() {
-                            if (geo.streetAndNumber.isNotEmpty)
+                            if (geo.streetAndNumber.isNotEmpty) {
                               addressController.text = geo.streetAndNumber;
+                            }
                             if (geo.neighborhood != null &&
                                 geo.neighborhood!.isNotEmpty) {
                               neighborhoodController.text = geo.neighborhood!;
@@ -644,14 +646,17 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
 
                 // Compõe endereço unificado com bairro e ponto de referência se fornecidos
                 final addrParts = <String>[];
-                if (addressController.text.trim().isNotEmpty)
+                if (addressController.text.trim().isNotEmpty) {
                   addrParts.add(addressController.text.trim());
-                if (neighborhoodController.text.trim().isNotEmpty)
+                }
+                if (neighborhoodController.text.trim().isNotEmpty) {
                   addrParts.add(
                     'Bairro: ${neighborhoodController.text.trim()}',
                   );
-                if (referenceController.text.trim().isNotEmpty)
+                }
+                if (referenceController.text.trim().isNotEmpty) {
                   addrParts.add('Ref: ${referenceController.text.trim()}');
+                }
 
                 final fullAddress = addrParts.isNotEmpty
                     ? addrParts.join(' - ')
@@ -710,15 +715,20 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
         builder: (ctx, setDialogState) {
           final filtered = allPeople.where((p) {
             if (p.deletedAt != null) return false;
-            if (onlyWithPhone && (p.phone == null || p.phone!.trim().isEmpty))
+            if (onlyWithPhone && (p.phone == null || p.phone!.trim().isEmpty)) {
               return false;
+            }
             if (selectedStatus != 'Todos') {
-              if (selectedStatus == 'Interessados' && p.status != 'interessado')
+              if (selectedStatus == 'Interessados' &&
+                  p.status != 'interessado') {
                 return false;
-              if (selectedStatus == 'Revisitas' && p.status != 'revisita')
+              }
+              if (selectedStatus == 'Revisitas' && p.status != 'revisita') {
                 return false;
-              if (selectedStatus == 'Estudos' && p.status != 'estudo')
+              }
+              if (selectedStatus == 'Estudos' && p.status != 'estudo') {
                 return false;
+              }
             }
             if (selectedSector != 'Todos') {
               final addr = (p.address ?? '').toLowerCase();
@@ -770,8 +780,9 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                       ),
                     ],
                     onChanged: (val) {
-                      if (val != null)
+                      if (val != null) {
                         setDialogState(() => selectedStatus = val);
+                      }
                     },
                   ),
                   const SizedBox(height: 12),
@@ -793,8 +804,9 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                       ),
                     ],
                     onChanged: (val) {
-                      if (val != null)
+                      if (val != null) {
                         setDialogState(() => selectedSector = val);
+                      }
                     },
                   ),
                   const SizedBox(height: 10),
@@ -806,8 +818,9 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                     ),
                     value: onlyWithPhone,
                     onChanged: (val) {
-                      if (val != null)
+                      if (val != null) {
                         setDialogState(() => onlyWithPhone = val);
+                      }
                     },
                   ),
                   const SizedBox(height: 8),
@@ -1197,14 +1210,16 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                   // Filtro por categoria
                   if (_selectedFilter == 'Todos') {
                     if (p.status == 'revisita_passada' ||
-                        p.status == 'revisita_encerrada')
+                        p.status == 'revisita_encerrada') {
                       return false;
+                    }
                   } else if (_selectedFilter == 'Sementes Recentes') {
                     if (!RecentSeedsHelper.isRecentSeed(
                       person: p,
                       visits: allVisits,
-                    ))
+                    )) {
                       return false;
+                    }
                   } else if (_selectedFilter == 'Interessados') {
                     if (p.status != 'interessado') return false;
                   } else if (_selectedFilter == 'Revisitas') {
@@ -1220,8 +1235,9 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                   if (_selectedTag != null && _selectedTag!.isNotEmpty) {
                     if (!p.tags.toLowerCase().contains(
                       _selectedTag!.toLowerCase(),
-                    ))
+                    )) {
                       return false;
+                    }
                   }
 
                   return true;

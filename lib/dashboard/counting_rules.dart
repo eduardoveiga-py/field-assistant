@@ -170,11 +170,13 @@ class DashboardCalculator {
       final hasSessionInPeriod = heldSessions.any(
         (sess) => sess.studyId == s.id,
       );
-      if (hasSessionInPeriod)
+      if (hasSessionInPeriod) {
         return true; // Se teve sessão no mês, conta nas estatísticas do mês!
+      }
 
-      if (s.status.toLowerCase() != 'ativo' || s.deletedAt != null)
+      if (s.status.toLowerCase() != 'ativo' || s.deletedAt != null) {
         return false;
+      }
       final partIds = studyParticipantMap[s.id];
       if (partIds != null &&
           partIds.isNotEmpty &&
@@ -296,8 +298,9 @@ class DashboardCalculator {
     // 7. Compromissos Futuros Agendados (Exclui revisitas passadas)
     final scheduledAppts = appointments.where((a) {
       if (a.deletedAt != null) return false;
-      if (a.personId != null && passedPersonIds.contains(a.personId))
+      if (a.personId != null && passedPersonIds.contains(a.personId)) {
         return false;
+      }
       final status = a.status.toLowerCase();
       return (status == 'planejado' || status == 'confirmado') &&
           a.startTime.isAfter(now);
@@ -306,8 +309,9 @@ class DashboardCalculator {
     // 8. Revisitas e Compromissos Vencidos
     final overdueAppts = appointments.where((a) {
       if (a.deletedAt != null) return false;
-      if (a.personId != null && passedPersonIds.contains(a.personId))
+      if (a.personId != null && passedPersonIds.contains(a.personId)) {
         return false;
+      }
       final status = a.status.toLowerCase();
       return (status == 'planejado' || status == 'confirmado') &&
           a.startTime.isBefore(now);

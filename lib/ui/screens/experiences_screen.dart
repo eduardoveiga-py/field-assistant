@@ -246,8 +246,9 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
                                           const Duration(days: 30),
                                         ),
                                       );
-                                      if (p != null)
+                                      if (p != null) {
                                         setDialogState(() => chosenDate = p);
+                                      }
                                     },
                                   ),
                                 ),
@@ -266,8 +267,9 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
                                         context: context,
                                         initialTime: chosenTime,
                                       );
-                                      if (t != null)
+                                      if (t != null) {
                                         setDialogState(() => chosenTime = t);
+                                      }
                                     },
                                   ),
                                 ),
@@ -302,8 +304,9 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
                                 ),
                               ],
                               onChanged: (val) {
-                                if (val != null)
+                                if (val != null) {
                                   setDialogState(() => selectedModality = val);
+                                }
                               },
                             ),
                             const SizedBox(height: 12),

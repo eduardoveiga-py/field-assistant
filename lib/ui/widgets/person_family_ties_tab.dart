@@ -168,8 +168,9 @@ class _PersonFamilyTiesTabState extends ConsumerState<PersonFamilyTiesTab> {
                       return DropdownMenuItem(value: r, child: Text(r));
                     }).toList(),
                     onChanged: (val) {
-                      if (val != null)
+                      if (val != null) {
                         setDialogState(() => selectedRelationship = val);
+                      }
                     },
                   ),
                   const SizedBox(height: 8),
@@ -301,8 +302,9 @@ class _PersonFamilyTiesTabState extends ConsumerState<PersonFamilyTiesTab> {
                     .map((r) => DropdownMenuItem(value: r, child: Text(r)))
                     .toList(),
                 onChanged: (val) {
-                  if (val != null)
+                  if (val != null) {
                     setDialogState(() => selectedRelationship = val);
+                  }
                 },
               ),
             ],

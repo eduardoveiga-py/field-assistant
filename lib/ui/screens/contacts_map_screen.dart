@@ -526,8 +526,9 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                       ),
                     ],
                     onChanged: (val) {
-                      if (val != null)
+                      if (val != null) {
                         setDialogState(() => selectedCategory = val);
+                      }
                     },
                   ),
                   const SizedBox(height: 12),
@@ -993,8 +994,9 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
 
           final filtered = people.where((p) {
             // Se for o contato em destaque vindo do perfil individual, nunca exclui por filtros
-            if (_highlightPersonId != null && p.id == _highlightPersonId)
+            if (_highlightPersonId != null && p.id == _highlightPersonId) {
               return true;
+            }
 
             final hasLoc =
                 (p.address != null && p.address!.trim().isNotEmpty) ||
@@ -1002,8 +1004,9 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
             if (!hasLoc) return false;
 
             if (_selectedStatusFilter == 'Todos') {
-              if (p.status == 'revisita_encerrada' || p.status == 'encerrado')
+              if (p.status == 'revisita_encerrada' || p.status == 'encerrado') {
                 return false;
+              }
             } else if (_selectedStatusFilter == 'Estudos' &&
                 p.status != 'estudo') {
               return false;
@@ -1079,10 +1082,11 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                                 label: Text(status),
                                 selected: _selectedStatusFilter == status,
                                 onSelected: (sel) {
-                                  if (sel)
+                                  if (sel) {
                                     setState(
                                       () => _selectedStatusFilter = status,
                                     );
+                                  }
                                 },
                                 selectedColor: AppTheme.primaryBlue.withValues(
                                   alpha: 0.15,
@@ -1114,8 +1118,9 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                                   );
                                 }).toList(),
                             onChanged: (val) {
-                              if (val != null)
+                              if (val != null) {
                                 setState(() => _selectedDayFilter = val);
+                              }
                             },
                           ),
                           const SizedBox(width: 8),
@@ -1136,8 +1141,9 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                                 );
                               }).toList(),
                               onChanged: (val) {
-                                if (val != null)
+                                if (val != null) {
                                   setState(() => _selectedNeighborhood = val);
+                                }
                               },
                             ),
                           const SizedBox(width: 8),

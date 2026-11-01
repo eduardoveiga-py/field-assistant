@@ -155,10 +155,12 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                                                   t.id,
                                                   newName,
                                                 );
-                                                if (editCtx.mounted)
+                                                if (editCtx.mounted) {
                                                   Navigator.pop(editCtx);
-                                                if (ctx.mounted)
+                                                }
+                                                if (ctx.mounted) {
                                                   Navigator.pop(ctx);
+                                                }
                                               }
                                             },
                                             child: const Text('Salvar'),

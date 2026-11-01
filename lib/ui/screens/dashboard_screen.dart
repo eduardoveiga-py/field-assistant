@@ -128,8 +128,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           ),
                         ],
                         onChanged: (val) {
-                          if (val != null)
+                          if (val != null) {
                             setDialogState(() => selectedModality = val);
+                          }
                         },
                       ),
                     ),
@@ -1461,8 +1462,9 @@ $header
                         ),
                       ],
                       onChanged: (val) {
-                        if (val != null)
+                        if (val != null) {
                           setState(() => _personalHourGoal = val);
+                        }
                       },
                     ),
                   ],
@@ -1858,8 +1860,9 @@ $header
               showTitles: true,
               getTitlesWidget: (val, meta) {
                 final idx = val.toInt();
-                if (idx < 0 || idx >= monthsData.length)
+                if (idx < 0 || idx >= monthsData.length) {
                   return const SizedBox.shrink();
+                }
                 return Text(
                   monthsData[idx]['label'] as String,
                   style: TextStyle(

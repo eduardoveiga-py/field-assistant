@@ -83,17 +83,22 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
   static Color _getAppointmentActivityColor(AppointmentEntry appt) {
     final titleLower = appt.title.toLowerCase();
     if (titleLower.contains('viagem')) return const Color(0xFF0D9488); // Teal
-    if (titleLower.contains('ausência') || titleLower.contains('ausencia'))
+    if (titleLower.contains('ausência') || titleLower.contains('ausencia')) {
       return const Color(0xFFD97706); // Amber
+    }
     if (titleLower.contains('folga')) return const Color(0xFF64748B); // Slate
-    if (titleLower.contains('pessoal'))
+    if (titleLower.contains('pessoal')) {
       return const Color(0xFF9333EA); // Purple
-    if (titleLower.contains('outro'))
+    }
+    if (titleLower.contains('outro')) {
       return const Color(0xFF475569); // Slate Grey
-    if (titleLower.contains('estudo') || appt.studyId != null)
+    }
+    if (titleLower.contains('estudo') || appt.studyId != null) {
       return const Color(0xFF059669); // Emerald Green
-    if (titleLower.contains('revisita'))
+    }
+    if (titleLower.contains('revisita')) {
       return const Color(0xFFEA580C); // Orange
+    }
     return const Color(0xFF2563EB); // Royal Blue (Campo)
   }
 
@@ -843,8 +848,9 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                                                   rawUrl,
                                                 );
                                             if (res != null) {
-                                              if (ctx.mounted)
+                                              if (ctx.mounted) {
                                                 Navigator.pop(ctx);
+                                              }
                                               if (context.mounted) {
                                                 ScaffoldMessenger.of(
                                                   context,
@@ -1154,17 +1160,22 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                         setDialogState(() {
                           appointmentCategory = val;
                           if (titleController.text.isEmpty) {
-                            if (val == 'Pessoal')
+                            if (val == 'Pessoal') {
                               titleController.text = 'Compromisso Pessoal';
-                            if (val == 'Reunião')
+                            }
+                            if (val == 'Reunião') {
                               titleController.text = 'Reunião Congregacional';
-                            if (val == 'Serviço de Campo')
+                            }
+                            if (val == 'Serviço de Campo') {
                               titleController.text = 'Saída de Campo';
-                            if (val == 'Viagem')
+                            }
+                            if (val == 'Viagem') {
                               titleController.text = 'Viagem';
+                            }
                             if (val == 'Folga') titleController.text = 'Folga';
-                            if (val == 'Ausência')
+                            if (val == 'Ausência') {
                               titleController.text = 'Ausência';
+                            }
                           }
                         });
                       }
@@ -1285,8 +1296,9 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                       ),
                     ],
                     onChanged: (val) {
-                      if (val != null)
+                      if (val != null) {
                         setDialogState(() => durationMinutes = val);
+                      }
                     },
                   ),
                   const SizedBox(height: 12),
@@ -1351,8 +1363,9 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                         ),
                       ],
                       onChanged: (val) {
-                        if (val != null)
+                        if (val != null) {
                           setDialogState(() => recurrenceCount = val);
+                        }
                       },
                     ),
                     const SizedBox(height: 8),
@@ -3030,8 +3043,9 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                       ),
                     ],
                     onChanged: (val) {
-                      if (val != null)
+                      if (val != null) {
                         setDialogState(() => durationMinutes = val);
+                      }
                     },
                   ),
                   const SizedBox(height: 12),
@@ -3088,8 +3102,9 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                         ),
                       ],
                       onChanged: (val) {
-                        if (val != null)
+                        if (val != null) {
                           setDialogState(() => recurrenceCount = val);
+                        }
                       },
                     ),
                     const SizedBox(height: 8),

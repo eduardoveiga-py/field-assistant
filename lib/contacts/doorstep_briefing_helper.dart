@@ -263,8 +263,9 @@ class DoorstepBriefingHelper {
     }
 
     final personNextAction = person.nextActionNote?.trim();
-    if (personNextAction != null && personNextAction.isNotEmpty)
+    if (personNextAction != null && personNextAction.isNotEmpty) {
       return personNextAction;
+    }
 
     if (latestVoiceNote != null) {
       final voiceDoubt = latestVoiceNote.extractedPendingDoubt?.trim();

@@ -272,8 +272,9 @@ class _PhoneContactsScreenState extends ConsumerState<PhoneContactsScreen> {
                       ),
                     ],
                     onChanged: (val) {
-                      if (val != null)
+                      if (val != null) {
                         setDialogState(() => selectedOrigin = val);
+                      }
                     },
                   ),
                   const SizedBox(height: 12),
@@ -358,8 +359,9 @@ class _PhoneContactsScreenState extends ConsumerState<PhoneContactsScreen> {
                               ),
                             ],
                             onChanged: (val) {
-                              if (val != null)
+                              if (val != null) {
                                 setDialogState(() => selectedPlatform = val);
+                              }
                             },
                           ),
                         ),
@@ -591,8 +593,9 @@ class _PhoneContactsScreenState extends ConsumerState<PhoneContactsScreen> {
                       ),
                     ],
                     onChanged: (val) {
-                      if (val != null)
+                      if (val != null) {
                         setDialogState(() => selectedStatus = val);
+                      }
                     },
                   ),
                 ],
@@ -687,8 +690,9 @@ class _PhoneContactsScreenState extends ConsumerState<PhoneContactsScreen> {
       }
       if (_selectedFilter == 'Com WhatsApp' && !c.hasWhatsApp) return false;
       if (_selectedFilter == 'Pessoas com Telefone') return false;
-      if (_selectedTagFilter != null && !c.tags.contains(_selectedTagFilter))
+      if (_selectedTagFilter != null && !c.tags.contains(_selectedTagFilter)) {
         return false;
+      }
       return true;
     }).toList();
 

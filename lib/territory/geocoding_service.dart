@@ -37,8 +37,9 @@ class ReverseGeocodingResult {
   String get formattedSummary {
     final parts = <String>[];
     if (streetAndNumber.isNotEmpty) parts.add(streetAndNumber);
-    if (neighborhood != null && neighborhood!.isNotEmpty)
+    if (neighborhood != null && neighborhood!.isNotEmpty) {
       parts.add(neighborhood!);
+    }
     if (city != null && city!.isNotEmpty) parts.add(city!);
     return parts.join(' - ');
   }

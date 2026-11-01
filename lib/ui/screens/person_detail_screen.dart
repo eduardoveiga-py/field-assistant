@@ -221,8 +221,9 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                       );
                     }).toList(),
                     onChanged: (val) {
-                      if (val != null)
+                      if (val != null) {
                         setDialogState(() => selectedPublicationId = val);
+                      }
                     },
                   ),
                   const SizedBox(height: 12),
@@ -240,8 +241,9 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                       DropdownMenuItem(value: 'tca', child: Text('Ticuna')),
                     ],
                     onChanged: (val) {
-                      if (val != null)
+                      if (val != null) {
                         setDialogState(() => selectedLanguage = val);
+                      }
                     },
                   ),
                   const SizedBox(height: 12),
@@ -293,8 +295,9 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                       ),
                     ],
                     onChanged: (val) {
-                      if (val != null)
+                      if (val != null) {
                         setDialogState(() => selectedFrequency = val);
+                      }
                     },
                   ),
                   const SizedBox(height: 12),
@@ -1064,8 +1067,9 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                                 ),
                               ],
                               onChanged: (val) {
-                                if (val != null)
+                                if (val != null) {
                                   setDialogState(() => currentStatus = val);
+                                }
                               },
                             ),
                             const SizedBox(height: 16),
@@ -1320,14 +1324,17 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                             }
                             final phone = phoneCtrl.text.trim();
                             final addrParts = <String>[];
-                            if (addrCtrl.text.trim().isNotEmpty)
+                            if (addrCtrl.text.trim().isNotEmpty) {
                               addrParts.add(addrCtrl.text.trim());
-                            if (neighborhoodCtrl.text.trim().isNotEmpty)
+                            }
+                            if (neighborhoodCtrl.text.trim().isNotEmpty) {
                               addrParts.add(
                                 'Bairro: ${neighborhoodCtrl.text.trim()}',
                               );
-                            if (refCtrl.text.trim().isNotEmpty)
+                            }
+                            if (refCtrl.text.trim().isNotEmpty) {
                               addrParts.add('Ref: ${refCtrl.text.trim()}');
+                            }
                             final fullAddress = addrParts.isNotEmpty
                                 ? addrParts.join(' - ')
                                 : null;
@@ -1682,8 +1689,9 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                               ),
                             ],
                             onChanged: (val) {
-                              if (val != null)
+                              if (val != null) {
                                 setDialogState(() => failureMotive = val);
+                              }
                             },
                           ),
                         ],
@@ -2506,10 +2514,11 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                               );
                             }).toList(),
                             onChanged: (val) {
-                              if (val != null)
+                              if (val != null) {
                                 setSheetState(
                                   () => selectedPublicationId = val,
                                 );
+                              }
                             },
                           ),
                           const SizedBox(height: 10),

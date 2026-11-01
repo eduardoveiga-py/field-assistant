@@ -199,8 +199,9 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
                       ),
                       lastDate: DateTime.now().add(const Duration(days: 1)),
                     );
-                    if (picked != null)
+                    if (picked != null) {
                       setDialogState(() => selectedDate = picked);
+                    }
                   },
                 ),
                 const SizedBox(height: 8),
@@ -261,8 +262,9 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
                     ),
                   ],
                   onChanged: (val) {
-                    if (val != null)
+                    if (val != null) {
                       setDialogState(() => selectedModality = val);
+                    }
                   },
                 ),
                 const SizedBox(height: 12),
@@ -484,8 +486,9 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
                               ),
                             ],
                             onChanged: (val) {
-                              if (val != null)
+                              if (val != null) {
                                 setState(() => _timerModality = val);
+                              }
                             },
                           ),
                         ],
