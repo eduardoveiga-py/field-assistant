@@ -4,6 +4,7 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/services.dart' show MissingPluginException;
 import 'package:path_provider/path_provider.dart';
 import 'package:crypto/crypto.dart';
 import 'package:encrypt/encrypt.dart' as enc;
@@ -114,7 +115,11 @@ class BackupService {
     if (documentsDirectoryProvider != null) {
       return await documentsDirectoryProvider!();
     }
-    return await getApplicationDocumentsDirectory();
+    try {
+      return await getApplicationDocumentsDirectory();
+    } on MissingPluginException {
+      return Directory.systemTemp;
+    }
   }
 
   Future<File> _persistSnapshotToDisk(String snapshotData) async {

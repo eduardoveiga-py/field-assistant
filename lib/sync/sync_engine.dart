@@ -55,7 +55,11 @@ class SyncEngine {
     final allKeys = {...localData.keys, ...remoteData.keys};
 
     for (final key in allKeys) {
-      if (key == 'revision' || key == 'updated_at' || key == 'updatedAt') {
+      if (key == 'revision' ||
+          key == 'updated_at' ||
+          key == 'updatedAt' ||
+          key == 'created_at' ||
+          key == 'createdAt') {
         continue;
       }
 
@@ -63,8 +67,18 @@ class SyncEngine {
       final remoteVal = remoteData[key];
       final baseVal = baseData[key];
 
-      final localChanged = localVal != baseVal;
-      final remoteChanged = remoteVal != baseVal;
+      final normLocal = localVal is DateTime
+          ? localVal.toUtc().toIso8601String()
+          : localVal;
+      final normRemote = remoteVal is DateTime
+          ? remoteVal.toUtc().toIso8601String()
+          : remoteVal;
+      final normBase = baseVal is DateTime
+          ? baseVal.toUtc().toIso8601String()
+          : baseVal;
+
+      final localChanged = normLocal != normBase;
+      final remoteChanged = normRemote != normBase;
 
       if (!localChanged && remoteChanged) {
         // Remoto alterou, local não: aceita remoto com segurança
@@ -74,7 +88,7 @@ class SyncEngine {
         merged[key] = localVal;
       } else if (localChanged && remoteChanged) {
         // Ambos alteraram
-        if (localVal == remoteVal) {
+        if (normLocal == normRemote) {
           // Alterações idênticas: sem conflito
           merged[key] = localVal;
         } else {

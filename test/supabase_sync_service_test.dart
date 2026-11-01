@@ -1,36 +1,80 @@
-import 'package:flutter_test/flutter_test.dart';
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:drift/drift.dart' as drift;
 import 'package:drift/native.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:ministerio_pessoal/database/app_database.dart';
 import 'package:ministerio_pessoal/database/repository.dart';
-import 'package:ministerio_pessoal/sync/sync_engine.dart';
 import 'package:ministerio_pessoal/sync/supabase_sync_service.dart';
+import 'package:ministerio_pessoal/sync/sync_engine.dart';
+import 'package:path/path.dart' as p;
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+http.Response mockJsonResponse(
+  http.Request request,
+  Object body, {
+  int statusCode = 200,
+  String contentRange = '*/0',
+}) {
+  return http.Response(
+    jsonEncode(body),
+    statusCode,
+    request: request,
+    headers: {
+      'content-type': 'application/json',
+      'content-range': contentRange,
+    },
+  );
+}
+
+http.Response mockBinaryResponse(
+  http.Request request,
+  List<int> bytes, {
+  int statusCode = 200,
+  String contentType = 'application/octet-stream',
+}) {
+  return http.Response.bytes(
+    bytes,
+    statusCode,
+    request: request,
+    headers: {'content-type': contentType},
+  );
+}
 
 void main() {
   group('SupabaseSyncService - Sincronização e Resiliência Offline', () {
     late AppDatabase db;
     late AppRepository repo;
     late SupabaseSyncService syncService;
+    late Directory tempDir;
 
-    setUp(() {
+    setUp(() async {
       db = AppDatabase.forTesting(NativeDatabase.memory());
       repo = AppRepository(db);
+      tempDir = await Directory.systemTemp.createTemp('sync_test_');
       syncService = SupabaseSyncService(
         db: db,
         repository: repo,
         supabaseUrl: '', // Não configurado
         supabaseAnonKey: '',
+        documentsDirectoryProvider: () async => tempDir.path,
       );
     });
 
     tearDown(() async {
       syncService.dispose();
       await db.close();
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
     });
 
     test('TC-SYNC-04: Relatório honesto — quando não configurado, reporta waitingConnection e não simula sucesso falso', () async {
       expect(syncService.isConfigured, isFalse);
 
-      // Insere uma operação pendente na fila
       await repo.createPerson(name: 'Irmão Teste');
 
       final result = await syncService.processQueue();
@@ -109,6 +153,500 @@ void main() {
         SupabaseSyncService.mapEntityToRemoteTable('voiceNotes'),
         equals('voice_notes'),
       );
+      expect(
+        SupabaseSyncService.mapEntityToRemoteTable('phoneContacts'),
+        equals('phone_contacts'),
+      );
+      expect(
+        SupabaseSyncService.mapEntityToRemoteTable('territoryLandmarks'),
+        equals('territory_landmarks'),
+      );
+    });
+
+    test('TC-SYNC-08: Merge sem conflito — mesclagem em nível de campo preserva edições locais e remotas distintas', () async {
+      final now = DateTime.now().toUtc();
+      await db
+          .into(db.people)
+          .insert(
+            PersonEntry(
+              id: 'p_merge_1',
+              name: 'Carlos Rocha',
+              phone: '11999990000',
+              firstContactAt: now,
+              status: 'interessado',
+              tags: '[]',
+              generalNotes: 'Nota Original',
+              createdAt: now,
+              updatedAt: now,
+              revision: 1,
+            ),
+          );
+
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: 'q_merge_1',
+              entityType: 'people',
+              entityId: 'p_merge_1',
+              operation: 'UPDATE',
+              payload: jsonEncode({
+                'id': 'p_merge_1',
+                'name': 'Carlos Rocha',
+                'phone': '11999990000',
+                'firstContactAt': now.toIso8601String(),
+                'status': 'interessado',
+                'tags': '[]',
+                'generalNotes': 'Nota Local Atualizada',
+                'createdAt': now.toIso8601String(),
+                'updatedAt': now
+                    .add(const Duration(minutes: 5))
+                    .toIso8601String(),
+                'revision': 2,
+              }),
+              createdAt: now,
+              status: const drift.Value('pending'),
+            ),
+          );
+
+      final remotePerson = {
+        'id': 'p_merge_1',
+        'name': 'Carlos Rocha',
+        'phone': '11888887777',
+        'first_contact_at': now.toIso8601String(),
+        'status': 'interessado',
+        'tags': '[]',
+        'general_notes': 'Nota Original',
+        'created_at': now.toIso8601String(),
+        'updated_at': now.add(const Duration(minutes: 10)).toIso8601String(),
+        'revision': 2,
+      };
+
+      final mockClient = MockClient((request) async {
+        if (request.url.path.contains('/rest/v1/people')) {
+          return mockJsonResponse(request, [
+            remotePerson,
+          ], contentRange: '0-0/1');
+        }
+        return mockJsonResponse(request, []);
+      });
+
+      final customSync = SupabaseSyncService(
+        db: db,
+        repository: repo,
+        clientOverride: SupabaseClient(
+          'https://mock.supabase.co',
+          'dummy-key-xyz',
+          httpClient: mockClient,
+        ),
+        documentsDirectoryProvider: () async => tempDir.path,
+      );
+
+      final res = await customSync.fetchRemoteChanges();
+      expect(res.successCount, equals(1));
+      expect(res.conflictCount, equals(0));
+
+      final updated = await (db.select(
+        db.people,
+      )..where((t) => t.id.equals('p_merge_1'))).getSingle();
+      expect(updated.phone, equals('11888887777'));
+      expect(updated.generalNotes, equals('Nota Local Atualizada'));
+    });
+
+    test('TC-SYNC-09: Detecção explícita de conflito — mutações concorrentes no mesmo campo sinalizam conflict sem sobrescrever cegamente', () async {
+      final now = DateTime.now().toUtc();
+      await db
+          .into(db.people)
+          .insert(
+            PersonEntry(
+              id: 'p_conflict_1',
+              name: 'Maria Silva',
+              phone: '1111-1111',
+              firstContactAt: now,
+              status: 'interessado',
+              tags: '[]',
+              createdAt: now,
+              updatedAt: now,
+              revision: 1,
+            ),
+          );
+
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: 'q_conflict_1',
+              entityType: 'people',
+              entityId: 'p_conflict_1',
+              operation: 'UPDATE',
+              payload: jsonEncode({
+                'id': 'p_conflict_1',
+                'name': 'Maria Silva',
+                'phone': '2222-2222',
+                'firstContactAt': now.toIso8601String(),
+                'status': 'interessado',
+                'tags': '[]',
+                'createdAt': now.toIso8601String(),
+                'updatedAt': now
+                    .add(const Duration(minutes: 5))
+                    .toIso8601String(),
+                'revision': 2,
+              }),
+              createdAt: now,
+              status: const drift.Value('pending'),
+            ),
+          );
+
+      final remotePerson = {
+        'id': 'p_conflict_1',
+        'name': 'Maria Silva',
+        'phone': '9999-9999',
+        'first_contact_at': now.toIso8601String(),
+        'status': 'interessado',
+        'tags': '[]',
+        'created_at': now.toIso8601String(),
+        'updated_at': now.add(const Duration(minutes: 6)).toIso8601String(),
+        'revision': 2,
+      };
+
+      final mockClient = MockClient((request) async {
+        if (request.url.path.contains('/rest/v1/people')) {
+          return mockJsonResponse(request, [
+            remotePerson,
+          ], contentRange: '0-0/1');
+        }
+        return mockJsonResponse(request, []);
+      });
+
+      final customSync = SupabaseSyncService(
+        db: db,
+        repository: repo,
+        clientOverride: SupabaseClient(
+          'https://mock.supabase.co',
+          'dummy-key-xyz',
+          httpClient: mockClient,
+        ),
+        documentsDirectoryProvider: () async => tempDir.path,
+      );
+
+      final res = await customSync.fetchRemoteChanges();
+      expect(res.conflictCount, equals(1));
+      expect(customSync.currentStatus, equals(SyncStatus.conflict));
+
+      final op = await (db.select(
+        db.syncQueue,
+      )..where((t) => t.id.equals('q_conflict_1'))).getSingle();
+      expect(op.status, equals('conflict'));
+
+      final current = await (db.select(
+        db.people,
+      )..where((t) => t.id.equals('p_conflict_1'))).getSingle();
+      expect(current.phone, isNot(equals('9999-9999')));
+    });
+
+    test('TC-SYNC-10: Preservação de Tombstone — registro excluído remotamente gera soft delete local sem ressurgimento', () async {
+      final now = DateTime.now().toUtc();
+      await db
+          .into(db.people)
+          .insert(
+            PersonEntry(
+              id: 'p_tomb_1',
+              name: 'Roberto Souza',
+              phone: '1133334444',
+              firstContactAt: now,
+              status: 'interessado',
+              tags: '[]',
+              createdAt: now,
+              updatedAt: now,
+              deletedAt: null,
+              revision: 1,
+            ),
+          );
+
+      final remoteDeleted = {
+        'id': 'p_tomb_1',
+        'name': 'Roberto Souza',
+        'phone': '1133334444',
+        'first_contact_at': now.toIso8601String(),
+        'status': 'interessado',
+        'tags': '[]',
+        'created_at': now.toIso8601String(),
+        'updated_at': now.add(const Duration(minutes: 5)).toIso8601String(),
+        'deleted_at': now.add(const Duration(minutes: 5)).toIso8601String(),
+        'revision': 2,
+      };
+
+      final mockClient = MockClient((request) async {
+        if (request.url.path.contains('/rest/v1/people')) {
+          return mockJsonResponse(request, [
+            remoteDeleted,
+          ], contentRange: '0-0/1');
+        }
+        return mockJsonResponse(request, []);
+      });
+
+      final customSync = SupabaseSyncService(
+        db: db,
+        repository: repo,
+        clientOverride: SupabaseClient(
+          'https://mock.supabase.co',
+          'dummy-key-xyz',
+          httpClient: mockClient,
+        ),
+        documentsDirectoryProvider: () async => tempDir.path,
+      );
+
+      final res = await customSync.fetchRemoteChanges();
+      expect(res.successCount, equals(1));
+
+      final local = await (db.select(
+        db.people,
+      )..where((t) => t.id.equals('p_tomb_1'))).getSingle();
+      expect(local.deletedAt, isNotNull);
+
+      final activeList = await repo.getAllPeople();
+      expect(activeList.any((p) => p.id == 'p_tomb_1'), isFalse);
+    });
+
+    test('TC-SYNC-11: Tratamento de falha de rede — registra erros estruturados em errors e preserva integridade local', () async {
+      final now = DateTime.now().toUtc();
+      await db
+          .into(db.people)
+          .insert(
+            PersonEntry(
+              id: 'p_net_1',
+              name: 'Irmão Protegido',
+              phone: '1155556666',
+              firstContactAt: now,
+              status: 'interessado',
+              tags: '[]',
+              createdAt: now,
+              updatedAt: now,
+              revision: 1,
+            ),
+          );
+
+      final mockClient = MockClient((request) async {
+        return http.Response('Internal Server Error', 500, request: request);
+      });
+
+      final customSync = SupabaseSyncService(
+        db: db,
+        repository: repo,
+        clientOverride: SupabaseClient(
+          'https://mock.supabase.co',
+          'dummy-key-xyz',
+          httpClient: mockClient,
+        ),
+        documentsDirectoryProvider: () async => tempDir.path,
+      );
+
+      final res = await customSync.fetchRemoteChanges();
+      expect(res.failureCount, greaterThan(0));
+      expect(res.errors, isNotEmpty);
+      expect(res.errors.first, contains('Erro ao buscar alterações na tabela'));
+      expect(customSync.currentStatus, equals(SyncStatus.error));
+
+      final local = await (db.select(
+        db.people,
+      )..where((t) => t.id.equals('p_net_1'))).getSingle();
+      expect(local.name, equals('Irmão Protegido'));
+    });
+
+    test('TC-SYNC-12: Paginação incremental sobre 100 registros — percorre páginas completas e processa todos os registros', () async {
+      final now = DateTime.now().toUtc();
+      final allRemotePeople = List.generate(150, (index) {
+        return {
+          'id': 'p_page_$index',
+          'name': 'Pessoa Paginada $index',
+          'phone': '110000${index.toString().padLeft(4, '0')}',
+          'first_contact_at': now.toIso8601String(),
+          'status': 'interessado',
+          'tags': '[]',
+          'created_at': now.toIso8601String(),
+          'updated_at': now.add(Duration(seconds: index)).toIso8601String(),
+          'revision': 1,
+        };
+      });
+
+      final mockClient = MockClient((request) async {
+        if (request.url.path.contains('/rest/v1/people')) {
+          final offsetParam = request.url.queryParameters['offset'];
+          final limitParam = request.url.queryParameters['limit'];
+          int from = 0;
+          int count = 100;
+          if (offsetParam != null && limitParam != null) {
+            from = int.parse(offsetParam);
+            count = int.parse(limitParam);
+          } else {
+            final rangeHeader =
+                request.headers['range'] ?? request.headers['Range'] ?? '';
+            final match = RegExp(r'(\d+)-(\d+)').firstMatch(rangeHeader);
+            from = match != null ? int.parse(match.group(1)!) : 0;
+            final to = match != null ? int.parse(match.group(2)!) : 99;
+            count = to - from + 1;
+          }
+
+          final pageItems = allRemotePeople.skip(from).take(count).toList();
+          final end = pageItems.isEmpty ? from : from + pageItems.length - 1;
+          return mockJsonResponse(
+            request,
+            pageItems,
+            contentRange: '$from-$end/${allRemotePeople.length}',
+          );
+        }
+        return mockJsonResponse(request, []);
+      });
+
+      final customSync = SupabaseSyncService(
+        db: db,
+        repository: repo,
+        clientOverride: SupabaseClient(
+          'https://mock.supabase.co',
+          'dummy-key-xyz',
+          httpClient: mockClient,
+        ),
+        documentsDirectoryProvider: () async => tempDir.path,
+      );
+
+      final res = await customSync.fetchRemoteChanges();
+      expect(res.totalProcessed, equals(150));
+      expect(res.successCount, equals(150));
+
+      final countInDb = await (db.select(db.people)).get();
+      expect(countInDb.length, equals(150));
+
+      final kvRow = await (db.select(
+        db.appKvStore,
+      )..where((t) => t.key.equals('last_synced_at_people'))).getSingleOrNull();
+      expect(kvRow, isNotNull);
+      expect(kvRow!.value, isNotEmpty);
+    });
+
+    test('TC-SYNC-13: Sincronização de mídia — upload no push e download no pull de notas de voz', () async {
+      final now = DateTime.now().toUtc();
+      final person = await repo.createPerson(name: 'Ana Costa');
+
+      final audioDir = Directory(p.join(tempDir.path, 'voice_notes'));
+      await audioDir.create(recursive: true);
+      final localAudioFile = File(p.join(audioDir.path, 'local_note.m4a'));
+      await localAudioFile.writeAsBytes(
+        utf8.encode('AUDIO_BINARY_BYTES_12345'),
+      );
+
+      await db
+          .into(db.voiceNotes)
+          .insert(
+            VoiceNotesCompanion.insert(
+              id: 'vn_upload_test',
+              personId: person.id,
+              audioFilePath: drift.Value(localAudioFile.path),
+              audioDurationSeconds: const drift.Value(12),
+              transcription: 'Transcrição do estudo com Ana',
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: 'q_vn_1',
+              entityType: 'voice_notes',
+              entityId: 'vn_upload_test',
+              operation: 'INSERT',
+              payload: jsonEncode({
+                'id': 'vn_upload_test',
+                'personId': person.id,
+                'audioDurationSeconds': 12,
+                'transcription': 'Transcrição do estudo com Ana',
+                'createdAt': now.toIso8601String(),
+                'updatedAt': now.toIso8601String(),
+              }),
+              createdAt: now,
+              status: const drift.Value('pending'),
+            ),
+          );
+
+      bool storageUploadCalled = false;
+      bool storageDownloadCalled = false;
+
+      final mockClient = MockClient((request) async {
+        final path = request.url.path;
+        if (path.contains(
+              '/storage/v1/object/voice_notes/vn_upload_test.m4a',
+            ) &&
+            request.method == 'POST') {
+          storageUploadCalled = true;
+          return mockJsonResponse(request, {
+            'Key': 'voice_notes/vn_upload_test.m4a',
+          });
+        }
+        if (path.contains(
+              '/storage/v1/object/voice_notes/vn_download_test.m4a',
+            ) &&
+            request.method == 'GET') {
+          storageDownloadCalled = true;
+          return mockBinaryResponse(
+            request,
+            utf8.encode('DOWNLOADED_BINARY_AUDIO_BYTES'),
+            contentType: 'audio/m4a',
+          );
+        }
+        if (path.contains('/rest/v1/voice_notes')) {
+          if (request.method == 'POST') {
+            return mockJsonResponse(request, []);
+          }
+          if (request.method == 'GET') {
+            return mockJsonResponse(request, [
+              {
+                'id': 'vn_download_test',
+                'person_id': person.id,
+                'audio_duration_seconds': 20,
+                'transcription': 'Transcrição baixada da nuvem',
+                'created_at': now.toIso8601String(),
+                'updated_at': now.toIso8601String(),
+                'revision': 1,
+              },
+            ], contentRange: '0-0/1');
+          }
+        }
+        return mockJsonResponse(request, []);
+      });
+
+      final customSync = SupabaseSyncService(
+        db: db,
+        repository: repo,
+        clientOverride: SupabaseClient(
+          'https://mock.supabase.co',
+          'dummy-key-xyz',
+          httpClient: mockClient,
+        ),
+        documentsDirectoryProvider: () async => tempDir.path,
+      );
+
+      final pushRes = await customSync.processQueue();
+      expect(pushRes.successCount, equals(2));
+      expect(
+        storageUploadCalled,
+        isTrue,
+        reason: 'Upload binário no Storage deve ser invocado',
+      );
+
+      final pullRes = await customSync.fetchRemoteChanges();
+      expect(pullRes.successCount, greaterThanOrEqualTo(1));
+      expect(
+        storageDownloadCalled,
+        isTrue,
+        reason: 'Download binário do Storage deve ser invocado',
+      );
+
+      final downloadedNote = await (db.select(
+        db.voiceNotes,
+      )..where((t) => t.id.equals('vn_download_test'))).getSingle();
+      expect(downloadedNote.audioFilePath, isNotNull);
+      expect(File(downloadedNote.audioFilePath!).existsSync(), isTrue);
     });
   });
 }
