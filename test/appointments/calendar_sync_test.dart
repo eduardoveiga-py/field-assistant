@@ -1,6 +1,12 @@
+import 'dart:collection';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:drift/native.dart';
 import 'package:drift/drift.dart' as drift;
+import 'package:device_calendar/device_calendar.dart' as dev_cal;
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:timezone/data/latest_all.dart' as tz_data;
+import 'package:timezone/timezone.dart' as tz;
 import 'package:ministerio_pessoal/database/app_database.dart';
 import 'package:ministerio_pessoal/database/repository.dart';
 import 'package:ministerio_pessoal/appointments/calendar_sync_coordinator.dart';
@@ -8,11 +14,63 @@ import 'package:ministerio_pessoal/appointments/google_calendar_provider.dart';
 import 'package:ministerio_pessoal/appointments/apple_eventkit_provider.dart';
 import 'package:ministerio_pessoal/appointments/calendar_provider.dart';
 
+class FakeDeviceCalendarPlugin implements dev_cal.DeviceCalendarPlugin {
+  bool hasPermissionsResult = true;
+  List<dev_cal.Calendar> calendarsResult = [];
+  List<dev_cal.Event> eventsResult = [];
+  String? createdEventIdResult = 'apple_created_1';
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+
+  @override
+  Future<dev_cal.Result<bool>> hasPermissions() async {
+    final res = dev_cal.Result<bool>();
+    res.data = hasPermissionsResult;
+    return res;
+  }
+
+  @override
+  Future<dev_cal.Result<bool>> requestPermissions() async {
+    final res = dev_cal.Result<bool>();
+    res.data = hasPermissionsResult;
+    return res;
+  }
+
+  @override
+  Future<dev_cal.Result<UnmodifiableListView<dev_cal.Calendar>>>
+  retrieveCalendars() async {
+    final res = dev_cal.Result<UnmodifiableListView<dev_cal.Calendar>>();
+    res.data = UnmodifiableListView<dev_cal.Calendar>(calendarsResult);
+    return res;
+  }
+
+  @override
+  Future<dev_cal.Result<UnmodifiableListView<dev_cal.Event>>> retrieveEvents(
+    String? calendarId,
+    dev_cal.RetrieveEventsParams? retrieveEventsParams,
+  ) async {
+    final res = dev_cal.Result<UnmodifiableListView<dev_cal.Event>>();
+    res.data = UnmodifiableListView<dev_cal.Event>(eventsResult);
+    return res;
+  }
+
+  @override
+  Future<dev_cal.Result<String>?> createOrUpdateEvent(
+    dev_cal.Event? event,
+  ) async {
+    final res = dev_cal.Result<String>();
+    res.data = createdEventIdResult;
+    return res;
+  }
+}
+
 class MockGoogleCalendarProvider extends GoogleCalendarProvider {
   bool authorized = true;
   final Map<String, Map<String, dynamic>> remoteEvents = {};
   int pushCount = 0;
   int deleteCount = 0;
+  String? forcePushId;
 
   MockGoogleCalendarProvider({this.authorized = true});
 
@@ -34,9 +92,11 @@ class MockGoogleCalendarProvider extends GoogleCalendarProvider {
             ))
             .getSingleOrNull();
 
-    final extId = existingLink?.externalEventId.isNotEmpty == true
-        ? existingLink!.externalEventId
-        : 'g_ev_${appointment.id}';
+    final extId =
+        forcePushId ??
+        (existingLink?.externalEventId.isNotEmpty == true
+            ? existingLink!.externalEventId
+            : 'g_ev_${appointment.id}');
     final etag =
         'etag_${DateTime.now().millisecondsSinceEpoch}_rev${appointment.revision}';
 
@@ -245,6 +305,7 @@ class MockAppleCalendarProvider extends AppleEventKitProvider {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  tz_data.initializeTimeZones();
 
   group('CalendarSyncCoordinator & 10 Scenarios Integration Contract', () {
     late AppDatabase db;
@@ -891,6 +952,340 @@ void main() {
       )..where((t) => t.id.equals('link_scen_d'))).getSingle();
       expect(link.syncStatus, equals('synced'));
       expect(link.externalETagAtSync, equals('etag_d_nova_edicao_remota'));
+    });
+
+    test('Cenário E — Resolução com novo ID externo: provedor retorna novo id ao fazer push e vínculo é atualizado com novo id e etag/fingerprint', () async {
+      mockGoogle.authorized = true;
+      mockGoogle.forcePushId = 'g_ev_new_reassigned_id';
+      final now = DateTime.now();
+      await db
+          .into(db.appointments)
+          .insert(
+            AppointmentsCompanion.insert(
+              id: 'appt_scen_e',
+              title: 'Compromisso com Reatribuição de ID',
+              startTime: DateTime(2026, 11, 20, 10, 0),
+              endTime: DateTime(2026, 11, 20, 11, 0),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await db
+          .into(db.calendarEventLinks)
+          .insert(
+            CalendarEventLinksCompanion.insert(
+              id: 'link_scen_e',
+              appointmentId: 'appt_scen_e',
+              externalEventId: 'old_temporary_id_scen_e',
+              provider: 'google',
+              syncStatus: const drift.Value('conflict'),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+
+      final conflicts = await coordinator.getPendingConflicts();
+      expect(conflicts.length, equals(1));
+
+      await coordinator.resolveConflictKeepLocal(conflicts.first);
+
+      final updatedLink = await (db.select(
+        db.calendarEventLinks,
+      )..where((t) => t.id.equals('link_scen_e'))).getSingle();
+      expect(updatedLink.externalEventId, equals('g_ev_new_reassigned_id'));
+      expect(updatedLink.syncStatus, equals('synced'));
+      expect(updatedLink.pendingResolution, isNull);
+      expect(updatedLink.externalETagAtSync, isNotNull);
+    });
+  });
+
+  group('AppleEventKitProvider - Fingerprint & Mass Deletion Protection', () {
+    late AppDatabase db;
+    late FakeDeviceCalendarPlugin fakePlugin;
+    late AppleEventKitProvider appleProvider;
+
+    setUp(() {
+      db = AppDatabase.forTesting(NativeDatabase.memory());
+      FlutterSecureStorage.setMockInitialValues({
+        'apple_eventkit_selected_id': 'cal_apple_test',
+      });
+      fakePlugin = FakeDeviceCalendarPlugin();
+      appleProvider = AppleEventKitProvider(deviceCalendarPlugin: fakePlugin);
+    });
+
+    tearDown(() async {
+      await db.close();
+    });
+
+    test(
+      'computeEventFingerprint normaliza propriedades e detecta mutações',
+      () {
+        final start = DateTime.utc(2026, 11, 25, 9, 0);
+        final end = DateTime.utc(2026, 11, 25, 10, 0);
+
+        final fp1 = AppleEventKitProvider.computeEventFingerprint(
+          externalEventId: 'ev_123',
+          calendarId: 'cal_apple_test',
+          title: 'Estudo Bíblico',
+          location: 'Av. Paulista, 100',
+          description: 'Capítulo 5',
+          startTime: start,
+          endTime: end,
+        );
+
+        final fp2 = AppleEventKitProvider.computeEventFingerprint(
+          externalEventId: 'ev_123',
+          calendarId: 'cal_apple_test',
+          title: 'Estudo Bíblico',
+          location: 'Av. Paulista, 100',
+          description: 'Capítulo 5',
+          startTime: start,
+          endTime: end,
+        );
+        expect(
+          fp1,
+          equals(fp2),
+          reason: 'Mesmos valores devem produzir o mesmo fingerprint',
+        );
+
+        final fpMutatedTitle = AppleEventKitProvider.computeEventFingerprint(
+          externalEventId: 'ev_123',
+          calendarId: 'cal_apple_test',
+          title: 'Estudo Bíblico Alterado',
+          location: 'Av. Paulista, 100',
+          description: 'Capítulo 5',
+          startTime: start,
+          endTime: end,
+        );
+        expect(
+          fp1,
+          isNot(equals(fpMutatedTitle)),
+          reason: 'Alteração no título deve alterar fingerprint',
+        );
+
+        final fpMutatedTime = AppleEventKitProvider.computeEventFingerprint(
+          externalEventId: 'ev_123',
+          calendarId: 'cal_apple_test',
+          title: 'Estudo Bíblico',
+          location: 'Av. Paulista, 100',
+          description: 'Capítulo 5',
+          startTime: start.add(const Duration(hours: 1)),
+          endTime: end.add(const Duration(hours: 1)),
+        );
+        expect(
+          fp1,
+          isNot(equals(fpMutatedTime)),
+          reason: 'Alteração no horário deve alterar fingerprint',
+        );
+      },
+    );
+
+    test('syncEvents pula eventos inalterados quando fingerprint coincide e atualiza quando muda', () async {
+      final start = DateTime.now().add(const Duration(days: 1));
+      final end = start.add(const Duration(hours: 1));
+
+      final ev = dev_cal.Event(
+        'cal_apple_test',
+        eventId: 'apple_ev_10',
+        title: 'Reunião Ministerial',
+      );
+      ev.start = tz.TZDateTime.from(start, tz.local);
+      ev.end = tz.TZDateTime.from(end, tz.local);
+      fakePlugin.eventsResult = [ev];
+
+      // 1ª sincronização: insere novo registro
+      final res1 = await appleProvider.syncEvents(db: db);
+      expect(res1.success, isTrue);
+      expect(res1.eventsDownloaded, equals(1));
+
+      final record = await (db.select(
+        db.externalCalendarEvents,
+      )..where((t) => t.externalEventId.equals('apple_ev_10'))).getSingle();
+      expect(record.etag, isNotNull);
+
+      // 2ª sincronização: mesmo evento com mesmo fingerprint é pulado
+      final res2 = await appleProvider.syncEvents(db: db);
+      expect(res2.success, isTrue);
+      expect(
+        res2.eventsDownloaded,
+        equals(0),
+        reason: 'Evento inalterado deve ser pulado',
+      );
+
+      // Modifica o evento remotamente
+      ev.title = 'Reunião Ministerial (Horário Alterado)';
+      final res3 = await appleProvider.syncEvents(db: db);
+      expect(res3.success, isTrue);
+      expect(
+        res3.eventsDownloaded,
+        equals(1),
+        reason: 'Evento alterado deve ser baixado e atualizado',
+      );
+
+      final updatedRecord = await (db.select(
+        db.externalCalendarEvents,
+      )..where((t) => t.externalEventId.equals('apple_ev_10'))).getSingle();
+      expect(
+        updatedRecord.title,
+        equals('Reunião Ministerial (Horário Alterado)'),
+      );
+      expect(updatedRecord.etag, isNot(equals(record.etag)));
+    });
+
+    test('syncEvents proteção contra exclusão falsa em massa quando retrieveEvents retorna vazio', () async {
+      final now = DateTime.now();
+      // Insere múltiplos eventos locais dentro da janela de sincronização
+      await db
+          .into(db.externalCalendarEvents)
+          .insert(
+            ExternalCalendarEventsCompanion.insert(
+              id: 'apple_ext_stored_1',
+              provider: 'apple_eventkit',
+              calendarId: 'cal_apple_test',
+              externalEventId: 'apple_ev_stored_1',
+              title: 'Compromisso 1',
+              startTime: now.add(const Duration(days: 5)),
+              endTime: now.add(const Duration(days: 5, hours: 1)),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await db
+          .into(db.externalCalendarEvents)
+          .insert(
+            ExternalCalendarEventsCompanion.insert(
+              id: 'apple_ext_stored_2',
+              provider: 'apple_eventkit',
+              calendarId: 'cal_apple_test',
+              externalEventId: 'apple_ev_stored_2',
+              title: 'Compromisso 2',
+              startTime: now.add(const Duration(days: 6)),
+              endTime: now.add(const Duration(days: 6, hours: 1)),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+
+      // Simula anomalia: consulta retorna vazio
+      fakePlugin.eventsResult = [];
+
+      final res = await appleProvider.syncEvents(db: db);
+      expect(res.success, isTrue);
+
+      // Confirma que proteção evitou deleção em massa
+      final events = await (db.select(
+        db.externalCalendarEvents,
+      )..where((t) => t.provider.equals('apple_eventkit'))).get();
+      expect(events.length, equals(2));
+      expect(events.every((e) => !e.isDeletedExternal), isTrue);
+    });
+
+    test('syncEvents reconcilia exclusão legítima quando subconjunto de eventos é retornado', () async {
+      final now = DateTime.now();
+      final start1 = now.add(const Duration(days: 2));
+      final end1 = start1.add(const Duration(hours: 1));
+      final start2 = now.add(const Duration(days: 3));
+      final end2 = start2.add(const Duration(hours: 1));
+
+      await db
+          .into(db.externalCalendarEvents)
+          .insert(
+            ExternalCalendarEventsCompanion.insert(
+              id: 'apple_ext_legit_1',
+              provider: 'apple_eventkit',
+              calendarId: 'cal_apple_test',
+              externalEventId: 'apple_ev_legit_1',
+              title: 'Permanece',
+              startTime: start1,
+              endTime: end1,
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await db
+          .into(db.externalCalendarEvents)
+          .insert(
+            ExternalCalendarEventsCompanion.insert(
+              id: 'apple_ext_legit_2',
+              provider: 'apple_eventkit',
+              calendarId: 'cal_apple_test',
+              externalEventId: 'apple_ev_legit_2',
+              title: 'Foi Excluído no Calendário Externo',
+              startTime: start2,
+              endTime: end2,
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+
+      // Retorna apenas evento 1; evento 2 foi excluído pelo usuário no Apple Calendar
+      final ev1 = dev_cal.Event(
+        'cal_apple_test',
+        eventId: 'apple_ev_legit_1',
+        title: 'Permanece',
+      );
+      ev1.start = tz.TZDateTime.from(start1, tz.local);
+      ev1.end = tz.TZDateTime.from(end1, tz.local);
+      fakePlugin.eventsResult = [ev1];
+
+      final res = await appleProvider.syncEvents(db: db);
+      expect(res.success, isTrue);
+
+      final ev1Db =
+          await (db.select(db.externalCalendarEvents)
+                ..where((t) => t.externalEventId.equals('apple_ev_legit_1')))
+              .getSingle();
+      expect(ev1Db.isDeletedExternal, isFalse);
+
+      final ev2Db =
+          await (db.select(db.externalCalendarEvents)
+                ..where((t) => t.externalEventId.equals('apple_ev_legit_2')))
+              .getSingle();
+      expect(ev2Db.isDeletedExternal, isTrue);
+      expect(ev2Db.externalStatus, equals('cancelled'));
+    });
+
+    test('pushAppointmentToExternal calcula fingerprint e persiste vínculo e evento externo', () async {
+      final now = DateTime.now();
+      final cal = dev_cal.Calendar(
+        id: 'cal_apple_test',
+        name: 'Meu Calendário',
+      );
+      fakePlugin.calendarsResult = [cal];
+      fakePlugin.createdEventIdResult = 'apple_pushed_99';
+
+      await db
+          .into(db.appointments)
+          .insert(
+            AppointmentsCompanion.insert(
+              id: 'appt_push_test',
+              title: 'Estudo com Thiago',
+              startTime: now.add(const Duration(days: 1)),
+              endTime: now.add(const Duration(days: 1, hours: 1)),
+              locationNotes: const drift.Value('Rua das Flores 10'),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+
+      final appt = await (db.select(
+        db.appointments,
+      )..where((t) => t.id.equals('appt_push_test'))).getSingle();
+
+      final pushRes = await appleProvider.pushAppointmentToExternal(db, appt);
+      expect(pushRes, equals('apple_pushed_99'));
+
+      final link = await (db.select(
+        db.calendarEventLinks,
+      )..where((t) => t.appointmentId.equals('appt_push_test'))).getSingle();
+      expect(link.externalEventId, equals('apple_pushed_99'));
+      expect(link.syncStatus, equals('synced'));
+      expect(link.externalETagAtSync, isNotNull);
+
+      final ext = await (db.select(
+        db.externalCalendarEvents,
+      )..where((t) => t.externalEventId.equals('apple_pushed_99'))).getSingle();
+      expect(ext.etag, equals(link.externalETagAtSync));
     });
   });
 }

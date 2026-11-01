@@ -179,6 +179,17 @@ class AppleEventKitProvider implements CalendarProvider {
         final endDt =
             ev.end?.toLocal() ?? startDt.add(const Duration(minutes: 30));
 
+        final fingerprint = computeEventFingerprint(
+          externalEventId: evId,
+          calendarId: calendarId,
+          title: ev.title ?? 'Evento do Calendário',
+          location: ev.location,
+          description: ev.description,
+          startTime: startDt,
+          endTime: endDt,
+          isAllDay: ev.allDay ?? false,
+        );
+
         final existing =
             await (db.select(db.externalCalendarEvents)..where(
                   (t) =>
@@ -204,12 +215,18 @@ class AppleEventKitProvider implements CalendarProvider {
                   isAllDay: drift.Value(ev.allDay ?? false),
                   lastSyncedAt: drift.Value(now),
                   isDeletedExternal: const drift.Value(false),
+                  etag: drift.Value(fingerprint),
                   createdAt: now,
                   updatedAt: now,
                 ),
               );
           downloaded++;
         } else {
+          // Pula evento inalterado quando fingerprint coincide e não foi cancelado
+          if (existing.etag == fingerprint && !existing.isDeletedExternal) {
+            continue;
+          }
+
           await (db.update(
             db.externalCalendarEvents,
           )..where((t) => t.id.equals(existing.id))).write(
@@ -221,6 +238,7 @@ class AppleEventKitProvider implements CalendarProvider {
               endTime: drift.Value(endDt),
               isAllDay: drift.Value(ev.allDay ?? false),
               isDeletedExternal: const drift.Value(false),
+              etag: drift.Value(fingerprint),
               lastSyncedAt: drift.Value(now),
               updatedAt: drift.Value(now),
             ),
@@ -242,17 +260,24 @@ class AppleEventKitProvider implements CalendarProvider {
               ))
               .get();
 
-      for (final stored in storedEventsInWindow) {
-        if (!activeExtIds.contains(stored.externalEventId)) {
-          await (db.update(
-            db.externalCalendarEvents,
-          )..where((t) => t.id.equals(stored.id))).write(
-            ExternalCalendarEventsCompanion(
-              isDeletedExternal: const drift.Value(true),
-              externalStatus: const drift.Value('cancelled'),
-              updatedAt: drift.Value(now),
-            ),
-          );
+      // Proteção contra exclusão falsa em massa:
+      // Se a consulta externa retornou 0 eventos mas existiam múltiplos eventos registrados na janela,
+      // não executa deleção em massa automática (pode ser falha transitória ou de permissão do EventKit).
+      final isMassDeletionAnomaly =
+          events.isEmpty && storedEventsInWindow.isNotEmpty;
+      if (!isMassDeletionAnomaly) {
+        for (final stored in storedEventsInWindow) {
+          if (!activeExtIds.contains(stored.externalEventId)) {
+            await (db.update(
+              db.externalCalendarEvents,
+            )..where((t) => t.id.equals(stored.id))).write(
+              ExternalCalendarEventsCompanion(
+                isDeletedExternal: const drift.Value(true),
+                externalStatus: const drift.Value('cancelled'),
+                updatedAt: drift.Value(now),
+              ),
+            );
+          }
         }
       }
 
@@ -309,6 +334,16 @@ class AppleEventKitProvider implements CalendarProvider {
         final externalId = result.data!;
         final now = DateTime.now();
 
+        final fingerprint = computeEventFingerprint(
+          externalEventId: externalId,
+          calendarId: calendarId,
+          title: appointment.title,
+          location: appointment.locationNotes,
+          description: 'Compromisso Field Assistant Ministerial',
+          startTime: appointment.startTime,
+          endTime: appointment.endTime,
+        );
+
         if (link != null) {
           await (db.update(
             db.calendarEventLinks,
@@ -316,6 +351,7 @@ class AppleEventKitProvider implements CalendarProvider {
             CalendarEventLinksCompanion(
               externalEventId: drift.Value(externalId),
               localRevisionAtSync: drift.Value(appointment.revision),
+              externalETagAtSync: drift.Value(fingerprint),
               syncStatus: const drift.Value('synced'),
               updatedAt: drift.Value(now),
             ),
@@ -331,11 +367,57 @@ class AppleEventKitProvider implements CalendarProvider {
                   provider: 'apple_eventkit',
                   syncStatus: const drift.Value('synced'),
                   localRevisionAtSync: drift.Value(appointment.revision),
+                  externalETagAtSync: drift.Value(fingerprint),
                   createdAt: now,
                   updatedAt: now,
                 ),
               );
         }
+
+        // Atualiza ou insere na tabela ExternalCalendarEvents para manter o etag em sincronia imediata
+        final existingExt =
+            await (db.select(db.externalCalendarEvents)..where(
+                  (t) =>
+                      t.provider.equals('apple_eventkit') &
+                      t.externalEventId.equals(externalId),
+                ))
+                .getSingleOrNull();
+
+        if (existingExt != null) {
+          await (db.update(
+            db.externalCalendarEvents,
+          )..where((t) => t.id.equals(existingExt.id))).write(
+            ExternalCalendarEventsCompanion(
+              title: drift.Value(appointment.title),
+              location: drift.Value(appointment.locationNotes),
+              startTime: drift.Value(appointment.startTime),
+              endTime: drift.Value(appointment.endTime),
+              etag: drift.Value(fingerprint),
+              lastSyncedAt: drift.Value(now),
+              updatedAt: drift.Value(now),
+            ),
+          );
+        } else {
+          await db
+              .into(db.externalCalendarEvents)
+              .insert(
+                ExternalCalendarEventsCompanion.insert(
+                  id: _uuid.v4(),
+                  provider: 'apple_eventkit',
+                  calendarId: calendarId,
+                  externalEventId: externalId,
+                  title: appointment.title,
+                  location: drift.Value(appointment.locationNotes),
+                  startTime: appointment.startTime,
+                  endTime: appointment.endTime,
+                  etag: drift.Value(fingerprint),
+                  lastSyncedAt: drift.Value(now),
+                  createdAt: now,
+                  updatedAt: now,
+                ),
+              );
+        }
+
         return externalId;
       }
       return null;

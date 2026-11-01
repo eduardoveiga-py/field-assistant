@@ -187,22 +187,40 @@ class CalendarSyncCoordinator {
           final resId = await provider.pushAppointmentToExternal(db, appt);
           if (resId != null) {
             totalUploaded++;
+            final effectiveExternalId = resId;
             final updatedExt =
                 await (db.select(db.externalCalendarEvents)..where(
                       (t) =>
-                          t.externalEventId.equals(link.externalEventId) &
+                          t.externalEventId.equals(effectiveExternalId) &
                           t.provider.equals(link.provider),
                     ))
                     .getSingleOrNull();
+            final currentLink = await (db.select(
+              db.calendarEventLinks,
+            )..where((t) => t.id.equals(link.id))).getSingleOrNull();
             final now = DateTime.now();
+            final newEtag =
+                currentLink?.externalETagAtSync ??
+                updatedExt?.etag ??
+                (link.provider == 'apple_eventkit'
+                    ? AppleEventKitProvider.computeEventFingerprint(
+                        externalEventId: effectiveExternalId,
+                        calendarId: updatedExt?.calendarId ?? '',
+                        title: appt.title,
+                        location: appt.locationNotes,
+                        startTime: appt.startTime,
+                        endTime: appt.endTime,
+                      )
+                    : ext?.etag);
             await (db.update(
               db.calendarEventLinks,
             )..where((t) => t.id.equals(link.id))).write(
               CalendarEventLinksCompanion(
+                externalEventId: drift.Value(effectiveExternalId),
                 syncStatus: const drift.Value('synced'),
                 pendingResolution: const drift.Value(null),
                 localRevisionAtSync: drift.Value(appt.revision),
-                externalETagAtSync: drift.Value(updatedExt?.etag ?? ext?.etag),
+                externalETagAtSync: drift.Value(newEtag),
                 updatedAt: drift.Value(now),
               ),
             );
@@ -415,16 +433,47 @@ class CalendarSyncCoordinator {
       );
     }
 
+    final effectiveExternalId = resId ?? conflict.link.externalEventId;
+
+    // Busca o registro externo atualizado para resgatar o etag / fingerprint mais recente
+    final updatedExt =
+        await (db.select(db.externalCalendarEvents)..where(
+              (t) =>
+                  t.externalEventId.equals(effectiveExternalId) &
+                  t.provider.equals(conflict.link.provider),
+            ))
+            .getSingleOrNull();
+
+    // Também verifica se o vínculo já possui o etag gravado pelo push do provedor
+    final currentLink = await (db.select(
+      db.calendarEventLinks,
+    )..where((t) => t.id.equals(conflict.link.id))).getSingleOrNull();
+
+    final newFingerprintOrEtag =
+        currentLink?.externalETagAtSync ??
+        updatedExt?.etag ??
+        (conflict.link.provider == 'apple_eventkit'
+            ? AppleEventKitProvider.computeEventFingerprint(
+                externalEventId: effectiveExternalId,
+                calendarId: updatedExt?.calendarId ?? '',
+                title: conflict.localAppointment.title,
+                location: conflict.localAppointment.locationNotes,
+                startTime: conflict.localAppointment.startTime,
+                endTime: conflict.localAppointment.endTime,
+              )
+            : conflict.externalEvent?.etag);
+
     final now = DateTime.now();
     await (db.update(
       db.calendarEventLinks,
     )..where((t) => t.id.equals(conflict.link.id))).write(
       CalendarEventLinksCompanion(
+        externalEventId: drift.Value(effectiveExternalId),
         syncStatus: drift.Value(resId != null ? 'synced' : 'pending_upload'),
         pendingResolution: drift.Value(resId != null ? null : 'keep_local'),
         localRevisionAtSync: drift.Value(conflict.localAppointment.revision),
         externalETagAtSync: resId != null
-            ? drift.Value(conflict.externalEvent?.etag)
+            ? drift.Value(newFingerprintOrEtag)
             : const drift.Value.absent(),
         updatedAt: drift.Value(now),
       ),
