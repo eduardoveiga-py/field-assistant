@@ -54,6 +54,7 @@ class MockGoogleCalendarProvider extends GoogleCalendarProvider {
         db.calendarEventLinks,
       )..where((t) => t.id.equals(existingLink.id))).write(
         CalendarEventLinksCompanion(
+          externalEventId: drift.Value(extId),
           externalETagAtSync: drift.Value(etag),
           localRevisionAtSync: drift.Value(appointment.revision),
           syncStatus: const drift.Value('synced'),
@@ -181,13 +182,53 @@ class MockAppleCalendarProvider extends AppleEventKitProvider {
     AppointmentEntry appointment,
   ) async {
     pushCount++;
-    final extId = 'apple_ev_${appointment.id}';
+    final existingLink =
+        await (db.select(db.calendarEventLinks)..where(
+              (t) =>
+                  t.appointmentId.equals(appointment.id) &
+                  t.provider.equals('apple_eventkit') &
+                  t.deletedAt.isNull(),
+            ))
+            .getSingleOrNull();
+
+    final extId = existingLink?.externalEventId.isNotEmpty == true
+        ? existingLink!.externalEventId
+        : 'apple_ev_${appointment.id}';
     appleEvents[extId] = {
       'id': extId,
       'title': appointment.title,
       'startTime': appointment.startTime,
       'endTime': appointment.endTime,
     };
+
+    final now = DateTime.now();
+    if (existingLink != null) {
+      await (db.update(
+        db.calendarEventLinks,
+      )..where((t) => t.id.equals(existingLink.id))).write(
+        CalendarEventLinksCompanion(
+          externalEventId: drift.Value(extId),
+          syncStatus: const drift.Value('synced'),
+          localRevisionAtSync: drift.Value(appointment.revision),
+          updatedAt: drift.Value(now),
+        ),
+      );
+    } else {
+      await db
+          .into(db.calendarEventLinks)
+          .insert(
+            CalendarEventLinksCompanion.insert(
+              id: 'link_apple_${appointment.id}',
+              appointmentId: appointment.id,
+              externalEventId: extId,
+              provider: 'apple_eventkit',
+              syncStatus: const drift.Value('synced'),
+              localRevisionAtSync: drift.Value(appointment.revision),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+    }
     return extId;
   }
 
@@ -545,6 +586,62 @@ void main() {
         db.calendarEventLinks,
       )..where((t) => t.id.equals('link_local_keep'))).getSingle();
       expect(link.syncStatus, equals('synced'));
+    });
+
+    test('Cenário 11 — Resolução de conflito mantendo versão local enquanto offline define pending_upload e envia ao reconectar', () async {
+      mockGoogle.authorized = false; // Usuário resolve conflito sem rede
+      final now = DateTime.now();
+      await db
+          .into(db.appointments)
+          .insert(
+            AppointmentsCompanion.insert(
+              id: 'appt_offline_keep',
+              title: 'Título Decidido Offline',
+              startTime: DateTime(2026, 11, 11, 10, 0),
+              endTime: DateTime(2026, 11, 11, 10, 30),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await db
+          .into(db.calendarEventLinks)
+          .insert(
+            CalendarEventLinksCompanion.insert(
+              id: 'link_offline_keep',
+              appointmentId: 'appt_offline_keep',
+              externalEventId: 'ext_keep_offline',
+              provider: 'google',
+              syncStatus: const drift.Value('conflict'),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+
+      final conflicts = await coordinator.getPendingConflicts();
+      expect(conflicts.length, equals(1));
+
+      // Resolve manter versão local enquanto offline
+      await coordinator.resolveConflictKeepLocal(conflicts.first);
+
+      // Não deve marcar synced falsamente: deve marcar pending_upload
+      final linkPending = await (db.select(
+        db.calendarEventLinks,
+      )..where((t) => t.id.equals('link_offline_keep'))).getSingle();
+      expect(linkPending.syncStatus, equals('pending_upload'));
+
+      // Quando a conexão volta, a sincronização envia a decisão para o calendário externo
+      mockGoogle.authorized = true;
+      final syncRes = await coordinator.syncAll();
+      expect(syncRes.eventsUploaded, equals(1));
+
+      final linkSynced = await (db.select(
+        db.calendarEventLinks,
+      )..where((t) => t.id.equals('link_offline_keep'))).getSingle();
+      expect(linkSynced.syncStatus, equals('synced'));
+      expect(
+        mockGoogle.remoteEvents['ext_keep_offline']?['summary'],
+        equals('Título Decidido Offline'),
+      );
     });
   });
 }

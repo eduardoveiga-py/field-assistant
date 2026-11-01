@@ -356,7 +356,7 @@ class GoogleCalendarProvider implements CalendarProvider {
     );
 
     try {
-      if (link != null) {
+      if (link != null && link.externalEventId.isNotEmpty) {
         final updated = await api.events.patch(
           gEvent,
           calendarId,
@@ -377,22 +377,36 @@ class GoogleCalendarProvider implements CalendarProvider {
       } else {
         final created = await api.events.insert(gEvent, calendarId);
         final now = DateTime.now();
-        final linkId = _uuid.v4();
-        await db
-            .into(db.calendarEventLinks)
-            .insert(
-              CalendarEventLinksCompanion.insert(
-                id: linkId,
-                appointmentId: appointment.id,
-                externalEventId: created.id ?? _uuid.v4(),
-                provider: 'google',
-                syncStatus: const drift.Value('synced'),
-                localRevisionAtSync: drift.Value(appointment.revision),
-                externalETagAtSync: drift.Value(created.etag),
-                createdAt: now,
-                updatedAt: now,
-              ),
-            );
+        if (link != null) {
+          await (db.update(
+            db.calendarEventLinks,
+          )..where((t) => t.id.equals(link.id))).write(
+            CalendarEventLinksCompanion(
+              externalEventId: drift.Value(created.id ?? _uuid.v4()),
+              externalETagAtSync: drift.Value(created.etag),
+              localRevisionAtSync: drift.Value(appointment.revision),
+              syncStatus: const drift.Value('synced'),
+              updatedAt: drift.Value(now),
+            ),
+          );
+        } else {
+          final linkId = _uuid.v4();
+          await db
+              .into(db.calendarEventLinks)
+              .insert(
+                CalendarEventLinksCompanion.insert(
+                  id: linkId,
+                  appointmentId: appointment.id,
+                  externalEventId: created.id ?? _uuid.v4(),
+                  provider: 'google',
+                  syncStatus: const drift.Value('synced'),
+                  localRevisionAtSync: drift.Value(appointment.revision),
+                  externalETagAtSync: drift.Value(created.etag),
+                  createdAt: now,
+                  updatedAt: now,
+                ),
+              );
+        }
         return created.id;
       }
     } catch (_) {

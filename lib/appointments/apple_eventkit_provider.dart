@@ -262,7 +262,9 @@ class AppleEventKitProvider implements CalendarProvider {
 
       final devEvent = dev_cal.Event(
         calendarId,
-        eventId: link?.externalEventId,
+        eventId: (link?.externalEventId.isNotEmpty == true)
+            ? link!.externalEventId
+            : null,
         title: appointment.title,
         description: 'Compromisso Field Assistant Ministerial',
         location: appointment.locationNotes,
@@ -280,6 +282,7 @@ class AppleEventKitProvider implements CalendarProvider {
             db.calendarEventLinks,
           )..where((t) => t.id.equals(link.id))).write(
             CalendarEventLinksCompanion(
+              externalEventId: drift.Value(externalId),
               localRevisionAtSync: drift.Value(appointment.revision),
               syncStatus: const drift.Value('synced'),
               updatedAt: drift.Value(now),

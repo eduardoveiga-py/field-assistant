@@ -366,8 +366,12 @@ class CalendarSyncCoordinator {
   /// Resolução: Manter versão local (sobrescreve evento externo e converge)
   Future<void> resolveConflictKeepLocal(CalendarConflictItem conflict) async {
     final provider = getProviderByName(conflict.link.provider);
+    String? resId;
     if (provider != null && await provider.isAuthorized()) {
-      await provider.pushAppointmentToExternal(db, conflict.localAppointment);
+      resId = await provider.pushAppointmentToExternal(
+        db,
+        conflict.localAppointment,
+      );
     }
 
     final now = DateTime.now();
@@ -375,7 +379,7 @@ class CalendarSyncCoordinator {
       db.calendarEventLinks,
     )..where((t) => t.id.equals(conflict.link.id))).write(
       CalendarEventLinksCompanion(
-        syncStatus: const drift.Value('synced'),
+        syncStatus: drift.Value(resId != null ? 'synced' : 'pending_upload'),
         localRevisionAtSync: drift.Value(conflict.localAppointment.revision),
         updatedAt: drift.Value(now),
       ),
