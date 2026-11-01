@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 import 'package:device_calendar/device_calendar.dart' as dev_cal;
 import 'package:drift/drift.dart' as drift;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -13,6 +16,35 @@ class AppleEventKitProvider implements CalendarProvider {
   final Uuid _uuid = const Uuid();
 
   static const String _keySelectedCalendarId = 'apple_eventkit_selected_id';
+
+  /// Gera um fingerprint determinístico normalizado das propriedades do evento externo.
+  /// Compatível com as capacidades reais do EventKit sem simular ETags do Google.
+  static String computeEventFingerprint({
+    required String externalEventId,
+    required String calendarId,
+    required String title,
+    String? location,
+    String? description,
+    required DateTime startTime,
+    required DateTime endTime,
+    bool isAllDay = false,
+    bool isCancelled = false,
+    String? recurrenceRule,
+  }) {
+    final normalized = [
+      externalEventId.trim(),
+      calendarId.trim(),
+      title.trim(),
+      (location ?? '').trim(),
+      (description ?? '').trim(),
+      startTime.toUtc().toIso8601String(),
+      endTime.toUtc().toIso8601String(),
+      isAllDay.toString(),
+      isCancelled.toString(),
+      (recurrenceRule ?? '').trim(),
+    ].join('|');
+    return sha256.convert(utf8.encode(normalized)).toString();
+  }
 
   AppleEventKitProvider({
     dev_cal.DeviceCalendarPlugin? deviceCalendarPlugin,

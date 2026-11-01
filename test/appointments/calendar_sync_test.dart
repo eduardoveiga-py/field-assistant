@@ -591,41 +591,47 @@ void main() {
     test('Cenário A — Resolução online: manter versão local envia, converge para synced e limpa conflito', () async {
       mockGoogle.authorized = true;
       final now = DateTime.now();
-      await db.into(db.appointments).insert(
-        AppointmentsCompanion.insert(
-          id: 'appt_scen_a',
-          title: 'Título Local A',
-          startTime: DateTime(2026, 11, 10, 14, 0),
-          endTime: DateTime(2026, 11, 10, 14, 30),
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
-      await db.into(db.calendarEventLinks).insert(
-        CalendarEventLinksCompanion.insert(
-          id: 'link_scen_a',
-          appointmentId: 'appt_scen_a',
-          externalEventId: 'ext_scen_a',
-          provider: 'google',
-          syncStatus: const drift.Value('conflict'),
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
-      await db.into(db.externalCalendarEvents).insert(
-        ExternalCalendarEventsCompanion.insert(
-          id: 'ext_row_scen_a',
-          provider: 'google',
-          calendarId: 'primary',
-          externalEventId: 'ext_scen_a',
-          title: 'Título Remoto Antigo',
-          startTime: DateTime(2026, 11, 10, 15, 0),
-          endTime: DateTime(2026, 11, 10, 15, 30),
-          etag: const drift.Value('etag_old_scen_a'),
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
+      await db
+          .into(db.appointments)
+          .insert(
+            AppointmentsCompanion.insert(
+              id: 'appt_scen_a',
+              title: 'Título Local A',
+              startTime: DateTime(2026, 11, 10, 14, 0),
+              endTime: DateTime(2026, 11, 10, 14, 30),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await db
+          .into(db.calendarEventLinks)
+          .insert(
+            CalendarEventLinksCompanion.insert(
+              id: 'link_scen_a',
+              appointmentId: 'appt_scen_a',
+              externalEventId: 'ext_scen_a',
+              provider: 'google',
+              syncStatus: const drift.Value('conflict'),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await db
+          .into(db.externalCalendarEvents)
+          .insert(
+            ExternalCalendarEventsCompanion.insert(
+              id: 'ext_row_scen_a',
+              provider: 'google',
+              calendarId: 'primary',
+              externalEventId: 'ext_scen_a',
+              title: 'Título Remoto Antigo',
+              startTime: DateTime(2026, 11, 10, 15, 0),
+              endTime: DateTime(2026, 11, 10, 15, 30),
+              etag: const drift.Value('etag_old_scen_a'),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
 
       final conflicts = await coordinator.getPendingConflicts();
       expect(conflicts.length, equals(1));
@@ -633,7 +639,9 @@ void main() {
       // Resolução online mantendo versão local
       await coordinator.resolveConflictKeepLocal(conflicts.first);
 
-      final link = await (db.select(db.calendarEventLinks)..where((t) => t.id.equals('link_scen_a'))).getSingle();
+      final link = await (db.select(
+        db.calendarEventLinks,
+      )..where((t) => t.id.equals('link_scen_a'))).getSingle();
       expect(link.syncStatus, equals('synced'));
       expect(link.pendingResolution, isNull);
 
@@ -644,42 +652,48 @@ void main() {
     test('Cenário B — Resolução offline: manter versão local persiste pendingResolution, sobrevive a reinicialização e converge após reconexão com externalCalendarEvents divergente', () async {
       mockGoogle.authorized = false; // Offline
       final now = DateTime.now();
-      await db.into(db.appointments).insert(
-        AppointmentsCompanion.insert(
-          id: 'appt_offline_keep',
-          title: 'Título Decidido no Campo',
-          startTime: DateTime(2026, 11, 11, 10, 0),
-          endTime: DateTime(2026, 11, 11, 10, 30),
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
-      await db.into(db.calendarEventLinks).insert(
-        CalendarEventLinksCompanion.insert(
-          id: 'link_offline_keep',
-          appointmentId: 'appt_offline_keep',
-          externalEventId: 'ext_keep_offline',
-          provider: 'google',
-          syncStatus: const drift.Value('conflict'),
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
+      await db
+          .into(db.appointments)
+          .insert(
+            AppointmentsCompanion.insert(
+              id: 'appt_offline_keep',
+              title: 'Título Decidido no Campo',
+              startTime: DateTime(2026, 11, 11, 10, 0),
+              endTime: DateTime(2026, 11, 11, 10, 30),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await db
+          .into(db.calendarEventLinks)
+          .insert(
+            CalendarEventLinksCompanion.insert(
+              id: 'link_offline_keep',
+              appointmentId: 'appt_offline_keep',
+              externalEventId: 'ext_keep_offline',
+              provider: 'google',
+              syncStatus: const drift.Value('conflict'),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
       // Insere externalCalendarEvents divergente que causou o conflito (NÃO vazio!)
-      await db.into(db.externalCalendarEvents).insert(
-        ExternalCalendarEventsCompanion.insert(
-          id: 'ext_row_offline_divergent',
-          provider: 'google',
-          calendarId: 'primary',
-          externalEventId: 'ext_keep_offline',
-          title: 'Título Remoto Conflitante',
-          startTime: DateTime(2026, 11, 11, 11, 0),
-          endTime: DateTime(2026, 11, 11, 11, 30),
-          etag: const drift.Value('etag_divergent_1'),
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
+      await db
+          .into(db.externalCalendarEvents)
+          .insert(
+            ExternalCalendarEventsCompanion.insert(
+              id: 'ext_row_offline_divergent',
+              provider: 'google',
+              calendarId: 'primary',
+              externalEventId: 'ext_keep_offline',
+              title: 'Título Remoto Conflitante',
+              startTime: DateTime(2026, 11, 11, 11, 0),
+              endTime: DateTime(2026, 11, 11, 11, 30),
+              etag: const drift.Value('etag_divergent_1'),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
 
       final conflicts = await coordinator.getPendingConflicts();
       expect(conflicts.length, equals(1));
@@ -726,41 +740,47 @@ void main() {
     test('Cenário C — Falha no envio: preserva pending_resolution e não marca como synced se envio falhar', () async {
       mockGoogle.authorized = true;
       final now = DateTime.now();
-      await db.into(db.appointments).insert(
-        AppointmentsCompanion.insert(
-          id: 'appt_scen_c',
-          title: 'Título Tentativa Falha',
-          startTime: DateTime(2026, 11, 13, 9, 0),
-          endTime: DateTime(2026, 11, 13, 9, 30),
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
-      await db.into(db.calendarEventLinks).insert(
-        CalendarEventLinksCompanion.insert(
-          id: 'link_scen_c',
-          appointmentId: 'appt_scen_c',
-          externalEventId: 'ext_scen_c',
-          provider: 'google',
-          syncStatus: const drift.Value('conflict'),
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
-      await db.into(db.externalCalendarEvents).insert(
-        ExternalCalendarEventsCompanion.insert(
-          id: 'ext_row_scen_c',
-          provider: 'google',
-          calendarId: 'primary',
-          externalEventId: 'ext_scen_c',
-          title: 'Remoto Antigo C',
-          startTime: DateTime(2026, 11, 13, 9, 0),
-          endTime: DateTime(2026, 11, 13, 9, 30),
-          etag: const drift.Value('etag_scen_c'),
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
+      await db
+          .into(db.appointments)
+          .insert(
+            AppointmentsCompanion.insert(
+              id: 'appt_scen_c',
+              title: 'Título Tentativa Falha',
+              startTime: DateTime(2026, 11, 13, 9, 0),
+              endTime: DateTime(2026, 11, 13, 9, 30),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await db
+          .into(db.calendarEventLinks)
+          .insert(
+            CalendarEventLinksCompanion.insert(
+              id: 'link_scen_c',
+              appointmentId: 'appt_scen_c',
+              externalEventId: 'ext_scen_c',
+              provider: 'google',
+              syncStatus: const drift.Value('conflict'),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await db
+          .into(db.externalCalendarEvents)
+          .insert(
+            ExternalCalendarEventsCompanion.insert(
+              id: 'ext_row_scen_c',
+              provider: 'google',
+              calendarId: 'primary',
+              externalEventId: 'ext_scen_c',
+              title: 'Remoto Antigo C',
+              startTime: DateTime(2026, 11, 13, 9, 0),
+              endTime: DateTime(2026, 11, 13, 9, 30),
+              etag: const drift.Value('etag_scen_c'),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
 
       final conflicts = await coordinator.getPendingConflicts();
       expect(conflicts.length, equals(1));
@@ -769,7 +789,9 @@ void main() {
       mockGoogle.authorized = false;
       await coordinator.resolveConflictKeepLocal(conflicts.first);
 
-      var link = await (db.select(db.calendarEventLinks)..where((t) => t.id.equals('link_scen_c'))).getSingle();
+      var link = await (db.select(
+        db.calendarEventLinks,
+      )..where((t) => t.id.equals('link_scen_c'))).getSingle();
       expect(link.syncStatus, equals('pending_upload'));
       expect(link.pendingResolution, equals('keep_local'));
 
@@ -778,7 +800,9 @@ void main() {
       expect(syncRes.eventsUploaded, equals(0));
 
       // Decisão continua persistida
-      link = await (db.select(db.calendarEventLinks)..where((t) => t.id.equals('link_scen_c'))).getSingle();
+      link = await (db.select(
+        db.calendarEventLinks,
+      )..where((t) => t.id.equals('link_scen_c'))).getSingle();
       expect(link.syncStatus, equals('pending_upload'));
       expect(link.pendingResolution, equals('keep_local'));
       expect(link.syncStatus, isNot(equals('synced')));
@@ -787,48 +811,56 @@ void main() {
     test('Cenário D — Alteração externa posterior: após resolução confirmada, nova edição externa legítima é detectada e converge sem falso conflito', () async {
       mockGoogle.authorized = true;
       final now = DateTime.now();
-      await db.into(db.appointments).insert(
-        AppointmentsCompanion.insert(
-          id: 'appt_scen_d',
-          title: 'Título Confirmado D',
-          startTime: DateTime(2026, 11, 14, 15, 0),
-          endTime: DateTime(2026, 11, 14, 15, 30),
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
-      await db.into(db.calendarEventLinks).insert(
-        CalendarEventLinksCompanion.insert(
-          id: 'link_scen_d',
-          appointmentId: 'appt_scen_d',
-          externalEventId: 'ext_scen_d',
-          provider: 'google',
-          syncStatus: const drift.Value('conflict'),
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
-      await db.into(db.externalCalendarEvents).insert(
-        ExternalCalendarEventsCompanion.insert(
-          id: 'ext_row_scen_d',
-          provider: 'google',
-          calendarId: 'primary',
-          externalEventId: 'ext_scen_d',
-          title: 'Remoto Conflitante Antigo',
-          startTime: DateTime(2026, 11, 14, 16, 0),
-          endTime: DateTime(2026, 11, 14, 16, 30),
-          etag: const drift.Value('etag_d_1'),
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
+      await db
+          .into(db.appointments)
+          .insert(
+            AppointmentsCompanion.insert(
+              id: 'appt_scen_d',
+              title: 'Título Confirmado D',
+              startTime: DateTime(2026, 11, 14, 15, 0),
+              endTime: DateTime(2026, 11, 14, 15, 30),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await db
+          .into(db.calendarEventLinks)
+          .insert(
+            CalendarEventLinksCompanion.insert(
+              id: 'link_scen_d',
+              appointmentId: 'appt_scen_d',
+              externalEventId: 'ext_scen_d',
+              provider: 'google',
+              syncStatus: const drift.Value('conflict'),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await db
+          .into(db.externalCalendarEvents)
+          .insert(
+            ExternalCalendarEventsCompanion.insert(
+              id: 'ext_row_scen_d',
+              provider: 'google',
+              calendarId: 'primary',
+              externalEventId: 'ext_scen_d',
+              title: 'Remoto Conflitante Antigo',
+              startTime: DateTime(2026, 11, 14, 16, 0),
+              endTime: DateTime(2026, 11, 14, 16, 30),
+              etag: const drift.Value('etag_d_1'),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
 
       // 1. Resolução do conflito original
       final conflicts = await coordinator.getPendingConflicts();
       expect(conflicts.length, equals(1));
       await coordinator.resolveConflictKeepLocal(conflicts.first);
 
-      var link = await (db.select(db.calendarEventLinks)..where((t) => t.id.equals('link_scen_d'))).getSingle();
+      var link = await (db.select(
+        db.calendarEventLinks,
+      )..where((t) => t.id.equals('link_scen_d'))).getSingle();
       expect(link.syncStatus, equals('synced'));
       expect(link.pendingResolution, isNull);
 
@@ -845,11 +877,18 @@ void main() {
       final syncRes = await coordinator.syncAll();
       expect(syncRes.eventsDownloaded, equals(1));
 
-      final updatedAppt = await (db.select(db.appointments)..where((t) => t.id.equals('appt_scen_d'))).getSingle();
-      expect(updatedAppt.title, equals('Título Atualizado no Google Calendar Mais Tarde'));
+      final updatedAppt = await (db.select(
+        db.appointments,
+      )..where((t) => t.id.equals('appt_scen_d'))).getSingle();
+      expect(
+        updatedAppt.title,
+        equals('Título Atualizado no Google Calendar Mais Tarde'),
+      );
       expect(updatedAppt.startTime, equals(DateTime(2026, 11, 14, 17, 0)));
 
-      link = await (db.select(db.calendarEventLinks)..where((t) => t.id.equals('link_scen_d'))).getSingle();
+      link = await (db.select(
+        db.calendarEventLinks,
+      )..where((t) => t.id.equals('link_scen_d'))).getSingle();
       expect(link.syncStatus, equals('synced'));
       expect(link.externalETagAtSync, equals('etag_d_nova_edicao_remota'));
     });

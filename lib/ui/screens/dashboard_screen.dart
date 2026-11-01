@@ -759,11 +759,41 @@ $header
                             style: TextStyle(fontSize: 12),
                           ),
                           onPressed: () {
+                            final activeStudiesForPeriod = studies.where((s) {
+                              if (s.deletedAt != null) return false;
+                              final hasSession =
+                                  sessions.any(
+                                    (sess) =>
+                                        sess.studyId == s.id &&
+                                        sess.status == 'realizada' &&
+                                        sess.deletedAt == null &&
+                                        sess.dateTimeField.isAfter(
+                                          _periodStart.subtract(
+                                            const Duration(seconds: 1),
+                                          ),
+                                        ) &&
+                                        sess.dateTimeField.isBefore(
+                                          _periodEnd.add(
+                                            const Duration(seconds: 1),
+                                          ),
+                                        ),
+                                  ) ||
+                                  (s.lastSessionAt != null &&
+                                      !s.lastSessionAt!.isBefore(
+                                        _periodStart,
+                                      ) &&
+                                      !s.lastSessionAt!.isAfter(_periodEnd));
+                              if (hasSession) return true;
+                              if (s.status != 'ativo') return false;
+                              if (s.startedAt.isAfter(_periodEnd)) return false;
+                              return true;
+                            }).toList();
+
                             ReportExportService.exportMinistryStatisticsPdf(
                               context: context,
                               metrics: metrics,
                               activities: activities,
-                              studies: studies,
+                              studies: activeStudiesForPeriod,
                               period: _selectedMonth,
                               periodMode: _statsPeriodMode,
                               scheduledHours: scheduledHours,
@@ -787,15 +817,47 @@ $header
                             'Enviar Relatório',
                             style: TextStyle(fontSize: 12),
                           ),
-                          onPressed: () => _shareMinistryReport(
-                            metrics: metrics,
-                            month: _selectedMonth.month,
-                            year: _selectedMonth.year,
-                            scheduledHours: scheduledHours,
-                            actualHours: actualHours,
-                            activities: activities,
-                            studies: studies,
-                          ),
+                          onPressed: () {
+                            final activeStudiesForPeriod = studies.where((s) {
+                              if (s.deletedAt != null) return false;
+                              final hasSession =
+                                  sessions.any(
+                                    (sess) =>
+                                        sess.studyId == s.id &&
+                                        sess.status == 'realizada' &&
+                                        sess.deletedAt == null &&
+                                        sess.dateTimeField.isAfter(
+                                          _periodStart.subtract(
+                                            const Duration(seconds: 1),
+                                          ),
+                                        ) &&
+                                        sess.dateTimeField.isBefore(
+                                          _periodEnd.add(
+                                            const Duration(seconds: 1),
+                                          ),
+                                        ),
+                                  ) ||
+                                  (s.lastSessionAt != null &&
+                                      !s.lastSessionAt!.isBefore(
+                                        _periodStart,
+                                      ) &&
+                                      !s.lastSessionAt!.isAfter(_periodEnd));
+                              if (hasSession) return true;
+                              if (s.status != 'ativo') return false;
+                              if (s.startedAt.isAfter(_periodEnd)) return false;
+                              return true;
+                            }).toList();
+
+                            _shareMinistryReport(
+                              metrics: metrics,
+                              month: _selectedMonth.month,
+                              year: _selectedMonth.year,
+                              scheduledHours: scheduledHours,
+                              actualHours: actualHours,
+                              activities: activities,
+                              studies: activeStudiesForPeriod,
+                            );
+                          },
                         ),
                       ],
                     );
@@ -888,17 +950,47 @@ $header
                                 icon: Icons.menu_book,
                                 color: const Color(0xFF7C3AED),
                                 onTap: () {
-                                  final active = studies
-                                      .where(
-                                        (s) =>
-                                            s.status == 'ativo' &&
-                                            s.deletedAt == null,
-                                      )
-                                      .toList();
+                                  final active = studies.where((s) {
+                                    if (s.deletedAt != null) return false;
+                                    final hasSessionInPeriod =
+                                        sessions.any(
+                                          (sess) =>
+                                              sess.studyId == s.id &&
+                                              sess.status == 'realizada' &&
+                                              sess.deletedAt == null &&
+                                              sess.dateTimeField.isAfter(
+                                                _periodStart.subtract(
+                                                  const Duration(seconds: 1),
+                                                ),
+                                              ) &&
+                                              sess.dateTimeField.isBefore(
+                                                _periodEnd.add(
+                                                  const Duration(seconds: 1),
+                                                ),
+                                              ),
+                                        ) ||
+                                        (s.lastSessionAt != null &&
+                                            !s.lastSessionAt!.isBefore(
+                                              _periodStart,
+                                            ) &&
+                                            !s.lastSessionAt!.isAfter(
+                                              _periodEnd,
+                                            ));
+                                    if (hasSessionInPeriod) {
+                                      return true;
+                                    }
+                                    if (s.status != 'ativo') {
+                                      return false;
+                                    }
+                                    if (s.startedAt.isAfter(_periodEnd)) {
+                                      return false;
+                                    }
+                                    return true;
+                                  }).toList();
                                   _showRecordsModal(
                                     context: context,
                                     title:
-                                        'Estudos Bíblicos Ativos (${active.length})',
+                                        'Estudos Bíblicos no Período (${active.length})',
                                     children: active
                                         .map(
                                           (s) => ListTile(
@@ -913,7 +1005,7 @@ $header
                                               ),
                                             ),
                                             subtitle: Text(
-                                              'Lição atual: ${s.currentLesson ?? "1"} • Idioma: ${s.language.toUpperCase()}',
+                                              'Lição atual: ${s.currentLesson ?? "1"} • Início: ${AppDateUtils.formatDate(s.startedAt)} • ${s.frequency.toUpperCase()}',
                                             ),
                                           ),
                                         )
@@ -952,28 +1044,74 @@ $header
                                             ),
                                       )
                                       .toList();
+                                  final visitedPersonIds = held
+                                      .map((v) => v.personId)
+                                      .toSet();
+                                  final onboardedRevisits = people.where((p) {
+                                    if (p.deletedAt != null) {
+                                      return false;
+                                    }
+                                    if (visitedPersonIds.contains(p.id)) {
+                                      return false;
+                                    }
+                                    if (p.lastContactAt == null) {
+                                      return false;
+                                    }
+                                    if (p.lastContactAt!.isBefore(
+                                          _periodStart,
+                                        ) ||
+                                        p.lastContactAt!.isAfter(_periodEnd)) {
+                                      return false;
+                                    }
+                                    return p.status.toLowerCase() ==
+                                            'revisita' ||
+                                        p.lastContactAt!.isAfter(
+                                          p.firstContactAt,
+                                        );
+                                  }).toList();
+
+                                  final allModalItems = <Widget>[
+                                    ...held.map(
+                                      (v) => ListTile(
+                                        leading: const Icon(
+                                          Icons.repeat,
+                                          color: AppTheme.accentTeal,
+                                        ),
+                                        title: Text(
+                                          v.topicsDiscussed ??
+                                              'Revisita considerada',
+                                        ),
+                                        subtitle: Text(
+                                          AppDateUtils.formatDateTime(
+                                            v.dateTimeField,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    ...onboardedRevisits.map(
+                                      (p) => ListTile(
+                                        leading: const Icon(
+                                          Icons.person_pin_circle_outlined,
+                                          color: AppTheme.accentTeal,
+                                        ),
+                                        title: Text(
+                                          'Revisita: ${p.name}',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        subtitle: Text(
+                                          'Última visita registrada em: ${AppDateUtils.formatDate(p.lastContactAt!)}',
+                                        ),
+                                      ),
+                                    ),
+                                  ];
+
                                   _showRecordsModal(
                                     context: context,
-                                    title: 'Revisitas do Mês (${held.length})',
-                                    children: held
-                                        .map(
-                                          (v) => ListTile(
-                                            leading: const Icon(
-                                              Icons.repeat,
-                                              color: AppTheme.accentTeal,
-                                            ),
-                                            title: Text(
-                                              v.topicsDiscussed ??
-                                                  'Revisita considerada',
-                                            ),
-                                            subtitle: Text(
-                                              AppDateUtils.formatDateTime(
-                                                v.dateTimeField,
-                                              ),
-                                            ),
-                                          ),
-                                        )
-                                        .toList(),
+                                    title:
+                                        'Revisitas do Mês (${allModalItems.length})',
+                                    children: allModalItems,
                                   );
                                 },
                               ),

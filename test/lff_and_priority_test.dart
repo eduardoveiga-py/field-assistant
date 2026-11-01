@@ -491,6 +491,116 @@ void main() {
         expect(itemA.internalScore, greaterThan(itemB.internalScore));
         expect(results.first.study.id, equals('s-1'));
       });
+
+      test('Estudo bíblico avançado (Lição 20) cadastrado no primeiro uso calcula velocidade real baseada em startedAt anterior sem exigir sessões prévias', () {
+        final now = DateTime(2026, 10, 15);
+        final student = PersonEntry(
+          id: 'p-adv',
+          name: 'Lucas Avançado',
+          status: 'estudante',
+          tags: '[]',
+          firstContactAt: now.subtract(const Duration(days: 70)),
+          createdAt: now,
+          updatedAt: now,
+          revision: 1,
+        );
+
+        final study = BibleStudyEntry(
+          id: 's-adv',
+          title: 'Estudo Lucas',
+          ownerId: 'u1',
+          startedAt: now.subtract(const Duration(days: 70)), // 10 semanas atrás
+          lastSessionAt: now.subtract(const Duration(days: 4)),
+          currentLesson: 20,
+          currentParagraph: 2,
+          publicationId: 'lff-book',
+          language: 'pt',
+          status: 'ativo',
+          frequency: 'semanal',
+          createdAt: now,
+          updatedAt: now,
+          revision: 1,
+        );
+
+        final part = StudyParticipantEntry(
+          id: 'sp-adv',
+          studyId: 's-adv',
+          personId: 'p-adv',
+          isPrimary: true,
+          createdAt: now,
+          updatedAt: now,
+          revision: 1,
+        );
+
+        final results = StudentPriorityEngine.calculatePriorities(
+          studies: [study],
+          participants: [part],
+          people: [student],
+          sessions: [], // sem sessões prévias gravadas no app
+          nowOverride: now,
+        );
+
+        expect(results.length, equals(1));
+        final item = results.first;
+        expect(item.study.currentLesson, equals(20));
+        expect(item.study.currentParagraph, equals(2));
+        // Velocidade calculada: ~1.9 lições/semana (20 lições em 10 semanas)
+        expect(item.lessonsPerWeekVelocity, greaterThan(1.5));
+        expect(item.priorityTier, anyOf(equals('Muito Alta'), equals('Alta')));
+      });
+
+      test('Estudo avançado (Lição 20) com startedAt deixado como hoje não explode a velocidade para valores absurdos', () {
+        final now = DateTime(2026, 10, 15);
+        final student = PersonEntry(
+          id: 'p-today-adv',
+          name: 'Marcos Novo',
+          status: 'estudante',
+          tags: '[]',
+          firstContactAt: now,
+          createdAt: now,
+          updatedAt: now,
+          revision: 1,
+        );
+
+        final study = BibleStudyEntry(
+          id: 's-today-adv',
+          title: 'Estudo Marcos',
+          ownerId: 'u1',
+          startedAt: now, // data de início não alterada, ficou como hoje
+          currentLesson: 20,
+          currentParagraph: 1,
+          publicationId: 'lff-book',
+          language: 'pt',
+          status: 'ativo',
+          frequency: 'semanal',
+          createdAt: now,
+          updatedAt: now,
+          revision: 1,
+        );
+
+        final part = StudyParticipantEntry(
+          id: 'sp-today-adv',
+          studyId: 's-today-adv',
+          personId: 'p-today-adv',
+          isPrimary: true,
+          createdAt: now,
+          updatedAt: now,
+          revision: 1,
+        );
+
+        final results = StudentPriorityEngine.calculatePriorities(
+          studies: [study],
+          participants: [part],
+          people: [student],
+          sessions: [],
+          nowOverride: now,
+        );
+
+        expect(results.length, equals(1));
+        final item = results.first;
+        // Velocidade deve ser razoável (~1 lição/semana estimada), e nunca 38+ lições/semana
+        expect(item.lessonsPerWeekVelocity, lessThan(2.0));
+      });
     },
   );
 

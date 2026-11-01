@@ -18,6 +18,7 @@ class StudentPriorityItem {
   final int successfulSessionsCount;
   final int failedSessionsCount;
   final int manualOrderIndex;
+  final DateTime? latestSessionDate;
 
   const StudentPriorityItem({
     required this.study,
@@ -30,14 +31,17 @@ class StudentPriorityItem {
     required this.successfulSessionsCount,
     required this.failedSessionsCount,
     this.manualOrderIndex = 0,
+    this.latestSessionDate,
   });
 
   PersonEntry get primaryPerson => person;
   double get progressPercent => progressPercentage;
   String get frequency => study.frequency;
-  int? get daysSinceLastSession => study.lastSessionAt != null
-      ? DateTime.now().difference(study.lastSessionAt!).inDays
-      : null;
+  int? get daysSinceLastSession {
+    final dt = latestSessionDate ?? study.lastSessionAt;
+    return dt != null ? DateTime.now().difference(dt).inDays : null;
+  }
+
   int get spiritualGoalsMetCount => completedGoalsCount;
   int get manualRank => manualOrderIndex + 1;
 
@@ -60,6 +64,7 @@ class StudentPriorityItem {
       successfulSessionsCount: successfulSessionsCount,
       failedSessionsCount: failedSessionsCount,
       manualOrderIndex: manualOrderIndex ?? this.manualOrderIndex,
+      latestSessionDate: latestSessionDate,
     );
   }
 }
@@ -237,11 +242,15 @@ class StudentPriorityEngine {
       }
 
       // 3. Velocidade de Consumo de Matéria (Lições e pontos por semana)
-      final studyAgeDays = max(1, now.difference(study.startedAt).inDays);
-      final studyAgeWeeks = max(0.5, studyAgeDays / 7.0);
-
       final currentLesson = study.currentLesson ?? 1;
       final currentPoint = study.currentParagraph ?? 1;
+
+      final studyAgeDays = max(1, now.difference(study.startedAt).inDays);
+      // Se o estudo é avançado (lição > 1) mas startedAt foi deixado como hoje/recente (< 7 dias),
+      // estima a idade com base em 1 lição/semana para evitar velocidade fictícia aberrante
+      final studyAgeWeeks = (currentLesson > 1 && studyAgeDays < 7)
+          ? max(1.0, (currentLesson - 1).toDouble())
+          : max(0.5, studyAgeDays / 7.0);
 
       // Velocidade estimada em lições por semana
       final double lessonsPerWeekVelocity =
@@ -277,8 +286,17 @@ class StudentPriorityEngine {
       score += (completedGoals * 35.0);
 
       // 5. Recência do último contato
-      if (study.lastSessionAt != null) {
-        final daysSinceLast = now.difference(study.lastSessionAt!).inDays;
+      final DateTime? latestSessionDate = studySessions.isNotEmpty
+          ? (study.lastSessionAt != null &&
+                    study.lastSessionAt!.isAfter(
+                      studySessions.first.dateTimeField,
+                    )
+                ? study.lastSessionAt
+                : studySessions.first.dateTimeField)
+          : study.lastSessionAt;
+
+      if (latestSessionDate != null) {
+        final daysSinceLast = now.difference(latestSessionDate).inDays;
         if (daysSinceLast <= 7) {
           score += 25.0;
         } else if (daysSinceLast > 21) {
@@ -319,6 +337,7 @@ class StudentPriorityEngine {
           successfulSessionsCount: successful,
           failedSessionsCount: failed,
           manualOrderIndex: manualIndex,
+          latestSessionDate: latestSessionDate,
         ),
       );
     }
@@ -329,10 +348,16 @@ class StudentPriorityEngine {
       items.sort((a, b) {
         final cmp = a.manualOrderIndex.compareTo(b.manualOrderIndex);
         if (cmp != 0) return cmp;
-        return b.internalScore.compareTo(a.internalScore);
+        final scoreCmp = b.internalScore.compareTo(a.internalScore);
+        if (scoreCmp != 0) return scoreCmp;
+        return b.progressPercentage.compareTo(a.progressPercentage);
       });
     } else {
-      items.sort((a, b) => b.internalScore.compareTo(a.internalScore));
+      items.sort((a, b) {
+        final scoreCmp = b.internalScore.compareTo(a.internalScore);
+        if (scoreCmp != 0) return scoreCmp;
+        return b.progressPercentage.compareTo(a.progressPercentage);
+      });
     }
 
     for (int i = 0; i < items.length; i++) {

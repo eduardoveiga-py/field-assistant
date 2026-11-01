@@ -422,5 +422,555 @@ void main() {
       ); // 3 de atividades + 1 de visita
       expect(metrics.totalVideos, equals(2));
     });
+
+    test('TC-COUNT-11: Estudo bíblico avançado (ex: Lição 20) cadastrado no primeiro uso do app conta nas estatísticas do mês sem exigir sessões prévias', () {
+      final studies = [
+        BibleStudyEntry(
+          id: 'study-advanced',
+          title: 'Estudo Carlos - Lição 20',
+          ownerId: 'user-1',
+          startedAt: DateTime(2026, 8, 1), // começou há 2 meses
+          status: 'ativo',
+          publicationId: 'lff-book',
+          currentLesson: 20,
+          currentParagraph: 3,
+          language: 'pt',
+          frequency: 'semanal',
+          createdAt: now, // cadastrado agora no primeiro uso do app
+          updatedAt: now,
+          revision: 1,
+        ),
+      ];
+
+      final metrics = DashboardCalculator.calculate(
+        studies: studies,
+        sessions: [], // nenhuma sessão gravada no app ainda
+        visits: [],
+        appointments: [],
+        activities: [],
+        periodStart: periodStart,
+        periodEnd: periodEnd,
+        nowOverride: now,
+      );
+
+      // Deve contar como estudo ativo no mês
+      expect(metrics.activeStudiesCount, equals(1));
+    });
+
+    test('TC-COUNT-12: Estudo bíblico com data de início futura (após o fim do período) NÃO conta como ativo no período', () {
+      final studies = [
+        BibleStudyEntry(
+          id: 'study-future',
+          title: 'Estudo Planejado para Próximo Mês',
+          ownerId: 'user-1',
+          startedAt: DateTime(2026, 11, 15), // início em novembro
+          status: 'ativo',
+          publicationId: 'lff-book',
+          currentLesson: 1,
+          currentParagraph: 1,
+          language: 'pt',
+          frequency: 'semanal',
+          createdAt: now,
+          updatedAt: now,
+          revision: 1,
+        ),
+      ];
+
+      final metrics = DashboardCalculator.calculate(
+        studies: studies,
+        sessions: [],
+        visits: [],
+        appointments: [],
+        activities: [],
+        periodStart: periodStart, // outubro
+        periodEnd: periodEnd, // 31 de outubro
+        nowOverride: now,
+      );
+
+      // Não deve contar em outubro, pois só se inicia em novembro
+      expect(metrics.activeStudiesCount, equals(0));
+    });
+
+    test('TC-COUNT-13: Estudo avançado (Lição >= 34) conta no funil da Parte 3 sem necessitar histórico prévio de 34 sessões registradas', () {
+      final studies = [
+        BibleStudyEntry(
+          id: 'study-part3',
+          title: 'Estudo Avançado Mariana',
+          ownerId: 'user-1',
+          startedAt: DateTime(2026, 5, 1),
+          status: 'ativo',
+          publicationId: 'lff-book',
+          currentLesson: 35, // Seção 3 do livro Seja Feliz Para Sempre!
+          currentParagraph: 2,
+          language: 'pt',
+          frequency: 'semanal',
+          createdAt: now,
+          updatedAt: now,
+          revision: 1,
+        ),
+      ];
+
+      final metrics = DashboardCalculator.calculate(
+        studies: studies,
+        sessions: [],
+        visits: [],
+        appointments: [],
+        activities: [],
+        periodStart: periodStart,
+        periodEnd: periodEnd,
+        nowOverride: now,
+      );
+
+      expect(metrics.funnelReachedPart3Count, equals(1));
+    });
+
+    test('TC-COUNT-14: Contato prévio (revisita) cadastrado com lastContactAt recente não entra em noRecentContactCount', () {
+      final people = [
+        PersonEntry(
+          id: 'person-recent-onboarded',
+          name: 'Dona Neide (Revisita Antiga)',
+          status: 'revisita',
+          tags: '[]',
+          firstContactAt: DateTime(2025, 1, 10), // primeiro contato há 1 ano
+          lastContactAt: now.subtract(
+            const Duration(days: 10),
+          ), // última visita há 10 dias
+          createdAt: now, // cadastrada hoje no app
+          updatedAt: now,
+          revision: 1,
+        ),
+        PersonEntry(
+          id: 'person-forgotten',
+          name: 'Seu Jorge',
+          status: 'revisita',
+          tags: '[]',
+          firstContactAt: DateTime(2025, 1, 10),
+          lastContactAt: now.subtract(
+            const Duration(days: 45),
+          ), // sem visita há mais de 30 dias
+          createdAt: now,
+          updatedAt: now,
+          revision: 1,
+        ),
+      ];
+
+      final metrics = DashboardCalculator.calculate(
+        studies: [],
+        sessions: [],
+        visits: [],
+        appointments: [],
+        activities: [],
+        people: people,
+        periodStart: periodStart,
+        periodEnd: periodEnd,
+        nowOverride: now,
+      );
+
+      // Apenas Seu Jorge deve contar em noRecentContactCount (> 30 dias)
+      expect(metrics.noRecentContactCount, equals(1));
+    });
+
+    test('TC-COUNT-15: Atenção de inatividade respeita lastSessionAt fornecido e evita falso alarme no primeiro dia para estudos recém-cadastrados', () {
+      final p1 = PersonEntry(
+        id: 'p-joao',
+        name: 'João',
+        status: 'estudante',
+        tags: '[]',
+        firstContactAt: now,
+        nextActionAt: now.add(const Duration(days: 7)),
+        createdAt: now,
+        updatedAt: now,
+        revision: 1,
+      );
+      final p2 = PersonEntry(
+        id: 'p-ana',
+        name: 'Ana',
+        status: 'estudante',
+        tags: '[]',
+        firstContactAt: now,
+        nextActionAt: now.add(const Duration(days: 7)),
+        createdAt: now,
+        updatedAt: now,
+        revision: 1,
+      );
+      final p3 = PersonEntry(
+        id: 'p-pedro',
+        name: 'Pedro',
+        status: 'estudante',
+        tags: '[]',
+        firstContactAt: now,
+        nextActionAt: now.add(const Duration(days: 7)),
+        createdAt: now,
+        updatedAt: now,
+        revision: 1,
+      );
+
+      final newlyOnboardedStudy = BibleStudyEntry(
+        id: 'study-new-app-first-day',
+        title: 'Estudo João Onboarded',
+        ownerId: 'user-1',
+        startedAt: DateTime(2026, 6, 1), // começou há 4 meses
+        status: 'ativo',
+        publicationId: 'lff-book',
+        currentLesson: 12,
+        currentParagraph: 1,
+        language: 'pt',
+        frequency: 'semanal',
+        createdAt: now, // cadastrado hoje no app!
+        updatedAt: now,
+        revision: 1,
+      );
+
+      final studyWithRecentSession = BibleStudyEntry(
+        id: 'study-recent-last-session',
+        title: 'Estudo Ana',
+        ownerId: 'user-1',
+        startedAt: DateTime(2026, 6, 1),
+        lastSessionAt: now.subtract(
+          const Duration(days: 7),
+        ), // última sessão há 7 dias
+        status: 'ativo',
+        publicationId: 'lff-book',
+        currentLesson: 15,
+        currentParagraph: 2,
+        language: 'pt',
+        frequency: 'semanal',
+        createdAt: now.subtract(const Duration(days: 60)),
+        updatedAt: now,
+        revision: 1,
+      );
+
+      final oldAbandonedStudy = BibleStudyEntry(
+        id: 'study-abandoned',
+        title: 'Estudo Abandonado Pedro',
+        ownerId: 'user-1',
+        startedAt: DateTime(2026, 1, 1),
+        lastSessionAt: now.subtract(
+          const Duration(days: 40),
+        ), // sem sessão há 40 dias
+        status: 'ativo',
+        publicationId: 'lff-book',
+        currentLesson: 5,
+        currentParagraph: 1,
+        language: 'pt',
+        frequency: 'semanal',
+        createdAt: now.subtract(const Duration(days: 100)),
+        updatedAt: now,
+        revision: 1,
+      );
+
+      final participants = [
+        StudyParticipantEntry(
+          id: 'sp-1',
+          studyId: newlyOnboardedStudy.id,
+          personId: p1.id,
+          isPrimary: true,
+          createdAt: now,
+          updatedAt: now,
+          revision: 1,
+        ),
+        StudyParticipantEntry(
+          id: 'sp-2',
+          studyId: studyWithRecentSession.id,
+          personId: p2.id,
+          isPrimary: true,
+          createdAt: now,
+          updatedAt: now,
+          revision: 1,
+        ),
+        StudyParticipantEntry(
+          id: 'sp-3',
+          studyId: oldAbandonedStudy.id,
+          personId: p3.id,
+          isPrimary: true,
+          createdAt: now,
+          updatedAt: now,
+          revision: 1,
+        ),
+      ];
+
+      final attentionItems = DashboardCalculator.getAttentionItems(
+        people: [p1, p2, p3],
+        studies: [
+          newlyOnboardedStudy,
+          studyWithRecentSession,
+          oldAbandonedStudy,
+        ],
+        participants: participants,
+        appointments: [],
+        nowOverride: now,
+      );
+
+      // newlyOnboardedStudy NÃO deve gerar alerta falso de inatividade porque foi criado hoje (primeiro uso do app)
+      expect(
+        attentionItems.any(
+          (item) =>
+              item.personName == 'João' && item.category == 'inactive_study',
+        ),
+        isFalse,
+      );
+
+      // studyWithRecentSession NÃO deve gerar alerta de inatividade pois teve sessão há 7 dias
+      expect(
+        attentionItems.any(
+          (item) =>
+              item.personName == 'Ana' && item.category == 'inactive_study',
+        ),
+        isFalse,
+      );
+
+      // oldAbandonedStudy DEVE gerar alerta de inatividade (> 14 dias sem sessão)
+      expect(
+        attentionItems.any(
+          (item) =>
+              item.personName == 'Pedro' && item.category == 'inactive_study',
+        ),
+        isTrue,
+      );
+    });
+
+    test('TC-COUNT-16: Revisita onboardada com lastContactAt no período conta em heldVisitsCount sem duplicar se já existir visita', () {
+      final p1 = PersonEntry(
+        id: 'p-revisita-onboarded',
+        name: 'Carlos Oliveira',
+        status: 'revisita',
+        tags: '[]',
+        firstContactAt: DateTime(2026, 5, 10),
+        lastContactAt: DateTime(2026, 10, 20), // no período de outubro
+        createdAt: now,
+        updatedAt: now,
+        revision: 1,
+      );
+
+      final p2 = PersonEntry(
+        id: 'p-revisita-com-visita-gravada',
+        name: 'Maria Visita',
+        status: 'revisita',
+        tags: '[]',
+        firstContactAt: DateTime(2026, 5, 10),
+        lastContactAt: DateTime(2026, 10, 22),
+        createdAt: now,
+        updatedAt: now,
+        revision: 1,
+      );
+
+      final loggedVisit = VisitEntry(
+        id: 'v-1',
+        personId: p2.id,
+        dateTimeField: DateTime(2026, 10, 22, 15, 0),
+        contactType: 'revisita',
+        result: 'Conversa bíblica',
+        createdAt: now,
+        updatedAt: now,
+        revision: 1,
+      );
+
+      final metrics = DashboardCalculator.calculate(
+        studies: [],
+        sessions: [],
+        visits: [loggedVisit],
+        appointments: [],
+        activities: [],
+        people: [p1, p2],
+        periodStart: periodStart, // 2026-10-01
+        periodEnd: periodEnd, // 2026-10-31
+        nowOverride: now,
+      );
+
+      // Deve contar 1 visita da tabela visits (p2) + 1 revisita onboardada sem linha avulsa (p1) = 2 revisitas
+      expect(metrics.heldVisitsCount, equals(2));
+    });
+
+    test('TC-COUNT-17: Estudo bíblico com lastSessionAt no período conta em heldSessionsCount e assistência mesmo sem linha em sessions', () {
+      final study = BibleStudyEntry(
+        id: 'study-hist-session',
+        title: 'Estudo Mateus Histórico',
+        ownerId: 'u1',
+        startedAt: DateTime(2026, 6, 1),
+        lastSessionAt: DateTime(2026, 10, 18, 14, 0), // sessão em outubro
+        status: 'ativo',
+        publicationId: 'lff-book',
+        currentLesson: 16,
+        currentParagraph: 2,
+        language: 'pt',
+        frequency: 'semanal',
+        createdAt: now,
+        updatedAt: now,
+        revision: 1,
+      );
+
+      final part = StudyParticipantEntry(
+        id: 'sp-mateus',
+        studyId: study.id,
+        personId: 'p-mateus',
+        isPrimary: true,
+        createdAt: now,
+        updatedAt: now,
+        revision: 1,
+      );
+
+      final metrics = DashboardCalculator.calculate(
+        studies: [study],
+        sessions: [], // nenhuma linha em sessions
+        visits: [],
+        appointments: [],
+        activities: [],
+        participants: [part],
+        periodStart: periodStart,
+        periodEnd: periodEnd,
+        nowOverride: now,
+      );
+
+      expect(metrics.activeStudiesCount, equals(1));
+      expect(metrics.heldSessionsCount, equals(1));
+      expect(metrics.totalStudyAttendance, equals(1));
+      expect(metrics.averageAttendancePerStudy, equals(1.0));
+    });
+
+    test('TC-COUNT-18: Estudo pausado que teve sessão no mês corrente conta em activeStudiesCount para o relatório do mês', () {
+      final study = BibleStudyEntry(
+        id: 'study-paused-with-session',
+        title: 'Estudo Pausado com Sessão em Outubro',
+        ownerId: 'u1',
+        startedAt: DateTime(2026, 4, 1),
+        lastSessionAt: DateTime(
+          2026,
+          10,
+          5,
+          10,
+          0,
+        ), // sessão no início de outubro
+        status: 'pausado', // pausado depois
+        publicationId: 'lff-book',
+        currentLesson: 12,
+        currentParagraph: 1,
+        language: 'pt',
+        frequency: 'semanal',
+        createdAt: now,
+        updatedAt: now,
+        revision: 1,
+      );
+
+      final metrics = DashboardCalculator.calculate(
+        studies: [study],
+        sessions: [],
+        visits: [],
+        appointments: [],
+        activities: [],
+        periodStart: periodStart,
+        periodEnd: periodEnd,
+        nowOverride: now,
+      );
+
+      // Segundo regras teocráticas, como teve sessão no mês, conta nos estudos dirigidos no mês
+      expect(metrics.activeStudiesCount, equals(1));
+      expect(metrics.heldSessionsCount, equals(1));
+    });
+
+    test('TC-COUNT-19: Estudante com estudo ativo cuja última sessão foi recente não entra em noRecentContactCount', () {
+      final student = PersonEntry(
+        id: 'p-active-student',
+        name: 'Lucas Estudante',
+        status: 'estudo',
+        tags: '[]',
+        firstContactAt: DateTime(2026, 1, 10),
+        lastContactAt: null, // não preenchido em people
+        createdAt: now,
+        updatedAt: now,
+        revision: 1,
+      );
+
+      final study = BibleStudyEntry(
+        id: 'study-lucas',
+        title: 'Estudo Lucas',
+        ownerId: 'u1',
+        startedAt: DateTime(2026, 1, 10),
+        lastSessionAt: now.subtract(
+          const Duration(days: 8),
+        ), // sessão há 8 dias
+        status: 'ativo',
+        publicationId: 'lff-book',
+        currentLesson: 22,
+        currentParagraph: 3,
+        language: 'pt',
+        frequency: 'semanal',
+        createdAt: now,
+        updatedAt: now,
+        revision: 1,
+      );
+
+      final part = StudyParticipantEntry(
+        id: 'sp-lucas',
+        studyId: study.id,
+        personId: student.id,
+        isPrimary: true,
+        createdAt: now,
+        updatedAt: now,
+        revision: 1,
+      );
+
+      final metrics = DashboardCalculator.calculate(
+        studies: [study],
+        sessions: [],
+        visits: [],
+        appointments: [],
+        activities: [],
+        people: [student],
+        participants: [part],
+        periodStart: periodStart,
+        periodEnd: periodEnd,
+        nowOverride: now,
+      );
+
+      // Não deve contar como sem contato recente (> 30 dias) pois teve sessão há 8 dias
+      expect(metrics.noRecentContactCount, equals(0));
+    });
+
+    test('TC-COUNT-20: Contato com compromisso futuro na agenda NÃO é sinalizado com no_next_action em getAttentionItems', () {
+      final person = PersonEntry(
+        id: 'p-scheduled',
+        name: 'Gabriel Agendado',
+        status: 'interessado',
+        tags: '[]',
+        firstContactAt: now,
+        nextActionAt: null, // sem nota em person
+        createdAt: now,
+        updatedAt: now,
+        revision: 1,
+      );
+
+      final futureAppt = AppointmentEntry(
+        id: 'appt-gabriel',
+        personId: person.id,
+        title: 'Revisita Gabriel',
+        startTime: now.add(
+          const Duration(days: 2),
+        ), // compromisso daqui a 2 dias
+        endTime: now.add(const Duration(days: 2, hours: 1)),
+        durationMinutes: 60,
+        status: 'confirmado',
+        isProvisional: false,
+        createdAt: now,
+        updatedAt: now,
+        revision: 1,
+      );
+
+      final attentionItems = DashboardCalculator.getAttentionItems(
+        people: [person],
+        studies: [],
+        participants: [],
+        appointments: [futureAppt],
+        nowOverride: now,
+      );
+
+      // Não deve conter item na categoria no_next_action pois há compromisso confirmado na agenda
+      expect(
+        attentionItems.any(
+          (item) =>
+              item.personId == person.id && item.category == 'no_next_action',
+        ),
+        isFalse,
+      );
+    });
   });
 }

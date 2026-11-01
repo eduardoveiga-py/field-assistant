@@ -166,6 +166,9 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
     String selectedPublicationId = 'lff-book';
     String selectedLanguage = 'pt';
     String selectedFrequency = 'semanal';
+    String selectedStatus = 'ativo';
+    DateTime selectedStartedAt = DateTime.now();
+    DateTime? selectedLastSessionAt;
     bool scheduleFirstStudy = true;
     DateTime firstStudyDateTime = DateTime.now().add(const Duration(days: 7));
     firstStudyDateTime = DateTime(
@@ -196,12 +199,132 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF7C3AED).withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: const Color(0xFF7C3AED).withValues(alpha: 0.25),
+                      ),
+                    ),
+                    child: const Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          size: 16,
+                          color: Color(0xFF7C3AED),
+                        ),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Estudo já em andamento? Defina a data real de início e a lição atual para que as estatísticas reflitam a realidade com precisão sem necessidade de sessões passadas fictícias.',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF5B21B6),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                   TextField(
                     controller: titleController,
                     decoration: const InputDecoration(
                       labelText: 'Título do estudo *',
                       hintText: 'Ex: Estudo da Família Lima',
                     ),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    initialValue: selectedStatus,
+                    decoration: const InputDecoration(
+                      labelText: 'Situação Inicial *',
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'ativo',
+                        child: Text('Ativo (Em andamento)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'pausado',
+                        child: Text('Pausado'),
+                      ),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) {
+                        setDialogState(() => selectedStatus = val);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  // Data de Início Real
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.calendar_today, size: 16),
+                          label: Text(
+                            'Início: ${AppDateUtils.formatDate(selectedStartedAt)}',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          onPressed: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: selectedStartedAt,
+                              firstDate: DateTime(2010),
+                              lastDate: DateTime.now().add(
+                                const Duration(days: 365),
+                              ),
+                            );
+                            if (picked != null) {
+                              setDialogState(() => selectedStartedAt = picked);
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  // Data da Última Sessão Realizada (opcional)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.history, size: 16),
+                          label: Text(
+                            selectedLastSessionAt != null
+                                ? 'Última Sessão: ${AppDateUtils.formatDate(selectedLastSessionAt!)}'
+                                : 'Última Sessão (opcional)',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          onPressed: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate:
+                                  selectedLastSessionAt ?? selectedStartedAt,
+                              firstDate: DateTime(2010),
+                              lastDate: DateTime.now(),
+                            );
+                            if (picked != null) {
+                              setDialogState(
+                                () => selectedLastSessionAt = picked,
+                              );
+                            }
+                          },
+                        ),
+                      ),
+                      if (selectedLastSessionAt != null)
+                        IconButton(
+                          icon: const Icon(Icons.clear, size: 16),
+                          tooltip: 'Remover data',
+                          onPressed: () => setDialogState(
+                            () => selectedLastSessionAt = null,
+                          ),
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
@@ -253,7 +376,7 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                         child: TextField(
                           controller: lessonController,
                           decoration: const InputDecoration(
-                            labelText: 'Lição Inicial',
+                            labelText: 'Lição Inicial / Atual',
                           ),
                           keyboardType: TextInputType.number,
                         ),
@@ -263,7 +386,7 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                         child: TextField(
                           controller: paragraphController,
                           decoration: const InputDecoration(
-                            labelText: 'Parágrafo Inicial',
+                            labelText: 'Parágrafo / Ponto',
                           ),
                           keyboardType: TextInputType.number,
                         ),
@@ -387,6 +510,9 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                     title: title,
                     publicationId: selectedPublicationId,
                     language: selectedLanguage,
+                    status: selectedStatus,
+                    startedAt: selectedStartedAt,
+                    lastSessionAt: selectedLastSessionAt,
                     currentLesson: initialLesson,
                     currentParagraph: initialPara,
                     frequency: selectedFrequency,
@@ -394,8 +520,21 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                     primaryParticipantId: person.id,
                   );
 
-                  if (person.status != 'estudo') {
-                    await repo.updatePerson(person.copyWith(status: 'estudo'));
+                  final shouldUpdateContact =
+                      selectedLastSessionAt != null &&
+                      (person.lastContactAt == null ||
+                          selectedLastSessionAt!.isAfter(
+                            person.lastContactAt!,
+                          ));
+                  if (person.status != 'estudo' || shouldUpdateContact) {
+                    await repo.updatePerson(
+                      person.copyWith(
+                        status: 'estudo',
+                        lastContactAt: shouldUpdateContact
+                            ? Value(selectedLastSessionAt)
+                            : Value(person.lastContactAt),
+                      ),
+                    );
                   }
 
                   if (scheduleFirstStudy) {
@@ -426,6 +565,285 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                   }
                 },
                 child: const Text('Iniciar Estudo'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  // Modal para editar dados de um estudo bíblico existente
+  void _showEditStudyDialog(BuildContext context, BibleStudyEntry study) {
+    final titleController = TextEditingController(text: study.title);
+    String selectedPublicationId = study.publicationId;
+    String selectedLanguage = study.language;
+    String selectedFrequency = study.frequency;
+    String selectedStatus = study.status;
+    DateTime realStartDate = study.startedAt;
+    DateTime? lastSessionDate = study.lastSessionAt;
+    final lessonController = TextEditingController(
+      text: (study.currentLesson ?? 1).toString(),
+    );
+    final paragraphController = TextEditingController(
+      text: (study.currentParagraph ?? 1).toString(),
+    );
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          return AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.edit_note, color: Color(0xFF7C3AED)),
+                SizedBox(width: 8),
+                Expanded(child: Text('Editar Dados do Estudo')),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: titleController,
+                    decoration: const InputDecoration(
+                      labelText: 'Título do estudo *',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    initialValue: selectedStatus,
+                    decoration: const InputDecoration(
+                      labelText: 'Situação do Estudo',
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'ativo', child: Text('Ativo')),
+                      DropdownMenuItem(
+                        value: 'pausado',
+                        child: Text('Pausado'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'concluido',
+                        child: Text('Concluído'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'encerrado',
+                        child: Text('Encerrado'),
+                      ),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) {
+                        setDialogState(() => selectedStatus = val);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  // Data de Início Real
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.calendar_today, size: 16),
+                          label: Text(
+                            'Início: ${AppDateUtils.formatDate(realStartDate)}',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          onPressed: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: realStartDate,
+                              firstDate: DateTime(2010),
+                              lastDate: DateTime.now().add(
+                                const Duration(days: 365),
+                              ),
+                            );
+                            if (picked != null) {
+                              setDialogState(() => realStartDate = picked);
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  // Lição e Ponto Atual
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: lessonController,
+                          decoration: const InputDecoration(
+                            labelText: 'Lição Atual',
+                            hintText: 'Ex: 15',
+                          ),
+                          keyboardType: TextInputType.number,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: paragraphController,
+                          decoration: const InputDecoration(
+                            labelText: 'Ponto / Parágrafo',
+                            hintText: 'Ex: 2',
+                          ),
+                          keyboardType: TextInputType.number,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  // Data da Última Sessão
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.history, size: 16),
+                          label: Text(
+                            lastSessionDate != null
+                                ? 'Última Sessão: ${AppDateUtils.formatDate(lastSessionDate!)}'
+                                : 'Última Sessão (opcional)',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          onPressed: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: lastSessionDate ?? DateTime.now(),
+                              firstDate: DateTime(2010),
+                              lastDate: DateTime.now(),
+                            );
+                            if (picked != null) {
+                              setDialogState(() => lastSessionDate = picked);
+                            }
+                          },
+                        ),
+                      ),
+                      if (lastSessionDate != null)
+                        IconButton(
+                          icon: const Icon(Icons.clear, size: 16),
+                          tooltip: 'Remover data',
+                          onPressed: () =>
+                              setDialogState(() => lastSessionDate = null),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    initialValue: selectedPublicationId,
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: 'Publicação'),
+                    items: PublicationCatalog.allPublications.map((p) {
+                      return DropdownMenuItem(
+                        value: p.id,
+                        child: Text(
+                          p.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setDialogState(() => selectedPublicationId = val);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    initialValue: selectedLanguage,
+                    decoration: const InputDecoration(
+                      labelText: 'Idioma do estudo',
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'pt', child: Text('Português')),
+                      DropdownMenuItem(
+                        value: 'bzs',
+                        child: Text('Libras (Língua de Sinais)'),
+                      ),
+                      DropdownMenuItem(value: 'tca', child: Text('Ticuna')),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) {
+                        setDialogState(() => selectedLanguage = val);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    initialValue: selectedFrequency,
+                    decoration: const InputDecoration(
+                      labelText: 'Frequência do estudo',
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'semanal',
+                        child: Text('Semanal (1x por semana)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'duas_vezes_semana',
+                        child: Text('Intensivo (2x por semana)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'quinzenal',
+                        child: Text('Quinzenal (A cada 15 dias)'),
+                      ),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) {
+                        setDialogState(() => selectedFrequency = val);
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancelar'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF7C3AED),
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: () async {
+                  final title = titleController.text.trim();
+                  if (title.isEmpty) return;
+                  final lesson =
+                      int.tryParse(lessonController.text.trim()) ?? 1;
+                  final paragraph =
+                      int.tryParse(paragraphController.text.trim()) ?? 1;
+
+                  final repo = ref.read(repositoryProvider);
+                  await repo.updateStudy(
+                    study.copyWith(
+                      title: title,
+                      status: selectedStatus,
+                      startedAt: realStartDate,
+                      lastSessionAt: Value(lastSessionDate),
+                      publicationId: selectedPublicationId,
+                      language: selectedLanguage,
+                      currentLesson: Value(lesson),
+                      currentParagraph: Value(paragraph),
+                      frequency: selectedFrequency,
+                    ),
+                  );
+
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Dados do estudo atualizados com sucesso!',
+                        ),
+                      ),
+                    );
+                  }
+                },
+                child: const Text('Salvar Alterações'),
               ),
             ],
           );
@@ -971,6 +1389,8 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
       text: person.preferredSchedule ?? '',
     );
     String currentStatus = person.status;
+    DateTime editFirstContact = person.firstContactAt;
+    DateTime? editLastContact = person.lastContactAt;
     final sectors = ref.read(sectorsStreamProvider).value ?? [];
 
     showDialog(
@@ -1071,6 +1491,119 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                                   setDialogState(() => currentStatus = val);
                                 }
                               },
+                            ),
+                            const SizedBox(height: 12),
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: AppTheme.primaryBlue.withValues(
+                                  alpha: 0.06,
+                                ),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: AppTheme.primaryBlue.withValues(
+                                    alpha: 0.2,
+                                  ),
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Row(
+                                    children: [
+                                      Icon(
+                                        Icons.history_edu,
+                                        size: 16,
+                                        color: AppTheme.primaryBlue,
+                                      ),
+                                      SizedBox(width: 6),
+                                      Text(
+                                        'Histórico Prévio (Primeiro Uso / Contato Antigo)',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppTheme.primaryBlue,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: OutlinedButton.icon(
+                                          icon: const Icon(
+                                            Icons.calendar_today,
+                                            size: 14,
+                                          ),
+                                          label: Text(
+                                            '1º Contato: ${AppDateUtils.formatDate(editFirstContact)}',
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                            ),
+                                          ),
+                                          onPressed: () async {
+                                            final p = await showDatePicker(
+                                              context: context,
+                                              initialDate: editFirstContact,
+                                              firstDate: DateTime(2010),
+                                              lastDate: DateTime.now(),
+                                            );
+                                            if (p != null) {
+                                              setDialogState(
+                                                () => editFirstContact = p,
+                                              );
+                                            }
+                                          },
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Expanded(
+                                        child: OutlinedButton.icon(
+                                          icon: const Icon(
+                                            Icons.history,
+                                            size: 14,
+                                          ),
+                                          label: Text(
+                                            editLastContact != null
+                                                ? 'Últ. Visita: ${AppDateUtils.formatDate(editLastContact!)}'
+                                                : 'Última Visita (opcional)',
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                            ),
+                                          ),
+                                          onPressed: () async {
+                                            final p = await showDatePicker(
+                                              context: context,
+                                              initialDate:
+                                                  editLastContact ??
+                                                  DateTime.now(),
+                                              firstDate: DateTime(2010),
+                                              lastDate: DateTime.now(),
+                                            );
+                                            if (p != null) {
+                                              setDialogState(
+                                                () => editLastContact = p,
+                                              );
+                                            }
+                                          },
+                                        ),
+                                      ),
+                                      if (editLastContact != null)
+                                        IconButton(
+                                          icon: const Icon(
+                                            Icons.clear,
+                                            size: 14,
+                                          ),
+                                          tooltip: 'Remover data',
+                                          onPressed: () => setDialogState(
+                                            () => editLastContact = null,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
                             const SizedBox(height: 16),
                             const Text(
@@ -1350,6 +1883,8 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                                 address: Value(fullAddress),
                                 latitude: Value(lat),
                                 longitude: Value(lng),
+                                firstContactAt: editFirstContact,
+                                lastContactAt: Value(editLastContact),
                                 preferredSchedule: Value(
                                   sched.isNotEmpty ? sched : null,
                                 ),
@@ -3971,42 +4506,57 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                                         ),
                                       ),
                                     ),
-                                    InkWell(
-                                      onTap: () => _showEditPersonTagsDialog(
-                                        context,
-                                        repo,
-                                        person,
-                                      ),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 6,
-                                          vertical: 2,
+                                    Semantics(
+                                      button: true,
+                                      label: 'Editar etiquetas',
+                                      child: InkWell(
+                                        onTap: () => _showEditPersonTagsDialog(
+                                          context,
+                                          repo,
+                                          person,
                                         ),
-                                        decoration: BoxDecoration(
-                                          color: AppTheme.primaryBlue
-                                              .withValues(alpha: 0.1),
-                                          borderRadius: BorderRadius.circular(
-                                            4,
+                                        borderRadius: BorderRadius.circular(4),
+                                        child: ConstrainedBox(
+                                          constraints: const BoxConstraints(
+                                            minWidth: 48,
+                                            minHeight: 48,
                                           ),
-                                        ),
-                                        child: const Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(
-                                              Icons.label_outline,
-                                              size: 12,
-                                              color: AppTheme.primaryBlue,
-                                            ),
-                                            SizedBox(width: 3),
-                                            Text(
-                                              'Tags',
-                                              style: TextStyle(
-                                                fontSize: 10,
-                                                fontWeight: FontWeight.bold,
-                                                color: AppTheme.primaryBlue,
+                                          child: Center(
+                                            child: Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 6,
+                                                    vertical: 2,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: AppTheme.primaryBlue
+                                                    .withValues(alpha: 0.1),
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                              ),
+                                              child: const Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(
+                                                    Icons.label_outline,
+                                                    size: 12,
+                                                    color: AppTheme.primaryBlue,
+                                                  ),
+                                                  SizedBox(width: 3),
+                                                  Text(
+                                                    'Tags',
+                                                    style: TextStyle(
+                                                      fontSize: 10,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      color:
+                                                          AppTheme.primaryBlue,
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
                                             ),
-                                          ],
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -5067,13 +5617,29 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                                 ),
                               ],
                             ),
-                            Text(
-                              '${progressPct.toStringAsFixed(1)}%',
-                              style: const TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF7C3AED),
-                              ),
+                            Row(
+                              children: [
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.edit_outlined,
+                                    color: Color(0xFF7C3AED),
+                                    size: 20,
+                                  ),
+                                  tooltip: 'Editar Dados do Estudo',
+                                  onPressed: () => _showEditStudyDialog(
+                                    context,
+                                    linkedStudy,
+                                  ),
+                                ),
+                                Text(
+                                  '${progressPct.toStringAsFixed(1)}%',
+                                  style: const TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF7C3AED),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
@@ -5441,12 +6007,15 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
             builder: (context, sessionSnapshot) {
               final sessions = sessionSnapshot.data ?? [];
               if (sessions.isEmpty) {
+                final isAdvanced = (linkedStudy.currentLesson ?? 1) > 1;
                 return Card(
                   child: Padding(
                     padding: const EdgeInsets.all(20),
                     child: Center(
                       child: Text(
-                        'Nenhuma sessão registrada para este estudo ainda.\nToque em "Registrar Sessão" ou "Registrar Conversa" para pontuar as lições.',
+                        isAdvanced
+                            ? 'Estudo em andamento (iniciado em ${AppDateUtils.formatDate(linkedStudy.startedAt)} • Lição atual: ${linkedStudy.currentLesson ?? 1}).\n${linkedStudy.lastSessionAt != null ? "Última sessão informada: ${AppDateUtils.formatDate(linkedStudy.lastSessionAt!)}.\n" : ""}Nenhuma sessão individual registrada no app ainda. Toque em "Registrar Sessão" para continuar acompanhando o progresso.'
+                            : 'Nenhuma sessão registrada para este estudo ainda.\nToque em "Registrar Sessão" ou "Registrar Conversa" para pontuar as lições.',
                         textAlign: TextAlign.center,
                         style: const TextStyle(color: AppTheme.textMuted),
                       ),
@@ -6735,6 +7304,65 @@ class PersonUnifiedTimelineSection extends ConsumerWidget {
                       color: const Color(0xFF10B981),
                     ),
                   );
+                }
+
+                // Se não há sessões avulsas registradas, inclui os marcos históricos informados
+                final study = linkedStudy;
+                if (study != null) {
+                  final hasStudyStart = items.any(
+                    (i) => i.date == study.startedAt,
+                  );
+                  if (!hasStudyStart) {
+                    items.add(
+                      _UnifiedTimelineEvent(
+                        date: study.startedAt,
+                        title: 'Início do Estudo Bíblico: ${study.title}',
+                        subtitle:
+                            'Iniciado em ${AppDateUtils.formatDate(study.startedAt)} • Lição Atual: ${study.currentLesson ?? 1}',
+                        tag: 'Marco Inicial',
+                        icon: Icons.flag_outlined,
+                        color: const Color(0xFF7C3AED),
+                      ),
+                    );
+                  }
+                  if (study.lastSessionAt != null) {
+                    final hasLastSession = items.any(
+                      (i) => i.date == study.lastSessionAt,
+                    );
+                    if (!hasLastSession) {
+                      items.add(
+                        _UnifiedTimelineEvent(
+                          date: study.lastSessionAt!,
+                          title:
+                              'Última Sessão Informada • Lição ${study.currentLesson ?? 1}',
+                          subtitle:
+                              'Realizada em ${AppDateUtils.formatDate(study.lastSessionAt!)} (Histórico Prévio)',
+                          tag: 'Estudo Bíblico',
+                          icon: Icons.school_outlined,
+                          color: const Color(0xFF7C3AED),
+                        ),
+                      );
+                    }
+                  }
+                } else {
+                  if (person.lastContactAt != null) {
+                    final hasLastContact = items.any(
+                      (i) => i.date == person.lastContactAt,
+                    );
+                    if (!hasLastContact) {
+                      items.add(
+                        _UnifiedTimelineEvent(
+                          date: person.lastContactAt!,
+                          title: 'Última Visita Informada',
+                          subtitle:
+                              'Realizada em ${AppDateUtils.formatDate(person.lastContactAt!)} (Histórico Prévio)',
+                          tag: 'Visita',
+                          icon: Icons.history,
+                          color: AppTheme.accentTeal,
+                        ),
+                      );
+                    }
+                  }
                 }
 
                 items.sort((a, b) => b.date.compareTo(a.date));

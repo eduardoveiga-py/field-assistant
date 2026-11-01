@@ -268,5 +268,65 @@ void main() {
       expect(fetched?.name, equals('Teste Construtor Padrao'));
       await defaultDb.close();
     });
+
+    test('createStudy persiste startedAt, lastSessionAt e enfileira payload de sincronização completo', () async {
+      final student = await repository.createPerson(name: 'Mateus');
+      final started = DateTime(2026, 7, 10, 15, 30);
+      final lastSession = DateTime(2026, 10, 20, 14, 0);
+
+      final study = await repository.createStudy(
+        title: 'Estudo Histórico Mateus',
+        participantPersonIds: [student.id],
+        startedAt: started,
+        lastSessionAt: lastSession,
+        currentLesson: 18,
+        currentParagraph: 4,
+        status: 'ativo',
+        publicationId: 'lff-book',
+      );
+
+      expect(study.title, equals('Estudo Histórico Mateus'));
+      expect(study.startedAt, equals(started));
+      expect(study.lastSessionAt, equals(lastSession));
+      expect(study.currentLesson, equals(18));
+      expect(study.currentParagraph, equals(4));
+
+      final pendingOps = await repository.getPendingSyncOperations();
+      final studyOp = pendingOps.firstWhere((op) => op.entityId == study.id);
+      expect(studyOp.entityType, equals('bible_studies'));
+      expect(studyOp.operation, equals('INSERT'));
+      expect(studyOp.payload, contains('"startedAt"'));
+      expect(studyOp.payload, contains('"lastSessionAt"'));
+      expect(studyOp.payload, contains('"currentLesson":18'));
+    });
+
+    test(
+      'createPerson persiste firstContactAt e lastContactAt no primeiro uso',
+      () async {
+        final firstContact = DateTime(2025, 5, 20);
+        final lastContact = DateTime(2026, 10, 15);
+
+        final person = await repository.createPerson(
+          name: 'Carlos Oliveira',
+          status: 'revisita',
+          firstContactAt: firstContact,
+          lastContactAt: lastContact,
+        );
+
+        expect(person.firstContactAt, equals(firstContact));
+        expect(person.lastContactAt, equals(lastContact));
+
+        final fetched = await repository.getPersonById(person.id);
+        expect(fetched?.firstContactAt, equals(firstContact));
+        expect(fetched?.lastContactAt, equals(lastContact));
+
+        final pendingOps = await repository.getPendingSyncOperations();
+        final personOp = pendingOps.firstWhere(
+          (op) => op.entityId == person.id,
+        );
+        expect(personOp.payload, contains('"firstContactAt"'));
+        expect(personOp.payload, contains('"lastContactAt"'));
+      },
+    );
   });
 }

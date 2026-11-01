@@ -629,10 +629,13 @@ class TodayScreen extends ConsumerWidget {
 
     final activeStudiesCount = studies.where((s) {
       if (s.deletedAt != null) return false;
-      final hadSessionThisMonth = monthHeldSessions.any(
-        (sess) => sess.studyId == s.id,
-      );
+      final hadSessionThisMonth =
+          monthHeldSessions.any((sess) => sess.studyId == s.id) ||
+          (s.lastSessionAt != null &&
+              !s.lastSessionAt!.isBefore(monthStart) &&
+              !s.lastSessionAt!.isAfter(monthEnd));
       if (hadSessionThisMonth) return true; // Conta na estatística mensal mesmo se repassado ou concluído depois
+      if (s.startedAt.isAfter(monthEnd)) return false;
       return s.status == 'ativo';
     }).length;
 

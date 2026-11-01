@@ -165,16 +165,37 @@ class DashboardCalculator {
           s.dateTimeField.isBefore(periodEnd.add(const Duration(seconds: 1)));
     }).toList();
 
+    // Estudos que tiveram sessão registrada no período (via sessions ou informada diretamente em lastSessionAt)
+    final studiesWithSessionInPeriod = <String>{};
+    for (final sess in heldSessions) {
+      studiesWithSessionInPeriod.add(sess.studyId);
+    }
+    for (final s in studies) {
+      if (s.deletedAt != null) continue;
+      if (s.lastSessionAt != null &&
+          s.lastSessionAt!.isAfter(
+            periodStart.subtract(const Duration(seconds: 1)),
+          ) &&
+          s.lastSessionAt!.isBefore(
+            periodEnd.add(const Duration(seconds: 1)),
+          )) {
+        studiesWithSessionInPeriod.add(s.id);
+      }
+    }
+
     // 2. Estudos Ativos no período (inclui estudos ativos ou que tiveram sessão realizada no período)
     final activeStudies = studies.where((s) {
-      final hasSessionInPeriod = heldSessions.any(
-        (sess) => sess.studyId == s.id,
-      );
+      if (s.deletedAt != null) return false;
+      final hasSessionInPeriod = studiesWithSessionInPeriod.contains(s.id);
       if (hasSessionInPeriod) {
         return true; // Se teve sessão no mês, conta nas estatísticas do mês!
       }
 
-      if (s.status.toLowerCase() != 'ativo' || s.deletedAt != null) {
+      if (s.status.toLowerCase() != 'ativo') {
+        return false;
+      }
+      // Se o estudo iniciou após o fim do período, não deve contar como ativo no período
+      if (s.startedAt.isAfter(periodEnd)) {
         return false;
       }
       final partIds = studyParticipantMap[s.id];
@@ -276,6 +297,30 @@ class DashboardCalculator {
           v.dateTimeField.isBefore(periodEnd.add(const Duration(seconds: 1)));
     }).toList();
 
+    // Contabiliza contatos ativos (revisitas) com lastContactAt no período sem registro avulso em visits
+    final peopleWithLoggedVisitsInPeriod = heldVisits
+        .map((v) => v.personId)
+        .toSet();
+    int onboardedVisitsCount = 0;
+    for (final p in activePeople) {
+      if (peopleWithLoggedVisitsInPeriod.contains(p.id)) continue;
+      if (p.lastContactAt != null &&
+          p.lastContactAt!.isAfter(
+            periodStart.subtract(const Duration(seconds: 1)),
+          ) &&
+          p.lastContactAt!.isBefore(
+            periodEnd.add(const Duration(seconds: 1)),
+          )) {
+        final isRevisita =
+            p.status.toLowerCase() == 'revisita' ||
+            p.lastContactAt!.isAfter(p.firstContactAt);
+        if (isRevisita) {
+          onboardedVisitsCount++;
+        }
+      }
+    }
+    final totalHeldVisits = heldVisits.length + onboardedVisitsCount;
+
     // 6. Não Estavam em Casa (Tentativas sem contato e ausências)
     final notAtHomeVisits = visits.where((v) {
       if (v.deletedAt != null) return false;
@@ -352,22 +397,60 @@ class DashboardCalculator {
         .length;
 
     // 12. Pessoas sem contato recente (> 30 dias ou nunca contatadas)
-    final noRecentContact = activePeople
-        .where(
-          (p) =>
-              p.status != 'outro' &&
-              (p.lastContactAt == null ||
-                  now.difference(p.lastContactAt!).inDays >= 30),
-        )
-        .length;
+    final personToStudyMap = <String, BibleStudyEntry>{};
+    for (final s in studies) {
+      if (s.deletedAt != null) continue;
+      final partIds = studyParticipantMap[s.id];
+      if (partIds != null) {
+        for (final pId in partIds) {
+          personToStudyMap[pId] = s;
+        }
+      }
+    }
+
+    final noRecentContact = activePeople.where((p) {
+      if (p.status == 'outro') return false;
+      DateTime? effectiveLastContact = p.lastContactAt;
+      final study = personToStudyMap[p.id];
+      if (study?.lastSessionAt != null) {
+        if (effectiveLastContact == null ||
+            study!.lastSessionAt!.isAfter(effectiveLastContact)) {
+          effectiveLastContact = study!.lastSessionAt;
+        }
+      }
+      return effectiveLastContact == null ||
+          now.difference(effectiveLastContact).inDays >= 30;
+    }).length;
 
     // 13. Assistência Total e Média por Estudo Bíblico no Período
+    int totalHeldSessions = heldSessions.length;
     int totalAttendance = 0;
     for (final session in heldSessions) {
       totalAttendance += parseSessionAttendance(session);
     }
-    final double avgAttendance = heldSessions.isNotEmpty
-        ? (totalAttendance / heldSessions.length)
+
+    final studiesWithLoggedSessions = heldSessions
+        .map((s) => s.studyId)
+        .toSet();
+    for (final s in studies) {
+      if (s.deletedAt != null) continue;
+      if (s.lastSessionAt != null &&
+          s.lastSessionAt!.isAfter(
+            periodStart.subtract(const Duration(seconds: 1)),
+          ) &&
+          s.lastSessionAt!.isBefore(
+            periodEnd.add(const Duration(seconds: 1)),
+          )) {
+        if (!studiesWithLoggedSessions.contains(s.id)) {
+          totalHeldSessions += 1;
+          final partCount = studyParticipantMap[s.id]?.length ?? 1;
+          totalAttendance += (partCount > 0 ? partCount : 1);
+        }
+      }
+    }
+
+    final double avgAttendance = totalHeldSessions > 0
+        ? (totalAttendance / totalHeldSessions)
         : 0.0;
 
     // 14. Publicações e Vídeos
@@ -496,9 +579,9 @@ class DashboardCalculator {
       endedStudiesByReason: endedByReason,
       endedVisitsCount: endedVisitsPeople.length,
       endedVisitsByReason: endedVisitsByReason,
-      heldSessionsCount: heldSessions.length,
+      heldSessionsCount: totalHeldSessions,
       uniqueParticipantsCount: uniqueParticipants.length,
-      heldVisitsCount: heldVisits.length,
+      heldVisitsCount: totalHeldVisits,
       scheduledVisitsCount: scheduledAppts.length,
       overdueVisitsCount: overdueAppts.length,
       completedAppointmentsCount: completedAppts,
@@ -826,7 +909,15 @@ class DashboardCalculator {
       if (study != null) {
         final lastSession = study.lastSessionAt ?? study.startedAt;
         final daysSinceLast = now.difference(lastSession).inDays;
-        if (daysSinceLast >= studyInactivityThresholdDays) {
+        // Evita falso positivo no primeiro uso do app para estudos em andamento cadastrados recentemente sem data de última sessão preenchida
+        final isNewlyOnboardedInApp =
+            study.lastSessionAt == null &&
+            study.createdAt.isAfter(study.startedAt) &&
+            now.difference(study.createdAt).inDays <
+                studyInactivityThresholdDays;
+
+        if (daysSinceLast >= studyInactivityThresholdDays &&
+            !isNewlyOnboardedInApp) {
           items.add(
             AttentionItem(
               personId: person.id,
@@ -842,7 +933,20 @@ class DashboardCalculator {
       }
 
       // 3. Pessoa sem próxima ação planejada
-      if (person.nextActionAt == null && person.status != 'outro') {
+      final hasFutureAppointment = appointments.any(
+        (a) =>
+            a.personId == person.id &&
+            a.deletedAt == null &&
+            a.status.toLowerCase() != 'cancelado' &&
+            a.startTime.isAfter(now),
+      );
+      final hasNextPlannedStudy =
+          study?.nextPlannedAt != null && study!.nextPlannedAt!.isAfter(now);
+
+      if (person.nextActionAt == null &&
+          !hasFutureAppointment &&
+          !hasNextPlannedStudy &&
+          person.status != 'outro') {
         items.add(
           AttentionItem(
             personId: person.id,

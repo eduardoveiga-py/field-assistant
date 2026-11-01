@@ -189,6 +189,8 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
     String selectedStatus = 'interessado';
     String selectedWeekday = 'Sábado';
     TimeOfDay selectedStudyTime = const TimeOfDay(hour: 9, minute: 0);
+    DateTime firstContactDate = DateTime.now();
+    DateTime? lastVisitDate;
 
     final sectors = ref.read(sectorsStreamProvider).value ?? [];
 
@@ -264,6 +266,95 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryBlue.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: AppTheme.primaryBlue.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(
+                            Icons.history_edu,
+                            size: 16,
+                            color: AppTheme.primaryBlue,
+                          ),
+                          SizedBox(width: 6),
+                          Text(
+                            'Histórico Prévio (Primeiro Uso / Contato Antigo)',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.primaryBlue,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              icon: const Icon(Icons.calendar_today, size: 14),
+                              label: Text(
+                                '1º Contato: ${AppDateUtils.formatDate(firstContactDate)}',
+                                style: const TextStyle(fontSize: 11),
+                              ),
+                              onPressed: () async {
+                                final p = await showDatePicker(
+                                  context: context,
+                                  initialDate: firstContactDate,
+                                  firstDate: DateTime(2010),
+                                  lastDate: DateTime.now(),
+                                );
+                                if (p != null) {
+                                  setDialogState(() => firstContactDate = p);
+                                }
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              icon: const Icon(Icons.history, size: 14),
+                              label: Text(
+                                lastVisitDate != null
+                                    ? 'Últ. Visita: ${AppDateUtils.formatDate(lastVisitDate!)}'
+                                    : 'Última Visita (opcional)',
+                                style: const TextStyle(fontSize: 11),
+                              ),
+                              onPressed: () async {
+                                final p = await showDatePicker(
+                                  context: context,
+                                  initialDate: lastVisitDate ?? DateTime.now(),
+                                  firstDate: DateTime(2010),
+                                  lastDate: DateTime.now(),
+                                );
+                                if (p != null) {
+                                  setDialogState(() => lastVisitDate = p);
+                                }
+                              },
+                            ),
+                          ),
+                          if (lastVisitDate != null)
+                            IconButton(
+                              icon: const Icon(Icons.clear, size: 14),
+                              tooltip: 'Remover data',
+                              onPressed: () =>
+                                  setDialogState(() => lastVisitDate = null),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 16),
                 const Text(
@@ -673,6 +764,8 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                   address: fullAddress,
                   latitude: lat,
                   longitude: lng,
+                  firstContactAt: firstContactDate,
+                  lastContactAt: lastVisitDate,
                   status: selectedStatus,
                   preferredSchedule: scheduleController.text.trim().isEmpty
                       ? null
@@ -1474,13 +1567,68 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                                                           minWidth: 48,
                                                           minHeight: 48,
                                                         ),
-                                                    child: const Center(
-                                                      child: Icon(
-                                                        Icons
-                                                            .add_circle_outline,
-                                                        size: 16,
-                                                        color: AppTheme
-                                                            .primaryBlue,
+                                                    child: Center(
+                                                      widthFactor: 1.0,
+                                                      heightFactor: 1.0,
+                                                      child: Container(
+                                                        padding:
+                                                            const EdgeInsets.symmetric(
+                                                              horizontal: 7,
+                                                              vertical: 3,
+                                                            ),
+                                                        decoration: BoxDecoration(
+                                                          color: isDark
+                                                              ? AppTheme
+                                                                    .primaryBlue
+                                                                    .withValues(
+                                                                      alpha:
+                                                                          0.18,
+                                                                    )
+                                                              : AppTheme
+                                                                    .primaryBlue
+                                                                    .withValues(
+                                                                      alpha:
+                                                                          0.08,
+                                                                    ),
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                4,
+                                                              ),
+                                                          border: Border.all(
+                                                            color: AppTheme
+                                                                .primaryBlue
+                                                                .withValues(
+                                                                  alpha: 0.4,
+                                                                ),
+                                                            width: 0.8,
+                                                          ),
+                                                        ),
+                                                        child: const Row(
+                                                          mainAxisSize:
+                                                              MainAxisSize.min,
+                                                          children: [
+                                                            Icon(
+                                                              Icons.add,
+                                                              size: 11,
+                                                              color: AppTheme
+                                                                  .primaryBlue,
+                                                            ),
+                                                            SizedBox(width: 3),
+                                                            ExcludeSemantics(
+                                                              child: Text(
+                                                                'Tag',
+                                                                style: TextStyle(
+                                                                  fontSize: 10,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .bold,
+                                                                  color: AppTheme
+                                                                      .primaryBlue,
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
                                                       ),
                                                     ),
                                                   ),

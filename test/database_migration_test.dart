@@ -479,19 +479,25 @@ void main() {
       expect(ver.read<int>('user_version'), equals(4));
 
       // Verifica que os dados foram preservados e a coluna pending_resolution existe e é acessível
-      final link = await (appDb.select(appDb.calendarEventLinks)..where((t) => t.id.equals('link_v3'))).getSingle();
+      final link = await (appDb.select(
+        appDb.calendarEventLinks,
+      )..where((t) => t.id.equals('link_v3'))).getSingle();
       expect(link.id, equals('link_v3'));
       expect(link.syncStatus, equals('conflict'));
       expect(link.pendingResolution, isNull);
 
       // Testa escrita na nova coluna
-      await (appDb.update(appDb.calendarEventLinks)..where((t) => t.id.equals('link_v3'))).write(
+      await (appDb.update(
+        appDb.calendarEventLinks,
+      )..where((t) => t.id.equals('link_v3'))).write(
         const CalendarEventLinksCompanion(
           pendingResolution: Value('keep_local'),
         ),
       );
 
-      final updated = await (appDb.select(appDb.calendarEventLinks)..where((t) => t.id.equals('link_v3'))).getSingle();
+      final updated = await (appDb.select(
+        appDb.calendarEventLinks,
+      )..where((t) => t.id.equals('link_v3'))).getSingle();
       expect(updated.pendingResolution, equals('keep_local'));
 
       await appDb.close();
