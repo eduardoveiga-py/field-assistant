@@ -120,6 +120,8 @@ class SupabaseSyncService {
     Map<String, dynamic> payload,
   ) {
     final sanitized = Map<String, dynamic>.from(payload);
+    sanitized.remove('_base');
+    sanitized.remove('baseData');
     if (entityType == 'voice_notes' || entityType == 'voiceNotes') {
       sanitized.remove('audio_file_path');
       sanitized.remove('audioFilePath');

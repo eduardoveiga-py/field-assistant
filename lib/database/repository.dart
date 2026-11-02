@@ -19,7 +19,12 @@ class AppRepository {
     required String entityId,
     required String operation,
     required Map<String, dynamic> payload,
+    Map<String, dynamic>? baseData,
   }) async {
+    final finalPayload = Map<String, dynamic>.from(payload);
+    if (baseData != null) {
+      finalPayload['_base'] = baseData;
+    }
     await db
         .into(db.syncQueue)
         .insert(
@@ -28,7 +33,7 @@ class AppRepository {
             entityType: entityType,
             entityId: entityId,
             operation: operation,
-            payload: jsonEncode(payload),
+            payload: jsonEncode(finalPayload),
             createdAt: DateTime.now(),
             status: const Value('pending'),
           ),
@@ -193,6 +198,7 @@ class AppRepository {
   }
 
   Future<void> updatePerson(PersonEntry person) async {
+    final existing = await getPersonById(person.id);
     final now = DateTime.now();
     final updated = person.copyWith(
       updatedAt: now,
@@ -222,6 +228,7 @@ class AppRepository {
           'nextActionNote': updated.nextActionNote,
           'revision': updated.revision,
         },
+        baseData: existing?.toJson(),
       );
     });
   }
@@ -374,6 +381,9 @@ class AppRepository {
   }
 
   Future<void> updateVisit(VisitEntry visit) async {
+    final existing = await (db.select(
+      db.visits,
+    )..where((tbl) => tbl.id.equals(visit.id))).getSingleOrNull();
     final now = DateTime.now();
     final updated = visit.copyWith(
       updatedAt: now,
@@ -394,6 +404,7 @@ class AppRepository {
           'suggestedReturnDate': updated.suggestedReturnDate?.toIso8601String(),
           'revision': updated.revision,
         },
+        baseData: existing?.toJson(),
       );
     });
   }
@@ -557,6 +568,7 @@ class AppRepository {
   }
 
   Future<void> updateStudy(BibleStudyEntry study) async {
+    final existing = await getStudyById(study.id);
     final now = DateTime.now();
     final updated = study.copyWith(
       updatedAt: now,
@@ -578,6 +590,7 @@ class AppRepository {
           'pauseOrCloseReason': updated.pauseOrCloseReason,
           'revision': updated.revision,
         },
+        baseData: existing?.toJson(),
       );
     });
   }
@@ -830,6 +843,9 @@ class AppRepository {
   }
 
   Future<void> updateAppointment(AppointmentEntry appointment) async {
+    final existing = await (db.select(
+      db.appointments,
+    )..where((tbl) => tbl.id.equals(appointment.id))).getSingleOrNull();
     final now = DateTime.now();
     final updated = appointment.copyWith(
       updatedAt: now,
@@ -863,6 +879,7 @@ class AppRepository {
           'status': updated.status,
           'revision': updated.revision,
         },
+        baseData: existing?.toJson(),
       );
     });
   }
@@ -1052,6 +1069,9 @@ class AppRepository {
   }
 
   Future<void> updateActivityRecord(ActivityRecordEntry activity) async {
+    final existing = await (db.select(
+      db.activityRecords,
+    )..where((tbl) => tbl.id.equals(activity.id))).getSingleOrNull();
     final now = DateTime.now();
     final updated = activity.copyWith(
       updatedAt: now,
@@ -1070,6 +1090,7 @@ class AppRepository {
           'notes': updated.notes,
           'revision': updated.revision,
         },
+        baseData: existing?.toJson(),
       );
     });
   }
