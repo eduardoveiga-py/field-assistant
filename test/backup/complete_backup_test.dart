@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:drift/native.dart';
 import 'package:drift/drift.dart' as drift;
@@ -12,15 +14,27 @@ void main() {
     late AppDatabase db;
     late AppRepository repo;
     late BackupService backupService;
+    late Directory testDocsDir;
 
-    setUp(() {
+    setUp(() async {
+      testDocsDir = await Directory.systemTemp.createTemp(
+        'complete_backup_test_',
+      );
       db = AppDatabase.forTesting(NativeDatabase.memory());
       repo = AppRepository(db);
-      backupService = BackupService(repo);
+      backupService = BackupService(
+        repo,
+        documentsDirectoryProvider: () async => testDocsDir,
+      );
     });
 
     tearDown(() async {
       await db.close();
+      if (testDocsDir.existsSync()) {
+        try {
+          await testDocsDir.delete(recursive: true);
+        } catch (_) {}
+      }
     });
 
     test('Exporta e restaura integralmente todas as 22 tabelas Drift com criptografia v2 (salt e IV)', () async {
@@ -280,9 +294,15 @@ void main() {
       expect(preview.sectorsToAdd, equals(0));
 
       // 4. Cria banco destino vazio e restaura
+      final targetDocsDir = await Directory.systemTemp.createTemp(
+        'complete_backup_target_',
+      );
       final targetDb = AppDatabase.forTesting(NativeDatabase.memory());
       final targetRepo = AppRepository(targetDb);
-      final targetBackupService = BackupService(targetRepo);
+      final targetBackupService = BackupService(
+        targetRepo,
+        documentsDirectoryProvider: () async => targetDocsDir,
+      );
 
       final targetPreview = await targetBackupService.previewBackup(
         encryptedDataString: encryptedJson,
@@ -341,6 +361,11 @@ void main() {
       expect(restoredCalEvents.first.title, equals('Evento Externo no Google'));
 
       await targetDb.close();
+      if (targetDocsDir.existsSync()) {
+        try {
+          await targetDocsDir.delete(recursive: true);
+        } catch (_) {}
+      }
     });
 
     test('Falha ao tentar descriptografar com senha incorreta', () async {

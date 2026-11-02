@@ -1491,8 +1491,10 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                                                 'revisita_passada') ...[
                                           const SizedBox(height: 4),
                                           Wrap(
-                                            spacing: 4,
+                                            spacing: 6,
                                             runSpacing: 4,
+                                            crossAxisAlignment:
+                                                WrapCrossAlignment.center,
                                             children: [
                                               if (person.status ==
                                                   'revisita_passada')
@@ -1527,25 +1529,36 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                                                   ),
                                                 ),
                                               ...personTagList.map(
-                                                (t) => Container(
-                                                  padding:
-                                                      const EdgeInsets.symmetric(
-                                                        horizontal: 6,
-                                                        vertical: 2,
+                                                (t) => InkWell(
+                                                  onTap: () =>
+                                                      _showEditTagsDialog(
+                                                        context,
+                                                        person,
                                                       ),
-                                                  decoration: BoxDecoration(
-                                                    color: isDark
-                                                        ? Colors.white10
-                                                        : Colors.grey.shade200,
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          4,
+                                                  borderRadius:
+                                                      BorderRadius.circular(4),
+                                                  child: Container(
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          horizontal: 6,
+                                                          vertical: 2,
                                                         ),
-                                                  ),
-                                                  child: Text(
-                                                    '#$t',
-                                                    style: const TextStyle(
-                                                      fontSize: 10,
+                                                    decoration: BoxDecoration(
+                                                      color: isDark
+                                                          ? Colors.white10
+                                                          : Colors
+                                                                .grey
+                                                                .shade200,
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            4,
+                                                          ),
+                                                    ),
+                                                    child: Text(
+                                                      '#$t',
+                                                      style: const TextStyle(
+                                                        fontSize: 10,
+                                                      ),
                                                     ),
                                                   ),
                                                 ),
@@ -1582,7 +1595,7 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                                                                     .primaryBlue
                                                                     .withValues(
                                                                       alpha:
-                                                                          0.18,
+                                                                          0.15,
                                                                     )
                                                               : AppTheme
                                                                     .primaryBlue
