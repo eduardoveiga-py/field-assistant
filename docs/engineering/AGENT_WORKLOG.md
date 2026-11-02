@@ -37,3 +37,8 @@
 - **Ação:** Inclusão de `recurrenceRuleStr` determinístico na computação do `computeEventFingerprint()` nas sincronizações do EventKit.
 - **Ação:** Criação e aprovação dos testes adversariais `TC-APPLE-ADV-01` e `TC-APPLE-ADV-02` em `test/appointments/calendar_sync_test.dart` (22 testes aprovados).
 - **Status:** Concluído.
+
+### Fase 5: Banco de Dados, Segurança e Integridade Global
+- **Ação:** Configuração de callback `setup` no `NativeDatabase.createInBackground` em `lib/database/connection/native.dart` para habilitar `PRAGMA foreign_keys = ON;`, `PRAGMA journal_mode = WAL;`, `PRAGMA synchronous = NORMAL;` e `busy_timeout = 5000;`.
+- **Ação:** Criação e aprovação de `test/database_integrity_test.dart` com testes `TC-DB-ADV-01` e `TC-DB-ADV-02` comprovando bloqueio de registros órfãos por Foreign Key.
+- **Status:** Concluído.
