@@ -4,7 +4,7 @@
 **Status Geral: REPROVADO PARA PRODUÇÃO**
 
 ### Justificativa Técnica
-Apesar de o aplicativo apresentar **100% de sucesso na suíte de 586 testes automatizados**, **0 issues de análise estática** e estabilização de staging de backup, cursor determinístico, integridade de chaves estrangeiras, schema remoto completo com RLS estrito e soft delete/tombstones, a publicação para produção está estritamente **bloqueada** por 3 pendências remanescentes (concorrência na agenda, microfone 30s e transcrição offline) e a ausência de validação em hardware físico Apple (iPhone/iPad).
+Apesar de o aplicativo apresentar **100% de sucesso na suíte de 591 testes automatizados**, **0 issues de análise estática** e estabilização de staging de backup, cursor determinístico, integridade de chaves estrangeiras, schema remoto completo com RLS estrito, soft delete/tombstones e hardening definitivo com 3-way merge real, a publicação para produção está estritamente **bloqueada** por pendências remanescentes fora do escopo de dados (concorrência de horários na agenda, timer de gravação de áudio e validação em hardware físico Apple iPhone/iPad).
 
 ---
 
@@ -15,7 +15,7 @@ Apesar de o aplicativo apresentar **100% de sucesso na suíte de 586 testes auto
 - [x] **Inicialização e configuração de produção validadas** *(APROVADO: Configuração e validação de ambiente na Unidade U1 via `AppConfig`; inicialização desacoplada, resiliente e ciclo de vida Riverpod em `main.dart` concluídos na Unidade U2 via `SupabaseInitializer`; retry de boot em U3.2)*
 - [x] **Banco local íntegro** *(APROVADO: Drift v4 com `PRAGMA foreign_keys = ON;`, `journal_mode = WAL;`, suporte IndexedDB via Wasm na Web)*
 - [x] **Migrações testadas e rastreáveis** *(APROVADO: `app_database.dart` atualizado na Unidade U3.2 com logging estruturado via `AppLogger.error` e `rethrow` de exceções de DDL, eliminando swallows silenciosos)*
-- [x] **Sincronização validada entre dispositivos** *(APROVADO: Schema remoto completo cobrindo todas as 10 tabelas, bucket de áudio de 10 MB, testes de serialização e pull em U3, integridade de soft delete/tombstones em U3.1, e 3-way merge determinístico com snapshot `_base` e preservação de áudio em U3.2)*
+- [x] **Sincronização validada entre dispositivos** *(APROVADO: Schema remoto completo cobrindo todas as 10 tabelas, bucket de áudio de 10 MB, testes de serialização e pull em U3, integridade de soft delete/tombstones em U3.1, e 3-way merge determinístico com snapshot `_base`, normalização profunda por valor de coleções em tags e preservação de áudio em U3.2)*
 - [ ] **Conflitos tratados explicitamente na Agenda** *(REPROVADO: Inserções concorrentes de horários idênticos em nós offline distintos geram sobreposição silenciosa pós-sync)*
 - [x] **RLS e permissões validadas** *(APROVADO: RLS ativo nas 10 tabelas e no bucket privado storage.objects com isolamento estrito por auth.uid() = owner_id e validação de posse da nota de voz em U3.2)*
 - [x] **Dados sensíveis adequadamente protegidos** *(APROVADO: Backup AES-256 GCM + PBKDF2; bloqueio ativo de chaves `service_role` em `AppConfig`, mascaramento em logs e `.gitignore` blindado para `.env*`)*
@@ -23,12 +23,12 @@ Apesar de o aplicativo apresentar **100% de sucesso na suíte de 586 testes auto
 - [ ] **Agenda validada contra concorrência** *(REPROVADO: Pendente detecção de colisões remotas)*
 - [ ] **Áudio validado em dispositivo real** *(REPROVADO: Timer de 30s não encerra o hardware de gravação; requer teste físico no iOS)*
 - [ ] **Transcrição documentada corretamente** *(REPROVADO: Descrita como "offline-first" no código, mas pode exigir rede no iOS/Web)*
-- [x] **Testes automatizados aprovados** *(APROVADO: 586 testes passando com 100% de sucesso)*
+- [x] **Testes automatizados aprovados** *(APROVADO: 591 testes passando com 100% de sucesso)*
 - [x] **Análise estática aprovada** *(APROVADO: `dart analyze lib test --fatal-infos` acusa 0 issues)*
 - [x] **Build Release Web aprovado** *(APROVADO: `flutter build web --release` compila com sucesso)*
 - [ ] **Archive iOS e instalação real validados** *(PENDENTE: Depende de runner macOS e Apple Developer Account)*
 - [ ] **Auditoria independente aprovada** *(PENDENTE: Aguardando correção dos itens P1)*
-- [x] **Documentação atualizada** *(APROVADO: Documentações de engenharia atualizadas com ADR-010, ADR-011, ADR-012, ADR-013, ADR-014 e 586 testes)*
+- [x] **Documentação atualizada** *(APROVADO: Documentações de engenharia atualizadas com ADR-010, ADR-011, ADR-012, ADR-013, ADR-014 e 591 testes)*
 
 ---
 

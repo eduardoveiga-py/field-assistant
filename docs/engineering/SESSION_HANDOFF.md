@@ -17,11 +17,13 @@
 
 2. **3-Way Merge Real e Preservação de Snapshot `_base` (BUG-U3-02 e BUG-U3-09):**
    - Em `PhoneContactsManager.updatePhoneContact`, `LandmarkManager.updateLandmark` e `VoiceNotesManager.saveVoiceNote`:
-     - O snapshot pré-edição (`existing.toMap()`) é capturado e gravado na carga da `syncQueue` como chave `_base`.
+     - O snapshot pré-edição (`existing.toMap()`) é capturado atomicamente e gravado na carga da `syncQueue` como chave `_base`.
      - Incremento monotônico do campo `revision: Value(existing.revision + 1)`.
-     - Todas as mutações locais e enfileiramentos na outbox foram encapsulados em `db.transaction`.
+     - Todas as mutações locais e enfileiramentos na outbox foram encapsulados em `db.transaction`, com guardas de não-mutação caso a entidade não exista.
+   - Em `SyncEngine.mergeEntities`:
+     - Normalização profunda por valor em coleções (`List` e `Map` como `tags`), eliminando falsos conflitos de identidade de memória no Dart.
    - Em `SupabaseSyncService._applyRemoteRecord`:
-     - Passado o `baseData` real extraído da outbox para `SyncEngine.mergeEntities`, eliminando a sobrescrita cega de alterações locais.
+     - Passado o `baseData` real extraído da outbox para `SyncEngine.mergeEntities`, eliminando a sobrescrita cega de alterações locais e preservando o snapshot na outbox.
 
 3. **Segurança Supabase Storage e Políticas RLS (BUG-U3-03 e BUG-U3-10):**
    - Criada migração versionada `supabase/migrations/20261102020000_u3_2_storage_and_hardening.sql`:
@@ -33,11 +35,16 @@
 4. **Preservação do Ponteiro Local de Áudio (BUG-U3-04):**
    - Em `SupabaseSyncService._updateLocalEntry` e `_applyRemoteRecord` para `voice_notes`:
      - Se o payload remoto trouxer `audioFilePath` nulo ou vazio, o caminho do arquivo de áudio local pré-existente (`existingNote.audioFilePath`) é preservado integralmente, prevenindo perda de referências a mídias locais em disco.
+   - Em `_downloadVoiceNoteAudio`:
+     - Checagem prévia em disco: se o arquivo já existe e possui tamanho > 0, evita downloads redundantes.
+     - Em caso de falha de rede/servidor (ex: HTTP 504), registra a pendência no `AppKvStore` (`pending_audio_download_$id`) para retentativa posterior via `retryPendingMediaDownloads()`.
 
 5. **Normalização de Tags JSONB e Booleans (BUG-U3-06):**
    - Em `SupabaseSyncService.toRemotePayload`:
      - `tags` de `phone_contacts` convertidas de string JSON para `List<dynamic>` nativo aceito pelo tipo PostgreSQL JSONB.
      - Flags `has_whatsapp` e `has_social` normalizadas de inteiros SQLite para booleanos nativos Dart.
+   - Em `normalizeRemotePayload`:
+     - Decodificação universal segura para arrays JSONB (`tags`, `participant_ids`).
 
 6. **Robustez e Transacionalidade de Requeue da Outbox (BUG-U3-07 e BUG-U3-08):**
    - Em `AppRepository.requeueFailedSyncOperations`:
@@ -54,23 +61,30 @@
 9. **Migrações Drift Resilientes:**
    - Em `lib/database/app_database.dart`: substituído `catch (_) {}` silencioso por `AppLogger.error` e `rethrow` nos métodos `_migrateLandmarksColumns`, `_migrateCustomTablesColumns` e `_migrateLegacyKvStore`.
 
-10. **Validação Automatizada Abrangente (13 Novos Testes Formais):**
-    - Criado `test/sync/supabase_hardening_u3_2_test.dart` com 13 testes cobrindo todas as correções de BUG-U3-02 a BUG-U3-10, ISSUE-U2-01 e ISSUE-U2-02.
-    - Total da suíte expandido de 573 para **586 testes**, todos aprovados com 100% de sucesso.
-    - Análise estática aprovada com **0 issues** sob `--fatal-infos`.
-    - Formatação aprovada (`dart format`).
+10. **Otimização de Throughput e Resiliência em Cálculos:**
+    - Em `lib/dashboard/pioneer_pace_calculator.dart`: otimização de iteração de dias com máscara binária de bits (`mask |= (1 << w)`), garantindo throughput superior a 10.000 iterações em tempo recorde sob carga extrema de CPU.
 
-11. **Memória Técnica e Documentação:**
+11. **Validação Automatizada Abrangente (18 Novos Testes Formais):**
+    - Criado `test/sync/supabase_hardening_u3_2_test.dart` com 17 testes formais.
+    - Expandido `test/sync_engine_test.dart` com teste de igualdade estrutural profunda em coleções.
+    - Total da suíte expandido de 573 para **591 testes**, todos aprovados com 100% de sucesso.
+    - Análise estática aprovada com **0 issues** sob `--fatal-infos`.
+    - Formatação estrita aprovada (`dart format`).
+    - Compilação Web de produção aprovada (`flutter build web --release`).
+
+12. **Memória Técnica e Documentação:**
     - Criado **ADR-014** em `docs/engineering/DECISION_LOG.md`.
     - Atualizados `IMPLEMENTATION_STATUS.md`, `PRODUCTION_READINESS.md`, `SESSION_HANDOFF.md`, `REGRESSION_GUARDRAILS.md` e `README.md`.
 
 ---
 
 ## 3. Estado Atual dos Testes e Ambiente
-- **Testes Unitários, Widget e Integração:** 586 aprovados, 0 falhas (`flutter test`).
+- **Testes Unitários, Widget e Integração:** 591 aprovados, 0 falhas (`flutter test`).
 - **Análise Estática:** 0 issues (`dart analyze lib test --fatal-infos`).
 - **Formatação de Código:** 100% em conformidade (`dart format`).
+- **Build Web Release:** `√ Built build\web` com sucesso.
 - **Branch Ativa:** `stabilization/u3.2-definitive-hardening`.
+- **Commit Final da U3.2:** `5dc1f96`.
 
 ---
 
