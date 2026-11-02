@@ -1,0 +1,34 @@
+# INVENTÁRIO E ESTADO DE IMPLEMENTAÇÃO DAS FUNCIONALIDADES
+
+Este documento mapeia o status real de cada funcionalidade do **Field Assistant**, contrastando código implementado, arquivos envolvidos, testes associados e problemas conhecidos.
+
+---
+
+## 1. Matriz de Funcionalidades
+
+| # | Funcionalidade | Módulo / Arquivos Principais | Testes Associados | Status Real | Problemas / Riscos Conhecidos |
+|---|---|---|---|---|---|
+| **F01** | **Gestão de Contatos e Pessoas** | `lib/contacts/`<br>`lib/database/repository.dart`<br>`lib/ui/screens/people_screen.dart`<br>`lib/ui/screens/person_detail_screen.dart` | `test/widget_test.dart`<br>`test/recent_seeds_test.dart`<br>`test/doorstep_briefing_adversarial_test.dart` | **Concluído com Débito Técnico** | `person_detail_screen.dart` é monolítico (7.346 linhas); `people_screen.dart` (2.054 linhas). Mutações indiretas foram corrigidas para a outbox. |
+| **F02** | **Registro de Visitas e Conversas** | `lib/database/repository.dart`<br>`lib/ui/screens/person_detail_screen.dart` | `test/unified_study_logging_test.dart`<br>`test/counting_rules_test.dart` | **Concluído** | Atualizações automáticas de data de último contato e próxima ação geram operação `UPDATE` para `people` na outbox. |
+| **F03** | **Estudos Bíblicos e Sessões** | `lib/dashboard/counting_rules.dart`<br>`lib/ui/screens/studies_screen.dart`<br>`lib/database/tables.dart` | `test/counting_rules_test.dart`<br>`test/voice_note_parser_theocratic_test.dart` | **Concluído com Débito Técnico** | `studies_screen.dart` possui 2.713 linhas. Separação de contagem de múltiplos participantes validada por 20 testes formais. |
+| **F04** | **Briefing na Porta (30s)** | `lib/contacts/doorstep_briefing_helper.dart`<br>`lib/ui/widgets/doorstep_briefing_card.dart` | `test/doorstep_briefing_test.dart`<br>`test/doorstep_briefing_adversarial_test.dart` | **Concluído** | Consolidação de lição, ponto, pendência, alvo e notas com deep link para JW Library. |
+| **F05** | **Agenda Estilo Consultório** | `lib/appointments/availability_engine.dart`<br>`lib/ui/screens/appointments_screen.dart` | `test/availability_engine_test.dart`<br>`test/appointments/calendar_sync_test.dart` | **Parcialmente Concluído (Gargalo de Concorrência)** | `appointments_screen.dart` possui 4.379 linhas. Validação local impede colisões locais, mas reservas simultâneas entre dois dispositivos offline geram colisões silenciosas pós-sincronização. |
+| **F06** | **Integração Apple EventKit e Google Calendar** | `lib/appointments/calendar_sync_coordinator.dart`<br>`lib/appointments/apple_eventkit_provider.dart`<br>`lib/appointments/google_calendar_provider.dart` | `test/appointments/calendar_sync_test.dart` (22 testes) | **Concluído e Blindado** | Proteção contra consultas parciais truncadas (>25%) e fingerprint SHA-256 com regra de recorrência. Necessita teste em dispositivo físico com calendário ativo. |
+| **F07** | **Calculadora de Ritmo de Pioneiro** | `lib/dashboard/pioneer_pace_calculator.dart`<br>`lib/ui/widgets/pioneer_pace_card.dart`<br>`lib/ui/screens/activities_screen.dart` | `test/pioneer_pace_calculator_test.dart`<br>`test/pioneer_pace_adversarial_test.dart` | **Concluído** | Testado contra anos bissextos, viradas de mês e estresse com TextScaler 2.0x sem overflow. |
+| **F08** | **Destaque de Sementes Recentes** | `lib/contacts/recent_seeds_helper.dart`<br>`lib/ui/screens/people_screen.dart` | `test/recent_seeds_test.dart` | **Concluído** | Badge visual de tempo decorrido nos contatos cadastrados há <= 7 dias sem revisita e chip de filtro. |
+| **F09** | **Botão Plano B Imediato** | `lib/appointments/plan_b_recommender.dart`<br>`lib/ui/widgets/plan_b_dialog.dart` | `test/plan_b_recommender_test.dart` | **Concluído** | Sugestão de 2 a 3 contatos mais próximos por Haversine geográfico e horários habituais ao desmarcar visita. |
+| **F10** | **Cronômetro Auto-Corretivo** | `lib/activities/auto_corrective_timer_logic.dart`<br>`lib/ui/screens/activities_screen.dart` | `test/auto_corrective_timer_test.dart` | **Concluído** | Persistência de timer no SQLite; alerta amigável ao ultrapassar 4h ininterruptas com diálogo de ajuste. |
+| **F11** | **Notas de Voz e Ditado** | `lib/voice_notes/audio_recording_service.dart`<br>`lib/voice_notes/voice_dictation_service.dart`<br>`lib/voice_notes/voice_note_parser.dart` | `test/voice_notes_test.dart` (15 testes) | **Parcialmente Concluído (Bug Crítico de Parada)** | **Bug P1:** O timer de 30 segundos apenas cancela a contagem mas NÃO interrompe o hardware de gravação. Transcrição "offline" depende de modelos do sistema operacional que podem não estar baixados. |
+| **F12** | **Backup e Restauração Criptografados** | `lib/settings/backup_service.dart`<br>`lib/ui/screens/settings_screen.dart` | `test/backup_service_test.dart` (18 testes) | **Concluído e Blindado** | AES-256 GCM + PBKDF2 (100k iterações); staging em 3 etapas com rollback transacional seguro de áudios; fallback para `/tmp` eliminado; suporte a snapshot em Web. |
+| **F13** | **Sincronização Offline-First Supabase** | `lib/sync/supabase_sync_service.dart`<br>`lib/sync/sync_engine.dart` | `test/supabase_sync_service_test.dart`<br>`test/sync_engine_test.dart` | **Bloqueado (P0 Inicialização e Migrações Incompletas)** | 1. `main.dart` não inicializa o Supabase.<br>2. Migrações remotas omitem 3 tabelas (`voice_notes`, `phone_contacts`, `territory_landmarks`) e bucket de storage.<br>3. `.env` não é injetado via `fromEnvironment`. |
+| **F14** | **Banco Local SQLite / Drift** | `lib/database/app_database.dart`<br>`lib/database/connection/native.dart`<br>`lib/database/connection/connection_web.dart` | `test/database_integrity_test.dart` | **Concluído com Ressalva P1 de Migrações** | Foreign Keys e WAL ativos. Migrações históricas usam `catch (_) {}` que silenciam falhas de alteração de schema. Banco nativo não possui criptografia em repouso por chave local. |
+| **F15** | **Mapa de Contatos e Território** | `lib/ui/screens/contacts_map_screen.dart`<br>`lib/territory/` | `test/unified_study_logging_test.dart` | **Concluído** | Reprojeção matemática de mapa sem ballooning; respeita a diretriz de não substituir a solução externa Hourglass. |
+| **F16** | **Configurações e Customização de Telas** | `lib/ui/screens/customize_features_screen.dart`<br>`lib/settings/app_settings_manager.dart` | `test/widget_test.dart` | **Concluído** | Feature flags ocultam itens na interface sem nunca executar migrações destrutivas de dados históricos. |
+
+---
+
+## 2. Quadro Resumo de Implementação
+- **Funcionalidades Totais Auditadas:** 16
+- **Totalmente Estabilizadas e Testadas:** 12 (75%)
+- **Parcialmente Implementadas com Débito / Risco P1:** 3 (18,75% — Concorrência na Agenda, Gravação de Áudio/Transcrição, Migrações do Banco Local)
+- **Bloqueadas por Defeitos P0:** 1 (6,25% — Sincronização Supabase remota: inicialização, schema de migrações e injeção de env)
