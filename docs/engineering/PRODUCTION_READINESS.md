@@ -23,12 +23,12 @@ Apesar de o aplicativo apresentar **100% de sucesso na suíte de 508 testes auto
 - [ ] **Agenda validada contra concorrência** *(REPROVADO: Pendente detecção de colisões remotas)*
 - [ ] **Áudio validado em dispositivo real** *(REPROVADO: Timer de 30s não encerra o hardware de gravação; requer teste físico no iOS)*
 - [ ] **Transcrição documentada corretamente** *(REPROVADO: Descrita como "offline-first" no código, mas pode exigir rede no iOS/Web)*
-- [x] **Testes automatizados aprovados** *(APROVADO: 534 testes passando com 100% de sucesso)*
+- [x] **Testes automatizados aprovados** *(APROVADO: 540 testes passando com 100% de sucesso)*
 - [x] **Análise estática aprovada** *(APROVADO: `dart analyze lib test --fatal-infos` acusa 0 issues)*
 - [x] **Build Release Web aprovado** *(APROVADO: `flutter build web --release` compila com sucesso)*
 - [ ] **Archive iOS e instalação real validados** *(PENDENTE: Depende de runner macOS e Apple Developer Account)*
 - [ ] **Auditoria independente aprovada** *(PENDENTE: Aguardando correção dos itens P0 e P1)*
-- [x] **Documentação atualizada** *(APROVADO: Documentações de engenharia atualizadas com ADR-010, ADR-011 e 534 testes)*
+- [x] **Documentação atualizada** *(APROVADO: Documentações de engenharia atualizadas com ADR-010, ADR-011 e 540 testes)*
 
 ---
 

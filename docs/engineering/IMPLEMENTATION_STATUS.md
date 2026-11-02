@@ -60,14 +60,14 @@ Este documento mapeia o status real de cada funcionalidade do **Field Assistant*
 - **Commit Base:** `9da0f21` (merge de U1)
 - **Branch Dedicada:** `stabilization/u2-supabase-lifecycle`
 - **Arquivos Alterados / Criados:**
-  - `lib/core/supabase_initializer.dart` (Novo: orquestrador desacoplado, enum de estados granular, lock assíncrono de concorrência com `Completer`, sanitização de credenciais, probe ativo `checkConnectivity`, listener de auth state, e providers Riverpod dedicados)
-  - `lib/main.dart` (Ordem de boot estrita: SQLite e repositório inicializam primeiro; inicialização remota do Supabase ocorre assíncrona e desacoplada via `unawaited`)
+  - `lib/core/supabase_initializer.dart` (Orquestrador centralizado, enum de estados granular, trava assíncrona de concorrência com `Completer`, sanitização de credenciais, probe ativo `checkConnectivity`, preservação de `authenticationRequired`, listener de auth state, e providers Riverpod dedicados)
+  - `lib/main.dart` (Ordem de boot estrita: SQLite e repositório inicializam primeiro; inicialização remota do Supabase ocorre assíncrona e desacoplada via `unawaited`; `supabaseSyncServiceProvider` ativado na raiz)
   - `lib/database/repository.dart` (Ajustado `getPendingSyncOperations()` para incluir operações `failed` com menos de 5 tentativas, garantindo durabilidade da outbox)
-  - `lib/sync/supabase_sync_service.dart` (Implementado `WidgetsBindingObserver` para resume de ciclo de vida em background, backoff exponencial com jitter clamped a 300s, `handleAppResume()`, `handleReconnection()`, e proteção contra `AssertionError` via `clientOrNull`)
-  - `test/core/supabase_initializer_test.dart` (Novo: 10 testes cobrindo modo offline, rejeição de credenciais inválidas, idempotência, concorrência simultânea, timeout e falhas de socket, probe de reachability, proteção de acesso e Riverpod)
-  - `test/sync/supabase_lifecycle_test.dart` (Novo: 7 testes cobrindo boot 100% offline sem exceções, durabilidade da outbox em falhas transitórias, limite de 5 retentativas sem starvation, cálculo de backoff com jitter, recuperação de conexão, background resume e transações locais concorrentes)
+  - `lib/sync/supabase_sync_service.dart` (Implementado `WidgetsBindingObserver` para resume de ciclo de vida em background, escuta a `stateStream` para reconexão automática, trava de reentrância `isSyncing`, blindagem 3-way merge em `_applyRemoteRecord`, backoff exponencial com jitter clamped a 300s, aborto seguro de loop em erros de rede e proteção contra `AssertionError` via `clientOrNull`)
+  - `test/core/supabase_initializer_test.dart` (12 testes cobrindo modo offline, rejeição de credenciais inválidas, idempotência, concorrência simultânea, timeout e falhas de socket, probe de reachability, preservação de `authenticationRequired`, notificação de rede e Riverpod)
+  - `test/sync/supabase_lifecycle_test.dart` (11 testes cobrindo boot 100% offline sem exceções, durabilidade da outbox em falhas transitórias, limite de 5 retentativas sem starvation, cálculo de backoff com jitter, recuperação de conexão, background resume, transações locais concorrentes, trava `isSyncing`, resiliência a falhas de rede, 3-way merge para failed ops e auto-reconexão via stream)
   - Documentação em `docs/engineering/` (ADR-011 adicionado em `DECISION_LOG.md`, matrizes atualizadas em `PRODUCTION_READINESS.md`, `SESSION_HANDOFF.md` e `REGRESSION_GUARDRAILS.md`)
-- **Testes Executados:** 534 testes aprovados (`flutter test`), 0 falhas, 0 issues de análise estática (`dart analyze lib test --fatal-infos`), build web release aprovado (`flutter build web --release`).
+- **Testes Executados:** 540 testes aprovados (`flutter test`), 0 falhas, 0 issues de análise estática (`dart analyze lib test --fatal-infos`), build web release aprovado (`flutter build web --release`).
 - **Resultado:** Aprovado em U2. Bloqueador P0-01 resolvido.
 - **Riscos Remanescentes:** Schema SQL remoto incompleto (P0-02, escopo da Unidade U3).
 - **Próxima Ação:** Executar Unidade U3 (Schema SQL remoto, Storage e validação RLS).

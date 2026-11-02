@@ -352,5 +352,239 @@ void main() {
       expect(result.totalProcessed, equals(20));
       expect(syncService.currentStatus, equals(SyncStatus.waitingConnection));
     });
+
+    test('8. Reentrância e Trava isSyncing: chamadas simultâneas a processQueue aguardam a execução ativa sem duplicar requisições', () async {
+      final validConfig = AppConfig.create(
+        environment: AppEnvironment.development,
+        supabaseUrl: 'https://reentrancy-test.supabase.co',
+        supabaseAnonKey: 'valid-anon-key-1234567890',
+      );
+
+      int remoteUpsertCalls = 0;
+      final mockHttpClient = MockClient((request) async {
+        remoteUpsertCalls++;
+        await Future.delayed(const Duration(milliseconds: 50));
+        return mockJsonResponse(request, []);
+      });
+
+      final mockClient = SupabaseClient(
+        validConfig.supabaseUrl,
+        validConfig.supabaseAnonKey,
+        httpClient: mockHttpClient,
+      );
+
+      final syncService = SupabaseSyncService(
+        db: db,
+        repository: repo,
+        config: validConfig,
+        clientOverride: mockClient,
+      );
+      addTearDown(syncService.dispose);
+
+      await repo.createPerson(name: 'Contato Reentrante');
+
+      // Dispara 5 chamadas simultâneas a processQueue
+      final futures = List.generate(
+        5,
+        (_) => syncService.processQueue(ignoreBackoff: true),
+      );
+
+      expect(syncService.isSyncing, isTrue);
+
+      final results = await Future.wait(futures);
+
+      expect(syncService.isSyncing, isFalse);
+      // Exatamente 1 envio remoto para o item, nunca 5 requisições duplicadas
+      expect(remoteUpsertCalls, equals(1));
+      for (final res in results) {
+        expect(res.successCount, equals(1));
+      }
+    });
+
+    test('9. Resiliência de Falha de Rede: preserva waitingConnection e aborta lote sem queimar tentativas dos próximos', () async {
+      final validConfig = AppConfig.create(
+        environment: AppEnvironment.development,
+        supabaseUrl: 'https://network-abort-test.supabase.co',
+        supabaseAnonKey: 'valid-anon-key-1234567890',
+      );
+
+      int httpCalls = 0;
+      final mockHttpClient = MockClient((req) async {
+        httpCalls++;
+        throw const SocketException('Host unresolvable');
+      });
+
+      final mockClient = SupabaseClient(
+        validConfig.supabaseUrl,
+        validConfig.supabaseAnonKey,
+        httpClient: mockHttpClient,
+      );
+
+      final syncService = SupabaseSyncService(
+        db: db,
+        repository: repo,
+        config: validConfig,
+        clientOverride: mockClient,
+      );
+      addTearDown(syncService.dispose);
+
+      // Cria 3 contatos na outbox
+      await repo.createPerson(name: 'Contato 1');
+      await repo.createPerson(name: 'Contato 2');
+      await repo.createPerson(name: 'Contato 3');
+
+      final pendingBefore = await repo.getPendingSyncOperations();
+      expect(pendingBefore.length, equals(3));
+
+      // Executa processQueue com rede indisponível
+      final result = await syncService.processQueue(ignoreBackoff: true);
+
+      // Status DEVE ser waitingConnection (não pode ser sobrescrito por error)
+      expect(syncService.currentStatus, equals(SyncStatus.waitingConnection));
+      // Interrompeu após a 1ª falha para não gastar chamadas nem queimar tentativas das outras 2 operações
+      expect(httpCalls, equals(1));
+      expect(result.failureCount, equals(1));
+
+      final allQueue = await (db.select(db.syncQueue)).get();
+      final failedOp = allQueue.firstWhere((q) => q.status == 'failed');
+      final pendingOps = allQueue.where((q) => q.status == 'pending').toList();
+
+      expect(failedOp.attempts, equals(1));
+      expect(pendingOps.length, equals(2));
+      for (final p in pendingOps) {
+        expect(p.attempts, equals(0)); // Não foram queimadas tentativas!
+      }
+    });
+
+    test('10. Integridade de Dados Locais: _applyRemoteRecord detecta outbox item com status failed e faz 3-way merge', () async {
+      final validConfig = AppConfig.create(
+        environment: AppEnvironment.development,
+        supabaseUrl: 'https://merge-test.supabase.co',
+        supabaseAnonKey: 'valid-anon-key-1234567890',
+      );
+
+      final person = await repo.createPerson(
+        name: 'Carlos Local',
+        phone: '11999990000',
+        generalNotes: 'Nota local original',
+      );
+
+      // Simula que a operação na outbox falhou temporariamente por falta de rede
+      final op = (await repo.getPendingSyncOperations()).first;
+      await (db.update(db.syncQueue)..where((t) => t.id.equals(op.id))).write(
+        const SyncQueueCompanion(
+          status: Value('failed'),
+          attempts: Value(1),
+          lastError: Value('SocketException transitória'),
+        ),
+      );
+
+      // Chega alteração remota com telefone atualizado remotamente
+      final remotePerson = {
+        'id': person.id,
+        'name': 'Carlos Local',
+        'phone': '11999991111', // Atualizado remotamente
+        'general_notes': 'Nota local original',
+        'status': 'interessado',
+        'first_contact_at': person.firstContactAt.toIso8601String(),
+        'updated_at': DateTime.now()
+            .add(const Duration(minutes: 5))
+            .toIso8601String(),
+        'revision': 2,
+      };
+
+      final mockHttpClient = MockClient((req) async {
+        if (req.url.path.contains('people')) {
+          return mockJsonResponse(req, [remotePerson]);
+        }
+        return mockJsonResponse(req, []);
+      });
+
+      final mockClient = SupabaseClient(
+        validConfig.supabaseUrl,
+        validConfig.supabaseAnonKey,
+        httpClient: mockHttpClient,
+      );
+
+      final syncService = SupabaseSyncService(
+        db: db,
+        repository: repo,
+        config: validConfig,
+        clientOverride: mockClient,
+      );
+      addTearDown(syncService.dispose);
+
+      // Executa fetchRemoteChanges
+      final pullResult = await syncService.fetchRemoteChanges();
+      expect(pullResult.successCount, equals(1));
+
+      // 3-way merge foi realizado: telefone remoto foi integrado sem destruir as notas locais
+      final updatedPerson = await (db.select(
+        db.people,
+      )..where((t) => t.id.equals(person.id))).getSingle();
+      expect(updatedPerson.phone, equals('11999991111'));
+      expect(updatedPerson.generalNotes, equals('Nota local original'));
+
+      // E a outbox foi atualizada com os dados mesclados
+      final updatedOp = (await repo.getPendingSyncOperations()).first;
+      final payload = jsonDecode(updatedOp.payload) as Map<String, dynamic>;
+      expect(payload['phone'], equals('11999991111'));
+    });
+
+    test('11. Auto-Reconexão via stateStream: transição para connected dispara handleReconnection automaticamente', () async {
+      final validConfig = AppConfig.create(
+        environment: AppEnvironment.development,
+        supabaseUrl: 'https://stream-reconnect.supabase.co',
+        supabaseAnonKey: 'valid-anon-key-1234567890',
+      );
+
+      int upsertCount = 0;
+      final mockHttpClient = MockClient((req) async {
+        if (req.method == 'POST') {
+          upsertCount++;
+        }
+        return mockJsonResponse(req, []);
+      });
+
+      final mockClient = SupabaseClient(
+        validConfig.supabaseUrl,
+        validConfig.supabaseAnonKey,
+        httpClient: mockHttpClient,
+      );
+
+      SupabaseInitializer.setMockStateForTesting(
+        state: SupabaseConnectionState.disconnected,
+        client: mockClient,
+        config: validConfig,
+        httpClient: mockHttpClient,
+      );
+
+      final syncService = SupabaseSyncService(
+        db: db,
+        repository: repo,
+        config: validConfig,
+        clientOverride: mockClient,
+      );
+      syncService.startLifecycleObservation();
+      addTearDown(syncService.dispose);
+
+      await repo.createPerson(name: 'Auto Reconnect Person');
+      expect((await repo.getPendingSyncOperations()).length, equals(1));
+
+      // Simula restauração de conexão detectada pelo SupabaseInitializer
+      SupabaseInitializer.setMockStateForTesting(
+        state: SupabaseConnectionState.connected,
+        client: mockClient,
+        config: validConfig,
+        httpClient: mockHttpClient,
+      );
+
+      // Aguarda processamento assíncrono do listener do stream
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      expect(upsertCount, greaterThanOrEqualTo(1));
+      final pendingAfter = await repo.getPendingSyncOperations();
+      expect(pendingAfter.isEmpty, isTrue);
+    });
   });
 }

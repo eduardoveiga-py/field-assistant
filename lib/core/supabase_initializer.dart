@@ -291,6 +291,11 @@ class SupabaseInitializer {
         final session = currentClient?.auth.currentSession;
         if (session != null && session.isExpired) {
           _updateState(SupabaseConnectionState.authenticationExpired);
+        } else if (_currentState ==
+                SupabaseConnectionState.authenticationRequired &&
+            session == null) {
+          // Não confunde conexão de rede ativa com autenticação de usuário
+          _updateState(SupabaseConnectionState.authenticationRequired);
         } else {
           _updateState(SupabaseConnectionState.connected);
         }
@@ -376,6 +381,14 @@ class SupabaseInitializer {
     }
     if (!_infoController.isClosed) {
       _infoController.add(_currentInfo);
+    }
+  }
+
+  /// Atualiza o estado para desconectado devido à falha de conectividade detectada em operações remotas.
+  static void setDisconnectedDueToNetwork(String reason) {
+    if (_currentState != SupabaseConnectionState.unconfigured &&
+        _currentState != SupabaseConnectionState.error) {
+      _updateState(SupabaseConnectionState.disconnected, errorMessage: reason);
     }
   }
 

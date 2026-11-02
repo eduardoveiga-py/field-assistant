@@ -141,10 +141,14 @@ Este registro preserva o contexto, as alternativas ponderadas e as consequência
   4. Blindar o acesso ao SDK Supabase via `SupabaseInitializer.clientOrNull`, retornando `null` com segurança em vez de lançar `AssertionError`.
   5. Adicionar escuta reativa a eventos de autenticação (`onAuthStateChange`) para detectar tokens expirados (`authenticationExpired`) e deslogamentos (`authenticationRequired`).
   6. Adicionar probe ativo de conectividade `checkConnectivity()` para validação de reachability contra `/rest/v1/` com timeout de 4 segundos.
-  7. Implementar ciclo de vida com `WidgetsBindingObserver` em `SupabaseSyncService` para disparar reavaliação de conectividade e sincronização imediata no retorno de segundo plano (`handleAppResume()`) e restauração de rede (`handleReconnection()`).
+  7. Implementar ciclo de vida com `WidgetsBindingObserver` em `SupabaseSyncService` e escuta a `SupabaseInitializer.stateStream` para disparar reavaliação de conectividade e sincronização imediata no retorno de segundo plano (`handleAppResume()`) e restauração automática de rede (`handleReconnection()`).
   8. Preservar durabilidade absoluta da outbox em `AppRepository.getPendingSyncOperations()` incluindo status `failed` com menos de 5 tentativas.
-  9. Implementar algoritmo de backoff exponencial com jitter aleatório (2^tentativas clamped em 300s + jitter até 25%) em `calculateBackoffSeconds`.
-  10. Evitar loops infinitos de rede pausando o processamento automático daquelas operações que atingem 5 tentativas consecutivas de falha, retendo-as fisicamente na tabela `sync_queue` para auditoria manual.
+  9. Blindar a mesclagem remota em `_applyRemoteRecord` para incluir operações na outbox com status `failed` (tentativas < 5) na resolução 3-way merge, prevenindo sobrescrita inadvertida de edições locais após falhas transitórias de envio.
+  10. Implementar trava de reentrância assíncrona (`isSyncing` e `_activeSyncCompleter`) em `SupabaseSyncService.processQueue` e `fetchRemoteChanges`, serializando chamadas concorrentes sem duplicação de requisições REST nem contenção SQLite.
+  11. Implementar algoritmo de backoff exponencial com jitter aleatório (2^tentativas clamped em 300s + jitter até 25%) em `calculateBackoffSeconds`.
+  12. Abortar imediatamente o lote em falhas de rede (`_isNetworkError`) para manter `SyncStatus.waitingConnection` e evitar queima prematura de tentativas nos itens subsequentes da fila.
+  13. Evitar loops infinitos de rede pausando o processamento automático daquelas operações que atingem 5 tentativas consecutivas de falha, retendo-as fisicamente na tabela `sync_queue` para auditoria manual.
 - **Justificativa:** Assegura que o aplicativo abra instantaneamente e funcione com 100% de capacidade local independente do status da rede ou do backend, enquanto orquestra sincronização transparente, segura e sem regressões na outbox.
-- **Consequências:** Zero dependência de rede no boot, zero crashes por `AssertionError`, durabilidade garantida da outbox local, reatividade Riverpod e recuperação automática de conectividade. Validado por 17 testes dedicados em `test/core/supabase_initializer_test.dart` e `test/sync/supabase_lifecycle_test.dart`, elevando o total da suíte para 534 testes 100% aprovados.
+- **Consequências:** Zero dependência de rede no boot, zero crashes por `AssertionError`, durabilidade garantida da outbox local, reatividade Riverpod e recuperação automática de conectividade. Validado por 23 testes dedicados em `test/core/supabase_initializer_test.dart` e `test/sync/supabase_lifecycle_test.dart`, elevando o total da suíte para 540 testes 100% aprovados.
+
 

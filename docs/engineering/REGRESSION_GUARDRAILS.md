@@ -50,6 +50,10 @@ Este documento define as regras fundamentais que **jamais podem ser violadas, en
    - O reprocessamento automático de operações deve ser limitado a 5 tentativas consecutivas (`attempts.isSmallerThanValue(5)` em `getPendingSyncOperations`). Ao atingir 5 falhas, a operação é pausada do envio automático para evitar saturação de bateria e rede, mas **permanece preservada no SQLite** para análise ou reativação manual.
 8. **Inicialização Desacoplada e Tolerante a Falhas:**
    - O boot da interface (`runApp()`) e o banco relacional local (`AppDatabase`) **nunca podem depender** de rede ou aguardar a resposta do backend Supabase. A inicialização remota deve ser assíncrona e não-bloqueante (`unawaited`). O acesso ao SDK deve ser blindado contra `AssertionError` via `SupabaseInitializer.clientOrNull`.
+9. **Reentrância e Serialização da Fila (isSyncing):**
+   - Chamadas concorrentes a `processQueue()` ou `fetchRemoteChanges()` devem ser serializadas via travas assíncronas (`isSyncing` e `_activeSyncCompleter`). Nunca permita que múltiplas rotinas processem simultaneamente a mesma fila de envio ou executem escritas concorrentes redundantes no banco local.
+10. **Proteção de Dados Locais em Falhas Transitórias:**
+    - Operações com status `failed` (tentativas < 5) na outbox representam mutações locais ativas ainda não convergidas. O processamento de alterações remotas (`_applyRemoteRecord`) deve obrigatoriamente incluí-las na resolução 3-way merge, sendo expressamente proibido sobrescrever dados locais sem reconciliação quando houver operação com status `failed` pendente.
 
 ---
 

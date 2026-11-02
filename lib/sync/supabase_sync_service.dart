@@ -53,6 +53,17 @@ class SupabaseSyncService with WidgetsBindingObserver {
   SyncStatus _currentStatus = SyncStatus.savedLocally;
   bool _isObservingLifecycle = false;
   final Map<String, DateTime> _lastAttemptTime = {};
+  bool _isSyncing = false;
+  Completer<SyncProcessResult>? _activeSyncCompleter;
+  bool _isFetchingRemote = false;
+  Completer<SyncProcessResult>? _activeFetchCompleter;
+  StreamSubscription<SupabaseConnectionState>? _connectionStateSubscription;
+
+  /// Retorna `true` se o processamento da fila de envio estiver em andamento.
+  bool get isSyncing => _isSyncing;
+
+  /// Retorna `true` se a busca de alterações remotas estiver em andamento.
+  bool get isFetchingRemote => _isFetchingRemote;
 
   static const List<String> syncTables = [
     'people',
@@ -120,17 +131,29 @@ class SupabaseSyncService with WidgetsBindingObserver {
     return (base + jitter).clamp(1, 300);
   }
 
-  /// Inicia a observação de mudanças de estado do ciclo de vida da aplicação Flutter.
+  /// Inicia a observação de mudanças de estado do ciclo de vida da aplicação Flutter e conectividade.
   void startLifecycleObservation() {
     if (!_isObservingLifecycle) {
       try {
         WidgetsBinding.instance.addObserver(this);
         _isObservingLifecycle = true;
       } catch (_) {}
+
+      _connectionStateSubscription?.cancel();
+      SupabaseConnectionState? previousState = SupabaseInitializer.currentState;
+      _connectionStateSubscription = SupabaseInitializer.stateStream.listen((
+        newState,
+      ) {
+        if (previousState != SupabaseConnectionState.connected &&
+            newState == SupabaseConnectionState.connected) {
+          unawaited(handleReconnection());
+        }
+        previousState = newState;
+      });
     }
   }
 
-  /// Encerra a observação do ciclo de vida.
+  /// Encerra a observação do ciclo de vida e conectividade.
   void stopLifecycleObservation() {
     if (_isObservingLifecycle) {
       try {
@@ -138,6 +161,8 @@ class SupabaseSyncService with WidgetsBindingObserver {
         _isObservingLifecycle = false;
       } catch (_) {}
     }
+    _connectionStateSubscription?.cancel();
+    _connectionStateSubscription = null;
   }
 
   @override
@@ -165,6 +190,8 @@ class SupabaseSyncService with WidgetsBindingObserver {
   /// Trata a recuperação explícita de conexão à internet.
   Future<void> handleReconnection() async {
     if (!isConfigured) return;
+    final activeClient = client;
+    if (activeClient == null) return;
     AppLogger.info(
       'SupabaseSyncService: Conexão restabelecida. Executando sincronização da outbox...',
     );
@@ -746,12 +773,22 @@ class SupabaseSyncService with WidgetsBindingObserver {
     try {
       final localMap = await _getLocalMap(table, id);
       final pendingOp =
-          await (db.select(db.syncQueue)..where(
-                (t) =>
-                    t.entityId.equals(id) &
-                    (t.status.equals('pending') |
-                        t.status.equals('in_progress')),
-              ))
+          await (db.select(db.syncQueue)
+                ..where(
+                  (t) =>
+                      t.entityId.equals(id) &
+                      (t.status.equals('pending') |
+                          t.status.equals('in_progress') |
+                          (t.status.equals('failed') &
+                              t.attempts.isSmallerThanValue(5))),
+                )
+                ..orderBy([
+                  (t) => drift.OrderingTerm(
+                    expression: t.createdAt,
+                    mode: drift.OrderingMode.desc,
+                  ),
+                ])
+                ..limit(1))
               .getSingleOrNull();
 
       if (localMap == null) {
@@ -882,6 +919,31 @@ class SupabaseSyncService with WidgetsBindingObserver {
 
   /// Busca e avalia alterações remotas mais recentes de forma incremental e paginada
   Future<SyncProcessResult> fetchRemoteChanges() async {
+    if (_activeFetchCompleter != null && !_activeFetchCompleter!.isCompleted) {
+      AppLogger.debug(
+        'SupabaseSyncService: fetchRemoteChanges já em andamento, aguardando término...',
+      );
+      return _activeFetchCompleter!.future;
+    }
+
+    final completer = Completer<SyncProcessResult>();
+    _activeFetchCompleter = completer;
+    _isFetchingRemote = true;
+
+    try {
+      final result = await _executeFetchRemoteChanges();
+      completer.complete(result);
+      return result;
+    } catch (e, st) {
+      completer.completeError(e, st);
+      rethrow;
+    } finally {
+      _isFetchingRemote = false;
+      _activeFetchCompleter = null;
+    }
+  }
+
+  Future<SyncProcessResult> _executeFetchRemoteChanges() async {
     if (!isConfigured) {
       return const SyncProcessResult(
         totalProcessed: 0,
@@ -889,6 +951,17 @@ class SupabaseSyncService with WidgetsBindingObserver {
         failureCount: 0,
         conflictCount: 0,
         message: 'Supabase não configurado. Busca remota suspensa.',
+      );
+    }
+
+    if (clientOverride == null && SupabaseInitializer.currentState.isOffline) {
+      _setStatus(SyncStatus.waitingConnection);
+      return const SyncProcessResult(
+        totalProcessed: 0,
+        successCount: 0,
+        failureCount: 0,
+        conflictCount: 0,
+        message: 'Dispositivo offline. Busca remota suspensa.',
       );
     }
 
@@ -908,6 +981,7 @@ class SupabaseSyncService with WidgetsBindingObserver {
     int successCount = 0;
     int failureCount = 0;
     int conflictCount = 0;
+    bool encounteredNetworkError = false;
     final List<String> errors = [];
 
     for (final table in syncTables) {
@@ -989,11 +1063,24 @@ class SupabaseSyncService with WidgetsBindingObserver {
         final err = 'Erro ao buscar alterações na tabela $table: $e';
         errors.add(err);
         failureCount++;
-        _setStatus(SyncStatus.error);
+        if (_isNetworkError(e)) {
+          encounteredNetworkError = true;
+          _setStatus(SyncStatus.waitingConnection);
+          if (clientOverride == null) {
+            SupabaseInitializer.setDisconnectedDueToNetwork(
+              'Falha de rede durante busca remota: $e',
+            );
+          }
+          break;
+        } else {
+          _setStatus(SyncStatus.error);
+        }
       }
     }
 
-    if (conflictCount > 0) {
+    if (encounteredNetworkError) {
+      _setStatus(SyncStatus.waitingConnection);
+    } else if (conflictCount > 0) {
       _setStatus(SyncStatus.conflict);
     } else if (failureCount > 0 || errors.isNotEmpty) {
       _setStatus(SyncStatus.error);
@@ -1014,6 +1101,33 @@ class SupabaseSyncService with WidgetsBindingObserver {
 
   /// Processa a fila persistente de sincronização com backoff exponencial e detecção de conflitos.
   Future<SyncProcessResult> processQueue({bool ignoreBackoff = false}) async {
+    if (_activeSyncCompleter != null && !_activeSyncCompleter!.isCompleted) {
+      AppLogger.debug(
+        'SupabaseSyncService: processQueue já em andamento, aguardando término...',
+      );
+      return _activeSyncCompleter!.future;
+    }
+
+    final completer = Completer<SyncProcessResult>();
+    _activeSyncCompleter = completer;
+    _isSyncing = true;
+
+    try {
+      final result = await _executeProcessQueue(ignoreBackoff: ignoreBackoff);
+      completer.complete(result);
+      return result;
+    } catch (e, st) {
+      completer.completeError(e, st);
+      rethrow;
+    } finally {
+      _isSyncing = false;
+      _activeSyncCompleter = null;
+    }
+  }
+
+  Future<SyncProcessResult> _executeProcessQueue({
+    bool ignoreBackoff = false,
+  }) async {
     final pendingOps = await repository.getPendingSyncOperations();
     if (pendingOps.isEmpty) {
       _setStatus(SyncStatus.synced);
@@ -1038,6 +1152,18 @@ class SupabaseSyncService with WidgetsBindingObserver {
       );
     }
 
+    if (clientOverride == null && SupabaseInitializer.currentState.isOffline) {
+      _setStatus(SyncStatus.waitingConnection);
+      return SyncProcessResult(
+        totalProcessed: pendingOps.length,
+        successCount: 0,
+        failureCount: 0,
+        conflictCount: 0,
+        message:
+            'Dispositivo offline. ${pendingOps.length} registros mantidos salvos localmente no SQLite.',
+      );
+    }
+
     final activeClient = client;
     if (activeClient == null) {
       _setStatus(SyncStatus.waitingConnection);
@@ -1056,6 +1182,7 @@ class SupabaseSyncService with WidgetsBindingObserver {
     int success = 0;
     int failure = 0;
     int conflicts = 0;
+    bool encounteredNetworkError = false;
     final List<String> errors = [];
 
     for (final op in pendingOps) {
@@ -1137,12 +1264,21 @@ class SupabaseSyncService with WidgetsBindingObserver {
         errors.add(err);
         await repository.markSyncOperationFailed(op.id, err);
         if (_isNetworkError(e)) {
+          encounteredNetworkError = true;
           _setStatus(SyncStatus.waitingConnection);
+          if (clientOverride == null) {
+            SupabaseInitializer.setDisconnectedDueToNetwork(
+              'Falha de rede durante sincronização: $e',
+            );
+          }
+          break; // Aborta imediatamente o lote sem queimar tentativas dos itens seguintes
         }
       }
     }
 
-    if (conflicts > 0) {
+    if (encounteredNetworkError) {
+      _setStatus(SyncStatus.waitingConnection);
+    } else if (conflicts > 0) {
       _setStatus(SyncStatus.conflict);
     } else if (failure > 0 || errors.isNotEmpty) {
       _setStatus(SyncStatus.error);

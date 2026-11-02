@@ -333,5 +333,78 @@ void main() {
       expect(container.read(supabaseClientProvider), isNotNull);
       expect(container.read(supabaseClientProvider), equals(dummyClient));
     });
+
+    test('11. Distinção transparente: checkConnectivity NÃO sobrescreve authenticationRequired para connected quando session é null', () async {
+      final validConfig = AppConfig.create(
+        environment: AppEnvironment.development,
+        supabaseUrl: 'https://auth-test.supabase.co',
+        supabaseAnonKey: 'valid-anon-key-1234567890',
+      );
+
+      final mockHttpClient = MockClient((req) async {
+        return http.Response('[]', 200);
+      });
+
+      final mockClient = SupabaseClient(
+        validConfig.supabaseUrl,
+        validConfig.supabaseAnonKey,
+        httpClient: mockHttpClient,
+      );
+
+      SupabaseInitializer.setMockStateForTesting(
+        state: SupabaseConnectionState.authenticationRequired,
+        client: mockClient,
+        config: validConfig,
+        httpClient: mockHttpClient,
+      );
+
+      expect(
+        SupabaseInitializer.currentState,
+        equals(SupabaseConnectionState.authenticationRequired),
+      );
+
+      // Probe de conectividade com resposta 200 do backend
+      final state = await SupabaseInitializer.checkConnectivity(
+        httpClient: mockHttpClient,
+      );
+
+      // Não pode regredir para connected pois o usuário continua deslogado!
+      expect(state, equals(SupabaseConnectionState.authenticationRequired));
+      expect(
+        SupabaseInitializer.currentState,
+        equals(SupabaseConnectionState.authenticationRequired),
+      );
+    });
+
+    test('12. Notificação de desconexão: setDisconnectedDueToNetwork transiciona estado e notifica streams', () async {
+      final validConfig = AppConfig.create(
+        environment: AppEnvironment.development,
+        supabaseUrl: 'https://disconnect-test.supabase.co',
+        supabaseAnonKey: 'valid-anon-key-1234567890',
+      );
+
+      SupabaseInitializer.setMockStateForTesting(
+        state: SupabaseConnectionState.connected,
+        config: validConfig,
+      );
+
+      final statesEmitted = <SupabaseConnectionState>[];
+      final sub = SupabaseInitializer.stateStream.listen(statesEmitted.add);
+
+      SupabaseInitializer.setDisconnectedDueToNetwork('Queda de DNS detectada');
+
+      await Future.delayed(const Duration(milliseconds: 20));
+      await sub.cancel();
+
+      expect(
+        SupabaseInitializer.currentState,
+        equals(SupabaseConnectionState.disconnected),
+      );
+      expect(
+        SupabaseInitializer.currentInfo.errorMessage,
+        contains('Queda de DNS'),
+      );
+      expect(statesEmitted, contains(SupabaseConnectionState.disconnected));
+    });
   });
 }

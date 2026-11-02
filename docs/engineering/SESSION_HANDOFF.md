@@ -4,6 +4,7 @@
 - **Data:** 02 de Novembro de 2026
 - **Branch Ativa:** `stabilization/u2-supabase-lifecycle` (criada a partir de `stabilization/u1-env-config` no commit `9da0f21`)
 - **Commit Base:** `9da0f21`
+- **Commit de Entrega U2:** `56e4420`
 - **Fase Executada:** **FASE 2 — ESTABILIZAÇÃO P0: UNIDADE U2 (INICIALIZAÇÃO DO SUPABASE, CICLO DE VIDA E RESILIÊNCIA OFFLINE)**
 
 ---
@@ -42,10 +43,10 @@
    - Substituição de acessos globais `Supabase.instance.client` pelo getter seguro `client` (delegado para `clientOverride ?? SupabaseInitializer.clientOrNull`), eliminando riscos de crash por `AssertionError`.
    - Limite de 5 tentativas consecutivas: operações que falham 5 vezes são pausadas do processamento contínuo para evitar starvation, mas permanecem preservadas no banco para auditoria manual.
 
-6. **Validação Automatizada Abrangente (17 Novos Testes):**
-   - `test/core/supabase_initializer_test.dart` (10 testes): modo offline unconfigured, configuração inválida com log mascarado, configuração válida, idempotência, concorrência simultânea (10 threads com completer lock), falhas de rede (`SocketException`), timeout de conexão (`TimeoutException`), probe ativo `checkConnectivity()`, proteção contra `AssertionError` em `clientOrNull`, reatividade Riverpod Notifiers.
-   - `test/sync/supabase_lifecycle_test.dart` (7 testes): boot 100% offline com mutações SQLite locais funcionais, preservação da outbox em falhas de rede, limite de 5 tentativas evitando loop infinito, algoritmo de backoff exponencial com jitter, recuperação de conexão esvaziando outbox, background resume com `handleAppResume`, estresse de concorrência com 20 inserções locais simultâneas na outbox.
-   - Total da suíte expandido de 517 para **534 testes**, todos aprovados com 100% de sucesso.
+6. **Validação Automatizada Abrangente (23 Novos Testes):**
+   - `test/core/supabase_initializer_test.dart` (12 testes): modo offline unconfigured, configuração inválida com log mascarado, configuração válida, idempotência, concorrência simultânea (10 threads com completer lock), falhas de rede (`SocketException`), timeout de conexão (`TimeoutException`), probe ativo `checkConnectivity()`, preservação estrita de `authenticationRequired` sem confusão com rede conectada, notificação de queda via `setDisconnectedDueToNetwork`, proteção contra `AssertionError` em `clientOrNull`, reatividade Riverpod Notifiers.
+   - `test/sync/supabase_lifecycle_test.dart` (11 testes): boot 100% offline com mutações SQLite locais funcionais, preservação da outbox em falhas de rede, limite de 5 tentativas evitando loop infinito, algoritmo de backoff exponencial com jitter, recuperação de conexão esvaziando outbox, background resume com `handleAppResume`, estresse de concorrência com 20 inserções locais simultâneas na outbox, trava de reentrância `isSyncing`, resiliência a falhas de rede sem queimar tentativas dos próximos itens, integridade de 3-way merge para failed ops e auto-reconexão via `stateStream`.
+   - Total da suíte expandido de 517 para **540 testes**, todos aprovados com 100% de sucesso.
    - Análise estática aprovada com **0 issues** sob `--fatal-infos`.
    - Formatação aprovada (`dart format`).
    - Compilação web release aprovada (`flutter build web --release`).
@@ -57,7 +58,7 @@
 ---
 
 ## 3. Estado Atual dos Testes e Ambiente
-- **Testes Unitários, Widget e Integração:** 534 aprovados, 0 falhas (`flutter test`).
+- **Testes Unitários, Widget e Integração:** 540 aprovados, 0 falhas (`flutter test`).
 - **Análise Estática:** 0 issues (`dart analyze lib test --fatal-infos`).
 - **Formatação de Código:** 100% em conformidade (`dart format --output=none --set-exit-if-changed lib test`).
 - **Build Web Release:** 100% aprovado (`flutter build web --release`).

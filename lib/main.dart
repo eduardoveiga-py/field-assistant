@@ -10,6 +10,7 @@ import 'core/app_theme.dart';
 import 'core/supabase_initializer.dart';
 import 'database/app_database.dart';
 import 'database/repository.dart';
+import 'sync/supabase_sync_service.dart';
 import 'ui/main_navigation_shell.dart';
 import 'ui/providers.dart';
 
@@ -65,6 +66,8 @@ class MinisterioPessoalApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Garante inicialização e observação de ciclo de vida e conectividade do SupabaseSyncService
+    ref.watch(supabaseSyncServiceProvider);
     final isSunMode = ref.watch(sunModeProvider);
 
     return MaterialApp(
