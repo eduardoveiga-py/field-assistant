@@ -2,76 +2,62 @@
 
 ## 1. Identificação da Sessão
 - **Data:** 01 de Novembro de 2026
-- **Branch Ativa:** `master`
-- **Último Commit:** `971ceec` (`docs(engineering): adicao da memoria tecnica operacional e relatorio de auditoria da Fase 1`)
-- **Fase Executada:** **FASE 1 — INVENTÁRIO INTEGRAL, AUDITORIA CRUZADA, REVALIDAÇÃO TÉCNICA E MEMÓRIA DE ENGENHARIA**
+- **Branch Ativa:** `stabilization/u1-env-config` (criada a partir de `master` no commit `19815c4`)
+- **Commit Base:** `19815c4`
+- **Fase Executada:** **FASE 2 — ESTABILIZAÇÃO P0: UNIDADE U1 (CONFIGURAÇÃO E INJEÇÃO DE AMBIENTE)**
 
 ---
 
-## 2. O Que Foi Realizado Nesta Sessão
-1. **Auditoria Integral da Arquitetura e Código:**
-   - Inspeção de todos os 17 submódulos em `lib/`, banco local Drift, sincronização Supabase, calendários, backup, mídias e telas UI.
-   - Análise estática com verificação em tempo real: `dart analyze lib test --fatal-infos` finalizado com **0 issues**.
-   - Execução integral da bateria de testes: `flutter test` executou todos os **508 testes automatizados com 100% de sucesso**.
-   - Verificação de compilação web e configurações de build iOS (`Info.plist`, `ci.yml`, `project.pbxproj`).
+## 2. O Que Foi Realizado Nesta Unidade (U1)
+1. **Preparação Obrigatória e Linha de Base:**
+   - Verificado HEAD correspondente ao commit `19815c4` com árvore limpa.
+   - Criada branch dedicada `stabilization/u1-env-config`.
+   - Executada linha de base: 508 testes aprovados, 0 issues no analisador estático.
 
-2. **Revalidação Empírica dos Problemas P0 / P1 / P2:**
-   - **P0-01 Confirmado:** `lib/main.dart` não inicializa o Supabase.
-   - **P0-02 Confirmado:** `supabase/migrations/20261026000000_initial_schema.sql` omite as tabelas `voice_notes`, `phone_contacts`, `territory_landmarks` e o bucket de Storage `voice_notes`.
-   - **P0-03 Confirmado:** `String.fromEnvironment` não lê arquivos `.env` sem flags explícitas no build.
-   - **P1-01 Confirmado:** `lib/voice_notes/audio_recording_service.dart` cancela o timer aos 30s mas não interrompe o hardware do gravador.
-   - **P1-02 Confirmado:** `lib/database/app_database.dart` silencia erros de DDL com `catch (_) {}`.
-   - **P1-03 Confirmado:** Reservas simultâneas de horários em dois dispositivos offline geram sobreposição silenciosa pós-sincronização.
-   - **P1-04 Confirmado:** Ditado declarado como "offline-first" depende de recursos do sistema operacional que podem exigir conexão ativa.
-   - **P2-01 Confirmado:** Telas monolíticas identificadas (`person_detail_screen.dart` com 7.346 linhas, `appointments_screen.dart` com 4.379 linhas, etc.).
-   - **P2-02 Confirmado:** Divergências no `README.md` (citando 32 e 412 testes em vez dos 508 reais).
+2. **Implementação Centralizada e Blindagem do `AppConfig` (`lib/core/app_config.dart`):**
+   - Criação do modelo imutável com enums `AppEnvironment` (`development`, `homologation`, `production`) e `ConfigStatus` (`unconfigured`, `valid`, `invalid`).
+   - Validação estrita de presença e formato de URLs: esquemas `http`/`https`, exigência obrigatória de `https` em `prod` sem exceção para localhost, e em `homolog` para hosts remotos.
+   - Proibição de credenciais básicas embebidas na URL (`userInfo`), query parameters e fragmentos em `SUPABASE_URL`, com normalização de trailing slashes e mascaramento seguro em logs.
+   - Bloqueio estrito de credenciais privilegiadas: detecção e rejeição de tokens `service_role` (inclusive em base64url com `-` e `_`), `supabase_admin`, `super_admin`, `admin`, `postgres` e tokens `sbp_`.
+   - Proibição de quebras de linha e espaços em branco internos na anon key.
+   - Mascaramento mandatório de dados sensíveis em logs (`maskedAnonKey` e `maskedUrl`), garantindo que segredos jamais vazem no console, com detalhamento de erros em `toDiagnosticString()`.
+   - Tratamento de ausência de configuração como um estado legítimo offline (`isOfflineOnly`), preservando 100% das mutações locais no Drift SQLite sem disparar exceções nem fingir sucesso.
+   - Provider Riverpod `appConfigProvider` para injeção de dependência desacoplada.
 
-3. **Geração da Memória Técnica Persistente em `docs/engineering/`:**
-   - Criados e consolidados:
-     - `MASTER_CONTEXT.md`
-     - `IMPLEMENTATION_STATUS.md`
-     - `PRODUCTION_READINESS.md`
-     - `DECISION_LOG.md`
-     - `SESSION_HANDOFF.md`
-     - `REGRESSION_GUARDRAILS.md`
-     - `INITIAL_AUDIT.md`
+3. **Integração com o SupabaseSyncService (`lib/sync/supabase_sync_service.dart`):**
+   - Delegação de `supabaseUrl` e `supabaseAnonKey` exclusivamente para `AppConfig`, eliminando campos duplicados e removendo todas as chamadas dispersas a `const String.fromEnvironment`.
+   - Distinção clara e honesta entre configuração ausente (modo offline local) e erro de conexão remota.
+
+4. **Templates de Variáveis de Ambiente, `.gitignore` e Automações de Build:**
+   - Criados templates versionados sem segredos: `.env.example`, `.env.homolog.example`, `.env.prod.example`.
+   - Blindado `.gitignore` com regra `.env*` e exceções `!.env.*.example`, garantindo que arquivos como `.env.prod` e `.env.homolog` jamais sejam versionados por engano.
+   - Atualizados scripts PowerShell e Batch (`run_web.ps1`, `run_web.bat`, `run_tests.ps1`) com parâmetro `-EnvFile` (e alias `-env`), detecção automática de `.env` local e flag estrita `--fatal-infos`.
+   - Criada documentação formal detalhada em `docs/ENVIRONMENT_CONFIGURATION.md`.
+   - Atualizado `README.md` com instruções completas e métrica real de 517 testes.
+
+5. **Validação Automatizada Abrangente:**
+   - Criada a suíte `test/core/app_config_test.dart` com **9 testes** cobrindo todos os cenários obrigatórios e ataques de borda (válido, url vazia, chave ausente, url inválida/userInfo, homolog, prod/localhost rejeitado, build sem remoto/offline, outbox preservada, delegação no sync service).
+   - Total de testes do repositório expandido para **517 testes**, todos aprovados com 100% de sucesso.
+   - Análise estática aprovada com **0 issues** sob `--fatal-infos`.
+   - Formatação aprovada (`dart format`).
+   - Compilação web release aprovada (`flutter build web --release`).
 
 ---
 
-## 3. Estado dos Testes e Ambiente
-- **Testes Unitários, Widget e Integração:** 508 aprovados, 0 falhas (`flutter test`).
+## 3. Estado Atual dos Testes e Ambiente
+- **Testes Unitários, Widget e Integração:** 517 aprovados, 0 falhas (`flutter test`).
 - **Análise Estática:** 0 issues (`dart analyze lib test --fatal-infos`).
-- **Formatação:** 100% aprovada (`dart format --output=none --set-exit-if-changed lib test`).
-- **Build Web Release:** 100% concluído (`flutter build web --release`).
+- **Formatação de Código:** 100% em conformidade (`dart format --output=none --set-exit-if-changed lib test`).
+- **Build Web Release:** 100% aprovado (`flutter build web --release`).
 
 ---
 
 ## 4. Próxima Tarefa Exata
-Aguardar autorização formal do usuário/coordenador para iniciar a **FASE 2: CORREÇÕES CONTROLADAS**.
+**PARAR E AGUARDAR AUTORIZAÇÃO FORMAL DO COORDENADOR PARA INICIAR A UNIDADE U2.**
 
-Quando autorizado, a ordem de execução deve ser:
-1. **Unidade 1 (P0):** Inicialização robusta e tolerante a falhas do Supabase em `lib/main.dart` com fallback para modo puramente local quando desconfigurado ou offline.
-2. **Unidade 2 (P0):** Criação de nova migração versionada `supabase/migrations/20261102000000_complete_sync_tables_and_storage.sql` com as tabelas `voice_notes`, `phone_contacts`, `territory_landmarks`, bucket `voice_notes` e políticas RLS de usuário.
-3. **Unidade 3 (P0):** Padronização da injeção de configuração de ambiente (`.env` via `--dart-define-from-file=.env` ou helper de configuração validado com mensagens de erro claras).
-4. **Unidade 4 (P1):** Correção do desligamento automático do gravador de áudio aos 30 segundos em `lib/voice_notes/audio_recording_service.dart`.
-5. **Unidade 5 (P1):** Eliminação de blocos `catch (_) {}` nas migrações do Drift em `lib/database/app_database.dart`, tornando falhas de DDL rastreáveis e transacionais.
-6. **Unidade 6 (P1):** Implementação de detecção e sinalização visual de sobreposições de horários provisórios/remotos na Agenda em `lib/appointments/`.
-7. **Unidade 7 (P1):** Correção da documentação e tratamento de disponibilidade de transcrição offline em `lib/voice_notes/voice_dictation_service.dart`.
-8. **Unidade 8 (P2):** Atualização dos números e requisitos no `README.md`.
-
----
-
-## 5. Comandos para Retomada Imediata
-```powershell
-# 1. Verificar integridade da árvore de trabalho
-git status
-
-# 2. Executar análise estática
-dart analyze lib test --fatal-infos
-
-# 3. Executar suíte de testes
-flutter test
-
-# 4. Compilar versão web para validação de integridade multiplataforma
-flutter build web --release
-```
+Quando autorizado, a Unidade U2 abordará:
+- **Unidade U2 — Inicialização do Supabase:**
+  - Inicialização centralizada e tolerante a falhas em `lib/main.dart` com `initializeSupabaseIfConfigured()`.
+  - Tratamento de falhas de inicialização, modo sem internet no boot, sessão expirada e ciclo de vida.
+  - Blindagem contra acessos prematuros a `Supabase.instance.client`.
+  - Garantia de que a falta de conectividade remota não bloqueia a abertura do aplicativo nem afeta o banco SQLite.

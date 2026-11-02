@@ -20,7 +20,7 @@ Este documento mapeia o status real de cada funcionalidade do **Field Assistant*
 | **F10** | **Cronômetro Auto-Corretivo** | `lib/activities/auto_corrective_timer_logic.dart`<br>`lib/ui/screens/activities_screen.dart` | `test/auto_corrective_timer_test.dart` | **Concluído** | Persistência de timer no SQLite; alerta amigável ao ultrapassar 4h ininterruptas com diálogo de ajuste. |
 | **F11** | **Notas de Voz e Ditado** | `lib/voice_notes/audio_recording_service.dart`<br>`lib/voice_notes/voice_dictation_service.dart`<br>`lib/voice_notes/voice_note_parser.dart` | `test/voice_notes_test.dart` (15 testes) | **Parcialmente Concluído (Bug Crítico de Parada)** | **Bug P1:** O timer de 30 segundos apenas cancela a contagem mas NÃO interrompe o hardware de gravação. Transcrição "offline" depende de modelos do sistema operacional que podem não estar baixados. |
 | **F12** | **Backup e Restauração Criptografados** | `lib/settings/backup_service.dart`<br>`lib/ui/screens/settings_screen.dart` | `test/backup_service_test.dart` (18 testes) | **Concluído e Blindado** | AES-256 GCM + PBKDF2 (100k iterações); staging em 3 etapas com rollback transacional seguro de áudios; fallback para `/tmp` eliminado; suporte a snapshot em Web. |
-| **F13** | **Sincronização Offline-First Supabase** | `lib/sync/supabase_sync_service.dart`<br>`lib/sync/sync_engine.dart` | `test/supabase_sync_service_test.dart`<br>`test/sync_engine_test.dart` | **Bloqueado (P0 Inicialização e Migrações Incompletas)** | 1. `main.dart` não inicializa o Supabase.<br>2. Migrações remotas omitem 3 tabelas (`voice_notes`, `phone_contacts`, `territory_landmarks`) e bucket de storage.<br>3. `.env` não é injetado via `fromEnvironment`. |
+| **F13** | **Sincronização Offline-First Supabase** | `lib/core/app_config.dart`<br>`lib/sync/supabase_sync_service.dart`<br>`lib/sync/sync_engine.dart` | `test/core/app_config_test.dart` (9 testes)<br>`test/supabase_sync_service_test.dart`<br>`test/sync_engine_test.dart` | **Em Estabilização (P0-03 Resolvido em U1; Bloqueado por P0-01 e P0-02)** | **U1 Concluída e Blindada:** Injeção e validação centralizada de ambiente implementada via `AppConfig`, com bloqueio de `service_role` (mesmo com base64url `-`/`_`), roles privilegiadas adicionais (`admin`, `postgres`), bloqueio de userInfo na URL e mascaramento seguro, normalização de trailing slash, HTTPS estrito em produção, proteção de `.gitignore` para `.env*`, e suporte a `.env` via `--dart-define-from-file`. Pendente U2 (Inicialização `main.dart`) e U3 (Schema remoto/Storage). |
 | **F14** | **Banco Local SQLite / Drift** | `lib/database/app_database.dart`<br>`lib/database/connection/native.dart`<br>`lib/database/connection/connection_web.dart` | `test/database_integrity_test.dart` | **Concluído com Ressalva P1 de Migrações** | Foreign Keys e WAL ativos. Migrações históricas usam `catch (_) {}` que silenciam falhas de alteração de schema. Banco nativo não possui criptografia em repouso por chave local. |
 | **F15** | **Mapa de Contatos e Território** | `lib/ui/screens/contacts_map_screen.dart`<br>`lib/territory/` | `test/unified_study_logging_test.dart` | **Concluído** | Reprojeção matemática de mapa sem ballooning; respeita a diretriz de não substituir a solução externa Hourglass. |
 | **F16** | **Configurações e Customização de Telas** | `lib/ui/screens/customize_features_screen.dart`<br>`lib/settings/app_settings_manager.dart` | `test/widget_test.dart` | **Concluído** | Feature flags ocultam itens na interface sem nunca executar migrações destrutivas de dados históricos. |
@@ -31,4 +31,27 @@ Este documento mapeia o status real de cada funcionalidade do **Field Assistant*
 - **Funcionalidades Totais Auditadas:** 16
 - **Totalmente Estabilizadas e Testadas:** 12 (75%)
 - **Parcialmente Implementadas com Débito / Risco P1:** 3 (18,75% — Concorrência na Agenda, Gravação de Áudio/Transcrição, Migrações do Banco Local)
-- **Bloqueadas por Defeitos P0:** 1 (6,25% — Sincronização Supabase remota: inicialização, schema de migrações e injeção de env)
+- **Em Estabilização P0:** 1 (6,25% — Sincronização Supabase remota: U1 concluída com 517 testes aprovados; U2 e U3 pendentes)
+
+---
+
+## 3. Registro de Execução da Fase 2 (Estabilização P0)
+
+### Unidade U1 — Configuração e Injeção de Ambiente
+- **Identificador:** `FASE2-U1`
+- **Commit Base:** `19815c4`
+- **Branch Dedicada:** `stabilization/u1-env-config`
+- **Arquivos Alterados / Criados:**
+  - `lib/core/app_config.dart` (Novo: modelo centralizado imutável, validador estrito de URL/chaves, bloqueio abrangente de credenciais privilegiadas, mascaramento de segredos em logs, normalização de trailing slash e userInfo masking)
+  - `lib/sync/supabase_sync_service.dart` (Integração com `AppConfig`, eliminação de `String.fromEnvironment` duplicados e campos delegados)
+  - `test/core/app_config_test.dart` (Novo: 9 testes cobrindo todos os cenários obrigatórios e ataques de borda)
+  - `.env.example`, `.env.homolog.example`, `.env.prod.example` (Templates versionados seguros sem segredos)
+  - `.gitignore` (Proteção estrita para `.env*` garantindo que `.env.prod` e `.env.homolog` jamais sejam comitados)
+  - `docs/ENVIRONMENT_CONFIGURATION.md` (Documentação formal de injeção e flags)
+  - `scripts/run_web.ps1`, `scripts/run_web.bat`, `scripts/run_tests.ps1` (Suporte a `-EnvFile`/`-env`, detecção automática de `.env` e `--fatal-infos`)
+  - `README.md` (Atualização da contagem de testes para 517 e comandos)
+- **Testes Executados:** 517 testes aprovados (`flutter test`), 0 falhas, 0 issues de análise estática (`dart analyze lib test --fatal-infos`).
+- **Resultado:** Aprovado em U1.
+- **Riscos Remanescentes:** Supabase ainda não é inicializado em `main.dart` (P0-01, escopo de U2); Schema SQL remoto incompleto (P0-02, escopo de U3).
+- **Dependências:** Autorização formal para prosseguir para a Unidade U2.
+- **Próxima Ação:** Executar Unidade U2 (Inicialização do Supabase tolerante a falhas em `main.dart`).

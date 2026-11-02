@@ -99,3 +99,24 @@ Este registro preserva o contexto, as alternativas ponderadas e as consequência
 - **Contexto:** Em `customize_features_screen.dart`, o usuário pode desativar telas ou submódulos (ex: experiências, publicações, notas de voz).
 - **Decisão:** A desativação de uma funcionalidade na interface apenas oculta seus pontos de entrada na UI. É expressamente proibido disparar `DROP TABLE` ou `DELETE` em dados históricos. Ao reativar a flag, todos os dados devem reaparecer intactos.
 - **Justificativa:** Preservação categórica do patrimônio de registros do publicador.
+
+---
+
+## ADR-010: Centralização e Validação Imutável de Ambiente via `AppConfig`
+- **Data:** Novembro de 2026 (Fase 2 — Unidade U1)
+- **Status:** Aprovado e Implementado
+- **Contexto:** A injeção de parâmetros do backend Supabase (`SUPABASE_URL` e `SUPABASE_ANON_KEY`) dependia de chamadas dispersas a `String.fromEnvironment()`. Quando variáveis não eram injetadas via `--dart-define-from-file`, o aplicativo assumia strings vazias sem distinção clara entre ausência de configuração e falha de conectividade. Havia risco de inserção acidental de credenciais privilegiadas (`service_role`) e vazamento de segredos em logs de depuração.
+- **Decisão:**
+  1. Centralizar toda a modelagem de configuração na classe imutável `AppConfig` (`lib/core/app_config.dart`).
+  2. Implementar validação estrita em tempo de compilação/inicialização com status explícito (`unconfigured`, `valid`, `invalid`).
+  3. Rejeitar categoricamente qualquer chave de autenticação com a role `service_role` (inclusive em base64url com `-` ou `_`), `supabase_admin`, `super_admin`, `admin`, `postgres` ou tokens `sbp_` via inspeção do payload JWT e de strings.
+  4. Proibir credenciais de autenticação embebidas na URL (Basic Auth `userInfo`), query parameters e fragmentos em `SUPABASE_URL`, mascarando eventuais dados de usuário em logs.
+  5. Exigir estritamente HTTPS em ambiente de produção (inclusive rejeitando `http://localhost`).
+  6. Normalizar URLs removendo barras finais redundantes.
+  7. Proibir espaços em branco internos e quebras de linha em `SUPABASE_ANON_KEY`.
+  8. Implementar mascaramento obrigatório de chaves (`maskedAnonKey`) em `toString()` e logs técnicos, e detalhar erros de validação em `toDiagnosticString()`.
+  9. Blindar `.gitignore` para ignorar `.env*` garantindo que `.env.prod` e `.env.homolog` não sejam versionados acidentalmente.
+  10. Tratar o modo sem configuração como um estado operacional offline legítimo e seguro (`isOfflineOnly`), sem lançar exceções e mantendo todas as mutações no SQLite.
+  11. Padronizar scripts de execução para auto-detecção de `.env` e injeção transparente de `--dart-define-from-file`.
+- **Justificativa:** Garante a inviolabilidade do modelo offline-first, previne vazamento de credenciais privilegiadas e elimina comportamentos indefinidos no boot.
+- **Consequências:** Inicialização 100% determinística, logs higienizados sem segredos e distinção formal entre modo offline e queda de rede. Validado pela suíte `test/core/app_config_test.dart` (9 testes dedicados, totalizando 517 testes no repositório).

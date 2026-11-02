@@ -69,3 +69,6 @@ Este documento define as regras fundamentais que **jamais podem ser violadas, en
    - Não inclua SDKs de rastreamento, publicidade ou telemetria de terceiros.
 4. **Preservação de Dados em Feature Flags:**
    - Desativar módulos em `customize_features_screen.dart` **não pode apagar dados históricos**. Ao reativar o módulo, todo o histórico deve reaparecer intacto.
+5. **Validação Estrita de Configuração e Injeção de Ambiente:**
+   - Toda configuração remota deve ser validada por `AppConfig`. Chaves com privilégio `service_role` e tokens administrativos são ativamente bloqueados antes de qualquer inicialização de rede. Segredos nunca podem ser impressos desmascarados em logs ou no console.
+

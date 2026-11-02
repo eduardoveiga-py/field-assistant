@@ -9,6 +9,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/app_config.dart';
 import '../database/app_database.dart';
 import '../database/repository.dart';
 import '../ui/providers.dart';
@@ -40,8 +41,7 @@ typedef SyncResult = SyncProcessResult;
 class SupabaseSyncService {
   final AppDatabase db;
   final AppRepository repository;
-  final String supabaseUrl;
-  final String supabaseAnonKey;
+  final AppConfig config;
   final SupabaseClient? clientOverride;
   final Future<String> Function()? documentsDirectoryProvider;
 
@@ -65,30 +65,30 @@ class SupabaseSyncService {
   SupabaseSyncService({
     required this.db,
     required this.repository,
-    this.supabaseUrl = const String.fromEnvironment(
-      'SUPABASE_URL',
-      defaultValue: '',
-    ),
-    this.supabaseAnonKey = const String.fromEnvironment(
-      'SUPABASE_ANON_KEY',
-      defaultValue: '',
-    ),
+    AppConfig? config,
+    String? supabaseUrl,
+    String? supabaseAnonKey,
     this.clientOverride,
     this.documentsDirectoryProvider,
-  });
+  }) : config =
+           config ??
+           (supabaseUrl != null || supabaseAnonKey != null
+               ? AppConfig.create(
+                   environment: AppEnvironment.development,
+                   supabaseUrl: supabaseUrl ?? '',
+                   supabaseAnonKey: supabaseAnonKey ?? '',
+                 )
+               : AppConfig.fromEnvironment());
+
+  String get supabaseUrl => config.supabaseUrl;
+  String get supabaseAnonKey => config.supabaseAnonKey;
 
   SyncStatus get currentStatus => _currentStatus;
   Stream<SyncStatus> get statusStream => _statusController.stream;
 
   bool get isConfigured {
     if (clientOverride != null) return true;
-    final url = supabaseUrl.trim();
-    final key = supabaseAnonKey.trim();
-    if (url.isEmpty || key.isEmpty) return false;
-    if (url.contains('your-supabase-url') || key.contains('your-anon-key')) {
-      return false;
-    }
-    return true;
+    return config.isConfigured;
   }
 
   void _setStatus(SyncStatus status) {
@@ -1091,7 +1091,8 @@ class SupabaseSyncService {
 /// Provider do serviço de sincronização do Supabase
 final supabaseSyncServiceProvider = Provider<SupabaseSyncService>((ref) {
   final repo = ref.watch(repositoryProvider);
-  return SupabaseSyncService(db: repo.db, repository: repo);
+  final config = ref.watch(appConfigProvider);
+  return SupabaseSyncService(db: repo.db, repository: repo, config: config);
 });
 
 /// Stream provider do status reativo de sincronização

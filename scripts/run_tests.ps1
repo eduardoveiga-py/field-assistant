@@ -9,8 +9,8 @@ if ($env:PATH -notlike "*C:\Users\vanes\flutter\bin*") {
     $env:PATH = "C:\Users\vanes\flutter\bin;$env:PATH"
 }
 
-Write-Host "`n[1/2] Executando Análise Estática (dart analyze)..." -ForegroundColor Yellow
-dart analyze lib test
+Write-Host "`n[1/2] Executando Análise Estática (dart analyze --fatal-infos)..." -ForegroundColor Yellow
+dart analyze lib test --fatal-infos
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "`n[FALHA] A análise estática encontrou erros ou avisos graves." -ForegroundColor Red

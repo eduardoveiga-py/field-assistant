@@ -65,7 +65,7 @@ lib/
   └── ui/                       # Telas (Hoje, Pessoas, Agenda, Estudos, Dashboard, Atividades, Lixeira, Ajustes)
 scripts/                        # Scripts para inicialização web e execução de testes no Windows
 supabase/                       # Migrações PostgreSQL e políticas RLS para sincronização
-test/                           # Suíte automatizada com 32 testes cobrindo todos os módulos
+test/                           # Suíte automatizada com 516 testes cobrindo todos os módulos
 ```
 
 ---
@@ -73,62 +73,72 @@ test/                           # Suíte automatizada com 32 testes cobrindo tod
 ## 🚀 Como Executar o Projeto Localmente
 
 ### Atalhos Prontos para Windows (PowerShell / Prompt)
-- Para rodar a versão Web no Chrome:
+- Para rodar a versão Web no Chrome com abertura automática e fallback:
   ```powershell
-  .\scripts\run_web.ps1
+  .\scripts\run_web.ps1 -Server
   ```
-  *(ou execute `scripts\run_web.bat` via duplo-clique no Explorer)*
-- Para rodar a análise estática e todos os testes:
+  *(detecta automaticamente o arquivo `.env` local caso exista)*
+- Para rodar especificando um arquivo de ambiente (ex: homologação):
+  ```powershell
+  .\scripts\run_web.ps1 -Server -EnvFile .env.homolog
+  ```
+- Para rodar a análise estática estrita (`--fatal-infos`) e todos os testes:
   ```powershell
   .\scripts\run_tests.ps1
   ```
 
 ### Pré-requisitos Manuais
-- **Flutter SDK**: Versão 3.27+ (estável) instalado.
-- **Dart SDK**: 3.5+ incluído no Flutter.
+- **Flutter SDK**: Versão 3.27+ (Dart 3.13+) instalado.
 - **Google Chrome** ou **Microsoft Edge** para testes em Web.
 
-### 1. Instalação das Dependências
+### 1. Configuração de Variáveis de Ambiente
+O aplicativo adota a arquitetura **Offline-First**:
+- Sem nenhuma configuração, o app opera 100% offline com persistência local em SQLite/IndexedDB.
+- Para habilitar sincronização com o Supabase, configure o arquivo `.env` a partir do template:
+  ```bash
+  cp .env.example .env
+  ```
+  *(Consulte [docs/ENVIRONMENT_CONFIGURATION.md](docs/ENVIRONMENT_CONFIGURATION.md) para detalhes completos)*
+
+### 2. Instalação das Dependências
 ```bash
 flutter pub get
 ```
 
-### 2. Geração de Código do Banco Drift
-Caso altere alguma tabela ou query:
-```bash
-dart run build_runner build --force-jit --delete-conflicting-outputs
-```
-
 ### 3. Execução no Navegador (Web)
 ```bash
+# Modo com injeção de variáveis de ambiente:
+flutter run -d chrome --dart-define-from-file=.env
+
+# Modo puramente offline:
 flutter run -d chrome
 ```
 
-### 4. Execução no Desktop (Windows)
+### 4. Compilação para Produção (Web & iOS Release)
 ```bash
-flutter run -d windows
-```
+# Web Release:
+flutter build web --release --dart-define-from-file=.env.prod
 
-### 5. Compilação para Produção (Web Release)
-```bash
-flutter build web --release
+# iOS Release (IPA):
+flutter build ipa --release --dart-define-from-file=.env.prod
 ```
 
 ---
 
 ## 🧪 Suíte de Testes Automatizados
 
-Para executar todos os 412 testes automatizados unitários, transacionais, adversariais e de interface:
+Para executar todos os **517 testes automatizados** unitários, transacionais, adversariais e de interface:
 ```bash
 flutter test
 ```
 
 Para validar a integridade estática do código (zero erros, zero warnings, zero infos):
 ```bash
-dart analyze lib test
+dart analyze lib test --fatal-infos
 ```
 
-### Cobertura de Testes (412 Testes Aprovados)
+### Cobertura de Testes (517 Testes Aprovados com 100% de Sucesso)
+- `test/core/app_config_test.dart`: Validação centralizada de ambiente (dev/homolog/prod), bloqueio de chaves privilegiadas (`service_role`), URLs válidas, mascaramento de segredos em logs e modo offline resiliente.
 - `test/counting_rules_test.dart`: Regras de contagem de estudos com múltiplos participantes, sessões, visitas, ações pendentes e contatos recentes.
 - `test/availability_engine_test.dart`: Detecção de sobreposição, contenção, horários consecutivos, buffers, sugestões inteligentes e status realizado.
 - `test/publication_link_resolver_test.dart`: Resolução de links em Português, Libras e fallback seguro.
@@ -140,6 +150,7 @@ dart analyze lib test
 - `test/pioneer_pace_adversarial_test.dart` & `test/pioneer_pace_card_adversarial_test.dart`: Desafios adversariais de calendário, anos bissextos, metas extremas, estresse de renderização 320px com TextScaler 2.0x e persistência concorrente.
 - `test/doorstep_briefing_adversarial_test.dart`: Briefing na porta, sementes recentes, textos ultra-longos e acessibilidade sob sol.
 - `test/widget_test.dart`: Navegação responsiva iPad (`NavigationRail`) e iPhone XR (`NavigationBar`), sem vazamentos de layout.
+
 
 ---
 

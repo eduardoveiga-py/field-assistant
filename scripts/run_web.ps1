@@ -42,6 +42,9 @@ param(
     [Alias("c")]
     [switch]$Clean,
 
+    [Alias("e", "env")]
+    [string]$EnvFile = "",
+
     [Alias("h", "?")]
     [switch]$Help
 )
@@ -222,7 +225,23 @@ if ($Clean) {
     flutter clean
 }
 
-# 5. Iniciar aplicação
+# 5. Detecção de variáveis de ambiente (.env)
+$envArgs = @()
+if ($EnvFile -ne "") {
+    if (Test-Path $EnvFile) {
+        Write-Host "`n[CONFIG] Utilizando arquivo de ambiente especificado: $EnvFile" -ForegroundColor Cyan
+        $envArgs = @("--dart-define-from-file=$EnvFile")
+    } else {
+        Write-Host "`n[AVISO] Arquivo de ambiente especificado não encontrado: $EnvFile" -ForegroundColor Yellow
+    }
+} elseif (Test-Path ".env") {
+    Write-Host "`n[CONFIG] Arquivo .env local detectado. Injetando --dart-define-from-file=.env" -ForegroundColor Cyan
+    $envArgs = @("--dart-define-from-file=.env")
+} else {
+    Write-Host "`n[CONFIG] Nenhum arquivo .env detectado. Executando em modo puramente offline." -ForegroundColor DarkGray
+}
+
+# 6. Iniciar aplicação
 $browserFlags = @(
     "--remote-allow-origins=*",
     "--disable-extensions",
@@ -245,7 +264,7 @@ if ($Mode -eq "web-server") {
     Start-BrowserWhenReady -targetPort $Port
     
     Write-Host "`n[4/4] Executando 'flutter run -d web-server --web-port $Port'..." -ForegroundColor Green
-    & flutter run -d web-server --web-port $Port
+    & flutter run -d web-server --web-port $Port @envArgs
 } else {
     Write-Host "`n[3/4] Iniciando no $Mode com flags de isolamento e permissão de origens..." -ForegroundColor Cyan
     Write-Host "  -> Porta: $Port" -ForegroundColor Cyan
@@ -257,9 +276,9 @@ if ($Mode -eq "web-server") {
     }
 
     Write-Host "[4/4] Executando flutter run -d $Mode..." -ForegroundColor Green
-    & flutter run -d $Mode @extraArgs
+    & flutter run -d $Mode @extraArgs @envArgs
 
-    # 6. Tratamento de fallback caso flutter run termine com erro (ex: DWDS timeout)
+    # 7. Tratamento de fallback caso flutter run termine com erro (ex: DWDS timeout)
     if ($LASTEXITCODE -ne 0) {
         Write-Host "`n==========================================================" -ForegroundColor Red
         Write-Host " [AVISO] Falha ou encerramento inesperado no ${Mode}/DWDS." -ForegroundColor Red
@@ -273,6 +292,6 @@ if ($Mode -eq "web-server") {
         Write-Host "`nIniciando servidor local resiliente em http://localhost:$Port..." -ForegroundColor Green
         Start-BrowserWhenReady -targetPort $Port -preferredBrowser $Mode
         
-        & flutter run -d web-server --web-port $Port
+        & flutter run -d web-server --web-port $Port @envArgs
     }
 }

@@ -10,25 +10,25 @@ Apesar de o aplicativo apresentar **100% de sucesso na suíte de 508 testes auto
 
 ## 2. Checklist de Aprovação para Produção (Critérios da Seção 12)
 
-- [ ] **Todos os P0 resolvidos** *(REPROVADO: Falhas P0-01, P0-02 e P0-03 ativas)*
+- [ ] **Todos os P0 resolvidos** *(REPROVADO: Falhas P0-01 e P0-02 ativas; P0-03 resolvido na Unidade U1)*
 - [ ] **Todos os P1 resolvidos ou formalmente aceitos** *(REPROVADO: Falhas P1-01, P1-02, P1-03 e P1-04 ativas)*
-- [ ] **Inicialização e configuração de produção validadas** *(REPROVADO: `main.dart` não inicializa o Supabase e `.env` não é lido por `String.fromEnvironment`)*
+- [ ] **Inicialização e configuração de produção validadas** *(PARCIAL: Configuração e validação de ambiente concluídas na Unidade U1 via `AppConfig`; inicialização em `main.dart` pendente na Unidade U2)*
 - [x] **Banco local íntegro** *(APROVADO: Drift v4 com `PRAGMA foreign_keys = ON;`, `journal_mode = WAL;`, suporte IndexedDB via Wasm na Web)*
 - [ ] **Migrações testadas e rastreáveis** *(REPROVADO: `app_database.dart` possui blocos `catch (_) {}` que silenciam falhas de DDL)*
 - [ ] **Sincronização validada entre dispositivos** *(REPROVADO: Migração SQL remota não contém tabelas `voice_notes`, `phone_contacts`, `territory_landmarks` nem storage bucket)*
 - [ ] **Conflitos tratados explicitamente na Agenda** *(REPROVADO: Inserções concorrentes de horários idênticos em nós offline distintos geram sobreposição silenciosa pós-sync)*
 - [ ] **RLS e permissões validadas** *(PARCIAL: RLS ativo nas 7 primeiras tabelas, ausente nas tabelas e storage omitidos)*
-- [x] **Dados sensíveis adequadamente protegidos** *(APROVADO: Backup AES-256 GCM + PBKDF2; sem chaves `service_role` comitadas)*
+- [x] **Dados sensíveis adequadamente protegidos** *(APROVADO: Backup AES-256 GCM + PBKDF2; bloqueio ativo de chaves `service_role` em `AppConfig`, mascaramento em logs e `.gitignore` blindado para `.env*`)*
 - [x] **Backup e restauração testados com staging seguro** *(APROVADO: Staging em 3 etapas com rollback verificado por `TC-BAK-ADV-01` a `04`)*
 - [ ] **Agenda validada contra concorrência** *(REPROVADO: Pendente detecção de colisões remotas)*
 - [ ] **Áudio validado em dispositivo real** *(REPROVADO: Timer de 30s não encerra o hardware de gravação; requer teste físico no iOS)*
 - [ ] **Transcrição documentada corretamente** *(REPROVADO: Descrita como "offline-first" no código, mas pode exigir rede no iOS/Web)*
-- [x] **Testes automatizados aprovados** *(APROVADO: 508 testes passando com 100% de sucesso)*
+- [x] **Testes automatizados aprovados** *(APROVADO: 517 testes passando com 100% de sucesso)*
 - [x] **Análise estática aprovada** *(APROVADO: `dart analyze lib test --fatal-infos` acusa 0 issues)*
 - [x] **Build Release Web aprovado** *(APROVADO: `flutter build web --release` compila com sucesso)*
 - [ ] **Archive iOS e instalação real validados** *(PENDENTE: Depende de runner macOS e Apple Developer Account)*
 - [ ] **Auditoria independente aprovada** *(PENDENTE: Aguardando correção dos itens P0 e P1)*
-- [ ] **Documentação atualizada** *(PARCIAL: Atualizada nesta Fase 1; README.md possui contagens legadas de 32 e 412 testes)*
+- [x] **Documentação atualizada** *(APROVADO: README.md atualizado para 517 testes e `docs/ENVIRONMENT_CONFIGURATION.md` criado na Unidade U1)*
 
 ---
 
@@ -39,16 +39,19 @@ Apesar de o aplicativo apresentar **100% de sucesso na suíte de 508 testes auto
    - **Arquivo:** `lib/main.dart:9-12`
    - **Evidência:** `main()` só invoca `WidgetsFlutterBinding.ensureInitialized()` e `runApp()`. `Supabase.initialize()` nunca é executado. Ao injetar credenciais, o acesso a `Supabase.instance.client` em `supabase_sync_service.dart` lança exceção em tempo de execução.
    - **Impacto:** O aplicativo é incapaz de sincronizar dados com o backend Supabase em produção.
+   - **Status:** **PENDENTE (Alvo da Unidade U2)**.
 
 2. **P0-02: Migrações SQL Remotas Incompletas (Descompasso de Tabelas e Storage)**
    - **Arquivo:** `supabase/migrations/20261026000000_initial_schema.sql` vs `lib/sync/supabase_sync_service.dart:52-63`
    - **Evidência:** `syncTables` sincroniza `voice_notes`, `phone_contacts` e `territory_landmarks`, e faz upload de mídias para o bucket `voice_notes`. O arquivo de migração não cria essas 3 tabelas nem o bucket de Storage.
    - **Impacto:** Erro HTTP 404 / PostgREST `42P01` (relação não existe) e falha total no envio/recepção de notas de voz, contatos e pontos de território.
+   - **Status:** **PENDENTE (Alvo da Unidade U3)**.
 
 3. **P0-03: Falha no Mecanismo de Injeção de Variáveis de Ambiente (`.env`)**
-   - **Arquivo:** `lib/sync/supabase_sync_service.dart:68-75` vs `.env.example`
-   - **Evidência:** O código usa `const String.fromEnvironment('SUPABASE_URL')`. Criar o arquivo `.env` recomendado em `.env.example` não surte efeito sem `--dart-define-from-file=.env`. Não há fallback ou validação no build.
-   - **Impacto:** O aplicativo assume silenciosamente strings vazias e desativa o sync sem aviso claro de erro de configuração.
+   - **Arquivo:** `lib/core/app_config.dart`, `lib/sync/supabase_sync_service.dart`, `scripts/run_web.ps1`
+   - **Evidência Original:** O código dependia de `const String.fromEnvironment('SUPABASE_URL')` sem validação, sem fallback offline explícito e sem documentação clara sobre `--dart-define-from-file`.
+   - **Resolução em U1:** Implementada a classe imutável `AppConfig` com validação de presença, checagem de URLs/esquemas, bloqueio estrito de credenciais privilegiadas (`service_role`), mascaramento seguro em logs técnicos, suporte automático a `-EnvFile`/`--dart-define-from-file`, templates `.env.example`, `.env.homolog.example`, `.env.prod.example`, e suíte de testes unitários dedicada (`test/core/app_config_test.dart`).
+   - **Status:** **RESOLVIDO NA UNIDADE U1**.
 
 ---
 

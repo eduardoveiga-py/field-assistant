@@ -23,6 +23,10 @@ if /i "!CURR!"=="--server" (
     set "ARGS=!ARGS! -Port"
 ) else if /i "!CURR!"=="-p" (
     set "ARGS=!ARGS! -Port"
+) else if /i "!CURR!"=="--env" (
+    set "ARGS=!ARGS! -EnvFile"
+) else if /i "!CURR!"=="-e" (
+    set "ARGS=!ARGS! -EnvFile"
 ) else if /i "!CURR!"=="--help" (
     set "ARGS=!ARGS! -Help"
 ) else if /i "!CURR!"=="-h" (
