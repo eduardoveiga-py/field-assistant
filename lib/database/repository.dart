@@ -1338,7 +1338,10 @@ class AppRepository {
     return (db.select(db.syncQueue)
           ..where(
             (tbl) =>
-                tbl.status.equals('pending') | tbl.status.equals('in_progress'),
+                tbl.status.equals('pending') |
+                tbl.status.equals('in_progress') |
+                (tbl.status.equals('failed') &
+                    tbl.attempts.isSmallerThanValue(5)),
           )
           ..orderBy([
             (t) =>

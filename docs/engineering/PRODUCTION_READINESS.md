@@ -10,9 +10,9 @@ Apesar de o aplicativo apresentar **100% de sucesso na suíte de 508 testes auto
 
 ## 2. Checklist de Aprovação para Produção (Critérios da Seção 12)
 
-- [ ] **Todos os P0 resolvidos** *(REPROVADO: Falhas P0-01 e P0-02 ativas; P0-03 resolvido na Unidade U1)*
+- [ ] **Todos os P0 resolvidos** *(REPROVADO: Falha P0-02 ativa; P0-01 e P0-03 resolvidos nas Unidades U1 e U2)*
 - [ ] **Todos os P1 resolvidos ou formalmente aceitos** *(REPROVADO: Falhas P1-01, P1-02, P1-03 e P1-04 ativas)*
-- [ ] **Inicialização e configuração de produção validadas** *(PARCIAL: Configuração e validação de ambiente concluídas na Unidade U1 via `AppConfig`; inicialização em `main.dart` pendente na Unidade U2)*
+- [x] **Inicialização e configuração de produção validadas** *(APROVADO: Configuração e validação de ambiente na Unidade U1 via `AppConfig`; inicialização desacoplada, resiliente e ciclo de vida Riverpod em `main.dart` concluídos na Unidade U2 via `SupabaseInitializer`)*
 - [x] **Banco local íntegro** *(APROVADO: Drift v4 com `PRAGMA foreign_keys = ON;`, `journal_mode = WAL;`, suporte IndexedDB via Wasm na Web)*
 - [ ] **Migrações testadas e rastreáveis** *(REPROVADO: `app_database.dart` possui blocos `catch (_) {}` que silenciam falhas de DDL)*
 - [ ] **Sincronização validada entre dispositivos** *(REPROVADO: Migração SQL remota não contém tabelas `voice_notes`, `phone_contacts`, `territory_landmarks` nem storage bucket)*
@@ -23,12 +23,12 @@ Apesar de o aplicativo apresentar **100% de sucesso na suíte de 508 testes auto
 - [ ] **Agenda validada contra concorrência** *(REPROVADO: Pendente detecção de colisões remotas)*
 - [ ] **Áudio validado em dispositivo real** *(REPROVADO: Timer de 30s não encerra o hardware de gravação; requer teste físico no iOS)*
 - [ ] **Transcrição documentada corretamente** *(REPROVADO: Descrita como "offline-first" no código, mas pode exigir rede no iOS/Web)*
-- [x] **Testes automatizados aprovados** *(APROVADO: 517 testes passando com 100% de sucesso)*
+- [x] **Testes automatizados aprovados** *(APROVADO: 534 testes passando com 100% de sucesso)*
 - [x] **Análise estática aprovada** *(APROVADO: `dart analyze lib test --fatal-infos` acusa 0 issues)*
 - [x] **Build Release Web aprovado** *(APROVADO: `flutter build web --release` compila com sucesso)*
 - [ ] **Archive iOS e instalação real validados** *(PENDENTE: Depende de runner macOS e Apple Developer Account)*
 - [ ] **Auditoria independente aprovada** *(PENDENTE: Aguardando correção dos itens P0 e P1)*
-- [x] **Documentação atualizada** *(APROVADO: README.md atualizado para 517 testes e `docs/ENVIRONMENT_CONFIGURATION.md` criado na Unidade U1)*
+- [x] **Documentação atualizada** *(APROVADO: Documentações de engenharia atualizadas com ADR-010, ADR-011 e 534 testes)*
 
 ---
 
@@ -36,10 +36,11 @@ Apesar de o aplicativo apresentar **100% de sucesso na suíte de 508 testes auto
 
 ### Bloqueadores P0 (Críticos — Bloqueiam Funcionamento Essencial e Segurança)
 1. **P0-01: Ausência de Inicialização do Supabase em Runtime**
-   - **Arquivo:** `lib/main.dart:9-12`
-   - **Evidência:** `main()` só invoca `WidgetsFlutterBinding.ensureInitialized()` e `runApp()`. `Supabase.initialize()` nunca é executado. Ao injetar credenciais, o acesso a `Supabase.instance.client` em `supabase_sync_service.dart` lança exceção em tempo de execução.
-   - **Impacto:** O aplicativo é incapaz de sincronizar dados com o backend Supabase em produção.
-   - **Status:** **PENDENTE (Alvo da Unidade U2)**.
+   - **Arquivo:** `lib/main.dart:9-32`, `lib/core/supabase_initializer.dart`, `lib/sync/supabase_sync_service.dart`
+   - **Evidência Original:** `main()` só invocava `WidgetsFlutterBinding.ensureInitialized()` e `runApp()`. `Supabase.initialize()` nunca era executado.
+   - **Resolução em U2:** Implementada ordem de boot estrita em `main.dart` com inicialização assíncrona desacoplada (`initializeSupabaseIfConfigured`), orquestrador `SupabaseInitializer` com lock de concorrência, suporte a reconexão automática e resume de ciclo de vida (`WidgetsBindingObserver`), durabilidade garantida da outbox (`AppRepository.getPendingSyncOperations`), backoff exponencial com jitter (clamped a 300s) e pausa em 5 falhas para evitar starvation.
+   - **Impacto:** Resolvido com 100% de independência e funcionamento offline garantido para o banco local.
+   - **Status:** **RESOLVIDO NA UNIDADE U2**.
 
 2. **P0-02: Migrações SQL Remotas Incompletas (Descompasso de Tabelas e Storage)**
    - **Arquivo:** `supabase/migrations/20261026000000_initial_schema.sql` vs `lib/sync/supabase_sync_service.dart:52-63`

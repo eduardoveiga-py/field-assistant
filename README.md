@@ -127,7 +127,7 @@ flutter build ipa --release --dart-define-from-file=.env.prod
 
 ## 🧪 Suíte de Testes Automatizados
 
-Para executar todos os **517 testes automatizados** unitários, transacionais, adversariais e de interface:
+Para executar todos os **534 testes automatizados** unitários, transacionais, adversariais e de interface:
 ```bash
 flutter test
 ```
@@ -137,8 +137,10 @@ Para validar a integridade estática do código (zero erros, zero warnings, zero
 dart analyze lib test --fatal-infos
 ```
 
-### Cobertura de Testes (517 Testes Aprovados com 100% de Sucesso)
+### Cobertura de Testes (534 Testes Aprovados com 100% de Sucesso)
 - `test/core/app_config_test.dart`: Validação centralizada de ambiente (dev/homolog/prod), bloqueio de chaves privilegiadas (`service_role`), URLs válidas, mascaramento de segredos em logs e modo offline resiliente.
+- `test/core/supabase_initializer_test.dart`: Inicialização idempotente desacoplada, lock de concorrência com Completer, sanitização de credenciais em logs, probe ativo de conectividade (/rest/v1/), proteção contra `AssertionError` em `clientOrNull` e reatividade Riverpod Notifiers.
+- `test/sync/supabase_lifecycle_test.dart`: Boot 100% offline sem exceções, durabilidade da outbox em falhas transitórias de rede, limite de 5 retentativas sem starvation/loop infinito, algoritmo de backoff exponencial com jitter, recuperação pós-reconexão, resume em background via `WidgetsBindingObserver` e inserções simultâneas na outbox.
 - `test/counting_rules_test.dart`: Regras de contagem de estudos com múltiplos participantes, sessões, visitas, ações pendentes e contatos recentes.
 - `test/availability_engine_test.dart`: Detecção de sobreposição, contenção, horários consecutivos, buffers, sugestões inteligentes e status realizado.
 - `test/publication_link_resolver_test.dart`: Resolução de links em Português, Libras e fallback seguro.

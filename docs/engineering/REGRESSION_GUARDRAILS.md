@@ -44,6 +44,12 @@ Este documento define as regras fundamentais que **jamais podem ser violadas, en
    - Entidades sincronizáveis utilizam `deleted_at`. A exclusão física remota sem tombstone é proibida para evitar ressurgimento indevido por sincronizações atrasadas.
 5. **Cursor Determinístico:**
    - A paginação do pull deve sempre incluir desempate determinístico: `.order('updated_at', ascending: true).order('id', ascending: true)`.
+6. **Durabilidade Absoluta da Outbox em Falhas Transitórias:**
+   - Operações que falham por queda de rede (ex: `SocketException`, `TimeoutException` ou HTTP 5xx) **jamais podem ser descartadas** da fila local `sync_queue`. Elas devem ser marcadas como `failed` e reenviadas em tentativas subsequentes respeitando backoff exponencial com jitter.
+7. **Limite de Retentativas e Prevenção de Starvation / Loop Infinito:**
+   - O reprocessamento automático de operações deve ser limitado a 5 tentativas consecutivas (`attempts.isSmallerThanValue(5)` em `getPendingSyncOperations`). Ao atingir 5 falhas, a operação é pausada do envio automático para evitar saturação de bateria e rede, mas **permanece preservada no SQLite** para análise ou reativação manual.
+8. **Inicialização Desacoplada e Tolerante a Falhas:**
+   - O boot da interface (`runApp()`) e o banco relacional local (`AppDatabase`) **nunca podem depender** de rede ou aguardar a resposta do backend Supabase. A inicialização remota deve ser assíncrona e não-bloqueante (`unawaited`). O acesso ao SDK deve ser blindado contra `AssertionError` via `SupabaseInitializer.clientOrNull`.
 
 ---
 

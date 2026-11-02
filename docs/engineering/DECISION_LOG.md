@@ -120,3 +120,31 @@ Este registro preserva o contexto, as alternativas ponderadas e as consequência
   11. Padronizar scripts de execução para auto-detecção de `.env` e injeção transparente de `--dart-define-from-file`.
 - **Justificativa:** Garante a inviolabilidade do modelo offline-first, previne vazamento de credenciais privilegiadas e elimina comportamentos indefinidos no boot.
 - **Consequências:** Inicialização 100% determinística, logs higienizados sem segredos e distinção formal entre modo offline e queda de rede. Validado pela suíte `test/core/app_config_test.dart` (9 testes dedicados, totalizando 517 testes no repositório).
+
+---
+
+## ADR-011: Inicialização Resiliente, Desacoplada e Ciclo de Vida do Supabase
+- **Data:** Novembro de 2026 (Fase 2 — Unidade U2)
+- **Status:** Aprovado e Implementado
+- **Contexto:** O aplicativo dependia de `Supabase.initialize()` que nunca era chamado em `lib/main.dart` (Bloqueador P0-01). Caso chamado de forma bloqueante antes de `runApp()`, o boot da aplicação travaria ou falharia em ambientes sem rede, violando a premissa fundamental offline-first. Além disso, acessos a `Supabase.instance.client` quando não inicializado lançavam `AssertionError`, e a fila de sincronização (outbox) corria o risco de perder ou travar operações após falhas de rede transitórias.
+- **Decisão:**
+  1. Criar o orquestrador `SupabaseInitializer` (`lib/core/supabase_initializer.dart`) com enum de estados de conexão granular (`unconfigured`, `initializing`, `initialized`, `connected`, `disconnected`, `authenticationRequired`, `authenticationExpired`, `error`).
+  2. Implementar ordem estrita de boot desacoplada em `lib/main.dart`:
+     - Passo 1: `WidgetsFlutterBinding.ensureInitialized()`.
+     - Passo 2: `AppConfig.fromEnvironment()`.
+     - Passo 3: Inicialização imediata e síncrona do banco local SQLite Drift (`AppDatabase`).
+     - Passo 4: Instanciação do `AppRepository`.
+     - Passo 5: Inicialização condicional, assíncrona e não-bloqueante (`unawaited(initializeSupabaseIfConfigured(...))`).
+     - Passo 6: Injeção de dependências desacopladas Riverpod (`ProviderScope` com overrides).
+     - Passo 7: `runApp()`.
+  3. Garantir idempotência e proteção de concorrência com trava `Completer<SupabaseStateInfo>` em `SupabaseInitializer.initialize(...)`.
+  4. Blindar o acesso ao SDK Supabase via `SupabaseInitializer.clientOrNull`, retornando `null` com segurança em vez de lançar `AssertionError`.
+  5. Adicionar escuta reativa a eventos de autenticação (`onAuthStateChange`) para detectar tokens expirados (`authenticationExpired`) e deslogamentos (`authenticationRequired`).
+  6. Adicionar probe ativo de conectividade `checkConnectivity()` para validação de reachability contra `/rest/v1/` com timeout de 4 segundos.
+  7. Implementar ciclo de vida com `WidgetsBindingObserver` em `SupabaseSyncService` para disparar reavaliação de conectividade e sincronização imediata no retorno de segundo plano (`handleAppResume()`) e restauração de rede (`handleReconnection()`).
+  8. Preservar durabilidade absoluta da outbox em `AppRepository.getPendingSyncOperations()` incluindo status `failed` com menos de 5 tentativas.
+  9. Implementar algoritmo de backoff exponencial com jitter aleatório (2^tentativas clamped em 300s + jitter até 25%) em `calculateBackoffSeconds`.
+  10. Evitar loops infinitos de rede pausando o processamento automático daquelas operações que atingem 5 tentativas consecutivas de falha, retendo-as fisicamente na tabela `sync_queue` para auditoria manual.
+- **Justificativa:** Assegura que o aplicativo abra instantaneamente e funcione com 100% de capacidade local independente do status da rede ou do backend, enquanto orquestra sincronização transparente, segura e sem regressões na outbox.
+- **Consequências:** Zero dependência de rede no boot, zero crashes por `AssertionError`, durabilidade garantida da outbox local, reatividade Riverpod e recuperação automática de conectividade. Validado por 17 testes dedicados em `test/core/supabase_initializer_test.dart` e `test/sync/supabase_lifecycle_test.dart`, elevando o total da suíte para 534 testes 100% aprovados.
+

@@ -1,14 +1,63 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'core/app_config.dart';
+import 'core/app_logger.dart';
 import 'core/app_theme.dart';
+import 'core/supabase_initializer.dart';
+import 'database/app_database.dart';
+import 'database/repository.dart';
 import 'ui/main_navigation_shell.dart';
 import 'ui/providers.dart';
 
-void main() {
+Future<void> main() async {
+  // 1. Inicialização do binding do Flutter
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const ProviderScope(child: MinisterioPessoalApp()));
+
+  // 2. Configuração de ambiente centralizada
+  final config = AppConfig.fromEnvironment();
+
+  // 3. Banco relacional SQLite Drift local
+  final db = AppDatabase();
+
+  // 4. Dependências locais do repositório
+  final repository = AppRepository(db);
+
+  // 5. Inicialização condicional do Supabase (não-bloqueante para a UI se houver latência de rede)
+  if (config.status == ConfigStatus.valid) {
+    unawaited(
+      initializeSupabaseIfConfigured(config: config).catchError((
+        Object error,
+        StackTrace stackTrace,
+      ) {
+        AppLogger.error(
+          'Falha não-bloqueante na inicialização do Supabase durante o boot',
+          error,
+          stackTrace,
+        );
+        return SupabaseConnectionState.error;
+      }),
+    );
+  } else {
+    AppLogger.info(
+      'Boot em modo local offline: Supabase ${config.status.name}.',
+    );
+  }
+
+  // 6. Configuração dos providers Riverpod e 7. Execução da UI
+  runApp(
+    ProviderScope(
+      overrides: [
+        appConfigProvider.overrideWithValue(config),
+        databaseProvider.overrideWithValue(db),
+        repositoryProvider.overrideWithValue(repository),
+      ],
+      child: const MinisterioPessoalApp(),
+    ),
+  );
 }
 
 class MinisterioPessoalApp extends ConsumerWidget {

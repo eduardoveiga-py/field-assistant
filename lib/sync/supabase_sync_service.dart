@@ -4,12 +4,15 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:drift/drift.dart' as drift;
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/app_config.dart';
+import '../core/app_logger.dart';
+import '../core/supabase_initializer.dart';
 import '../database/app_database.dart';
 import '../database/repository.dart';
 import '../ui/providers.dart';
@@ -38,7 +41,7 @@ class SyncProcessResult {
 typedef SyncResult = SyncProcessResult;
 
 /// Serviço de sincronização offline-first integrado com Supabase e fila persistente SQLite (Drift).
-class SupabaseSyncService {
+class SupabaseSyncService with WidgetsBindingObserver {
   final AppDatabase db;
   final AppRepository repository;
   final AppConfig config;
@@ -48,6 +51,8 @@ class SupabaseSyncService {
   final StreamController<SyncStatus> _statusController =
       StreamController<SyncStatus>.broadcast();
   SyncStatus _currentStatus = SyncStatus.savedLocally;
+  bool _isObservingLifecycle = false;
+  final Map<String, DateTime> _lastAttemptTime = {};
 
   static const List<String> syncTables = [
     'people',
@@ -96,6 +101,76 @@ class SupabaseSyncService {
     if (!_statusController.isClosed) {
       _statusController.add(status);
     }
+  }
+
+  /// Retorna o cliente Supabase disponível (injetado via teste ou inicializado globalmente).
+  /// Retorna `null` se o Supabase não tiver sido inicializado, prevenindo AssertionError.
+  SupabaseClient? get client {
+    if (clientOverride != null) return clientOverride;
+    return SupabaseInitializer.clientOrNull;
+  }
+
+  /// Calcula backoff exponencial com jitter (Full Jitter).
+  /// Base: 2^attempts limitado a 300 segundos, com até 25% de jitter aleatório para evitar picos de concorrência.
+  static int calculateBackoffSeconds(int attempts, {Random? random}) {
+    if (attempts <= 0) return 0;
+    final base = pow(2, min(attempts, 8)).clamp(1, 300).toInt();
+    final rng = random ?? Random();
+    final jitter = (rng.nextDouble() * 0.25 * base).round();
+    return (base + jitter).clamp(1, 300);
+  }
+
+  /// Inicia a observação de mudanças de estado do ciclo de vida da aplicação Flutter.
+  void startLifecycleObservation() {
+    if (!_isObservingLifecycle) {
+      try {
+        WidgetsBinding.instance.addObserver(this);
+        _isObservingLifecycle = true;
+      } catch (_) {}
+    }
+  }
+
+  /// Encerra a observação do ciclo de vida.
+  void stopLifecycleObservation() {
+    if (_isObservingLifecycle) {
+      try {
+        WidgetsBinding.instance.removeObserver(this);
+        _isObservingLifecycle = false;
+      } catch (_) {}
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(handleAppResume());
+    }
+  }
+
+  /// Trata o retorno do aplicativo do segundo plano para o primeiro plano (resumed).
+  Future<void> handleAppResume() async {
+    if (!isConfigured) return;
+    AppLogger.info(
+      'SupabaseSyncService: Aplicativo voltou ao primeiro plano (resumed). Reavaliando conectividade...',
+    );
+    await SupabaseInitializer.checkConnectivity();
+    if (SupabaseInitializer.currentState.isConnected ||
+        clientOverride != null) {
+      await retryPendingMediaDownloads();
+      await processQueue(ignoreBackoff: true);
+      await fetchRemoteChanges();
+    }
+  }
+
+  /// Trata a recuperação explícita de conexão à internet.
+  Future<void> handleReconnection() async {
+    if (!isConfigured) return;
+    AppLogger.info(
+      'SupabaseSyncService: Conexão restabelecida. Executando sincronização da outbox...',
+    );
+    await retryPendingMediaDownloads();
+    await processQueue(ignoreBackoff: true);
+    await fetchRemoteChanges();
   }
 
   static String snakeToCamel(String s) {
@@ -642,12 +717,8 @@ class SupabaseSyncService {
   /// Retenta o download de áudios que falharam durante a recepção de metadados
   Future<int> retryPendingMediaDownloads() async {
     if (!isConfigured) return 0;
-    SupabaseClient? client;
-    try {
-      client = clientOverride ?? Supabase.instance.client;
-    } catch (_) {
-      return 0;
-    }
+    final activeClient = client;
+    if (activeClient == null) return 0;
 
     final pendingRows = await (db.select(
       db.appKvStore,
@@ -656,7 +727,7 @@ class SupabaseSyncService {
     int recovered = 0;
     for (final row in pendingRows) {
       final id = row.key.replaceFirst('pending_audio_download_', '');
-      final ok = await _downloadVoiceNoteAudio(id, client);
+      final ok = await _downloadVoiceNoteAudio(id, activeClient);
       if (ok) recovered++;
     }
     return recovered;
@@ -821,10 +892,8 @@ class SupabaseSyncService {
       );
     }
 
-    SupabaseClient? client;
-    try {
-      client = clientOverride ?? Supabase.instance.client;
-    } catch (_) {
+    final activeClient = client;
+    if (activeClient == null) {
       return const SyncProcessResult(
         totalProcessed: 0,
         successCount: 0,
@@ -856,7 +925,7 @@ class SupabaseSyncService {
         DateTime? newestUpdatedAt;
 
         while (true) {
-          var query = client.from(table).select();
+          var query = activeClient.from(table).select();
           if (lastSyncedAt != null) {
             query = query.gt(
               'updated_at',
@@ -882,7 +951,7 @@ class SupabaseSyncService {
             final applied = await _applyRemoteRecord(
               table: table,
               remoteRecord: map,
-              client: client,
+              client: activeClient,
               errors: errors,
             );
 
@@ -944,7 +1013,7 @@ class SupabaseSyncService {
   }
 
   /// Processa a fila persistente de sincronização com backoff exponencial e detecção de conflitos.
-  Future<SyncProcessResult> processQueue() async {
+  Future<SyncProcessResult> processQueue({bool ignoreBackoff = false}) async {
     final pendingOps = await repository.getPendingSyncOperations();
     if (pendingOps.isEmpty) {
       _setStatus(SyncStatus.synced);
@@ -969,12 +1038,8 @@ class SupabaseSyncService {
       );
     }
 
-    _setStatus(SyncStatus.syncing);
-
-    SupabaseClient? client;
-    try {
-      client = clientOverride ?? Supabase.instance.client;
-    } catch (_) {
+    final activeClient = client;
+    if (activeClient == null) {
       _setStatus(SyncStatus.waitingConnection);
       return SyncProcessResult(
         totalProcessed: pendingOps.length,
@@ -985,6 +1050,8 @@ class SupabaseSyncService {
         message: 'Cliente Supabase não inicializado. Registros salvos com segurança localmente.',
       );
     }
+
+    _setStatus(SyncStatus.syncing);
 
     int success = 0;
     int failure = 0;
@@ -1000,11 +1067,14 @@ class SupabaseSyncService {
         continue;
       }
 
-      final backoffSeconds = pow(2, op.attempts).clamp(1, 300).toInt();
-      final now = DateTime.now();
-      if (now.difference(op.createdAt).inSeconds < backoffSeconds &&
-          op.attempts > 0) {
-        continue;
+      if (!ignoreBackoff) {
+        final backoffSeconds = calculateBackoffSeconds(op.attempts);
+        final now = DateTime.now();
+        final lastAttempt = _lastAttemptTime[op.id] ?? op.createdAt;
+        if (op.attempts > 0 &&
+            now.difference(lastAttempt).inSeconds < backoffSeconds) {
+          continue;
+        }
       }
 
       try {
@@ -1016,16 +1086,17 @@ class SupabaseSyncService {
 
         if (operation == 'INSERT' || operation == 'UPDATE') {
           final remotePayload = toRemotePayload(op.entityType, cleanPayload);
-          await client.from(tableName).upsert(remotePayload);
+          await activeClient.from(tableName).upsert(remotePayload);
 
           if (tableName == 'voice_notes') {
             final audioOk = await _uploadVoiceNoteAudio(
               op.entityId,
-              client,
+              activeClient,
               errors,
             );
             if (!audioOk) {
               failure++;
+              _lastAttemptTime[op.id] = DateTime.now();
               await repository.markSyncOperationFailed(
                 op.id,
                 'Falha no upload do arquivo binário de áudio para o Storage',
@@ -1035,13 +1106,16 @@ class SupabaseSyncService {
           }
 
           await repository.markSyncOperationSuccess(op.id);
+          _lastAttemptTime.remove(op.id);
           success++;
         } else if (operation == 'DELETE') {
-          await client.from(tableName).delete().eq('id', op.entityId);
+          await activeClient.from(tableName).delete().eq('id', op.entityId);
           await repository.markSyncOperationSuccess(op.id);
+          _lastAttemptTime.remove(op.id);
           success++;
         }
       } on PostgrestException catch (e) {
+        _lastAttemptTime[op.id] = DateTime.now();
         if (e.code == '23505' || e.code == '409') {
           conflicts++;
           _setStatus(SyncStatus.conflict);
@@ -1057,10 +1131,14 @@ class SupabaseSyncService {
           await repository.markSyncOperationFailed(op.id, err);
         }
       } catch (e) {
+        _lastAttemptTime[op.id] = DateTime.now();
         failure++;
         final err = 'Erro na operação ${op.id} (${op.entityType}): $e';
         errors.add(err);
         await repository.markSyncOperationFailed(op.id, err);
+        if (_isNetworkError(e)) {
+          _setStatus(SyncStatus.waitingConnection);
+        }
       }
     }
 
@@ -1083,8 +1161,24 @@ class SupabaseSyncService {
     );
   }
 
+  static bool _isNetworkError(Object error) {
+    final str = error.toString().toLowerCase();
+    return str.contains('socketexception') ||
+        str.contains('network') ||
+        str.contains('connection refused') ||
+        str.contains('failed host lookup') ||
+        str.contains('clientexception') ||
+        str.contains('timeoutexception') ||
+        str.contains('handshakeexception') ||
+        str.contains('os error') ||
+        str.contains('timed out');
+  }
+
   void dispose() {
-    _statusController.close();
+    stopLifecycleObservation();
+    if (!_statusController.isClosed) {
+      _statusController.close();
+    }
   }
 }
 
@@ -1092,7 +1186,14 @@ class SupabaseSyncService {
 final supabaseSyncServiceProvider = Provider<SupabaseSyncService>((ref) {
   final repo = ref.watch(repositoryProvider);
   final config = ref.watch(appConfigProvider);
-  return SupabaseSyncService(db: repo.db, repository: repo, config: config);
+  final service = SupabaseSyncService(
+    db: repo.db,
+    repository: repo,
+    config: config,
+  );
+  service.startLifecycleObservation();
+  ref.onDispose(() => service.dispose());
+  return service;
 });
 
 /// Stream provider do status reativo de sincronização

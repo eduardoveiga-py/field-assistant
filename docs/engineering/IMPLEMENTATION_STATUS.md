@@ -20,7 +20,7 @@ Este documento mapeia o status real de cada funcionalidade do **Field Assistant*
 | **F10** | **Cronômetro Auto-Corretivo** | `lib/activities/auto_corrective_timer_logic.dart`<br>`lib/ui/screens/activities_screen.dart` | `test/auto_corrective_timer_test.dart` | **Concluído** | Persistência de timer no SQLite; alerta amigável ao ultrapassar 4h ininterruptas com diálogo de ajuste. |
 | **F11** | **Notas de Voz e Ditado** | `lib/voice_notes/audio_recording_service.dart`<br>`lib/voice_notes/voice_dictation_service.dart`<br>`lib/voice_notes/voice_note_parser.dart` | `test/voice_notes_test.dart` (15 testes) | **Parcialmente Concluído (Bug Crítico de Parada)** | **Bug P1:** O timer de 30 segundos apenas cancela a contagem mas NÃO interrompe o hardware de gravação. Transcrição "offline" depende de modelos do sistema operacional que podem não estar baixados. |
 | **F12** | **Backup e Restauração Criptografados** | `lib/settings/backup_service.dart`<br>`lib/ui/screens/settings_screen.dart` | `test/backup_service_test.dart` (18 testes) | **Concluído e Blindado** | AES-256 GCM + PBKDF2 (100k iterações); staging em 3 etapas com rollback transacional seguro de áudios; fallback para `/tmp` eliminado; suporte a snapshot em Web. |
-| **F13** | **Sincronização Offline-First Supabase** | `lib/core/app_config.dart`<br>`lib/sync/supabase_sync_service.dart`<br>`lib/sync/sync_engine.dart` | `test/core/app_config_test.dart` (9 testes)<br>`test/supabase_sync_service_test.dart`<br>`test/sync_engine_test.dart` | **Em Estabilização (P0-03 Resolvido em U1; Bloqueado por P0-01 e P0-02)** | **U1 Concluída e Blindada:** Injeção e validação centralizada de ambiente implementada via `AppConfig`, com bloqueio de `service_role` (mesmo com base64url `-`/`_`), roles privilegiadas adicionais (`admin`, `postgres`), bloqueio de userInfo na URL e mascaramento seguro, normalização de trailing slash, HTTPS estrito em produção, proteção de `.gitignore` para `.env*`, e suporte a `.env` via `--dart-define-from-file`. Pendente U2 (Inicialização `main.dart`) e U3 (Schema remoto/Storage). |
+| **F13** | **Sincronização Offline-First Supabase** | `lib/core/app_config.dart`<br>`lib/core/supabase_initializer.dart`<br>`lib/sync/supabase_sync_service.dart`<br>`lib/sync/sync_engine.dart` | `test/core/app_config_test.dart` (9 testes)<br>`test/core/supabase_initializer_test.dart` (10 testes)<br>`test/sync/supabase_lifecycle_test.dart` (7 testes)<br>`test/supabase_sync_service_test.dart`<br>`test/sync_engine_test.dart` | **Em Estabilização (P0-03 Resolvido em U1; P0-01 Resolvido em U2; Bloqueado apenas por P0-02)** | **U1 e U2 Concluídas e Blindadas:** Injeção segura via `AppConfig`, inicialização não-bloqueante desacoplada em `main.dart`, orquestrador `SupabaseInitializer` com lock de concorrência e zero `AssertionError`, ciclo de vida `WidgetsBindingObserver`, durabilidade garantida da outbox, backoff exponencial com jitter e pausa em 5 falhas. Pendente U3 (Schema remoto/Storage). |
 | **F14** | **Banco Local SQLite / Drift** | `lib/database/app_database.dart`<br>`lib/database/connection/native.dart`<br>`lib/database/connection/connection_web.dart` | `test/database_integrity_test.dart` | **Concluído com Ressalva P1 de Migrações** | Foreign Keys e WAL ativos. Migrações históricas usam `catch (_) {}` que silenciam falhas de alteração de schema. Banco nativo não possui criptografia em repouso por chave local. |
 | **F15** | **Mapa de Contatos e Território** | `lib/ui/screens/contacts_map_screen.dart`<br>`lib/territory/` | `test/unified_study_logging_test.dart` | **Concluído** | Reprojeção matemática de mapa sem ballooning; respeita a diretriz de não substituir a solução externa Hourglass. |
 | **F16** | **Configurações e Customização de Telas** | `lib/ui/screens/customize_features_screen.dart`<br>`lib/settings/app_settings_manager.dart` | `test/widget_test.dart` | **Concluído** | Feature flags ocultam itens na interface sem nunca executar migrações destrutivas de dados históricos. |
@@ -31,7 +31,7 @@ Este documento mapeia o status real de cada funcionalidade do **Field Assistant*
 - **Funcionalidades Totais Auditadas:** 16
 - **Totalmente Estabilizadas e Testadas:** 12 (75%)
 - **Parcialmente Implementadas com Débito / Risco P1:** 3 (18,75% — Concorrência na Agenda, Gravação de Áudio/Transcrição, Migrações do Banco Local)
-- **Em Estabilização P0:** 1 (6,25% — Sincronização Supabase remota: U1 concluída com 517 testes aprovados; U2 e U3 pendentes)
+- **Em Estabilização P0:** 1 (6,25% — Sincronização Supabase remota: U1 e U2 concluídas com 534 testes aprovados; U3 pendente)
 
 ---
 
@@ -54,4 +54,20 @@ Este documento mapeia o status real de cada funcionalidade do **Field Assistant*
 - **Resultado:** Aprovado em U1.
 - **Riscos Remanescentes:** Supabase ainda não é inicializado em `main.dart` (P0-01, escopo de U2); Schema SQL remoto incompleto (P0-02, escopo de U3).
 - **Dependências:** Autorização formal para prosseguir para a Unidade U2.
-- **Próxima Ação:** Executar Unidade U2 (Inicialização do Supabase tolerante a falhas em `main.dart`).
+
+### Unidade U2 — Inicialização do Supabase, Ciclo de Vida e Resiliência Offline
+- **Identificador:** `FASE2-U2`
+- **Commit Base:** `9da0f21` (merge de U1)
+- **Branch Dedicada:** `stabilization/u2-supabase-lifecycle`
+- **Arquivos Alterados / Criados:**
+  - `lib/core/supabase_initializer.dart` (Novo: orquestrador desacoplado, enum de estados granular, lock assíncrono de concorrência com `Completer`, sanitização de credenciais, probe ativo `checkConnectivity`, listener de auth state, e providers Riverpod dedicados)
+  - `lib/main.dart` (Ordem de boot estrita: SQLite e repositório inicializam primeiro; inicialização remota do Supabase ocorre assíncrona e desacoplada via `unawaited`)
+  - `lib/database/repository.dart` (Ajustado `getPendingSyncOperations()` para incluir operações `failed` com menos de 5 tentativas, garantindo durabilidade da outbox)
+  - `lib/sync/supabase_sync_service.dart` (Implementado `WidgetsBindingObserver` para resume de ciclo de vida em background, backoff exponencial com jitter clamped a 300s, `handleAppResume()`, `handleReconnection()`, e proteção contra `AssertionError` via `clientOrNull`)
+  - `test/core/supabase_initializer_test.dart` (Novo: 10 testes cobrindo modo offline, rejeição de credenciais inválidas, idempotência, concorrência simultânea, timeout e falhas de socket, probe de reachability, proteção de acesso e Riverpod)
+  - `test/sync/supabase_lifecycle_test.dart` (Novo: 7 testes cobrindo boot 100% offline sem exceções, durabilidade da outbox em falhas transitórias, limite de 5 retentativas sem starvation, cálculo de backoff com jitter, recuperação de conexão, background resume e transações locais concorrentes)
+  - Documentação em `docs/engineering/` (ADR-011 adicionado em `DECISION_LOG.md`, matrizes atualizadas em `PRODUCTION_READINESS.md`, `SESSION_HANDOFF.md` e `REGRESSION_GUARDRAILS.md`)
+- **Testes Executados:** 534 testes aprovados (`flutter test`), 0 falhas, 0 issues de análise estática (`dart analyze lib test --fatal-infos`), build web release aprovado (`flutter build web --release`).
+- **Resultado:** Aprovado em U2. Bloqueador P0-01 resolvido.
+- **Riscos Remanescentes:** Schema SQL remoto incompleto (P0-02, escopo da Unidade U3).
+- **Próxima Ação:** Executar Unidade U3 (Schema SQL remoto, Storage e validação RLS).
