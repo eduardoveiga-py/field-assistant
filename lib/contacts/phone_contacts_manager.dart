@@ -261,14 +261,19 @@ class PhoneContactsManager {
   }
 
   Future<void> updatePhoneContact(PhoneContactItem contact) async {
-    final existing = await (db.select(
-      db.phoneContacts,
-    )..where((t) => t.id.equals(contact.id))).getSingleOrNull();
-
-    final nextRev = (existing?.revision ?? 1) + 1;
     final now = DateTime.now();
 
     await db.transaction(() async {
+      final existing = await (db.select(
+        db.phoneContacts,
+      )..where((t) => t.id.equals(contact.id))).getSingleOrNull();
+
+      if (existing == null) {
+        return;
+      }
+
+      final nextRev = existing.revision + 1;
+
       await (db.update(
         db.phoneContacts,
       )..where((t) => t.id.equals(contact.id))).write(
@@ -294,7 +299,7 @@ class PhoneContactsManager {
         ...contact.toMap(),
         'updated_at': now.toIso8601String(),
         'revision': nextRev,
-        if (existing != null) '_base': _entryToItem(existing).toMap(),
+        '_base': _entryToItem(existing).toMap(),
       };
 
       await db

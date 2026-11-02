@@ -348,13 +348,17 @@ class LandmarkManager {
     final cleanLng = validCoords ? landmark.longitude : null;
     final now = DateTime.now();
 
-    final existing = await (db.select(
-      db.territoryLandmarks,
-    )..where((t) => t.id.equals(landmark.id))).getSingleOrNull();
-
-    final nextRev = (existing?.revision ?? 1) + 1;
-
     await db.transaction(() async {
+      final existing = await (db.select(
+        db.territoryLandmarks,
+      )..where((t) => t.id.equals(landmark.id))).getSingleOrNull();
+
+      if (existing == null) {
+        return;
+      }
+
+      final nextRev = existing.revision + 1;
+
       await (db.update(
         db.territoryLandmarks,
       )..where((t) => t.id.equals(landmark.id))).write(
@@ -376,7 +380,7 @@ class LandmarkManager {
         'longitude': cleanLng,
         'updated_at': now.toIso8601String(),
         'revision': nextRev,
-        if (existing != null) '_base': _entryToLandmark(existing).toMap(),
+        '_base': _entryToLandmark(existing).toMap(),
       };
 
       await db

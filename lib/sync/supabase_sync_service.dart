@@ -255,15 +255,25 @@ class SupabaseSyncService with WidgetsBindingObserver {
       }
     });
 
+    // Normalização ampla de campos JSONB se serializados como string JSON
+    if (remote['tags'] is String) {
+      try {
+        final decoded = jsonDecode(remote['tags'] as String);
+        if (decoded is List) {
+          remote['tags'] = decoded;
+        }
+      } catch (_) {}
+    }
+    if (remote['participant_ids'] is String) {
+      try {
+        final decoded = jsonDecode(remote['participant_ids'] as String);
+        if (decoded is List) {
+          remote['participant_ids'] = decoded;
+        }
+      } catch (_) {}
+    }
+
     if (entityType == 'phone_contacts' || entityType == 'phoneContacts') {
-      if (remote['tags'] is String) {
-        try {
-          final decoded = jsonDecode(remote['tags'] as String);
-          if (decoded is List) {
-            remote['tags'] = decoded;
-          }
-        } catch (_) {}
-      }
       if (remote.containsKey('has_whatsapp')) {
         remote['has_whatsapp'] =
             remote['has_whatsapp'] == true || remote['has_whatsapp'] == 1;
@@ -292,6 +302,12 @@ class SupabaseSyncService with WidgetsBindingObserver {
       } else if (value is int &&
           (camelKey == 'latitude' || camelKey == 'longitude')) {
         result[camelKey] = value.toDouble();
+      } else if (camelKey == 'hasWhatsapp' ||
+          camelKey == 'hasSocial' ||
+          camelKey == 'isPrimary' ||
+          camelKey == 'isAllDay' ||
+          camelKey == 'isDeletedExternal') {
+        result[camelKey] = (value == true || value == 1 || value == 'true');
       } else {
         result[camelKey] = value;
       }
@@ -344,7 +360,17 @@ class SupabaseSyncService with WidgetsBindingObserver {
   static String? _isoString(dynamic val) {
     if (val == null) return null;
     if (val is DateTime) return val.toUtc().toIso8601String();
-    return val.toString();
+    if (val is int) {
+      return DateTime.fromMillisecondsSinceEpoch(val).toUtc().toIso8601String();
+    }
+    final str = val.toString();
+    final asInt = int.tryParse(str);
+    if (asInt != null && str.length >= 10 && !str.contains('-')) {
+      return DateTime.fromMillisecondsSinceEpoch(asInt)
+          .toUtc()
+          .toIso8601String();
+    }
+    return str;
   }
 
   Map<String, dynamic> _prepareEntryMap(
@@ -581,6 +607,7 @@ class SupabaseSyncService with WidgetsBindingObserver {
             (map['audioFilePath'] == null ||
                 map['audioFilePath'].toString().isEmpty)) {
           map['audioFilePath'] = existingNote.audioFilePath;
+          map['audio_file_path'] = existingNote.audioFilePath;
         }
         var entry = VoiceNoteEntry.fromJson(map);
         if (existingNote != null &&
@@ -815,7 +842,11 @@ class SupabaseSyncService with WidgetsBindingObserver {
         final file = File(vn.audioFilePath!);
         if (await file.exists()) {
           final bytes = await file.readAsBytes();
-          final storageFileName = id.endsWith('.m4a') ? id : '$id.m4a';
+          final ext = p.extension(vn.audioFilePath!).toLowerCase();
+          final validExt = (ext == '.mp4' || ext == '.aac' || ext == '.m4a')
+              ? ext
+              : '.m4a';
+          final storageFileName = id.endsWith(validExt) ? id : '$id$validExt';
           await client.storage
               .from('voice_notes')
               .uploadBinary(
@@ -835,11 +866,46 @@ class SupabaseSyncService with WidgetsBindingObserver {
 
   Future<bool> _downloadVoiceNoteAudio(String id, SupabaseClient client) async {
     try {
-      final storageFileName = id.endsWith('.m4a') ? id : '$id.m4a';
-      final bytes = await client.storage
-          .from('voice_notes')
-          .download(storageFileName);
-      if (bytes.isNotEmpty) {
+      final existingNote = await (db.select(
+        db.voiceNotes,
+      )..where((t) => t.id.equals(id))).getSingleOrNull();
+      if (existingNote?.audioFilePath != null &&
+          existingNote!.audioFilePath!.isNotEmpty) {
+        final existingFile = File(existingNote.audioFilePath!);
+        if (await existingFile.exists() && await existingFile.length() > 0) {
+          // Arquivo local já existe e está íntegro no disco; preserva sem desperdício de rede
+          return true;
+        }
+      }
+
+      final candidates = id.contains('.')
+          ? [id]
+          : ['$id.m4a', '$id.mp4', '$id.aac'];
+      List<int>? bytes;
+      String? matchedFileName;
+
+      for (final candidate in candidates) {
+        try {
+          final candidateBytes = await client.storage
+              .from('voice_notes')
+              .download(candidate);
+          if (candidateBytes.isNotEmpty && candidateBytes.length > 16) {
+            bytes = candidateBytes;
+            matchedFileName = candidate;
+            break;
+          }
+        } catch (e) {
+          final errStr = e.toString().toLowerCase();
+          final isNotFound =
+              errStr.contains('404') || errStr.contains('not found');
+          if (!isNotFound) {
+            // Erro de rede ou servidor (ex: 504 Gateway Timeout, timeout, socket): interrompe e propaga
+            rethrow;
+          }
+        }
+      }
+
+      if (bytes != null && bytes.isNotEmpty && matchedFileName != null) {
         final docsDir = documentsDirectoryProvider != null
             ? await documentsDirectoryProvider!()
             : (await getApplicationDocumentsDirectory()).path;
@@ -847,7 +913,7 @@ class SupabaseSyncService with WidgetsBindingObserver {
         if (!await voiceNotesDir.exists()) {
           await voiceNotesDir.create(recursive: true);
         }
-        final localFilePath = p.join(voiceNotesDir.path, storageFileName);
+        final localFilePath = p.join(voiceNotesDir.path, matchedFileName);
         final file = File(localFilePath);
         await file.writeAsBytes(bytes, flush: true);
 
@@ -861,6 +927,19 @@ class SupabaseSyncService with WidgetsBindingObserver {
         )..where((t) => t.key.equals('pending_audio_download_$id'))).go();
         return true;
       }
+
+      // Se nenhum candidato teve sucesso no download, registra pendência para retentativa resiliente
+      try {
+        await db
+            .into(db.appKvStore)
+            .insertOnConflictUpdate(
+              AppKvStoreCompanion.insert(
+                key: 'pending_audio_download_$id',
+                value: DateTime.now().toUtc().toIso8601String(),
+                updatedAt: drift.Value(DateTime.now()),
+              ),
+            );
+      } catch (_) {}
       return false;
     } catch (e) {
       // Registra a nota no AppKvStore para retentativa resiliente posterior
@@ -897,6 +976,12 @@ class SupabaseSyncService with WidgetsBindingObserver {
     }
     return recovered;
   }
+
+  @visibleForTesting
+  Future<bool> downloadVoiceNoteAudioForTesting(
+    String id,
+    SupabaseClient client,
+  ) => _downloadVoiceNoteAudio(id, client);
 
   @visibleForTesting
   Future<bool> applyRemoteRecordForTesting(
@@ -1054,11 +1139,17 @@ class SupabaseSyncService with WidgetsBindingObserver {
                 localData['audioFilePath'];
           }
           await _updateLocalEntry(table, mergeResult.mergedData);
+          final updatedPayload = {
+            ...mergeResult.mergedData,
+            if (rawPayload.containsKey('_base')) '_base': rawPayload['_base'],
+            if (rawPayload.containsKey('baseData'))
+              'baseData': rawPayload['baseData'],
+          };
           await (db.update(
             db.syncQueue,
           )..where((t) => t.id.equals(pendingOp.id))).write(
             SyncQueueCompanion(
-              payload: drift.Value(jsonEncode(mergeResult.mergedData)),
+              payload: drift.Value(jsonEncode(updatedPayload)),
             ),
           );
           return true;

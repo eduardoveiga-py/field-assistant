@@ -61,12 +61,19 @@ class PioneerPaceCalculator {
 
     int remainingOutings = 0;
     if (designatedWeekdays.isNotEmpty) {
+      int mask = 0;
+      for (int i = 0; i < designatedWeekdays.length; i++) {
+        final w = designatedWeekdays[i];
+        if (w >= 1 && w <= 7) {
+          mask |= (1 << w);
+        }
+      }
       int currentWeekday = currentDate.weekday;
       for (int day = currentDate.day; day <= lastDayOfMonth; day++) {
-        if (designatedWeekdays.contains(currentWeekday)) {
+        if ((mask & (1 << currentWeekday)) != 0) {
           remainingOutings++;
         }
-        currentWeekday = (currentWeekday % 7) + 1;
+        currentWeekday = (currentWeekday == 7) ? 1 : currentWeekday + 1;
       }
     }
 

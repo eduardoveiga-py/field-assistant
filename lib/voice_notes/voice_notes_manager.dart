@@ -56,21 +56,19 @@ class VoiceNotesManager {
     required String operation,
     required Map<String, dynamic> payload,
   }) async {
-    try {
-      await db
-          .into(db.syncQueue)
-          .insert(
-            SyncQueueCompanion.insert(
-              id: _uuid.v4(),
-              entityType: 'voice_notes',
-              entityId: entityId,
-              operation: operation,
-              payload: jsonEncode(payload),
-              createdAt: DateTime.now(),
-              status: const Value('pending'),
-            ),
-          );
-    } catch (_) {}
+    await db
+        .into(db.syncQueue)
+        .insert(
+          SyncQueueCompanion.insert(
+            id: _uuid.v4(),
+            entityType: 'voice_notes',
+            entityId: entityId,
+            operation: operation,
+            payload: jsonEncode(payload),
+            createdAt: DateTime.now(),
+            status: const Value('pending'),
+          ),
+        );
   }
 
   Future<List<VoiceNoteItem>> getAllVoiceNotes() async {
@@ -131,9 +129,9 @@ class VoiceNotesManager {
   }
 
   Future<void> saveVoiceNote(VoiceNoteItem item) async {
-    final existing = await getVoiceNoteById(item.id);
     final now = DateTime.now();
     await db.transaction(() async {
+      final existing = await getVoiceNoteById(item.id);
       if (existing != null) {
         final nextRev = existing.revision + 1;
         await (db.update(

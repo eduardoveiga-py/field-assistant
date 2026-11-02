@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 enum SyncStatus {
   savedLocally,
   syncing,
@@ -67,15 +69,16 @@ class SyncEngine {
       final remoteVal = remoteData[key];
       final baseVal = baseData[key];
 
-      final normLocal = localVal is DateTime
-          ? localVal.toUtc().toIso8601String()
-          : localVal;
-      final normRemote = remoteVal is DateTime
-          ? remoteVal.toUtc().toIso8601String()
-          : remoteVal;
-      final normBase = baseVal is DateTime
-          ? baseVal.toUtc().toIso8601String()
-          : baseVal;
+      dynamic normalizeValue(dynamic val) {
+        if (val == null) return null;
+        if (val is DateTime) return val.toUtc().toIso8601String();
+        if (val is List || val is Map) return jsonEncode(val);
+        return val;
+      }
+
+      final normLocal = normalizeValue(localVal);
+      final normRemote = normalizeValue(remoteVal);
+      final normBase = normalizeValue(baseVal);
 
       final localChanged = normLocal != normBase;
       final remoteChanged = normRemote != normBase;

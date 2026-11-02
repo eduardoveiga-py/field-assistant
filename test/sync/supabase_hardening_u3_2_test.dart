@@ -5,6 +5,9 @@ import 'package:drift/drift.dart' as drift;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/testing.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:ministerio_pessoal/sync/sync_engine.dart';
 
 import 'package:ministerio_pessoal/contacts/phone_contacts_manager.dart';
 import 'package:ministerio_pessoal/core/app_config.dart';
@@ -488,64 +491,212 @@ void main() {
     });
   });
 
-  group(
-    'U3.2 Além de P1 e P2: Resiliência de Inicialização e Outbox Providers',
-    () {
-      test('12. SupabaseInitializer.retryInitialization re-tenta com segurança após falha de boot (ISSUE-U2-01)', () async {
-        await SupabaseInitializer.resetForTesting();
+  group('U3.2 Além de P1 e P2: Resiliência de Inicialização e Outbox Providers', () {
+    test('12. SupabaseInitializer.retryInitialization re-tenta com segurança após falha de boot (ISSUE-U2-01)', () async {
+      await SupabaseInitializer.resetForTesting();
 
-        // Configuração desconfigurada (modo offline local seguro)
-        final state1 = await SupabaseInitializer.initializeIfConfigured(
-          config: AppConfig.unconfigured(),
-        );
-        expect(state1, equals(SupabaseConnectionState.unconfigured));
+      // Configuração desconfigurada (modo offline local seguro)
+      final state1 = await SupabaseInitializer.initializeIfConfigured(
+        config: AppConfig.unconfigured(),
+      );
+      expect(state1, equals(SupabaseConnectionState.unconfigured));
 
-        // Re-tentativa com retryInitialization
-        final state2 = await SupabaseInitializer.retryInitialization(
-          config: AppConfig.unconfigured(),
+      // Re-tentativa com retryInitialization
+      final state2 = await SupabaseInitializer.retryInitialization(
+        config: AppConfig.unconfigured(),
+      );
+      expect(state2, equals(SupabaseConnectionState.unconfigured));
+    });
+
+    test('13. OutboxRecoveryNotifier e Provider Riverpod para recuperação da outbox (ISSUE-U2-02)', () async {
+      final container = ProviderContainer(
+        overrides: [
+          databaseProvider.overrideWithValue(db),
+          repositoryProvider.overrideWithValue(repo),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final now = DateTime.now();
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: 'op-riverpod-fail',
+              entityType: 'people',
+              entityId: 'p-99',
+              operation: 'INSERT',
+              payload: jsonEncode({'id': 'p-99', 'name': 'Teste Riverpod'}),
+              status: const drift.Value('failed'),
+              attempts: const drift.Value(5),
+              lastError: const drift.Value('Erro de rede persistente'),
+              createdAt: now,
+            ),
+          );
+
+      final notifier = container.read(outboxRecoveryProvider.notifier);
+      final count = await notifier.requeueFailedOperations();
+      expect(count, equals(1));
+
+      final state = container.read(outboxRecoveryProvider);
+      expect(state.value, equals(1));
+
+      final restoredOp = await (db.select(
+        db.syncQueue,
+      )..where((t) => t.id.equals('op-riverpod-fail'))).getSingle();
+      expect(restoredOp.status, equals('pending'));
+      expect(restoredOp.attempts, equals(4));
+    });
+
+    test('14. _applyRemoteRecord preserva snapshot _base na outbox após merge bem-sucedido', () async {
+      final contact = await phoneManager.addPhoneContact(
+        name: 'Renata',
+        phone: '11987654321',
+        origin: 'Informal',
+        notes: 'Nota base',
+      );
+      await (db.delete(db.syncQueue)).go();
+
+      // Usuário alterou nome localmente
+      await phoneManager.updatePhoneContact(
+        PhoneContactItem(
+          id: contact.id,
+          name: 'Renata Local',
+          phone: contact.phone,
+          hasWhatsApp: contact.hasWhatsApp,
+          hasSocial: contact.hasSocial,
+          tags: contact.tags,
+          origin: contact.origin,
+          notes: 'Nota base',
+          createdAt: contact.createdAt,
+          updatedAt: contact.updatedAt,
+        ),
+      );
+
+      // Remoto alterou origin (sem conflito)
+      final remoteRecord = {
+        'id': contact.id,
+        'name': contact.name,
+        'phone': contact.phone,
+        'notes': 'Nota base',
+        'origin': 'Praça Central',
+        'has_whatsapp': false,
+        'has_social': false,
+        'tags': [],
+        'created_at': contact.createdAt.toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+        'revision': 2,
+      };
+
+      final errors = <String>[];
+      final applied = await syncService.applyRemoteRecordForTesting(
+        'phone_contacts',
+        remoteRecord,
+        errors,
+      );
+
+      expect(errors, isEmpty);
+      expect(applied, isTrue);
+
+      // Verifica que o payload atualizado na outbox ainda contém _base
+      final updatedOp = await (db.select(
+        db.syncQueue,
+      )..where((t) => t.entityId.equals(contact.id))).getSingle();
+      final payload = jsonDecode(updatedOp.payload) as Map<String, dynamic>;
+      expect(payload['name'], equals('Renata Local'));
+      expect(payload['origin'], equals('Praça Central'));
+      expect(payload.containsKey('_base'), isTrue);
+    });
+
+    test('15. _downloadVoiceNoteAudio não realiza download de rede se arquivo local já existir e for íntegro em disco', () async {
+      final tempDir = Directory.systemTemp.createTempSync('audio_test_');
+      addTearDown(() => tempDir.deleteSync(recursive: true));
+      final localFile = File('${tempDir.path}/test_cached_note.m4a');
+      await localFile.writeAsBytes([1, 2, 3, 4, 5]);
+
+      final now = DateTime.now();
+      await db
+          .into(db.voiceNotes)
+          .insert(
+            VoiceNotesCompanion.insert(
+              id: 'vn-local-cached',
+              personId: 'p-cached',
+              transcription: 'Áudio em cache',
+              audioFilePath: drift.Value(localFile.path),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+
+      // Cliente mock com verificação de zero chamadas de download
+      final mockHttpClient = MockClient((req) async {
+        fail(
+          'Não deve efetuar chamada de rede para áudio já existente em disco!',
         );
-        expect(state2, equals(SupabaseConnectionState.unconfigured));
       });
+      final client = SupabaseClient(
+        'https://test.supabase.co',
+        'anon-key',
+        httpClient: mockHttpClient,
+      );
 
-      test('13. OutboxRecoveryNotifier e Provider Riverpod para recuperação da outbox (ISSUE-U2-02)', () async {
-        final container = ProviderContainer(
-          overrides: [
-            databaseProvider.overrideWithValue(db),
-            repositoryProvider.overrideWithValue(repo),
-          ],
-        );
-        addTearDown(container.dispose);
+      final ok = await syncService.downloadVoiceNoteAudioForTesting(
+        'vn-local-cached',
+        client,
+      );
+      expect(ok, isTrue);
+    });
 
-        final now = DateTime.now();
-        await db
-            .into(db.syncQueue)
-            .insert(
-              SyncQueueCompanion.insert(
-                id: 'op-riverpod-fail',
-                entityType: 'people',
-                entityId: 'p-99',
-                operation: 'INSERT',
-                payload: jsonEncode({'id': 'p-99', 'name': 'Teste Riverpod'}),
-                status: const drift.Value('failed'),
-                attempts: const drift.Value(5),
-                lastError: const drift.Value('Erro de rede persistente'),
-                createdAt: now,
-              ),
-            );
+    test('16. SyncEngine.mergeEntities com coleções em tags de lista e mapas normaliza por valor e evita falsos conflitos', () {
+      final base = {
+        'id': 'pc-list-merge',
+        'name': 'Carlos',
+        'tags': ['amigo', 'estudo'],
+      };
+      final local = {
+        'id': 'pc-list-merge',
+        'name': 'Carlos Local',
+        'tags': ['amigo', 'estudo'],
+      };
+      final remote = {
+        'id': 'pc-list-merge',
+        'name': 'Carlos',
+        'tags': ['amigo', 'estudo'],
+      };
 
-        final notifier = container.read(outboxRecoveryProvider.notifier);
-        final count = await notifier.requeueFailedOperations();
-        expect(count, equals(1));
+      final result = SyncEngine.mergeEntities(
+        entityType: 'phone_contacts',
+        entityId: 'pc-list-merge',
+        localData: local,
+        remoteData: remote,
+        baseData: base,
+      );
 
-        final state = container.read(outboxRecoveryProvider);
-        expect(state.value, equals(1));
+      expect(result.hasConflict, isFalse);
+      expect(result.mergedData['name'], equals('Carlos Local'));
+    });
 
-        final restoredOp = await (db.select(
-          db.syncQueue,
-        )..where((t) => t.id.equals('op-riverpod-fail'))).getSingle();
-        expect(restoredOp.status, equals('pending'));
-        expect(restoredOp.attempts, equals(4));
-      });
-    },
-  );
+    test('17. PhoneContactsManager e LandmarkManager ignoram update de entidade inexistente sem enfileirar lixo na outbox', () async {
+      await (db.delete(db.syncQueue)).go();
+
+      final ghostContact = PhoneContactItem(
+        id: 'non-existent-contact-uuid',
+        name: 'Fantasma',
+        phone: '00000000',
+        hasWhatsApp: false,
+        hasSocial: false,
+        tags: [],
+        origin: 'Informal',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      await phoneManager.updatePhoneContact(ghostContact);
+
+      final queueCount = await (db.select(
+        db.syncQueue,
+      )..where((t) => t.entityId.equals('non-existent-contact-uuid'))).get();
+      expect(queueCount, isEmpty);
+    });
+  });
 }

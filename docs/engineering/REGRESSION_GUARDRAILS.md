@@ -69,6 +69,14 @@ Este documento define as regras fundamentais que **jamais podem ser violadas, en
     - Quando um registro de nota de voz for recebido do Supabase sem URL/caminho de arquivo de áudio remoto (`audioFilePath == null` ou vazio), o sincronizador (`_updateLocalEntry` e `_applyRemoteRecord`) DEVE preservar o caminho do arquivo de áudio já gravado no SQLite (`existingNote.audioFilePath`). É terminantemente proibido sobrescrever o ponteiro do arquivo local por nulo.
 13. **Normalização de Tipos JSONB no PostgREST:**
     - Colunas PostgreSQL do tipo `JSONB` (ex: `tags` em `phone_contacts`) devem ser transmitidas pelo cliente Dart como tipos estruturados nativos (`List<dynamic>` ou `Map<String, dynamic>`), e NUNCA como strings serializadas via `jsonEncode()`, sob risco de inserção de strings literais no JSONB ou falha de validação de schema.
+14. **Normalização por Conteúdo em Coleções no 3-Way Merge (`SyncEngine`):**
+    - Coleções (`List` e `Map`, como `tags` e `participant_ids`) devem ser comparadas por valor normalizado (`jsonEncode`) e não por identidade de referência de memória Dart. O operador `==` padrão em instâncias de listas gera falsos conflitos no motor de sincronização mesmo quando o conteúdo dos nós local e remoto é idêntico.
+15. **Conversão Canônica de Epoch Milissegundos (`_isoString`):**
+    - Timestamps numéricos serializados pelo Drift (`int` em milissegundos desde o epoch retornado por `row.toJson()`) devem ser convertidos via `DateTime.fromMillisecondsSinceEpoch(val).toUtc().toIso8601String()`. Nunca retorne `val.toString()` para inteiros, pois isso gera `FormatException` fatal no deserializador `DateTime.parse`.
+16. **Tratamento de Exceções de Rede no Download de Mídia Multi-Extensão:**
+    - Em `_downloadVoiceNoteAudio`, erros de rede ou servidor (HTTP 504 Gateway Timeout, 5xx, timeouts de socket) durante o download de arquivos binários NÃO devem ser engolidos silenciosamente na iteração de extensões candidatas (`.m4a`, `.mp4`, `.aac`). Devem propagar para o bloco de captura e registrar `pending_audio_download_$id` no `AppKvStore`, viabilizando recuperação resiliente posterior via `retryPendingMediaDownloads()`.
+17. **Guarda contra Mutação de Entidades Inexistentes nos Managers:**
+    - Operações de `update` em `PhoneContactsManager`, `LandmarkManager` e `VoiceNotesManager` devem verificar atomicamente a existência prévia da entidade dentro de `db.transaction`. Se inexistente, devem retornar precocemente sem enfileirar operações fantasmas na `sync_queue`.
 
 ---
 

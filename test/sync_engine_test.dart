@@ -93,5 +93,41 @@ void main() {
       expect(result.hasConflict, isFalse);
       expect(result.mergedData['currentLesson'], equals(4));
     });
+
+    test('TC-SYNC-04: Campos de lista (tags) e mapa preservam igualdade de valor e evitam falsos conflitos', () {
+      final baseData = {
+        'id': 'contact-1',
+        'name': 'Lucas',
+        'tags': ['amigo', 'estudo'],
+        'extra': {'nota': 1},
+      };
+
+      // Ambos os nós mantiveram tags idênticas e alteraram outros campos
+      final localData = {
+        'id': 'contact-1',
+        'name': 'Lucas Local',
+        'tags': ['amigo', 'estudo'],
+        'extra': {'nota': 1},
+      };
+
+      final remoteData = {
+        'id': 'contact-1',
+        'name': 'Lucas',
+        'tags': ['amigo', 'estudo'],
+        'extra': {'nota': 1},
+      };
+
+      final result = SyncEngine.mergeEntities(
+        entityType: 'phone_contacts',
+        entityId: 'contact-1',
+        localData: localData,
+        remoteData: remoteData,
+        baseData: baseData,
+      );
+
+      expect(result.hasConflict, isFalse);
+      expect(result.mergedData['name'], equals('Lucas Local'));
+      expect(result.conflicts, isEmpty);
+    });
   });
 }
