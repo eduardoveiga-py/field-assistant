@@ -4,7 +4,7 @@
 - **Data:** 02 de Novembro de 2026
 - **Branch Ativa:** `stabilization/u3-supabase-schema` (criada a partir de `stabilization/u2-supabase-lifecycle` no commit `8e6a1ff`)
 - **Commit Base:** `8e6a1ff`
-- **Commit de Entrega U3 (Código e Testes):** `87c0447`
+- **Commits de Entrega U3:** `87c0447` (código, schema SQL e testes) e `f17c051` (memória técnica e documentação)
 - **Fase Executada:** **FASE 2 — ESTABILIZAÇÃO P0: UNIDADE U3 (SCHEMA REMOTO SUPABASE, STORAGE, RLS E VALIDAÇÃO DE SEGURANÇA)**
 
 ---
