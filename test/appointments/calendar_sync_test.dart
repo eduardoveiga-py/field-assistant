@@ -1287,5 +1287,122 @@ void main() {
       )..where((t) => t.externalEventId.equals('apple_pushed_99'))).getSingle();
       expect(ext.etag, equals(link.externalETagAtSync));
     });
+
+    test('TC-APPLE-ADV-01: Proteção contra Exclusão Parcial Truncada — consulta devolvendo fração anormalmente reduzida (>25% de ausência) preserva registros locais', () async {
+      final now = DateTime.now();
+      final cal = dev_cal.Calendar(
+        id: 'cal_apple_test',
+        name: 'Calendário Principal',
+      );
+      fakePlugin.calendarsResult = [cal];
+
+      // Insere 20 eventos conhecidos no banco local dentro da janela
+      for (int i = 0; i < 20; i++) {
+        final start = now.add(Duration(days: i + 1));
+        final end = start.add(const Duration(hours: 1));
+        await db
+            .into(db.externalCalendarEvents)
+            .insert(
+              ExternalCalendarEventsCompanion.insert(
+                id: 'ext_bulk_$i',
+                provider: 'apple_eventkit',
+                calendarId: 'cal_apple_test',
+                externalEventId: 'apple_bulk_ev_$i',
+                title: 'Compromisso Ministerial $i',
+                startTime: start,
+                endTime: end,
+                createdAt: now,
+                updatedAt: now,
+              ),
+            );
+      }
+
+      // Simula retorno parcial da API com apenas 5 eventos (queda de 75% — anomalia de consulta parcial)
+      final returnedEvents = <dev_cal.Event>[];
+      for (int i = 0; i < 5; i++) {
+        final start = now.add(Duration(days: i + 1));
+        final end = start.add(const Duration(hours: 1));
+        final ev = dev_cal.Event(
+          'cal_apple_test',
+          eventId: 'apple_bulk_ev_$i',
+          title: 'Compromisso Ministerial $i',
+        );
+        ev.start = tz.TZDateTime.from(start, tz.local);
+        ev.end = tz.TZDateTime.from(end, tz.local);
+        returnedEvents.add(ev);
+      }
+      fakePlugin.eventsResult = returnedEvents;
+
+      final res = await appleProvider.syncEvents(db: db);
+      expect(res.success, isTrue);
+
+      // VERIFICAÇÃO CRÍTICA:
+      // Nenhum dos 20 eventos deve ter sido marcado como cancelado/excluído falsamente!
+      final allStored = await (db.select(
+        db.externalCalendarEvents,
+      )..where((t) => t.provider.equals('apple_eventkit'))).get();
+      expect(allStored.length, equals(20));
+      expect(allStored.every((e) => !e.isDeletedExternal), isTrue);
+    });
+
+    test('TC-APPLE-ADV-02: Fingerprint com Recorrência — alteração de regra de recorrência modifica o SHA-256 e dispara atualização determinística', () async {
+      final now = DateTime.now();
+      final cal = dev_cal.Calendar(
+        id: 'cal_apple_test',
+        name: 'Calendário Principal',
+      );
+      fakePlugin.calendarsResult = [cal];
+
+      final start = now.add(const Duration(days: 2));
+      final end = start.add(const Duration(hours: 1));
+
+      // 1. Evento com recorrência semanal
+      final evWeekly = dev_cal.Event(
+        'cal_apple_test',
+        eventId: 'apple_rec_ev_1',
+        title: 'Estudo Recorrente',
+      );
+      evWeekly.start = tz.TZDateTime.from(start, tz.local);
+      evWeekly.end = tz.TZDateTime.from(end, tz.local);
+      evWeekly.recurrenceRule = dev_cal.RecurrenceRule(
+        dev_cal.RecurrenceFrequency.Weekly,
+        interval: 1,
+      );
+      fakePlugin.eventsResult = [evWeekly];
+
+      final res1 = await appleProvider.syncEvents(db: db);
+      expect(res1.success, isTrue);
+
+      final row1 = await (db.select(
+        db.externalCalendarEvents,
+      )..where((t) => t.externalEventId.equals('apple_rec_ev_1'))).getSingle();
+      final fpWeekly = row1.etag;
+      expect(fpWeekly, isNotNull);
+
+      // 2. Altera a frequência de recorrência para diária
+      final evDaily = dev_cal.Event(
+        'cal_apple_test',
+        eventId: 'apple_rec_ev_1',
+        title: 'Estudo Recorrente',
+      );
+      evDaily.start = tz.TZDateTime.from(start, tz.local);
+      evDaily.end = tz.TZDateTime.from(end, tz.local);
+      evDaily.recurrenceRule = dev_cal.RecurrenceRule(
+        dev_cal.RecurrenceFrequency.Daily,
+        interval: 1,
+      );
+      fakePlugin.eventsResult = [evDaily];
+
+      final res2 = await appleProvider.syncEvents(db: db);
+      expect(res2.success, isTrue);
+
+      final row2 = await (db.select(
+        db.externalCalendarEvents,
+      )..where((t) => t.externalEventId.equals('apple_rec_ev_1'))).getSingle();
+      final fpDaily = row2.etag;
+
+      // O fingerprint com frequência diária DEVE ser diferente do semanal
+      expect(fpDaily, isNot(equals(fpWeekly)));
+    });
   });
 }

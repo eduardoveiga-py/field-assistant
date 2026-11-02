@@ -31,3 +31,9 @@
 - **Ação:** Outbox Completa: `createVisit()` em `lib/database/repository.dart` passa a enfileirar atomicamente operação `UPDATE` para `people` (com `baseData`) ao atualizar `lastContactAt` e `nextActionNote`.
 - **Ação:** Criação e aprovação dos testes `TC-SYNC-ADV-01`, `TC-SYNC-ADV-02`, `TC-SYNC-ADV-03` em `test/supabase_sync_service_test.dart` e `TC-SYNC-ADV-04` em `test/repository_database_test.dart`.
 - **Status:** Concluído.
+
+### Fase 4: Apple EventKit: Blindagem contra Falsas Exclusões e Fingerprint Robusto
+- **Ação:** Proteção contra consultas parciais truncadas: bloqueia cancelamento em massa indevido quando a consulta devolve fração anormalmente reduzida (>25% ausência).
+- **Ação:** Inclusão de `recurrenceRuleStr` determinístico na computação do `computeEventFingerprint()` nas sincronizações do EventKit.
+- **Ação:** Criação e aprovação dos testes adversariais `TC-APPLE-ADV-01` e `TC-APPLE-ADV-02` em `test/appointments/calendar_sync_test.dart` (22 testes aprovados).
+- **Status:** Concluído.

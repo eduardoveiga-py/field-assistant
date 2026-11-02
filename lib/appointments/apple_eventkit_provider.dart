@@ -179,6 +179,10 @@ class AppleEventKitProvider implements CalendarProvider {
         final endDt =
             ev.end?.toLocal() ?? startDt.add(const Duration(minutes: 30));
 
+        final recurrenceRuleStr = ev.recurrenceRule != null
+            ? '${ev.recurrenceRule!.recurrenceFrequency}_${ev.recurrenceRule!.interval}_${ev.recurrenceRule!.totalOccurrences}_${ev.recurrenceRule!.endDate?.toIso8601String()}'
+            : null;
+
         final fingerprint = computeEventFingerprint(
           externalEventId: evId,
           calendarId: calendarId,
@@ -188,6 +192,7 @@ class AppleEventKitProvider implements CalendarProvider {
           startTime: startDt,
           endTime: endDt,
           isAllDay: ev.allDay ?? false,
+          recurrenceRule: recurrenceRuleStr,
         );
 
         final existing =
@@ -260,12 +265,19 @@ class AppleEventKitProvider implements CalendarProvider {
               ))
               .get();
 
-      // Proteção contra exclusão falsa em massa:
-      // Se a consulta externa retornou 0 eventos mas existiam múltiplos eventos registrados na janela,
-      // não executa deleção em massa automática (pode ser falha transitória ou de permissão do EventKit).
+      // Proteção contra exclusão falsa em massa e consultas parciais truncadas:
+      // 1. Se a consulta retornou 0 eventos mas existiam registros armazenados na janela.
+      // 2. Se a consulta retornou uma fração anormalmente reduzida (>25% de ausência súbita quando há 4 ou mais eventos).
+      final missingCount = storedEventsInWindow
+          .where((s) => !activeExtIds.contains(s.externalEventId))
+          .length;
       final isMassDeletionAnomaly =
           events.isEmpty && storedEventsInWindow.isNotEmpty;
-      if (!isMassDeletionAnomaly) {
+      final isPartialTruncationAnomaly =
+          storedEventsInWindow.length >= 4 &&
+          (missingCount / storedEventsInWindow.length) > 0.25;
+
+      if (!isMassDeletionAnomaly && !isPartialTruncationAnomaly) {
         for (final stored in storedEventsInWindow) {
           if (!activeExtIds.contains(stored.externalEventId)) {
             await (db.update(
