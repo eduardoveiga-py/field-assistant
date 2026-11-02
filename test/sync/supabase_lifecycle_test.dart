@@ -104,7 +104,7 @@ void main() {
       expect(result.totalProcessed, equals(3));
       expect(result.successCount, equals(0));
       expect(result.message, contains('não configurado'));
-      expect(syncService.currentStatus, equals(SyncStatus.waitingConnection));
+      expect(syncService.currentStatus, equals(SyncStatus.savedLocally));
 
       // As operações continuam intactas no banco Drift
       final opsAfter = await repo.getPendingSyncOperations();
@@ -350,7 +350,7 @@ void main() {
       // ProcessQueue sob concorrência não quebra o banco
       final result = await syncService.processQueue();
       expect(result.totalProcessed, equals(20));
-      expect(syncService.currentStatus, equals(SyncStatus.waitingConnection));
+      expect(syncService.currentStatus, equals(SyncStatus.savedLocally));
     });
 
     test('8. Reentrância e Trava isSyncing: chamadas simultâneas a processQueue aguardam a execução ativa sem duplicar requisições', () async {
@@ -585,6 +585,243 @@ void main() {
       expect(upsertCount, greaterThanOrEqualTo(1));
       final pendingAfter = await repo.getPendingSyncOperations();
       expect(pendingAfter.isEmpty, isTrue);
+    });
+
+    test('12. Instabilidade HTTP 503 PostgREST: aborta lote sem queimar tentativas subsequentes e notifica desconexão', () async {
+      final validConfig = AppConfig.create(
+        environment: AppEnvironment.development,
+        supabaseUrl: 'https://postgrest-503-test.supabase.co',
+        supabaseAnonKey: 'valid-anon-key-1234567890',
+      );
+
+      SupabaseInitializer.setMockStateForTesting(
+        state: SupabaseConnectionState.connected,
+        config: validConfig,
+      );
+
+      int httpCalls = 0;
+      final mockHttpClient = MockClient((req) async {
+        httpCalls++;
+        return http.Response(
+          jsonEncode({
+            'code': '503',
+            'message':
+                '503 Service Unavailable: upstream server temporary outage',
+            'details': 'Cloudflare gateway timeout or upstream down',
+            'hint': null,
+          }),
+          503,
+          request: req,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      final mockClient = SupabaseClient(
+        validConfig.supabaseUrl,
+        validConfig.supabaseAnonKey,
+        httpClient: mockHttpClient,
+      );
+
+      final syncService = SupabaseSyncService(
+        db: db,
+        repository: repo,
+        config: validConfig,
+        clientOverride: mockClient,
+      );
+      addTearDown(syncService.dispose);
+
+      await repo.createPerson(name: 'Item 1');
+      await repo.createPerson(name: 'Item 2');
+      await repo.createPerson(name: 'Item 3');
+
+      final pendingBefore = await repo.getPendingSyncOperations();
+      expect(pendingBefore.length, equals(3));
+
+      final result = await syncService.processQueue(ignoreBackoff: true);
+
+      expect(httpCalls, equals(1));
+      expect(result.failureCount, equals(1));
+      expect(syncService.currentStatus, equals(SyncStatus.waitingConnection));
+      expect(
+        SupabaseInitializer.currentState,
+        equals(SupabaseConnectionState.disconnected),
+      );
+
+      final allQueue = await (db.select(db.syncQueue)).get();
+      final failedOp = allQueue.firstWhere((q) => q.status == 'failed');
+      final pendingOps = allQueue.where((q) => q.status == 'pending').toList();
+
+      expect(failedOp.attempts, equals(1));
+      expect(pendingOps.length, equals(2));
+      for (final op in pendingOps) {
+        expect(op.attempts, equals(0));
+      }
+    });
+
+    test('13. Blindagem de dados locais em _applyRemoteRecord com outbox attempts >= 5 (failed)', () async {
+      final validConfig = AppConfig.create(
+        environment: AppEnvironment.development,
+        supabaseUrl: 'https://merge-failed-test.supabase.co',
+        supabaseAnonKey: 'valid-anon-key-1234567890',
+      );
+
+      final person = await repo.createPerson(
+        name: 'Carlos Excedido',
+        phone: '11988880000',
+        generalNotes:
+            'Anotação confidencial do usuário que NÃO pode ser perdida',
+      );
+
+      final op = (await repo.getPendingSyncOperations()).first;
+      await (db.update(db.syncQueue)..where((t) => t.id.equals(op.id))).write(
+        const SyncQueueCompanion(
+          status: Value('failed'),
+          attempts: Value(5),
+          lastError: Value('Max attempts exceeded'),
+        ),
+      );
+
+      final remotePerson = {
+        'id': person.id,
+        'name': 'Carlos Excedido',
+        'phone': '11988889999',
+        'general_notes':
+            'Anotação confidencial do usuário que NÃO pode ser perdida',
+        'status': 'interessado',
+        'first_contact_at': person.firstContactAt.toIso8601String(),
+        'updated_at': DateTime.now()
+            .add(const Duration(minutes: 10))
+            .toIso8601String(),
+        'revision': 2,
+      };
+
+      final mockHttpClient = MockClient((req) async {
+        if (req.url.path.contains('people')) {
+          return mockJsonResponse(req, [remotePerson]);
+        }
+        return mockJsonResponse(req, []);
+      });
+
+      final mockClient = SupabaseClient(
+        validConfig.supabaseUrl,
+        validConfig.supabaseAnonKey,
+        httpClient: mockHttpClient,
+      );
+
+      final syncService = SupabaseSyncService(
+        db: db,
+        repository: repo,
+        config: validConfig,
+        clientOverride: mockClient,
+      );
+      addTearDown(syncService.dispose);
+
+      final pullResult = await syncService.fetchRemoteChanges();
+      expect(pullResult.successCount, equals(1));
+
+      final localPersonAfter = await repo.getPersonById(person.id);
+      expect(localPersonAfter, isNotNull);
+      expect(
+        localPersonAfter!.generalNotes,
+        equals('Anotação confidencial do usuário que NÃO pode ser perdida'),
+      );
+      expect(localPersonAfter.phone, equals('11988889999'));
+    });
+
+    test('14. Status com Fila Vazia em Modo Desconfigurado ou Offline NÃO deve ser synced', () async {
+      final unconfiguredService = SupabaseSyncService(
+        db: db,
+        repository: repo,
+        config: AppConfig.create(
+          environment: AppEnvironment.development,
+          supabaseUrl: '',
+          supabaseAnonKey: '',
+        ),
+      );
+      addTearDown(unconfiguredService.dispose);
+
+      final resultUnconfigured = await unconfiguredService.processQueue();
+      expect(
+        unconfiguredService.currentStatus,
+        equals(SyncStatus.savedLocally),
+      );
+      expect(resultUnconfigured.message, contains('não configurado'));
+
+      final validConfig = AppConfig.create(
+        environment: AppEnvironment.development,
+        supabaseUrl: 'https://offline-empty-test.supabase.co',
+        supabaseAnonKey: 'valid-anon-key-1234567890',
+      );
+
+      SupabaseInitializer.setMockStateForTesting(
+        state: SupabaseConnectionState.disconnected,
+        config: validConfig,
+      );
+
+      final offlineService = SupabaseSyncService(
+        db: db,
+        repository: repo,
+        config: validConfig,
+      );
+      addTearDown(offlineService.dispose);
+
+      final resultOffline = await offlineService.processQueue();
+      expect(
+        offlineService.currentStatus,
+        equals(SyncStatus.waitingConnection),
+      );
+      expect(resultOffline.message, contains('offline'));
+    });
+
+    test('15. Falsos Indicadores de Sincronização em sync(): mensagem reflete suspensão remota quando offline ou não configurado', () async {
+      final unconfiguredService = SupabaseSyncService(
+        db: db,
+        repository: repo,
+        config: AppConfig.create(
+          environment: AppEnvironment.development,
+          supabaseUrl: '',
+          supabaseAnonKey: '',
+        ),
+      );
+      addTearDown(unconfiguredService.dispose);
+
+      final syncResultUnconfigured = await unconfiguredService.sync();
+      expect(
+        syncResultUnconfigured.message,
+        contains('Supabase não configurado'),
+      );
+      expect(
+        syncResultUnconfigured.message,
+        isNot(contains('Sincronização bidirecional: 0 enviados, 0 recebidos.')),
+      );
+
+      final validConfig = AppConfig.create(
+        environment: AppEnvironment.development,
+        supabaseUrl: 'https://sync-msg-test.supabase.co',
+        supabaseAnonKey: 'valid-anon-key-1234567890',
+      );
+
+      SupabaseInitializer.setMockStateForTesting(
+        state: SupabaseConnectionState.disconnected,
+        config: validConfig,
+      );
+
+      final offlineService = SupabaseSyncService(
+        db: db,
+        repository: repo,
+        config: validConfig,
+      );
+      addTearDown(offlineService.dispose);
+
+      final syncResultOffline = await offlineService.sync();
+      expect(
+        syncResultOffline.message,
+        contains('Dispositivo offline para sincronização remota'),
+      );
+      expect(
+        syncResultOffline.message,
+        isNot(contains('Sincronização bidirecional: 0 enviados, 0 recebidos.')),
+      );
     });
   });
 }

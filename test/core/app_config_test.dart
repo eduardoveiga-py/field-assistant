@@ -518,7 +518,7 @@ void main() {
       expect(processResult.successCount, equals(0));
       expect(processResult.message, contains('não configurado'));
       expect(processResult.message, contains('mantidos salvos localmente'));
-      expect(syncService.currentStatus, equals(SyncStatus.waitingConnection));
+      expect(syncService.currentStatus, equals(SyncStatus.savedLocally));
 
       // Fila permanece intacta no SQLite
       final queueItemsAfter = await (db.select(db.syncQueue)).get();

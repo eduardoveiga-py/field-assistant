@@ -107,6 +107,11 @@ class SupabaseSyncService with WidgetsBindingObserver {
     return config.isConfigured;
   }
 
+  bool get isOffline {
+    if (clientOverride != null) return false;
+    return SupabaseInitializer.currentState.isOffline;
+  }
+
   void _setStatus(SyncStatus status) {
     _currentStatus = status;
     if (!_statusController.isClosed) {
@@ -779,8 +784,8 @@ class SupabaseSyncService with WidgetsBindingObserver {
                       t.entityId.equals(id) &
                       (t.status.equals('pending') |
                           t.status.equals('in_progress') |
-                          (t.status.equals('failed') &
-                              t.attempts.isSmallerThanValue(5))),
+                          t.status.equals('failed') |
+                          t.status.equals('conflict')),
                 )
                 ..orderBy([
                   (t) => drift.OrderingTerm(
@@ -903,9 +908,53 @@ class SupabaseSyncService with WidgetsBindingObserver {
   /// 2. Busca e mescla alterações remotas (pull), respeitando integridade offline-first
   Future<SyncProcessResult> sync() async {
     final pushResult = await processQueue();
-    if (!isConfigured) return pushResult;
+    if (!isConfigured) {
+      return SyncProcessResult(
+        totalProcessed: pushResult.totalProcessed,
+        successCount: pushResult.successCount,
+        failureCount: pushResult.failureCount,
+        conflictCount: pushResult.conflictCount,
+        errors: pushResult.errors,
+        message: 'Sincronização local preservada. Supabase não configurado para sincronização remota.',
+      );
+    }
+    if (isOffline) {
+      return SyncProcessResult(
+        totalProcessed: pushResult.totalProcessed,
+        successCount: pushResult.successCount,
+        failureCount: pushResult.failureCount,
+        conflictCount: pushResult.conflictCount,
+        errors: pushResult.errors,
+        message: 'Sincronização local preservada. Dispositivo offline para sincronização remota.',
+      );
+    }
+
     final pullResult = await fetchRemoteChanges();
     final allErrors = [...pushResult.errors, ...pullResult.errors];
+
+    if (pullResult.message.contains('não configurado')) {
+      return SyncProcessResult(
+        totalProcessed: pushResult.totalProcessed + pullResult.totalProcessed,
+        successCount: pushResult.successCount + pullResult.successCount,
+        failureCount: pushResult.failureCount + pullResult.failureCount,
+        conflictCount: pushResult.conflictCount + pullResult.conflictCount,
+        errors: allErrors,
+        message: 'Sincronização local preservada. Supabase não configurado para sincronização remota.',
+      );
+    }
+
+    if (pullResult.message.contains('suspensa') ||
+        pullResult.message.contains('offline')) {
+      return SyncProcessResult(
+        totalProcessed: pushResult.totalProcessed + pullResult.totalProcessed,
+        successCount: pushResult.successCount + pullResult.successCount,
+        failureCount: pushResult.failureCount + pullResult.failureCount,
+        conflictCount: pushResult.conflictCount + pullResult.conflictCount,
+        errors: allErrors,
+        message: 'Sincronização local preservada. Dispositivo offline para sincronização remota.',
+      );
+    }
+
     return SyncProcessResult(
       totalProcessed: pushResult.totalProcessed + pullResult.totalProcessed,
       successCount: pushResult.successCount + pullResult.successCount,
@@ -954,7 +1003,7 @@ class SupabaseSyncService with WidgetsBindingObserver {
       );
     }
 
-    if (clientOverride == null && SupabaseInitializer.currentState.isOffline) {
+    if (isOffline) {
       _setStatus(SyncStatus.waitingConnection);
       return const SyncProcessResult(
         totalProcessed: 0,
@@ -1128,6 +1177,34 @@ class SupabaseSyncService with WidgetsBindingObserver {
   Future<SyncProcessResult> _executeProcessQueue({
     bool ignoreBackoff = false,
   }) async {
+    if (!isConfigured) {
+      _setStatus(SyncStatus.savedLocally);
+      final pendingOps = await repository.getPendingSyncOperations();
+      return SyncProcessResult(
+        totalProcessed: pendingOps.length,
+        successCount: 0,
+        failureCount: 0,
+        conflictCount: 0,
+        message: pendingOps.isEmpty
+            ? 'Supabase não configurado. Modo offline local ativo.'
+            : 'Supabase não configurado. ${pendingOps.length} registros mantidos salvos localmente no SQLite.',
+      );
+    }
+
+    if (isOffline) {
+      _setStatus(SyncStatus.waitingConnection);
+      final pendingOps = await repository.getPendingSyncOperations();
+      return SyncProcessResult(
+        totalProcessed: pendingOps.length,
+        successCount: 0,
+        failureCount: 0,
+        conflictCount: 0,
+        message: pendingOps.isEmpty
+            ? 'Dispositivo offline. Modo offline local ativo.'
+            : 'Dispositivo offline. ${pendingOps.length} registros mantidos salvos localmente no SQLite.',
+      );
+    }
+
     final pendingOps = await repository.getPendingSyncOperations();
     if (pendingOps.isEmpty) {
       _setStatus(SyncStatus.synced);
@@ -1137,30 +1214,6 @@ class SupabaseSyncService with WidgetsBindingObserver {
         failureCount: 0,
         conflictCount: 0,
         message: 'Fila de sincronização vazia. Todos os registros locais estão preservados.',
-      );
-    }
-
-    if (!isConfigured) {
-      _setStatus(SyncStatus.waitingConnection);
-      return SyncProcessResult(
-        totalProcessed: pendingOps.length,
-        successCount: 0,
-        failureCount: 0,
-        conflictCount: 0,
-        message:
-            'Supabase não configurado. ${pendingOps.length} registros mantidos salvos localmente no SQLite.',
-      );
-    }
-
-    if (clientOverride == null && SupabaseInitializer.currentState.isOffline) {
-      _setStatus(SyncStatus.waitingConnection);
-      return SyncProcessResult(
-        totalProcessed: pendingOps.length,
-        successCount: 0,
-        failureCount: 0,
-        conflictCount: 0,
-        message:
-            'Dispositivo offline. ${pendingOps.length} registros mantidos salvos localmente no SQLite.',
       );
     }
 
@@ -1250,6 +1303,18 @@ class SupabaseSyncService with WidgetsBindingObserver {
               'Conflito detectado na operação ${op.id} (${op.entityType}): ${e.message}';
           errors.add(err);
           await repository.markSyncOperationFailed(op.id, err);
+        } else if (_isTransientPostgrestError(e) || _isNetworkError(e)) {
+          encounteredNetworkError = true;
+          _setStatus(SyncStatus.waitingConnection);
+          SupabaseInitializer.setDisconnectedDueToNetwork(
+            'Instabilidade temporária no servidor Supabase (${e.code ?? e.message})',
+          );
+          failure++;
+          final err =
+              'Instabilidade no servidor PostgREST na operação ${op.id} (${op.entityType}): ${e.message}';
+          errors.add(err);
+          await repository.markSyncOperationFailed(op.id, err);
+          break;
         } else {
           failure++;
           final err =
@@ -1266,11 +1331,9 @@ class SupabaseSyncService with WidgetsBindingObserver {
         if (_isNetworkError(e)) {
           encounteredNetworkError = true;
           _setStatus(SyncStatus.waitingConnection);
-          if (clientOverride == null) {
-            SupabaseInitializer.setDisconnectedDueToNetwork(
-              'Falha de rede durante sincronização: $e',
-            );
-          }
+          SupabaseInitializer.setDisconnectedDueToNetwork(
+            'Falha de rede durante sincronização: $e',
+          );
           break; // Aborta imediatamente o lote sem queimar tentativas dos itens seguintes
         }
       }
@@ -1295,6 +1358,37 @@ class SupabaseSyncService with WidgetsBindingObserver {
       message:
           'Sincronização concluída: $success enviados, $failure falhas, $conflicts conflitos.',
     );
+  }
+
+  static bool _isTransientPostgrestError(PostgrestException e) {
+    final code = e.code?.trim() ?? '';
+    final codeNum = int.tryParse(code);
+    if (codeNum != null && codeNum >= 500 && codeNum <= 599) {
+      return true;
+    }
+    if (code == '500' || code == '502' || code == '503' || code == '504') {
+      return true;
+    }
+
+    final text = '${e.message} ${e.details ?? ''} ${e.hint ?? ''}'
+        .toLowerCase();
+    return text.contains('500') ||
+        text.contains('502') ||
+        text.contains('503') ||
+        text.contains('504') ||
+        text.contains('bad gateway') ||
+        text.contains('gateway timeout') ||
+        text.contains('gateway time-out') ||
+        text.contains('service unavailable') ||
+        text.contains('internal server error') ||
+        text.contains('server error') ||
+        text.contains('cloudflare') ||
+        text.contains('upstream connect') ||
+        text.contains('connection refused') ||
+        text.contains('connection reset') ||
+        text.contains('temporarily unavailable') ||
+        text.contains('timed out') ||
+        text.contains('timeout');
   }
 
   static bool _isNetworkError(Object error) {

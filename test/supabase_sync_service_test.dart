@@ -72,7 +72,7 @@ void main() {
       }
     });
 
-    test('TC-SYNC-04: Relatório honesto — quando não configurado, reporta waitingConnection e não simula sucesso falso', () async {
+    test('TC-SYNC-04: Relatório honesto — quando não configurado, reporta savedLocally e não simula sucesso falso', () async {
       expect(syncService.isConfigured, isFalse);
 
       await repo.createPerson(name: 'Irmão Teste');
@@ -82,19 +82,35 @@ void main() {
       expect(result.totalProcessed, greaterThanOrEqualTo(1));
       expect(result.successCount, equals(0));
       expect(result.message, contains('não configurado'));
-      expect(syncService.currentStatus, equals(SyncStatus.waitingConnection));
+      expect(syncService.currentStatus, equals(SyncStatus.savedLocally));
     });
 
-    test(
-      'TC-SYNC-05: Fila vazia reporta status synced com 0 operações',
-      () async {
-        final result = await syncService.processQueue();
+    test('TC-SYNC-05: Fila vazia reporta status synced quando configurado e savedLocally quando desconfigurado', () async {
+      // Desconfigurado: fila vazia não deve virar synced
+      final unconfiguredResult = await syncService.processQueue();
+      expect(unconfiguredResult.totalProcessed, equals(0));
+      expect(unconfiguredResult.successCount, equals(0));
+      expect(syncService.currentStatus, equals(SyncStatus.savedLocally));
 
-        expect(result.totalProcessed, equals(0));
-        expect(result.successCount, equals(0));
-        expect(syncService.currentStatus, equals(SyncStatus.synced));
-      },
-    );
+      // Configurado: fila vazia reporta status synced
+      final configuredSync = SupabaseSyncService(
+        db: db,
+        repository: repo,
+        supabaseUrl: 'https://configured.supabase.co',
+        supabaseAnonKey: 'dummy-anon-key-1234567890',
+        clientOverride: SupabaseClient(
+          'https://configured.supabase.co',
+          'dummy-anon-key-1234567890',
+          httpClient: MockClient((req) async => mockJsonResponse(req, [])),
+        ),
+      );
+      addTearDown(configuredSync.dispose);
+
+      final configuredResult = await configuredSync.processQueue();
+      expect(configuredResult.totalProcessed, equals(0));
+      expect(configuredResult.successCount, equals(0));
+      expect(configuredSync.currentStatus, equals(SyncStatus.synced));
+    });
 
     test('TC-SYNC-06: Sanitização de payload remove caminhos de arquivos locais de voice_notes', () {
       final voiceNotePayload = {
