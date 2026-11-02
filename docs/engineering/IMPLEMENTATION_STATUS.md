@@ -31,7 +31,7 @@ Este documento mapeia o status real de cada funcionalidade do **Field Assistant*
 - **Funcionalidades Totais Auditadas:** 16
 - **Totalmente Estabilizadas e Testadas:** 12 (75%)
 - **Parcialmente Implementadas com Débito / Risco P1:** 3 (18,75% — Concorrência na Agenda, Gravação de Áudio/Transcrição, Migrações do Banco Local)
-- **Em Estabilização P0:** 1 (6,25% — Sincronização Supabase remota: U1 e U2 concluídas com 534 testes aprovados; U3 pendente)
+- **Em Estabilização P0:** 1 (6,25% — Sincronização Supabase remota: U1 e U2 concluídas com 547 testes aprovados; U3 pendente)
 
 ---
 
@@ -65,9 +65,9 @@ Este documento mapeia o status real de cada funcionalidade do **Field Assistant*
   - `lib/database/repository.dart` (Ajustado `getPendingSyncOperations()` para incluir operações `failed` com menos de 5 tentativas, garantindo durabilidade da outbox)
   - `lib/sync/supabase_sync_service.dart` (Implementado `WidgetsBindingObserver` para resume de ciclo de vida em background, escuta a `stateStream` para reconexão automática, trava de reentrância `isSyncing`, blindagem 3-way merge em `_applyRemoteRecord`, backoff exponencial com jitter clamped a 300s, aborto seguro de loop em erros de rede e proteção contra `AssertionError` via `clientOrNull`)
   - `test/core/supabase_initializer_test.dart` (12 testes cobrindo modo offline, rejeição de credenciais inválidas, idempotência, concorrência simultânea, timeout e falhas de socket, probe de reachability, preservação de `authenticationRequired`, notificação de rede e Riverpod)
-  - `test/sync/supabase_lifecycle_test.dart` (11 testes cobrindo boot 100% offline sem exceções, durabilidade da outbox em falhas transitórias, limite de 5 retentativas sem starvation, cálculo de backoff com jitter, recuperação de conexão, background resume, transações locais concorrentes, trava `isSyncing`, resiliência a falhas de rede, 3-way merge para failed ops e auto-reconexão via stream)
+  - `test/sync/supabase_lifecycle_test.dart` (18 testes cobrindo boot 100% offline sem exceções, durabilidade da outbox em falhas transitórias, limite de 5 retentativas sem starvation, cálculo de backoff com jitter, recuperação de conexão, background resume, transações locais concorrentes, trava `isSyncing`, resiliência a falhas de rede, 3-way merge para failed ops, auto-reconexão via stream, interrupção em erros 5xx/503 do PostgREST, blindagem contra sobrescrita com attempts >= 5, status com fila vazia em modo offline/desconfigurado, mensagens diagnósticas precisas em `sync()`, detecção de erros transitórios alfanuméricos e cancelamento de busca remota em instabilidade)
   - Documentação em `docs/engineering/` (ADR-011 adicionado em `DECISION_LOG.md`, matrizes atualizadas em `PRODUCTION_READINESS.md`, `SESSION_HANDOFF.md` e `REGRESSION_GUARDRAILS.md`)
-- **Testes Executados:** 540 testes aprovados (`flutter test`), 0 falhas, 0 issues de análise estática (`dart analyze lib test --fatal-infos`), build web release aprovado (`flutter build web --release`).
+- **Testes Executados:** 547 testes aprovados (`flutter test`), 0 falhas, 0 issues de análise estática (`dart analyze lib test --fatal-infos`), build web release aprovado (`flutter build web --release`).
 - **Resultado:** Aprovado em U2. Bloqueador P0-01 resolvido.
 - **Riscos Remanescentes:** Schema SQL remoto incompleto (P0-02, escopo da Unidade U3).
 - **Próxima Ação:** Executar Unidade U3 (Schema SQL remoto, Storage e validação RLS).

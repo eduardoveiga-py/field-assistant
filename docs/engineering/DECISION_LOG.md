@@ -149,6 +149,6 @@ Este registro preserva o contexto, as alternativas ponderadas e as consequência
   12. Abortar imediatamente o lote em falhas de rede (`_isNetworkError`) para manter `SyncStatus.waitingConnection` e evitar queima prematura de tentativas nos itens subsequentes da fila.
   13. Evitar loops infinitos de rede pausando o processamento automático daquelas operações que atingem 5 tentativas consecutivas de falha, retendo-as fisicamente na tabela `sync_queue` para auditoria manual.
 - **Justificativa:** Assegura que o aplicativo abra instantaneamente e funcione com 100% de capacidade local independente do status da rede ou do backend, enquanto orquestra sincronização transparente, segura e sem regressões na outbox.
-- **Consequências:** Zero dependência de rede no boot, zero crashes por `AssertionError`, durabilidade garantida da outbox local, reatividade Riverpod e recuperação automática de conectividade. Validado por 23 testes dedicados em `test/core/supabase_initializer_test.dart` e `test/sync/supabase_lifecycle_test.dart`, elevando o total da suíte para 540 testes 100% aprovados.
+- **Consequências:** Zero dependência de rede no boot, zero crashes por `AssertionError`, durabilidade garantida da outbox local, reatividade Riverpod e recuperação automática de conectividade. Validado por 30 testes dedicados em `test/core/supabase_initializer_test.dart` e `test/sync/supabase_lifecycle_test.dart`, elevando o total da suíte para 547 testes 100% aprovados.
 
 
