@@ -184,6 +184,34 @@ Este registro preserva o contexto, as alternativas ponderadas e as consequência
   8. Fornecer fallbacks seguros em `_prepareEntryMap` para colunas obrigatórias de contatos telefônicos, marcos e notas de voz em tombstones parciais.
 - **Consequências:** Exclusão física remota abolida. Propagação confiável de exclusões entre dispositivos heterogêneos. Proteção contra ressurreição por upserts antigos. Validado por 11 novos testes formais em `test/sync/supabase_soft_delete_test.dart` (Testes A a K), elevando a suíte para 573 testes aprovados (100%), 0 issues de análise estática e build web release aprovado. Detalhes em `docs/engineering/ADR_U3_1_SOFT_DELETE_TOMBSTONES.md`.
 
+---
+
+## ADR-014: Hardening Definitivo de Sincronização, 3-Way Merge e Segurança Supabase Storage (Unidade U3.2)
+- **Status:** Aprovado e Implementado
+- **Data:** 02 de Novembro de 2026
+- **Contexto:** Após as Unidades U3 e U3.1, a auditoria detalhada de resiliência identificou 9 apontamentos (BUG-U3-02 a BUG-U3-10) e duas melhorias arquiteturais de U2 pendentes (ISSUE-U2-01 e ISSUE-U2-02). Especificamente:
+  1. `PhoneContactsManager`, `LandmarkManager` e `VoiceNotesManager` enfileiravam operações de edição na `sync_queue` sem o snapshot `_base` e sem incrementar `revision`, tornando a resolução 3-way merge em `_applyRemoteRecord` cega ou baseada no estado já modificado (BUG-U3-02 e BUG-U3-09).
+  2. As políticas RLS do Supabase Storage no bucket `voice_notes` permitiam upload para qualquer usuário autenticado quando `owner` fosse `NULL`, criando risco de sobrescrita de áudios de outros usuários (BUG-U3-03 e BUG-U3-10).
+  3. Atualizações remotas de notas de voz apagavam o caminho de áudio local em disco (`audioFilePath`) quando o servidor não retornava caminho remoto de arquivo (BUG-U3-04).
+  4. Migrações PostgreSQL usavam `timezone('utc'::text, now())` em colunas `TIMESTAMPTZ`, gerando inconsistências de timezone (BUG-U3-05).
+  5. Campo `tags` em `phone_contacts` era serializado como string JSON (`jsonEncode`) em vez de array nativo JSONB aceito pelo Supabase (BUG-U3-06).
+  6. `requeueFailedSyncOperations` não possuía guarda contra lista vazia (gerando DML desnecessário), não era atômico com transação do banco e sobrescrevia o número de tentativas mesmo para registros com tentativas inferiores (BUG-U3-07 e BUG-U3-08).
+- **Decisão:**
+  1. **3-Way Merge Real:** Capturar o snapshot pré-edição (`existing.toMap()`) e gravá-lo no payload como `_base` em `updatePhoneContact`, `updateLandmark` e `saveVoiceNote`, incrementando atômica e monotonicamente `revision: Value(existing.revision + 1)`. Em `_applyRemoteRecord`, passar esse `baseData` real para `SyncEngine.mergeEntities`.
+  2. **Transacionalidade Local:** Envolver todas as operações de mutação de managers em `db.transaction`, garantindo atomicidade entre a gravação na tabela primária e o enfileiramento na `sync_queue`.
+  3. **Preservação de Áudio Local:** Em `_updateLocalEntry` e `_applyRemoteRecord` para `voice_notes`, consultar a entidade local prévia e preservar explicitamente `existing.audioFilePath` caso a resposta remota seja nula ou vazia.
+  4. **Segurança Supabase Storage e RLS:** Criar migração versionada `20261102020000_u3_2_storage_and_hardening.sql`:
+     - Nova política `voice_notes_storage_insert` que valida estritamente a posse da nota de voz vinculada via `EXISTS (SELECT 1 FROM public.voice_notes vn WHERE vn.id::text = regexp_replace(storage.objects.name, '\.[^.]+$', '') AND vn.owner_id = auth.uid())`.
+     - Suporte multi-extensão (.mp4, .aac, .m4a) na validação de nome do arquivo via regex.
+     - Substituição de `timezone('utc'::text, now())` por `now()` padrão de PostgreSQL em defaults e triggers de todas as tabelas.
+  5. **Normalização JSONB:** Em `toRemotePayload`, decodificar strings JSON de `tags` para `List<dynamic>` nativo do Dart antes do envio via PostgREST, além de converter inteiros para booleanos nas flags de WhatsApp e Redes Sociais.
+  6. **Resiliência do Requeue:** Proteger `requeueFailedSyncOperations` com retorno precoce se `operationIds.isEmpty`, envolver em `db.transaction`, e limitar tentativas com clamping: `attempts < 4 ? attempts : 4`.
+  7. **Recuperação de Boot (ISSUE-U2-01):** Implementar `SupabaseInitializer.retryInitialization()` e `retrySupabaseInitializationIfConfigured()`.
+  8. **Reatividade da Outbox (ISSUE-U2-02):** Implementar e expor `OutboxRecoveryNotifier`, `outboxRecoveryProvider` e `failedSyncOperationsStreamProvider`.
+  9. **Tratamento de Migrações Drift:** Registrar erros estruturados com `AppLogger.error` e emitir `rethrow` de exceções de DDL em `_migrateLandmarksColumns`, `_migrateCustomTablesColumns` e `_migrateLegacyKvStore`.
+- **Consequências:** Eliminação categórica de todos os 9 defeitos auditados. Sistema atinge consistência determinística multidispositivo sem sobrescrita cega, sem vazamento de arquivos de áudio, com RLS estrito e resiliência completa da outbox. Validado por 13 novos testes em `test/sync/supabase_hardening_u3_2_test.dart`, totalizando 586 testes 100% aprovados, análise estática limpa e compilação web íntegra.
+
+
 
 
 

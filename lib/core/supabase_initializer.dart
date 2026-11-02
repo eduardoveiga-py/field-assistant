@@ -259,6 +259,32 @@ class SupabaseInitializer {
     }
   }
 
+  /// Permite re-tentar a inicialização caso tenha falhado no boot (ex: modo avião desligado).
+  ///
+  /// Se o SDK já estiver inicializado, reavalia a conectividade de rede chamando [checkConnectivity].
+  /// Se o SDK ainda não foi inicializado com sucesso (ou falhou previamente),
+  /// limpa o estado de concorrência pendente e reexecuta [initializeIfConfigured].
+  static Future<SupabaseConnectionState> retryInitialization({
+    AppConfig? config,
+    http.Client? httpClient,
+    SupabaseCustomInitializer? customInit,
+    bool checkConnectivityOnStartup = true,
+  }) async {
+    if (_isInitialized) {
+      AppLogger.info(
+        'SupabaseInitializer.retryInitialization: SDK já inicializado, revalidando conectividade...',
+      );
+      return checkConnectivity(httpClient: httpClient);
+    }
+    _initCompleter = null;
+    return initializeIfConfigured(
+      config: config,
+      httpClient: httpClient,
+      customInit: customInit,
+      checkConnectivityOnStartup: checkConnectivityOnStartup,
+    );
+  }
+
   /// Verifica conectividade de rede ativa com o backend do Supabase
   static Future<SupabaseConnectionState> checkConnectivity({
     http.Client? httpClient,
@@ -441,6 +467,21 @@ Future<SupabaseConnectionState> initializeSupabaseIfConfigured({
   bool checkConnectivityOnStartup = true,
 }) {
   return SupabaseInitializer.initializeIfConfigured(
+    config: config,
+    httpClient: httpClient,
+    customInit: customInit,
+    checkConnectivityOnStartup: checkConnectivityOnStartup,
+  );
+}
+
+/// Função de conveniência de nível superior para re-tentar a inicialização.
+Future<SupabaseConnectionState> retrySupabaseInitializationIfConfigured({
+  AppConfig? config,
+  http.Client? httpClient,
+  SupabaseCustomInitializer? customInit,
+  bool checkConnectivityOnStartup = true,
+}) {
+  return SupabaseInitializer.retryInitialization(
     config: config,
     httpClient: httpClient,
     customInit: customInit,

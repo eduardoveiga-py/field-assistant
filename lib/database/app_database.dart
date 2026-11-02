@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 
 import 'tables.dart';
 import 'connection/connection.dart' as impl;
+import '../core/app_logger.dart';
 
 part 'app_database.g.dart';
 
@@ -123,7 +124,14 @@ class AppDatabase extends _$AppDatabase {
           "UPDATE territory_landmarks SET revision = 1 WHERE revision IS NULL;",
         );
       }
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.error(
+        'AppDatabase: falha crítica na migração de colunas de territory_landmarks',
+        e,
+        st,
+      );
+      rethrow;
+    }
   }
 
   Future<void> _migrateCustomTablesColumns() async {
@@ -172,7 +180,14 @@ class AppDatabase extends _$AppDatabase {
             "UPDATE $tbl SET revision = 1 WHERE revision IS NULL;",
           );
         }
-      } catch (_) {}
+      } catch (e, st) {
+        AppLogger.error(
+          'AppDatabase: falha crítica na migração de colunas para tabela customizada $tbl',
+          e,
+          st,
+        );
+        rethrow;
+      }
     }
   }
 
@@ -198,7 +213,14 @@ class AppDatabase extends _$AppDatabase {
         }
         await customStatement("DROP TABLE IF EXISTS app_settings_kv");
       }
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.error(
+        'AppDatabase: falha ao migrar chave-valor legado app_settings_kv',
+        e,
+        st,
+      );
+      rethrow;
+    }
   }
 
   Future<void> _createTableIfNotExists(Migrator m, TableInfo table) async {

@@ -63,6 +63,12 @@ Este documento define as regras fundamentais que **jamais podem ser violadas, en
    - Chamadas concorrentes a `processQueue()` ou `fetchRemoteChanges()` devem ser serializadas via travas assíncronas (`isSyncing` e `_activeSyncCompleter`). Nunca permita que múltiplas rotinas processem simultaneamente a mesma fila de envio ou executem escritas concorrentes redundantes no banco local.
 10. **Proteção de Dados Locais em Falhas Transitórias:**
     - Operações com status `failed` (tentativas < 5) na outbox representam mutações locais ativas ainda não convergidas. O processamento de alterações remotas (`_applyRemoteRecord`) deve obrigatoriamente incluí-las na resolução 3-way merge, sendo expressamente proibido sobrescrever dados locais sem reconciliação quando houver operação com status `failed` pendente.
+11. **Preservação Obrigatória de Snapshot `_base` nas Mutações de Managers:**
+    - Todo manager ou método que grava uma operação de `UPDATE` na `sync_queue` DEVE extrair a entidade pré-edição (`existing.toMap()`) e registrá-la como `_base` no mapa do payload, incrementando `revision = existing.revision + 1` no banco Drift dentro de uma `db.transaction`. Nunca permita que `baseData` seja omitido ou que aponte para a entidade pós-edição, pois isso torna o 3-way merge (`SyncEngine.mergeEntities`) cego e suscetível a sobrescrita involuntária.
+12. **Preservação de Ponteiros de Áudio Local em Notas de Voz:**
+    - Quando um registro de nota de voz for recebido do Supabase sem URL/caminho de arquivo de áudio remoto (`audioFilePath == null` ou vazio), o sincronizador (`_updateLocalEntry` e `_applyRemoteRecord`) DEVE preservar o caminho do arquivo de áudio já gravado no SQLite (`existingNote.audioFilePath`). É terminantemente proibido sobrescrever o ponteiro do arquivo local por nulo.
+13. **Normalização de Tipos JSONB no PostgREST:**
+    - Colunas PostgreSQL do tipo `JSONB` (ex: `tags` em `phone_contacts`) devem ser transmitidas pelo cliente Dart como tipos estruturados nativos (`List<dynamic>` ou `Map<String, dynamic>`), e NUNCA como strings serializadas via `jsonEncode()`, sob risco de inserção de strings literais no JSONB ou falha de validação de schema.
 
 ---
 
@@ -90,4 +96,8 @@ Este documento define as regras fundamentais que **jamais podem ser violadas, en
    - Desativar módulos em `customize_features_screen.dart` **não pode apagar dados históricos**. Ao reativar o módulo, todo o histórico deve reaparecer intacto.
 5. **Validação Estrita de Configuração e Injeção de Ambiente:**
    - Toda configuração remota deve ser validada por `AppConfig`. Chaves com privilégio `service_role` e tokens administrativos são ativamente bloqueados antes de qualquer inicialização de rede. Segredos nunca podem ser impressos desmascarados em logs ou no console.
+6. **Validação de Propriedade em Uploads de Storage RLS:**
+   - Políticas de INSERT em buckets de armazenamento do Supabase (ex: `voice_notes`) DEVEM verificar categoricamente que o usuário autenticado é proprietário da entidade pai associada (validação via subconsulta `EXISTS (SELECT 1 FROM public.voice_notes WHERE id::text = ... AND owner_id = auth.uid())`). É expressamente proibido liberar uploads para `owner IS NULL` sem restrição referencial.
+7. **Padrão de Timestamps no Banco Remoto:**
+   - Colunas do tipo `TIMESTAMPTZ` em PostgreSQL devem utilizar `DEFAULT now()` ou `now()` em triggers. NUNCA utilize `timezone('utc'::text, now())`, pois isso distorce a semântica de fuso horário de instantes absolutos.
 

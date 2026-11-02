@@ -28,6 +28,8 @@ class PhoneContactItem {
   final DateTime createdAt;
   final DateTime updatedAt;
 
+  final int revision;
+
   PhoneContactItem({
     required this.id,
     required this.name,
@@ -44,6 +46,7 @@ class PhoneContactItem {
     this.convertedPersonId,
     required this.createdAt,
     required this.updatedAt,
+    this.revision = 1,
   });
 
   Map<String, dynamic> toMap() => {
@@ -51,9 +54,9 @@ class PhoneContactItem {
     'name': name,
     'phone': phone,
     'secondary_phone': secondaryPhone,
-    'has_whatsapp': hasWhatsApp ? 1 : 0,
+    'has_whatsapp': hasWhatsApp,
     'whatsapp_info': whatsAppInfo,
-    'has_social': hasSocial ? 1 : 0,
+    'has_social': hasSocial,
     'social_platform': socialPlatform,
     'social_handle': socialHandle,
     'notes': notes,
@@ -62,6 +65,7 @@ class PhoneContactItem {
     'converted_person_id': convertedPersonId,
     'created_at': createdAt.toIso8601String(),
     'updated_at': updatedAt.toIso8601String(),
+    'revision': revision,
   };
 
   factory PhoneContactItem.fromMap(Map<String, dynamic> map) {
@@ -69,9 +73,13 @@ class PhoneContactItem {
     try {
       final raw = map['tags'];
       if (raw != null) {
-        final decoded = jsonDecode(raw as String);
-        if (decoded is List) {
-          parsedTags = decoded.map((e) => e.toString()).toList();
+        if (raw is List) {
+          parsedTags = raw.map((e) => e.toString()).toList();
+        } else {
+          final decoded = jsonDecode(raw as String);
+          if (decoded is List) {
+            parsedTags = decoded.map((e) => e.toString()).toList();
+          }
         }
       }
     } catch (_) {}
@@ -81,9 +89,15 @@ class PhoneContactItem {
       name: map['name'] as String,
       phone: map['phone'] as String,
       secondaryPhone: map['secondary_phone'] as String?,
-      hasWhatsApp: (map['has_whatsapp'] as int? ?? 0) == 1,
+      hasWhatsApp:
+          map['has_whatsapp'] == true ||
+          (map['has_whatsapp'] as num?)?.toInt() == 1 ||
+          map['hasWhatsapp'] == true,
       whatsAppInfo: map['whatsapp_info'] as String?,
-      hasSocial: (map['has_social'] as int? ?? 0) == 1,
+      hasSocial:
+          map['has_social'] == true ||
+          (map['has_social'] as num?)?.toInt() == 1 ||
+          map['hasSocial'] == true,
       socialPlatform: map['social_platform'] as String?,
       socialHandle: map['social_handle'] as String?,
       notes: map['notes'] as String?,
@@ -92,6 +106,7 @@ class PhoneContactItem {
       convertedPersonId: map['converted_person_id'] as String?,
       createdAt: DateTime.parse(map['created_at'] as String),
       updatedAt: DateTime.parse(map['updated_at'] as String),
+      revision: (map['revision'] as num?)?.toInt() ?? 1,
     );
   }
 }
@@ -112,6 +127,27 @@ class PhoneContactsManager {
       AppLogger.warning('Erro ao processar tags de contato telefônico', e);
     }
     return [];
+  }
+
+  PhoneContactItem _entryToItem(PhoneContactEntry r) {
+    return PhoneContactItem(
+      id: r.id,
+      name: r.name,
+      phone: r.phone,
+      secondaryPhone: r.secondaryPhone,
+      hasWhatsApp: r.hasWhatsapp,
+      whatsAppInfo: r.whatsappInfo,
+      hasSocial: r.hasSocial,
+      socialPlatform: r.socialPlatform,
+      socialHandle: r.socialHandle,
+      notes: r.notes,
+      tags: _parseTags(r.tags),
+      origin: r.origin,
+      convertedPersonId: r.convertedPersonId,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+      revision: r.revision,
+    );
   }
 
   Future<void> _refresh() async {
@@ -135,27 +171,7 @@ class PhoneContactsManager {
                       OrderingTerm(expression: t.name, mode: OrderingMode.asc),
                 ]))
               .get();
-      return rows
-          .map(
-            (r) => PhoneContactItem(
-              id: r.id,
-              name: r.name,
-              phone: r.phone,
-              secondaryPhone: r.secondaryPhone,
-              hasWhatsApp: r.hasWhatsapp,
-              whatsAppInfo: r.whatsappInfo,
-              hasSocial: r.hasSocial,
-              socialPlatform: r.socialPlatform,
-              socialHandle: r.socialHandle,
-              notes: r.notes,
-              tags: _parseTags(r.tags),
-              origin: r.origin,
-              convertedPersonId: r.convertedPersonId,
-              createdAt: r.createdAt,
-              updatedAt: r.updatedAt,
-            ),
-          )
-          .toList();
+      return rows.map(_entryToItem).toList();
     } catch (_) {
       return [];
     }
@@ -182,28 +198,6 @@ class PhoneContactsManager {
     final now = DateTime.now();
     final id = _uuid.v4();
 
-    await db
-        .into(db.phoneContacts)
-        .insert(
-          PhoneContactsCompanion.insert(
-            id: id,
-            name: name.trim(),
-            phone: phone.trim(),
-            secondaryPhone: Value(secondaryPhone?.trim()),
-            hasWhatsapp: Value(hasWhatsApp),
-            whatsappInfo: Value(whatsAppInfo?.trim()),
-            hasSocial: Value(hasSocial),
-            socialPlatform: Value(socialPlatform?.trim()),
-            socialHandle: Value(socialHandle?.trim()),
-            notes: Value(notes?.trim()),
-            tags: Value(jsonEncode(tags)),
-            origin: Value(origin),
-            convertedPersonId: const Value.absent(),
-            createdAt: now,
-            updatedAt: now,
-          ),
-        );
-
     final item = PhoneContactItem(
       id: id,
       name: name.trim(),
@@ -220,9 +214,33 @@ class PhoneContactsManager {
       convertedPersonId: null,
       createdAt: now,
       updatedAt: now,
+      revision: 1,
     );
 
-    try {
+    await db.transaction(() async {
+      await db
+          .into(db.phoneContacts)
+          .insert(
+            PhoneContactsCompanion.insert(
+              id: id,
+              name: name.trim(),
+              phone: phone.trim(),
+              secondaryPhone: Value(secondaryPhone?.trim()),
+              hasWhatsapp: Value(hasWhatsApp),
+              whatsappInfo: Value(whatsAppInfo?.trim()),
+              hasSocial: Value(hasSocial),
+              socialPlatform: Value(socialPlatform?.trim()),
+              socialHandle: Value(socialHandle?.trim()),
+              notes: Value(notes?.trim()),
+              tags: Value(jsonEncode(tags)),
+              origin: Value(origin),
+              convertedPersonId: const Value.absent(),
+              createdAt: now,
+              updatedAt: now,
+              revision: const Value(1),
+            ),
+          );
+
       await db
           .into(db.syncQueue)
           .insert(
@@ -236,35 +254,49 @@ class PhoneContactsManager {
               status: const Value('pending'),
             ),
           );
-    } catch (_) {}
+    });
 
     await _refresh();
     return item;
   }
 
   Future<void> updatePhoneContact(PhoneContactItem contact) async {
-    final now = DateTime.now();
-    await (db.update(
+    final existing = await (db.select(
       db.phoneContacts,
-    )..where((t) => t.id.equals(contact.id))).write(
-      PhoneContactsCompanion(
-        name: Value(contact.name.trim()),
-        phone: Value(contact.phone.trim()),
-        secondaryPhone: Value(contact.secondaryPhone?.trim()),
-        hasWhatsapp: Value(contact.hasWhatsApp),
-        whatsappInfo: Value(contact.whatsAppInfo?.trim()),
-        hasSocial: Value(contact.hasSocial),
-        socialPlatform: Value(contact.socialPlatform?.trim()),
-        socialHandle: Value(contact.socialHandle?.trim()),
-        notes: Value(contact.notes?.trim()),
-        tags: Value(jsonEncode(contact.tags)),
-        origin: Value(contact.origin),
-        convertedPersonId: Value(contact.convertedPersonId),
-        updatedAt: Value(now),
-      ),
-    );
+    )..where((t) => t.id.equals(contact.id))).getSingleOrNull();
 
-    try {
+    final nextRev = (existing?.revision ?? 1) + 1;
+    final now = DateTime.now();
+
+    await db.transaction(() async {
+      await (db.update(
+        db.phoneContacts,
+      )..where((t) => t.id.equals(contact.id))).write(
+        PhoneContactsCompanion(
+          name: Value(contact.name.trim()),
+          phone: Value(contact.phone.trim()),
+          secondaryPhone: Value(contact.secondaryPhone?.trim()),
+          hasWhatsapp: Value(contact.hasWhatsApp),
+          whatsappInfo: Value(contact.whatsAppInfo?.trim()),
+          hasSocial: Value(contact.hasSocial),
+          socialPlatform: Value(contact.socialPlatform?.trim()),
+          socialHandle: Value(contact.socialHandle?.trim()),
+          notes: Value(contact.notes?.trim()),
+          tags: Value(jsonEncode(contact.tags)),
+          origin: Value(contact.origin),
+          convertedPersonId: Value(contact.convertedPersonId),
+          updatedAt: Value(now),
+          revision: Value(nextRev),
+        ),
+      );
+
+      final payloadMap = {
+        ...contact.toMap(),
+        'updated_at': now.toIso8601String(),
+        'revision': nextRev,
+        if (existing != null) '_base': _entryToItem(existing).toMap(),
+      };
+
       await db
           .into(db.syncQueue)
           .insert(
@@ -273,23 +305,23 @@ class PhoneContactsManager {
               entityType: 'phone_contacts',
               entityId: contact.id,
               operation: 'UPDATE',
-              payload: jsonEncode(contact.toMap()),
+              payload: jsonEncode(payloadMap),
               createdAt: now,
               status: const Value('pending'),
             ),
           );
-    } catch (_) {}
+    });
 
     await _refresh();
   }
 
   Future<void> deletePhoneContact(String id) async {
     final now = DateTime.now();
-    await (db.update(db.phoneContacts)..where((t) => t.id.equals(id))).write(
-      PhoneContactsCompanion(deletedAt: Value(now), updatedAt: Value(now)),
-    );
+    await db.transaction(() async {
+      await (db.update(db.phoneContacts)..where((t) => t.id.equals(id))).write(
+        PhoneContactsCompanion(deletedAt: Value(now), updatedAt: Value(now)),
+      );
 
-    try {
       await db
           .into(db.syncQueue)
           .insert(
@@ -307,7 +339,7 @@ class PhoneContactsManager {
               status: const Value('pending'),
             ),
           );
-    } catch (_) {}
+    });
 
     await _refresh();
   }

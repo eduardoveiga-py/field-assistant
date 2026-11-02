@@ -254,6 +254,26 @@ class SupabaseSyncService with WidgetsBindingObserver {
         remote[camelToSnake(key)] = value;
       }
     });
+
+    if (entityType == 'phone_contacts' || entityType == 'phoneContacts') {
+      if (remote['tags'] is String) {
+        try {
+          final decoded = jsonDecode(remote['tags'] as String);
+          if (decoded is List) {
+            remote['tags'] = decoded;
+          }
+        } catch (_) {}
+      }
+      if (remote.containsKey('has_whatsapp')) {
+        remote['has_whatsapp'] =
+            remote['has_whatsapp'] == true || remote['has_whatsapp'] == 1;
+      }
+      if (remote.containsKey('has_social')) {
+        remote['has_social'] =
+            remote['has_social'] == true || remote['has_social'] == 1;
+      }
+    }
+
     return remote;
   }
 
@@ -551,7 +571,27 @@ class SupabaseSyncService with WidgetsBindingObserver {
             .replace(ActivityRecordEntry.fromJson(map));
         break;
       case 'voice_notes':
-        await db.update(db.voiceNotes).replace(VoiceNoteEntry.fromJson(map));
+        final noteId = map['id']?.toString() ?? '';
+        final existingNote = await (db.select(
+          db.voiceNotes,
+        )..where((t) => t.id.equals(noteId))).getSingleOrNull();
+        if (existingNote != null &&
+            existingNote.audioFilePath != null &&
+            existingNote.audioFilePath!.isNotEmpty &&
+            (map['audioFilePath'] == null ||
+                map['audioFilePath'].toString().isEmpty)) {
+          map['audioFilePath'] = existingNote.audioFilePath;
+        }
+        var entry = VoiceNoteEntry.fromJson(map);
+        if (existingNote != null &&
+            existingNote.audioFilePath != null &&
+            existingNote.audioFilePath!.isNotEmpty &&
+            (entry.audioFilePath == null || entry.audioFilePath!.isEmpty)) {
+          entry = entry.copyWith(
+            audioFilePath: drift.Value(existingNote.audioFilePath),
+          );
+        }
+        await db.update(db.voiceNotes).replace(entry);
         break;
       case 'phone_contacts':
         await db
@@ -858,6 +898,19 @@ class SupabaseSyncService with WidgetsBindingObserver {
     return recovered;
   }
 
+  @visibleForTesting
+  Future<bool> applyRemoteRecordForTesting(
+    String table,
+    Map<String, dynamic> remoteRecord,
+    List<String> errors, [
+    SupabaseClient? client,
+  ]) => _applyRemoteRecord(
+    table: table,
+    remoteRecord: remoteRecord,
+    client: client ?? this.client,
+    errors: errors,
+  );
+
   Future<bool> _applyRemoteRecord({
     required String table,
     required Map<String, dynamic> remoteRecord,
@@ -993,6 +1046,13 @@ class SupabaseSyncService with WidgetsBindingObserver {
           _setStatus(SyncStatus.conflict);
           return false;
         } else {
+          if (table == 'voice_notes' &&
+              localData['audioFilePath'] != null &&
+              (mergeResult.mergedData['audioFilePath'] == null ||
+                  mergeResult.mergedData['audioFilePath'].toString().isEmpty)) {
+            mergeResult.mergedData['audioFilePath'] =
+                localData['audioFilePath'];
+          }
           await _updateLocalEntry(table, mergeResult.mergedData);
           await (db.update(
             db.syncQueue,
@@ -1707,3 +1767,46 @@ final syncStatusStreamProvider = StreamProvider<SyncStatus>((ref) {
   final syncService = ref.watch(supabaseSyncServiceProvider);
   return syncService.statusStream;
 });
+
+/// Notifier e Provider para recuperação supervisionada da outbox com falha (ISSUE-U2-02)
+class OutboxRecoveryNotifier extends Notifier<AsyncValue<int>> {
+  @override
+  AsyncValue<int> build() => const AsyncValue.data(0);
+
+  /// Reenfileira operações com falha e opcionalmente dispara processamento da fila.
+  Future<int> requeueFailedOperations({List<String>? operationIds}) async {
+    state = const AsyncValue.loading();
+    try {
+      final repo = ref.read(repositoryProvider);
+      final count = await repo.requeueFailedSyncOperations(
+        operationIds: operationIds,
+      );
+      if (count > 0) {
+        final syncService = ref.read(supabaseSyncServiceProvider);
+        unawaited(syncService.processQueue());
+      }
+      state = AsyncValue.data(count);
+      return count;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      rethrow;
+    }
+  }
+}
+
+/// Provider do notifier de recuperação da outbox
+final outboxRecoveryProvider =
+    NotifierProvider<OutboxRecoveryNotifier, AsyncValue<int>>(
+      OutboxRecoveryNotifier.new,
+    );
+
+/// StreamProvider reativo com operações da fila que estão em estado de falha
+final failedSyncOperationsStreamProvider = StreamProvider<List<SyncQueueEntry>>(
+  (ref) {
+    final repo = ref.watch(repositoryProvider);
+    return (repo.db.select(repo.db.syncQueue)
+          ..where((t) => t.status.equals('failed'))
+          ..orderBy([(t) => drift.OrderingTerm.desc(t.createdAt)]))
+        .watch();
+  },
+);

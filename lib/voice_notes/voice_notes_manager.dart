@@ -133,58 +133,66 @@ class VoiceNotesManager {
   Future<void> saveVoiceNote(VoiceNoteItem item) async {
     final existing = await getVoiceNoteById(item.id);
     final now = DateTime.now();
-    if (existing != null) {
-      await (db.update(
-        db.voiceNotes,
-      )..where((tbl) => tbl.id.equals(item.id))).write(
-        VoiceNotesCompanion(
-          visitId: Value(item.visitId),
-          studyId: Value(item.studyId),
-          audioFilePath: Value(item.audioFilePath),
-          audioDurationSeconds: Value(item.audioDurationSeconds),
-          transcription: Value(item.transcription),
-          detectedLesson: Value(item.detectedLesson),
-          detectedPoint: Value(item.detectedPoint),
-          extractedPendingDoubt: Value(item.extractedPendingDoubt),
-          extractedEmpathyNote: Value(item.extractedEmpathyNote),
-          updatedAt: Value(now),
-          deletedAt: Value(item.deletedAt),
-          revision: Value(existing.revision + 1),
-        ),
-      );
-      await _recordSyncOperation(
-        entityId: item.id,
-        operation: 'UPDATE',
-        payload: item.toMap(),
-      );
-    } else {
-      await db
-          .into(db.voiceNotes)
-          .insert(
-            VoiceNotesCompanion.insert(
-              id: item.id,
-              personId: item.personId,
-              visitId: Value(item.visitId),
-              studyId: Value(item.studyId),
-              audioFilePath: Value(item.audioFilePath),
-              audioDurationSeconds: Value(item.audioDurationSeconds),
-              transcription: item.transcription,
-              detectedLesson: Value(item.detectedLesson),
-              detectedPoint: Value(item.detectedPoint),
-              extractedPendingDoubt: Value(item.extractedPendingDoubt),
-              extractedEmpathyNote: Value(item.extractedEmpathyNote),
-              createdAt: item.createdAt,
-              updatedAt: item.updatedAt,
-              deletedAt: Value(item.deletedAt),
-              revision: Value(item.revision),
-            ),
-          );
-      await _recordSyncOperation(
-        entityId: item.id,
-        operation: 'INSERT',
-        payload: item.toMap(),
-      );
-    }
+    await db.transaction(() async {
+      if (existing != null) {
+        final nextRev = existing.revision + 1;
+        await (db.update(
+          db.voiceNotes,
+        )..where((tbl) => tbl.id.equals(item.id))).write(
+          VoiceNotesCompanion(
+            visitId: Value(item.visitId),
+            studyId: Value(item.studyId),
+            audioFilePath: Value(item.audioFilePath),
+            audioDurationSeconds: Value(item.audioDurationSeconds),
+            transcription: Value(item.transcription),
+            detectedLesson: Value(item.detectedLesson),
+            detectedPoint: Value(item.detectedPoint),
+            extractedPendingDoubt: Value(item.extractedPendingDoubt),
+            extractedEmpathyNote: Value(item.extractedEmpathyNote),
+            updatedAt: Value(now),
+            deletedAt: Value(item.deletedAt),
+            revision: Value(nextRev),
+          ),
+        );
+        await _recordSyncOperation(
+          entityId: item.id,
+          operation: 'UPDATE',
+          payload: {
+            ...item.toMap(),
+            'updated_at': now.toIso8601String(),
+            'revision': nextRev,
+            '_base': existing.toMap(),
+          },
+        );
+      } else {
+        await db
+            .into(db.voiceNotes)
+            .insert(
+              VoiceNotesCompanion.insert(
+                id: item.id,
+                personId: item.personId,
+                visitId: Value(item.visitId),
+                studyId: Value(item.studyId),
+                audioFilePath: Value(item.audioFilePath),
+                audioDurationSeconds: Value(item.audioDurationSeconds),
+                transcription: item.transcription,
+                detectedLesson: Value(item.detectedLesson),
+                detectedPoint: Value(item.detectedPoint),
+                extractedPendingDoubt: Value(item.extractedPendingDoubt),
+                extractedEmpathyNote: Value(item.extractedEmpathyNote),
+                createdAt: item.createdAt,
+                updatedAt: item.updatedAt,
+                deletedAt: Value(item.deletedAt),
+                revision: Value(item.revision),
+              ),
+            );
+        await _recordSyncOperation(
+          entityId: item.id,
+          operation: 'INSERT',
+          payload: item.toMap(),
+        );
+      }
+    });
     await _refresh();
   }
 
@@ -202,18 +210,20 @@ class VoiceNotesManager {
 
   Future<void> deleteVoiceNote(String id) async {
     final now = DateTime.now();
-    await (db.update(db.voiceNotes)..where((tbl) => tbl.id.equals(id))).write(
-      VoiceNotesCompanion(deletedAt: Value(now), updatedAt: Value(now)),
-    );
-    await _recordSyncOperation(
-      entityId: id,
-      operation: 'DELETE',
-      payload: {
-        'id': id,
-        'deleted_at': now.toIso8601String(),
-        'updated_at': now.toIso8601String(),
-      },
-    );
+    await db.transaction(() async {
+      await (db.update(db.voiceNotes)..where((tbl) => tbl.id.equals(id))).write(
+        VoiceNotesCompanion(deletedAt: Value(now), updatedAt: Value(now)),
+      );
+      await _recordSyncOperation(
+        entityId: id,
+        operation: 'DELETE',
+        payload: {
+          'id': id,
+          'deleted_at': now.toIso8601String(),
+          'updated_at': now.toIso8601String(),
+        },
+      );
+    });
     await _refresh();
   }
 

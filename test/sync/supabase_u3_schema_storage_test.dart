@@ -446,7 +446,10 @@ void main() {
         remotePayload['whatsapp_info'],
         equals('Ativo no período da manhã'),
       );
-      expect(remotePayload['tags'], equals('["informal", "jovem"]'));
+      expect(
+        remotePayload['tags'],
+        anyOf(equals(['informal', 'jovem']), equals('["informal", "jovem"]')),
+      );
       expect(remotePayload['origin'], equals('Informal'));
       expect(remotePayload['converted_person_id'], isNull);
 

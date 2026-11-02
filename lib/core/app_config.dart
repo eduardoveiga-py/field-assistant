@@ -87,6 +87,17 @@ class AppConfig {
     required this.validationErrors,
   });
 
+  /// Cria uma instância segura desconfigurada (modo offline local puro).
+  factory AppConfig.unconfigured([
+    AppEnvironment environment = AppEnvironment.development,
+  ]) {
+    return AppConfig.create(
+      environment: environment,
+      supabaseUrl: '',
+      supabaseAnonKey: '',
+    );
+  }
+
   /// Construtor que lê diretamente as variáveis do ambiente compilado (via `--dart-define` ou `--dart-define-from-file`).
   factory AppConfig.fromEnvironment({
     String? environment,
