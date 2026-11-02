@@ -15,21 +15,22 @@ BEGIN
         -- Se a mutação recebida tenta limpar deleted_at (ressuscitar o registro)
         IF NEW.deleted_at IS NULL THEN
             -- Proteção contra ressurreição:
-            -- Se a operação recebida for mais antiga ou concorrente (updated_at <= OLD.deleted_at
-            -- ou revision <= OLD.revision), PRESERVA O TOMBSTONE no servidor.
+            -- Se a operação recebida for mais antiga, concorrente ou não comprovar restauração legítima
+            -- (updated_at <= OLD.deleted_at ou updated_at IS NULL ou revision <= OLD.revision ou revision IS NULL),
+            -- PRESERVA O TOMBSTONE no servidor.
             -- Somente aceita restauração se for uma ação explícita com revision > OLD.revision
             -- E updated_at posterior a OLD.deleted_at.
-            IF (NEW.updated_at IS NOT NULL AND NEW.updated_at <= OLD.deleted_at) OR
-               (NEW.revision <= OLD.revision) THEN
+            IF (NEW.updated_at IS NULL OR NEW.updated_at <= OLD.deleted_at) OR
+               (COALESCE(NEW.revision, 0) <= COALESCE(OLD.revision, 0)) THEN
                 NEW.deleted_at := OLD.deleted_at;
                 NEW.updated_at := GREATEST(OLD.updated_at, COALESCE(NEW.updated_at, OLD.updated_at));
-                NEW.revision := GREATEST(OLD.revision, NEW.revision);
+                NEW.revision := GREATEST(COALESCE(OLD.revision, 1), COALESCE(NEW.revision, 1));
             END IF;
         ELSE
             -- Ambos são tombstones: preserva a data de exclusão e avança metadados
             NEW.deleted_at := COALESCE(OLD.deleted_at, NEW.deleted_at);
             NEW.updated_at := GREATEST(OLD.updated_at, COALESCE(NEW.updated_at, OLD.updated_at));
-            NEW.revision := GREATEST(OLD.revision, NEW.revision);
+            NEW.revision := GREATEST(COALESCE(OLD.revision, 1), COALESCE(NEW.revision, 1));
         END IF;
     END IF;
 
@@ -40,8 +41,8 @@ BEGIN
             NEW.updated_at := NEW.deleted_at;
         END IF;
         -- Garante que a revisão seja incrementada para precedência determinística
-        IF NEW.revision <= OLD.revision THEN
-            NEW.revision := OLD.revision + 1;
+        IF NEW.revision IS NULL OR NEW.revision <= COALESCE(OLD.revision, 0) THEN
+            NEW.revision := COALESCE(OLD.revision, 0) + 1;
         END IF;
     END IF;
 
@@ -70,3 +71,22 @@ BEGIN
     END LOOP;
 END;
 $$;
+
+-- ============================================================================
+-- SCRIPT DE ROLLBACK / REVERSÃO (se necessário):
+-- ============================================================================
+-- DO $$
+-- DECLARE
+--     tbl text;
+--     tables text[] := ARRAY[
+--         'people', 'visits', 'bible_studies', 'study_participants', 
+--         'study_sessions', 'appointments', 'activity_records', 
+--         'voice_notes', 'phone_contacts', 'territory_landmarks'
+--     ];
+-- BEGIN
+--     FOREACH tbl IN ARRAY tables LOOP
+--         EXECUTE format('DROP TRIGGER IF EXISTS trg_soft_delete_guard ON public.%I', tbl);
+--     END LOOP;
+-- END;
+-- $$;
+-- DROP FUNCTION IF EXISTS public.handle_soft_delete_and_resurrection_guard();

@@ -44,9 +44,15 @@ Este documento define as regras fundamentais que **jamais podem ser violadas, en
    - Nenhuma operação DELETE na outbox pode invocar `.delete()` no Supabase. Deve sempre realizar um update preenchendo `deleted_at = now`, `updated_at = now` e incrementando `revision`.
    - Se uma entidade já estiver soft-deletada localmente, o push de operações `INSERT` ou `UPDATE` pendentes deve preservar `deleted_at` para não anular o tombstone remoto.
    - Triggers no PostgreSQL (`handle_soft_delete_and_resurrection_guard`) e a lógica de recepção no cliente (`_applyRemoteRecord`) devem rejeitar a anulação de `deleted_at` por upserts atrasados, permitindo ressurreição apenas se `remoteRev > localRev` e `remoteUpdated > localDeletedAt`.
+   - O trigger no PostgreSQL deve tratar expressamente metadados `NULL` (`IS NULL` e `COALESCE(revision, 0)`), impedindo que mutações atrasadas com atributos ausentes burlem a proteção booleana do SQL e ressuscitem registros excluídos.
+   - A gravação local de exclusões lógicas (`_softDeleteLocalEntry`) deve atualizar atomicamente `deletedAt`, `updatedAt` e `revision` em todas as 10 tabelas sincronizadas, prevenindo descompassos de revisão em consultas locais subsequentes.
+   - A ingestão de tombstones parciais (`_prepareEntryMap`) deve fornecer fallbacks seguros para colunas obrigatórias no Drift (`phone_contacts.name`, `territory_landmarks.name`, `voice_notes.personId`), evitando `TypeError` quando o cliente receber tombstone de registro ainda desconhecido localmente.
+   - Tombstones recebidos para notas de voz (`voice_notes`) devem suprimir expressamente o download de binários de áudio (`!isRemoteDeleted`).
+   - Se houver operação `DELETE` pendente na outbox para um registro recebido, a resolução deve ignorar o merge de entidades de 3 vias (`SyncEngine.mergeEntities`), evitando corrupção de atributos locais com payloads parciais.
    - Tombstones recebidos devem ser aplicados diretamente no banco local sem passar pelos métodos de negócio do repositório para evitar enfileiramento na outbox e loops de sincronização.
-5. **Cursor Incremental Composto (updated_at, id):**
+5. **Cursor Incremental Composto (updated_at, id) e Barreira de Falha:**
    - A paginação do pull e o cursor incremental (`last_synced_at_$table` e `last_synced_id_$table`) devem desemparelhar carimbos idênticos com `id.gt.$id`, prevenindo que registros e tombstones gerados no mesmo instante sejam ignorados.
+   - Se qualquer registro de uma página falhar na aplicação local por erro transitório/não-conflito, os cursores (`last_synced_at` e `last_synced_id`) da tabela NÃO devem avançar, impedindo o avanço prematuro do cursor e a perda permanente de registros remotos.
 6. **Durabilidade Absoluta da Outbox em Falhas Transitórias:**
    - Operações que falham por queda de rede (ex: `SocketException`, `TimeoutException` ou HTTP 5xx) **jamais podem ser descartadas** da fila local `sync_queue`. Elas devem ser marcadas como `failed` e reenviadas em tentativas subsequentes respeitando backoff exponencial com jitter.
 7. **Limite de Retentativas e Prevenção de Starvation / Loop Infinito:**

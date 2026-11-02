@@ -445,12 +445,15 @@ class SupabaseSyncService with WidgetsBindingObserver {
         map['modality'] ??= 'campo';
         break;
       case 'voice_notes':
+        map['personId'] = (map['personId'] ?? map['person_id'] ?? '')
+            .toString();
         map['audioDurationSeconds'] = map['audioDurationSeconds'] is int
             ? map['audioDurationSeconds']
             : int.tryParse(map['audioDurationSeconds']?.toString() ?? '0') ?? 0;
         map['transcription'] ??= '';
         break;
       case 'phone_contacts':
+        map['name'] ??= '';
         map['hasWhatsapp'] =
             map['hasWhatsapp'] == true ||
             map['has_whatsapp'] == true ||
@@ -466,6 +469,7 @@ class SupabaseSyncService with WidgetsBindingObserver {
         map['phone'] ??= '';
         break;
       case 'territory_landmarks':
+        map['name'] ??= '';
         map['category'] ??= 'outro';
         break;
     }
@@ -565,61 +569,137 @@ class SupabaseSyncService with WidgetsBindingObserver {
   Future<void> _softDeleteLocalEntry(
     String table,
     String id,
-    dynamic deletedAtVal,
-  ) async {
+    dynamic deletedAtVal, {
+    dynamic updatedAtVal,
+    int? revisionVal,
+  }) async {
     final deletedAt = deletedAtVal is DateTime
         ? deletedAtVal
         : DateTime.tryParse(deletedAtVal?.toString() ?? '') ?? DateTime.now();
+    final updatedAt = updatedAtVal is DateTime
+        ? updatedAtVal
+        : DateTime.tryParse(updatedAtVal?.toString() ?? '') ?? deletedAt;
+    final revision = revisionVal;
+
     switch (table) {
       case 'people':
         await (db.update(db.people)..where((t) => t.id.equals(id))).write(
-          PeopleCompanion(deletedAt: drift.Value(deletedAt)),
+          PeopleCompanion(
+            deletedAt: drift.Value(deletedAt),
+            updatedAt: drift.Value(updatedAt),
+            revision: revision != null
+                ? drift.Value(revision)
+                : const drift.Value.absent(),
+          ),
         );
         break;
       case 'visits':
         await (db.update(db.visits)..where((t) => t.id.equals(id))).write(
-          VisitsCompanion(deletedAt: drift.Value(deletedAt)),
+          VisitsCompanion(
+            deletedAt: drift.Value(deletedAt),
+            updatedAt: drift.Value(updatedAt),
+            revision: revision != null
+                ? drift.Value(revision)
+                : const drift.Value.absent(),
+          ),
         );
         break;
       case 'bible_studies':
         await (db.update(db.bibleStudies)..where((t) => t.id.equals(id))).write(
-          BibleStudiesCompanion(deletedAt: drift.Value(deletedAt)),
+          BibleStudiesCompanion(
+            deletedAt: drift.Value(deletedAt),
+            updatedAt: drift.Value(updatedAt),
+            revision: revision != null
+                ? drift.Value(revision)
+                : const drift.Value.absent(),
+          ),
         );
         break;
       case 'study_participants':
         await (db.update(
           db.studyParticipants,
         )..where((t) => t.id.equals(id))).write(
-          StudyParticipantsCompanion(deletedAt: drift.Value(deletedAt)),
+          StudyParticipantsCompanion(
+            deletedAt: drift.Value(deletedAt),
+            updatedAt: drift.Value(updatedAt),
+            revision: revision != null
+                ? drift.Value(revision)
+                : const drift.Value.absent(),
+          ),
         );
         break;
       case 'study_sessions':
-        await (db.update(db.studySessions)..where((t) => t.id.equals(id)))
-            .write(StudySessionsCompanion(deletedAt: drift.Value(deletedAt)));
+        await (db.update(
+          db.studySessions,
+        )..where((t) => t.id.equals(id))).write(
+          StudySessionsCompanion(
+            deletedAt: drift.Value(deletedAt),
+            updatedAt: drift.Value(updatedAt),
+            revision: revision != null
+                ? drift.Value(revision)
+                : const drift.Value.absent(),
+          ),
+        );
         break;
       case 'appointments':
         await (db.update(db.appointments)..where((t) => t.id.equals(id))).write(
-          AppointmentsCompanion(deletedAt: drift.Value(deletedAt)),
+          AppointmentsCompanion(
+            deletedAt: drift.Value(deletedAt),
+            updatedAt: drift.Value(updatedAt),
+            revision: revision != null
+                ? drift.Value(revision)
+                : const drift.Value.absent(),
+          ),
         );
         break;
       case 'activity_records':
-        await (db.update(db.activityRecords)..where((t) => t.id.equals(id)))
-            .write(ActivityRecordsCompanion(deletedAt: drift.Value(deletedAt)));
+        await (db.update(
+          db.activityRecords,
+        )..where((t) => t.id.equals(id))).write(
+          ActivityRecordsCompanion(
+            deletedAt: drift.Value(deletedAt),
+            updatedAt: drift.Value(updatedAt),
+            revision: revision != null
+                ? drift.Value(revision)
+                : const drift.Value.absent(),
+          ),
+        );
         break;
       case 'voice_notes':
         await (db.update(db.voiceNotes)..where((t) => t.id.equals(id))).write(
-          VoiceNotesCompanion(deletedAt: drift.Value(deletedAt)),
+          VoiceNotesCompanion(
+            deletedAt: drift.Value(deletedAt),
+            updatedAt: drift.Value(updatedAt),
+            revision: revision != null
+                ? drift.Value(revision)
+                : const drift.Value.absent(),
+          ),
         );
         break;
       case 'phone_contacts':
-        await (db.update(db.phoneContacts)..where((t) => t.id.equals(id)))
-            .write(PhoneContactsCompanion(deletedAt: drift.Value(deletedAt)));
+        await (db.update(
+          db.phoneContacts,
+        )..where((t) => t.id.equals(id))).write(
+          PhoneContactsCompanion(
+            deletedAt: drift.Value(deletedAt),
+            updatedAt: drift.Value(updatedAt),
+            revision: revision != null
+                ? drift.Value(revision)
+                : const drift.Value.absent(),
+          ),
+        );
         break;
       case 'territory_landmarks':
         await (db.update(
           db.territoryLandmarks,
         )..where((t) => t.id.equals(id))).write(
-          TerritoryLandmarksCompanion(deletedAt: drift.Value(deletedAt)),
+          TerritoryLandmarksCompanion(
+            deletedAt: drift.Value(deletedAt),
+            updatedAt: drift.Value(updatedAt),
+            revision: revision != null
+                ? drift.Value(revision)
+                : const drift.Value.absent(),
+          ),
         );
         break;
     }
@@ -810,14 +890,66 @@ class SupabaseSyncService with WidgetsBindingObserver {
               .getSingleOrNull();
 
       if (localMap == null) {
+        final isRemoteDeleted =
+            normalized['deletedAt'] != null || normalized['deleted_at'] != null;
         await _insertLocalEntry(table, normalized);
-        if (table == 'voice_notes' && client != null) {
+        if (table == 'voice_notes' && client != null && !isRemoteDeleted) {
           await _downloadVoiceNoteAudio(id, client);
         }
         return true;
       }
 
       if (pendingOp != null) {
+        if (pendingOp.operation.toUpperCase() == 'DELETE') {
+          final isRemoteDeleted =
+              normalized['deletedAt'] != null ||
+              normalized['deleted_at'] != null;
+          if (isRemoteDeleted) {
+            final remoteDeletedAt =
+                normalized['deletedAt'] ?? normalized['deleted_at'];
+            final remoteUpdatedAt =
+                normalized['updatedAt'] ??
+                normalized['updated_at'] ??
+                remoteDeletedAt;
+            final remoteRev = normalized['revision'] as int?;
+            await _softDeleteLocalEntry(
+              table,
+              id,
+              remoteDeletedAt,
+              updatedAtVal: remoteUpdatedAt,
+              revisionVal: remoteRev,
+            );
+            return true;
+          }
+          final remoteRev = normalized['revision'] as int? ?? 1;
+          final localRev = localMap['revision'] as int? ?? 1;
+          final remoteUpdatedAtStr =
+              normalized['updatedAt']?.toString() ??
+              normalized['updated_at']?.toString();
+          final localDeletedAtStr =
+              localMap['deletedAt']?.toString() ??
+              localMap['deleted_at']?.toString();
+          final remoteUpdated = remoteUpdatedAtStr != null
+              ? DateTime.tryParse(remoteUpdatedAtStr)
+              : null;
+          final localDeletedAt = localDeletedAtStr != null
+              ? DateTime.tryParse(localDeletedAtStr)
+              : null;
+
+          final isLegitimateRestore =
+              remoteRev > localRev &&
+              remoteUpdated != null &&
+              localDeletedAt != null &&
+              remoteUpdated.isAfter(localDeletedAt);
+
+          if (!isLegitimateRestore) {
+            // Mantém a exclusão pendente local e não ressuscita localmente
+            return true;
+          }
+          await _updateLocalEntry(table, normalized);
+          return true;
+        }
+
         final rawPayload =
             jsonDecode(pendingOp.payload) as Map<String, dynamic>;
         final Map<String, dynamic> baseData;
@@ -875,10 +1007,19 @@ class SupabaseSyncService with WidgetsBindingObserver {
         final isRemoteDeleted =
             normalized['deletedAt'] != null || normalized['deleted_at'] != null;
         if (isRemoteDeleted) {
+          final remoteDeletedAt =
+              normalized['deletedAt'] ?? normalized['deleted_at'];
+          final remoteUpdatedAt =
+              normalized['updatedAt'] ??
+              normalized['updated_at'] ??
+              remoteDeletedAt;
+          final remoteRev = normalized['revision'] as int?;
           await _softDeleteLocalEntry(
             table,
             id,
-            normalized['deletedAt'] ?? normalized['deleted_at'],
+            remoteDeletedAt,
+            updatedAtVal: remoteUpdatedAt,
+            revisionVal: remoteRev,
           );
           return true;
         } else {
@@ -1089,6 +1230,7 @@ class SupabaseSyncService with WidgetsBindingObserver {
         const pageSize = 100;
         DateTime? newestUpdatedAt = lastSyncedAt;
         String? newestId = lastSyncedId;
+        bool hadFailuresInTable = false;
 
         while (true) {
           var query = activeClient.from(table).select();
@@ -1145,6 +1287,7 @@ class SupabaseSyncService with WidgetsBindingObserver {
                 conflictCount++;
               } else {
                 failureCount++;
+                hadFailuresInTable = true;
               }
             }
           }
@@ -1154,7 +1297,7 @@ class SupabaseSyncService with WidgetsBindingObserver {
         }
 
         final finalUpdatedAt = newestUpdatedAt;
-        if (finalUpdatedAt != null) {
+        if (finalUpdatedAt != null && !hadFailuresInTable) {
           await db
               .into(db.appKvStore)
               .insertOnConflictUpdate(

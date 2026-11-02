@@ -869,5 +869,199 @@ void main() {
       )..where((t) => t.id.equals(landmark.id))).getSingle();
       expect(tlB.deletedAt, isNotNull);
     });
+
+    test('Teste H — Tombstones parciais para voice_notes, phone_contacts e territory_landmarks inseridos sem exceção', () async {
+      final syncB = createServiceB();
+      addTearDown(syncB.dispose);
+
+      final now = DateTime.now().toUtc();
+      final nowIso = now.toIso8601String();
+
+      // Semeia tombstones parciais (somente id, deleted_at, updated_at, revision)
+      // para tabelas que possuem campos NOT NULL como name ou personId
+      server.seed('phone_contacts', {
+        'id': 'pc-partial-tomb-1',
+        'deleted_at': nowIso,
+        'updated_at': nowIso,
+        'revision': 2,
+      });
+      server.seed('territory_landmarks', {
+        'id': 'tl-partial-tomb-1',
+        'deleted_at': nowIso,
+        'updated_at': nowIso,
+        'revision': 2,
+      });
+      server.seed('voice_notes', {
+        'id': 'vn-partial-tomb-1',
+        'deleted_at': nowIso,
+        'updated_at': nowIso,
+        'revision': 2,
+      });
+
+      final pull = await syncB.fetchRemoteChanges();
+      expect(pull.failureCount, equals(0));
+      expect(pull.successCount, equals(3));
+
+      final pc = await (dbB.select(
+        dbB.phoneContacts,
+      )..where((t) => t.id.equals('pc-partial-tomb-1'))).getSingleOrNull();
+      expect(pc, isNotNull);
+      expect(pc!.deletedAt, isNotNull);
+
+      final tl = await (dbB.select(
+        dbB.territoryLandmarks,
+      )..where((t) => t.id.equals('tl-partial-tomb-1'))).getSingleOrNull();
+      expect(tl, isNotNull);
+      expect(tl!.deletedAt, isNotNull);
+
+      final vn = await (dbB.select(
+        dbB.voiceNotes,
+      )..where((t) => t.id.equals('vn-partial-tomb-1'))).getSingleOrNull();
+      expect(vn, isNotNull);
+      expect(vn!.deletedAt, isNotNull);
+    });
+
+    test('Teste I — Tombstone remoto atualiza atomicamente deletedAt, updatedAt e revision no Drift', () async {
+      final syncA = createServiceA();
+      final syncB = createServiceB();
+      addTearDown(syncA.dispose);
+      addTearDown(syncB.dispose);
+
+      // 1. Cria pessoa e propaga para B
+      final personA = await repoA.createPerson(name: 'Integridade Metadados');
+      await syncA.processQueue();
+      await syncB.fetchRemoteChanges();
+
+      final localBeforeB = await (dbB.select(
+        dbB.people,
+      )..where((t) => t.id.equals(personA.id))).getSingle();
+      expect(localBeforeB.revision, equals(1));
+      expect(localBeforeB.deletedAt, isNull);
+
+      // 2. A exclui o registro com revision avançada
+      final tDel = DateTime.utc(2026, 11, 2, 15, 30, 0);
+      await (dbA.update(
+        dbA.people,
+      )..where((t) => t.id.equals(personA.id))).write(
+        PeopleCompanion(
+          deletedAt: drift.Value(tDel),
+          updatedAt: drift.Value(tDel),
+          revision: const drift.Value(5),
+        ),
+      );
+      await dbA
+          .into(dbA.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: 'q_del_meta',
+              entityType: 'people',
+              entityId: personA.id,
+              operation: 'DELETE',
+              payload: jsonEncode({
+                'id': personA.id,
+                'deletedAt': tDel.toIso8601String(),
+                'updatedAt': tDel.toIso8601String(),
+                'revision': 5,
+              }),
+              createdAt: tDel,
+              status: const drift.Value('pending'),
+            ),
+          );
+
+      await syncA.processQueue();
+
+      // 3. B recebe o tombstone remoto
+      await syncB.fetchRemoteChanges();
+
+      final localAfterB = await (dbB.select(
+        dbB.people,
+      )..where((t) => t.id.equals(personA.id))).getSingle();
+
+      // deletedAt, updatedAt e revision devem estar sincronizados com o tombstone remoto
+      expect(localAfterB.deletedAt, isNotNull);
+      expect(localAfterB.deletedAt!.toUtc(), equals(tDel));
+      expect(localAfterB.updatedAt.toUtc(), equals(tDel));
+      expect(localAfterB.revision, equals(5));
+    });
+
+    test('Teste J — Barreira contra ressurreição rejeita upsert com revision ou updated_at nulos', () async {
+      final syncA = createServiceA();
+      addTearDown(syncA.dispose);
+
+      final now = DateTime.now().toUtc();
+      final nowIso = now.toIso8601String();
+
+      // Semeia tombstone no servidor
+      server.seed('people', {
+        'id': 'p_tomb_guard_null',
+        'name': 'Pessoa Tombstone',
+        'deleted_at': nowIso,
+        'updated_at': nowIso,
+        'revision': 3,
+      });
+
+      // Tenta enviar upsert ativo sem revision e sem updated_at
+      await dbA
+          .into(dbA.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: 'q_resurrect_nulls',
+              entityType: 'people',
+              entityId: 'p_tomb_guard_null',
+              operation: 'UPDATE',
+              payload: jsonEncode({
+                'id': 'p_tomb_guard_null',
+                'name': 'Tentativa Ressurreição Sem Metadados',
+                // revision e updatedAt omitidos/nulos
+              }),
+              createdAt: now,
+              status: const drift.Value('pending'),
+            ),
+          );
+
+      await syncA.processQueue();
+
+      final remote = server.getRow('people', 'p_tomb_guard_null');
+      expect(remote, isNotNull);
+      // O tombstone no servidor NÃO foi apagado
+      expect(remote!['deleted_at'], equals(nowIso));
+    });
+
+    test('Teste K — Concorrência com operação local DELETE pendente não sofre corrupção por merge', () async {
+      final syncA = createServiceA();
+      addTearDown(syncA.dispose);
+
+      final now = DateTime.now().toUtc();
+      final person = await repoA.createPerson(name: 'Pessoa Delete Pendente');
+      await syncA.processQueue();
+
+      // Localmente o usuário exclui a pessoa (operação DELETE fica na outbox)
+      await repoA.deletePerson(person.id);
+      final pending = await repoA.getPendingSyncOperations();
+      expect(pending.any((op) => op.operation == 'DELETE'), isTrue);
+
+      // Chega uma alteração remota ativa (ex: outro dispositivo enviou edição antes)
+      server.seed('people', {
+        'id': person.id,
+        'name': 'Nome Remoto Modificado',
+        'updated_at': now
+            .subtract(const Duration(seconds: 10))
+            .toIso8601String(),
+        'created_at': now.toIso8601String(),
+        'revision': 1,
+      });
+
+      // Executa busca remota
+      await syncA.fetchRemoteChanges();
+
+      // Confirma que o registro local CONTINUA excluído e não foi ressuscitado nem corrompido
+      final activePeople = await repoA.getAllPeople();
+      expect(activePeople.any((p) => p.id == person.id), isFalse);
+
+      final rawLocal = await (dbA.select(
+        dbA.people,
+      )..where((t) => t.id.equals(person.id))).getSingle();
+      expect(rawLocal.deletedAt, isNotNull);
+    });
   });
 }

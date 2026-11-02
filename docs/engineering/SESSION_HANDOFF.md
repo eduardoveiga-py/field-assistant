@@ -32,13 +32,16 @@
    - Filtro PostgREST utiliza `.or('updated_at.gt.$iso,and(updated_at.eq.$iso,id.gt.$id))`, assegurando que nenhum tombstone com timestamp idêntico seja omitido.
 
 6. **Desacoplamento da Aplicação Local de Tombstones (Zero Loop de Outbox):**
-   - Ao receber tombstones remotos, `_softDeleteLocalEntry` atualiza diretamente o Drift SQLite sem invocar os métodos de negócio do `AppRepository`, impedindo a inserção de novos registros na `sync_queue` e prevenindo ciclos infinitos de eco.
+   - Ao receber tombstones remotos, `_softDeleteLocalEntry` atualiza diretamente o Drift SQLite (`deletedAt`, `updatedAt` e `revision`) sem invocar os métodos de negócio do `AppRepository`, impedindo a inserção de novos registros na `sync_queue` e prevenindo ciclos infinitos de eco.
+   - Se houver operação local `DELETE` pendente na outbox para a mesma entidade, o merge trilateral é ignorado para preservar a integridade dos dados locais contra corrupção.
+   - Download de áudio para notas de voz soft-deletadas é explicitamente suprimido na recepção de tombstones.
 
 7. **Resiliência a Falhas de Rede e Defaults Seguros:**
    - Quedas de rede (HTTP 504) durante o PATCH mantêm a operação pendente na outbox e a retentativa subsequente após restabelecimento de conexão é idempotente e bem-sucedida.
-   - `_prepareEntryMap` atualizado com fallbacks não-nulos para campos obrigatórios (`studyId`, `personId`, `title`, `name`), prevenindo exceções de cast em tombstones sem campos secundários.
+   - `_prepareEntryMap` atualizado com fallbacks não-nulos para campos obrigatórios de todas as 10 entidades (`studyId`, `personId`, `title`, `name`, `phone`), prevenindo exceções de cast em tombstones sem campos secundários.
+   - Cursor incremental composto interrompe antecipadamente quando `rows.length < pageSize` e congela o cursor se houver falhas não-conflitantes na tabela, permitindo retentativa segura.
 
-8. **Validação Automatizada Abrangente (7 Novos Testes Formais):**
+8. **Validação Automatizada Abrangente (11 Novos Testes Formais):**
    - Criado `test/sync/supabase_soft_delete_test.dart` cobrindo:
      - **Teste A:** Exclusão de A propagada para B via Tombstone (`physicalDeleteCalls == 0`).
      - **Teste B:** Upsert antigo de nó desconectado não ressuscita registro excluído.
@@ -47,7 +50,11 @@
      - **Teste E:** Cursor incremental não pula tombstones com timestamp idêntico.
      - **Teste F:** Recepção de tombstone aplica no Drift local com zero eco de fila (`syncQueue.isEmpty`).
      - **Teste G:** Soft delete validado em todas as 10 tabelas sincronizadas.
-   - Total da suíte expandido de 562 para **569 testes**, todos aprovados com 100% de sucesso.
+     - **Teste H:** Ingestão de tombstones parciais para voice_notes, phone_contacts e territory_landmarks sem exceções.
+     - **Teste I:** Atualização atômica de `deletedAt`, `updatedAt` e `revision` no Drift SQLite ao receber tombstone.
+     - **Teste J:** Barreira contra ressurreição no servidor rejeita upsert com revision ou updated_at nulos.
+     - **Teste K:** Concorrência com operação local DELETE pendente preserva integridade sem corrupção por merge.
+   - Total da suíte expandido de 562 para **573 testes**, todos aprovados com 100% de sucesso.
    - Análise estática aprovada com **0 issues** sob `--fatal-infos`.
    - Formatação aprovada (`dart format`).
 
@@ -58,7 +65,7 @@
 ---
 
 ## 3. Estado Atual dos Testes e Ambiente
-- **Testes Unitários, Widget e Integração:** 569 aprovados, 0 falhas (`flutter test`).
+- **Testes Unitários, Widget e Integração:** 573 aprovados, 0 falhas (`flutter test`).
 - **Análise Estática:** 0 issues (`dart analyze lib test --fatal-infos`).
 - **Formatação de Código:** 100% em conformidade (`dart format --output=none --set-exit-if-changed lib test`).
 - **Branch Ativa:** `stabilization/u3.1-soft-delete`.

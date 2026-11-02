@@ -4,7 +4,7 @@
 **Status Geral: REPROVADO PARA PRODUÇÃO**
 
 ### Justificativa Técnica
-Apesar de o aplicativo apresentar **100% de sucesso na suíte de 508 testes automatizados**, **0 issues de análise estática** e estabilização de staging de backup, cursor determinístico e integridade de chaves estrangeiras, a publicação para produção está estritamente **bloqueada** por 3 falhas de severidade **P0**, 4 falhas de severidade **P1** e a ausência de validação em hardware físico Apple (iPhone/iPad).
+Apesar de o aplicativo apresentar **100% de sucesso na suíte de 573 testes automatizados**, **0 issues de análise estática** e estabilização de staging de backup, cursor determinístico e integridade de chaves estrangeiras, a publicação para produção está estritamente **bloqueada** por 4 falhas de severidade **P1** e a ausência de validação em hardware físico Apple (iPhone/iPad).
 
 ---
 
@@ -23,12 +23,12 @@ Apesar de o aplicativo apresentar **100% de sucesso na suíte de 508 testes auto
 - [ ] **Agenda validada contra concorrência** *(REPROVADO: Pendente detecção de colisões remotas)*
 - [ ] **Áudio validado em dispositivo real** *(REPROVADO: Timer de 30s não encerra o hardware de gravação; requer teste físico no iOS)*
 - [ ] **Transcrição documentada corretamente** *(REPROVADO: Descrita como "offline-first" no código, mas pode exigir rede no iOS/Web)*
-- [x] **Testes automatizados aprovados** *(APROVADO: 569 testes passando com 100% de sucesso)*
+- [x] **Testes automatizados aprovados** *(APROVADO: 573 testes passando com 100% de sucesso)*
 - [x] **Análise estática aprovada** *(APROVADO: `dart analyze lib test --fatal-infos` acusa 0 issues)*
 - [x] **Build Release Web aprovado** *(APROVADO: `flutter build web --release` compila com sucesso)*
 - [ ] **Archive iOS e instalação real validados** *(PENDENTE: Depende de runner macOS e Apple Developer Account)*
 - [ ] **Auditoria independente aprovada** *(PENDENTE: Aguardando correção dos itens P1)*
-- [x] **Documentação atualizada** *(APROVADO: Documentações de engenharia atualizadas com ADR-010, ADR-011, ADR-012, ADR-013 e 569 testes)*
+- [x] **Documentação atualizada** *(APROVADO: Documentações de engenharia atualizadas com ADR-010, ADR-011, ADR-012, ADR-013 e 573 testes)*
 
 ---
 

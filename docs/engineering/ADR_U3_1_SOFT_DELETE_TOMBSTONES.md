@@ -54,27 +54,27 @@ if (!isLegitimateRestore) {
 ### 4. Blindagem de Ressurreição no PostgreSQL via Triggers
 Criada a migração `supabase/migrations/20261102010000_u3_1_soft_delete_tombstones.sql` implementando a função de trigger:
 `handle_soft_delete_and_resurrection_guard()`
-Ela é anexada a todas as 10 tabelas sincronizadas. Qualquer `UPDATE` que tente redefinir `deleted_at` para `NULL` em um registro já soft-deletado é barrado a menos que `NEW.revision > OLD.revision` e `NEW.updated_at > OLD.deleted_at`. Caso contrário, `NEW.deleted_at` é forçado a manter o valor existente de `OLD.deleted_at`.
+Ela é anexada a todas as 10 tabelas sincronizadas. Qualquer `UPDATE` que tente redefinir `deleted_at` para `NULL` em um registro já soft-deletado é barrado a menos que comprove restauração legítima e mais recente (`COALESCE(NEW.revision, 0) > COALESCE(OLD.revision, 0)` e `NEW.updated_at IS NOT NULL AND NEW.updated_at > OLD.deleted_at`). A trigger trata explicitamente valores `NULL` com `COALESCE` para impedir evasão da barreira quando mutações parciais omitem `revision` ou `updated_at`. Um script de rollback reversível é incluído no arquivo.
 
-### 5. Cursor Incremental Composto `(updated_at, id)`
+### 5. Cursor Incremental Composto `(updated_at, id)` com Barreira de Falha
 A consulta de alterações remotas em `fetchRemoteChanges` agora persiste `last_synced_at_$table` e `last_synced_id_$table` no `AppKvStore`. A query PostgREST utiliza o filtro composto:
 ```dart
 query = query.or('updated_at.gt.$lastSyncedAtIso,and(updated_at.eq.$lastSyncedAtIso,id.gt.$lastSyncedId)');
 ```
-Isso garante que nenhum registro ou tombstone que compartilhe exatamente o mesmo carimbo de data/hora seja omitido na paginação.
+Isso garante que nenhum registro ou tombstone que compartilhe exatamente o mesmo carimbo de data/hora seja omitido na paginação. A paginação foi otimizada para interromper quando `rows.length < pageSize` (evitando round-trip HTTP redundante). Adicionalmente, caso ocorra qualquer falha não-conflitante de aplicação de registros na tabela (`hadFailuresInTable`), o cursor não é avançado, permitindo que ciclos subsequentes reexecutem a busca e apliquem registros pendentes com segurança.
 
-### 6. Desacoplamento da Aplicação Local de Tombstones (Zero Loop)
-Ao receber um tombstone remoto (`deleted_at != null`), o sincronizador executa `_softDeleteLocalEntry`, que atualiza diretamente a tabela do Drift no SQLite sem invocar os métodos de negócio do `AppRepository`, impedindo a inserção de novas operações na tabela `sync_queue` e prevenindo loops de sincronização.
+### 6. Desacoplamento da Aplicação Local de Tombstones e Atualização Atômica de Metadados
+Ao receber um tombstone remoto (`deleted_at != null`), o sincronizador executa `_softDeleteLocalEntry`, que atualiza diretamente a tabela do Drift no SQLite (`deletedAt`, `updatedAt` e `revision`) sem invocar os métodos de negócio do `AppRepository`, impedindo a inserção de novas operações na tabela `sync_queue` e prevenindo loops de sincronização. Caso a entidade seja uma nota de voz deletada, o download de mídia binária é explicitamente suprimido. Se houver uma operação `DELETE` pendente na outbox para o mesmo ID, o merge trilateral é ignorado para evitar que o payload parcial de exclusão branqueie campos locais.
 
-### 7. Resiliência a Falhas de Rede e Idempotência
-Caso a chamada de `PATCH` falhe (ex: queda de rede HTTP 504), a operação na outbox permanece como `pending` (ou `failed`) com tentativa contabilizada. Na reconexão, o reenvio atualiza o mesmo registro no Supabase com idempotência garantida.
+### 7. Resiliência a Falhas de Rede, Defaults Seguros e Idempotência
+Caso a chamada de `PATCH` falhe (ex: queda de rede HTTP 504), a operação na outbox permanece como `pending` (ou `failed`) com tentativa contabilizada. Na reconexão, o reenvio atualiza o mesmo registro no Supabase com idempotência garantida. O método `_prepareEntryMap` fornece fallbacks seguros para todas as colunas não-nulas de todas as 10 entidades (incluindo `phone_contacts.name`, `territory_landmarks.name` e `voice_notes.personId`), permitindo que tombstones parciais sejam ingeridos sem erros de tipo.
 
 ---
 
 ## Consequências
 - **Zero Exclusões Físicas:** `server.physicalDeleteCalls` é estritamente 0 em todo o ciclo de vida.
-- **Ressurreição Eliminada:** Dispositivos offline não desfazem exclusões anteriores ao subir suas filas pendentes.
-- **Auditoria Plena:** O histórico permanece íntegro no SQLite e no PostgreSQL, permitindo restaurações intencionais ou expurgos em conformidade com retenção de dados se necessário no futuro.
-- **Robustez Multidispositivo:** Dispositivo A exclui -> Supabase registra tombstone -> Dispositivo B recebe tombstone incrementalmente sem perda e sem eco de fila.
-- **Testes:** 7 novos testes exaustivos implementados em `test/sync/supabase_soft_delete_test.dart` (Testes A, B, C, D, E, F, G), todos aprovados com 100% de sucesso.
-- **Total do Projeto:** Suíte expandida de 562 para **569 testes aprovados**, 0 issues no analisador estático (`dart analyze lib test`).
+- **Ressurreição Eliminada:** Dispositivos offline não desfazem exclusões anteriores ao subir suas filas pendentes, mesmo sob omissão de campos ou mutações com metadados nulos.
+- **Auditoria Plena:** O histórico permanece íntegro no SQLite e no PostgreSQL, com carimbos e revisões sincronizados atomicamente.
+- **Robustez Multidispositivo:** Dispositivo A exclui -> Supabase registra tombstone -> Dispositivo B recebe tombstone incrementalmente sem perda, sem download inútil de áudio e sem eco de fila.
+- **Testes:** 11 testes exaustivos implementados em `test/sync/supabase_soft_delete_test.dart` (Testes A a K), todos aprovados com 100% de sucesso.
+- **Total do Projeto:** Suíte expandida de 562 para **573 testes aprovados**, 0 issues no analisador estático (`dart analyze lib test --fatal-infos`).
