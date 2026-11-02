@@ -108,6 +108,10 @@ class SupabaseSyncService with WidgetsBindingObserver {
   }
 
   bool get isOffline {
+    if (SupabaseInitializer.currentState ==
+        SupabaseConnectionState.disconnected) {
+      return true;
+    }
     if (clientOverride != null) return false;
     return SupabaseInitializer.currentState.isOffline;
   }
@@ -918,7 +922,7 @@ class SupabaseSyncService with WidgetsBindingObserver {
         message: 'Sincronização local preservada. Supabase não configurado para sincronização remota.',
       );
     }
-    if (isOffline) {
+    if (isOffline || _currentStatus == SyncStatus.waitingConnection) {
       return SyncProcessResult(
         totalProcessed: pushResult.totalProcessed,
         successCount: pushResult.successCount,
@@ -943,7 +947,9 @@ class SupabaseSyncService with WidgetsBindingObserver {
       );
     }
 
-    if (pullResult.message.contains('suspensa') ||
+    if (isOffline ||
+        _currentStatus == SyncStatus.waitingConnection ||
+        pullResult.message.contains('suspensa') ||
         pullResult.message.contains('offline')) {
       return SyncProcessResult(
         totalProcessed: pushResult.totalProcessed + pullResult.totalProcessed,
@@ -1205,6 +1211,26 @@ class SupabaseSyncService with WidgetsBindingObserver {
       );
     }
 
+    final activeClient = client;
+    if (activeClient == null) {
+      _setStatus(
+        SupabaseInitializer.currentState.hasError
+            ? SyncStatus.error
+            : SyncStatus.waitingConnection,
+      );
+      final pendingOps = await repository.getPendingSyncOperations();
+      return SyncProcessResult(
+        totalProcessed: pendingOps.length,
+        successCount: 0,
+        failureCount: 0,
+        conflictCount: 0,
+        errors: const ['Cliente Supabase não inicializado.'],
+        message: pendingOps.isEmpty
+            ? 'Cliente Supabase não inicializado. Modo offline local ativo.'
+            : 'Cliente Supabase não inicializado. Registros salvos com segurança localmente.',
+      );
+    }
+
     final pendingOps = await repository.getPendingSyncOperations();
     if (pendingOps.isEmpty) {
       _setStatus(SyncStatus.synced);
@@ -1214,19 +1240,6 @@ class SupabaseSyncService with WidgetsBindingObserver {
         failureCount: 0,
         conflictCount: 0,
         message: 'Fila de sincronização vazia. Todos os registros locais estão preservados.',
-      );
-    }
-
-    final activeClient = client;
-    if (activeClient == null) {
-      _setStatus(SyncStatus.waitingConnection);
-      return SyncProcessResult(
-        totalProcessed: pendingOps.length,
-        successCount: 0,
-        failureCount: 0,
-        conflictCount: 0,
-        errors: const ['Cliente Supabase não inicializado.'],
-        message: 'Cliente Supabase não inicializado. Registros salvos com segurança localmente.',
       );
     }
 
@@ -1306,8 +1319,11 @@ class SupabaseSyncService with WidgetsBindingObserver {
         } else if (_isTransientPostgrestError(e) || _isNetworkError(e)) {
           encounteredNetworkError = true;
           _setStatus(SyncStatus.waitingConnection);
+          final codeOrMsg = (e.code != null && e.code!.trim().isNotEmpty)
+              ? e.code
+              : e.message;
           SupabaseInitializer.setDisconnectedDueToNetwork(
-            'Instabilidade temporária no servidor Supabase (${e.code ?? e.message})',
+            'Instabilidade temporária no servidor Supabase ($codeOrMsg)',
           );
           failure++;
           final err =
@@ -1366,16 +1382,27 @@ class SupabaseSyncService with WidgetsBindingObserver {
     if (codeNum != null && codeNum >= 500 && codeNum <= 599) {
       return true;
     }
-    if (code == '500' || code == '502' || code == '503' || code == '504') {
+    if (code.contains('500') ||
+        code.contains('502') ||
+        code.contains('503') ||
+        code.contains('504') ||
+        code.startsWith('08') ||
+        code == '53300' ||
+        code.startsWith('57')) {
       return true;
     }
 
-    final text = '${e.message} ${e.details ?? ''} ${e.hint ?? ''}'
+    final text = '$code ${e.message} ${e.details ?? ''} ${e.hint ?? ''}'
         .toLowerCase();
     return text.contains('500') ||
         text.contains('502') ||
         text.contains('503') ||
         text.contains('504') ||
+        text.contains('520') ||
+        text.contains('521') ||
+        text.contains('522') ||
+        text.contains('523') ||
+        text.contains('524') ||
         text.contains('bad gateway') ||
         text.contains('gateway timeout') ||
         text.contains('gateway time-out') ||

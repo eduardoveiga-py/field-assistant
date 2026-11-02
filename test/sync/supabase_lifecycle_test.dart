@@ -823,5 +823,143 @@ void main() {
         isNot(contains('Sincronização bidirecional: 0 enviados, 0 recebidos.')),
       );
     });
+
+    test('16. Instabilidade transitória com códigos não-numéricos (PGRST503, 57P01): aborta lote e notifica desconexão', () async {
+      final validConfig = AppConfig.create(
+        environment: AppEnvironment.development,
+        supabaseUrl: 'https://pgrst-code-test.supabase.co',
+        supabaseAnonKey: 'valid-anon-key-1234567890',
+      );
+
+      SupabaseInitializer.setMockStateForTesting(
+        state: SupabaseConnectionState.connected,
+        config: validConfig,
+      );
+
+      int httpCalls = 0;
+      final mockHttpClient = MockClient((req) async {
+        httpCalls++;
+        return http.Response(
+          jsonEncode({
+            'code': 'PGRST503',
+            'message': 'Database server temporary outage',
+            'details': '503 backend unreachable',
+          }),
+          503,
+          request: req,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      final mockClient = SupabaseClient(
+        validConfig.supabaseUrl,
+        validConfig.supabaseAnonKey,
+        httpClient: mockHttpClient,
+      );
+
+      final syncService = SupabaseSyncService(
+        db: db,
+        repository: repo,
+        config: validConfig,
+        clientOverride: mockClient,
+      );
+      addTearDown(syncService.dispose);
+
+      await repo.createPerson(name: 'Item A');
+      await repo.createPerson(name: 'Item B');
+
+      final result = await syncService.processQueue(ignoreBackoff: true);
+
+      expect(httpCalls, equals(1));
+      expect(result.failureCount, equals(1));
+      expect(syncService.currentStatus, equals(SyncStatus.waitingConnection));
+      expect(
+        SupabaseInitializer.currentState,
+        equals(SupabaseConnectionState.disconnected),
+      );
+
+      final queue = await (db.select(db.syncQueue)).get();
+      expect(queue.firstWhere((q) => q.status == 'failed').attempts, equals(1));
+      expect(
+        queue.firstWhere((q) => q.status == 'pending').attempts,
+        equals(0),
+      );
+    });
+
+    test('17. Fila vazia com config válida mas client nulo NÃO deve marcar status synced', () async {
+      final validConfig = AppConfig.create(
+        environment: AppEnvironment.development,
+        supabaseUrl: 'https://null-client-empty.supabase.co',
+        supabaseAnonKey: 'valid-anon-key-1234567890',
+      );
+
+      // Simula estado de erro no SupabaseInitializer (sem cliente inicializado)
+      SupabaseInitializer.setMockStateForTesting(
+        state: SupabaseConnectionState.error,
+        config: validConfig,
+        client: null,
+      );
+
+      final nullClientService = SupabaseSyncService(
+        db: db,
+        repository: repo,
+        config: validConfig,
+        clientOverride: null,
+      );
+      addTearDown(nullClientService.dispose);
+
+      final result = await nullClientService.processQueue();
+      expect(nullClientService.currentStatus, isNot(equals(SyncStatus.synced)));
+      expect(nullClientService.currentStatus, equals(SyncStatus.error));
+      expect(result.message, contains('Cliente Supabase não inicializado'));
+    });
+
+    test('18. sync() interrompe busca remota quando processQueue sofre queda de conexão / 503', () async {
+      final validConfig = AppConfig.create(
+        environment: AppEnvironment.development,
+        supabaseUrl: 'https://sync-disconnect-test.supabase.co',
+        supabaseAnonKey: 'valid-anon-key-1234567890',
+      );
+
+      SupabaseInitializer.setMockStateForTesting(
+        state: SupabaseConnectionState.connected,
+        config: validConfig,
+      );
+
+      int totalCalls = 0;
+      final mockHttpClient = MockClient((req) async {
+        totalCalls++;
+        return http.Response(
+          jsonEncode({'code': '503', 'message': '503 Service Unavailable'}),
+          503,
+          request: req,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      final mockClient = SupabaseClient(
+        validConfig.supabaseUrl,
+        validConfig.supabaseAnonKey,
+        httpClient: mockHttpClient,
+      );
+
+      final syncService = SupabaseSyncService(
+        db: db,
+        repository: repo,
+        config: validConfig,
+        clientOverride: mockClient,
+      );
+      addTearDown(syncService.dispose);
+
+      await repo.createPerson(name: 'Pessoa Sync Desconectada');
+
+      final syncResult = await syncService.sync();
+
+      // Somente a chamada de push foi feita; o pull foi imediatamente prevenido
+      expect(totalCalls, equals(1));
+      expect(syncService.currentStatus, equals(SyncStatus.waitingConnection));
+      expect(syncResult.message, contains('offline'));
+      expect(syncResult.message, isNot(contains('Sincronização bidirecional')));
+    });
   });
 }
