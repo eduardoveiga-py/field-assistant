@@ -4,7 +4,6 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:flutter/services.dart' show MissingPluginException;
 import 'package:path_provider/path_provider.dart';
 import 'package:crypto/crypto.dart';
 import 'package:encrypt/encrypt.dart' as enc;
@@ -29,6 +28,15 @@ class RestoreMediaException implements Exception {
   const RestoreMediaException(this.message);
   @override
   String toString() => 'RestoreMediaException: $message';
+}
+
+/// Lançado quando não é possível obter um diretório persistente e seguro.
+/// O Field Assistant rejeita o uso de diretórios temporários (Directory.systemTemp) para dados críticos.
+class StorageUnavailableException implements Exception {
+  final String message;
+  const StorageUnavailableException(this.message);
+  @override
+  String toString() => 'StorageUnavailableException: $message';
 }
 
 class RestoreResult {
@@ -112,13 +120,15 @@ class BackupService {
   BackupService(this.repository, {this.documentsDirectoryProvider});
 
   Future<Directory> _getDocsDir() async {
-    if (documentsDirectoryProvider != null) {
-      return await documentsDirectoryProvider!();
-    }
     try {
+      if (documentsDirectoryProvider != null) {
+        return await documentsDirectoryProvider!();
+      }
       return await getApplicationDocumentsDirectory();
-    } on MissingPluginException {
-      return Directory.systemTemp;
+    } catch (e) {
+      throw StorageUnavailableException(
+        'Armazenamento persistente seguro indisponível no dispositivo: $e',
+      );
     }
   }
 
@@ -722,10 +732,25 @@ class BackupService {
       );
     }
 
-    // Persiste snapshot em disco e grava caminho no KV store.
-    // Em ambiente de testes (sem path_provider), persiste apenas em memória.
+    // Persiste snapshot em disco e grava caminho no KV store (ou salva no KV store sob Web).
     _lastPreRestoreSafetyBackup = snapshotData;
-    if (!kIsWeb) {
+    if (kIsWeb) {
+      try {
+        await db
+            .into(db.appKvStore)
+            .insertOnConflictUpdate(
+              AppKvStoreCompanion.insert(
+                key: 'last_safety_snapshot_data',
+                value: snapshotData,
+                updatedAt: Value(DateTime.now()),
+              ),
+            );
+      } catch (e) {
+        throw RestoreAbortedException(
+          'Falha ao persistir snapshot de segurança na Web: $e',
+        );
+      }
+    } else {
       try {
         final snapshotFile = await _persistSnapshotToDisk(snapshotData);
         await _validateSnapshotFile(snapshotFile, password: safetyKey);
@@ -745,7 +770,86 @@ class BackupService {
       }
     }
 
-    final createdAudioFiles = <File>[];
+    Directory? docsDir;
+    Directory? stagingDir;
+    Directory? audioBackupDir;
+    Directory? restoredAudioDir;
+    final stagedFiles = <String, File>{};
+    final replacedOriginalsBackup = <File, File>{};
+    final newlyAddedFiles = <File>[];
+
+    final voiceNotes = (data['voiceNotes'] as List<dynamic>?) ?? [];
+    final voiceNoteAudios =
+        (data['voiceNoteAudios'] as Map<String, dynamic>?) ?? {};
+    final voiceNoteAudioHashes =
+        (data['voiceNoteAudioHashes'] as Map<String, dynamic>?) ?? {};
+
+    if (!kIsWeb && voiceNoteAudios.isNotEmpty) {
+      try {
+        docsDir = await _getDocsDir();
+        final runId =
+            '${DateTime.now().millisecondsSinceEpoch}_${_uuid.v4().substring(0, 8)}';
+        stagingDir = Directory('${docsDir.path}/safety_staging_$runId');
+        audioBackupDir = Directory(
+          '${docsDir.path}/safety_audio_backup_$runId',
+        );
+        await stagingDir.create(recursive: true);
+        await audioBackupDir.create(recursive: true);
+
+        restoredAudioDir = Directory('${docsDir.path}/voice_notes');
+        if (!restoredAudioDir.existsSync()) {
+          await restoredAudioDir.create(recursive: true);
+        }
+
+        // Etapa 1: Extrair e validar em staging antes de tocar no destino
+        for (final item in voiceNotes) {
+          final id = (item as Map<String, dynamic>)['id'] as String?;
+          if (id != null && voiceNoteAudios.containsKey(id)) {
+            try {
+              final audioBytes = base64Decode(voiceNoteAudios[id] as String);
+              if (voiceNoteAudioHashes.containsKey(id)) {
+                final expectedHash = voiceNoteAudioHashes[id] as String;
+                final actualHash = sha256.convert(audioBytes).toString();
+                if (actualHash != expectedHash) {
+                  corruptedFiles.add(id);
+                  continue;
+                }
+              }
+              final stagingFile = File('${stagingDir.path}/vn_$id.m4a');
+              await stagingFile.writeAsBytes(audioBytes, flush: true);
+              stagedFiles[id] = stagingFile;
+
+              final targetFile = File('${restoredAudioDir.path}/vn_$id.m4a');
+              if (await targetFile.exists()) {
+                // Etapa 2: Preservar arquivo original antes de qualquer sobrescrita
+                final backupFile = File('${audioBackupDir.path}/vn_$id.m4a');
+                await targetFile.copy(backupFile.path);
+                replacedOriginalsBackup[targetFile] = backupFile;
+              } else {
+                newlyAddedFiles.add(targetFile);
+              }
+            } catch (_) {
+              corruptedFiles.add(id);
+            }
+          }
+        }
+      } catch (e) {
+        if (stagingDir != null && stagingDir.existsSync()) {
+          try {
+            stagingDir.deleteSync(recursive: true);
+          } catch (_) {}
+        }
+        if (audioBackupDir != null && audioBackupDir.existsSync()) {
+          try {
+            audioBackupDir.deleteSync(recursive: true);
+          } catch (_) {}
+        }
+        throw RestoreMediaException(
+          'Falha na preparação da área de staging de áudios: $e',
+        );
+      }
+    }
+
     try {
       await db.transaction(() async {
         // 1. Pessoas
@@ -939,54 +1043,18 @@ class BackupService {
         }
 
         // 8. Notas de Voz & Áudios Binários
-        final voiceNotes = (data['voiceNotes'] as List<dynamic>?) ?? [];
-        final voiceNoteAudios =
-            (data['voiceNoteAudios'] as Map<String, dynamic>?) ?? {};
-        Directory? restoredAudioDir;
-        if (!kIsWeb && voiceNoteAudios.isNotEmpty) {
-          try {
-            final docsDir = await _getDocsDir();
-            restoredAudioDir = Directory('${docsDir.path}/voice_notes');
-            if (!restoredAudioDir.existsSync()) {
-              await restoredAudioDir.create(recursive: true);
-            }
-          } catch (e) {
-            throw RestoreMediaException(
-              'Falha ao criar diretório de notas de voz voice_notes: $e',
-            );
-          }
-        }
-
-        final voiceNoteAudioHashes =
-            (data['voiceNoteAudioHashes'] as Map<String, dynamic>?) ?? {};
         for (final item in voiceNotes) {
           var entry = VoiceNoteEntry.fromJson(item as Map<String, dynamic>);
-          if (voiceNoteAudios.containsKey(entry.id)) {
-            try {
-              final audioBytes = base64Decode(
-                voiceNoteAudios[entry.id] as String,
-              );
-              // Validação estrita de integridade com hash criptográfico SHA-256
-              if (voiceNoteAudioHashes.containsKey(entry.id)) {
-                final expectedHash = voiceNoteAudioHashes[entry.id] as String;
-                final actualHash = sha256.convert(audioBytes).toString();
-                if (actualHash != expectedHash) {
-                  // Arquivo corrompido, registra falha de integridade e não grava arquivo inválido
-                  corruptedFiles.add(entry.id);
-                  continue;
-                }
-              }
-              if (restoredAudioDir != null) {
-                final targetFile = File(
-                  '${restoredAudioDir.path}/vn_${entry.id}.m4a',
-                );
-                await targetFile.writeAsBytes(audioBytes, flush: true);
-                createdAudioFiles.add(targetFile);
-                entry = entry.copyWith(audioFilePath: Value(targetFile.path));
-              }
-            } catch (_) {
-              corruptedFiles.add(entry.id);
-            }
+          if (stagedFiles.containsKey(entry.id) && restoredAudioDir != null) {
+            final targetFile = File(
+              '${restoredAudioDir.path}/vn_${entry.id}.m4a',
+            );
+            await stagedFiles[entry.id]!.copy(targetFile.path);
+            entry = entry.copyWith(audioFilePath: Value(targetFile.path));
+          } else if (voiceNoteAudios.containsKey(entry.id) &&
+              !stagedFiles.containsKey(entry.id)) {
+            // Nota cujo áudio falhou na integridade em staging
+            entry = entry.copyWith(audioFilePath: const Value(null));
           }
 
           final existing = await (db.select(
@@ -1303,14 +1371,50 @@ class BackupService {
         }
       });
     } catch (e) {
-      for (final f in createdAudioFiles) {
+      // Rollback seguro de arquivos de áudio:
+      // 1. Remove apenas arquivos recém-adicionados que não existiam antes da restauração
+      for (final f in newlyAddedFiles) {
         try {
           if (f.existsSync()) {
             f.deleteSync();
           }
         } catch (_) {}
       }
+
+      // 2. Restaura integralmente os arquivos originais pré-existentes a partir do backup de segurança
+      for (final entry in replacedOriginalsBackup.entries) {
+        try {
+          if (entry.value.existsSync()) {
+            entry.value.copySync(entry.key.path);
+          }
+        } catch (_) {}
+      }
+
+      // 3. Limpa diretórios transitórios de staging e backup
+      if (stagingDir != null && stagingDir.existsSync()) {
+        try {
+          stagingDir.deleteSync(recursive: true);
+        } catch (_) {}
+      }
+      if (audioBackupDir != null && audioBackupDir.existsSync()) {
+        try {
+          audioBackupDir.deleteSync(recursive: true);
+        } catch (_) {}
+      }
+
       rethrow;
+    }
+
+    // Sucesso: limpa diretórios transitórios de staging e backup
+    if (stagingDir != null && stagingDir.existsSync()) {
+      try {
+        stagingDir.deleteSync(recursive: true);
+      } catch (_) {}
+    }
+    if (audioBackupDir != null && audioBackupDir.existsSync()) {
+      try {
+        audioBackupDir.deleteSync(recursive: true);
+      } catch (_) {}
     }
 
     return RestoreResult(
@@ -1413,5 +1517,14 @@ class BackupService {
     } catch (_) {
       return null;
     }
+  }
+
+  /// Retorna os dados em string do snapshot de segurança pré-restauração (suportado na Web)
+  Future<String?> getLastSafetySnapshotData() async {
+    final row =
+        await (repository.db.select(repository.db.appKvStore)
+              ..where((tbl) => tbl.key.equals('last_safety_snapshot_data')))
+            .getSingleOrNull();
+    return row?.value ?? _lastPreRestoreSafetyBackup;
   }
 }

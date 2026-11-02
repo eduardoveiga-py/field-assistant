@@ -658,8 +658,12 @@ void main() {
         expect(remainingFiles, isEmpty);
       }
 
-      await targetDocsDir.delete(recursive: true);
       await dbTarget.close();
+      if (targetDocsDir.existsSync()) {
+        try {
+          await targetDocsDir.delete(recursive: true);
+        } catch (_) {}
+      }
     });
 
     test('TC-BAK-14: Snapshot de segurança persistente é gravado em disco e registrado no AppKvStore', () async {
@@ -683,6 +687,250 @@ void main() {
       // Valida que o snapshot gravado no KV store é legível e íntegro
       final content = await snapshotFile.readAsString();
       expect(content, isNotEmpty);
+    });
+
+    test('TC-BAK-ADV-01: Staging e Rollback Seguro — sobrescrita de áudio existente com falha na transação comprova que o áudio original é recuperado intacto', () async {
+      final dbTarget = AppDatabase.forTesting(NativeDatabase.memory());
+      final repoTarget = AppRepository(dbTarget);
+      final targetDocsDir = await Directory.systemTemp.createTemp(
+        'adv_preserve_target_',
+      );
+      final serviceTarget = BackupService(
+        repoTarget,
+        documentsDirectoryProvider: () async => targetDocsDir,
+      );
+
+      // 1. Prepara áudio original existente no aparelho de destino
+      final vnDir = Directory('${targetDocsDir.path}/voice_notes');
+      await vnDir.create(recursive: true);
+      final originalAudio = File('${vnDir.path}/vn_preserve_1.m4a');
+      const originalContent = 'AUDIO_ORIGINAL_QUE_NAO_PODE_SER_PERDIDO_12345';
+      await originalAudio.writeAsBytes(
+        utf8.encode(originalContent),
+        flush: true,
+      );
+
+      final pTarget = await repoTarget.createPerson(
+        name: 'Pessoa Local Existente',
+      );
+      await dbTarget
+          .into(dbTarget.voiceNotes)
+          .insert(
+            VoiceNotesCompanion.insert(
+              id: 'preserve_1',
+              personId: pTarget.id,
+              transcription: 'Transcrição original preservada',
+              audioFilePath: Value(originalAudio.path),
+              createdAt: DateTime.now(),
+              updatedAt: DateTime.now(),
+            ),
+          );
+
+      // 2. Prepara backup contendo uma versão substituta para 'preserve_1'
+      final pOrig = await repository.createPerson(name: 'Pessoa Externa');
+      final newAudioFile = File('${testDocsDir.path}/new_audio.m4a');
+      await newAudioFile.writeAsBytes(
+        utf8.encode('AUDIO_NOVO_DO_BACKUP_99999'),
+        flush: true,
+      );
+
+      await repository.db
+          .into(repository.db.voiceNotes)
+          .insert(
+            VoiceNotesCompanion.insert(
+              id: 'preserve_1',
+              personId: pOrig.id,
+              transcription: 'Transcrição substituta do backup',
+              audioFilePath: Value(newAudioFile.path),
+              createdAt: DateTime.now(),
+              updatedAt: DateTime.now(),
+            ),
+          );
+
+      final encrypted = await backupService.exportEncryptedBackup('pwd123');
+      final preview = await backupService.previewBackup(
+        encryptedDataString: encrypted,
+        password: 'pwd123',
+      );
+
+      // 3. Força falha transacional no banco injetando dado inválido
+      final rawData = Map<String, dynamic>.from(preview.rawDecryptedData);
+      rawData['visits'] = [
+        {
+          'id': 'invalid_visit_for_abort',
+          'personId': 'non_existent_uuid',
+          'dateTimeField': 'invalid_date',
+          'contactType': 'revisita',
+          'result': 'x',
+          'createdAt': 'invalid',
+          'updatedAt': 'invalid',
+          'revision': 1,
+        },
+      ];
+
+      final failingPreview = RestorePreview(
+        peopleToAdd: preview.peopleToAdd,
+        peopleToUpdate: preview.peopleToUpdate,
+        peopleUnchanged: preview.peopleUnchanged,
+        visitsToAdd: 1,
+        visitsToUpdate: 0,
+        studiesToAdd: 0,
+        sessionsToAdd: 0,
+        appointmentsToAdd: 0,
+        activitiesToAdd: 0,
+        voiceNotesToAdd: preview.voiceNotesToAdd,
+        inventoryTables: preview.inventoryTables,
+        corruptedAudioIds: const [],
+        rawDecryptedData: rawData,
+      );
+
+      expect(
+        () async => await serviceTarget.commitRestore(failingPreview),
+        throwsA(anything),
+      );
+
+      // 4. VERIFICAÇÃO CRÍTICA DE PRESERVAÇÃO:
+      // O arquivo original DEVE existir e conter exatamente o conteúdo original
+      expect(originalAudio.existsSync(), isTrue);
+      final restoredBytes = await originalAudio.readAsBytes();
+      expect(utf8.decode(restoredBytes), equals(originalContent));
+
+      await dbTarget.close();
+      if (targetDocsDir.existsSync()) {
+        try {
+          await targetDocsDir.delete(recursive: true);
+        } catch (_) {}
+      }
+    });
+
+    test('TC-BAK-ADV-02: Limpeza de Staging — falha antes ou durante a restauração não deixa diretórios transitórios órfãos', () async {
+      final dbTarget = AppDatabase.forTesting(NativeDatabase.memory());
+      final repoTarget = AppRepository(dbTarget);
+      final targetDocsDir = await Directory.systemTemp.createTemp(
+        'adv_staging_target_',
+      );
+      final serviceTarget = BackupService(
+        repoTarget,
+        documentsDirectoryProvider: () async => targetDocsDir,
+      );
+
+      final p = await repository.createPerson(name: 'Pessoa');
+      final aFile = File('${testDocsDir.path}/a.m4a');
+      await aFile.writeAsBytes([1, 2, 3]);
+      await repository.db
+          .into(repository.db.voiceNotes)
+          .insert(
+            VoiceNotesCompanion.insert(
+              id: 'clean_1',
+              personId: p.id,
+              transcription: 'Transcrição para teste de limpeza',
+              audioFilePath: Value(aFile.path),
+              createdAt: DateTime.now(),
+              updatedAt: DateTime.now(),
+            ),
+          );
+
+      final encrypted = await backupService.exportEncryptedBackup('pwd123');
+      final preview = await backupService.previewBackup(
+        encryptedDataString: encrypted,
+        password: 'pwd123',
+      );
+
+      // Injeta falha
+      final rawData = Map<String, dynamic>.from(preview.rawDecryptedData);
+      rawData['visits'] = [
+        {
+          'id': 'x',
+          'personId': 'none',
+          'dateTimeField': 'bad',
+          'createdAt': 'bad',
+          'updatedAt': 'bad',
+          'revision': 1,
+        },
+      ];
+      final failingPreview = RestorePreview(
+        peopleToAdd: preview.peopleToAdd,
+        peopleToUpdate: preview.peopleToUpdate,
+        peopleUnchanged: preview.peopleUnchanged,
+        visitsToAdd: 1,
+        visitsToUpdate: 0,
+        studiesToAdd: 0,
+        sessionsToAdd: 0,
+        appointmentsToAdd: 0,
+        activitiesToAdd: 0,
+        voiceNotesToAdd: preview.voiceNotesToAdd,
+        inventoryTables: preview.inventoryTables,
+        corruptedAudioIds: const [],
+        rawDecryptedData: rawData,
+      );
+
+      expect(
+        () async => await serviceTarget.commitRestore(failingPreview),
+        throwsA(anything),
+      );
+
+      // Verifica que nenhum safety_staging ou safety_audio_backup sobrou
+      final remainingDirs = targetDocsDir
+          .listSync()
+          .whereType<Directory>()
+          .map((d) => d.path)
+          .where(
+            (path) =>
+                path.contains('safety_staging_') ||
+                path.contains('safety_audio_backup_'),
+          )
+          .toList();
+      expect(remainingDirs, isEmpty);
+
+      await dbTarget.close();
+      if (targetDocsDir.existsSync()) {
+        try {
+          await targetDocsDir.delete(recursive: true);
+        } catch (_) {}
+      }
+    });
+
+    test('TC-BAK-ADV-03: StorageUnavailableException e RestoreAbortedException ocorrem quando diretório persistente não pode ser obtido (sem fallback temporário)', () async {
+      await repository.createPerson(name: 'Pessoa Teste Storage');
+      final encrypted = await backupService.exportEncryptedBackup('pwd');
+      final preview = await backupService.previewBackup(
+        encryptedDataString: encrypted,
+        password: 'pwd',
+      );
+
+      final brokenService = BackupService(
+        repository,
+        documentsDirectoryProvider: () async {
+          throw const FileSystemException('Permissão de escrita negada no SO');
+        },
+      );
+
+      expect(
+        () async => await brokenService.commitRestore(preview),
+        throwsA(
+          isA<RestoreAbortedException>().having(
+            (e) => e.message,
+            'message',
+            contains('StorageUnavailableException'),
+          ),
+        ),
+      );
+    });
+
+    test('TC-BAK-ADV-04: Snapshot durável é gravado no AppKvStore e recuperável via getLastSafetySnapshotData', () async {
+      await repository.createPerson(name: 'Pessoa Web Snapshot');
+      final encrypted = await backupService.exportEncryptedBackup('pwd123');
+      final preview = await backupService.previewBackup(
+        encryptedDataString: encrypted,
+        password: 'pwd123',
+      );
+
+      await backupService.commitRestore(preview);
+
+      final snapshotData = await backupService.getLastSafetySnapshotData();
+      expect(snapshotData, isNotNull);
+      expect(snapshotData, contains('ciphertext'));
+      expect(snapshotData, contains('salt'));
     });
   });
 }
