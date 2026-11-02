@@ -4,9 +4,10 @@
 - **Branch Base:** `master`
 - **Commit Base:** `6bd1e6cc72bb469ea76fe6cb749f7b15fb7986f3`
 - **Schema Drift/SQLite:** Versão `4`
-- **Total de Testes Automatizados no Início da Missão:** 496 testes aprovados
+- **Total de Testes Automatizados:** 508 testes aprovados (100% de sucesso)
 - **Status do Build Web:** Concluído com sucesso (`flutter build web --release`)
 - **Status da Análise Estática:** 0 issues (`dart analyze lib test --fatal-infos`)
+- **Status da Formatação:** 100% em conformidade (`dart format --output=none --set-exit-if-changed lib test`)
 
 ---
 
@@ -23,8 +24,8 @@ O **Field Assistant** é uma aplicação Flutter para organização do ministér
 
 | Módulo | Caminho | Responsabilidade |
 |---|---|---|
-| **Database** | `lib/database/` | `app_database.dart`, `tables.dart`, `repository.dart`, conexões nativa e web. |
-| **Settings / Backup** | `lib/settings/` | `backup_service.dart`, exportação/importação cifrada, prévias e snapshots de segurança. |
+| **Database** | `lib/database/` | `app_database.dart`, `tables.dart`, `repository.dart`, conexões nativa e web com Foreign Keys e WAL mode. |
+| **Settings / Backup** | `lib/settings/` | `backup_service.dart`, exportação/importação cifrada, prévias e snapshots de segurança em 3 estágios. |
 | **Sync Engine** | `lib/sync/` | `sync_engine.dart`, `supabase_sync_service.dart`, controle de fila, cursor estável e upload/download de áudio. |
 | **Appointments / Calendar** | `lib/appointments/` | `calendar_sync_coordinator.dart`, `apple_eventkit_provider.dart`, `google_calendar_provider.dart`. |
 | **Dashboard / Rules** | `lib/dashboard/` | `counting_rules.dart`, `student_priority_engine.dart`. |
@@ -36,8 +37,8 @@ O **Field Assistant** é uma aplicação Flutter para organização do ministér
 ## 3. Estado Atual das Fases da Missão
 
 - [x] **Fase 1 — Diagnóstico, Blindagem Inicial e Memória Técnica**
-- [ ] **Fase 2 — Backup e Recuperação Transacional à Prova de Falhas**
-- [ ] **Fase 3 — Sincronização Supabase: Cursor Estável, Áudio Resiliente e Outbox Completa**
-- [ ] **Fase 4 — Apple EventKit: Blindagem contra Falsas Exclusões e Fingerprint Robusto**
-- [ ] **Fase 5 — Banco de Dados, Segurança e Integridade Global**
-- [ ] **Fase 6 — Bateria de Testes Globais, Análise Estática e Relatório Final**
+- [x] **Fase 2 — Backup e Recuperação Transacional à Prova de Falhas**
+- [x] **Fase 3 — Sincronização Supabase: Cursor Estável, Áudio Resiliente e Outbox Completa**
+- [x] **Fase 4 — Apple EventKit: Blindagem contra Falsas Exclusões e Fingerprint Robusto**
+- [x] **Fase 5 — Banco de Dados, Segurança e Integridade Global**
+- [x] **Fase 6 — Bateria de Testes Globais, Análise Estática, Ajustes de UI e Conclusão**

@@ -42,3 +42,12 @@
 - **Ação:** Configuração de callback `setup` no `NativeDatabase.createInBackground` em `lib/database/connection/native.dart` para habilitar `PRAGMA foreign_keys = ON;`, `PRAGMA journal_mode = WAL;`, `PRAGMA synchronous = NORMAL;` e `busy_timeout = 5000;`.
 - **Ação:** Criação e aprovação de `test/database_integrity_test.dart` com testes `TC-DB-ADV-01` e `TC-DB-ADV-02` comprovando bloqueio de registros órfãos por Foreign Key.
 - **Status:** Concluído.
+
+### Fase 6: Bateria de Testes Globais, Análise Estática, Ajustes de UI e Conclusão
+- **Ação:** Correção de isolamento de diretório em `test/backup/complete_backup_test.dart` fornecendo `documentsDirectoryProvider` temporário isolado.
+- **Ação:** Redesign do botão e chips de tags em `lib/ui/screens/people_screen.dart`, eliminando o container horizontal esticado que gerava a barra cinza indesejada, mantendo acessibilidade (48x48) e permitindo toque direto nos chips para edição.
+- **Ação:** Execução e aprovação de 100% da suíte de testes automatizados (`flutter test`): 508 testes aprovados, 0 falhas.
+- **Ação:** Execução de análise estática sem resíduos (`dart analyze lib test --fatal-infos`): 0 issues.
+- **Ação:** Verificação de formatação estrita (`dart format --output=none --set-exit-if-changed lib test`): 100% aprovado.
+- **Ação:** Compilação de release Web validada (`flutter build web --release`): sucesso.
+- **Status:** Concluído.
