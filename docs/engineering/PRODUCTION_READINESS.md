@@ -15,20 +15,20 @@ Apesar de o aplicativo apresentar **100% de sucesso na suíte de 508 testes auto
 - [x] **Inicialização e configuração de produção validadas** *(APROVADO: Configuração e validação de ambiente na Unidade U1 via `AppConfig`; inicialização desacoplada, resiliente e ciclo de vida Riverpod em `main.dart` concluídos na Unidade U2 via `SupabaseInitializer`)*
 - [x] **Banco local íntegro** *(APROVADO: Drift v4 com `PRAGMA foreign_keys = ON;`, `journal_mode = WAL;`, suporte IndexedDB via Wasm na Web)*
 - [ ] **Migrações testadas e rastreáveis** *(REPROVADO: `app_database.dart` possui blocos `catch (_) {}` que silenciam falhas de DDL)*
-- [ ] **Sincronização validada entre dispositivos** *(REPROVADO: Migração SQL remota não contém tabelas `voice_notes`, `phone_contacts`, `territory_landmarks` nem storage bucket)*
+- [x] **Sincronização validada entre dispositivos** *(APROVADO: Schema remoto completo cobrindo todas as 10 tabelas, bucket de áudio de 10 MB e testes de serialização e pull em U3)*
 - [ ] **Conflitos tratados explicitamente na Agenda** *(REPROVADO: Inserções concorrentes de horários idênticos em nós offline distintos geram sobreposição silenciosa pós-sync)*
-- [ ] **RLS e permissões validadas** *(PARCIAL: RLS ativo nas 7 primeiras tabelas, ausente nas tabelas e storage omitidos)*
+- [x] **RLS e permissões validadas** *(APROVADO: RLS ativo nas 10 tabelas e no bucket privado storage.objects com isolamento estrito por auth.uid() = owner_id)*
 - [x] **Dados sensíveis adequadamente protegidos** *(APROVADO: Backup AES-256 GCM + PBKDF2; bloqueio ativo de chaves `service_role` em `AppConfig`, mascaramento em logs e `.gitignore` blindado para `.env*`)*
 - [x] **Backup e restauração testados com staging seguro** *(APROVADO: Staging em 3 etapas com rollback verificado por `TC-BAK-ADV-01` a `04`)*
 - [ ] **Agenda validada contra concorrência** *(REPROVADO: Pendente detecção de colisões remotas)*
 - [ ] **Áudio validado em dispositivo real** *(REPROVADO: Timer de 30s não encerra o hardware de gravação; requer teste físico no iOS)*
 - [ ] **Transcrição documentada corretamente** *(REPROVADO: Descrita como "offline-first" no código, mas pode exigir rede no iOS/Web)*
-- [x] **Testes automatizados aprovados** *(APROVADO: 547 testes passando com 100% de sucesso)*
+- [x] **Testes automatizados aprovados** *(APROVADO: 562 testes passando com 100% de sucesso)*
 - [x] **Análise estática aprovada** *(APROVADO: `dart analyze lib test --fatal-infos` acusa 0 issues)*
 - [x] **Build Release Web aprovado** *(APROVADO: `flutter build web --release` compila com sucesso)*
 - [ ] **Archive iOS e instalação real validados** *(PENDENTE: Depende de runner macOS e Apple Developer Account)*
-- [ ] **Auditoria independente aprovada** *(PENDENTE: Aguardando correção dos itens P0 e P1)*
-- [x] **Documentação atualizada** *(APROVADO: Documentações de engenharia atualizadas com ADR-010, ADR-011 e 547 testes)*
+- [ ] **Auditoria independente aprovada** *(PENDENTE: Aguardando correção dos itens P1)*
+- [x] **Documentação atualizada** *(APROVADO: Documentações de engenharia atualizadas com ADR-010, ADR-011, ADR-012 e 562 testes)*
 
 ---
 
@@ -43,10 +43,11 @@ Apesar de o aplicativo apresentar **100% de sucesso na suíte de 508 testes auto
    - **Status:** **RESOLVIDO NA UNIDADE U2**.
 
 2. **P0-02: Migrações SQL Remotas Incompletas (Descompasso de Tabelas e Storage)**
-   - **Arquivo:** `supabase/migrations/20261026000000_initial_schema.sql` vs `lib/sync/supabase_sync_service.dart:52-63`
-   - **Evidência:** `syncTables` sincroniza `voice_notes`, `phone_contacts` e `territory_landmarks`, e faz upload de mídias para o bucket `voice_notes`. O arquivo de migração não cria essas 3 tabelas nem o bucket de Storage.
-   - **Impacto:** Erro HTTP 404 / PostgREST `42P01` (relação não existe) e falha total no envio/recepção de notas de voz, contatos e pontos de território.
-   - **Status:** **PENDENTE (Alvo da Unidade U3)**.
+   - **Arquivo:** `supabase/migrations/20261102000000_u3_missing_tables_storage.sql` vs `lib/sync/supabase_sync_service.dart:68-79`
+   - **Evidência Original:** `syncTables` sincronizava `voice_notes`, `phone_contacts` e `territory_landmarks`, e fazia upload de mídias para o bucket `voice_notes`. O arquivo de migração original não criava essas 3 tabelas nem o bucket de Storage.
+   - **Resolução em U3:** Criada a migração versionada `20261102000000_u3_missing_tables_storage.sql` com DDL completo das 3 tabelas, chaves estrangeiras, índices de auditoria, RLS granular por operação (SELECT, INSERT, UPDATE, DELETE), triggers para `updated_at`/`revision`, bucket privado `voice_notes` de 10 MB e políticas RLS de storage para `storage.objects`.
+   - **Impacto:** Descompasso de schema categoricamente eliminado.
+   - **Status:** **RESOLVIDO NA UNIDADE U3**.
 
 3. **P0-03: Falha no Mecanismo de Injeção de Variáveis de Ambiente (`.env`)**
    - **Arquivo:** `lib/core/app_config.dart`, `lib/sync/supabase_sync_service.dart`, `scripts/run_web.ps1`

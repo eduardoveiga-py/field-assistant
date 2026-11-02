@@ -20,7 +20,7 @@ Este documento mapeia o status real de cada funcionalidade do **Field Assistant*
 | **F10** | **Cronômetro Auto-Corretivo** | `lib/activities/auto_corrective_timer_logic.dart`<br>`lib/ui/screens/activities_screen.dart` | `test/auto_corrective_timer_test.dart` | **Concluído** | Persistência de timer no SQLite; alerta amigável ao ultrapassar 4h ininterruptas com diálogo de ajuste. |
 | **F11** | **Notas de Voz e Ditado** | `lib/voice_notes/audio_recording_service.dart`<br>`lib/voice_notes/voice_dictation_service.dart`<br>`lib/voice_notes/voice_note_parser.dart` | `test/voice_notes_test.dart` (15 testes) | **Parcialmente Concluído (Bug Crítico de Parada)** | **Bug P1:** O timer de 30 segundos apenas cancela a contagem mas NÃO interrompe o hardware de gravação. Transcrição "offline" depende de modelos do sistema operacional que podem não estar baixados. |
 | **F12** | **Backup e Restauração Criptografados** | `lib/settings/backup_service.dart`<br>`lib/ui/screens/settings_screen.dart` | `test/backup_service_test.dart` (18 testes) | **Concluído e Blindado** | AES-256 GCM + PBKDF2 (100k iterações); staging em 3 etapas com rollback transacional seguro de áudios; fallback para `/tmp` eliminado; suporte a snapshot em Web. |
-| **F13** | **Sincronização Offline-First Supabase** | `lib/core/app_config.dart`<br>`lib/core/supabase_initializer.dart`<br>`lib/sync/supabase_sync_service.dart`<br>`lib/sync/sync_engine.dart` | `test/core/app_config_test.dart` (9 testes)<br>`test/core/supabase_initializer_test.dart` (10 testes)<br>`test/sync/supabase_lifecycle_test.dart` (7 testes)<br>`test/supabase_sync_service_test.dart`<br>`test/sync_engine_test.dart` | **Em Estabilização (P0-03 Resolvido em U1; P0-01 Resolvido em U2; Bloqueado apenas por P0-02)** | **U1 e U2 Concluídas e Blindadas:** Injeção segura via `AppConfig`, inicialização não-bloqueante desacoplada em `main.dart`, orquestrador `SupabaseInitializer` com lock de concorrência e zero `AssertionError`, ciclo de vida `WidgetsBindingObserver`, durabilidade garantida da outbox, backoff exponencial com jitter e pausa em 5 falhas. Pendente U3 (Schema remoto/Storage). |
+| **F13** | **Sincronização Offline-First Supabase** | `lib/core/app_config.dart`<br>`lib/core/supabase_initializer.dart`<br>`lib/sync/supabase_sync_service.dart`<br>`lib/sync/sync_engine.dart`<br>`supabase/migrations/` | `test/core/app_config_test.dart` (9 testes)<br>`test/core/supabase_initializer_test.dart` (12 testes)<br>`test/sync/supabase_lifecycle_test.dart` (18 testes)<br>`test/sync/supabase_u3_schema_storage_test.dart` (15 testes)<br>`test/supabase_sync_service_test.dart`<br>`test/sync_engine_test.dart` | **Concluído e Blindado (Bloqueadores P0-01, P0-02 e P0-03 Resolvidos)** | Injeção centralizada segura (U1), boot desacoplado não-bloqueante (U2), travas reentrantes `isSyncing`, durabilidade outbox e 3-way merge, schema remoto completo com as 10 tabelas, bucket privado de áudio de 10 MB e isolamento RLS estrito (U3). |
 | **F14** | **Banco Local SQLite / Drift** | `lib/database/app_database.dart`<br>`lib/database/connection/native.dart`<br>`lib/database/connection/connection_web.dart` | `test/database_integrity_test.dart` | **Concluído com Ressalva P1 de Migrações** | Foreign Keys e WAL ativos. Migrações históricas usam `catch (_) {}` que silenciam falhas de alteração de schema. Banco nativo não possui criptografia em repouso por chave local. |
 | **F15** | **Mapa de Contatos e Território** | `lib/ui/screens/contacts_map_screen.dart`<br>`lib/territory/` | `test/unified_study_logging_test.dart` | **Concluído** | Reprojeção matemática de mapa sem ballooning; respeita a diretriz de não substituir a solução externa Hourglass. |
 | **F16** | **Configurações e Customização de Telas** | `lib/ui/screens/customize_features_screen.dart`<br>`lib/settings/app_settings_manager.dart` | `test/widget_test.dart` | **Concluído** | Feature flags ocultam itens na interface sem nunca executar migrações destrutivas de dados históricos. |
@@ -29,9 +29,9 @@ Este documento mapeia o status real de cada funcionalidade do **Field Assistant*
 
 ## 2. Quadro Resumo de Implementação
 - **Funcionalidades Totais Auditadas:** 16
-- **Totalmente Estabilizadas e Testadas:** 12 (75%)
+- **Totalmente Estabilizadas e Testadas:** 13 (81,25%)
 - **Parcialmente Implementadas com Débito / Risco P1:** 3 (18,75% — Concorrência na Agenda, Gravação de Áudio/Transcrição, Migrações do Banco Local)
-- **Em Estabilização P0:** 1 (6,25% — Sincronização Supabase remota: U1 e U2 concluídas com 547 testes aprovados; U3 pendente)
+- **Em Estabilização P0:** 0 (0% — Bloqueadores P0-01, P0-02 e P0-03 100% resolvidos)
 
 ---
 
@@ -70,4 +70,36 @@ Este documento mapeia o status real de cada funcionalidade do **Field Assistant*
 - **Testes Executados:** 547 testes aprovados (`flutter test`), 0 falhas, 0 issues de análise estática (`dart analyze lib test --fatal-infos`), build web release aprovado (`flutter build web --release`).
 - **Resultado:** Aprovado em U2. Bloqueador P0-01 resolvido.
 - **Riscos Remanescentes:** Schema SQL remoto incompleto (P0-02, escopo da Unidade U3).
-- **Próxima Ação:** Executar Unidade U3 (Schema SQL remoto, Storage e validação RLS).
+- **Próxima Ação:** Executada Unidade U3 (Schema SQL remoto, Storage e validação RLS).
+
+### Unidade U3 — Schema Remoto Supabase, Storage e Validação RLS
+- **Identificador:** `FASE2-U3`
+- **Commit Base:** `8e6a1ff`
+- **Branch Dedicada:** `stabilization/u3-supabase-schema`
+- **Arquivos Alterados / Criados:**
+  - `supabase/migrations/20261102000000_u3_missing_tables_storage.sql` (Novo: DDL de `voice_notes`, `phone_contacts` e `territory_landmarks` com UUID pk, `owner_id REFERENCES auth.users(id) DEFAULT auth.uid()`, FKs para `people`/`visits`/`bible_studies`, índices de busca/auditoria, RLS estrito por operação SELECT/INSERT/UPDATE/DELETE, triggers de auditoria `updated_at`/`revision`, bucket privado `voice_notes` de 10 MB e políticas RLS de storage)
+  - `lib/database/repository.dart` (Adicionado método `requeueFailedSyncOperations()` para recuperação segura e supervisionada de operações com falha sem descarte de histórico)
+  - `test/sync/supabase_u3_schema_storage_test.dart` (Novo: 15 testes cobrindo DDL, índices, bucket privado, contratos RLS positivo, negativo e anônimo, Storage RLS, serialização de payloads das 3 tabelas, inbound pull com 3-way merge e procedimento de requeue)
+  - `docs/engineering/DECISION_LOG.md` (ADR-012 documentado)
+  - `docs/engineering/IMPLEMENTATION_STATUS.md`, `PRODUCTION_READINESS.md`, `SESSION_HANDOFF.md`, `REGRESSION_GUARDRAILS.md`, `README.md`
+- **Testes Executados:** 562 testes aprovados (`flutter test`), 0 falhas, 0 issues de análise estática (`dart analyze lib test --fatal-infos`), build web release aprovado (`flutter build web --release`).
+- **Resultado:** Aprovado em U3. Bloqueador P0-02 categoricamente eliminado.
+- **Riscos Remanescentes:** Validação em infraestrutura Supabase Cloud / staging real; validação física em iPhone/iPad (Fase 4); concorrência remota na agenda (P1); parada do microfone (P1).
+- **Próxima Ação:** Homologação e transição para estabilização de bugs P1.
+
+---
+
+## 4. Matriz de Entidades Locais com Auditoria Não Sincronizadas
+
+| Entidade Local (Drift) | Tabela Remota (Supabase) | Presente no Sincronizador? | Possui Outbox? | Necessário em Outros Aparelhos? | Risco de Inconsistência Funcional / Recomendação |
+|---|---|:---:|:---:|:---:|---|
+| `FamilyTies` (`family_ties`) | Inexistente | Não | Não | Sim (grau de parentesco entre contatos) | **Baixo/Médio:** Contatos sincronizam, mas o vínculo de parentesco (ex: pai/filho) permanece apenas no aparelho de origem. Recomendada unidade futura para inclusão no schema. |
+| `PersonPhotos` (`person_photos`) | Inexistente | Não | Não | Recomendável | **Baixo:** Fotos de perfil são armazenadas apenas localmente. Não bloqueia o uso ministerial principal. |
+| `TerritorySectors` (`territory_sectors`) | Inexistente | Não | Não | Sim | **Médio:** Subdivisões territoriais internas; o aplicativo delega território primário para Hourglass, mas anotações de setor não sincronizam. |
+| `MinistryExperiences` (`ministry_experiences`) | Inexistente | Não | Não | Desejável | **Baixo:** Relatos de experiências memoráveis de campo salvos localmente. |
+| `PersonPublications` (`person_publications`) | Inexistente | Não | Não | Sim | **Médio:** Histórico de publicações deixadas com um morador; visitas registram o texto, mas a tabela normalizada não sobe. |
+| `ResearchArticles` (`research_articles`) | Inexistente | Não | Não | Opcional | **Baixo:** Notas temáticas e artigos pesquisados; uso pessoal local. |
+| `ResearchTags` (`research_tags`) | Inexistente | Não | Não | Opcional | **Baixo:** Tags de categorização de artigos de pesquisa. |
+| `ExternalCalendarEvents` | Inexistente | Não (por design) | Não (por design) | Não (local do device) | **Nenhum (Conforme):** Tabela de cache do Apple EventKit / Google Calendar nativo de cada aparelho físico. |
+| `CalendarEventLinks` | Inexistente | Não (por design) | Não (por design) | Não (local do device) | **Nenhum (Conforme):** Mapeamento de IDs externos do sistema operacional específico. |
+

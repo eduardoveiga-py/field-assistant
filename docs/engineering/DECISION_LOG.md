@@ -151,4 +151,21 @@ Este registro preserva o contexto, as alternativas ponderadas e as consequência
 - **Justificativa:** Assegura que o aplicativo abra instantaneamente e funcione com 100% de capacidade local independente do status da rede ou do backend, enquanto orquestra sincronização transparente, segura e sem regressões na outbox.
 - **Consequências:** Zero dependência de rede no boot, zero crashes por `AssertionError`, durabilidade garantida da outbox local, reatividade Riverpod e recuperação automática de conectividade. Validado por 30 testes dedicados em `test/core/supabase_initializer_test.dart` e `test/sync/supabase_lifecycle_test.dart`, elevando o total da suíte para 547 testes 100% aprovados.
 
+---
+
+### ADR-012: Schema Remoto Supabase, Storage Privado de Áudio e Validação RLS (Unidade U3)
+- **Status:** Aprovado
+- **Data:** 02 de Novembro de 2026
+- **Contexto:** A auditoria inicial (Fase 1) identificou o bloqueador crítico P0-02: ausência das tabelas `voice_notes`, `phone_contacts` e `territory_landmarks` e do bucket de Storage `voice_notes` na migração remota do Supabase (`supabase/migrations/20261026000000_initial_schema.sql`). Embora o sincronizador (`SupabaseSyncService`) já incluísse essas entidades em `syncTables` e realizasse a sanitização e upload de binários, qualquer tentativa de sincronização real dessas 3 entidades contra o Supabase falharia por falta das tabelas remotas ou do bucket de armazenamento.
+- **Decisão:**
+  1. Criar a migração versionada `supabase/migrations/20261102000000_u3_missing_tables_storage.sql` definindo as 3 tabelas com schema 100% compatível com Drift (`id UUID`, `owner_id UUID REFERENCES auth.users(id) DEFAULT auth.uid()`, chaves estrangeiras apropriadas, campos de auditoria `created_at`, `updated_at`, `deleted_at`, `revision`).
+  2. Ativar Row-Level Security (RLS) estrito nas 3 tabelas com políticas granulares para SELECT, INSERT, UPDATE e DELETE, garantindo isolamento total por `auth.uid() = owner_id` e bloqueio de usuários anônimos.
+  3. Vincular triggers para atualização automática de `updated_at` e incremento de `revision` via `handle_update_audit()`.
+  4. Configurar o bucket de Supabase Storage `voice_notes` como estritamente privado (`public = false`), limitando o tamanho dos arquivos a 10 MB e restringindo aos MIME types de áudio (`audio/m4a`, `audio/x-m4a`, `audio/mp4`, `audio/aac`).
+  5. Definir políticas RLS em `storage.objects` restringindo leitura, upload, atualização e exclusão aos usuários proprietários (`owner = auth.uid()` ou dono da nota de voz vinculada).
+  6. Implementar método `requeueFailedSyncOperations()` em `AppRepository` para recuperação segura de itens em estado `failed` com 5 tentativas, atendendo à pendência ISSUE-U2-02 sem descarte de histórico.
+  7. Manter abertas e documentadas as pendências ISSUE-U2-01 (recuperação automática de falha crítica no boot de `Supabase.initialize()`), ISSUE-U2-03 (teste E2E contínuo com reinicialização em disco) e ISSUE-U2-04 (listener de interfaces de rede).
+- **Consequências:** Bloqueador crítico P0-02 categoricamente eliminado. O schema remoto do Supabase agora cobre todas as 10 entidades mapeadas no sincronizador. Validado por 15 novos testes dedicados em `test/sync/supabase_u3_schema_storage_test.dart`, elevando a suíte para 562 testes automatizados 100% aprovados, análise estática limpa (`No issues found!`) e build web release aprovado.
+
+
 

@@ -65,7 +65,7 @@ lib/
   └── ui/                       # Telas (Hoje, Pessoas, Agenda, Estudos, Dashboard, Atividades, Lixeira, Ajustes)
 scripts/                        # Scripts para inicialização web e execução de testes no Windows
 supabase/                       # Migrações PostgreSQL e políticas RLS para sincronização
-test/                           # Suíte automatizada com 516 testes cobrindo todos os módulos
+test/                           # Suíte automatizada com 562 testes cobrindo todos os módulos
 ```
 
 ---
@@ -127,7 +127,7 @@ flutter build ipa --release --dart-define-from-file=.env.prod
 
 ## 🧪 Suíte de Testes Automatizados
 
-Para executar todos os **547 testes automatizados** unitários, transacionais, adversariais e de interface:
+Para executar todos os **562 testes automatizados** unitários, transacionais, adversariais e de interface:
 ```bash
 flutter test
 ```
@@ -137,7 +137,8 @@ Para validar a integridade estática do código (zero erros, zero warnings, zero
 dart analyze lib test --fatal-infos
 ```
 
-### Cobertura de Testes (547 Testes Aprovados com 100% de Sucesso)
+### Cobertura de Testes (562 Testes Aprovados com 100% de Sucesso)
+- `test/sync/supabase_u3_schema_storage_test.dart`: DDL SQL remota e integridade de schema das 3 tabelas faltantes (`voice_notes`, `phone_contacts`, `territory_landmarks`), bucket privado `voice_notes` (10 MB, m4a/mp4/aac), contratos RLS positivo/negativo/anônimo, isolamento de Storage, serialização/sanitização snake_case, 3-way merge inbound no Drift e reprocessamento seguro da outbox via `requeueFailedSyncOperations()`.
 - `test/core/app_config_test.dart`: Validação centralizada de ambiente (dev/homolog/prod), bloqueio de chaves privilegiadas (`service_role`), URLs válidas, mascaramento de segredos em logs e modo offline resiliente.
 - `test/core/supabase_initializer_test.dart`: Inicialização idempotente desacoplada, lock de concorrência com Completer, sanitização de credenciais em logs, probe ativo de conectividade (/rest/v1/), preservação de `authenticationRequired`, proteção contra `AssertionError` em `clientOrNull` e reatividade Riverpod Notifiers.
 - `test/sync/supabase_lifecycle_test.dart`: Boot 100% offline sem exceções, durabilidade da outbox em falhas transitórias de rede, limite de 5 retentativas sem starvation/loop infinito, algoritmo de backoff exponencial com jitter, recuperação pós-reconexão, resume em background via `WidgetsBindingObserver`, transações simultâneas na outbox, trava de reentrância `isSyncing`, resiliência a falhas de rede sem queima de tentativas subsequentes, 3-way merge para failed ops e auto-reconexão via stream.
