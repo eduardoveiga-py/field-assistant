@@ -1370,4 +1370,36 @@ class AppRepository {
       );
     }
   }
+
+  /// Recupera com seguranca operacoes da outbox com falha (attempts >= 5),
+  /// redefinindo seu status para 'pending' e ajustando tentativas para 4
+  /// para permitir mais um ciclo supervisionado de tentativas, sem descartar
+  /// registros da outbox e preservando o historico do erro previo.
+  Future<int> requeueFailedSyncOperations({List<String>? operationIds}) async {
+    final query = db.select(db.syncQueue)
+      ..where((tbl) {
+        final isFailed = tbl.status.equals('failed');
+        if (operationIds != null && operationIds.isNotEmpty) {
+          return isFailed & tbl.id.isIn(operationIds);
+        }
+        return isFailed & tbl.attempts.isBiggerOrEqualValue(5);
+      });
+    final failedOps = await query.get();
+    int count = 0;
+    for (final op in failedOps) {
+      await (db.update(
+        db.syncQueue,
+      )..where((tbl) => tbl.id.equals(op.id))).write(
+        SyncQueueCompanion(
+          status: const Value('pending'),
+          attempts: const Value(4),
+          lastError: Value(
+            'Reenfileirado para sincronizacao. Erro previo: ${op.lastError ?? "nenhum"}',
+          ),
+        ),
+      );
+      count++;
+    }
+    return count;
+  }
 }
