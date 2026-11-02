@@ -4,7 +4,7 @@
 - **Data:** 02 de Novembro de 2026
 - **Branch Ativa:** `stabilization/u2-supabase-lifecycle` (criada a partir de `stabilization/u1-env-config` no commit `9da0f21`)
 - **Commit Base:** `9da0f21`
-- **Commit de Entrega U2:** `56e4420`
+- **Commit de Entrega U2:** `35a5edb`
 - **Fase Executada:** **FASE 2 — ESTABILIZAÇÃO P0: UNIDADE U2 (INICIALIZAÇÃO DO SUPABASE, CICLO DE VIDA E RESILIÊNCIA OFFLINE)**
 
 ---
