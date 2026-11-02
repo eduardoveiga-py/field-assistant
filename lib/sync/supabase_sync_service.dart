@@ -346,6 +346,7 @@ class SupabaseSyncService with WidgetsBindingObserver {
 
     switch (table) {
       case 'people':
+        map['name'] ??= '';
         map['status'] ??= 'interessado';
         map['tags'] ??= '[]';
         map['firstContactAt'] =
@@ -360,6 +361,8 @@ class SupabaseSyncService with WidgetsBindingObserver {
             _isoString(map['next_action_at']);
         break;
       case 'visits':
+        map['personId'] = (map['personId'] ?? map['person_id'] ?? '')
+            .toString();
         map['dateTimeField'] =
             _isoString(map['dateTimeField']) ??
             _isoString(map['dateTime']) ??
@@ -373,6 +376,7 @@ class SupabaseSyncService with WidgetsBindingObserver {
             _isoString(map['suggested_return_date']);
         break;
       case 'bible_studies':
+        map['title'] ??= '';
         map['ownerId'] ??= 'local_user';
         map['startedAt'] =
             _isoString(map['startedAt']) ??
@@ -390,6 +394,9 @@ class SupabaseSyncService with WidgetsBindingObserver {
             _isoString(map['next_planned_at']);
         break;
       case 'study_participants':
+        map['studyId'] = (map['studyId'] ?? map['study_id'] ?? '').toString();
+        map['personId'] = (map['personId'] ?? map['person_id'] ?? '')
+            .toString();
         map['isPrimary'] =
             map['isPrimary'] == true ||
             map['is_primary'] == true ||
@@ -397,6 +404,7 @@ class SupabaseSyncService with WidgetsBindingObserver {
             map['is_primary'] == 1;
         break;
       case 'study_sessions':
+        map['studyId'] = (map['studyId'] ?? map['study_id'] ?? '').toString();
         map['dateTimeField'] =
             _isoString(map['dateTimeField']) ??
             _isoString(map['dateTime']) ??
@@ -407,6 +415,7 @@ class SupabaseSyncService with WidgetsBindingObserver {
         map['participantIds'] ??= '[]';
         break;
       case 'appointments':
+        map['title'] ??= '';
         map['durationMinutes'] = map['durationMinutes'] is int
             ? map['durationMinutes']
             : int.tryParse(map['durationMinutes']?.toString() ?? '30') ?? 30;
@@ -873,6 +882,8 @@ class SupabaseSyncService with WidgetsBindingObserver {
           );
           return true;
         } else {
+          final isLocalDeleted =
+              localMap['deletedAt'] != null || localMap['deleted_at'] != null;
           final localUpdatedAtStr = localMap['updatedAt']?.toString();
           final remoteUpdatedAtStr =
               normalized['updatedAt']?.toString() ??
@@ -886,6 +897,26 @@ class SupabaseSyncService with WidgetsBindingObserver {
           DateTime? remoteUpdated = remoteUpdatedAtStr != null
               ? DateTime.tryParse(remoteUpdatedAtStr)
               : null;
+
+          if (isLocalDeleted) {
+            final localDeletedAtStr =
+                localMap['deletedAt']?.toString() ??
+                localMap['deleted_at']?.toString();
+            final localDeletedAt = localDeletedAtStr != null
+                ? DateTime.tryParse(localDeletedAtStr)
+                : null;
+
+            final isLegitimateRestore =
+                remoteRev > localRev &&
+                remoteUpdated != null &&
+                localDeletedAt != null &&
+                remoteUpdated.isAfter(localDeletedAt);
+
+            if (!isLegitimateRestore) {
+              // Upsert desatualizado de nó desconectado: PREVINE RESSURREIÇÃO! Mantém o tombstone local.
+              return true;
+            }
+          }
 
           final isRemoteNewer = remoteUpdated != null && localUpdated != null
               ? (remoteUpdated.isAfter(localUpdated) ||
@@ -1045,21 +1076,31 @@ class SupabaseSyncService with WidgetsBindingObserver {
             await (db.select(db.appKvStore)
                   ..where((t) => t.key.equals('last_synced_at_$table')))
                 .getSingleOrNull();
+        final kvIdRow =
+            await (db.select(db.appKvStore)
+                  ..where((t) => t.key.equals('last_synced_id_$table')))
+                .getSingleOrNull();
         final lastSyncedAt = kvRow != null
             ? DateTime.tryParse(kvRow.value)
             : null;
+        final lastSyncedId = kvIdRow?.value;
 
         int offset = 0;
         const pageSize = 100;
-        DateTime? newestUpdatedAt;
+        DateTime? newestUpdatedAt = lastSyncedAt;
+        String? newestId = lastSyncedId;
 
         while (true) {
           var query = activeClient.from(table).select();
           if (lastSyncedAt != null) {
-            query = query.gt(
-              'updated_at',
-              lastSyncedAt.toUtc().toIso8601String(),
-            );
+            final lastSyncedAtIso = lastSyncedAt.toUtc().toIso8601String();
+            if (lastSyncedId != null && lastSyncedId.isNotEmpty) {
+              query = query.or(
+                'updated_at.gt.$lastSyncedAtIso,and(updated_at.eq.$lastSyncedAtIso,id.gt.$lastSyncedId)',
+              );
+            } else {
+              query = query.gte('updated_at', lastSyncedAtIso);
+            }
           }
 
           final res = await query
@@ -1072,6 +1113,7 @@ class SupabaseSyncService with WidgetsBindingObserver {
           for (final rawItem in rows) {
             totalProcessed++;
             final map = rawItem as Map<String, dynamic>;
+            final id = (map['id'] ?? '').toString();
             final updatedAtRaw = map['updated_at'] ?? map['updatedAt'];
             final dt = updatedAtRaw != null
                 ? DateTime.tryParse(updatedAtRaw.toString())
@@ -1086,9 +1128,17 @@ class SupabaseSyncService with WidgetsBindingObserver {
 
             if (applied) {
               successCount++;
-              if (dt != null &&
-                  (newestUpdatedAt == null || dt.isAfter(newestUpdatedAt))) {
-                newestUpdatedAt = dt;
+              if (dt != null) {
+                final currentNewest = newestUpdatedAt;
+                if (currentNewest == null || dt.isAfter(currentNewest)) {
+                  newestUpdatedAt = dt;
+                  newestId = id;
+                } else if (dt.isAtSameMomentAs(currentNewest)) {
+                  final currentId = newestId;
+                  if (currentId == null || id.compareTo(currentId) > 0) {
+                    newestId = id;
+                  }
+                }
               }
             } else {
               if (_currentStatus == SyncStatus.conflict) {
@@ -1103,16 +1153,29 @@ class SupabaseSyncService with WidgetsBindingObserver {
           offset += pageSize;
         }
 
-        if (newestUpdatedAt != null) {
+        final finalUpdatedAt = newestUpdatedAt;
+        if (finalUpdatedAt != null) {
           await db
               .into(db.appKvStore)
               .insertOnConflictUpdate(
                 AppKvStoreCompanion.insert(
                   key: 'last_synced_at_$table',
-                  value: newestUpdatedAt.toUtc().toIso8601String(),
+                  value: finalUpdatedAt.toUtc().toIso8601String(),
                   updatedAt: drift.Value(DateTime.now()),
                 ),
               );
+          final finalId = newestId;
+          if (finalId != null) {
+            await db
+                .into(db.appKvStore)
+                .insertOnConflictUpdate(
+                  AppKvStoreCompanion.insert(
+                    key: 'last_synced_id_$table',
+                    value: finalId,
+                    updatedAt: drift.Value(DateTime.now()),
+                  ),
+                );
+          }
         }
       } catch (e) {
         final err = 'Erro ao buscar alterações na tabela $table: $e';
@@ -1278,6 +1341,14 @@ class SupabaseSyncService with WidgetsBindingObserver {
         final operation = op.operation.toUpperCase();
 
         if (operation == 'INSERT' || operation == 'UPDATE') {
+          final localMap = await _getLocalMap(tableName, op.entityId);
+          if (localMap != null &&
+              (localMap['deletedAt'] != null ||
+                  localMap['deleted_at'] != null)) {
+            // Se o registro já foi marcado como tombstone localmente, preserva o deleted_at
+            cleanPayload['deleted_at'] =
+                localMap['deletedAt'] ?? localMap['deleted_at'];
+          }
           final remotePayload = toRemotePayload(op.entityType, cleanPayload);
           await activeClient.from(tableName).upsert(remotePayload);
 
@@ -1302,7 +1373,42 @@ class SupabaseSyncService with WidgetsBindingObserver {
           _lastAttemptTime.remove(op.id);
           success++;
         } else if (operation == 'DELETE') {
-          await activeClient.from(tableName).delete().eq('id', op.entityId);
+          final localMap = await _getLocalMap(tableName, op.entityId);
+          final deletedAtRaw =
+              cleanPayload['deleted_at'] ??
+              cleanPayload['deletedAt'] ??
+              localMap?['deletedAt'] ??
+              localMap?['deleted_at'] ??
+              op.createdAt.toUtc().toIso8601String();
+          final updatedAtRaw =
+              cleanPayload['updated_at'] ??
+              cleanPayload['updatedAt'] ??
+              localMap?['updatedAt'] ??
+              localMap?['updated_at'] ??
+              deletedAtRaw;
+          final revisionRaw =
+              cleanPayload['revision'] ?? localMap?['revision'] ?? 1;
+
+          final deletedAtIso =
+              _isoString(deletedAtRaw) ??
+              DateTime.now().toUtc().toIso8601String();
+          final updatedAtIso =
+              _isoString(updatedAtRaw) ??
+              DateTime.now().toUtc().toIso8601String();
+          final revision = revisionRaw is int
+              ? revisionRaw
+              : int.tryParse(revisionRaw.toString()) ?? 1;
+
+          final tombstonePayload = <String, dynamic>{
+            'deleted_at': deletedAtIso,
+            'updated_at': updatedAtIso,
+            'revision': revision,
+          };
+
+          await activeClient
+              .from(tableName)
+              .update(tombstonePayload)
+              .eq('id', op.entityId);
           await repository.markSyncOperationSuccess(op.id);
           _lastAttemptTime.remove(op.id);
           success++;

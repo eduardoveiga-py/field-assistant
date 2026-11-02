@@ -62,7 +62,7 @@ graph TD
 ---
 
 ## 4. Estado Geral de Produção
-- **Testes Automatizados:** 508 testes passando com 100% de sucesso (`flutter test`).
+- **Testes Automatizados:** 569 testes passando com 100% de sucesso (`flutter test`).
 - **Análise Estática:** 0 issues com `--fatal-infos` (`dart analyze lib test --fatal-infos`).
 - **Formatação:** 100% em conformidade (`dart format --output=none --set-exit-if-changed lib test`).
 - **Compilação Web:** Sucesso (`flutter build web --release`).

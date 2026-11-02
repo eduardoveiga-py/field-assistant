@@ -208,7 +208,11 @@ class VoiceNotesManager {
     await _recordSyncOperation(
       entityId: id,
       operation: 'DELETE',
-      payload: {'id': id, 'deleted_at': now.toIso8601String()},
+      payload: {
+        'id': id,
+        'deleted_at': now.toIso8601String(),
+        'updated_at': now.toIso8601String(),
+      },
     );
     await _refresh();
   }

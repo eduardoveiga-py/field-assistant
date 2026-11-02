@@ -167,5 +167,22 @@ Este registro preserva o contexto, as alternativas ponderadas e as consequência
   7. Manter abertas e documentadas as pendências ISSUE-U2-01 (recuperação automática de falha crítica no boot de `Supabase.initialize()`), ISSUE-U2-03 (teste E2E contínuo com reinicialização em disco) e ISSUE-U2-04 (listener de interfaces de rede).
 - **Consequências:** Bloqueador crítico P0-02 categoricamente eliminado. O schema remoto do Supabase agora cobre todas as 10 entidades mapeadas no sincronizador. Validado por 15 novos testes dedicados em `test/sync/supabase_u3_schema_storage_test.dart`, elevando a suíte para 562 testes automatizados 100% aprovados, análise estática limpa (`No issues found!`) e build web release aprovado.
 
+---
+
+### ADR-013: Integridade de Exclusões Lógicas (Soft Delete), Propagação via Tombstones e Prevenção de Ressurreição (Unidade U3.1)
+- **Status:** Aprovado
+- **Data:** 02 de Novembro de 2026
+- **Contexto:** A operação `DELETE` na outbox executava `activeClient.from(table).delete().eq('id', op.entityId)` fisicamente no Supabase. Isso destruía o histórico, impedia a propagação de exclusões para outros dispositivos via `fetchRemoteChanges` (já que a linha não existia mais para ter `updated_at > last_synced_at`), arriscava cascatas indesejadas no PostgreSQL e permitia que nós desconectados ressuscitassem registros excluídos via upsert antigo.
+- **Decisão:**
+  1. Eliminar completamente a chamada `.delete()` no cliente Supabase.
+  2. Implementar soft delete via `.update({'deleted_at': ..., 'updated_at': ..., 'revision': ...})` na outbox para todas as 10 tabelas sincronizadas.
+  3. Preservar `deleted_at` em operações de `INSERT` e `UPDATE` quando o registro local já for um tombstone, impedindo sobrescritas acidentais com `deleted_at = null`.
+  4. Implementar barreira contra ressurreição no cliente (`_applyRemoteRecord`): registros remotos ativos não sobrescrevem tombstones locais a menos que comprovem restauração deliberada mais recente (`remoteRev > localRev` e `remoteUpdated > localDeletedAt`).
+  5. Implementar barreira contra ressurreição no PostgreSQL (`handle_soft_delete_and_resurrection_guard()` na migração `20261102010000_u3_1_soft_delete_tombstones.sql`).
+  6. Migrar o cursor incremental para ordenação e filtro composto `(updated_at, id)`, assegurando que tombstones criados no mesmo instante nunca sejam ignorados na paginação.
+  7. Desacoplar a aplicação de tombstones recebidos (`_softDeleteLocalEntry`) dos métodos de negócio do `AppRepository`, garantindo zero eco e zero loop de sincronização.
+- **Consequências:** Exclusão física remota abolida. Propagação confiável de exclusões entre dispositivos heterogêneos. Proteção contra ressurreição por upserts antigos. Validado por 7 novos testes formais em `test/sync/supabase_soft_delete_test.dart` (Testes A a G), elevando a suíte para 569 testes aprovados (100%), 0 issues de análise estática e build web release aprovado. Detalhes em `docs/engineering/ADR_U3_1_SOFT_DELETE_TOMBSTONES.md`.
+
+
 
 

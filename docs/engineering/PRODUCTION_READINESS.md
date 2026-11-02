@@ -15,7 +15,7 @@ Apesar de o aplicativo apresentar **100% de sucesso na suíte de 508 testes auto
 - [x] **Inicialização e configuração de produção validadas** *(APROVADO: Configuração e validação de ambiente na Unidade U1 via `AppConfig`; inicialização desacoplada, resiliente e ciclo de vida Riverpod em `main.dart` concluídos na Unidade U2 via `SupabaseInitializer`)*
 - [x] **Banco local íntegro** *(APROVADO: Drift v4 com `PRAGMA foreign_keys = ON;`, `journal_mode = WAL;`, suporte IndexedDB via Wasm na Web)*
 - [ ] **Migrações testadas e rastreáveis** *(REPROVADO: `app_database.dart` possui blocos `catch (_) {}` que silenciam falhas de DDL)*
-- [x] **Sincronização validada entre dispositivos** *(APROVADO: Schema remoto completo cobrindo todas as 10 tabelas, bucket de áudio de 10 MB e testes de serialização e pull em U3)*
+- [x] **Sincronização validada entre dispositivos** *(APROVADO: Schema remoto completo cobrindo todas as 10 tabelas, bucket de áudio de 10 MB, testes de serialização e pull em U3, e integridade de soft delete/tombstones sem exclusão física e com prevenção de ressurreição em U3.1)*
 - [ ] **Conflitos tratados explicitamente na Agenda** *(REPROVADO: Inserções concorrentes de horários idênticos em nós offline distintos geram sobreposição silenciosa pós-sync)*
 - [x] **RLS e permissões validadas** *(APROVADO: RLS ativo nas 10 tabelas e no bucket privado storage.objects com isolamento estrito por auth.uid() = owner_id)*
 - [x] **Dados sensíveis adequadamente protegidos** *(APROVADO: Backup AES-256 GCM + PBKDF2; bloqueio ativo de chaves `service_role` em `AppConfig`, mascaramento em logs e `.gitignore` blindado para `.env*`)*
@@ -23,12 +23,12 @@ Apesar de o aplicativo apresentar **100% de sucesso na suíte de 508 testes auto
 - [ ] **Agenda validada contra concorrência** *(REPROVADO: Pendente detecção de colisões remotas)*
 - [ ] **Áudio validado em dispositivo real** *(REPROVADO: Timer de 30s não encerra o hardware de gravação; requer teste físico no iOS)*
 - [ ] **Transcrição documentada corretamente** *(REPROVADO: Descrita como "offline-first" no código, mas pode exigir rede no iOS/Web)*
-- [x] **Testes automatizados aprovados** *(APROVADO: 562 testes passando com 100% de sucesso)*
+- [x] **Testes automatizados aprovados** *(APROVADO: 569 testes passando com 100% de sucesso)*
 - [x] **Análise estática aprovada** *(APROVADO: `dart analyze lib test --fatal-infos` acusa 0 issues)*
 - [x] **Build Release Web aprovado** *(APROVADO: `flutter build web --release` compila com sucesso)*
 - [ ] **Archive iOS e instalação real validados** *(PENDENTE: Depende de runner macOS e Apple Developer Account)*
 - [ ] **Auditoria independente aprovada** *(PENDENTE: Aguardando correção dos itens P1)*
-- [x] **Documentação atualizada** *(APROVADO: Documentações de engenharia atualizadas com ADR-010, ADR-011, ADR-012 e 562 testes)*
+- [x] **Documentação atualizada** *(APROVADO: Documentações de engenharia atualizadas com ADR-010, ADR-011, ADR-012, ADR-013 e 569 testes)*
 
 ---
 

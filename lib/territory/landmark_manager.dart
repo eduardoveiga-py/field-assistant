@@ -387,6 +387,7 @@ class LandmarkManager {
               payload: jsonEncode({
                 'id': id,
                 'deleted_at': now.toIso8601String(),
+                'updated_at': now.toIso8601String(),
               }),
               createdAt: now,
               status: const Value('pending'),

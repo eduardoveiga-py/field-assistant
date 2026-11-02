@@ -40,10 +40,13 @@ Este documento define as regras fundamentais que **jamais podem ser violadas, en
    - O reenvio da mesma operação de sincronização após timeout ou queda de conexão **deve ser idempotente**. Nunca crie registros duplicados.
 3. **Proibição de "Last Write Wins" Cego:**
    - Conflitos em anotações pastorais, históricos de conversas e dados de contatos devem ser detectados em nível de campo (`SyncEngine.mergeEntities`). Quando o mesmo campo for modificado em ambos os nós, as duas versões devem ser retidas.
-4. **Exclusões Lógicas (Tombstones):**
-   - Entidades sincronizáveis utilizam `deleted_at`. A exclusão física remota sem tombstone é proibida para evitar ressurgimento indevido por sincronizações atrasadas.
-5. **Cursor Determinístico:**
-   - A paginação do pull deve sempre incluir desempate determinístico: `.order('updated_at', ascending: true).order('id', ascending: true)`.
+4. **Exclusões Lógicas Estritas (Tombstones) e Prevenção de Ressurreição:**
+   - Nenhuma operação DELETE na outbox pode invocar `.delete()` no Supabase. Deve sempre realizar um update preenchendo `deleted_at = now`, `updated_at = now` e incrementando `revision`.
+   - Se uma entidade já estiver soft-deletada localmente, o push de operações `INSERT` ou `UPDATE` pendentes deve preservar `deleted_at` para não anular o tombstone remoto.
+   - Triggers no PostgreSQL (`handle_soft_delete_and_resurrection_guard`) e a lógica de recepção no cliente (`_applyRemoteRecord`) devem rejeitar a anulação de `deleted_at` por upserts atrasados, permitindo ressurreição apenas se `remoteRev > localRev` e `remoteUpdated > localDeletedAt`.
+   - Tombstones recebidos devem ser aplicados diretamente no banco local sem passar pelos métodos de negócio do repositório para evitar enfileiramento na outbox e loops de sincronização.
+5. **Cursor Incremental Composto (updated_at, id):**
+   - A paginação do pull e o cursor incremental (`last_synced_at_$table` e `last_synced_id_$table`) devem desemparelhar carimbos idênticos com `id.gt.$id`, prevenindo que registros e tombstones gerados no mesmo instante sejam ignorados.
 6. **Durabilidade Absoluta da Outbox em Falhas Transitórias:**
    - Operações que falham por queda de rede (ex: `SocketException`, `TimeoutException` ou HTTP 5xx) **jamais podem ser descartadas** da fila local `sync_queue`. Elas devem ser marcadas como `failed` e reenviadas em tentativas subsequentes respeitando backoff exponencial com jitter.
 7. **Limite de Retentativas e Prevenção de Starvation / Loop Infinito:**

@@ -249,7 +249,12 @@ class AppRepository {
         entityType: 'people',
         entityId: id,
         operation: 'DELETE',
-        payload: {'id': id, 'deletedAt': now.toIso8601String()},
+        payload: {
+          'id': id,
+          'deletedAt': now.toIso8601String(),
+          'updatedAt': now.toIso8601String(),
+          'revision': updated.revision,
+        },
       );
     });
   }
@@ -446,7 +451,12 @@ class AppRepository {
         entityType: 'visits',
         entityId: id,
         operation: 'DELETE',
-        payload: {'id': id, 'deletedAt': now.toIso8601String()},
+        payload: {
+          'id': id,
+          'deletedAt': now.toIso8601String(),
+          'updatedAt': now.toIso8601String(),
+          'revision': updated.revision,
+        },
       );
     });
   }
@@ -630,7 +640,12 @@ class AppRepository {
         entityType: 'bible_studies',
         entityId: id,
         operation: 'DELETE',
-        payload: {'id': id, 'deletedAt': now.toIso8601String()},
+        payload: {
+          'id': id,
+          'deletedAt': now.toIso8601String(),
+          'updatedAt': now.toIso8601String(),
+          'revision': updated.revision,
+        },
       );
     });
   }
@@ -1020,7 +1035,12 @@ class AppRepository {
         entityType: 'appointments',
         entityId: id,
         operation: 'DELETE',
-        payload: {'id': id, 'deletedAt': now.toIso8601String()},
+        payload: {
+          'id': id,
+          'deletedAt': now.toIso8601String(),
+          'updatedAt': now.toIso8601String(),
+          'revision': updated.revision,
+        },
       );
     });
   }
@@ -1132,7 +1152,12 @@ class AppRepository {
         entityType: 'activity_records',
         entityId: id,
         operation: 'DELETE',
-        payload: {'id': id, 'deletedAt': now.toIso8601String()},
+        payload: {
+          'id': id,
+          'deletedAt': now.toIso8601String(),
+          'updatedAt': now.toIso8601String(),
+          'revision': updated.revision,
+        },
       );
     });
   }
