@@ -23,3 +23,11 @@
 - **Ação:** Suporte a snapshot persistente no `appKvStore` para Web (`kIsWeb`) e método `getLastSafetySnapshotData()`.
 - **Ação:** Criação e aprovação dos testes adversariais `TC-BAK-ADV-01`, `TC-BAK-ADV-02`, `TC-BAK-ADV-03` e `TC-BAK-ADV-04` em `test/backup_service_test.dart` (18 testes passando).
 - **Status:** Concluído.
+
+### Fase 3: Sincronização Supabase: Cursor Estável, Áudio Resiliente e Outbox Completa
+- **Ação:** Cursor estável composto com ordenação determinística `.order('updated_at', ascending: true).order('id', ascending: true)` e avanço de cursor estritamente para itens aplicados com sucesso.
+- **Ação:** Resiliência de áudio no push: `_uploadVoiceNoteAudio()` retorna `bool`; em caso de erro, a operação na `sync_queue` é mantida como `failed` para retentativa e NUNCA é marcada como `synced`.
+- **Ação:** Resiliência de áudio no pull: falha de download registra pendência em `appKvStore` e novo método `retryPendingMediaDownloads()` permite recuperação resiliente posterior.
+- **Ação:** Outbox Completa: `createVisit()` em `lib/database/repository.dart` passa a enfileirar atomicamente operação `UPDATE` para `people` (com `baseData`) ao atualizar `lastContactAt` e `nextActionNote`.
+- **Ação:** Criação e aprovação dos testes `TC-SYNC-ADV-01`, `TC-SYNC-ADV-02`, `TC-SYNC-ADV-03` em `test/supabase_sync_service_test.dart` e `TC-SYNC-ADV-04` em `test/repository_database_test.dart`.
+- **Status:** Concluído.

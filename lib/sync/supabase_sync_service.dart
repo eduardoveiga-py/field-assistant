@@ -562,7 +562,7 @@ class SupabaseSyncService {
     }
   }
 
-  Future<void> _uploadVoiceNoteAudio(
+  Future<bool> _uploadVoiceNoteAudio(
     String id,
     SupabaseClient client,
     List<String> errors,
@@ -583,14 +583,17 @@ class SupabaseSyncService {
                 bytes,
                 fileOptions: const FileOptions(upsert: true),
               );
+          return true;
         }
       }
+      return true;
     } catch (e) {
       errors.add('Erro no upload de áudio de voice_notes ($id): $e');
+      return false;
     }
   }
 
-  Future<void> _downloadVoiceNoteAudio(String id, SupabaseClient client) async {
+  Future<bool> _downloadVoiceNoteAudio(String id, SupabaseClient client) async {
     try {
       final storageFileName = id.endsWith('.m4a') ? id : '$id.m4a';
       final bytes = await client.storage
@@ -611,10 +614,52 @@ class SupabaseSyncService {
         await (db.update(db.voiceNotes)..where((t) => t.id.equals(id))).write(
           VoiceNotesCompanion(audioFilePath: drift.Value(localFilePath)),
         );
+
+        // Remove pendência de download se estava registrada
+        await (db.delete(
+          db.appKvStore,
+        )..where((t) => t.key.equals('pending_audio_download_$id'))).go();
+        return true;
       }
-    } catch (_) {
-      // Falha não-fatal no download do áudio
+      return false;
+    } catch (e) {
+      // Registra a nota no AppKvStore para retentativa resiliente posterior
+      try {
+        await db
+            .into(db.appKvStore)
+            .insertOnConflictUpdate(
+              AppKvStoreCompanion.insert(
+                key: 'pending_audio_download_$id',
+                value: DateTime.now().toUtc().toIso8601String(),
+                updatedAt: drift.Value(DateTime.now()),
+              ),
+            );
+      } catch (_) {}
+      return false;
     }
+  }
+
+  /// Retenta o download de áudios que falharam durante a recepção de metadados
+  Future<int> retryPendingMediaDownloads() async {
+    if (!isConfigured) return 0;
+    SupabaseClient? client;
+    try {
+      client = clientOverride ?? Supabase.instance.client;
+    } catch (_) {
+      return 0;
+    }
+
+    final pendingRows = await (db.select(
+      db.appKvStore,
+    )..where((t) => t.key.like('pending_audio_download_%'))).get();
+
+    int recovered = 0;
+    for (final row in pendingRows) {
+      final id = row.key.replaceFirst('pending_audio_download_', '');
+      final ok = await _downloadVoiceNoteAudio(id, client);
+      if (ok) recovered++;
+    }
+    return recovered;
   }
 
   Future<bool> _applyRemoteRecord({
@@ -821,6 +866,7 @@ class SupabaseSyncService {
 
           final res = await query
               .order('updated_at', ascending: true)
+              .order('id', ascending: true)
               .range(offset, offset + pageSize - 1);
           final List rows = res as List;
           if (rows.isEmpty) break;
@@ -829,13 +875,9 @@ class SupabaseSyncService {
             totalProcessed++;
             final map = rawItem as Map<String, dynamic>;
             final updatedAtRaw = map['updated_at'] ?? map['updatedAt'];
-            if (updatedAtRaw != null) {
-              final dt = DateTime.tryParse(updatedAtRaw.toString());
-              if (dt != null &&
-                  (newestUpdatedAt == null || dt.isAfter(newestUpdatedAt))) {
-                newestUpdatedAt = dt;
-              }
-            }
+            final dt = updatedAtRaw != null
+                ? DateTime.tryParse(updatedAtRaw.toString())
+                : null;
 
             final applied = await _applyRemoteRecord(
               table: table,
@@ -846,6 +888,10 @@ class SupabaseSyncService {
 
             if (applied) {
               successCount++;
+              if (dt != null &&
+                  (newestUpdatedAt == null || dt.isAfter(newestUpdatedAt))) {
+                newestUpdatedAt = dt;
+              }
             } else {
               if (_currentStatus == SyncStatus.conflict) {
                 conflictCount++;
@@ -973,7 +1019,19 @@ class SupabaseSyncService {
           await client.from(tableName).upsert(remotePayload);
 
           if (tableName == 'voice_notes') {
-            await _uploadVoiceNoteAudio(op.entityId, client, errors);
+            final audioOk = await _uploadVoiceNoteAudio(
+              op.entityId,
+              client,
+              errors,
+            );
+            if (!audioOk) {
+              failure++;
+              await repository.markSyncOperationFailed(
+                op.id,
+                'Falha no upload do arquivo binário de áudio para o Storage',
+              );
+              continue;
+            }
           }
 
           await repository.markSyncOperationSuccess(op.id);

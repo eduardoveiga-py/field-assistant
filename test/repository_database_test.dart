@@ -328,5 +328,53 @@ void main() {
         expect(personOp.payload, contains('"lastContactAt"'));
       },
     );
+
+    test('TC-SYNC-ADV-04: createVisit atualiza people e gera atomicamente uma operacao UPDATE para people na syncQueue com baseData', () async {
+      final initialPerson = await repository.createPerson(
+        name: 'Pessoa Visita Outbox',
+        phone: '11999998888',
+      );
+
+      // Limpa operações pendentes da criação para isolar o teste
+      await db.delete(db.syncQueue).go();
+
+      final visitDate = DateTime(2026, 11, 2, 10, 0);
+      final returnDate = DateTime(2026, 11, 9, 10, 0);
+
+      await repository.createVisit(
+        personId: initialPerson.id,
+        dateTime: visitDate,
+        contactType: 'revisita',
+        result: 'conversou',
+        nextStep: 'Levar folheto sobre o futuro',
+        suggestedReturnDate: returnDate,
+      );
+
+      final pendingOps = await repository.getPendingSyncOperations();
+      expect(pendingOps.length, equals(2));
+
+      // 1. Operação para a visita (INSERT)
+      final visitOp = pendingOps.firstWhere((op) => op.entityType == 'visits');
+      expect(visitOp.operation, equals('INSERT'));
+
+      // 2. Operação atômica indireta para a pessoa (UPDATE)
+      final personOp = pendingOps.firstWhere((op) => op.entityType == 'people');
+      expect(personOp.operation, equals('UPDATE'));
+      expect(personOp.entityId, equals(initialPerson.id));
+      expect(
+        personOp.payload,
+        contains('"nextActionNote":"Levar folheto sobre o futuro"'),
+      );
+      expect(personOp.payload, contains('_base'));
+
+      // Verifica que o banco local refletiu o novo lastContactAt e revision
+      final updatedPerson = await repository.getPersonById(initialPerson.id);
+      expect(updatedPerson?.lastContactAt, equals(visitDate));
+      expect(
+        updatedPerson?.nextActionNote,
+        equals('Levar folheto sobre o futuro'),
+      );
+      expect(updatedPerson?.revision, equals(initialPerson.revision + 1));
+    });
   });
 }

@@ -648,5 +648,248 @@ void main() {
       expect(downloadedNote.audioFilePath, isNotNull);
       expect(File(downloadedNote.audioFilePath!).existsSync(), isTrue);
     });
+
+    test('TC-SYNC-ADV-01: Cursor Determinístico — 120 registros remotos com o exato mesmo timestamp são puxados integralmente', () async {
+      final now = DateTime.now().toUtc();
+      final fixedTimestamp = now.toIso8601String();
+
+      final allRemotePeople = List.generate(
+        120,
+        (i) => {
+          'id': 'person_bulk_${i.toString().padLeft(3, '0')}',
+          'name': 'Pessoa Bulk $i',
+          'phone': '119000000$i',
+          'first_contact_at': fixedTimestamp,
+          'status': 'interessado',
+          'tags': '[]',
+          'general_notes': 'Nota $i',
+          'created_at': fixedTimestamp,
+          'updated_at': fixedTimestamp,
+          'revision': 1,
+        },
+      );
+
+      final mockClient = MockClient((request) async {
+        final path = request.url.path;
+        if (path.contains('/rest/v1/people')) {
+          final offsetParam = request.url.queryParameters['offset'];
+          final limitParam = request.url.queryParameters['limit'];
+          int from = 0;
+          int count = 100;
+          if (offsetParam != null && limitParam != null) {
+            from = int.parse(offsetParam);
+            count = int.parse(limitParam);
+          } else {
+            final rangeHeader =
+                request.headers['range'] ?? request.headers['Range'] ?? '';
+            final match = RegExp(r'(\d+)-(\d+)').firstMatch(rangeHeader);
+            from = match != null ? int.parse(match.group(1)!) : 0;
+            final to = match != null ? int.parse(match.group(2)!) : 99;
+            count = to - from + 1;
+          }
+
+          final pageItems = allRemotePeople.skip(from).take(count).toList();
+          final end = pageItems.isEmpty ? from : from + pageItems.length - 1;
+          return mockJsonResponse(
+            request,
+            pageItems,
+            contentRange: '$from-$end/120',
+          );
+        }
+        return mockJsonResponse(request, []);
+      });
+
+      final customSync = SupabaseSyncService(
+        db: db,
+        repository: repo,
+        clientOverride: SupabaseClient(
+          'https://mock.supabase.co',
+          'dummy-key-xyz',
+          httpClient: mockClient,
+        ),
+        documentsDirectoryProvider: () async => tempDir.path,
+      );
+
+      final res = await customSync.fetchRemoteChanges();
+      expect(res.totalProcessed, equals(120));
+      expect(res.successCount, equals(120));
+
+      final allPeople = await db.select(db.people).get();
+      expect(allPeople.length, equals(120));
+
+      final kvRow = await (db.select(
+        db.appKvStore,
+      )..where((t) => t.key.equals('last_synced_at_people'))).getSingleOrNull();
+      expect(kvRow, isNotNull);
+      expect(kvRow!.value, equals(fixedTimestamp));
+    });
+
+    test('TC-SYNC-ADV-02: Upload de áudio não confirmado mantém operação na fila como failed sem marcar sucesso', () async {
+      final now = DateTime.now().toUtc();
+      final person = await repo.createPerson(name: 'Irmão com Falha de Áudio');
+
+      final audioDir = Directory(p.join(tempDir.path, 'voice_notes'));
+      await audioDir.create(recursive: true);
+      final audioFile = File(p.join(audioDir.path, 'failing_audio.m4a'));
+      await audioFile.writeAsBytes(utf8.encode('AUDIO_DATA'));
+
+      await db
+          .into(db.voiceNotes)
+          .insert(
+            VoiceNotesCompanion.insert(
+              id: 'vn_failing_upload',
+              personId: person.id,
+              transcription: 'Transcrição',
+              audioFilePath: drift.Value(audioFile.path),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: 'q_vn_fail_upload',
+              entityType: 'voice_notes',
+              entityId: 'vn_failing_upload',
+              operation: 'INSERT',
+              payload: jsonEncode({
+                'id': 'vn_failing_upload',
+                'personId': person.id,
+                'transcription': 'Transcrição',
+                'createdAt': now.toIso8601String(),
+                'updatedAt': now.toIso8601String(),
+              }),
+              createdAt: now,
+              status: const drift.Value('pending'),
+            ),
+          );
+
+      final mockClient = MockClient((request) async {
+        final path = request.url.path;
+        // Metadados são aceitos pelo PostgREST
+        if (path.contains('/rest/v1/voice_notes')) {
+          return mockJsonResponse(request, []);
+        }
+        // Storage simula falha 500 no upload do arquivo binário
+        if (path.contains('/storage/v1/object/voice_notes')) {
+          return http.Response('Internal Storage Error', 500);
+        }
+        return mockJsonResponse(request, []);
+      });
+
+      final customSync = SupabaseSyncService(
+        db: db,
+        repository: repo,
+        clientOverride: SupabaseClient(
+          'https://mock.supabase.co',
+          'dummy-key-xyz',
+          httpClient: mockClient,
+        ),
+        documentsDirectoryProvider: () async => tempDir.path,
+      );
+
+      final result = await customSync.processQueue();
+      expect(result.failureCount, equals(1));
+      expect(
+        result.successCount,
+        equals(1),
+      ); // Person criada no setUp passou, nota de voz falhou
+
+      // VERIFICAÇÃO CRÍTICA:
+      // A operação da nota de voz NÃO PODE ter sido marcada como synced!
+      final opInDb = await (db.select(
+        db.syncQueue,
+      )..where((t) => t.id.equals('q_vn_fail_upload'))).getSingle();
+      expect(opInDb.status, equals('failed'));
+      expect(opInDb.attempts, equals(1));
+      expect(opInDb.lastError, contains('Falha no upload do arquivo binário'));
+    });
+
+    test('TC-SYNC-ADV-03: Download de áudio pendente é registrado e recuperável via retryPendingMediaDownloads', () async {
+      final now = DateTime.now().toUtc();
+      final person = await repo.createPerson(name: 'Irmão com Áudio Pendente');
+
+      bool allowDownload = false;
+
+      final mockClient = MockClient((request) async {
+        final path = request.url.path;
+        if (path.contains('/rest/v1/voice_notes')) {
+          return mockJsonResponse(request, [
+            {
+              'id': 'vn_pending_dl_1',
+              'person_id': person.id,
+              'transcription': 'Transcrição pendente',
+              'created_at': now.toIso8601String(),
+              'updated_at': now.toIso8601String(),
+              'revision': 1,
+            },
+          ], contentRange: '0-0/1');
+        }
+        if (path.contains(
+          '/storage/v1/object/voice_notes/vn_pending_dl_1.m4a',
+        )) {
+          if (!allowDownload) {
+            return http.Response('Network timeout on audio', 504);
+          } else {
+            return mockBinaryResponse(
+              request,
+              utf8.encode('AUDIO_RECOVERED_BYTES_999'),
+              contentType: 'audio/m4a',
+            );
+          }
+        }
+        return mockJsonResponse(request, []);
+      });
+
+      final customSync = SupabaseSyncService(
+        db: db,
+        repository: repo,
+        clientOverride: SupabaseClient(
+          'https://mock.supabase.co',
+          'dummy-key-xyz',
+          httpClient: mockClient,
+        ),
+        documentsDirectoryProvider: () async => tempDir.path,
+      );
+
+      // 1. Pull inicial: metadado chega, mas download do áudio falha com 504
+      final pullRes = await customSync.fetchRemoteChanges();
+      expect(pullRes.successCount, greaterThanOrEqualTo(1));
+
+      // Verifica que o registro de pendência foi gravado no AppKvStore
+      final pendingKey =
+          await (db.select(db.appKvStore)..where(
+                (t) => t.key.equals('pending_audio_download_vn_pending_dl_1'),
+              ))
+              .getSingleOrNull();
+      expect(pendingKey, isNotNull);
+
+      // Nota de voz local ainda não possui caminho de áudio
+      final noteBefore = await (db.select(
+        db.voiceNotes,
+      )..where((t) => t.id.equals('vn_pending_dl_1'))).getSingle();
+      expect(noteBefore.audioFilePath, isNull);
+
+      // 2. Conexão restabelecida: autoriza download e executa retryPendingMediaDownloads
+      allowDownload = true;
+      final recoveredCount = await customSync.retryPendingMediaDownloads();
+      expect(recoveredCount, equals(1));
+
+      // 3. Verifica que o arquivo físico existe e a pendência foi removida
+      final noteAfter = await (db.select(
+        db.voiceNotes,
+      )..where((t) => t.id.equals('vn_pending_dl_1'))).getSingle();
+      expect(noteAfter.audioFilePath, isNotNull);
+      expect(File(noteAfter.audioFilePath!).existsSync(), isTrue);
+
+      final pendingKeyAfter =
+          await (db.select(db.appKvStore)..where(
+                (t) => t.key.equals('pending_audio_download_vn_pending_dl_1'),
+              ))
+              .getSingleOrNull();
+      expect(pendingKeyAfter, isNull);
+    });
   });
 }

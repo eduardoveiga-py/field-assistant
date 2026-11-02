@@ -353,6 +353,26 @@ class AppRepository {
           revision: person.revision + 1,
         );
         await db.update(db.people).replace(updatePersonData);
+        await _recordSyncOperation(
+          entityType: 'people',
+          entityId: person.id,
+          operation: 'UPDATE',
+          payload: {
+            'id': updatePersonData.id,
+            'name': updatePersonData.name,
+            'phone': updatePersonData.phone,
+            'firstContactAt': updatePersonData.firstContactAt.toIso8601String(),
+            'lastContactAt': updatePersonData.lastContactAt?.toIso8601String(),
+            'nextActionAt': updatePersonData.nextActionAt?.toIso8601String(),
+            'nextActionNote': updatePersonData.nextActionNote,
+            'status': updatePersonData.status,
+            'tags': updatePersonData.tags,
+            'generalNotes': updatePersonData.generalNotes,
+            'revision': updatePersonData.revision,
+            'updatedAt': now.toIso8601String(),
+          },
+          baseData: person.toJson(),
+        );
       }
 
       await _recordSyncOperation(
