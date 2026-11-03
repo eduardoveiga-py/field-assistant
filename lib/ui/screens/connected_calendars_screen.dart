@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -50,15 +51,18 @@ class _ConnectedCalendarsScreenState
       gSelectedId = await coordinator.googleProvider.getSelectedCalendarId();
     }
 
-    // Apple state
-    final aAuth = await coordinator.appleProvider.isAuthorized();
+    // Apple state (somente executado em plataformas com suporte nativo)
+    bool aAuth = false;
     String? aAcc;
     List<ExternalCalendarItem> aCals = [];
     String? aSelectedId;
-    if (aAuth) {
-      aAcc = await coordinator.appleProvider.getConnectedAccountName();
-      aCals = await coordinator.appleProvider.getAvailableCalendars();
-      aSelectedId = await coordinator.appleProvider.getSelectedCalendarId();
+    if (!kIsWeb) {
+      aAuth = await coordinator.appleProvider.isAuthorized();
+      if (aAuth) {
+        aAcc = await coordinator.appleProvider.getConnectedAccountName();
+        aCals = await coordinator.appleProvider.getAvailableCalendars();
+        aSelectedId = await coordinator.appleProvider.getSelectedCalendarId();
+      }
     }
 
     final pendingConflicts = await coordinator.getPendingConflicts();
@@ -106,12 +110,52 @@ class _ConnectedCalendarsScreenState
   }
 
   Future<void> _connectGoogle() async {
-    final coordinator = ref.read(calendarSyncCoordinatorProvider);
-    final authorized = await coordinator.googleProvider.requestAuthorization();
-    if (authorized) {
-      await _syncNow();
+    setState(() {
+      _isSyncing = true;
+      _syncMessage = null;
+    });
+
+    try {
+      final coordinator = ref.read(calendarSyncCoordinatorProvider);
+      final authorized = await coordinator.googleProvider
+          .requestAuthorization();
+      if (authorized) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Conta Google conectada com sucesso!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+        await _syncNow();
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Não foi possível conectar ao Google Calendar. Verifique a autenticação e tente novamente.',
+              ),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao conectar ao Google Agenda: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSyncing = false);
+        await _loadState();
+      }
     }
-    await _loadState();
   }
 
   Future<void> _disconnectGoogle() async {
@@ -142,22 +186,85 @@ class _ConnectedCalendarsScreenState
     if (confirmed == true) {
       final coordinator = ref.read(calendarSyncCoordinatorProvider);
       await coordinator.googleProvider.disconnect();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Google Calendar desconectado.')),
+        );
+      }
       await _loadState();
     }
   }
 
   Future<void> _connectApple() async {
-    final coordinator = ref.read(calendarSyncCoordinatorProvider);
-    final authorized = await coordinator.appleProvider.requestAuthorization();
-    if (authorized) {
-      await _syncNow();
+    if (kIsWeb) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'A sincronização com calendário nativo/Apple Calendar só está disponível em dispositivos iOS e macOS.',
+          ),
+          backgroundColor: Colors.blueGrey,
+        ),
+      );
+      return;
     }
-    await _loadState();
+
+    setState(() {
+      _isSyncing = true;
+      _syncMessage = null;
+    });
+
+    try {
+      final coordinator = ref.read(calendarSyncCoordinatorProvider);
+      final authorized = await coordinator.appleProvider.requestAuthorization();
+      if (authorized) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Acesso ao calendário do dispositivo autorizado!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+        await _syncNow();
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Permissão de acesso ao calendário negada pelo usuário.',
+              ),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao autorizar calendário: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSyncing = false);
+        await _loadState();
+      }
+    }
   }
 
   Future<void> _disconnectApple() async {
     final coordinator = ref.read(calendarSyncCoordinatorProvider);
     await coordinator.appleProvider.disconnect();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Calendário do dispositivo desvinculado.'),
+        ),
+      );
+    }
     await _loadState();
   }
 
@@ -548,15 +655,19 @@ class _ConnectedCalendarsScreenState
                               ),
                             ),
                             Text(
-                              _isAppleAuthorized
-                                  ? (_appleAccount ?? 'Acesso Autorizado')
-                                  : 'Não autorizado',
+                              kIsWeb
+                                  ? 'Disponível no app iOS / macOS'
+                                  : (_isAppleAuthorized
+                                        ? (_appleAccount ?? 'Acesso Autorizado')
+                                        : 'Não autorizado'),
                               style: TextStyle(
                                 fontSize: 13,
-                                color: _isAppleAuthorized
-                                    ? Colors.green[700]
-                                    : Colors.grey,
-                                fontWeight: _isAppleAuthorized
+                                color: kIsWeb
+                                    ? Colors.grey
+                                    : (_isAppleAuthorized
+                                          ? Colors.green[700]
+                                          : Colors.grey),
+                                fontWeight: (!kIsWeb && _isAppleAuthorized)
                                     ? FontWeight.w600
                                     : FontWeight.normal,
                               ),
@@ -564,7 +675,26 @@ class _ConnectedCalendarsScreenState
                           ],
                         ),
                       ),
-                      if (_isAppleAuthorized)
+                      if (kIsWeb)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text(
+                            'Apenas iOS',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        )
+                      else if (_isAppleAuthorized)
                         OutlinedButton(
                           onPressed: _disconnectApple,
                           child: const Text('Desvincular'),
@@ -577,7 +707,20 @@ class _ConnectedCalendarsScreenState
                         ),
                     ],
                   ),
-                  if (_isAppleAuthorized && _appleCalendars.isNotEmpty) ...[
+                  if (kIsWeb) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      'No navegador Web, utilize a integração com Google Calendar ou importe/exporte arquivos .ics na tela da Agenda.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).textTheme.bodySmall?.color
+                            ?.withValues(alpha: 0.7),
+                      ),
+                    ),
+                  ],
+                  if (!kIsWeb &&
+                      _isAppleAuthorized &&
+                      _appleCalendars.isNotEmpty) ...[
                     const Divider(height: 24),
                     const Text(
                       'Calendário Selecionado no Dispositivo:',

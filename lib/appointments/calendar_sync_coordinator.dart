@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart' as drift;
 
@@ -44,15 +45,20 @@ class CalendarSyncCoordinator {
   final AppDatabase db;
   final GoogleCalendarProvider googleProvider;
   final AppleEventKitProvider appleProvider;
+  final bool _isWebPlatform;
 
   CalendarSyncCoordinator(
     this.db, {
     GoogleCalendarProvider? google,
     AppleEventKitProvider? apple,
-  }) : googleProvider = google ?? GoogleCalendarProvider(),
-       appleProvider = apple ?? AppleEventKitProvider();
+    bool? isWebPlatform,
+  }) : _isWebPlatform = isWebPlatform ?? kIsWeb,
+       googleProvider = google ?? GoogleCalendarProvider(),
+       appleProvider =
+           apple ?? AppleEventKitProvider(isWebPlatform: isWebPlatform);
 
-  List<CalendarProvider> get allProviders => [googleProvider, appleProvider];
+  List<CalendarProvider> get allProviders =>
+      _isWebPlatform ? [googleProvider] : [googleProvider, appleProvider];
 
   CalendarProvider? getProviderByName(String providerName) {
     if (providerName == 'google') return googleProvider;

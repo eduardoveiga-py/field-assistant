@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:device_calendar/device_calendar.dart' as dev_cal;
 import 'package:drift/drift.dart' as drift;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:uuid/uuid.dart';
@@ -11,9 +12,21 @@ import '../database/app_database.dart';
 import 'calendar_provider.dart';
 
 class AppleEventKitProvider implements CalendarProvider {
-  final dev_cal.DeviceCalendarPlugin _deviceCalendarPlugin;
+  final dev_cal.DeviceCalendarPlugin? _injectedPlugin;
+  dev_cal.DeviceCalendarPlugin? _pluginInstance;
   final FlutterSecureStorage _secureStorage;
   final Uuid _uuid = const Uuid();
+  final bool _isWebPlatform;
+
+  dev_cal.DeviceCalendarPlugin get _deviceCalendarPlugin {
+    if (_isWebPlatform) {
+      throw UnsupportedError(
+        'DeviceCalendarPlugin não pode ser acessado na plataforma Web.',
+      );
+    }
+    return _injectedPlugin ??
+        (_pluginInstance ??= dev_cal.DeviceCalendarPlugin());
+  }
 
   static const String _keySelectedCalendarId = 'apple_eventkit_selected_id';
 
@@ -49,15 +62,17 @@ class AppleEventKitProvider implements CalendarProvider {
   AppleEventKitProvider({
     dev_cal.DeviceCalendarPlugin? deviceCalendarPlugin,
     FlutterSecureStorage? secureStorage,
-  }) : _deviceCalendarPlugin =
-           deviceCalendarPlugin ?? dev_cal.DeviceCalendarPlugin(),
-       _secureStorage = secureStorage ?? const FlutterSecureStorage();
+    bool? isWebPlatform,
+  }) : _injectedPlugin = deviceCalendarPlugin,
+       _secureStorage = secureStorage ?? const FlutterSecureStorage(),
+       _isWebPlatform = isWebPlatform ?? kIsWeb;
 
   @override
   CalendarProviderType get providerType => CalendarProviderType.appleEventKit;
 
   @override
   Future<bool> isAuthorized() async {
+    if (_isWebPlatform) return false;
     try {
       final permissions = await _deviceCalendarPlugin.hasPermissions();
       return permissions.isSuccess && (permissions.data ?? false);
@@ -68,6 +83,7 @@ class AppleEventKitProvider implements CalendarProvider {
 
   @override
   Future<bool> requestAuthorization() async {
+    if (_isWebPlatform) return false;
     try {
       final res = await _deviceCalendarPlugin.requestPermissions();
       return res.isSuccess && (res.data ?? false);
@@ -78,6 +94,7 @@ class AppleEventKitProvider implements CalendarProvider {
 
   @override
   Future<String?> getConnectedAccountName() async {
+    if (_isWebPlatform) return null;
     final calendars = await getAvailableCalendars();
     final selectedId = await getSelectedCalendarId();
     if (selectedId != null) {
@@ -91,6 +108,7 @@ class AppleEventKitProvider implements CalendarProvider {
 
   @override
   Future<List<ExternalCalendarItem>> getAvailableCalendars() async {
+    if (_isWebPlatform) return [];
     try {
       final authorized = await isAuthorized();
       if (!authorized) return [];
@@ -113,16 +131,19 @@ class AppleEventKitProvider implements CalendarProvider {
 
   @override
   Future<String?> getSelectedCalendarId() async {
+    if (_isWebPlatform) return null;
     return await _secureStorage.read(key: _keySelectedCalendarId);
   }
 
   @override
   Future<void> setSelectedCalendarId(String calendarId) async {
+    if (_isWebPlatform) return;
     await _secureStorage.write(key: _keySelectedCalendarId, value: calendarId);
   }
 
   @override
   Future<void> disconnect() async {
+    if (_isWebPlatform) return;
     await _secureStorage.delete(key: _keySelectedCalendarId);
   }
 
@@ -131,6 +152,12 @@ class AppleEventKitProvider implements CalendarProvider {
     required AppDatabase db,
     bool fullSync = false,
   }) async {
+    if (_isWebPlatform) {
+      return CalendarSyncResult(
+        success: false,
+        errorMessage: 'Apple Calendar / Calendário nativo não é suportado no ambiente Web.',
+      );
+    }
     try {
       final authorized = await isAuthorized();
       if (!authorized) {
@@ -307,6 +334,7 @@ class AppleEventKitProvider implements CalendarProvider {
     AppDatabase db,
     AppointmentEntry appointment,
   ) async {
+    if (_isWebPlatform) return null;
     try {
       if (!await isAuthorized()) return null;
       final calendarId = await getSelectedCalendarId();
@@ -443,6 +471,7 @@ class AppleEventKitProvider implements CalendarProvider {
     AppDatabase db,
     String externalEventId,
   ) async {
+    if (_isWebPlatform) return false;
     try {
       final calendarId = await getSelectedCalendarId();
       if (calendarId == null) return false;

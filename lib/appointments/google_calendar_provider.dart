@@ -39,6 +39,7 @@ class GoogleCalendarProvider implements CalendarProvider {
 
   GoogleSignInAccount? _currentUser;
   bool _initialized = false;
+  Map<String, String>? _webAuthHeaders;
 
   GoogleCalendarProvider({
     GoogleSignIn? googleSignIn,
@@ -61,8 +62,22 @@ class GoogleCalendarProvider implements CalendarProvider {
   Future<bool> isAuthorized() async {
     try {
       await _ensureInitialized();
-      _currentUser ??= await _googleSignIn.attemptLightweightAuthentication();
-      return _currentUser != null;
+      if (_googleSignIn.supportsAuthenticate()) {
+        _currentUser ??= await _googleSignIn.attemptLightweightAuthentication();
+        return _currentUser != null;
+      } else {
+        if (_webAuthHeaders != null) return true;
+        final auth = await _googleSignIn.authorizationClient
+            .authorizationForScopes([_calendarScope]);
+        if (auth != null) {
+          _webAuthHeaders = {
+            'Authorization': 'Bearer ${auth.accessToken}',
+            'X-Goog-AuthUser': '0',
+          };
+          return true;
+        }
+        return false;
+      }
     } catch (_) {
       return false;
     }
@@ -72,10 +87,20 @@ class GoogleCalendarProvider implements CalendarProvider {
   Future<bool> requestAuthorization() async {
     try {
       await _ensureInitialized();
-      _currentUser = await _googleSignIn.authenticate(
-        scopeHint: [_calendarScope],
-      );
-      return _currentUser != null;
+      if (_googleSignIn.supportsAuthenticate()) {
+        _currentUser = await _googleSignIn.authenticate(
+          scopeHint: [_calendarScope],
+        );
+        return _currentUser != null;
+      } else {
+        final clientAuth = await _googleSignIn.authorizationClient
+            .authorizeScopes([_calendarScope]);
+        _webAuthHeaders = {
+          'Authorization': 'Bearer ${clientAuth.accessToken}',
+          'X-Goog-AuthUser': '0',
+        };
+        return true;
+      }
     } catch (_) {
       return false;
     }
@@ -83,24 +108,36 @@ class GoogleCalendarProvider implements CalendarProvider {
 
   @override
   Future<String?> getConnectedAccountName() async {
-    if (_currentUser == null) {
+    if (_currentUser == null && _webAuthHeaders == null) {
       await isAuthorized();
     }
-    return _currentUser?.email;
+    return _currentUser?.email ??
+        (_webAuthHeaders != null ? 'Conta Google' : null);
   }
 
   Future<gcal.CalendarApi?> _getCalendarApi() async {
-    if (_currentUser == null) {
-      await isAuthorized();
-      if (_currentUser == null) {
-        final authorized = await requestAuthorization();
-        if (!authorized || _currentUser == null) return null;
-      }
+    final authorized = await isAuthorized();
+    if (!authorized) {
+      final reqAuth = await requestAuthorization();
+      if (!reqAuth) return null;
     }
 
     try {
-      final headers = await _currentUser!.authorizationClient
-          .authorizationHeaders([_calendarScope], promptIfNecessary: true);
+      Map<String, String>? headers;
+      if (_currentUser != null) {
+        headers = await _currentUser!.authorizationClient.authorizationHeaders([
+          _calendarScope,
+        ], promptIfNecessary: true);
+      } else if (_webAuthHeaders != null) {
+        headers = _webAuthHeaders;
+      } else {
+        final clientAuth = await _googleSignIn.authorizationClient
+            .authorizeScopes([_calendarScope]);
+        headers = {
+          'Authorization': 'Bearer ${clientAuth.accessToken}',
+          'X-Goog-AuthUser': '0',
+        };
+      }
       if (headers == null) return null;
       final authClient = _AuthenticatedClient(headers);
       return gcal.CalendarApi(authClient);
@@ -155,6 +192,7 @@ class GoogleCalendarProvider implements CalendarProvider {
       await _googleSignIn.signOut();
     } catch (_) {}
     _currentUser = null;
+    _webAuthHeaders = null;
     await _secureStorage.delete(key: _keySelectedCalendarId);
   }
 
