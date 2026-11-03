@@ -96,6 +96,8 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
       0.0,
     );
 
+    TileCacheService.instance.cancelZoomExcept(targetZoom);
+
     setState(() {
       _zoom = targetZoom;
     });
@@ -231,6 +233,19 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
 
     final pinX = _lon2pixelX(_selectedLng, _zoom) - originPx;
     final pinY = _lat2pixelY(_selectedLat, _zoom) - originPy;
+
+    // Prioriza blocos do centro para fora
+    final tileCoords = <({int x, int y})>[];
+    for (int tx = minTileX; tx <= maxTileX; tx++) {
+      for (int ty = minTileY; ty <= maxTileY; ty++) {
+        tileCoords.add((x: tx, y: ty));
+      }
+    }
+    tileCoords.sort((a, b) {
+      final distA = (a.x - centerTileX).abs() + (a.y - centerTileY).abs();
+      final distB = (b.x - centerTileX).abs() + (b.y - centerTileY).abs();
+      return distA.compareTo(distB);
+    });
 
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
@@ -438,34 +453,35 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
                                     : const Color(0xFFF1F5F9),
                                 child: Stack(
                                   children: [
-                                    // Tiles do OpenStreetMap com suporte a cache offline móvel
-                                    for (
-                                      int tx = minTileX;
-                                      tx <= maxTileX;
-                                      tx++
-                                    )
-                                      for (
-                                        int ty = minTileY;
-                                        ty <= maxTileY;
-                                        ty++
-                                      )
-                                        Positioned(
-                                          key: ValueKey(
-                                            'picker_tile_pos_${_zoom}_${tx}_$ty',
-                                          ),
-                                          left: (tx - minTileX) * _tileSize,
-                                          top: (ty - minTileY) * _tileSize,
-                                          child: CachedTileWidget(
-                                            key: ValueKey(
-                                              'picker_tile_${_zoom}_${tx}_$ty',
+                                    // Tiles do OpenStreetMap com suporte a cache offline móvel isolados em RepaintBoundary
+                                    RepaintBoundary(
+                                      child: Stack(
+                                        children: [
+                                          for (final coord in tileCoords)
+                                            Positioned(
+                                              key: ValueKey(
+                                                'picker_tile_pos_${_zoom}_${coord.x}_${coord.y}',
+                                              ),
+                                              left:
+                                                  (coord.x - minTileX) *
+                                                  _tileSize,
+                                              top:
+                                                  (coord.y - minTileY) *
+                                                  _tileSize,
+                                              child: CachedTileWidget(
+                                                key: ValueKey(
+                                                  'picker_tile_${_zoom}_${coord.x}_${coord.y}',
+                                                ),
+                                                z: _zoom,
+                                                x: coord.x,
+                                                y: coord.y,
+                                                size: _tileSize,
+                                                isDark: isDark,
+                                              ),
                                             ),
-                                            z: _zoom,
-                                            x: tx,
-                                            y: ty,
-                                            size: _tileSize,
-                                            isDark: isDark,
-                                          ),
-                                        ),
+                                        ],
+                                      ),
+                                    ),
 
                                     // Pino da Casa / Localização Selecionada
                                     Positioned(

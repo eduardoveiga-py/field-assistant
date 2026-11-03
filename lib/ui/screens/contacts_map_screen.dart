@@ -48,6 +48,8 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
   bool _hasCenteredHighlightPerson = false;
   int _zoom = 15;
   static const double _tileSize = 256.0;
+  static const int _gridHalfSize =
+      5; // 11x11 blocos = 2816x2816 px (otimizado para fluidez a 60fps)
   DateTime? _lastZoomChangeTime;
 
   @override
@@ -115,11 +117,10 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
     final focalLat = _pixelY2lat(worldPy, _zoom);
 
     // Reprojeção para novo nível de resolução 'z'
-    const int gridHalfSize = 7;
     final newCenterTileX = _lon2tileX(centerLng, targetZoom);
     final newCenterTileY = _lat2tileY(centerLat, targetZoom);
-    final newMinTileX = newCenterTileX - gridHalfSize;
-    final newMinTileY = newCenterTileY - gridHalfSize;
+    final newMinTileX = newCenterTileX - _gridHalfSize;
+    final newMinTileY = newCenterTileY - _gridHalfSize;
     final newOriginPx = newMinTileX * _tileSize;
     final newOriginPy = newMinTileY * _tileSize;
 
@@ -129,8 +130,8 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
     final newCanvasX = newWorldPx - newOriginPx;
     final newCanvasY = newWorldPy - newOriginPy;
 
-    final canvasWidth = (gridHalfSize * 2 + 1) * _tileSize;
-    final canvasHeight = (gridHalfSize * 2 + 1) * _tileSize;
+    final canvasWidth = (_gridHalfSize * 2 + 1) * _tileSize;
+    final canvasHeight = (_gridHalfSize * 2 + 1) * _tileSize;
     final newDx = ((viewportW / 2.0) - newCanvasX).clamp(
       viewportW - canvasWidth,
       0.0,
@@ -139,6 +140,8 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
       viewportH - canvasHeight,
       0.0,
     );
+
+    TileCacheService.instance.cancelZoomExcept(targetZoom);
 
     setState(() {
       _zoom = targetZoom;
@@ -1381,18 +1384,17 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
     final centerTileX = _lon2tileX(centerLng, _zoom);
     final centerTileY = _lat2tileY(centerLat, _zoom);
 
-    // Grade ampla (15x15 blocos = 3840x3840 px) que cobre 100% da tela em qualquer dispositivo móvel, tablet ou desktop
-    const int gridHalfSize = 7;
-    final minTileX = centerTileX - gridHalfSize;
-    final maxTileX = centerTileX + gridHalfSize;
-    final minTileY = centerTileY - gridHalfSize;
-    final maxTileY = centerTileY + gridHalfSize;
+    // Grade otimizada (11x11 blocos = 2816x2816 px) que cobre 100% da tela em qualquer dispositivo móvel, tablet ou desktop
+    final minTileX = centerTileX - _gridHalfSize;
+    final maxTileX = centerTileX + _gridHalfSize;
+    final minTileY = centerTileY - _gridHalfSize;
+    final maxTileY = centerTileY + _gridHalfSize;
 
     final originPx = minTileX * _tileSize;
     final originPy = minTileY * _tileSize;
 
-    final canvasWidth = (gridHalfSize * 2 + 1) * _tileSize;
-    final canvasHeight = (gridHalfSize * 2 + 1) * _tileSize;
+    final canvasWidth = (_gridHalfSize * 2 + 1) * _tileSize;
+    final canvasHeight = (_gridHalfSize * 2 + 1) * _tileSize;
 
     final centerPx = _lon2pixelX(centerLng, _zoom) - originPx;
     final centerPy = _lat2pixelY(centerLat, _zoom) - originPy;
@@ -1442,6 +1444,36 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
             }
           });
         }
+
+        // Calcula o centro focal do viewport atual (onde os olhos do usuário estão agora)
+        final currentMatrix = _transformationController.value;
+        final currentScale = currentMatrix.getMaxScaleOnAxis();
+        final effectiveScale = currentScale > 0.01 ? currentScale : 1.0;
+        final curDx = currentMatrix.storage[12];
+        final curDy = currentMatrix.storage[13];
+        final viewportW = constraints.maxWidth > 0
+            ? constraints.maxWidth
+            : 400.0;
+        final viewportH = constraints.maxHeight > 0
+            ? constraints.maxHeight
+            : 600.0;
+        final canvasCenterX = ((viewportW / 2.0) - curDx) / effectiveScale;
+        final canvasCenterY = ((viewportH / 2.0) - curDy) / effectiveScale;
+        final focalTileX = minTileX + (canvasCenterX / _tileSize).floor();
+        final focalTileY = minTileY + (canvasCenterY / _tileSize).floor();
+
+        // Prioriza blocos do foco do viewport para fora: a área visível carrega imediatamente
+        final tileCoords = <({int x, int y})>[];
+        for (int tx = minTileX; tx <= maxTileX; tx++) {
+          for (int ty = minTileY; ty <= maxTileY; ty++) {
+            tileCoords.add((x: tx, y: ty));
+          }
+        }
+        tileCoords.sort((a, b) {
+          final distA = (a.x - focalTileX).abs() + (a.y - focalTileY).abs();
+          final distB = (b.x - focalTileX).abs() + (b.y - focalTileY).abs();
+          return distA.compareTo(distB);
+        });
 
         return Stack(
           children: [
@@ -1540,47 +1572,68 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                           : const Color(0xFFF1F5F9),
                       child: Stack(
                         children: [
-                          // Camada de Tiles do OpenStreetMap com suporte a cache offline móvel
-                          for (int tx = minTileX; tx <= maxTileX; tx++)
-                            for (int ty = minTileY; ty <= maxTileY; ty++)
-                              Positioned(
-                                key: ValueKey('tile_pos_${_zoom}_${tx}_$ty'),
-                                left: (tx - minTileX) * _tileSize,
-                                top: (ty - minTileY) * _tileSize,
-                                child: CachedTileWidget(
-                                  key: ValueKey('tile_${_zoom}_${tx}_$ty'),
-                                  z: _zoom,
-                                  x: tx,
-                                  y: ty,
-                                  size: _tileSize,
-                                  isDark: isDark,
-                                ),
-                              ),
+                          // Camada de Tiles do OpenStreetMap isolada em RepaintBoundary para movimentação a 60fps sem repintura
+                          RepaintBoundary(
+                            child: Stack(
+                              children: [
+                                for (final coord in tileCoords)
+                                  Positioned(
+                                    key: ValueKey(
+                                      'tile_pos_${_zoom}_${coord.x}_${coord.y}',
+                                    ),
+                                    left: (coord.x - minTileX) * _tileSize,
+                                    top: (coord.y - minTileY) * _tileSize,
+                                    child: CachedTileWidget(
+                                      key: ValueKey(
+                                        'tile_${_zoom}_${coord.x}_${coord.y}',
+                                      ),
+                                      z: _zoom,
+                                      x: coord.x,
+                                      y: coord.y,
+                                      size: _tileSize,
+                                      isDark: isDark,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
 
                           // Renderização dos Marcos / Pontos de Referência geolocalizados
                           if (_showLandmarks)
-                            for (int i = 0; i < geoLandmarks.length; i++)
-                              _buildLandmarkPin(
-                                geoLandmarks[i],
-                                i,
-                                geoLandmarks.length,
-                                originPx: originPx,
-                                originPy: originPy,
-                                canvasWidth: canvasWidth,
-                                canvasHeight: canvasHeight,
+                            RepaintBoundary(
+                              child: Stack(
+                                children: [
+                                  for (int i = 0; i < geoLandmarks.length; i++)
+                                    _buildLandmarkPin(
+                                      geoLandmarks[i],
+                                      i,
+                                      geoLandmarks.length,
+                                      originPx: originPx,
+                                      originPy: originPy,
+                                      canvasWidth: canvasWidth,
+                                      canvasHeight: canvasHeight,
+                                    ),
+                                ],
                               ),
+                            ),
 
                           // Renderização de cada pino de contato com coordenadas válidas (destacado por último)
-                          for (int i = 0; i < orderedContacts.length; i++)
-                            _buildMapPin(
-                              orderedContacts[i],
-                              i,
-                              orderedContacts.length,
-                              originPx: originPx,
-                              originPy: originPy,
-                              canvasWidth: canvasWidth,
-                              canvasHeight: canvasHeight,
+                          RepaintBoundary(
+                            child: Stack(
+                              children: [
+                                for (int i = 0; i < orderedContacts.length; i++)
+                                  _buildMapPin(
+                                    orderedContacts[i],
+                                    i,
+                                    orderedContacts.length,
+                                    originPx: originPx,
+                                    originPy: originPy,
+                                    canvasWidth: canvasWidth,
+                                    canvasHeight: canvasHeight,
+                                  ),
+                              ],
                             ),
+                          ),
                         ],
                       ),
                     ),

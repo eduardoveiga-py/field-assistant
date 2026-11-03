@@ -6,3 +6,8 @@ abstract class TileCacheBackend {
   Future<bool> isTileCached(int z, int x, int y);
   Future<int> getCachedTileCount();
 }
+
+abstract class TileCacheCancellable {
+  void cancelTile(int z, int x, int y);
+  void cancelZoomExcept(int currentZoom);
+}
