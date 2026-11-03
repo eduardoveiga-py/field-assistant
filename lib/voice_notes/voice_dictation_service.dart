@@ -128,6 +128,7 @@ class LocalVoiceDictationService implements VoiceDictationService {
     _currentTranscription = '';
 
     if (!availableOverride || failureReason != null) {
+      _isListening = false;
       onError?.call(
         failureReason ?? 'Reconhecimento de fala offline indisponível no dispositivo. Digite o resumo manualmente.',
       );

@@ -82,6 +82,7 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
   int _seconds = 0;
   bool _isPlayingAudio = false;
   bool _isSaving = false;
+  bool _isSaved = false;
   RecordingResult? _recordingResult;
   ParsedVoiceNote _parsedNote = const ParsedVoiceNote(rawText: '');
 
@@ -141,6 +142,10 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
   void dispose() {
     _durationSub?.cancel();
     _playerStateSub?.cancel();
+    if (!_isSaved) {
+      _recordingService.cancelRecording();
+      _dictationService.stopListening();
+    }
     if (widget.recordingService == null) {
       _recordingService.dispose();
     }
@@ -260,9 +265,10 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
     if (_isPlayingAudio) {
       _playerService.pause();
     } else {
-      _playerService.play(
-        _recordingResult?.filePath ?? 'simulated_voice_note.m4a',
-      );
+      final path = _recordingResult?.filePath;
+      if (path != null && path.isNotEmpty) {
+        _playerService.play(path);
+      }
     }
   }
 
@@ -307,6 +313,8 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
         result: _selectedResult,
         updateStudyProgress: _updateStudyProgress,
       );
+
+      _isSaved = true;
 
       if (mounted) {
         Navigator.of(context).pop();

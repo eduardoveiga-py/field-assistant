@@ -133,6 +133,16 @@ BEGIN
     END IF;
 END $$;
 
+-- ----------------------------------------------------------------------------
+-- 3. SUPORTE A STATUS DE CONFLITO EM APPOINTMENTS (AGENDA CONCORRENTE)
+-- ----------------------------------------------------------------------------
+-- Permite que compromissos sobrepostos pós-sincronização recebam status 'conflito'
+-- sem violar a restrição de verificação CHECK na tabela appointments do Supabase.
+ALTER TABLE public.appointments DROP CONSTRAINT IF EXISTS appointments_status_check;
+ALTER TABLE public.appointments ADD CONSTRAINT appointments_status_check CHECK (status IN (
+    'planejado', 'confirmado', 'realizado', 'cancelado', 'nao_realizado', 'reagendado', 'provisorio', 'conflito'
+));
+
 -- ============================================================================
 -- SCRIPT DE ROLLBACK / REVERSÃO (se necessário):
 -- ============================================================================

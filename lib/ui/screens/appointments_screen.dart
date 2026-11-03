@@ -1626,6 +1626,36 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                     ),
                   ],
                 ),
+                if (appt.status == 'conflito' || appt.isProvisional)
+                  Container(
+                    margin: const EdgeInsets.only(top: 8),
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppTheme.alertRed.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppTheme.alertRed, width: 1.2),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(
+                          Icons.warning_amber_rounded,
+                          color: AppTheme.alertRed,
+                          size: 20,
+                        ),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Conflito pós-sincronização: há outro compromisso no mesmo intervalo. Reagende para liberar o horário.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.alertRed,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 const Divider(height: 24),
                 ListTile(
                   leading: const Icon(
@@ -3671,23 +3701,72 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                                 ],
                               ),
                             ),
-                            title: Text(
-                              appt.title,
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                                decoration: isDone
-                                    ? TextDecoration.lineThrough
-                                    : null,
-                              ),
+                            title: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    appt.title,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                      decoration: isDone
+                                          ? TextDecoration.lineThrough
+                                          : null,
+                                    ),
+                                  ),
+                                ),
+                                if (appt.status == 'conflito' ||
+                                    appt.isProvisional)
+                                  Container(
+                                    margin: const EdgeInsets.only(left: 6),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color:
+                                          (appt.status == 'conflito'
+                                                  ? AppTheme.alertRed
+                                                  : AppTheme.alertAmber)
+                                              .withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(
+                                        color: appt.status == 'conflito'
+                                            ? AppTheme.alertRed
+                                            : AppTheme.alertAmber,
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      appt.status == 'conflito'
+                                          ? 'CONFLITO'
+                                          : 'PROVISÓRIO',
+                                      style: TextStyle(
+                                        color: appt.status == 'conflito'
+                                            ? AppTheme.alertRed
+                                            : AppTheme.alertAmber,
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
                             subtitle: Text(
-                              appt.locationNotes ?? 'Status: ${appt.status}',
+                              appt.status == 'conflito'
+                                  ? '⚠️ Conflito de horário detectado pós-sincronização'
+                                  : (appt.locationNotes ??
+                                        'Status: ${appt.status}'),
                               style: TextStyle(
                                 fontSize: 12,
-                                color: isDark
-                                    ? const Color(0xFF94A3B8)
-                                    : AppTheme.textMuted,
+                                color: appt.status == 'conflito'
+                                    ? AppTheme.alertRed
+                                    : (isDark
+                                          ? const Color(0xFF94A3B8)
+                                          : AppTheme.textMuted),
+                                fontWeight: appt.status == 'conflito'
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
                               ),
                             ),
                             trailing: IconButton(

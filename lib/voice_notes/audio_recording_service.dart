@@ -43,6 +43,7 @@ class RealAudioRecordingService implements AudioRecordingService {
   final AudioRecorder _audioRecorder = AudioRecorder();
   final Uuid _uuid = const Uuid();
   bool _isRecording = false;
+  bool _isCancelled = false;
   Timer? _timer;
   int _elapsedSeconds = 0;
   DateTime? _startedAt;
@@ -80,6 +81,11 @@ class RealAudioRecordingService implements AudioRecordingService {
 
   @override
   Future<String> startRecording({String? customPath}) async {
+    if (_stopFuture != null) {
+      try {
+        await _stopFuture;
+      } catch (_) {}
+    }
     if (_isRecording) {
       await cancelRecording();
     }
@@ -89,6 +95,7 @@ class RealAudioRecordingService implements AudioRecordingService {
       throw Exception('Permissão de gravação de áudio negada');
     }
 
+    _isCancelled = false;
     _elapsedSeconds = 0;
     _startedAt = DateTime.now();
     _stopFuture = null;
@@ -142,16 +149,23 @@ class RealAudioRecordingService implements AudioRecordingService {
 
   @override
   Future<RecordingResult?> stopRecording() async {
+    if (_isCancelled) {
+      return null;
+    }
     if (_stopFuture != null) {
       return _stopFuture;
     }
     if (!_isRecording) {
-      return _lastResult;
+      return _isCancelled ? null : _lastResult;
     }
 
     _stopFuture = _executeStop();
     try {
       final result = await _stopFuture;
+      if (_isCancelled) {
+        _lastResult = null;
+        return null;
+      }
       _lastResult = result;
       return result;
     } finally {
@@ -169,13 +183,17 @@ class RealAudioRecordingService implements AudioRecordingService {
       path = await _audioRecorder.stop();
     } catch (_) {}
 
+    if (_isCancelled) {
+      return null;
+    }
+
     path ??= _currentFilePath ?? 'voice_note_${_uuid.v4()}.m4a';
 
     final duration = Duration(seconds: _elapsedSeconds);
     final recordedAt = _startedAt ?? DateTime.now();
 
     int size = 0;
-    if (!kIsWeb) {
+    if (!kIsWeb && !path.startsWith('web_storage://')) {
       try {
         final file = File(path);
         if (file.existsSync()) {
@@ -197,18 +215,20 @@ class RealAudioRecordingService implements AudioRecordingService {
 
   @override
   Future<void> cancelRecording() async {
+    _isCancelled = true;
     _timer?.cancel();
     _timer = null;
     _isRecording = false;
     _elapsedSeconds = 0;
-    _stopFuture = null;
     _lastResult = null;
 
     try {
       await _audioRecorder.cancel();
     } catch (_) {}
 
-    if (_currentFilePath != null && !kIsWeb) {
+    if (_currentFilePath != null &&
+        !kIsWeb &&
+        !_currentFilePath!.startsWith('web_storage://')) {
       try {
         final file = File(_currentFilePath!);
         if (file.existsSync()) {
@@ -221,6 +241,9 @@ class RealAudioRecordingService implements AudioRecordingService {
 
   @override
   void dispose() {
+    if (_isRecording) {
+      unawaited(cancelRecording());
+    }
     _timer?.cancel();
     _timer = null;
     _durationController.close();
@@ -235,6 +258,7 @@ class RealAudioRecordingService implements AudioRecordingService {
 class LocalAudioRecordingService implements AudioRecordingService {
   final Uuid _uuid = const Uuid();
   bool _isRecording = false;
+  bool _isCancelled = false;
   Timer? _timer;
   int _elapsedSeconds = 0;
   DateTime? _startedAt;
@@ -259,10 +283,16 @@ class LocalAudioRecordingService implements AudioRecordingService {
 
   @override
   Future<String> startRecording({String? customPath}) async {
+    if (_stopFuture != null) {
+      try {
+        await _stopFuture;
+      } catch (_) {}
+    }
     if (_isRecording) {
       await cancelRecording();
     }
 
+    _isCancelled = false;
     _isRecording = true;
     _elapsedSeconds = 0;
     _startedAt = DateTime.now();
@@ -312,16 +342,23 @@ class LocalAudioRecordingService implements AudioRecordingService {
 
   @override
   Future<RecordingResult?> stopRecording() async {
+    if (_isCancelled) {
+      return null;
+    }
     if (_stopFuture != null) {
       return _stopFuture;
     }
     if (!_isRecording) {
-      return _lastResult;
+      return _isCancelled ? null : _lastResult;
     }
 
     _stopFuture = _executeStop();
     try {
       final result = await _stopFuture;
+      if (_isCancelled) {
+        _lastResult = null;
+        return null;
+      }
       _lastResult = result;
       return result;
     } finally {
@@ -334,16 +371,21 @@ class LocalAudioRecordingService implements AudioRecordingService {
     _timer = null;
     _isRecording = false;
 
+    if (_isCancelled) {
+      return null;
+    }
+
     final duration = Duration(seconds: _elapsedSeconds);
     final recordedAt = _startedAt ?? DateTime.now();
     final path = _currentFilePath ?? 'voice_note_${_uuid.v4()}.m4a';
 
     int size = 0;
-    if (!kIsWeb && path.startsWith('/')) {
+    if (!kIsWeb && !path.startsWith('web_storage://')) {
       try {
         final file = File(path);
         if (!file.existsSync()) {
           // Grava cabeçalho mínimo simulado para arquivo offline
+          await file.parent.create(recursive: true);
           await file.writeAsBytes(List<int>.filled(64, 0));
         }
         size = await file.length();
@@ -364,16 +406,16 @@ class LocalAudioRecordingService implements AudioRecordingService {
 
   @override
   Future<void> cancelRecording() async {
+    _isCancelled = true;
     _timer?.cancel();
     _timer = null;
     _isRecording = false;
     _elapsedSeconds = 0;
-    _stopFuture = null;
     _lastResult = null;
 
     if (_currentFilePath != null &&
         !kIsWeb &&
-        _currentFilePath!.startsWith('/')) {
+        !_currentFilePath!.startsWith('web_storage://')) {
       try {
         final file = File(_currentFilePath!);
         if (file.existsSync()) {
@@ -386,6 +428,9 @@ class LocalAudioRecordingService implements AudioRecordingService {
 
   @override
   void dispose() {
+    if (_isRecording) {
+      cancelRecording();
+    }
     _timer?.cancel();
     _timer = null;
     _durationController.close();
@@ -464,7 +509,10 @@ class RealAudioPlayerService implements AudioPlayerService {
   @override
   Future<void> pause() async {
     try {
-      await _player.pause();
+      await _player.pause().timeout(
+        const Duration(milliseconds: 250),
+        onTimeout: () {},
+      );
     } catch (_) {}
     _isPlaying = false;
     if (!_stateController.isClosed) _stateController.add(false);
@@ -473,7 +521,10 @@ class RealAudioPlayerService implements AudioPlayerService {
   @override
   Future<void> stop() async {
     try {
-      await _player.stop();
+      await _player.stop().timeout(
+        const Duration(milliseconds: 250),
+        onTimeout: () {},
+      );
     } catch (_) {}
     _isPlaying = false;
     if (!_stateController.isClosed) _stateController.add(false);

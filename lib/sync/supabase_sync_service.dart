@@ -471,7 +471,9 @@ class SupabaseSyncService with WidgetsBindingObserver {
             map['isProvisional'] == true ||
             map['is_provisional'] == true ||
             map['isProvisional'] == 1 ||
-            map['is_provisional'] == 1;
+            map['is_provisional'] == 1 ||
+            map['isProvisional'] == 'true' ||
+            map['is_provisional'] == 'true';
         map['startTime'] =
             _isoString(map['startTime']) ??
             _isoString(map['start_time']) ??
@@ -1263,7 +1265,8 @@ class SupabaseSyncService with WidgetsBindingObserver {
         return;
       }
 
-      final activeAppointments =
+      // Consulta indexada por intervalo temporal no SQLite Drift (idx_appointments_start_time / idx_appointments_end_time)
+      final colliding =
           await (db.select(db.appointments)..where(
                 (t) =>
                     t.id.isNotValue(appt.id) &
@@ -1275,41 +1278,71 @@ class SupabaseSyncService with WidgetsBindingObserver {
                       'realizado',
                       'concluido',
                       'concluído',
-                    ]),
+                    ]) &
+                    t.startTime.isSmallerThanValue(appt.endTime) &
+                    t.endTime.isBiggerThanValue(appt.startTime),
               ))
               .get();
-
-      final colliding = activeAppointments.where((other) {
-        return appt.startTime.isBefore(other.endTime) &&
-            appt.endTime.isAfter(other.startTime);
-      }).toList();
 
       if (colliding.isNotEmpty) {
         AppLogger.warning(
           'SupabaseSyncService: Conflito de agenda concorrente pós-sincronização detectado para compromisso $appointmentId (${colliding.length} sobreposições).',
         );
 
-        await (db.update(
-          db.appointments,
-        )..where((t) => t.id.equals(appt.id))).write(
-          const AppointmentsCompanion(
-            status: drift.Value('conflito'),
-            isProvisional: drift.Value(true),
-          ),
-        );
+        final now = DateTime.now();
 
-        for (final other in colliding) {
-          if (other.status != 'conflito' || !other.isProvisional) {
-            await (db.update(
-              db.appointments,
-            )..where((t) => t.id.equals(other.id))).write(
-              const AppointmentsCompanion(
-                status: drift.Value('conflito'),
-                isProvisional: drift.Value(true),
-              ),
-            );
+        await db.transaction(() async {
+          await (db.update(
+            db.appointments,
+          )..where((t) => t.id.equals(appt.id))).write(
+            AppointmentsCompanion(
+              status: const drift.Value('conflito'),
+              isProvisional: const drift.Value(true),
+              updatedAt: drift.Value(now),
+            ),
+          );
+
+          for (final other in colliding) {
+            if (other.status != 'conflito' || !other.isProvisional) {
+              await (db.update(
+                db.appointments,
+              )..where((t) => t.id.equals(other.id))).write(
+                AppointmentsCompanion(
+                  status: const drift.Value('conflito'),
+                  isProvisional: const drift.Value(true),
+                  updatedAt: drift.Value(now),
+                ),
+              );
+
+              // Atualiza o payload em syncQueue se o compromisso colidente possuir operação pendente
+              final pendingOps =
+                  await (db.select(db.syncQueue)..where(
+                        (t) =>
+                            t.entityType.equals('appointments') &
+                            t.entityId.equals(other.id) &
+                            t.status.equals('pending'),
+                      ))
+                      .get();
+
+              for (final op in pendingOps) {
+                try {
+                  final decoded =
+                      jsonDecode(op.payload) as Map<String, dynamic>;
+                  decoded['status'] = 'conflito';
+                  decoded['isProvisional'] = true;
+                  decoded['updatedAt'] = now.toIso8601String();
+                  await (db.update(
+                    db.syncQueue,
+                  )..where((t) => t.id.equals(op.id))).write(
+                    SyncQueueCompanion(
+                      payload: drift.Value(jsonEncode(decoded)),
+                    ),
+                  );
+                } catch (_) {}
+              }
+            }
           }
-        }
+        });
       }
     } catch (e, st) {
       AppLogger.error(

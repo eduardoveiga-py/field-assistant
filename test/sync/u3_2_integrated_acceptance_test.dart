@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:drift/native.dart';
@@ -225,22 +228,76 @@ void main() {
         expect(result3, equals(result1));
       });
 
-      test(
-        '5. cancelRecording() limpa estado, cancela timer e reseta arquivo',
-        () async {
-          final service = LocalAudioRecordingService();
-          addTearDown(service.dispose);
+      test('5. cancelRecording() limpa estado, cancela timer, reseta arquivo físico do disco e previne ressuscitação', () async {
+        final tempDir = await Directory.systemTemp.createTemp(
+          'audio_acc_test_',
+        );
+        addTearDown(() async {
+          if (await tempDir.exists()) {
+            await tempDir.delete(recursive: true);
+          }
+        });
 
-          await service.startRecording();
-          expect(service.isRecording, isTrue);
+        final service = LocalAudioRecordingService();
+        addTearDown(service.dispose);
 
-          await service.cancelRecording();
-          expect(service.isRecording, isFalse);
+        final customAudioPath = '${tempDir.path}/test_cancellation.m4a';
+        final startedPath = await service.startRecording(
+          customPath: customAudioPath,
+        );
+        expect(service.isRecording, isTrue);
+        expect(startedPath, equals(customAudioPath));
 
-          final stopped = await service.stopRecording();
-          expect(stopped, isNull);
-        },
-      );
+        // Simula gravação que escreveu bytes parciais
+        final testFile = File(customAudioPath);
+        await testFile.parent.create(recursive: true);
+        await testFile.writeAsBytes(List<int>.filled(128, 1));
+        expect(await testFile.exists(), isTrue);
+
+        // Dispara cancelamento físico
+        await service.cancelRecording();
+        expect(service.isRecording, isFalse);
+        expect(
+          await testFile.exists(),
+          isFalse,
+          reason: 'Arquivo temporário cancelado DEVE ser apagado fisicamente',
+        );
+
+        final stopped = await service.stopRecording();
+        expect(
+          stopped,
+          isNull,
+          reason:
+              'Gravação cancelada nunca deve retornar RecordingResult ativo',
+        );
+
+        // Idempotência após cancelamento: novo ciclo de gravação inicia limpo sem resíduos
+        final newPath = await service.startRecording(
+          customPath: '${tempDir.path}/test_clean_after_cancel.m4a',
+        );
+        expect(service.isRecording, isTrue);
+        final res = await service.stopRecording();
+        expect(res, isNotNull);
+        expect(res!.filePath, equals(newPath));
+      });
+
+      test('5b. Serialização e concorrência: cancelamento ou parada simultânea não corrompe estado nem deixa gravação zumbi', () async {
+        final service = LocalAudioRecordingService();
+        addTearDown(service.dispose);
+
+        await service.startRecording();
+        expect(service.isRecording, isTrue);
+
+        // Dispara stopRecording e cancelRecording simultaneamente (rajada concorrente)
+        final stopFuture = service.stopRecording();
+        final cancelFuture = service.cancelRecording();
+
+        await Future.wait([stopFuture, cancelFuture]);
+
+        expect(service.isRecording, isFalse);
+        final postResult = await service.stopRecording();
+        expect(postResult, isNull);
+      });
     },
   );
 
@@ -371,53 +428,238 @@ void main() {
     });
   });
 
-  group('U3.2 Acceptance — Segurança e Isolamento Multiusuário RLS', () {
-    test('8. Isolamento RLS: Operações de usuário B não são autorizadas para usuário A', () {
-      const userA = 'user-uuid-1111-1111';
-      const userB = 'user-uuid-2222-2222';
-
-      bool evaluateRLSPolicy({
-        required String authUid,
-        required String recordOwnerId,
-        required String operation,
-      }) {
-        if (authUid.isEmpty) return false;
-        // Política de isolamento estrito
-        return authUid == recordOwnerId;
-      }
-
+  group('U3.2 Acceptance — Segurança, Schema Supabase e Isolamento Multiusuário RLS', () {
+    test('8. Isolamento RLS e Supabase Schema: Verificação estrita das migrações SQL e políticas de ownership', () {
+      // 1. Verifica migração U3.2
+      final u32Migration = File(
+        'supabase/migrations/20261102020000_u3_2_storage_and_hardening.sql',
+      );
       expect(
-        evaluateRLSPolicy(
-          authUid: userA,
-          recordOwnerId: userA,
-          operation: 'SELECT',
-        ),
+        u32Migration.existsSync(),
         isTrue,
+        reason: 'Migração 20261102020000_u3_2_storage_and_hardening.sql deve existir',
+      );
+      final u32Content = u32Migration.readAsStringSync();
+
+      // Constraint CHECK de appointments_status_check deve suportar 'conflito'
+      expect(u32Content, contains('appointments_status_check'));
+      expect(u32Content, contains("'conflito'"));
+
+      // Políticas RLS de Storage para voice_notes devem checar propriedade do usuário vn.owner_id = auth.uid()
+      expect(u32Content, contains('voice_notes_storage_insert'));
+      expect(u32Content, contains('vn.owner_id = auth.uid()'));
+      expect(u32Content, contains('voice_notes_storage_select'));
+      expect(u32Content, contains('voice_notes_storage_update'));
+      expect(u32Content, contains('voice_notes_storage_delete'));
+      expect(
+        u32Content,
+        contains(r"regexp_replace(storage.objects.name, '\.[^.]+$', '')"),
+      );
+
+      // 2. Verifica schema base de migrações
+      final initialMigration = File(
+        'supabase/migrations/20261026000000_initial_schema.sql',
+      );
+      expect(initialMigration.existsSync(), isTrue);
+      final initialContent = initialMigration.readAsStringSync();
+
+      // Todas as tabelas principais devem ter RLS habilitado
+      expect(
+        initialContent,
+        contains('ALTER TABLE public.people ENABLE ROW LEVEL SECURITY;'),
       );
       expect(
-        evaluateRLSPolicy(
-          authUid: userA,
-          recordOwnerId: userB,
-          operation: 'SELECT',
-        ),
-        isFalse,
+        initialContent,
+        contains('ALTER TABLE public.visits ENABLE ROW LEVEL SECURITY;'),
       );
       expect(
-        evaluateRLSPolicy(
-          authUid: userA,
-          recordOwnerId: userB,
-          operation: 'UPDATE',
-        ),
-        isFalse,
+        initialContent,
+        contains('ALTER TABLE public.bible_studies ENABLE ROW LEVEL SECURITY;'),
       );
       expect(
-        evaluateRLSPolicy(
-          authUid: userA,
-          recordOwnerId: userB,
-          operation: 'DELETE',
+        initialContent,
+        contains(
+          'ALTER TABLE public.study_participants ENABLE ROW LEVEL SECURITY;',
         ),
-        isFalse,
       );
+      expect(
+        initialContent,
+        contains(
+          'ALTER TABLE public.study_sessions ENABLE ROW LEVEL SECURITY;',
+        ),
+      );
+      expect(
+        initialContent,
+        contains('ALTER TABLE public.appointments ENABLE ROW LEVEL SECURITY;'),
+      );
+      expect(
+        initialContent,
+        contains(
+          'ALTER TABLE public.activity_records ENABLE ROW LEVEL SECURITY;',
+        ),
+      );
+
+      final u3MissingMigration = File(
+        'supabase/migrations/20261102000000_u3_missing_tables_storage.sql',
+      );
+      expect(u3MissingMigration.existsSync(), isTrue);
+      final u3MissingContent = u3MissingMigration.readAsStringSync();
+      expect(
+        u3MissingContent,
+        contains('ALTER TABLE public.voice_notes ENABLE ROW LEVEL SECURITY;'),
+      );
+      expect(
+        u3MissingContent,
+        contains(
+          'ALTER TABLE public.phone_contacts ENABLE ROW LEVEL SECURITY;',
+        ),
+      );
+      expect(
+        u3MissingContent,
+        contains(
+          'ALTER TABLE public.territory_landmarks ENABLE ROW LEVEL SECURITY;',
+        ),
+      );
+
+      // 3. Verifica políticas explícitas com auth.uid() = owner_id em SELECT, INSERT, UPDATE, DELETE
+      expect(u3MissingContent, contains('auth.uid() = owner_id'));
     });
+
+    test('9. Concorrência na Agenda: Atualização de payload da Outbox ao marcar conflito em agendamento com operação pendente', () async {
+      final baseDate = DateTime(2026, 11, 15, 9, 0);
+
+      // Dispositivo B cria compromisso local que entra na outbox (sync_queue) com status pendente
+      final localAppt = await repo.createAppointment(
+        id: 'appt-pending-outbox-01',
+        title: 'Estudo Matinal Local',
+        startTime: baseDate,
+        endTime: baseDate.add(const Duration(minutes: 45)),
+        durationMinutes: 45,
+        status: 'planejado',
+      );
+
+      // Confirma que foi gerada operação INSERT na outbox
+      final initialQueueOp = await (db.select(
+        db.syncQueue,
+      )..where((t) => t.entityId.equals(localAppt.id))).getSingle();
+      final initialPayload =
+          jsonDecode(initialQueueOp.payload) as Map<String, dynamic>;
+      expect(initialPayload['status'], equals('planejado'));
+
+      // Dispositivo A envia registro remoto concorrente sobrepondo o mesmo intervalo
+      final remoteOverlapping = {
+        'id': 'appt-remote-dev-a-01',
+        'title': 'Revisita Remota Concorrente',
+        'start_time': baseDate
+            .add(const Duration(minutes: 15))
+            .toIso8601String(),
+        'end_time': baseDate.add(const Duration(minutes: 60)).toIso8601String(),
+        'duration_minutes': 45,
+        'status': 'planejado',
+        'is_provisional': false,
+        'created_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+        'revision': 1,
+      };
+
+      final errors = <String>[];
+      final ok = await syncService.applyRemoteRecordForTesting(
+        'appointments',
+        remoteOverlapping,
+        errors,
+      );
+      expect(ok, isTrue);
+
+      // Verifica que no banco local ambos foram marcados com conflito e isProvisional
+      final dbLocal = await repo.getAppointmentById('appt-pending-outbox-01');
+      final dbRemote = await repo.getAppointmentById('appt-remote-dev-a-01');
+      expect(dbLocal!.status, equals('conflito'));
+      expect(dbLocal.isProvisional, isTrue);
+      expect(dbRemote!.status, equals('conflito'));
+      expect(dbRemote.isProvisional, isTrue);
+
+      // CRÍTICO: A operação pendente na outbox (sync_queue) DEVE ter sido atualizada com 'conflito' e 'isProvisional'
+      // para evitar que um push futuro sobrescreva o conflito com dados desatualizados!
+      final updatedQueueOp = await (db.select(
+        db.syncQueue,
+      )..where((t) => t.entityId.equals(localAppt.id))).getSingle();
+      final updatedPayload =
+          jsonDecode(updatedQueueOp.payload) as Map<String, dynamic>;
+      expect(updatedPayload['status'], equals('conflito'));
+      expect(updatedPayload['isProvisional'], isTrue);
+    });
+
+    testWidgets(
+      '10. QuickVoiceNoteDialog: Fechar sem salvar aciona cancelRecording() e previne vazamento de arquivo',
+      (tester) async {
+        final tempDir = Directory.systemTemp.createTempSync(
+          'dialog_leak_test_',
+        );
+        addTearDown(() {
+          if (tempDir.existsSync()) {
+            tempDir.deleteSync(recursive: true);
+          }
+        });
+
+        final localAudio = LocalAudioRecordingService();
+        final dictation = LocalVoiceDictationService();
+
+        final person = PersonEntry(
+          id: 'person-leak-test',
+          name: 'Maria Teste Descarte',
+          firstContactAt: DateTime.now(),
+          status: 'interessado',
+          tags: '[]',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+          revision: 1,
+        );
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              databaseProvider.overrideWithValue(db),
+              repositoryProvider.overrideWithValue(repo),
+            ],
+            child: MaterialApp(
+              home: Scaffold(
+                body: Builder(
+                  builder: (context) => ElevatedButton(
+                    onPressed: () => QuickVoiceNoteDialog.show(
+                      context: context,
+                      person: person,
+                      recordingService: localAudio,
+                      dictationService: dictation,
+                      playerService: LocalAudioPlayerService(),
+                    ),
+                    child: const Text('Abrir Modal'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        await tester.tap(find.text('Abrir Modal'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 500));
+
+        // Inicia gravação
+        await tester.tap(find.text('Iniciar Gravação'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(localAudio.isRecording, isTrue);
+
+        // Usuário clica no botão de fechar ('X') descartando sem salvar
+        await tester.tap(find.byTooltip('Fechar'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 500));
+
+        // Gravador e ditado devem ter sido cancelados e liberados sem vazamento
+        expect(localAudio.isRecording, isFalse);
+        expect(dictation.isListening, isFalse);
+        expect(find.byType(QuickVoiceNoteDialog), findsNothing);
+      },
+    );
   });
 }
