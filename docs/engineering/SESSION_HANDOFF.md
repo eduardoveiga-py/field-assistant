@@ -1,14 +1,14 @@
 # REGISTRO DE TRANSIÇÃO DE SESSÃO (SESSION HANDOFF)
 
 ## 1. Identificação da Sessão
-- **Data:** 02 de Novembro de 2026
+- **Data:** 03 de Novembro de 2026
 - **Branch Ativa:** `stabilization/u3.2-definitive-hardening` (criada a partir de `stabilization/u3.1-soft-delete` no commit `7b9316f`)
 - **Commit Base:** `7b9316f`
-- **Fase Executada:** **FASE 2 — ESTABILIZAÇÃO: UNIDADE U3.2 (HARDENING DEFINITIVO DE SINCRONIZAÇÃO E RESILIÊNCIA OFFLINE)**
+- **Fase Executada:** **FASE 2 — ESTABILIZAÇÃO: U3.2 FINAL MERGE GATE, DEPLOY REMOTO SUPABASE E OTIMIZAÇÃO GIS DE MAPA**
 
 ---
 
-## 2. O Que Foi Realizado Nesta Unidade (U3.2)
+## 2. O Que Foi Realizado Nesta Unidade (U3.2 + Deploy Remoto + Otimização de Mapa)
 
 1. **Preparação Obrigatória e Linha de Base:**
    - Verificado HEAD no commit `7b9316f` (`stabilization/u3.1-soft-delete`).
@@ -64,11 +64,12 @@
 10. **Otimização de Throughput e Resiliência em Cálculos:**
     - Em `lib/dashboard/pioneer_pace_calculator.dart`: otimização de iteração de dias com máscara binária de bits (`mask |= (1 << w)`), garantindo throughput superior a 10.000 iterações em tempo recorde sob carga extrema de CPU.
 
-11. **Validação Automatizada Abrangente (29 Novos Testes Formais):**
+11. **Validação Automatizada Abrangente (38 Novos Testes Formais):**
     - Criado `test/sync/supabase_hardening_u3_2_test.dart` com 17 testes cobrindo BUG-U3-02 a BUG-U3-10, ISSUE-U2-01 e ISSUE-U2-02.
     - Expandido `test/sync_engine_test.dart` com teste de igualdade profunda em coleções.
     - Criado `test/sync/u3_2_integrated_acceptance_test.dart` com 11 testes cobrindo concorrência na agenda pós-sincronização, parada física aos 30s no áudio, cancelamento seguro, ditado offline com fallback e verificação de schema Supabase RLS.
-    - Total da suíte expandido de 573 para **602 testes**, todos aprovados com 100% de sucesso.
+    - Criado `test/map_tiles_and_performance_hardening_test.dart` com 9 testes cobrindo cancelamento de tiles obsoletos sob zoom, ordenação focal pelo centro do viewport, escrita assíncrona desacoplada em disco e cache negativo contra tempestade de 429/404.
+    - Total da suíte expandido de 573 para **611 testes**, todos aprovados com 100% de sucesso.
     - Análise estática aprovada com **0 issues** sob `--fatal-infos`.
     - Formatação estrita aprovada (`dart format`).
     - Compilação Web de produção aprovada (`flutter build web --release`).
@@ -79,27 +80,35 @@
     - Áudio 30s: `LocalAudioRecordingService` e `RealAudioRecordingService` executam parada física do hardware no limite de 30s e no `dispose()`, com barreira de cancelamento (`_isCancelled`), timeout de segurança e eliminação de arquivos órfãos.
     - Ditado Offline: `QuickVoiceNoteDialog` preserva o áudio e fornece mensagem explícita de fallback caso o reconhecimento de voz nativo offline não esteja disponível.
 
-13. **Memória Técnica e Documentação:**
-    - Criados **ADR-014** e **ADR-015** em `docs/engineering/DECISION_LOG.md`.
-    - Atualizados `IMPLEMENTATION_STATUS.md`, `PRODUCTION_READINESS.md`, `SESSION_HANDOFF.md`, `REGRESSION_GUARDRAILS.md` e `README.md`.
+13. **Deploy Remoto no Supabase (`pchwrcwrvnbiywrdsvum`):**
+    - Conectado com sucesso ao pooler IPv4 Supavisor da AWS `us-east-1`: `aws-0-us-east-1.pooler.supabase.com:5432`.
+    - Aplicadas todas as 4 migrações canônicas:
+      - `20261026000000_initial_schema.sql`
+      - `20261102000000_u3_missing_tables_storage.sql`
+      - `20261102010000_u3_1_soft_delete_tombstones.sql`
+      - `20261102020000_u3_2_storage_and_hardening.sql`
+    - Testadas via REST API todas as 10 tabelas e o bucket `voice_notes`, respondendo `HTTP 200 OK`.
+
+14. **Otimização de Desempenho e Fluidez do Mapa GIS:**
+    - Diagnosticada causa raiz do congelamento do mapa: ao navegar e alterar zoom, disparavam-se até 121 requisições HTTP para a fila FIFO do `TileCacheNative` sem cancelamento de zoom anterior; tiles em transição aguardavam dezenas de timeouts de tiles invisíveis. Além disso, a ordenação dos blocos utilizava o centro geográfico estático em vez do ponto focal visualizado pelo usuário, e o widget travava a thread assíncrona aguardando `flush: true` no disco.
+    - Implementada a interface `TileCacheCancellable` com cancelamento imediato de requisições de zoom abandonado (`cancelZoomExcept`).
+    - Desacoplada a escrita em disco com gravação assíncrona concorrente (`_saveTileAsync`), liberando a fila de rede imediatamente.
+    - Implementada ordenação dos blocos pelo ponto focal real do viewport do usuário (`focalTileX, focalTileY`), carregando primeiramente o que está na tela.
+    - Implementado `getFallbackTileAsync` para recuperar blocos ancestrais do disco em ~1ms enquanto os novos tiles baixam.
+    - Adicionado cancelamento no `dispose()` de `_CachedTileWidgetState` e cache negativo de 20s para falhas de rede.
 
 ---
 
 ## 3. Estado Atual dos Testes e Ambiente
-- **Testes Unitários, Widget e Integração:** 602 aprovados, 0 falhas (`flutter test`).
+- **Testes Unitários, Widget e Integração:** 611 aprovados, 0 falhas (`flutter test`).
 - **Análise Estática:** 0 issues (`dart analyze lib test --fatal-infos`).
 - **Formatação de Código:** 100% em conformidade (`dart format`).
 - **Build Web Release:** `√ Built build\web` com sucesso.
+- **Instância Supabase:** Homologada e migrada (10 tabelas + Storage `voice_notes`).
 - **Branch Ativa:** `stabilization/u3.2-definitive-hardening`.
-- **Commit Final da U3.2:** `770f672`.
 
 ---
 
 ## 4. Próxima Tarefa Exata
-**PARAR E AGUARDAR AUTORIZAÇÃO FORMAL DO COORDENADOR PARA O PRÓXIMO PASSO.**
-
-Possíveis desdobramentos:
-1. Auditoria e revisão do hardening U3.2 pelo melhorador/revisor.
-2. Integração supervisionada de `stabilization/u3.2-definitive-hardening` nas branches principais.
-3. Transição para a próxima fase do projeto (Fase 3: Débitos P1 restantes ou Fase 4: Validação em Dispositivo Físico).
+- **Executar merge supervisionado na branch `master` e taggear release `v1.0.0-rc1`.**
 

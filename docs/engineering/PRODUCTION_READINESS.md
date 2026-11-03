@@ -4,7 +4,7 @@
 **Status Geral: REPROVADO PARA PRODUÇÃO**
 
 ### Justificativa Técnica
-O aplicativo apresenta **100% de sucesso na suíte de 602 testes automatizados**, **0 issues de análise estática** sob `--fatal-infos` e estabilização completa de persistência, soft delete/tombstones, 3-way merge determinístico, detecção de concorrência na agenda pós-sincronização, parada física aos 30s no áudio e fallback explícito de ditado offline. A publicação final depende exclusivamente das validações externas de ambiente: teste em hardware físico Apple (iPhone/iPad) e geração de archive iOS em runner macOS com conta de desenvolvedor ativa.
+O aplicativo apresenta **100% de sucesso na suíte de 611 testes automatizados**, **0 issues de análise estática** sob `--fatal-infos` e estabilização completa de persistência, soft delete/tombstones, 3-way merge determinístico, detecção de concorrência na agenda pós-sincronização, parada física aos 30s no áudio, fallback explícito de ditado offline, fluidez no motor cartográfico GIS com cancelamento assíncrono de tiles e deploy verificado na instância real do Supabase (`pchwrcwrvnbiywrdsvum`). A publicação final no ecossistema iOS depende exclusivamente das validações externas de ambiente: teste em hardware físico Apple (iPhone/iPad) e geração de archive iOS em runner macOS com conta de desenvolvedor ativa.
 
 ---
 
@@ -23,11 +23,13 @@ O aplicativo apresenta **100% de sucesso na suíte de 602 testes automatizados**
 - [x] **Agenda validada contra concorrência** *(APROVADO: Cobertura automatizada por `u3_2_integrated_acceptance_test.dart` com cenários de sobreposição, contiguidade e concorrência na outbox)*
 - [x] **Áudio validado no código com parada física de 30s** *(APROVADO NO CÓDIGO: Timer de 30s dispara `record.stop()` ativamente no hardware com barreira contra cancelamento e limpeza de arquivos órfãos)*
 - [x] **Transcrição documentada corretamente e com fallback** *(APROVADO: Diálogo orienta sobre necessidade do pacote de idioma offline baixado nos Ajustes do iOS e preserva o áudio para reprodução e transcrição manual)*
-- [x] **Testes automatizados aprovados** *(APROVADO: 602 testes passando com 100% de sucesso)*
+- [x] **Testes automatizados aprovados** *(APROVADO: 611 testes passando com 100% de sucesso)*
 - [x] **Análise estática aprovada** *(APROVADO: `dart analyze lib test --fatal-infos` acusa 0 issues)*
 - [x] **Build Release Web aprovado** *(APROVADO: `flutter build web --release` compila com sucesso)*
 - [ ] **Archive iOS e instalação real em aparelho físico** *(PENDENTE EXTERNO: Depende de runner macOS e Apple Developer Account)*
-- [x] **Documentação atualizada** *(APROVADO: Documentações de engenharia atualizadas com ADR-010, ADR-011, ADR-012, ADR-013, ADR-014, ADR-015 e 602 testes)*
+- [x] **Deploy e schema Supabase aplicados na nuvem** *(APROVADO: Todas as 4 migrações aplicadas no projeto `pchwrcwrvnbiywrdsvum`, 10 tabelas e bucket `voice_notes` respondendo HTTP 200)*
+- [x] **Desempenho e fluidez cartográfica GIS** *(APROVADO: Cancelamento instantâneo de tiles obsoletos ao mudar zoom, ordenação focal pelo viewport e fallback L1/disco eliminando travamentos)*
+- [x] **Documentação atualizada** *(APROVADO: Documentações de engenharia atualizadas com ADR-010 a ADR-015 e 611 testes)*
 
 ---
 
@@ -101,4 +103,4 @@ O aplicativo apresenta **100% de sucesso na suíte de 602 testes automatizados**
    - Acesso ao Apple TestFlight para distribuição e testes em hardware físico.
    - Dispositivos físicos de referência: iPhone (ex: iPhone XR / iPhone 13+) e iPad (iPad 10/11 ou Pro).
 2. **Ambiente Supabase:**
-   - Projeto Supabase dedicado para Homologação/Produção com execução das migrações SQL atualizadas e bucket `voice_notes` configurado.
+   - **Concluído:** Projeto Supabase `pchwrcwrvnbiywrdsvum` migrado via pooler IPv4 (`aws-0-us-east-1.pooler.supabase.com:5432`). As 4 migrações SQL aplicadas, todas as 10 tabelas sincronizadas e o bucket privado `voice_notes` de 10 MB validados com sucesso.
