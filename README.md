@@ -65,7 +65,7 @@ lib/
   └── ui/                       # Telas (Hoje, Pessoas, Agenda, Estudos, Dashboard, Atividades, Lixeira, Ajustes)
 scripts/                        # Scripts para inicialização web e execução de testes no Windows
 supabase/                       # Migrações PostgreSQL e políticas RLS para sincronização
-test/                           # Suíte automatizada com 611 testes cobrindo todos os módulos
+test/                           # Suíte automatizada com 626 testes cobrindo todos os módulos
 ```
 
 ---
@@ -127,7 +127,7 @@ flutter build ipa --release --dart-define-from-file=.env.prod
 
 ## 🧪 Suíte de Testes Automatizados
 
-Para executar todos os **611 testes automatizados** unitários, transacionais, adversariais e de interface:
+Para executar todos os **626 testes automatizados** unitários, transacionais, adversariais e de interface:
 ```bash
 flutter test
 ```
@@ -137,7 +137,8 @@ Para validar a integridade estática do código (zero erros, zero warnings, zero
 dart analyze lib test --fatal-infos
 ```
 
-### Cobertura de Testes (611 Testes Aprovados com 100% de Sucesso)
+### Cobertura de Testes (626 Testes Aprovados com 100% de Sucesso)
+- `test/appointments/web_calendar_platform_isolation_test.dart`: Isolamento multiplataforma de calendários, eliminação de `MissingPluginException` do `device_calendar` no Flutter Web, preservação 100% nativa do Apple EventKit no iOS, suporte moderno ao Google Identity Services (GIS) Web via `authorizationClient` e tratamento de erros na UI.
 - `test/map_tiles_and_performance_hardening_test.dart`: Otimização de desempenho e fluidez cartográfica, cancelamento de requisições de tiles obsoletos ao mudar zoom (`cancelZoomExcept`), ordenação focal pelo viewport, escrita assíncrona desacoplada em disco, cache negativo contra 429/404 e fallback de tiles ancestrais a partir do disco.
 - `test/sync/u3_2_integrated_acceptance_test.dart`: Concorrência na agenda pós-sincronização, marcação atômica de `conflito` e `isProvisional`, sincronização síncrona da outbox, limite real de 30 segundos no microfone com parada física do hardware no driver nativo, cancelamento seguro, fallback do ditado offline com preservação do áudio e verificação de schema PostgreSQL RLS.
 - `test/sync/supabase_hardening_u3_2_test.dart`: Preservação de snapshot `_base` e incremento atômico de `revision` nos managers (`phone_contacts`, `landmarks`, `voice_notes`), 3-way merge determinístico sem sobrescrita cega no inbound sync, preservação de caminho local de áudio (`audioFilePath`), normalização de tags JSONB e booleans no payload Supabase, requeue de outbox atômico e com clamping de tentativas, recuperação resiliente de boot (`retryInitialization`), e validação de regras de migração SQL/Storage RLS.

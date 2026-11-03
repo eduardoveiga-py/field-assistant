@@ -97,10 +97,17 @@
     - Implementado `getFallbackTileAsync` para recuperar blocos ancestrais do disco em ~1ms enquanto os novos tiles baixam.
     - Adicionado cancelamento no `dispose()` de `_CachedTileWidgetState` e cache negativo de 20s para falhas de rede.
 
+15. **Isolamento Multiplataforma de Calendário Web e Hardening Google OAuth:**
+    - Diagnosticada e comprovada a causa raiz de `MissingPluginException` na Web: o plugin `device_calendar` (usado por `AppleEventKitProvider`) não possui implementação Web registrada. Tanto na abertura de `ConnectedCalendarsScreen` quanto no clique em "Conectar Google" (que disparava `_syncNow`), o código consultava permissões nativas via `appleProvider.isAuthorized()`.
+    - Implementada barreira de plataforma `_isWebPlatform` em `AppleEventKitProvider`, interceptando todas as chamadas nativas (`isAuthorized`, `requestAuthorization`, `getAvailableCalendars`, `syncEvents`, `pushAppointmentToExternal`, `deleteExternalEvent`), retornando imediatamente sem acessar o canal de plataforma.
+    - Em `GoogleCalendarProvider`: adicionado suporte ao fluxo moderno Google Identity Services (GIS) Web via `authorizationClient.authorizeScopes([_calendarScope])` e `_webAuthHeaders`, contornando a indisponibilidade de `authenticate()` no navegador.
+    - Em `ConnectedCalendarsScreen`: card do Apple EventKit exibe badge informativo "Apenas iOS" na Web com texto explicativo; adicionado tratamento de exceções com `SnackBar` informativa.
+    - Criados 15 testes dedicados em `test/appointments/web_calendar_platform_isolation_test.dart`.
+
 ---
 
 ## 3. Estado Atual dos Testes e Ambiente
-- **Testes Unitários, Widget e Integração:** 611 aprovados, 0 falhas (`flutter test`).
+- **Testes Unitários, Widget e Integração:** 626 aprovados, 0 falhas (`flutter test`).
 - **Análise Estática:** 0 issues (`dart analyze lib test --fatal-infos`).
 - **Formatação de Código:** 100% em conformidade (`dart format`).
 - **Build Web Release:** `√ Built build\web` com sucesso.
