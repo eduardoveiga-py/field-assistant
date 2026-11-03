@@ -65,7 +65,7 @@ lib/
   └── ui/                       # Telas (Hoje, Pessoas, Agenda, Estudos, Dashboard, Atividades, Lixeira, Ajustes)
 scripts/                        # Scripts para inicialização web e execução de testes no Windows
 supabase/                       # Migrações PostgreSQL e políticas RLS para sincronização
-test/                           # Suíte automatizada com 626 testes cobrindo todos os módulos
+test/                           # Suíte automatizada com 635 testes cobrindo todos os módulos
 ```
 
 ---
@@ -127,7 +127,7 @@ flutter build ipa --release --dart-define-from-file=.env.prod
 
 ## 🧪 Suíte de Testes Automatizados
 
-Para executar todos os **626 testes automatizados** unitários, transacionais, adversariais e de interface:
+Para executar todos os **635 testes automatizados** unitários, transacionais, adversariais e de interface:
 ```bash
 flutter test
 ```
@@ -137,7 +137,8 @@ Para validar a integridade estática do código (zero erros, zero warnings, zero
 dart analyze lib test --fatal-infos
 ```
 
-### Cobertura de Testes (626 Testes Aprovados com 100% de Sucesso)
+### Cobertura de Testes (635 Testes Aprovados com 100% de Sucesso)
+- `test/appointments/ics_settings_management_test.dart`: Migração de importação/exportação de arquivos `.ics` para a tela de Configurações, despoluição da Agenda, acionamento automático de sincronização de calendário em segundo plano nas mutações locais e disparo de pull automático ao retornar ao app (`AppLifecycleState.resumed`).
 - `test/appointments/web_calendar_platform_isolation_test.dart`: Isolamento multiplataforma de calendários, eliminação de `MissingPluginException` do `device_calendar` no Flutter Web, preservação 100% nativa do Apple EventKit no iOS, suporte moderno ao Google Identity Services (GIS) Web via `authorizationClient` e tratamento de erros na UI.
 - `test/map_tiles_and_performance_hardening_test.dart`: Otimização de desempenho e fluidez cartográfica, cancelamento de requisições de tiles obsoletos ao mudar zoom (`cancelZoomExcept`), ordenação focal pelo viewport, escrita assíncrona desacoplada em disco, cache negativo contra 429/404 e fallback de tiles ancestrais a partir do disco.
 - `test/sync/u3_2_integrated_acceptance_test.dart`: Concorrência na agenda pós-sincronização, marcação atômica de `conflito` e `isProvisional`, sincronização síncrona da outbox, limite real de 30 segundos no microfone com parada física do hardware no driver nativo, cancelamento seguro, fallback do ditado offline com preservação do áudio e verificação de schema PostgreSQL RLS.

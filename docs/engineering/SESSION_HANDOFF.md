@@ -104,10 +104,18 @@
     - Em `ConnectedCalendarsScreen`: card do Apple EventKit exibe badge informativo "Apenas iOS" na Web com texto explicativo; adicionado tratamento de exceções com `SnackBar` informativa.
     - Criados 15 testes dedicados em `test/appointments/web_calendar_platform_isolation_test.dart`.
 
+16. **Centralização de Importação/Exportação .ics em Ajustes e Automação de Sync da Agenda:**
+    - Diagnosticada poluição visual na Agenda (`AppointmentsScreen`) decorrente de banners fixos de importação/exportação de arquivo `.ics`.
+    - Criado componente modal desacoplado `showIcsManagementModal` (`lib/appointments/ics_management_sheet.dart`) com suporte a exportação para Google Calendar, Apple Calendar (.ics), importação de arquivo local e colagem de texto VCALENDAR da área de transferência.
+    - Integrado `ListTile` dedicado ("Importar / Exportar Calendário (.ics)") na seção *Sincronização & Nuvem* de `SettingsScreen`, e atalho secundário em `ConnectedCalendarsScreen`.
+    - Limpa a tela `AppointmentsScreen`, eliminando blocos redundantes de importação .ics e adicionando `WidgetsBindingObserver` para escutar `AppLifecycleState.resumed` (pull automático ao retornar ao app) e disparo automático de `_triggerBackgroundCalendarSync` ao criar, editar, reagendar ou excluir compromissos (push automático imediato).
+    - Implementada escrita em disco nos documentos do app em plataformas nativas via `path_provider` (`getApplicationDocumentsDirectory`) no `lib/reports/web_downloader_stub.dart`.
+    - Criados 7 testes formais dedicados em `test/appointments/ics_settings_management_test.dart`.
+
 ---
 
 ## 3. Estado Atual dos Testes e Ambiente
-- **Testes Unitários, Widget e Integração:** 626 aprovados, 0 falhas (`flutter test`).
+- **Testes Unitários, Widget e Integração:** 635 aprovados, 0 falhas (`flutter test`).
 - **Análise Estática:** 0 issues (`dart analyze lib test --fatal-infos`).
 - **Formatação de Código:** 100% em conformidade (`dart format`).
 - **Build Web Release:** `√ Built build\web` com sucesso.
