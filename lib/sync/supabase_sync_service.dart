@@ -306,7 +306,8 @@ class SupabaseSyncService with WidgetsBindingObserver {
           camelKey == 'hasSocial' ||
           camelKey == 'isPrimary' ||
           camelKey == 'isAllDay' ||
-          camelKey == 'isDeletedExternal') {
+          camelKey == 'isDeletedExternal' ||
+          camelKey == 'isProvisional') {
         result[camelKey] = (value == true || value == 1 || value == 'true');
       } else {
         result[camelKey] = value;
@@ -996,6 +997,11 @@ class SupabaseSyncService with WidgetsBindingObserver {
     errors: errors,
   );
 
+  @visibleForTesting
+  Future<void> checkAndMarkAppointmentConflictsForTesting(
+    String appointmentId,
+  ) => _checkAndMarkAppointmentConflicts(appointmentId);
+
   Future<bool> _applyRemoteRecord({
     required String table,
     required Map<String, dynamic> remoteRecord,
@@ -1031,6 +1037,9 @@ class SupabaseSyncService with WidgetsBindingObserver {
         final isRemoteDeleted =
             normalized['deletedAt'] != null || normalized['deleted_at'] != null;
         await _insertLocalEntry(table, normalized);
+        if (table == 'appointments' && !isRemoteDeleted) {
+          await _checkAndMarkAppointmentConflicts(id);
+        }
         if (table == 'voice_notes' && client != null && !isRemoteDeleted) {
           await _downloadVoiceNoteAudio(id, client);
         }
@@ -1139,6 +1148,9 @@ class SupabaseSyncService with WidgetsBindingObserver {
                 localData['audioFilePath'];
           }
           await _updateLocalEntry(table, mergeResult.mergedData);
+          if (table == 'appointments') {
+            await _checkAndMarkAppointmentConflicts(id);
+          }
           final updatedPayload = {
             ...mergeResult.mergedData,
             if (rawPayload.containsKey('_base')) '_base': rawPayload['_base'],
@@ -1217,6 +1229,9 @@ class SupabaseSyncService with WidgetsBindingObserver {
 
           if (isRemoteNewer) {
             await _updateLocalEntry(table, normalized);
+            if (table == 'appointments') {
+              await _checkAndMarkAppointmentConflicts(id);
+            }
             if (table == 'voice_notes' && client != null) {
               await _downloadVoiceNoteAudio(id, client);
             }
@@ -1227,6 +1242,81 @@ class SupabaseSyncService with WidgetsBindingObserver {
     } catch (e) {
       errors.add('Erro ao aplicar registro remoto em $table ($id): $e');
       return false;
+    }
+  }
+
+  /// Detecta sobreposição concorrente de horários na agenda após sincronização e marca conflito explícito sem perda de dados.
+  Future<void> _checkAndMarkAppointmentConflicts(String appointmentId) async {
+    try {
+      final appt = await (db.select(
+        db.appointments,
+      )..where((t) => t.id.equals(appointmentId))).getSingleOrNull();
+      if (appt == null || appt.deletedAt != null) return;
+
+      final status = appt.status.toLowerCase();
+      if (status == 'cancelado' ||
+          status == 'nao_realizado' ||
+          status == 'reagendado' ||
+          status == 'realizado' ||
+          status == 'concluido' ||
+          status == 'concluído') {
+        return;
+      }
+
+      final activeAppointments =
+          await (db.select(db.appointments)..where(
+                (t) =>
+                    t.id.isNotValue(appt.id) &
+                    t.deletedAt.isNull() &
+                    t.status.isNotIn([
+                      'cancelado',
+                      'nao_realizado',
+                      'reagendado',
+                      'realizado',
+                      'concluido',
+                      'concluído',
+                    ]),
+              ))
+              .get();
+
+      final colliding = activeAppointments.where((other) {
+        return appt.startTime.isBefore(other.endTime) &&
+            appt.endTime.isAfter(other.startTime);
+      }).toList();
+
+      if (colliding.isNotEmpty) {
+        AppLogger.warning(
+          'SupabaseSyncService: Conflito de agenda concorrente pós-sincronização detectado para compromisso $appointmentId (${colliding.length} sobreposições).',
+        );
+
+        await (db.update(
+          db.appointments,
+        )..where((t) => t.id.equals(appt.id))).write(
+          const AppointmentsCompanion(
+            status: drift.Value('conflito'),
+            isProvisional: drift.Value(true),
+          ),
+        );
+
+        for (final other in colliding) {
+          if (other.status != 'conflito' || !other.isProvisional) {
+            await (db.update(
+              db.appointments,
+            )..where((t) => t.id.equals(other.id))).write(
+              const AppointmentsCompanion(
+                status: drift.Value('conflito'),
+                isProvisional: drift.Value(true),
+              ),
+            );
+          }
+        }
+      }
+    } catch (e, st) {
+      AppLogger.error(
+        'SupabaseSyncService: Erro ao verificar conflito de agenda pós-sincronização',
+        e,
+        st,
+      );
     }
   }
 

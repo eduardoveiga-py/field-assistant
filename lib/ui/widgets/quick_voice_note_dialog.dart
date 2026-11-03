@@ -186,23 +186,42 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
       _dictationError = null;
     });
 
-    final dictationFuture = _dictationService.startListening(
-      onResult: (text) {
-        if (mounted) {
-          _transcriptionController.text = text;
-          _processTranscription(text);
-        }
-      },
-      onError: (err) {
-        if (mounted) {
-          setState(() {
-            _dictationError = err;
-          });
-        }
-      },
-    );
-    final recordingFuture = _recordingService.startRecording();
-    await Future.wait([dictationFuture, recordingFuture]);
+    final recordingFuture = _recordingService.startRecording().catchError((e) {
+      if (mounted) {
+        setState(() {
+          _isRecording = false;
+          _dictationError = 'Erro ao acessar microfone para gravação: $e';
+        });
+      }
+      return '';
+    });
+
+    final dictationFuture = _dictationService
+        .startListening(
+          onResult: (text) {
+            if (mounted) {
+              _transcriptionController.text = text;
+              _processTranscription(text);
+            }
+          },
+          onError: (err) {
+            if (mounted) {
+              setState(() {
+                _dictationError = err;
+              });
+            }
+          },
+        )
+        .catchError((e) {
+          if (mounted) {
+            setState(() {
+              _dictationError =
+                  'Reconhecimento de fala offline indisponível no iOS ($e). O áudio está sendo gravado e preservado; você pode digitar o resumo manualmente.';
+            });
+          }
+        });
+
+    await Future.wait([recordingFuture, dictationFuture]);
   }
 
   Future<void> _stopRecording() async {

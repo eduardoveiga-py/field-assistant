@@ -48,6 +48,9 @@ class RealAudioRecordingService implements AudioRecordingService {
   DateTime? _startedAt;
   String? _currentFilePath;
 
+  Future<RecordingResult?>? _stopFuture;
+  RecordingResult? _lastResult;
+
   final StreamController<int> _durationController =
       StreamController<int>.broadcast();
 
@@ -88,6 +91,8 @@ class RealAudioRecordingService implements AudioRecordingService {
 
     _elapsedSeconds = 0;
     _startedAt = DateTime.now();
+    _stopFuture = null;
+    _lastResult = null;
 
     if (customPath != null && customPath.isNotEmpty) {
       _currentFilePath = customPath;
@@ -128,6 +133,7 @@ class RealAudioRecordingService implements AudioRecordingService {
       }
       if (_elapsedSeconds >= 30) {
         timer.cancel();
+        unawaited(stopRecording());
       }
     });
 
@@ -136,8 +142,24 @@ class RealAudioRecordingService implements AudioRecordingService {
 
   @override
   Future<RecordingResult?> stopRecording() async {
-    if (!_isRecording) return null;
+    if (_stopFuture != null) {
+      return _stopFuture;
+    }
+    if (!_isRecording) {
+      return _lastResult;
+    }
 
+    _stopFuture = _executeStop();
+    try {
+      final result = await _stopFuture;
+      _lastResult = result;
+      return result;
+    } finally {
+      _stopFuture = null;
+    }
+  }
+
+  Future<RecordingResult?> _executeStop() async {
     _timer?.cancel();
     _timer = null;
     _isRecording = false;
@@ -179,6 +201,8 @@ class RealAudioRecordingService implements AudioRecordingService {
     _timer = null;
     _isRecording = false;
     _elapsedSeconds = 0;
+    _stopFuture = null;
+    _lastResult = null;
 
     try {
       await _audioRecorder.cancel();
@@ -215,6 +239,8 @@ class LocalAudioRecordingService implements AudioRecordingService {
   int _elapsedSeconds = 0;
   DateTime? _startedAt;
   String? _currentFilePath;
+  Future<RecordingResult?>? _stopFuture;
+  RecordingResult? _lastResult;
 
   final StreamController<int> _durationController =
       StreamController<int>.broadcast();
@@ -240,6 +266,8 @@ class LocalAudioRecordingService implements AudioRecordingService {
     _isRecording = true;
     _elapsedSeconds = 0;
     _startedAt = DateTime.now();
+    _stopFuture = null;
+    _lastResult = null;
 
     if (customPath != null && customPath.isNotEmpty) {
       _currentFilePath = customPath;
@@ -275,6 +303,7 @@ class LocalAudioRecordingService implements AudioRecordingService {
       // Limite máximo de segurança para nota rápida: 30 segundos
       if (_elapsedSeconds >= 30) {
         timer.cancel();
+        unawaited(stopRecording());
       }
     });
 
@@ -283,8 +312,24 @@ class LocalAudioRecordingService implements AudioRecordingService {
 
   @override
   Future<RecordingResult?> stopRecording() async {
-    if (!_isRecording) return null;
+    if (_stopFuture != null) {
+      return _stopFuture;
+    }
+    if (!_isRecording) {
+      return _lastResult;
+    }
 
+    _stopFuture = _executeStop();
+    try {
+      final result = await _stopFuture;
+      _lastResult = result;
+      return result;
+    } finally {
+      _stopFuture = null;
+    }
+  }
+
+  Future<RecordingResult?> _executeStop() async {
     _timer?.cancel();
     _timer = null;
     _isRecording = false;
@@ -323,6 +368,8 @@ class LocalAudioRecordingService implements AudioRecordingService {
     _timer = null;
     _isRecording = false;
     _elapsedSeconds = 0;
+    _stopFuture = null;
+    _lastResult = null;
 
     if (_currentFilePath != null &&
         !kIsWeb &&

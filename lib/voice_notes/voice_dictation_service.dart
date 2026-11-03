@@ -20,6 +20,7 @@ class RealVoiceDictationService implements VoiceDictationService {
   final stt.SpeechToText _speech = stt.SpeechToText();
   bool _isInitialized = false;
   bool _isListening = false;
+  ValueChanged<String>? _currentOnError;
 
   @override
   bool get isListening => _isListening;
@@ -31,6 +32,9 @@ class RealVoiceDictationService implements VoiceDictationService {
         _isInitialized = await _speech.initialize(
           onError: (error) {
             _isListening = false;
+            _currentOnError?.call(
+              'Ditado offline indisponível (${error.errorMsg}). Digite o resumo manualmente.',
+            );
           },
           onStatus: (status) {
             _isListening = status == 'listening';
@@ -48,11 +52,12 @@ class RealVoiceDictationService implements VoiceDictationService {
     required ValueChanged<String> onResult,
     ValueChanged<String>? onError,
   }) async {
+    _currentOnError = onError;
     try {
       final available = await isAvailable();
       if (!available) {
         onError?.call(
-          'Reconhecimento de fala indisponível no dispositivo. Digite o resumo manualmente.',
+          'Reconhecimento de fala offline indisponível no iOS. O áudio está sendo gravado e preservado; você pode digitar o resumo manualmente.',
         );
         return;
       }
@@ -70,13 +75,16 @@ class RealVoiceDictationService implements VoiceDictationService {
       );
     } catch (e) {
       _isListening = false;
-      onError?.call('Erro ao iniciar reconhecimento de voz: $e');
+      onError?.call(
+        'Erro ao iniciar reconhecimento de fala offline: $e. O áudio segue sendo gravado normalmente.',
+      );
     }
   }
 
   @override
   Future<void> stopListening() async {
     _isListening = false;
+    _currentOnError = null;
     try {
       await _speech.stop();
     } catch (_) {}
@@ -85,6 +93,7 @@ class RealVoiceDictationService implements VoiceDictationService {
   @override
   void dispose() {
     _isListening = false;
+    _currentOnError = null;
     try {
       _speech.cancel();
     } catch (_) {}
@@ -96,14 +105,17 @@ class RealVoiceDictationService implements VoiceDictationService {
 class LocalVoiceDictationService implements VoiceDictationService {
   bool _isListening = false;
   ValueChanged<String>? _onResult;
+  ValueChanged<String>? _onError;
   String _currentTranscription = '';
   final List<String> _pendingEmissions = [];
+  bool availableOverride = true;
+  String? failureReason;
 
   @override
   bool get isListening => _isListening;
 
   @override
-  Future<bool> isAvailable() async => true;
+  Future<bool> isAvailable() async => availableOverride;
 
   @override
   Future<void> startListening({
@@ -112,7 +124,16 @@ class LocalVoiceDictationService implements VoiceDictationService {
   }) async {
     _isListening = true;
     _onResult = onResult;
+    _onError = onError;
     _currentTranscription = '';
+
+    if (!availableOverride || failureReason != null) {
+      onError?.call(
+        failureReason ?? 'Reconhecimento de fala offline indisponível no dispositivo. Digite o resumo manualmente.',
+      );
+      return;
+    }
+
     for (final pending in _pendingEmissions) {
       _currentTranscription = pending;
       _onResult!(pending);
@@ -130,9 +151,15 @@ class LocalVoiceDictationService implements VoiceDictationService {
     }
   }
 
+  /// Método utilitário para simular falha no ditado durante gravação
+  void emitError(String error) {
+    _onError?.call(error);
+  }
+
   @override
   Future<void> stopListening() async {
     _isListening = false;
+    _onError = null;
     _pendingEmissions.clear();
   }
 
@@ -140,6 +167,7 @@ class LocalVoiceDictationService implements VoiceDictationService {
   void dispose() {
     _isListening = false;
     _onResult = null;
+    _onError = null;
     _pendingEmissions.clear();
   }
 }

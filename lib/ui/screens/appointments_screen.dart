@@ -112,6 +112,10 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
         return AppTheme.alertAmber;
       case 'reagendado':
         return const Color(0xFF8B5CF6);
+      case 'conflito':
+        return AppTheme.alertRed;
+      case 'provisorio':
+        return AppTheme.alertAmber;
       default:
         return AppTheme.primaryBlue;
     }
