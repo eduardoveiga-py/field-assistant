@@ -1,4 +1,8 @@
+import 'package:drift/drift.dart' as drift;
+import 'package:http/http.dart' as http;
+
 import '../database/app_database.dart';
+import '../database/repository.dart';
 
 class ParsedIcsEvent {
   final String summary;
@@ -256,5 +260,88 @@ class IcsCalendarHelper {
 
     buffer.writeln('END:VCALENDAR');
     return buffer.toString();
+  }
+
+  /// Importa uma string iCalendar (.ics) para o banco de dados via [AppRepository]
+  /// Identifica eventos existentes pelo apptId ou por correspondência de título e horário próximo (< 5 min).
+  static Future<({int created, int updated})> importIcsEventsToRepository({
+    required AppRepository repo,
+    required String rawIcs,
+  }) async {
+    int createdCount = 0;
+    int updatedCount = 0;
+    final existingAppts = await repo.db.select(repo.db.appointments).get();
+    final events = parseIcsEvents(rawIcs);
+
+    for (final ev in events) {
+      AppointmentEntry? existing;
+      if (ev.apptId != null) {
+        existing = existingAppts.where((a) => a.id == ev.apptId).firstOrNull;
+      }
+      existing ??= existingAppts.where((a) {
+        final sameTitle =
+            a.title.trim().toLowerCase() == ev.summary.trim().toLowerCase();
+        final timeDiff = a.startTime.difference(ev.startTime).inMinutes.abs();
+        return sameTitle && timeDiff < 5;
+      }).firstOrNull;
+
+      if (existing != null) {
+        await repo.updateAppointment(
+          existing.copyWith(
+            title: ev.summary,
+            startTime: ev.startTime,
+            endTime: ev.endTime,
+            durationMinutes: ev.durationMinutes,
+            status: ev.status,
+            locationNotes: drift.Value(ev.location ?? existing.locationNotes),
+          ),
+        );
+        updatedCount++;
+      } else {
+        await repo.createAppointment(
+          id: ev.apptId,
+          title: ev.summary,
+          startTime: ev.startTime,
+          endTime: ev.endTime,
+          durationMinutes: ev.durationMinutes,
+          status: ev.status,
+          locationNotes: ev.location,
+        );
+        createdCount++;
+      }
+    }
+    return (created: createdCount, updated: updatedCount);
+  }
+
+  /// Sincroniza compromissos a partir de uma URL Webcal / iCal
+  static Future<({int created, int updated})?> syncFromWebcalUrl({
+    required AppRepository repo,
+    required String rawUrl,
+    bool silent = false,
+  }) async {
+    var cleanUrl = rawUrl.trim().replaceAll(RegExp(r'^["\x27]|["\x27]$'), '');
+    if (cleanUrl.startsWith('webcal://') || cleanUrl.startsWith('webcals://')) {
+      cleanUrl = cleanUrl.replaceFirst(RegExp(r'^webcals?://'), 'https://');
+    }
+    String? icsBody;
+    try {
+      final uri = Uri.parse(cleanUrl);
+      final resp = await http.get(uri).timeout(const Duration(seconds: 10));
+      if (resp.statusCode == 200 && resp.body.contains('BEGIN:VCALENDAR')) {
+        icsBody = resp.body;
+      }
+    } catch (e) {
+      if (icsBody == null && !silent) {
+        throw Exception(
+          'Não foi possível acessar a URL diretamente por restrições de rede ou CORS.\n\n'
+          'Por favor, utilize a integração oficial em "Calendários Conectados", ou baixe o arquivo .ics e importe usando "Selecionar Arquivo .ics" para manter seus dados 100% privados.',
+        );
+      }
+    }
+
+    if (icsBody != null) {
+      return importIcsEventsToRepository(repo: repo, rawIcs: icsBody);
+    }
+    return null;
   }
 }

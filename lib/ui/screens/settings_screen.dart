@@ -10,6 +10,7 @@ import 'activities_screen.dart';
 import 'trash_screen.dart';
 import 'customize_features_screen.dart';
 import 'connected_calendars_screen.dart';
+import '../../appointments/ics_management_sheet.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -752,6 +753,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                     );
                   },
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  key: const ValueKey('settings_ics_import_export_tile'),
+                  leading: const Icon(
+                    Icons.file_download_outlined,
+                    color: Color(0xFF7C3AED),
+                  ),
+                  title: const Text('Importar / Exportar Calendário (.ics)'),
+                  subtitle: const Text(
+                    'Importação e exportação de compromissos via arquivo iCalendar.',
+                  ),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+                  onTap: () => showIcsManagementModal(context, ref),
                 ),
               ],
             ),

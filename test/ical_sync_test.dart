@@ -1,5 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:drift/native.dart';
 import 'package:ministerio_pessoal/database/app_database.dart';
+import 'package:ministerio_pessoal/database/repository.dart';
 import 'package:ministerio_pessoal/appointments/ics_calendar_helper.dart';
 
 void main() {
@@ -115,5 +117,83 @@ END:VCALENDAR
         expect(ics, contains('END:VCALENDAR'));
       },
     );
+
+    test('TC-ICAL-05: importIcsEventsToRepository cria novos compromissos a partir de .ics', () async {
+      final db = AppDatabase.forTesting(NativeDatabase.memory());
+      final repo = AppRepository(db);
+
+      const ics = '''
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Test//EN
+BEGIN:VEVENT
+UID:event-101@google.com
+DTSTART:20261105T100000Z
+DTEND:20261105T110000Z
+SUMMARY:Revisita com Carlos
+LOCATION:Rua B, 200
+STATUS:CONFIRMED
+END:VEVENT
+END:VCALENDAR
+''';
+
+      final res = await IcsCalendarHelper.importIcsEventsToRepository(
+        repo: repo,
+        rawIcs: ics,
+      );
+
+      expect(res.created, equals(1));
+      expect(res.updated, equals(0));
+
+      final all = await db.select(db.appointments).get();
+      expect(all.length, equals(1));
+      expect(all.first.title, equals('Revisita com Carlos'));
+      expect(all.first.locationNotes, equals('Rua B, 200'));
+
+      await db.close();
+    });
+
+    test('TC-ICAL-06: importIcsEventsToRepository atualiza compromisso existente com mesmo título e horário', () async {
+      final db = AppDatabase.forTesting(NativeDatabase.memory());
+      final repo = AppRepository(db);
+
+      final existing = await repo.createAppointment(
+        title: 'Estudo Bíblico Família Silva',
+        startTime: DateTime.utc(2026, 11, 6, 14, 0),
+        endTime: DateTime.utc(2026, 11, 6, 15, 0),
+        durationMinutes: 60,
+        status: 'confirmado',
+      );
+
+      const ics = '''
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Test//EN
+BEGIN:VEVENT
+UID:silva-updated@google.com
+DTSTART:20261106T140000Z
+DTEND:20261106T153000Z
+SUMMARY:Estudo Bíblico Família Silva
+LOCATION:Casa da Família Silva - Sala
+STATUS:CONFIRMED
+END:VEVENT
+END:VCALENDAR
+''';
+
+      final res = await IcsCalendarHelper.importIcsEventsToRepository(
+        repo: repo,
+        rawIcs: ics,
+      );
+
+      expect(res.created, equals(0));
+      expect(res.updated, equals(1));
+
+      final all = await db.select(db.appointments).get();
+      expect(all.length, equals(1));
+      expect(all.first.id, equals(existing.id));
+      expect(all.first.locationNotes, equals('Casa da Família Silva - Sala'));
+
+      await db.close();
+    });
   });
 }

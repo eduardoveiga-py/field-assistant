@@ -6,6 +6,7 @@ import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../../appointments/calendar_provider.dart';
 import '../../appointments/calendar_sync_coordinator.dart';
+import '../../appointments/ics_management_sheet.dart';
 
 class ConnectedCalendarsScreen extends ConsumerStatefulWidget {
   const ConnectedCalendarsScreen({super.key});
@@ -710,7 +711,7 @@ class _ConnectedCalendarsScreenState
                   if (kIsWeb) ...[
                     const SizedBox(height: 10),
                     Text(
-                      'No navegador Web, utilize a integração com Google Calendar ou importe/exporte arquivos .ics na tela da Agenda.',
+                      'No navegador Web, utilize a integração oficial com Google Calendar ou importe/exporte arquivos .ics na seção de Sincronização das Configurações.',
                       style: TextStyle(
                         fontSize: 12,
                         color: Theme.of(context).textTheme.bodySmall?.color
@@ -796,6 +797,19 @@ class _ConnectedCalendarsScreenState
                 ),
               ),
               onPressed: _isSyncing ? null : _syncNow,
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: OutlinedButton.icon(
+              icon: const Icon(
+                Icons.file_download_outlined,
+                color: Color(0xFF7C3AED),
+              ),
+              label: const Text('Importar / Exportar Arquivo .ics (iCalendar)'),
+              onPressed: () => showIcsManagementModal(context, ref),
             ),
           ),
         ],
