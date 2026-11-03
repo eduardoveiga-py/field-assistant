@@ -64,27 +64,34 @@
 10. **Otimização de Throughput e Resiliência em Cálculos:**
     - Em `lib/dashboard/pioneer_pace_calculator.dart`: otimização de iteração de dias com máscara binária de bits (`mask |= (1 << w)`), garantindo throughput superior a 10.000 iterações em tempo recorde sob carga extrema de CPU.
 
-11. **Validação Automatizada Abrangente (18 Novos Testes Formais):**
-    - Criado `test/sync/supabase_hardening_u3_2_test.dart` com 17 testes formais.
-    - Expandido `test/sync_engine_test.dart` com teste de igualdade estrutural profunda em coleções.
-    - Total da suíte expandido de 573 para **591 testes**, todos aprovados com 100% de sucesso.
+11. **Validação Automatizada Abrangente (29 Novos Testes Formais):**
+    - Criado `test/sync/supabase_hardening_u3_2_test.dart` com 17 testes cobrindo BUG-U3-02 a BUG-U3-10, ISSUE-U2-01 e ISSUE-U2-02.
+    - Expandido `test/sync_engine_test.dart` com teste de igualdade profunda em coleções.
+    - Criado `test/sync/u3_2_integrated_acceptance_test.dart` com 11 testes cobrindo concorrência na agenda pós-sincronização, parada física aos 30s no áudio, cancelamento seguro, ditado offline com fallback e verificação de schema Supabase RLS.
+    - Total da suíte expandido de 573 para **602 testes**, todos aprovados com 100% de sucesso.
     - Análise estática aprovada com **0 issues** sob `--fatal-infos`.
     - Formatação estrita aprovada (`dart format`).
     - Compilação Web de produção aprovada (`flutter build web --release`).
 
-12. **Memória Técnica e Documentação:**
-    - Criado **ADR-014** em `docs/engineering/DECISION_LOG.md`.
+12. **Resolução Integrada de Concorrência na Agenda, Áudio e Ditado:**
+    - Agenda: rotina atômica em `SupabaseSyncService._checkAndMarkAppointmentConflicts` que detecta sobreposições de horários de compromissos baixados da nuvem, marcando status como `conflito` e `isProvisional: true` tanto no SQLite Drift quanto na carga de itens pendentes na `sync_queue`.
+    - Supabase Schema: migração `20261102020000_u3_2_storage_and_hardening.sql` atualizada para suportar `conflito` no check constraint `appointments_status_check`.
+    - Áudio 30s: `LocalAudioRecordingService` e `RealAudioRecordingService` executam parada física do hardware no limite de 30s e no `dispose()`, com barreira de cancelamento (`_isCancelled`), timeout de segurança e eliminação de arquivos órfãos.
+    - Ditado Offline: `QuickVoiceNoteDialog` preserva o áudio e fornece mensagem explícita de fallback caso o reconhecimento de voz nativo offline não esteja disponível.
+
+13. **Memória Técnica e Documentação:**
+    - Criados **ADR-014** e **ADR-015** em `docs/engineering/DECISION_LOG.md`.
     - Atualizados `IMPLEMENTATION_STATUS.md`, `PRODUCTION_READINESS.md`, `SESSION_HANDOFF.md`, `REGRESSION_GUARDRAILS.md` e `README.md`.
 
 ---
 
 ## 3. Estado Atual dos Testes e Ambiente
-- **Testes Unitários, Widget e Integração:** 591 aprovados, 0 falhas (`flutter test`).
+- **Testes Unitários, Widget e Integração:** 602 aprovados, 0 falhas (`flutter test`).
 - **Análise Estática:** 0 issues (`dart analyze lib test --fatal-infos`).
 - **Formatação de Código:** 100% em conformidade (`dart format`).
 - **Build Web Release:** `√ Built build\web` com sucesso.
 - **Branch Ativa:** `stabilization/u3.2-definitive-hardening`.
-- **Commit Final da U3.2:** `5dc1f96`.
+- **Commit Final da U3.2:** `770f672`.
 
 ---
 
