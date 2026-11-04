@@ -65,6 +65,15 @@ class GoogleAuthResult {
       );
 }
 
+/// Exceção lançada em caso de falhas específicas de autenticação ou configuração com o Google Calendar.
+class GoogleCalendarAuthException implements Exception {
+  final String message;
+  const GoogleCalendarAuthException(this.message);
+
+  @override
+  String toString() => 'GoogleCalendarAuthException: $message';
+}
+
 /// Utilitários para conformidade estrita de privacidade e higiene de logs (sem Bearer tokens, senhas ou e-mails completos).
 class LoggingHygiene {
   static String maskEmail(String? email) {
@@ -165,10 +174,17 @@ class GoogleCalendarProvider implements CalendarProvider {
               defaultValue: '',
             ).trim();
 
+      if (kIsWeb && effectiveClientId.isEmpty) {
+        _initialized = false;
+        _lastAuthFailureReason =
+            GoogleAuthFailureReason.clientConfigurationError;
+        _lastAuthErrorMessage =
+            'Google Web Client ID não configurado para ambiente Web. Configure seu Client ID nas preferências de calendário.';
+        throw GoogleCalendarAuthException(_lastAuthErrorMessage!);
+      }
+
       await _googleSignIn.initialize(
-        clientId: kIsWeb && effectiveClientId.isNotEmpty
-            ? effectiveClientId
-            : null,
+        clientId: effectiveClientId.isNotEmpty ? effectiveClientId : null,
       );
       _initialized = true;
     } catch (e) {
@@ -194,6 +210,11 @@ class GoogleCalendarProvider implements CalendarProvider {
     }
     if (str.contains('clientconfigurationerror') ||
         str.contains('unauthorized_client') ||
+        str.contains('invalid_client') ||
+        str.contains('the oauth client was not found') ||
+        str.contains('client was not found') ||
+        str.contains('401') ||
+        str.contains('oauth client') ||
         str.contains('idpiframe_initialization_failed') ||
         str.contains('clientid') ||
         str.contains('client_id') ||

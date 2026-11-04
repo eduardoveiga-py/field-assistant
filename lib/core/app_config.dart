@@ -401,11 +401,41 @@ class AppConfig {
     return 'AppConfig(env: ${environment.name}, status: ${status.name}, url: $maskedUrl, anonKey: $maskedAnonKey, googleClientId: $maskedGoogleWebClientId)';
   }
 
+  /// Cria uma cópia com campos modificados, revalidando através de [AppConfig.create].
+  AppConfig copyWith({
+    AppEnvironment? environment,
+    String? supabaseUrl,
+    String? supabaseAnonKey,
+    String? googleWebClientId,
+  }) {
+    return AppConfig.create(
+      environment: environment ?? this.environment,
+      supabaseUrl: supabaseUrl ?? this.supabaseUrl,
+      supabaseAnonKey: supabaseAnonKey ?? this.supabaseAnonKey,
+      googleWebClientId: googleWebClientId ?? this.googleWebClientId,
+    );
+  }
+
   @override
   String toString() => toDiagnosticString();
 }
 
-/// Provider Riverpod para disponibilização global da configuração validada.
-final appConfigProvider = Provider<AppConfig>((ref) {
-  return AppConfig.fromEnvironment();
-});
+/// Notifier para gestão reativa e atualização dinâmica de configurações de ambiente e nuvem.
+class AppConfigNotifier extends Notifier<AppConfig> {
+  final AppConfig? _initialConfig;
+
+  AppConfigNotifier([this._initialConfig]);
+
+  @override
+  AppConfig build() => _initialConfig ?? AppConfig.fromEnvironment();
+
+  /// Atualiza dinamicamente a configuração do app em tempo de execução.
+  void updateConfig(AppConfig newConfig) {
+    state = newConfig;
+  }
+}
+
+/// Provider Riverpod para disponibilização global e reativa da configuração validada.
+final appConfigProvider = NotifierProvider<AppConfigNotifier, AppConfig>(
+  AppConfigNotifier.new,
+);

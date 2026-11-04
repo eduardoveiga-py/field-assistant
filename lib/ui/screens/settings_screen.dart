@@ -11,6 +11,9 @@ import 'trash_screen.dart';
 import 'customize_features_screen.dart';
 import 'connected_calendars_screen.dart';
 import '../../appointments/ics_management_sheet.dart';
+import '../../core/app_config.dart';
+import '../../core/supabase_initializer.dart';
+import '../../database/app_database.dart';
 import '../../sync/supabase_auth_service.dart';
 import '../../sync/supabase_sync_service.dart';
 
@@ -562,6 +565,176 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  // Diálogo de Configuração Dinâmica do Servidor Supabase
+  void _showSupabaseConfigDialog(BuildContext context) {
+    final currentConfig = ref.read(appConfigProvider);
+    final urlController = TextEditingController(text: currentConfig.supabaseUrl);
+    final anonKeyController = TextEditingController(text: currentConfig.supabaseAnonKey);
+    final googleClientIdController = TextEditingController(text: currentConfig.googleWebClientId);
+    bool isSaving = false;
+    String? validationError;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          return AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.cloud_sync, color: AppTheme.primaryBlue),
+                SizedBox(width: 8),
+                Expanded(child: Text('Configurar Servidor Supabase')),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Informe as credenciais públicas do seu projeto Supabase para habilitar autenticação e sincronização na nuvem.',
+                    style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: urlController,
+                    keyboardType: TextInputType.url,
+                    decoration: const InputDecoration(
+                      labelText: 'URL do Projeto Supabase *',
+                      hintText: 'https://seu-projeto.supabase.co',
+                      prefixIcon: Icon(Icons.link),
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: anonKeyController,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Chave Pública Anon Key *',
+                      hintText: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+                      prefixIcon: Icon(Icons.vpn_key_outlined),
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: googleClientIdController,
+                    decoration: const InputDecoration(
+                      labelText: 'Google Web Client ID (Opcional)',
+                      hintText: 'xxxx.apps.googleusercontent.com',
+                      prefixIcon: Icon(Icons.g_mobiledata),
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  if (validationError != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      validationError!,
+                      style: const TextStyle(color: Colors.red, fontSize: 12),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: isSaving ? null : () => Navigator.pop(ctx),
+                child: const Text('Cancelar'),
+              ),
+              ElevatedButton(
+                onPressed: isSaving
+                    ? null
+                    : () async {
+                        final rawUrl = urlController.text.trim();
+                        final rawKey = anonKeyController.text.trim();
+                        final rawGoogleId = googleClientIdController.text.trim();
+
+                        final testConfig = AppConfig.create(
+                          environment: currentConfig.environment,
+                          supabaseUrl: rawUrl,
+                          supabaseAnonKey: rawKey,
+                          googleWebClientId: rawGoogleId,
+                        );
+
+                        if (testConfig.isInvalid) {
+                          setDialogState(() {
+                            validationError = testConfig.validationErrorMessage ??
+                                'Configuração inválida.';
+                          });
+                          return;
+                        }
+
+                        setDialogState(() {
+                          isSaving = true;
+                          validationError = null;
+                        });
+
+                        try {
+                          final db = ref.read(databaseProvider);
+                          await db.into(db.appKvStore).insertOnConflictUpdate(
+                                AppKvStoreCompanion.insert(
+                                  key: 'config_supabase_url',
+                                  value: rawUrl,
+                                ),
+                              );
+                          await db.into(db.appKvStore).insertOnConflictUpdate(
+                                AppKvStoreCompanion.insert(
+                                  key: 'config_supabase_anon_key',
+                                  value: rawKey,
+                                ),
+                              );
+                          if (rawGoogleId.isNotEmpty) {
+                            await db.into(db.appKvStore).insertOnConflictUpdate(
+                                  AppKvStoreCompanion.insert(
+                                    key: 'config_google_web_client_id',
+                                    value: rawGoogleId,
+                                  ),
+                                );
+                          }
+
+                          ref.read(appConfigProvider.notifier).updateConfig(testConfig);
+
+                          if (testConfig.status == ConfigStatus.valid) {
+                            await SupabaseInitializer.initializeIfConfigured(
+                              config: testConfig,
+                            );
+                          }
+
+                          if (!ctx.mounted) return;
+                          Navigator.pop(ctx);
+
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Servidor Supabase configurado com sucesso!'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                            _showAuthModal(context);
+                          }
+                        } catch (e) {
+                          setDialogState(() {
+                            isSaving = false;
+                            validationError = 'Erro ao conectar ao servidor: $e';
+                          });
+                        }
+                      },
+                child: isSaving
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Salvar e Conectar'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   // Diálogo para Autenticação Supabase (Login, Cadastro e Recuperação de Senha)
   void _showAuthModal(BuildContext context) {
     final emailController = TextEditingController();
@@ -598,6 +771,54 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         : 'Acesse sua conta para sincronizar suas visitas, estudos e territórios.',
                     style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
                   ),
+                  if (!authService.isConfigured) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.amber),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.info_outline, color: Colors.amber, size: 16),
+                              SizedBox(width: 6),
+                              Text(
+                                'Servidor Supabase não configurado',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'Configure a URL e Anon Key do seu projeto para poder entrar ou se cadastrar.',
+                            style: TextStyle(fontSize: 11),
+                          ),
+                          const SizedBox(height: 6),
+                          OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            icon: const Icon(Icons.settings, size: 14),
+                            label: const Text('Configurar Servidor', style: TextStyle(fontSize: 11)),
+                            onPressed: () {
+                              Navigator.pop(ctx);
+                              _showSupabaseConfigDialog(context);
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   TextField(
                     controller: emailController,
@@ -674,6 +895,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         if (email.isEmpty || password.isEmpty) {
                           setDialogState(() {
                             errorMessage = 'Preencha e-mail e senha.';
+                          });
+                          return;
+                        }
+
+                        if (!authService.isConfigured) {
+                          setDialogState(() {
+                            errorMessage = 'Servidor não configurado. Toque em "Configurar Servidor" acima.';
                           });
                           return;
                         }
@@ -832,14 +1060,39 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       );
     }
 
+    final isConfigured = authService.isConfigured;
+
+    if (!isConfigured) {
+      return ListTile(
+        leading: const Icon(Icons.cloud_queue, color: Color(0xFFD97706), size: 28),
+        title: const Text('Conta Supabase (Nuvem)'),
+        subtitle: const Text('Servidor não configurado. Toque para conectar seu projeto.'),
+        trailing: ElevatedButton.icon(
+          icon: const Icon(Icons.settings, size: 16),
+          label: const Text('Configurar', style: TextStyle(fontSize: 12)),
+          onPressed: () => _showSupabaseConfigDialog(context),
+        ),
+      );
+    }
+
     return ListTile(
       leading: const Icon(Icons.cloud_off, color: Color(0xFFD97706), size: 28),
       title: const Text('Conta Supabase'),
       subtitle: const Text('Não conectado. Entre para sincronizar entre aparelhos.'),
-      trailing: ElevatedButton.icon(
-        icon: const Icon(Icons.login, size: 16),
-        label: const Text('Entrar', style: TextStyle(fontSize: 12)),
-        onPressed: () => _showAuthModal(context),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.settings_outlined, size: 20),
+            tooltip: 'Configurações do Servidor',
+            onPressed: () => _showSupabaseConfigDialog(context),
+          ),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.login, size: 16),
+            label: const Text('Entrar', style: TextStyle(fontSize: 12)),
+            onPressed: () => _showAuthModal(context),
+          ),
+        ],
       ),
     );
   }

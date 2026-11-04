@@ -8,6 +8,9 @@ import '../../appointments/calendar_provider.dart';
 import '../../appointments/calendar_sync_coordinator.dart';
 import '../../appointments/google_calendar_provider.dart';
 import '../../appointments/ics_management_sheet.dart';
+import '../../core/app_config.dart';
+import '../../database/app_database.dart';
+import '../providers.dart';
 
 class ConnectedCalendarsScreen extends ConsumerStatefulWidget {
   const ConnectedCalendarsScreen({super.key});
@@ -33,6 +36,89 @@ class _ConnectedCalendarsScreenState
   String? _selectedAppleCalId;
 
   List<CalendarConflictItem> _conflicts = [];
+
+  Future<bool> _showConfigureGoogleClientIdDialog(BuildContext context) async {
+    final config = ref.read(appConfigProvider);
+    final controller = TextEditingController(text: config.googleWebClientId);
+    String? localError;
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          return AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.key, color: Colors.red),
+                SizedBox(width: 8),
+                Expanded(child: Text('Google Web Client ID')),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Para conectar o Google Agenda no navegador Web, informe o Client ID Web '
+                    'gerado no Google Cloud Console com as origens JavaScript autorizadas (ex: http://localhost:PORT).',
+                    style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: controller,
+                    decoration: InputDecoration(
+                      labelText: 'Client ID OAuth 2.0 Web *',
+                      hintText: '123456789-abcdef.apps.googleusercontent.com',
+                      errorText: localError,
+                      prefixIcon: const Icon(Icons.vpn_key_outlined),
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancelar'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  final entered = controller.text.trim();
+                  if (entered.isEmpty) {
+                    setDialogState(() {
+                      localError = 'Client ID não pode ser vazio.';
+                    });
+                    return;
+                  }
+
+                  final db = ref.read(databaseProvider);
+                  await db.into(db.appKvStore).insertOnConflictUpdate(
+                        AppKvStoreCompanion.insert(
+                          key: 'config_google_web_client_id',
+                          value: entered,
+                        ),
+                      );
+
+                  ref.read(appConfigProvider.notifier).updateConfig(
+                        config.copyWith(googleWebClientId: entered),
+                      );
+
+                  if (ctx.mounted) {
+                    Navigator.pop(ctx, true);
+                  }
+                },
+                child: const Text('Salvar'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    return result ?? false;
+  }
 
   @override
   void initState() {
@@ -148,6 +234,12 @@ class _ConnectedCalendarsScreenState
 
   Future<void> _connectGoogle() async {
     if (_isConnectingGoogle || _isSyncing) return;
+
+    final config = ref.read(appConfigProvider);
+    if (kIsWeb && config.googleWebClientId.trim().isEmpty) {
+      final configured = await _showConfigureGoogleClientIdDialog(context);
+      if (!configured) return;
+    }
 
     setState(() {
       _isConnectingGoogle = true;
@@ -624,6 +716,12 @@ class _ConnectedCalendarsScreenState
                           ],
                         ),
                       ),
+                      if (kIsWeb)
+                        IconButton(
+                          icon: const Icon(Icons.settings_outlined, size: 20),
+                          tooltip: 'Configurar Client ID Web',
+                          onPressed: () => _showConfigureGoogleClientIdDialog(context),
+                        ),
                       if (_isGoogleAuthorized)
                         OutlinedButton(
                           onPressed: (_isConnectingGoogle || _isSyncing)

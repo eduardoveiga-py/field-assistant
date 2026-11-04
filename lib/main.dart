@@ -19,10 +19,55 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // 2. Configuração de ambiente centralizada
-  final config = AppConfig.fromEnvironment();
+  var config = AppConfig.fromEnvironment();
 
   // 3. Banco relacional SQLite Drift local
   final db = AppDatabase();
+
+  // Se não foi configurado via compile-time environment (--dart-define),
+  // tenta carregar configurações previamente persistidas no banco local (appKvStore)
+  if (config.status == ConfigStatus.unconfigured) {
+    try {
+      final savedUrlRow = await (db.select(db.appKvStore)
+            ..where((t) => t.key.equals('config_supabase_url')))
+          .getSingleOrNull();
+      final savedKeyRow = await (db.select(db.appKvStore)
+            ..where((t) => t.key.equals('config_supabase_anon_key')))
+          .getSingleOrNull();
+      final savedGoogleClientIdRow = await (db.select(db.appKvStore)
+            ..where((t) => t.key.equals('config_google_web_client_id')))
+          .getSingleOrNull();
+
+      if (savedUrlRow != null &&
+          savedKeyRow != null &&
+          savedUrlRow.value.trim().isNotEmpty &&
+          savedKeyRow.value.trim().isNotEmpty) {
+        final runtimeConfig = AppConfig.create(
+          environment: AppEnvironment.development,
+          supabaseUrl: savedUrlRow.value.trim(),
+          supabaseAnonKey: savedKeyRow.value.trim(),
+          googleWebClientId: savedGoogleClientIdRow?.value.trim() ?? '',
+        );
+        if (runtimeConfig.isValid) {
+          config = runtimeConfig;
+          AppLogger.info(
+            'AppConfig carregado a partir do armazenamento persistente local (appKvStore): ${config.toDiagnosticString()}',
+          );
+        }
+      } else if (savedGoogleClientIdRow != null &&
+          savedGoogleClientIdRow.value.trim().isNotEmpty) {
+        config = config.copyWith(
+          googleWebClientId: savedGoogleClientIdRow.value.trim(),
+        );
+      }
+    } catch (e, st) {
+      AppLogger.warning(
+        'Falha não-bloqueante ao ler configurações salvas em appKvStore',
+        e,
+        st,
+      );
+    }
+  }
 
   // 4. Dependências locais do repositório
   final repository = AppRepository(db);
@@ -52,7 +97,7 @@ Future<void> main() async {
   runApp(
     ProviderScope(
       overrides: [
-        appConfigProvider.overrideWithValue(config),
+        appConfigProvider.overrideWith(() => AppConfigNotifier(config)),
         databaseProvider.overrideWithValue(db),
         repositoryProvider.overrideWithValue(repository),
       ],
