@@ -76,6 +76,14 @@ class SupabaseSyncService with WidgetsBindingObserver {
     'voice_notes',
     'phone_contacts',
     'territory_landmarks',
+    'family_ties',
+    'ministry_experiences',
+    'person_photos',
+    'person_publications',
+    'research_articles',
+    'research_tags',
+    'territory_sectors',
+    'student_manual_order',
   ];
 
   SupabaseSyncService({
@@ -138,6 +146,26 @@ class SupabaseSyncService with WidgetsBindingObserver {
     final rng = random ?? Random();
     final jitter = (rng.nextDouble() * 0.25 * base).round();
     return (base + jitter).clamp(1, 300);
+  }
+
+  /// Retorna a chave de cursor particionada por usuário para isolamento multi-tenant local.
+  String _cursorAtKey(String table, SupabaseClient client) {
+    String? uid;
+    try {
+      uid = client.auth.currentUser?.id;
+    } catch (_) {}
+    final prefix = (uid != null && uid.isNotEmpty) ? '${uid}_' : '';
+    return 'last_synced_at_$prefix$table';
+  }
+
+  /// Retorna a chave do último ID sincronizado particionada por usuário.
+  String _cursorIdKey(String table, SupabaseClient client) {
+    String? uid;
+    try {
+      uid = client.auth.currentUser?.id;
+    } catch (_) {}
+    final prefix = (uid != null && uid.isNotEmpty) ? '${uid}_' : '';
+    return 'last_synced_id_$prefix$table';
   }
 
   /// Inicia a observação de mudanças de estado do ciclo de vida da aplicação Flutter e conectividade.
@@ -254,6 +282,10 @@ class SupabaseSyncService with WidgetsBindingObserver {
         remote[camelToSnake(key)] = value;
       }
     });
+
+    if (remote['owner_id'] == 'local_user') {
+      remote.remove('owner_id');
+    }
 
     // Normalização ampla de campos JSONB se serializados como string JSON
     if (remote['tags'] is String) {
@@ -521,6 +553,60 @@ class SupabaseSyncService with WidgetsBindingObserver {
         map['name'] ??= '';
         map['category'] ??= 'outro';
         break;
+      case 'family_ties':
+        map['personId'] = (map['personId'] ?? map['person_id'] ?? '').toString();
+        map['relatedPersonId'] = map['relatedPersonId'] ?? map['related_person_id'];
+        map['relatedPersonName'] = (map['relatedPersonName'] ?? map['related_person_name'] ?? '').toString();
+        map['relationshipType'] = (map['relationshipType'] ?? map['relationship_type'] ?? '').toString();
+        break;
+      case 'ministry_experiences':
+        map['title'] ??= '';
+        map['content'] ??= '';
+        map['mediaUrls'] = map['mediaUrls'] ?? map['media_urls'] ?? '[]';
+        if (map['mediaUrls'] is! String) map['mediaUrls'] = jsonEncode(map['mediaUrls']);
+        map['tags'] ??= '[]';
+        if (map['tags'] is! String) map['tags'] = jsonEncode(map['tags']);
+        map['dateTimeField'] = _isoString(map['dateTimeField']) ??
+            _isoString(map['dateTime']) ??
+            _isoString(map['date_time']) ??
+            map['createdAt'];
+        map['locationOrModality'] = map['locationOrModality'] ?? map['location_or_modality'];
+        break;
+      case 'person_photos':
+        map['personId'] = (map['personId'] ?? map['person_id'] ?? '').toString();
+        map['photoType'] = (map['photoType'] ?? map['photo_type'] ?? 'profile').toString();
+        map['imageData'] = (map['imageData'] ?? map['image_data'] ?? '').toString();
+        break;
+      case 'person_publications':
+        map['personId'] = (map['personId'] ?? map['person_id'] ?? '').toString();
+        map['publicationTitle'] = (map['publicationTitle'] ?? map['publication_title'] ?? '').toString();
+        map['itemType'] = (map['itemType'] ?? map['item_type'] ?? 'livro').toString();
+        map['status'] ??= 'entregue';
+        map['date'] = _isoString(map['date']) ?? DateTime.now().toIso8601String().substring(0, 10);
+        map['notes'] = map['notes'];
+        break;
+      case 'research_articles':
+        map['title'] ??= '';
+        map['summary'] ??= '';
+        map['content'] ??= '';
+        map['tags'] = map['tags'] ?? '[]';
+        if (map['tags'] is! String) map['tags'] = jsonEncode(map['tags']);
+        map['attachments'] = map['attachments'] ?? '[]';
+        if (map['attachments'] is! String) map['attachments'] = jsonEncode(map['attachments']);
+        break;
+      case 'research_tags':
+        map['name'] ??= '';
+        break;
+      case 'territory_sectors':
+        map['name'] ??= '';
+        map['description'] = map['description'];
+        break;
+      case 'student_manual_order':
+        map['studyId'] = (map['studyId'] ?? map['study_id'] ?? '').toString();
+        map['manualIndex'] = map['manualIndex'] is int
+            ? map['manualIndex']
+            : int.tryParse(map['manualIndex']?.toString() ?? map['manual_index']?.toString() ?? '0') ?? 0;
+        break;
     }
     return map;
   }
@@ -563,6 +649,30 @@ class SupabaseSyncService with WidgetsBindingObserver {
         await db
             .into(db.territoryLandmarks)
             .insert(TerritoryLandmarkEntry.fromJson(map));
+        break;
+      case 'family_ties':
+        await db.into(db.familyTies).insert(FamilyTieEntry.fromJson(map));
+        break;
+      case 'ministry_experiences':
+        await db.into(db.ministryExperiences).insert(MinistryExperienceEntry.fromJson(map));
+        break;
+      case 'person_photos':
+        await db.into(db.personPhotos).insert(PersonPhotoEntry.fromJson(map));
+        break;
+      case 'person_publications':
+        await db.into(db.personPublications).insert(PersonPublicationEntry.fromJson(map));
+        break;
+      case 'research_articles':
+        await db.into(db.researchArticles).insert(ResearchArticleEntry.fromJson(map));
+        break;
+      case 'research_tags':
+        await db.into(db.researchTags).insert(ResearchTagEntry.fromJson(map));
+        break;
+      case 'territory_sectors':
+        await db.into(db.territorySectors).insert(TerritorySectorEntry.fromJson(map));
+        break;
+      case 'student_manual_order':
+        await db.into(db.studentManualOrder).insert(StudentManualOrderEntry.fromJson(map));
         break;
     }
   }
@@ -632,6 +742,30 @@ class SupabaseSyncService with WidgetsBindingObserver {
         await db
             .update(db.territoryLandmarks)
             .replace(TerritoryLandmarkEntry.fromJson(map));
+        break;
+      case 'family_ties':
+        await db.update(db.familyTies).replace(FamilyTieEntry.fromJson(map));
+        break;
+      case 'ministry_experiences':
+        await db.update(db.ministryExperiences).replace(MinistryExperienceEntry.fromJson(map));
+        break;
+      case 'person_photos':
+        await db.update(db.personPhotos).replace(PersonPhotoEntry.fromJson(map));
+        break;
+      case 'person_publications':
+        await db.update(db.personPublications).replace(PersonPublicationEntry.fromJson(map));
+        break;
+      case 'research_articles':
+        await db.update(db.researchArticles).replace(ResearchArticleEntry.fromJson(map));
+        break;
+      case 'research_tags':
+        await db.update(db.researchTags).replace(ResearchTagEntry.fromJson(map));
+        break;
+      case 'territory_sectors':
+        await db.update(db.territorySectors).replace(TerritorySectorEntry.fromJson(map));
+        break;
+      case 'student_manual_order':
+        await db.update(db.studentManualOrder).replace(StudentManualOrderEntry.fromJson(map));
         break;
     }
   }
@@ -772,6 +906,78 @@ class SupabaseSyncService with WidgetsBindingObserver {
           ),
         );
         break;
+      case 'family_ties':
+        await (db.update(db.familyTies)..where((t) => t.id.equals(id))).write(
+          FamilyTiesCompanion(
+            deletedAt: drift.Value(deletedAt),
+            updatedAt: drift.Value(updatedAt),
+            revision: revision != null ? drift.Value(revision) : const drift.Value.absent(),
+          ),
+        );
+        break;
+      case 'ministry_experiences':
+        await (db.update(db.ministryExperiences)..where((t) => t.id.equals(id))).write(
+          MinistryExperiencesCompanion(
+            deletedAt: drift.Value(deletedAt),
+            updatedAt: drift.Value(updatedAt),
+            revision: revision != null ? drift.Value(revision) : const drift.Value.absent(),
+          ),
+        );
+        break;
+      case 'person_photos':
+        await (db.update(db.personPhotos)..where((t) => t.id.equals(id))).write(
+          PersonPhotosCompanion(
+            deletedAt: drift.Value(deletedAt),
+            updatedAt: drift.Value(updatedAt),
+            revision: revision != null ? drift.Value(revision) : const drift.Value.absent(),
+          ),
+        );
+        break;
+      case 'person_publications':
+        await (db.update(db.personPublications)..where((t) => t.id.equals(id))).write(
+          PersonPublicationsCompanion(
+            deletedAt: drift.Value(deletedAt),
+            updatedAt: drift.Value(updatedAt),
+            revision: revision != null ? drift.Value(revision) : const drift.Value.absent(),
+          ),
+        );
+        break;
+      case 'research_articles':
+        await (db.update(db.researchArticles)..where((t) => t.id.equals(id))).write(
+          ResearchArticlesCompanion(
+            deletedAt: drift.Value(deletedAt),
+            updatedAt: drift.Value(updatedAt),
+            revision: revision != null ? drift.Value(revision) : const drift.Value.absent(),
+          ),
+        );
+        break;
+      case 'research_tags':
+        await (db.update(db.researchTags)..where((t) => t.id.equals(id))).write(
+          ResearchTagsCompanion(
+            deletedAt: drift.Value(deletedAt),
+            updatedAt: drift.Value(updatedAt),
+            revision: revision != null ? drift.Value(revision) : const drift.Value.absent(),
+          ),
+        );
+        break;
+      case 'territory_sectors':
+        await (db.update(db.territorySectors)..where((t) => t.id.equals(id))).write(
+          TerritorySectorsCompanion(
+            deletedAt: drift.Value(deletedAt),
+            updatedAt: drift.Value(updatedAt),
+            revision: revision != null ? drift.Value(revision) : const drift.Value.absent(),
+          ),
+        );
+        break;
+      case 'student_manual_order':
+        await (db.update(db.studentManualOrder)..where((t) => t.studyId.equals(id))).write(
+          StudentManualOrderCompanion(
+            deletedAt: drift.Value(deletedAt),
+            updatedAt: drift.Value(updatedAt),
+            revision: revision != null ? drift.Value(revision) : const drift.Value.absent(),
+          ),
+        );
+        break;
     }
   }
 
@@ -826,6 +1032,30 @@ class SupabaseSyncService with WidgetsBindingObserver {
         final row = await (db.select(
           db.territoryLandmarks,
         )..where((t) => t.id.equals(id))).getSingleOrNull();
+        return row?.toJson();
+      case 'family_ties':
+        final row = await (db.select(db.familyTies)..where((t) => t.id.equals(id))).getSingleOrNull();
+        return row?.toJson();
+      case 'ministry_experiences':
+        final row = await (db.select(db.ministryExperiences)..where((t) => t.id.equals(id))).getSingleOrNull();
+        return row?.toJson();
+      case 'person_photos':
+        final row = await (db.select(db.personPhotos)..where((t) => t.id.equals(id))).getSingleOrNull();
+        return row?.toJson();
+      case 'person_publications':
+        final row = await (db.select(db.personPublications)..where((t) => t.id.equals(id))).getSingleOrNull();
+        return row?.toJson();
+      case 'research_articles':
+        final row = await (db.select(db.researchArticles)..where((t) => t.id.equals(id))).getSingleOrNull();
+        return row?.toJson();
+      case 'research_tags':
+        final row = await (db.select(db.researchTags)..where((t) => t.id.equals(id))).getSingleOrNull();
+        return row?.toJson();
+      case 'territory_sectors':
+        final row = await (db.select(db.territorySectors)..where((t) => t.id.equals(id))).getSingleOrNull();
+        return row?.toJson();
+      case 'student_manual_order':
+        final row = await (db.select(db.studentManualOrder)..where((t) => t.studyId.equals(id))).getSingleOrNull();
         return row?.toJson();
       default:
         return null;
@@ -1487,13 +1717,15 @@ class SupabaseSyncService with WidgetsBindingObserver {
 
     for (final table in syncTables) {
       try {
+        final atKey = _cursorAtKey(table, activeClient);
+        final idKey = _cursorIdKey(table, activeClient);
         final kvRow =
             await (db.select(db.appKvStore)
-                  ..where((t) => t.key.equals('last_synced_at_$table')))
+                  ..where((t) => t.key.equals(atKey)))
                 .getSingleOrNull();
         final kvIdRow =
             await (db.select(db.appKvStore)
-                  ..where((t) => t.key.equals('last_synced_id_$table')))
+                  ..where((t) => t.key.equals(idKey)))
                 .getSingleOrNull();
         final lastSyncedAt = kvRow != null
             ? DateTime.tryParse(kvRow.value)
@@ -1505,6 +1737,7 @@ class SupabaseSyncService with WidgetsBindingObserver {
         DateTime? newestUpdatedAt = lastSyncedAt;
         String? newestId = lastSyncedId;
         bool hadFailuresInTable = false;
+        final idCol = table == 'student_manual_order' ? 'study_id' : 'id';
 
         while (true) {
           var query = activeClient.from(table).select();
@@ -1512,7 +1745,7 @@ class SupabaseSyncService with WidgetsBindingObserver {
             final lastSyncedAtIso = lastSyncedAt.toUtc().toIso8601String();
             if (lastSyncedId != null && lastSyncedId.isNotEmpty) {
               query = query.or(
-                'updated_at.gt.$lastSyncedAtIso,and(updated_at.eq.$lastSyncedAtIso,id.gt.$lastSyncedId)',
+                'updated_at.gt.$lastSyncedAtIso,and(updated_at.eq.$lastSyncedAtIso,$idCol.gt.$lastSyncedId)',
               );
             } else {
               query = query.gte('updated_at', lastSyncedAtIso);
@@ -1521,7 +1754,7 @@ class SupabaseSyncService with WidgetsBindingObserver {
 
           final res = await query
               .order('updated_at', ascending: true)
-              .order('id', ascending: true)
+              .order(idCol, ascending: true)
               .range(offset, offset + pageSize - 1);
           final List rows = res as List;
           if (rows.isEmpty) break;
@@ -1529,7 +1762,7 @@ class SupabaseSyncService with WidgetsBindingObserver {
           for (final rawItem in rows) {
             totalProcessed++;
             final map = rawItem as Map<String, dynamic>;
-            final id = (map['id'] ?? '').toString();
+            final id = (map['id'] ?? map['study_id'] ?? map['studyId'] ?? '').toString();
             final updatedAtRaw = map['updated_at'] ?? map['updatedAt'];
             final dt = updatedAtRaw != null
                 ? DateTime.tryParse(updatedAtRaw.toString())
@@ -1576,7 +1809,7 @@ class SupabaseSyncService with WidgetsBindingObserver {
               .into(db.appKvStore)
               .insertOnConflictUpdate(
                 AppKvStoreCompanion.insert(
-                  key: 'last_synced_at_$table',
+                  key: atKey,
                   value: finalUpdatedAt.toUtc().toIso8601String(),
                   updatedAt: drift.Value(DateTime.now()),
                 ),
@@ -1587,7 +1820,7 @@ class SupabaseSyncService with WidgetsBindingObserver {
                 .into(db.appKvStore)
                 .insertOnConflictUpdate(
                   AppKvStoreCompanion.insert(
-                    key: 'last_synced_id_$table',
+                    key: idKey,
                     value: finalId,
                     updatedAt: drift.Value(DateTime.now()),
                   ),
@@ -1767,6 +2000,10 @@ class SupabaseSyncService with WidgetsBindingObserver {
                 localMap['deletedAt'] ?? localMap['deleted_at'];
           }
           final remotePayload = toRemotePayload(op.entityType, cleanPayload);
+          final currentUid = activeClient.auth.currentUser?.id;
+          if (currentUid != null && currentUid.isNotEmpty) {
+            remotePayload['owner_id'] = currentUid;
+          }
           await activeClient.from(tableName).upsert(remotePayload);
 
           if (tableName == 'voice_notes') {
@@ -1822,18 +2059,20 @@ class SupabaseSyncService with WidgetsBindingObserver {
             'revision': revision,
           };
 
+          final pkeyCol = tableName == 'student_manual_order' ? 'study_id' : 'id';
           await activeClient
               .from(tableName)
               .update(tombstonePayload)
-              .eq('id', op.entityId);
+              .eq(pkeyCol, op.entityId);
           await repository.markSyncOperationSuccess(op.id);
           _lastAttemptTime.remove(op.id);
           success++;
         } else if (operation == 'HARD_DELETE') {
+          final pkeyCol = tableName == 'student_manual_order' ? 'study_id' : 'id';
           await activeClient
               .from(tableName)
               .delete()
-              .eq('id', op.entityId);
+              .eq(pkeyCol, op.entityId);
           await repository.markSyncOperationSuccess(op.id);
           _lastAttemptTime.remove(op.id);
           success++;

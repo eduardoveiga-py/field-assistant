@@ -11,6 +11,8 @@ import 'trash_screen.dart';
 import 'customize_features_screen.dart';
 import 'connected_calendars_screen.dart';
 import '../../appointments/ics_management_sheet.dart';
+import '../../sync/supabase_auth_service.dart';
+import '../../sync/supabase_sync_service.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -560,6 +562,288 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  // Diálogo para Autenticação Supabase (Login, Cadastro e Recuperação de Senha)
+  void _showAuthModal(BuildContext context) {
+    final emailController = TextEditingController();
+    final passwordController = TextEditingController();
+    bool isSignUp = false;
+    bool isLoading = false;
+    String? errorMessage;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          final authService = ref.read(supabaseAuthServiceProvider);
+
+          return AlertDialog(
+            title: Row(
+              children: [
+                Icon(
+                  isSignUp ? Icons.person_add : Icons.account_circle,
+                  color: AppTheme.primaryBlue,
+                ),
+                const SizedBox(width: 8),
+                Text(isSignUp ? 'Criar Nova Conta' : 'Entrar na Conta'),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isSignUp
+                        ? 'Crie uma conta para sincronizar seus dados entre iPhone, iPad e Web.'
+                        : 'Acesse sua conta para sincronizar suas visitas, estudos e territórios.',
+                    style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: const InputDecoration(
+                      labelText: 'E-mail *',
+                      prefixIcon: Icon(Icons.email_outlined),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: passwordController,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Senha *',
+                      prefixIcon: Icon(Icons.lock_outline),
+                    ),
+                  ),
+                  if (errorMessage != null) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      errorMessage!,
+                      style: const TextStyle(color: Colors.red, fontSize: 12),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  if (!isSignUp)
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: isLoading
+                            ? null
+                            : () async {
+                                final email = emailController.text.trim();
+                                if (email.isEmpty) {
+                                  setDialogState(() {
+                                    errorMessage = 'Informe seu e-mail para recuperar a senha.';
+                                  });
+                                  return;
+                                }
+                                setDialogState(() => isLoading = true);
+                                final res = await authService.resetPasswordForEmail(email);
+                                setDialogState(() {
+                                  isLoading = false;
+                                  errorMessage = res.message ?? res.error;
+                                });
+                              },
+                        child: const Text('Esqueci minha senha', style: TextStyle(fontSize: 12)),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: isLoading
+                    ? null
+                    : () {
+                        setDialogState(() {
+                          isSignUp = !isSignUp;
+                          errorMessage = null;
+                        });
+                      },
+                child: Text(
+                  isSignUp ? 'Já tem conta? Entrar' : 'Não tem conta? Cadastrar',
+                ),
+              ),
+              ElevatedButton(
+                onPressed: isLoading
+                    ? null
+                    : () async {
+                        final email = emailController.text.trim();
+                        final password = passwordController.text;
+                        if (email.isEmpty || password.isEmpty) {
+                          setDialogState(() {
+                            errorMessage = 'Preencha e-mail e senha.';
+                          });
+                          return;
+                        }
+
+                        setDialogState(() {
+                          isLoading = true;
+                          errorMessage = null;
+                        });
+
+                        final result = isSignUp
+                            ? await authService.signUpWithEmailPassword(
+                                email: email,
+                                password: password,
+                              )
+                            : await authService.signInWithEmailPassword(
+                                email: email,
+                                password: password,
+                              );
+
+                        if (!ctx.mounted) return;
+
+                        if (!result.success) {
+                          setDialogState(() {
+                            isLoading = false;
+                            errorMessage = result.error ?? 'Falha na autenticação.';
+                          });
+                          return;
+                        }
+
+                        Navigator.pop(ctx);
+                        _handlePostLoginDataMigration(context, result.user?.id);
+                      },
+                child: isLoading
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(isSignUp ? 'Cadastrar' : 'Entrar'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  // Trata dados locais criados antes do login
+  Future<void> _handlePostLoginDataMigration(BuildContext context, String? userId) async {
+    if (userId == null) return;
+    final repo = ref.read(repositoryProvider);
+    final authService = ref.read(supabaseAuthServiceProvider);
+    final preLoginCount = await authService.countPreLoginRecords(repo.db);
+
+    if (preLoginCount > 0 && context.mounted) {
+      final choice = await showDialog<String>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.cloud_upload, color: AppTheme.primaryBlue),
+              SizedBox(width: 8),
+              Expanded(child: Text('Dados Locais Detectados')),
+            ],
+          ),
+          content: Text(
+            'Você possui $preLoginCount registro(s) criados neste aparelho antes de entrar na conta. '
+            'Deseja associar esses dados à sua conta na nuvem?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, 'discard'),
+              child: const Text('Descartar Locais', style: TextStyle(color: Colors.red)),
+            ),
+            OutlinedButton(
+              onPressed: () => Navigator.pop(ctx, 'keep'),
+              child: const Text('Manter no Aparelho'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, 'associate'),
+              child: const Text('Associar à Conta (Recomendado)'),
+            ),
+          ],
+        ),
+      );
+
+      if (choice == 'associate') {
+        await authService.associatePreLoginData(
+          repository: repo,
+          userId: userId,
+        );
+      } else if (choice == 'discard') {
+        await authService.discardPreLoginData(repo.db);
+      }
+    }
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sincronizando seus dados com a nuvem...')),
+      );
+      await ref.read(supabaseSyncServiceProvider).sync();
+    }
+  }
+
+  // Confirmação de Logout
+  void _showLogoutConfirmation(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Sair da Conta'),
+        content: const Text(
+          'Deseja realmente sair da sua conta Supabase? '
+          'Seus dados salvos localmente permanecerão no aparelho, mas a sincronização na nuvem será pausada.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await ref.read(supabaseAuthServiceProvider).signOut();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Sessão encerrada com sucesso.')),
+                );
+              }
+            },
+            child: const Text('Sair', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSupabaseAccountTile(BuildContext context) {
+    final authService = ref.watch(supabaseAuthServiceProvider);
+    final user = authService.currentUser;
+
+    if (user != null) {
+      return ListTile(
+        leading: const Icon(Icons.account_circle, color: Color(0xFF166534), size: 28),
+        title: const Text('Conta Supabase Conectada'),
+        subtitle: Text(
+          user.email ?? 'Usuário Autenticado',
+          style: const TextStyle(fontWeight: FontWeight.w500),
+        ),
+        trailing: TextButton.icon(
+          icon: const Icon(Icons.logout, size: 16, color: Colors.red),
+          label: const Text('Sair', style: TextStyle(color: Colors.red, fontSize: 12)),
+          onPressed: () => _showLogoutConfirmation(context),
+        ),
+      );
+    }
+
+    return ListTile(
+      leading: const Icon(Icons.cloud_off, color: Color(0xFFD97706), size: 28),
+      title: const Text('Conta Supabase'),
+      subtitle: const Text('Não conectado. Entre para sincronizar entre aparelhos.'),
+      trailing: ElevatedButton.icon(
+        icon: const Icon(Icons.login, size: 16),
+        label: const Text('Entrar', style: TextStyle(fontSize: 12)),
+        onPressed: () => _showAuthModal(context),
+      ),
+    );
+  }
+
   // Modal de Inspeção da Fila de Sincronização
   void _showSyncQueueModal(BuildContext context) async {
     final repo = ref.read(repositoryProvider);
@@ -708,15 +992,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           Card(
             child: Column(
               children: [
+                _buildSupabaseAccountTile(context),
+                const Divider(height: 1),
                 ListTile(
                   leading: const Icon(Icons.sync, color: AppTheme.primaryBlue),
                   title: const Text('Estado da Sincronização'),
-                  subtitle: const Text(
-                    'Operando Local-First (Offline). Alterações gravadas localmente.',
+                  subtitle: Text(
+                    ref.watch(supabaseAuthServiceProvider).isAuthenticated
+                        ? 'Sincronização na nuvem ativa (Multi-dispositivo).'
+                        : 'Operando Local-First (Offline). Alterações gravadas localmente.',
                   ),
-                  trailing: const Chip(
-                    label: Text('Local-First', style: TextStyle(fontSize: 11)),
-                    backgroundColor: Color(0xFFE0E7FF),
+                  trailing: Chip(
+                    label: Text(
+                      ref.watch(supabaseAuthServiceProvider).isAuthenticated
+                          ? 'Nuvem Ativa'
+                          : 'Local-First',
+                      style: const TextStyle(fontSize: 11),
+                    ),
+                    backgroundColor:
+                        ref.watch(supabaseAuthServiceProvider).isAuthenticated
+                            ? const Color(0xFFDCFCE7)
+                            : const Color(0xFFE0E7FF),
                   ),
                 ),
                 Padding(
@@ -725,13 +1021,45 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     right: 16,
                     bottom: 12,
                   ),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      icon: const Icon(Icons.cloud_sync),
-                      label: const Text('Verificar Fila de Sincronização'),
-                      onPressed: () => _showSyncQueueModal(context),
-                    ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.cloud_sync, size: 18),
+                          label: const Text('Ver Fila', style: TextStyle(fontSize: 12)),
+                          onPressed: () => _showSyncQueueModal(context),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          icon: const Icon(Icons.refresh, size: 18),
+                          label: const Text('Sincronizar', style: TextStyle(fontSize: 12)),
+                          onPressed: () async {
+                            final scaffold = ScaffoldMessenger.of(context);
+                            scaffold.hideCurrentSnackBar();
+                            scaffold.showSnackBar(
+                              const SnackBar(
+                                content: Text('Sincronizando com a nuvem...'),
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                            final result = await ref.read(supabaseSyncServiceProvider).sync();
+                            scaffold.hideCurrentSnackBar();
+                            scaffold.showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  result.success
+                                      ? 'Sincronização concluída (${result.totalProcessed} processados).'
+                                      : 'Sincronização finalizada: ${result.message}',
+                                ),
+                                backgroundColor: result.success ? const Color(0xFF166534) : null,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const Divider(height: 1),

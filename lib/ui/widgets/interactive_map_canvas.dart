@@ -98,6 +98,8 @@ class InteractiveMapCanvasState extends State<InteractiveMapCanvas> {
 
   double _originPx = 0.0;
   double _originPy = 0.0;
+  double? _activeCenterLng;
+  double? _activeCenterLat;
   DateTime? _lastZoomChangeTime;
   Offset? _lastPinchFocalPoint;
 
@@ -192,9 +194,9 @@ class InteractiveMapCanvasState extends State<InteractiveMapCanvas> {
     final focalLng = pixelX2lon(worldPx, _zoom, _tileSize);
     final focalLat = pixelY2lat(worldPy, _zoom, _tileSize);
 
-    // Nova origem do grid em targetZoom
-    final newCenterTileX = lon2tileX(centerLng, newZoom);
-    final newCenterTileY = lat2tileY(centerLat, newZoom);
+    // Nova origem do grid em targetZoom centrada no próprio ponto focal para zero drift
+    final newCenterTileX = lon2tileX(focalLng, newZoom);
+    final newCenterTileY = lat2tileY(focalLat, newZoom);
     final newMinTileX = newCenterTileX - _gridHalfSize;
     final newMinTileY = newCenterTileY - _gridHalfSize;
     final newOriginPx = newMinTileX * _tileSize;
@@ -229,6 +231,8 @@ class InteractiveMapCanvasState extends State<InteractiveMapCanvas> {
       _zoom = newZoom;
       _originPx = newOriginPx;
       _originPy = newOriginPy;
+      _activeCenterLng = focalLng;
+      _activeCenterLat = focalLat;
     });
 
     _transformationController.value =
@@ -242,6 +246,10 @@ class InteractiveMapCanvasState extends State<InteractiveMapCanvas> {
     double centerPx,
     double centerPy,
   ) {
+    setState(() {
+      _activeCenterLng = null;
+      _activeCenterLat = null;
+    });
     final dx = (viewportW / 2.0) - centerPx;
     final dy = (viewportH / 2.0) - centerPy;
     _transformationController.value = Matrix4.translationValues(dx, dy, 0.0);
@@ -313,8 +321,11 @@ class InteractiveMapCanvasState extends State<InteractiveMapCanvas> {
       centerLng = allLngs[allLngs.length ~/ 2];
     }
 
-    final centerTileX = lon2tileX(centerLng, _zoom);
-    final centerTileY = lat2tileY(centerLat, _zoom);
+    final effectiveCenterLat = _activeCenterLat ?? centerLat;
+    final effectiveCenterLng = _activeCenterLng ?? centerLng;
+
+    final centerTileX = lon2tileX(effectiveCenterLng, _zoom);
+    final centerTileY = lat2tileY(effectiveCenterLat, _zoom);
 
     final minTileX = centerTileX - _gridHalfSize;
     final maxTileX = centerTileX + _gridHalfSize;
@@ -327,8 +338,8 @@ class InteractiveMapCanvasState extends State<InteractiveMapCanvas> {
     final canvasWidth = (_gridHalfSize * 2 + 1) * _tileSize;
     final canvasHeight = (_gridHalfSize * 2 + 1) * _tileSize;
 
-    final centerPx = lon2pixelX(centerLng, _zoom, _tileSize) - _originPx;
-    final centerPy = lat2pixelY(centerLat, _zoom, _tileSize) - _originPy;
+    final centerPx = lon2pixelX(effectiveCenterLng, _zoom, _tileSize) - _originPx;
+    final centerPy = lat2pixelY(effectiveCenterLat, _zoom, _tileSize) - _originPy;
 
     final orderedContacts = List<PersonEntry>.from(geoContacts);
     if (widget.highlightPersonId != null) {

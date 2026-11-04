@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:record/record.dart';
 import 'package:audioplayers/audioplayers.dart';
+import '../core/app_logger.dart';
 
 /// Resultado encapsulado de uma sessão de gravação de áudio.
 class RecordingResult {
@@ -181,7 +182,9 @@ class RealAudioRecordingService implements AudioRecordingService {
     String? path;
     try {
       path = await _audioRecorder.stop();
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.warning('AudioRecordingService: falha ao parar hardware do gravador', e, st);
+    }
 
     if (_isCancelled) {
       return null;
@@ -224,7 +227,9 @@ class RealAudioRecordingService implements AudioRecordingService {
 
     try {
       await _audioRecorder.cancel();
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.warning('AudioRecordingService: falha ao cancelar hardware do gravador', e, st);
+    }
 
     if (_currentFilePath != null &&
         !kIsWeb &&

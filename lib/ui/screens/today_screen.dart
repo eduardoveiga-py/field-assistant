@@ -17,6 +17,7 @@ import '../../core/feature_registry.dart';
 import 'settings_screen.dart';
 import 'global_search_screen.dart';
 import 'next_actions_screen.dart';
+import '../../sync/supabase_sync_service.dart';
 
 class TodayScreen extends ConsumerWidget {
   final Function(int)? onTabChange;
@@ -134,17 +135,57 @@ class TodayScreen extends ConsumerWidget {
                 child: ElevatedButton.icon(
                   icon: const Icon(Icons.sync),
                   label: const Text('Sincronizar Agora'),
-                  onPressed: () {
+                  onPressed: () async {
                     Navigator.pop(ctx);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          pendingOps.isEmpty
-                              ? 'Todos os registros locais já estão sincronizados!'
-                              : '${pendingOps.length} operação(ões) enfileirada(s) processada(s) localmente.',
+                      const SnackBar(
+                        content: Row(
+                          children: [
+                            SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            ),
+                            SizedBox(width: 12),
+                            Text('Sincronizando com Supabase...'),
+                          ],
                         ),
+                        duration: Duration(seconds: 2),
                       ),
                     );
+                    try {
+                      final syncService = ref.read(supabaseSyncServiceProvider);
+                      final result = await syncService.sync();
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              result.success
+                                  ? (result.totalProcessed > 0
+                                      ? 'Sincronização concluída: ${result.successCount} registros sincronizados.'
+                                      : 'Todos os registros locais já estão sincronizados!')
+                                  : 'Aviso de sincronização: ${result.message}',
+                            ),
+                            backgroundColor:
+                                result.success ? Colors.green : Colors.orange,
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Erro na sincronização: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    }
                   },
                 ),
               ),

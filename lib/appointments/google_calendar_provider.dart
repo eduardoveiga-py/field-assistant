@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:drift/drift.dart' as drift;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -7,6 +8,98 @@ import 'package:uuid/uuid.dart';
 
 import '../database/app_database.dart';
 import 'calendar_provider.dart';
+
+/// Enumeração de causas específicas de falha de autenticação/autorização com Google Calendar.
+enum GoogleAuthFailureReason {
+  none,
+  userCancelled,
+  popupBlocked,
+  clientConfigurationError,
+  scopeDenied,
+  networkError,
+  calendarApiDisabled,
+  unknown;
+
+  String get userFriendlyMessage {
+    switch (this) {
+      case GoogleAuthFailureReason.popupBlocked:
+        return 'Janela de login bloqueada pelo navegador. Permita pop-ups para este site e tente novamente.';
+      case GoogleAuthFailureReason.clientConfigurationError:
+        return 'Configuração do Google Cloud inválida: Client ID ausente ou origem Web não autorizada no console do Google Cloud.';
+      case GoogleAuthFailureReason.userCancelled:
+        return 'Conexão com Google Calendar cancelada pelo usuário.';
+      case GoogleAuthFailureReason.scopeDenied:
+        return 'Permissão de acesso à agenda negada. Conceda permissão aos eventos para sincronizar.';
+      case GoogleAuthFailureReason.networkError:
+        return 'Falha de conexão com os servidores do Google. Verifique sua conexão com a internet.';
+      case GoogleAuthFailureReason.calendarApiDisabled:
+        return 'A Google Calendar API não está habilitada no projeto Google Cloud. Habilite-a no console GCP.';
+      case GoogleAuthFailureReason.none:
+      case GoogleAuthFailureReason.unknown:
+        return 'Não foi possível conectar ao Google Calendar. Verifique a autenticação e tente novamente.';
+    }
+  }
+}
+
+/// Resultado detalhado de solicitação de autenticação/autorização Google.
+class GoogleAuthResult {
+  final bool success;
+  final GoogleAuthFailureReason failureReason;
+  final String? errorMessage;
+
+  const GoogleAuthResult({
+    required this.success,
+    this.failureReason = GoogleAuthFailureReason.none,
+    this.errorMessage,
+  });
+
+  factory GoogleAuthResult.success() => const GoogleAuthResult(success: true);
+  factory GoogleAuthResult.failure(
+    GoogleAuthFailureReason reason, [
+    String? message,
+  ]) =>
+      GoogleAuthResult(
+        success: false,
+        failureReason: reason,
+        errorMessage: message,
+      );
+}
+
+/// Utilitários para conformidade estrita de privacidade e higiene de logs (sem Bearer tokens, senhas ou e-mails completos).
+class LoggingHygiene {
+  static String maskEmail(String? email) {
+    if (email == null || email.trim().isEmpty) return '(sem email)';
+    final parts = email.trim().split('@');
+    if (parts.length != 2) return '***';
+    final user = parts[0];
+    final domain = parts[1];
+    if (user.length <= 2) {
+      return '${user[0]}*@$domain';
+    }
+    return '${user[0]}***${user[user.length - 1]}@$domain';
+  }
+
+  static String sanitizeErrorMessage(Object? error) {
+    if (error == null) return '';
+    var msg = error.toString();
+    // Remove tokens Bearer
+    msg = msg.replaceAll(
+      RegExp(r'Bearer\s+[A-Za-z0-9\-._~+/]+=*', caseSensitive: false),
+      'Bearer [REDACTED]',
+    );
+    // Mascara emails completos
+    msg = msg.replaceAllMapped(
+      RegExp(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'),
+      (match) => maskEmail(match.group(0)),
+    );
+    // Mascara parâmetros de credenciais sensíveis
+    msg = msg.replaceAllMapped(
+      RegExp(r'(access_token|key|client_secret)=[^&\s]+'),
+      (match) => '${match.group(1)}=[REDACTED]',
+    );
+    return msg;
+  }
+}
 
 class _AuthenticatedClient extends http.BaseClient {
   final Map<String, String> _headers;
@@ -32,6 +125,9 @@ class GoogleCalendarProvider implements CalendarProvider {
   final GoogleSignIn _googleSignIn;
   final FlutterSecureStorage _secureStorage;
   final Uuid _uuid = const Uuid();
+  final String? webClientId;
+  final gcal.CalendarApi? calendarApi;
+  final String? accountName;
 
   static const String _calendarScope =
       'https://www.googleapis.com/auth/calendar.events';
@@ -42,18 +138,85 @@ class GoogleCalendarProvider implements CalendarProvider {
   bool _initialized = false;
   Map<String, String>? _webAuthHeaders;
 
+  GoogleAuthFailureReason _lastAuthFailureReason =
+      GoogleAuthFailureReason.none;
+  String? _lastAuthErrorMessage;
+
+  GoogleAuthFailureReason get lastAuthFailureReason => _lastAuthFailureReason;
+  GoogleAuthFailureReason get lastFailureReason => _lastAuthFailureReason;
+  String? get lastAuthErrorMessage => _lastAuthErrorMessage;
+
   GoogleCalendarProvider({
     GoogleSignIn? googleSignIn,
     FlutterSecureStorage? secureStorage,
+    this.webClientId,
+    this.calendarApi,
+    this.accountName,
   }) : _googleSignIn = googleSignIn ?? GoogleSignIn.instance,
        _secureStorage = secureStorage ?? const FlutterSecureStorage();
 
   Future<void> _ensureInitialized() async {
     if (_initialized) return;
     try {
-      await _googleSignIn.initialize();
-    } catch (_) {}
-    _initialized = true;
+      final effectiveClientId = webClientId?.trim().isNotEmpty == true
+          ? webClientId!.trim()
+          : const String.fromEnvironment(
+              'GOOGLE_WEB_CLIENT_ID',
+              defaultValue: '',
+            ).trim();
+
+      await _googleSignIn.initialize(
+        clientId: kIsWeb && effectiveClientId.isNotEmpty
+            ? effectiveClientId
+            : null,
+      );
+      _initialized = true;
+    } catch (e) {
+      _initialized = false;
+      _lastAuthFailureReason = _classifyException(e);
+      _lastAuthErrorMessage = LoggingHygiene.sanitizeErrorMessage(e);
+      rethrow;
+    }
+  }
+
+  GoogleAuthFailureReason _classifyException(Object e) {
+    final str = e.toString().toLowerCase();
+    if (str.contains('canceled') ||
+        str.contains('cancelled') ||
+        str.contains('popup_closed_by_user')) {
+      return GoogleAuthFailureReason.userCancelled;
+    }
+    if (str.contains('uiunavailable') ||
+        str.contains('popup_blocked') ||
+        str.contains('popup_failed_to_open') ||
+        str.contains('blocked')) {
+      return GoogleAuthFailureReason.popupBlocked;
+    }
+    if (str.contains('clientconfigurationerror') ||
+        str.contains('unauthorized_client') ||
+        str.contains('idpiframe_initialization_failed') ||
+        str.contains('clientid') ||
+        str.contains('client_id') ||
+        str.contains('origin')) {
+      return GoogleAuthFailureReason.clientConfigurationError;
+    }
+    if (str.contains('access_denied') ||
+        str.contains('denied') ||
+        str.contains('scope')) {
+      return GoogleAuthFailureReason.scopeDenied;
+    }
+    if (str.contains('accessnotconfigured') ||
+        str.contains('api not enabled') ||
+        str.contains('not activated')) {
+      return GoogleAuthFailureReason.calendarApiDisabled;
+    }
+    if (str.contains('network') ||
+        str.contains('socket') ||
+        str.contains('offline') ||
+        str.contains('failed to fetch')) {
+      return GoogleAuthFailureReason.networkError;
+    }
+    return GoogleAuthFailureReason.unknown;
   }
 
   @override
@@ -61,6 +224,7 @@ class GoogleCalendarProvider implements CalendarProvider {
 
   @override
   Future<bool> isAuthorized() async {
+    if (calendarApi != null) return true;
     try {
       await _ensureInitialized();
       if (_googleSignIn.supportsAuthenticate()) {
@@ -79,20 +243,32 @@ class GoogleCalendarProvider implements CalendarProvider {
         }
         return false;
       }
-    } catch (_) {
+    } catch (e) {
+      _lastAuthFailureReason = _classifyException(e);
+      _lastAuthErrorMessage = LoggingHygiene.sanitizeErrorMessage(e);
       return false;
     }
   }
 
-  @override
-  Future<bool> requestAuthorization() async {
+  /// Solicita autorização expondo o resultado detalhado com motivo da falha.
+  Future<GoogleAuthResult> requestAuthorizationResult() async {
+    _lastAuthFailureReason = GoogleAuthFailureReason.none;
+    _lastAuthErrorMessage = null;
     try {
       await _ensureInitialized();
       if (_googleSignIn.supportsAuthenticate()) {
         _currentUser = await _googleSignIn.authenticate(
           scopeHint: [_calendarScope],
         );
-        return _currentUser != null;
+        if (_currentUser != null) {
+          return GoogleAuthResult.success();
+        } else {
+          _lastAuthFailureReason = GoogleAuthFailureReason.userCancelled;
+          return GoogleAuthResult.failure(
+            GoogleAuthFailureReason.userCancelled,
+            'Conexão cancelada pelo usuário.',
+          );
+        }
       } else {
         final clientAuth = await _googleSignIn.authorizationClient
             .authorizeScopes([_calendarScope]);
@@ -100,15 +276,25 @@ class GoogleCalendarProvider implements CalendarProvider {
           'Authorization': 'Bearer ${clientAuth.accessToken}',
           'X-Goog-AuthUser': '0',
         };
-        return true;
+        return GoogleAuthResult.success();
       }
-    } catch (_) {
-      return false;
+    } catch (e) {
+      _lastAuthFailureReason = _classifyException(e);
+      final sanitized = LoggingHygiene.sanitizeErrorMessage(e);
+      _lastAuthErrorMessage = sanitized;
+      return GoogleAuthResult.failure(_lastAuthFailureReason, sanitized);
     }
   }
 
   @override
+  Future<bool> requestAuthorization() async {
+    final result = await requestAuthorizationResult();
+    return result.success;
+  }
+
+  @override
   Future<String?> getConnectedAccountName() async {
+    if (accountName != null) return accountName;
     if (_currentUser == null && _webAuthHeaders == null) {
       await isAuthorized();
     }
@@ -117,6 +303,7 @@ class GoogleCalendarProvider implements CalendarProvider {
   }
 
   Future<gcal.CalendarApi?> _getCalendarApi() async {
+    if (calendarApi != null) return calendarApi;
     final authorized = await isAuthorized();
     if (!authorized) {
       final reqAuth = await requestAuthorization();
@@ -138,11 +325,14 @@ class GoogleCalendarProvider implements CalendarProvider {
           'Authorization': 'Bearer ${clientAuth.accessToken}',
           'X-Goog-AuthUser': '0',
         };
+        _webAuthHeaders = headers;
       }
       if (headers == null) return null;
       final authClient = _AuthenticatedClient(headers);
       return gcal.CalendarApi(authClient);
-    } catch (_) {
+    } catch (e) {
+      _lastAuthFailureReason = _classifyException(e);
+      _lastAuthErrorMessage = LoggingHygiene.sanitizeErrorMessage(e);
       return null;
     }
   }
@@ -165,36 +355,106 @@ class GoogleCalendarProvider implements CalendarProvider {
           isReadOnly: isReadOnly,
         );
       }).toList();
-    } catch (_) {
-      return [
-        ExternalCalendarItem(
-          id: 'primary',
-          name: 'Principal (${_currentUser?.email ?? "Google"})',
-          accountName: _currentUser?.email,
-          isReadOnly: false,
-        ),
-      ];
+    } catch (e) {
+      _lastAuthErrorMessage =
+          'Erro ao listar calendários disponíveis: ${LoggingHygiene.sanitizeErrorMessage(e)}';
+      return []; // NUNCA retorna calendário artificial "primary" quando a API falhar
     }
+  }
+
+  String _selectedCalendarKey(String accountKey) =>
+      'google_calendar_${accountKey}_selected_id';
+
+  String _syncTokenKey(String accountKey, String calendarId) =>
+      'google_calendar_${accountKey}_synctoken_$calendarId';
+
+  Future<String> _getAccountStorageKey() async {
+    if (_currentUser != null) {
+      if (_currentUser!.id.isNotEmpty) return _currentUser!.id;
+      if (_currentUser!.email.isNotEmpty) {
+        return _hashAccount(_currentUser!.email);
+      }
+    }
+    final name = await getConnectedAccountName();
+    if (name != null && name != 'Conta Google' && name.isNotEmpty) {
+      return _hashAccount(name);
+    }
+    return 'default';
+  }
+
+  String _hashAccount(String raw) {
+    final sanitized =
+        raw.trim().toLowerCase().replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
+    return sanitized.length > 32 ? sanitized.substring(0, 32) : sanitized;
+  }
+
+  Future<String?> _getSyncToken(String accountKey, String calendarId) async {
+    final scoped = await _secureStorage.read(
+      key: _syncTokenKey(accountKey, calendarId),
+    );
+    if (scoped != null && scoped.isNotEmpty) return scoped;
+    return await _secureStorage.read(
+      key: '$_keySyncTokenPrefix$calendarId',
+    );
+  }
+
+  Future<void> _setSyncToken(
+    String accountKey,
+    String calendarId,
+    String token,
+  ) async {
+    await _secureStorage.write(
+      key: _syncTokenKey(accountKey, calendarId),
+      value: token,
+    );
+  }
+
+  Future<void> _deleteSyncToken(String accountKey, String calendarId) async {
+    await _secureStorage.delete(key: _syncTokenKey(accountKey, calendarId));
+    await _secureStorage.delete(key: '$_keySyncTokenPrefix$calendarId');
   }
 
   @override
   Future<String?> getSelectedCalendarId() async {
+    final accountKey = await _getAccountStorageKey();
+    final scoped =
+        await _secureStorage.read(key: _selectedCalendarKey(accountKey));
+    if (scoped != null && scoped.isNotEmpty) return scoped;
     return await _secureStorage.read(key: _keySelectedCalendarId) ?? 'primary';
   }
 
   @override
   Future<void> setSelectedCalendarId(String calendarId) async {
-    await _secureStorage.write(key: _keySelectedCalendarId, value: calendarId);
+    final accountKey = await _getAccountStorageKey();
+    await _secureStorage.write(
+      key: _selectedCalendarKey(accountKey),
+      value: calendarId,
+    );
+    await _secureStorage.write(
+      key: _keySelectedCalendarId,
+      value: calendarId,
+    );
   }
 
   @override
   Future<void> disconnect() async {
+    final accountKey = await _getAccountStorageKey();
+    final calendarId = await getSelectedCalendarId() ?? 'primary';
     try {
       await _googleSignIn.signOut();
     } catch (_) {}
     _currentUser = null;
     _webAuthHeaders = null;
+    _initialized = false;
+    _lastAuthFailureReason = GoogleAuthFailureReason.none;
+    _lastAuthErrorMessage = null;
+
+    // Limpa chaves isoladas da conta
+    await _secureStorage.delete(key: _selectedCalendarKey(accountKey));
+    await _secureStorage.delete(key: _syncTokenKey(accountKey, calendarId));
+    // Limpa chaves globais legadas
     await _secureStorage.delete(key: _keySelectedCalendarId);
+    await _secureStorage.delete(key: '$_keySyncTokenPrefix$calendarId');
   }
 
   @override
@@ -206,163 +466,230 @@ class GoogleCalendarProvider implements CalendarProvider {
     if (api == null) {
       return CalendarSyncResult(
         success: false,
-        errorMessage: 'Não foi possível autenticar com a Google Calendar API.',
+        errorMessage: _lastAuthErrorMessage ??
+            'Não foi possível autenticar com a Google Calendar API.',
       );
     }
 
+    final accountKey = await _getAccountStorageKey();
     final calendarId = await getSelectedCalendarId() ?? 'primary';
-    String? syncToken;
-    if (!fullSync) {
-      syncToken = await _secureStorage.read(
-        key: '$_keySyncTokenPrefix$calendarId',
-      );
-    }
 
-    int downloaded = 0;
-    int uploaded = 0;
-    int conflicts = 0;
-
-    String? pageToken;
-    String? nextSyncToken;
-    bool needsFullSync = false;
-
-    do {
+    if (fullSync) {
+      await _deleteSyncToken(accountKey, calendarId);
       try {
-        gcal.Events events;
-        if (syncToken != null && syncToken.isNotEmpty && !needsFullSync) {
-          events = await api.events.list(
-            calendarId,
-            syncToken: syncToken,
-            pageToken: pageToken,
-            maxResults: 250,
-          );
-        } else {
-          // Sincronização completa (janela de 90 dias atrás até 180 dias à frente)
-          final timeMin = DateTime.now()
-              .subtract(const Duration(days: 90))
-              .toUtc();
-          final timeMax = DateTime.now().add(const Duration(days: 180)).toUtc();
-          events = await api.events.list(
-            calendarId,
-            pageToken: pageToken,
-            timeMin: timeMin,
-            timeMax: timeMax,
-            singleEvents: true,
-            maxResults: 250,
-          );
-        }
-
-        pageToken = events.nextPageToken;
-        nextSyncToken = events.nextSyncToken;
-
-        final items = events.items ?? [];
-        for (final item in items) {
-          final eventId = item.id;
-          if (eventId == null) continue;
-
-          final isCancelled = item.status == 'cancelled';
-          final startDt =
-              item.start?.dateTime ?? item.start?.date ?? DateTime.now();
-          final endDt =
-              item.end?.dateTime ??
-              item.end?.date ??
-              startDt.add(const Duration(minutes: 30));
-
-          // Atualiza ou insere na tabela tipada ExternalCalendarEvents
-          final existing =
-              await (db.select(db.externalCalendarEvents)..where(
-                    (t) =>
-                        t.provider.equals('google') &
-                        t.externalEventId.equals(eventId),
-                  ))
-                  .getSingleOrNull();
-
-          final now = DateTime.now();
-          if (existing == null) {
-            if (!isCancelled) {
-              await db
-                  .into(db.externalCalendarEvents)
-                  .insert(
-                    ExternalCalendarEventsCompanion.insert(
-                      id: _uuid.v4(),
-                      provider: 'google',
-                      calendarId: calendarId,
-                      externalEventId: eventId,
-                      iCalUid: drift.Value(item.iCalUID),
-                      title: item.summary ?? 'Evento Google',
-                      location: drift.Value(item.location),
-                      description: drift.Value(item.description),
-                      startTime: startDt,
-                      endTime: endDt,
-                      timeZone: drift.Value(item.start?.timeZone),
-                      isAllDay: drift.Value(item.start?.date != null),
-                      externalStatus: drift.Value(item.status),
-                      lastModifiedExternal: drift.Value(item.updated),
-                      lastSyncedAt: drift.Value(now),
-                      isDeletedExternal: const drift.Value(false),
-                      etag: drift.Value(item.etag),
-                      createdAt: now,
-                      updatedAt: now,
-                    ),
-                  );
-              downloaded++;
-            }
-          } else {
-            await (db.update(
-              db.externalCalendarEvents,
-            )..where((t) => t.id.equals(existing.id))).write(
-              ExternalCalendarEventsCompanion(
-                title: drift.Value(item.summary ?? existing.title),
-                location: drift.Value(item.location),
-                description: drift.Value(item.description),
-                startTime: drift.Value(startDt),
-                endTime: drift.Value(endDt),
-                externalStatus: drift.Value(item.status),
-                lastModifiedExternal: drift.Value(item.updated),
-                lastSyncedAt: drift.Value(now),
-                isDeletedExternal: drift.Value(isCancelled),
-                etag: drift.Value(item.etag),
-                updatedAt: drift.Value(now),
-              ),
-            );
-            downloaded++;
-          }
-        }
-      } on gcal.DetailedApiRequestError catch (e) {
-        if (e.status == 410) {
-          // Sync token expirado (410 Gone) -> executa full sync com segurança
-          syncToken = null;
-          pageToken = null;
-          needsFullSync = true;
-          continue;
-        } else {
-          return CalendarSyncResult(
-            success: false,
-            errorMessage: 'Erro da API Google: ${e.message}',
-            eventsDownloaded: downloaded,
-          );
-        }
+        return await _runSyncLoop(
+          api: api,
+          db: db,
+          calendarId: calendarId,
+          accountKey: accountKey,
+          isFullSync: true,
+        );
       } catch (e) {
         return CalendarSyncResult(
           success: false,
-          errorMessage: 'Falha durante sincronização: $e',
-          eventsDownloaded: downloaded,
+          errorMessage:
+              'Falha durante sincronização: ${LoggingHygiene.sanitizeErrorMessage(e)}',
         );
+      }
+    }
+
+    final syncToken = await _getSyncToken(accountKey, calendarId);
+    if (syncToken == null || syncToken.isEmpty) {
+      try {
+        return await _runSyncLoop(
+          api: api,
+          db: db,
+          calendarId: calendarId,
+          accountKey: accountKey,
+          isFullSync: true,
+        );
+      } catch (e) {
+        return CalendarSyncResult(
+          success: false,
+          errorMessage:
+              'Falha durante sincronização: ${LoggingHygiene.sanitizeErrorMessage(e)}',
+        );
+      }
+    }
+
+    try {
+      return await _runSyncLoop(
+        api: api,
+        db: db,
+        calendarId: calendarId,
+        accountKey: accountKey,
+        isFullSync: false,
+        syncToken: syncToken,
+      );
+    } on gcal.DetailedApiRequestError catch (e) {
+      if (e.status == 410) {
+        // Sync token expirado (HTTP 410 Gone) -> 
+        // 1. Apaga token expirado do secure storage imediatamente
+        await _deleteSyncToken(accountKey, calendarId);
+        // 2. Executa e conclui sincronização completa real em todas as páginas
+        try {
+          return await _runSyncLoop(
+            api: api,
+            db: db,
+            calendarId: calendarId,
+            accountKey: accountKey,
+            isFullSync: true,
+          );
+        } catch (fullSyncError) {
+          return CalendarSyncResult(
+            success: false,
+            errorMessage:
+                'Falha durante full sync pós-410: ${LoggingHygiene.sanitizeErrorMessage(fullSyncError)}',
+          );
+        }
+      }
+      return CalendarSyncResult(
+        success: false,
+        errorMessage: 'Erro da API Google: ${e.message}',
+      );
+    } catch (e) {
+      return CalendarSyncResult(
+        success: false,
+        errorMessage:
+            'Falha durante sincronização: ${LoggingHygiene.sanitizeErrorMessage(e)}',
+      );
+    }
+  }
+
+  Future<CalendarSyncResult> _runSyncLoop({
+    required gcal.CalendarApi api,
+    required AppDatabase db,
+    required String calendarId,
+    required String accountKey,
+    required bool isFullSync,
+    String? syncToken,
+  }) async {
+    int downloaded = 0;
+    String? pageToken;
+    String? nextSyncToken;
+
+    do {
+      gcal.Events events;
+      if (!isFullSync && syncToken != null && syncToken.isNotEmpty) {
+        events = await api.events.list(
+          calendarId,
+          syncToken: syncToken,
+          pageToken: pageToken,
+          maxResults: 250,
+        );
+      } else {
+        final timeMin =
+            DateTime.now().subtract(const Duration(days: 90)).toUtc();
+        final timeMax = DateTime.now().add(const Duration(days: 180)).toUtc();
+        events = await api.events.list(
+          calendarId,
+          pageToken: pageToken,
+          timeMin: timeMin,
+          timeMax: timeMax,
+          singleEvents: true,
+          maxResults: 250,
+        );
+      }
+
+      pageToken = events.nextPageToken;
+      if (events.nextSyncToken != null) {
+        nextSyncToken = events.nextSyncToken;
+      }
+
+      final items = events.items ?? [];
+      for (final item in items) {
+        final eventId = item.id;
+        if (eventId == null) continue;
+
+        final isCancelled = item.status == 'cancelled';
+        final startDt =
+            item.start?.dateTime ?? item.start?.date ?? DateTime.now();
+        final endDt = item.end?.dateTime ??
+            item.end?.date ??
+            startDt.add(const Duration(minutes: 30));
+
+        // Consulta tipada com escopo de chave composta: provider, calendarId, externalEventId e externalAccount
+        final existing = await (db.select(db.externalCalendarEvents)..where(
+              (t) =>
+                  t.provider.equals('google') &
+                  t.calendarId.equals(calendarId) &
+                  t.externalEventId.equals(eventId) &
+                  (accountKey.isNotEmpty && accountKey != 'default'
+                      ? (t.externalAccount.equals(accountKey) |
+                          t.externalAccount.isNull())
+                      : const drift.Constant(true)),
+            )).getSingleOrNull();
+
+        final now = DateTime.now();
+        if (existing == null) {
+          if (!isCancelled) {
+            await db.into(db.externalCalendarEvents).insert(
+                  ExternalCalendarEventsCompanion.insert(
+                    id: _uuid.v4(),
+                    provider: 'google',
+                    externalAccount: drift.Value(
+                      accountKey.isNotEmpty && accountKey != 'default'
+                          ? accountKey
+                          : null,
+                    ),
+                    calendarId: calendarId,
+                    externalEventId: eventId,
+                    iCalUid: drift.Value(item.iCalUID),
+                    title: item.summary ?? 'Evento Google',
+                    location: drift.Value(item.location),
+                    description: drift.Value(item.description),
+                    startTime: startDt,
+                    endTime: endDt,
+                    timeZone: drift.Value(item.start?.timeZone),
+                    isAllDay: drift.Value(item.start?.date != null),
+                    externalStatus: drift.Value(item.status),
+                    lastModifiedExternal: drift.Value(item.updated),
+                    lastSyncedAt: drift.Value(now),
+                    isDeletedExternal: const drift.Value(false),
+                    etag: drift.Value(item.etag),
+                    createdAt: now,
+                    updatedAt: now,
+                  ),
+                );
+            downloaded++;
+          }
+        } else {
+          await (db.update(db.externalCalendarEvents)
+                ..where((t) => t.id.equals(existing.id)))
+              .write(
+            ExternalCalendarEventsCompanion(
+              externalAccount: drift.Value(
+                accountKey.isNotEmpty && accountKey != 'default'
+                    ? accountKey
+                    : existing.externalAccount,
+              ),
+              title: drift.Value(item.summary ?? existing.title),
+              location: drift.Value(item.location),
+              description: drift.Value(item.description),
+              startTime: drift.Value(startDt),
+              endTime: drift.Value(endDt),
+              externalStatus: drift.Value(item.status),
+              lastModifiedExternal: drift.Value(item.updated),
+              lastSyncedAt: drift.Value(now),
+              isDeletedExternal: drift.Value(isCancelled),
+              etag: drift.Value(item.etag),
+              updatedAt: drift.Value(now),
+            ),
+          );
+          downloaded++;
+        }
       }
     } while (pageToken != null);
 
     if (nextSyncToken != null) {
-      await _secureStorage.write(
-        key: '$_keySyncTokenPrefix$calendarId',
-        value: nextSyncToken,
-      );
+      await _setSyncToken(accountKey, calendarId, nextSyncToken);
     }
 
     return CalendarSyncResult(
       success: true,
       eventsDownloaded: downloaded,
-      eventsUploaded: uploaded,
-      conflictsFound: conflicts,
+      eventsUploaded: 0,
+      conflictsFound: 0,
     );
   }
 
@@ -448,7 +775,8 @@ class GoogleCalendarProvider implements CalendarProvider {
         }
         return created.id;
       }
-    } catch (_) {
+    } catch (e) {
+      _lastAuthErrorMessage = LoggingHygiene.sanitizeErrorMessage(e);
       return null;
     }
   }
@@ -496,8 +824,10 @@ class GoogleCalendarProvider implements CalendarProvider {
             );
         return true;
       }
+      _lastAuthErrorMessage = LoggingHygiene.sanitizeErrorMessage(e);
       return false;
-    } catch (_) {
+    } catch (e) {
+      _lastAuthErrorMessage = LoggingHygiene.sanitizeErrorMessage(e);
       return false;
     }
   }

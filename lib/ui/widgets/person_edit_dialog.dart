@@ -397,6 +397,7 @@ class _PersonEditDialogState extends ConsumerState<PersonEditDialog> {
                             icon: const Icon(Icons.my_location, size: 16),
                             label: const Text('🧭 GPS Atual', style: TextStyle(fontSize: 12)),
                             onPressed: () async {
+                              final messenger = ScaffoldMessenger.of(context);
                               final pos = await GeolocationHelper.getCurrentLocation();
                               if (pos != null) {
                                 setState(() {
@@ -418,6 +419,17 @@ class _PersonEditDialogState extends ConsumerState<PersonEditDialog> {
                                       _neighborhoodCtrl.text = geo.neighborhood!;
                                     }
                                   });
+                                }
+                              } else {
+                                if (mounted) {
+                                  messenger.hideCurrentSnackBar();
+                                  messenger.showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Não foi possível obter a localização GPS. Verifique se o GPS está ativado e com permissão concedida.',
+                                      ),
+                                    ),
+                                  );
                                 }
                               }
                             },

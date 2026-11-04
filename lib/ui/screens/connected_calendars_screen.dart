@@ -6,6 +6,7 @@ import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../../appointments/calendar_provider.dart';
 import '../../appointments/calendar_sync_coordinator.dart';
+import '../../appointments/google_calendar_provider.dart';
 import '../../appointments/ics_management_sheet.dart';
 
 class ConnectedCalendarsScreen extends ConsumerStatefulWidget {
@@ -18,6 +19,7 @@ class ConnectedCalendarsScreen extends ConsumerStatefulWidget {
 
 class _ConnectedCalendarsScreenState
     extends ConsumerState<ConnectedCalendarsScreen> {
+  bool _isConnectingGoogle = false;
   bool _isSyncing = false;
   String? _syncMessage;
   bool _isGoogleAuthorized = false;
@@ -50,6 +52,15 @@ class _ConnectedCalendarsScreenState
       gAcc = await coordinator.googleProvider.getConnectedAccountName();
       gCals = await coordinator.googleProvider.getAvailableCalendars();
       gSelectedId = await coordinator.googleProvider.getSelectedCalendarId();
+      final writable = gCals.where((c) => !c.isReadOnly).toList();
+      if (writable.isNotEmpty) {
+        if (gSelectedId == null || !writable.any((c) => c.id == gSelectedId)) {
+          gSelectedId = writable.first.id;
+          await coordinator.googleProvider.setSelectedCalendarId(gSelectedId);
+        }
+      } else {
+        gSelectedId = null;
+      }
     }
 
     // Apple state (somente executado em plataformas com suporte nativo)
@@ -63,6 +74,16 @@ class _ConnectedCalendarsScreenState
         aAcc = await coordinator.appleProvider.getConnectedAccountName();
         aCals = await coordinator.appleProvider.getAvailableCalendars();
         aSelectedId = await coordinator.appleProvider.getSelectedCalendarId();
+        final writable = aCals.where((c) => !c.isReadOnly).toList();
+        if (writable.isNotEmpty) {
+          if (aSelectedId == null ||
+              !writable.any((c) => c.id == aSelectedId)) {
+            aSelectedId = writable.first.id;
+            await coordinator.appleProvider.setSelectedCalendarId(aSelectedId);
+          }
+        } else {
+          aSelectedId = null;
+        }
       }
     }
 
@@ -73,14 +94,12 @@ class _ConnectedCalendarsScreenState
         _isGoogleAuthorized = gAuth;
         _googleAccount = gAcc;
         _googleCalendars = gCals;
-        _selectedGoogleCalId =
-            gSelectedId ?? (gCals.isNotEmpty ? gCals.first.id : 'primary');
+        _selectedGoogleCalId = gSelectedId;
 
         _isAppleAuthorized = aAuth;
         _appleAccount = aAcc;
         _appleCalendars = aCals;
-        _selectedAppleCalId =
-            aSelectedId ?? (aCals.isNotEmpty ? aCals.first.id : null);
+        _selectedAppleCalId = aSelectedId;
 
         _conflicts = pendingConflicts;
       });
@@ -128,49 +147,74 @@ class _ConnectedCalendarsScreenState
   }
 
   Future<void> _connectGoogle() async {
+    if (_isConnectingGoogle || _isSyncing) return;
+
     setState(() {
-      _isSyncing = true;
+      _isConnectingGoogle = true;
       _syncMessage = null;
     });
 
     try {
       final coordinator = ref.read(calendarSyncCoordinatorProvider);
-      final authorized = await coordinator.googleProvider
-          .requestAuthorization();
+      final authorized =
+          await coordinator.googleProvider.requestAuthorization();
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
       if (authorized) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Conta Google conectada com sucesso!'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Conta Google conectada com sucesso!'),
+            backgroundColor: Colors.green,
+          ),
+        );
         await _syncNow();
       } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Não foi possível conectar ao Google Calendar. Verifique a autenticação e tente novamente.',
-              ),
-              backgroundColor: Colors.orange,
-            ),
-          );
+        final reason = coordinator.googleProvider.lastAuthFailureReason;
+        final message = reason.userFriendlyMessage;
+        Color bgColor = Colors.orange;
+
+        switch (reason) {
+          case GoogleAuthFailureReason.userCancelled:
+            bgColor = Colors.blueGrey;
+            break;
+          case GoogleAuthFailureReason.popupBlocked:
+            bgColor = Colors.deepOrange;
+            break;
+          case GoogleAuthFailureReason.clientConfigurationError:
+          case GoogleAuthFailureReason.calendarApiDisabled:
+          case GoogleAuthFailureReason.networkError:
+            bgColor = Colors.red;
+            break;
+          case GoogleAuthFailureReason.scopeDenied:
+          case GoogleAuthFailureReason.none:
+          case GoogleAuthFailureReason.unknown:
+            bgColor = Colors.orange;
+            break;
         }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: bgColor,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        final sanitized = LoggingHygiene.sanitizeErrorMessage(e);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erro ao conectar ao Google Agenda: $e'),
+            content: Text('Erro ao conectar ao Google Agenda: $sanitized'),
             backgroundColor: Colors.red,
           ),
         );
       }
     } finally {
       if (mounted) {
-        setState(() => _isSyncing = false);
+        setState(() => _isConnectingGoogle = false);
         await _loadState();
       }
     }
@@ -559,15 +603,20 @@ class _ConnectedCalendarsScreenState
                               ),
                             ),
                             Text(
-                              _isGoogleAuthorized
-                                  ? (_googleAccount ?? 'Conta Conectada')
-                                  : 'Não conectado',
+                              _isConnectingGoogle
+                                  ? 'Conectando...'
+                                  : (_isGoogleAuthorized
+                                      ? (_googleAccount ?? 'Conta Conectada')
+                                      : 'Não conectado'),
                               style: TextStyle(
                                 fontSize: 13,
-                                color: _isGoogleAuthorized
-                                    ? Colors.green[700]
-                                    : Colors.grey,
-                                fontWeight: _isGoogleAuthorized
+                                color: _isConnectingGoogle
+                                    ? Colors.blue[700]
+                                    : (_isGoogleAuthorized
+                                        ? Colors.green[700]
+                                        : Colors.grey),
+                                fontWeight: (_isConnectingGoogle ||
+                                        _isGoogleAuthorized)
                                     ? FontWeight.w600
                                     : FontWeight.normal,
                               ),
@@ -577,55 +626,99 @@ class _ConnectedCalendarsScreenState
                       ),
                       if (_isGoogleAuthorized)
                         OutlinedButton(
-                          onPressed: _disconnectGoogle,
+                          onPressed: (_isConnectingGoogle || _isSyncing)
+                              ? null
+                              : _disconnectGoogle,
                           child: const Text('Desconectar'),
                         )
                       else
                         ElevatedButton.icon(
-                          icon: const Icon(Icons.login, size: 18),
-                          label: const Text('Conectar'),
-                          onPressed: _connectGoogle,
+                          icon: _isConnectingGoogle
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.login, size: 18),
+                          label: Text(_isConnectingGoogle
+                              ? 'Conectando...'
+                              : 'Conectar'),
+                          onPressed: (_isConnectingGoogle || _isSyncing)
+                              ? null
+                              : _connectGoogle,
                         ),
                     ],
                   ),
-                  if (_isGoogleAuthorized && _googleCalendars.isNotEmpty) ...[
+                  if (_isGoogleAuthorized) ...[
                     const Divider(height: 24),
-                    const Text(
-                      'Calendário de Destino:',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    DropdownButtonFormField<String>(
-                      initialValue: _selectedGoogleCalId,
-                      isExpanded: true,
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                      ),
-                      items: _googleCalendars.map((c) {
-                        return DropdownMenuItem<String>(
-                          value: c.id,
-                          child: Text(
-                            '${c.name}${c.isReadOnly ? " (Somente Leitura)" : ""}',
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        );
-                      }).toList(),
-                      onChanged: (val) async {
-                        if (val != null) {
-                          setState(() => _selectedGoogleCalId = val);
-                          final coordinator = ref.read(
-                            calendarSyncCoordinatorProvider,
+                    Builder(
+                      builder: (context) {
+                        final writableGoogle = _googleCalendars
+                            .where((c) => !c.isReadOnly)
+                            .toList();
+                        if (writableGoogle.isEmpty) {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            child: Text(
+                              'Nenhum calendário com permissão de escrita disponível.',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontStyle: FontStyle.italic,
+                                color: Colors.orange[800],
+                              ),
+                            ),
                           );
-                          await coordinator.googleProvider
-                              .setSelectedCalendarId(val);
                         }
+                        final effectiveValue = writableGoogle
+                                .any((c) => c.id == _selectedGoogleCalId)
+                            ? _selectedGoogleCalId
+                            : writableGoogle.first.id;
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Calendário de Destino:',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            DropdownButtonFormField<String>(
+                              initialValue: effectiveValue,
+                              isExpanded: true,
+                              decoration: const InputDecoration(
+                                border: OutlineInputBorder(),
+                                contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                              ),
+                              items: writableGoogle.map((c) {
+                                return DropdownMenuItem<String>(
+                                  value: c.id,
+                                  child: Text(
+                                    c.name,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (val) async {
+                                if (val != null) {
+                                  setState(() => _selectedGoogleCalId = val);
+                                  final coordinator = ref.read(
+                                    calendarSyncCoordinatorProvider,
+                                  );
+                                  await coordinator.googleProvider
+                                      .setSelectedCalendarId(val);
+                                }
+                              },
+                            ),
+                          ],
+                        );
                       },
                     ),
                   ],
@@ -736,47 +829,73 @@ class _ConnectedCalendarsScreenState
                       ),
                     ),
                   ],
-                  if (!kIsWeb &&
-                      _isAppleAuthorized &&
-                      _appleCalendars.isNotEmpty) ...[
+                  if (!kIsWeb && _isAppleAuthorized) ...[
                     const Divider(height: 24),
-                    const Text(
-                      'Calendário Selecionado no Dispositivo:',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    DropdownButtonFormField<String>(
-                      initialValue: _selectedAppleCalId,
-                      isExpanded: true,
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                      ),
-                      items: _appleCalendars.map((c) {
-                        return DropdownMenuItem<String>(
-                          value: c.id,
-                          child: Text(
-                            '${c.name} (${c.accountName ?? "Local"})${c.isReadOnly ? " [Leitura]" : ""}',
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        );
-                      }).toList(),
-                      onChanged: (val) async {
-                        if (val != null) {
-                          setState(() => _selectedAppleCalId = val);
-                          final coordinator = ref.read(
-                            calendarSyncCoordinatorProvider,
-                          );
-                          await coordinator.appleProvider.setSelectedCalendarId(
-                            val,
+                    Builder(
+                      builder: (context) {
+                        final writableApple = _appleCalendars
+                            .where((c) => !c.isReadOnly)
+                            .toList();
+                        if (writableApple.isEmpty) {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            child: Text(
+                              'Nenhum calendário com permissão de escrita no dispositivo.',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontStyle: FontStyle.italic,
+                                color: Colors.orange[800],
+                              ),
+                            ),
                           );
                         }
+                        final effectiveValue = writableApple
+                                .any((c) => c.id == _selectedAppleCalId)
+                            ? _selectedAppleCalId
+                            : writableApple.first.id;
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Calendário Selecionado no Dispositivo:',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            DropdownButtonFormField<String>(
+                              initialValue: effectiveValue,
+                              isExpanded: true,
+                              decoration: const InputDecoration(
+                                border: OutlineInputBorder(),
+                                contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                              ),
+                              items: writableApple.map((c) {
+                                return DropdownMenuItem<String>(
+                                  value: c.id,
+                                  child: Text(
+                                    '${c.name} (${c.accountName ?? "Local"})',
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (val) async {
+                                if (val != null) {
+                                  setState(() => _selectedAppleCalId = val);
+                                  final coordinator = ref.read(
+                                    calendarSyncCoordinatorProvider,
+                                  );
+                                  await coordinator.appleProvider
+                                      .setSelectedCalendarId(val);
+                                }
+                              },
+                            ),
+                          ],
+                        );
                       },
                     ),
                   ],

@@ -76,6 +76,7 @@ class AppConfig {
   final AppEnvironment environment;
   final String supabaseUrl;
   final String supabaseAnonKey;
+  final String googleWebClientId;
   final ConfigStatus status;
   final List<String> validationErrors;
 
@@ -83,6 +84,7 @@ class AppConfig {
     required this.environment,
     required this.supabaseUrl,
     required this.supabaseAnonKey,
+    required this.googleWebClientId,
     required this.status,
     required this.validationErrors,
   });
@@ -95,6 +97,7 @@ class AppConfig {
       environment: environment,
       supabaseUrl: '',
       supabaseAnonKey: '',
+      googleWebClientId: '',
     );
   }
 
@@ -103,6 +106,7 @@ class AppConfig {
     String? environment,
     String? supabaseUrl,
     String? supabaseAnonKey,
+    String? googleWebClientId,
   }) {
     final envStr =
         environment ??
@@ -113,11 +117,15 @@ class AppConfig {
     final keyStr =
         supabaseAnonKey ??
         const String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: '');
+    final googleClientIdStr =
+        googleWebClientId ??
+        const String.fromEnvironment('GOOGLE_WEB_CLIENT_ID', defaultValue: '');
 
     final config = AppConfig.create(
       environment: AppEnvironment.fromString(envStr),
       supabaseUrl: urlStr,
       supabaseAnonKey: keyStr,
+      googleWebClientId: googleClientIdStr,
     );
 
     if (config.isInvalid) {
@@ -135,6 +143,7 @@ class AppConfig {
     required AppEnvironment environment,
     required String supabaseUrl,
     required String supabaseAnonKey,
+    String googleWebClientId = '',
   }) {
     var trimmedUrl = supabaseUrl.trim();
     // Normalização: remove barra final desnecessária
@@ -143,6 +152,7 @@ class AppConfig {
     }
 
     final trimmedKey = supabaseAnonKey.trim();
+    final trimmedGoogleClientId = googleWebClientId.trim();
     final List<String> errors = [];
 
     // Cenário 1: Sem configuração remota (Modo Offline Válido e Seguro)
@@ -151,6 +161,7 @@ class AppConfig {
         environment: environment,
         supabaseUrl: '',
         supabaseAnonKey: '',
+        googleWebClientId: trimmedGoogleClientId,
         status: ConfigStatus.unconfigured,
         validationErrors: const [],
       );
@@ -262,6 +273,7 @@ class AppConfig {
         environment: environment,
         supabaseUrl: trimmedUrl,
         supabaseAnonKey: trimmedKey,
+        googleWebClientId: trimmedGoogleClientId,
         status: ConfigStatus.invalid,
         validationErrors: List.unmodifiable(errors),
       );
@@ -271,6 +283,7 @@ class AppConfig {
       environment: environment,
       supabaseUrl: trimmedUrl,
       supabaseAnonKey: trimmedKey,
+      googleWebClientId: trimmedGoogleClientId,
       status: ConfigStatus.valid,
       validationErrors: const [],
     );
@@ -357,6 +370,13 @@ class AppConfig {
     return '${supabaseAnonKey.substring(0, 6)}...${supabaseAnonKey.substring(supabaseAnonKey.length - 4)} (len: ${supabaseAnonKey.length})';
   }
 
+  /// Versão mascarada do Google Web Client ID para logs diagnósticos seguros.
+  String get maskedGoogleWebClientId {
+    if (googleWebClientId.isEmpty) return '(não configurado)';
+    if (googleWebClientId.length <= 16) return '***';
+    return '${googleWebClientId.substring(0, 8)}...${googleWebClientId.substring(googleWebClientId.length - 8)}';
+  }
+
   /// Valida estritamente a configuração.
   /// Lança [AppConfigException] se [isInvalid] for verdadeiro ou se [requireConfigured] for true e estiver em modo offline.
   void validateOrThrow({bool requireConfigured = false}) {
@@ -376,9 +396,9 @@ class AppConfig {
   /// Representação de diagnóstico técnico segura, que nunca expõe chaves completas ou credenciais.
   String toDiagnosticString() {
     if (isInvalid) {
-      return 'AppConfig(env: ${environment.name}, status: ${status.name}, url: $maskedUrl, anonKey: $maskedAnonKey, errors: [${validationErrors.join("; ")}])';
+      return 'AppConfig(env: ${environment.name}, status: ${status.name}, url: $maskedUrl, anonKey: $maskedAnonKey, googleClientId: $maskedGoogleWebClientId, errors: [${validationErrors.join("; ")}])';
     }
-    return 'AppConfig(env: ${environment.name}, status: ${status.name}, url: $maskedUrl, anonKey: $maskedAnonKey)';
+    return 'AppConfig(env: ${environment.name}, status: ${status.name}, url: $maskedUrl, anonKey: $maskedAnonKey, googleClientId: $maskedGoogleWebClientId)';
   }
 
   @override

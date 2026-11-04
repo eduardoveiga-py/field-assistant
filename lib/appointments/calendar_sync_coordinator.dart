@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart' as drift;
 
+import '../core/app_config.dart';
 import '../database/app_database.dart';
 import '../ui/providers.dart';
 import 'calendar_provider.dart';
@@ -88,11 +89,15 @@ class CalendarSyncCoordinator {
       final authorized = authStatusCache[provider] ?? false;
       if (!authorized) continue;
 
-      final res = await provider.syncEvents(db: db, fullSync: fullSync);
-      totalDownloaded += res.eventsDownloaded;
-      totalUploaded += res.eventsUploaded;
-      if (!res.success && res.errorMessage != null) {
-        errors.add('${provider.providerType.displayName}: ${res.errorMessage}');
+      try {
+        final res = await provider.syncEvents(db: db, fullSync: fullSync);
+        totalDownloaded += res.eventsDownloaded;
+        totalUploaded += res.eventsUploaded;
+        if (!res.success && res.errorMessage != null) {
+          errors.add('${provider.providerType.displayName}: ${res.errorMessage}');
+        }
+      } catch (e) {
+        errors.add('${provider.providerType.displayName}: $e');
       }
     }
 
@@ -538,5 +543,11 @@ final calendarSyncCoordinatorProvider = Provider<CalendarSyncCoordinator>((
   ref,
 ) {
   final db = ref.watch(databaseProvider);
-  return CalendarSyncCoordinator(db);
+  final config = ref.watch(appConfigProvider);
+  return CalendarSyncCoordinator(
+    db,
+    google: GoogleCalendarProvider(
+      webClientId: config.googleWebClientId,
+    ),
+  );
 });

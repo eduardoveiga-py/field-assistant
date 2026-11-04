@@ -491,8 +491,21 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                       onPressed: () async {
                         final pos =
                             await GeolocationHelper.getCurrentLocation();
-                        final lat = pos?.latitude ?? -23.550520;
-                        final lng = pos?.longitude ?? -46.633308;
+                        if (pos == null) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Não foi possível obter a localização GPS. Verifique se o GPS está ativado e com permissão concedida.',
+                                ),
+                              ),
+                            );
+                          }
+                          return;
+                        }
+                        final lat = pos.latitude;
+                        final lng = pos.longitude;
                         setDialogState(() {
                           latController.text = lat.toStringAsFixed(6);
                           lngController.text = lng.toStringAsFixed(6);

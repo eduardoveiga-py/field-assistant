@@ -26,6 +26,8 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>O Field Assistant precisa da sua localização para capturar as coordenadas exatas do contato no território e centralizar o mapa.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>O aplicativo precisa de acesso ao microfone para permitir o registro rápido de notas de voz após as visitas.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>

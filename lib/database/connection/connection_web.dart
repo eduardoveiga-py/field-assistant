@@ -136,35 +136,34 @@ QueryExecutor constructDb({bool inMemory = false}) {
             path: '/$dbName',
             fileSystem: fs,
           );
-        } catch (fsErr) {
+        } catch (fsErr, stack) {
           developer.log(
-            'Falha ao abrir IndexedDbFileSystem ($fsErr). Recorrendo a InMemoryFileSystem...',
+            'Falha crítica ao abrir IndexedDbFileSystem ($fsErr). Persistência Web fail-closed ativada.',
             name: 'DriftWeb',
             error: fsErr,
+            stackTrace: stack,
           );
-          sqlite3.registerVirtualFileSystem(
-            InMemoryFileSystem(),
-            makeDefault: true,
+          throw StateError(
+            'Falha crítica de persistência Web: Não foi possível inicializar o IndexedDB ($fsErr). '
+            'A aplicação foi interrompida para impedir perda irreversível de dados em memória volátil.',
           );
-          return WasmDatabase.inMemory(sqlite3);
         }
       }
     } catch (e, stack) {
       developer.log(
-        'Falha no carregamento direto de WasmSqlite3 ($e). Ativando fallback de contingência...',
+        'Falha fatal no carregamento de WasmSqlite3 ($e). Persistência Web fail-closed ativada.',
         name: 'DriftWeb',
         error: e,
         stackTrace: stack,
       );
+      if (inMemory) {
+        return _FallbackWebQueryExecutor();
+      }
+      throw StateError(
+        'Falha crítica de inicialização do banco de dados Web: Não foi possível carregar os binários WebAssembly SQLite ($e). '
+        'Para garantir a integridade dos dados locais, o aplicativo não operará em modo de descarte silencioso.',
+      );
     }
-
-    // 3. Fallback de Segurança Robusto: Evita crash de tela vermelha quando o ambiente Web bloqueia totalmente WebAssembly
-    developer.log(
-      'AVISO [DriftWeb]: Não foi possível carregar ou compilar os binários WebAssembly (sqlite3.wasm / drift_worker.js). '
-      'Executando em modo degradado de segurança para evitar travamento da interface.',
-      name: 'DriftWeb',
-    );
-    return _FallbackWebQueryExecutor();
   });
 }
 
