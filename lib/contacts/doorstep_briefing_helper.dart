@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import '../database/app_database.dart';
+import '../publications/lff_book_catalog.dart';
 import '../publications/publication_catalog.dart';
 import '../publications/publication_link_resolver.dart';
 import '../voice_notes/voice_note_models.dart';
@@ -34,6 +35,18 @@ class DoorstepBriefingData {
   /// Duração em segundos da última nota de voz
   final int? voiceNoteDurationSeconds;
 
+  /// Título oficial da lição (obtido pelo catálogo oficial de publicações LFF)
+  final String? officialLessonTitle;
+
+  /// Título oficial do ponto/seção
+  final String? officialPointTitle;
+
+  /// Título da seção/unidade do livro
+  final String? sectionTitle;
+
+  /// Data da última visita registrada
+  final DateTime? lastVisitDate;
+
   const DoorstepBriefingData({
     this.lessonAndPoint,
     this.jwLibraryUri,
@@ -44,6 +57,10 @@ class DoorstepBriefingData {
     this.audioFilePath,
     this.voiceNoteTranscription,
     this.voiceNoteDurationSeconds,
+    this.officialLessonTitle,
+    this.officialPointTitle,
+    this.sectionTitle,
+    this.lastVisitDate,
   });
 
   bool get hasLessonOrTopic =>
@@ -81,7 +98,11 @@ class DoorstepBriefingData {
           publicationTitle == other.publicationTitle &&
           audioFilePath == other.audioFilePath &&
           voiceNoteTranscription == other.voiceNoteTranscription &&
-          voiceNoteDurationSeconds == other.voiceNoteDurationSeconds;
+          voiceNoteDurationSeconds == other.voiceNoteDurationSeconds &&
+          officialLessonTitle == other.officialLessonTitle &&
+          officialPointTitle == other.officialPointTitle &&
+          sectionTitle == other.sectionTitle &&
+          lastVisitDate == other.lastVisitDate;
 
   @override
   int get hashCode =>
@@ -93,14 +114,20 @@ class DoorstepBriefingData {
       publicationTitle.hashCode ^
       audioFilePath.hashCode ^
       voiceNoteTranscription.hashCode ^
-      voiceNoteDurationSeconds.hashCode;
+      voiceNoteDurationSeconds.hashCode ^
+      officialLessonTitle.hashCode ^
+      officialPointTitle.hashCode ^
+      sectionTitle.hashCode ^
+      lastVisitDate.hashCode;
 
   @override
   String toString() =>
       'DoorstepBriefingData(lessonAndPoint: $lessonAndPoint, jwLibraryUri: $jwLibraryUri, '
       'pendingDoubt: $pendingDoubt, spiritualGoal: $spiritualGoal, empathyNote: $empathyNote, '
       'publicationTitle: $publicationTitle, audioFilePath: $audioFilePath, '
-      'voiceNoteTranscription: $voiceNoteTranscription, voiceNoteDurationSeconds: $voiceNoteDurationSeconds)';
+      'voiceNoteTranscription: $voiceNoteTranscription, voiceNoteDurationSeconds: $voiceNoteDurationSeconds, '
+      'officialLessonTitle: $officialLessonTitle, officialPointTitle: $officialPointTitle, '
+      'sectionTitle: $sectionTitle, lastVisitDate: $lastVisitDate)';
 }
 
 /// Helper puro responsável por consolidar os dados para o Briefing na Porta.
@@ -126,6 +153,25 @@ class DoorstepBriefingHelper {
     final spiritualGoal = _extractSpiritualGoal(person, linkedStudy);
     final empathyNote = _extractEmpathyNote(person, latestVoiceNote);
 
+    String? officialLessonTitle;
+    String? officialPointTitle;
+    String? sectionTitle;
+
+    if (linkedStudy != null && linkedStudy.currentLesson != null) {
+      final lessonInfo = LffBookCatalog.getLesson(linkedStudy.currentLesson!);
+      if (lessonInfo != null) {
+        officialLessonTitle = lessonInfo.title;
+        sectionTitle = LffBookCatalog.getSection(linkedStudy.currentLesson!).title;
+        if (linkedStudy.currentParagraph != null &&
+            linkedStudy.currentParagraph! >= 1 &&
+            linkedStudy.currentParagraph! <= lessonInfo.pointTitles.length) {
+          officialPointTitle = lessonInfo.pointTitles[linkedStudy.currentParagraph! - 1];
+        }
+      }
+    }
+
+    final lastVisitDate = latestVisit?.dateTimeField ?? person.lastContactAt;
+
     return DoorstepBriefingData(
       lessonAndPoint: lessonInfo.lessonAndPoint,
       jwLibraryUri: lessonInfo.jwLibraryUri,
@@ -136,6 +182,10 @@ class DoorstepBriefingHelper {
       audioFilePath: latestVoiceNote?.audioFilePath,
       voiceNoteTranscription: latestVoiceNote?.transcription,
       voiceNoteDurationSeconds: latestVoiceNote?.audioDurationSeconds,
+      officialLessonTitle: officialLessonTitle,
+      officialPointTitle: officialPointTitle,
+      sectionTitle: sectionTitle,
+      lastVisitDate: lastVisitDate,
     );
   }
 

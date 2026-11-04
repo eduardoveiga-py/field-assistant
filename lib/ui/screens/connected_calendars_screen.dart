@@ -93,20 +93,37 @@ class _ConnectedCalendarsScreenState
       _syncMessage = null;
     });
 
-    final coordinator = ref.read(calendarSyncCoordinatorProvider);
-    final result = await coordinator.syncAll();
+    try {
+      final coordinator = ref.read(calendarSyncCoordinatorProvider);
+      final result = await coordinator.syncAll().timeout(
+        const Duration(seconds: 30),
+        onTimeout: () => CalendarSyncResult(
+          success: false,
+          errorMessage: 'Tempo limite de sincronização esgotado (30s).',
+        ),
+      );
 
-    if (mounted) {
-      setState(() {
-        _isSyncing = false;
-        if (result.success) {
-          _syncMessage =
-              'Sincronização concluída com sucesso! (${result.eventsDownloaded} recebidos, ${result.eventsUploaded} enviados)';
-        } else {
-          _syncMessage = 'Aviso: ${result.errorMessage}';
-        }
-      });
-      await _loadState();
+      if (mounted) {
+        setState(() {
+          if (result.success) {
+            _syncMessage =
+                'Sincronização concluída com sucesso! (${result.eventsDownloaded} recebidos, ${result.eventsUploaded} enviados)';
+          } else {
+            _syncMessage = 'Aviso: ${result.errorMessage}';
+          }
+        });
+        await _loadState();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _syncMessage = 'Erro na sincronização: $e';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSyncing = false);
+      }
     }
   }
 

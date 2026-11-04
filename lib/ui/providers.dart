@@ -50,26 +50,20 @@ final activitiesStreamProvider = StreamProvider<List<ActivityRecordEntry>>((
 
 final studyParticipantsStreamProvider =
     StreamProvider<List<StudyParticipantEntry>>((ref) {
-      final repo = ref.watch(repositoryProvider);
-      return (repo.db.select(
-        repo.db.studyParticipants,
-      )..where((t) => t.deletedAt.isNull())).watch();
-    });
+  final repo = ref.watch(repositoryProvider);
+  return repo.watchAllStudyParticipants();
+});
 
 final studySessionsStreamProvider = StreamProvider<List<StudySessionEntry>>((
   ref,
 ) {
   final repo = ref.watch(repositoryProvider);
-  return (repo.db.select(
-    repo.db.studySessions,
-  )..where((t) => t.deletedAt.isNull())).watch();
+  return repo.watchAllSessions();
 });
 
 final visitsStreamProvider = StreamProvider<List<VisitEntry>>((ref) {
   final repo = ref.watch(repositoryProvider);
-  return (repo.db.select(
-    repo.db.visits,
-  )..where((t) => t.deletedAt.isNull())).watch();
+  return repo.watchAllVisits();
 });
 
 /// Notifier e Provider do Modo Sol Intenso & Alto Contraste

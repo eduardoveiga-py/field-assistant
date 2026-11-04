@@ -78,9 +78,14 @@ class CalendarSyncCoordinator {
     int totalConflicts = 0;
     final errors = <String>[];
 
+    final authStatusCache = <CalendarProvider, bool>{};
+    for (final provider in allProviders) {
+      authStatusCache[provider] = await provider.isAuthorized();
+    }
+
     // 1. Download de alterações externas
     for (final provider in allProviders) {
-      final authorized = await provider.isAuthorized();
+      final authorized = authStatusCache[provider] ?? false;
       if (!authorized) continue;
 
       final res = await provider.syncEvents(db: db, fullSync: fullSync);
@@ -96,7 +101,8 @@ class CalendarSyncCoordinator {
 
     for (final link in allLinks) {
       final provider = getProviderByName(link.provider);
-      final isProvAuth = provider != null && await provider.isAuthorized();
+      final isProvAuth =
+          provider != null && (authStatusCache[provider] ?? false);
 
       // Caso 1: Vínculo já marcado como deletado no banco (tombstone) e pendente de exclusão externa
       if (link.deletedAt != null) {
@@ -316,7 +322,7 @@ class CalendarSyncCoordinator {
 
     for (final appt in activeAppointments) {
       for (final provider in allProviders) {
-        if (!await provider.isAuthorized()) continue;
+        if (!(authStatusCache[provider] ?? false)) continue;
         final providerName =
             provider.providerType == CalendarProviderType.google
             ? 'google'

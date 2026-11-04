@@ -376,5 +376,88 @@ void main() {
       );
       expect(updatedPerson?.revision, equals(initialPerson.revision + 1));
     });
+
+    test('createStudy enfileira atomicamente operacoes de sincronizacao para cada participante', () async {
+      final p1 = await repository.createPerson(name: 'Participante 1');
+      final p2 = await repository.createPerson(name: 'Participante 2');
+      await db.delete(db.syncQueue).go();
+
+      final study = await repository.createStudy(
+        title: 'Estudo com Participantes Outbox',
+        publicationId: 'lff-book',
+        participantPersonIds: [p1.id, p2.id],
+      );
+
+      final pending = await repository.getPendingSyncOperations();
+      // Deve conter 1 operacao para o estudo e 2 para os participantes
+      expect(pending.length, equals(3));
+      final studyOp = pending.where((op) => op.entityType == 'bible_studies').toList();
+      final partOps = pending.where((op) => op.entityType == 'study_participants').toList();
+      expect(studyOp.length, equals(1));
+      expect(studyOp.first.entityId, equals(study.id));
+      expect(partOps.length, equals(2));
+      expect(partOps.any((op) => op.payload.contains(p1.id)), isTrue);
+      expect(partOps.any((op) => op.payload.contains(p2.id)), isTrue);
+    });
+
+    test('restoreDeletedItem inclui deleted_at null e revision incrementada no payload da outbox', () async {
+      final person = await repository.createPerson(name: 'Restaurado Test');
+      await repository.deletePerson(person.id);
+      await db.delete(db.syncQueue).go();
+
+      await repository.restoreDeletedItem('people', person.id);
+
+      final pending = await repository.getPendingSyncOperations();
+      expect(pending.length, equals(1));
+      final op = pending.first;
+      expect(op.entityType, equals('people'));
+      expect(op.entityId, equals(person.id));
+      expect(op.operation, equals('UPDATE'));
+      expect(op.payload, contains('"deleted_at":null'));
+      expect(op.payload, contains('"restored":true'));
+      expect(op.payload, contains('"revision":3')); // 1 (create) -> 2 (delete) -> 3 (restore)
+    });
+
+    test('Streams reativos e carregamento em lote de participantes e visitas funcionam corretamente', () async {
+      final person = await repository.createPerson(name: 'Reativo Test');
+      final visit = await repository.createVisit(
+        personId: person.id,
+        dateTime: DateTime.now(),
+        contactType: 'revisita',
+        result: 'interessado',
+      );
+      final study = await repository.createStudy(
+        title: 'Estudo Reativo',
+        publicationId: 'lff-book',
+        participantPersonIds: [person.id],
+      );
+      final session = await repository.createStudySession(
+        studyId: study.id,
+        dateTime: DateTime.now(),
+        lessonCovered: 1,
+        paragraphsCovered: '1-3',
+      );
+
+      // watchAllVisits
+      final visits = await repository.watchAllVisits().first;
+      expect(visits.any((v) => v.id == visit.id), isTrue);
+
+      // watchAllStudyParticipants
+      final participants = await repository.watchAllStudyParticipants().first;
+      expect(participants.any((p) => p.studyId == study.id), isTrue);
+
+      // getAllStudyParticipants
+      final allParticipants = await repository.getAllStudyParticipants();
+      expect(allParticipants.any((p) => p.studyId == study.id), isTrue);
+
+      // getParticipantsForStudies (batch)
+      final batchMap = await repository.getParticipantsForStudies([study.id]);
+      expect(batchMap.containsKey(study.id), isTrue);
+      expect(batchMap[study.id]!.length, equals(1));
+
+      // watchAllSessions
+      final sessions = await repository.watchAllSessions().first;
+      expect(sessions.any((s) => s.id == session.id), isTrue);
+    });
   });
 }

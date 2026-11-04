@@ -1,37 +1,39 @@
 # CHECKLIST E CLASSIFICAÇÃO DE PRONTIDÃO PARA PRODUÇÃO
 
 ## 1. Classificação Atual
-**Status Geral: REPROVADO PARA PRODUÇÃO**
+**Status Geral: RELEASE CANDIDATE VERIFICADO (APROVADO NO CÓDIGO E TESTES)**
 
 ### Justificativa Técnica
-O aplicativo apresenta **100% de sucesso na suíte de 635 testes automatizados**, **0 issues de análise estática** sob `--fatal-infos` e estabilização completa de persistência, soft delete/tombstones, 3-way merge determinístico, detecção de concorrência na agenda pós-sincronização, parada física aos 30s no áudio, fallback explícito de ditado offline, fluidez no motor cartográfico GIS com cancelamento assíncrono de tiles, isolamento multiplataforma de calendários na Web (eliminando `MissingPluginException` do `device_calendar` e suportando Google OAuth Web nativo), automação de sincronização de agenda em segundo plano via lifecycle e centralização de arquivos .ics em Configurações, além de deploy verificado na instância real do Supabase (`pchwrcwrvnbiywrdsvum`). A publicação final no ecossistema iOS depende exclusivamente das validações externas de ambiente: teste em hardware físico Apple (iPhone/iPad) e geração de archive iOS em runner macOS com conta de desenvolvedor ativa.
+O aplicativo apresenta **100% de sucesso na suíte de 704 testes automatizados**, **0 issues de análise estática** sob `dart analyze lib test --fatal-infos` e estabilização completa de todas as fases da missão (M1 a M5). A sincronização multi-dispositivo foi exaustivamente comprovada nos 10 cenários P0 obrigatórios (push/pull bidirecional, durabilidade da outbox pós-restart, 3-way merge determinístico, detecção de conflitos, detecção de compromissos concorrentes na agenda pós-sync, tombstones sem ressurreição, mídia privada no Storage sem expor caminhos locais, RLS multi-tenant estrito por `owner_id = auth.uid()`, resiliência de rede com backoff e bootstrap limpo). Todas as telas monolíticas foram modularizadas em widgets coesos em `lib/ui/widgets/` preservando rigorosamente todas as `Key`s e contratos de widget test. A publicação final na Apple App Store depende exclusivamente das validações externas de ambiente: teste em hardware físico Apple (iPhone/iPad) e geração de archive iOS em runner macOS com conta Apple Developer ativa.
 
 ---
 
 ## 2. Checklist de Aprovação para Produção (Critérios da Seção 12)
 
-- [x] **Todos os P0 resolvidos** *(APROVADO: P0-01 resolvido em U2; P0-02 resolvido em U3; P0-03 resolvido em U1; integridade de tombstones em U3.1 e hardening definitivo em U3.2)*
-- [x] **Todos os P1 resolvidos no código** *(APROVADO: P1-01 concorrência na agenda pós-sync resolvido; P1-02 migrações Drift resolvido; P1-03 parada física aos 30s de áudio resolvida; P1-04 fallback de ditado offline e preservação de áudio resolvidos)*
-- [x] **Inicialização e configuração de produção validadas** *(APROVADO: Configuração e validação de ambiente na Unidade U1 via `AppConfig`; inicialização desacoplada, resiliente e ciclo de vida Riverpod em `main.dart` concluídos na Unidade U2 via `SupabaseInitializer`; retry de boot em U3.2)*
-- [x] **Banco local íntegro** *(APROVADO: Drift v4 com `PRAGMA foreign_keys = ON;`, `journal_mode = WAL;`, suporte IndexedDB via Wasm na Web)*
-- [x] **Migrações testadas e rastreáveis** *(APROVADO: `app_database.dart` atualizado na Unidade U3.2 com logging estruturado via `AppLogger.error` e `rethrow` de exceções de DDL, eliminando swallows silenciosos)*
-- [x] **Sincronização validada entre dispositivos** *(APROVADO: Schema remoto completo cobrindo todas as 10 tabelas, bucket de áudio de 10 MB, testes de serialização e pull em U3, integridade de soft delete/tombstones em U3.1, e 3-way merge determinístico com snapshot `_base`, normalização profunda por valor de coleções em tags e preservação de áudio em U3.2)*
+- [x] **Todos os P0 resolvidos** *(APROVADO: P0-01 Supabase desacoplado; P0-02 schema 10 tabelas e storage; P0-03 injeção AppConfig e bloqueio de service_role; integridade de tombstones e 10 cenários multi-dispositivo P0)*
+- [x] **Todos os P1 resolvidos no código** *(APROVADO: P1-01 parada física aos 30s de áudio; P1-02 migrações Drift resilientes sem swallows; P1-03 concorrência na agenda pós-sync resolvida; P1-04 fallback de ditado offline e preservação de áudio resolvidos)*
+- [x] **Todos os P2 resolvidos na arquitetura** *(APROVADO: Telas monolíticas modularizadas para `lib/ui/widgets/`, `AppRepository` decomposto em Mixins de domínio em `lib/database/domains/` preservando 100% de retrocompatibilidade)*
+- [x] **Os 5 requisitos prioritários de UI implementados** *(APROVADO: Linha do tempo com datas exatas dos marcos espirituais, centralização e foco exato de zoom no mapa, fim do loading infinito no Google Calendar com timeout, visitas retroativas com toggle e briefing na porta enriquecido com catálogo LFF e data da última visita)*
+- [x] **Inicialização e configuração de produção validadas** *(APROVADO: Configuração e validação de ambiente via `AppConfig`; inicialização desacoplada, resiliente e ciclo de vida Riverpod em `main.dart` via `SupabaseInitializer`)*
+- [x] **Banco local íntegro** *(APROVADO: Drift v4 com 22 tabelas, `PRAGMA foreign_keys = ON;`, `journal_mode = WAL;`, suporte IndexedDB via Wasm na Web e worker canônico `drift_worker.js`)*
+- [x] **Migrações testadas e rastreáveis** *(APROVADO: `app_database.dart` atualizado com logging estruturado via `AppLogger.error` e `rethrow` de exceções de DDL, eliminando swallows silenciosos)*
+- [x] **Sincronização validada entre dispositivos (10 Cenários P0)** *(APROVADO: 10 cenários de aceitação cobertos por testes unitários e integrados em `test/sync/cross_device_10_scenarios_p0_test.dart`)*
 - [x] **Conflitos tratados explicitamente na Agenda** *(APROVADO: Inserções concorrentes com sobreposição de horários recebidas após sincronização são detectadas pelo `SupabaseSyncService`, marcando status `conflito` e `isProvisional: true` na base local e atualizando a outbox)*
-- [x] **RLS e permissões validadas** *(APROVADO: RLS ativo nas 10 tabelas e no bucket privado storage.objects com isolamento estrito por auth.uid() = owner_id e validação de posse da nota de voz em U3.2)*
+- [x] **RLS e permissões validadas** *(APROVADO: RLS ativo nas 10 tabelas e no bucket privado storage.objects com isolamento estrito por auth.uid() = owner_id e validação de posse da nota de voz)*
 - [x] **Dados sensíveis adequadamente protegidos** *(APROVADO: Backup AES-256 GCM + PBKDF2; bloqueio ativo de chaves `service_role` em `AppConfig`, mascaramento em logs e `.gitignore` blindado para `.env*`)*
 - [x] **Backup e restauração testados com staging seguro** *(APROVADO: Staging em 3 etapas com rollback verificado por `TC-BAK-ADV-01` a `04`)*
-- [x] **Agenda validada contra concorrência** *(APROVADO: Cobertura automatizada por `u3_2_integrated_acceptance_test.dart` com cenários de sobreposição, contiguidade e concorrência na outbox)*
 - [x] **Áudio validado no código com parada física de 30s** *(APROVADO NO CÓDIGO: Timer de 30s dispara `record.stop()` ativamente no hardware com barreira contra cancelamento e limpeza de arquivos órfãos)*
 - [x] **Transcrição documentada corretamente e com fallback** *(APROVADO: Diálogo orienta sobre necessidade do pacote de idioma offline baixado nos Ajustes do iOS e preserva o áudio para reprodução e transcrição manual)*
-- [x] **Testes automatizados aprovados** *(APROVADO: 635 testes passando com 100% de sucesso)*
-- [x] **Análise estática aprovada** *(APROVADO: `dart analyze lib test --fatal-infos` acusa 0 issues)*
+- [x] **Testes automatizados aprovados** *(APROVADO: 704 testes passando com 100% de sucesso)*
+- [x] **Análise estática aprovada** *(APROVADO: `dart analyze lib test --fatal-infos` acusa rigorosamente 0 issues)*
 - [x] **Build Release Web aprovado** *(APROVADO: `flutter build web --release` compila com sucesso)*
 - [ ] **Archive iOS e instalação real em aparelho físico** *(PENDENTE EXTERNO: Depende de runner macOS e Apple Developer Account)*
 - [x] **Deploy e schema Supabase aplicados na nuvem** *(APROVADO: Todas as 4 migrações aplicadas no projeto `pchwrcwrvnbiywrdsvum`, 10 tabelas e bucket `voice_notes` respondendo HTTP 200)*
 - [x] **Desempenho e fluidez cartográfica GIS** *(APROVADO: Cancelamento instantâneo de tiles obsoletos ao mudar zoom, ordenação focal pelo viewport e fallback L1/disco eliminando travamentos)*
 - [x] **Isolamento de Calendário Web e Google OAuth** *(APROVADO: Zero chamadas nativas ao `device_calendar` no navegador Web, fluxo OAuth Google desacoplado de permissões nativas e UI adaptada com badge "Apenas iOS")*
 - [x] **Automação de Sincronização e Limpeza de UI na Agenda** *(APROVADO: Push automático ao salvar/editar e pull automático no retorno ao app (`AppLifecycleState.resumed`), com banner .ics migrado para Ajustes)*
-- [x] **Documentação atualizada** *(APROVADO: Documentações de engenharia atualizadas com ADR-010 a ADR-015 e 635 testes)*
+- [x] **Documentação atualizada** *(APROVADO: Documentações de arquitetura, decisões canônicas ADR-001 a ADR-023, modelo de dados, protocolo de sync, segurança e registros de engenharia M1 a M5 atualizados)*
+
 
 ---
 

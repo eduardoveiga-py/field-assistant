@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../contacts/doorstep_briefing_helper.dart';
 import '../../core/app_theme.dart';
+import '../../core/date_utils.dart';
 import '../../voice_notes/audio_recording_service.dart';
 
 /// Card de visualização ultrarrápida (30 segundos) para preparação imediata
@@ -455,8 +456,52 @@ class _DoorstepBriefingCardState extends State<DoorstepBriefingCard> {
                     : (isDark ? Colors.white : const Color(0xFF0F172A)),
               ),
             ),
+            if (data.officialLessonTitle != null) ...[
+              const SizedBox(height: 3),
+              Text(
+                data.officialLessonTitle!,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: isSunMode ? Colors.black : AppTheme.primaryBlue,
+                ),
+              ),
+            ],
+            if (data.officialPointTitle != null) ...[
+              const SizedBox(height: 2),
+              Text(
+                data.officialPointTitle!,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isSunMode
+                      ? Colors.black87
+                      : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569)),
+                ),
+              ),
+            ],
+            if (data.lastVisitDate != null) ...[
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Icon(
+                    Icons.history,
+                    size: 13,
+                    color: isSunMode ? Colors.black54 : AppTheme.textMuted,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Última visita: ${AppDateUtils.formatDate(data.lastVisitDate!)}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isSunMode ? Colors.black54 : AppTheme.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ],
             if (data.publicationTitle != null &&
-                data.publicationTitle != data.lessonAndPoint) ...[
+                data.publicationTitle != data.lessonAndPoint &&
+                data.publicationTitle != data.officialLessonTitle) ...[
               const SizedBox(height: 2),
               Text(
                 data.publicationTitle!,

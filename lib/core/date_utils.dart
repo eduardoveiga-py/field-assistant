@@ -17,6 +17,14 @@ class AppDateUtils {
     return _timeFormat.format(date);
   }
 
+  /// Formata TimeOfDay no formato HH:mm
+  static String formatTimeOfDay(dynamic time) {
+    if (time == null) return '';
+    final hour = (time.hour as int).toString().padLeft(2, '0');
+    final minute = (time.minute as int).toString().padLeft(2, '0');
+    return '$hour:$minute';
+  }
+
   /// Formata data e hora no formato DD/MM/AAAA HH:mm
   static String formatDateTime(DateTime? date) {
     if (date == null) return '';

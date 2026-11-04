@@ -1,7 +1,5 @@
 import 'dart:math' as math;
 
-import 'package:clock/clock.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,6 +15,7 @@ import '../../territory/landmark_manager.dart';
 import '../../territory/sector_manager.dart';
 import '../../territory/tile_cache/tile_cache_service.dart';
 import '../providers.dart';
+import '../widgets/interactive_map_canvas.dart';
 import '../widgets/map_location_picker_dialog.dart';
 import '../../contacts/person_hand_off_helper.dart';
 import 'person_detail_screen.dart';
@@ -31,9 +30,6 @@ class ContactsMapScreen extends ConsumerStatefulWidget {
 }
 
 class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
-  final TransformationController _transformationController =
-      TransformationController();
-  bool _hasCenteredInitialView = false;
   String? _highlightPersonId;
   String _selectedStatusFilter =
       'Todos'; // 'Todos', 'Estudos', 'Revisitas', 'Interessados'
@@ -43,121 +39,14 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
   bool _showLandmarks = true;
   PersonEntry? _selectedPinPerson;
   TerritoryLandmark? _selectedPinLandmark;
+  int _zoom = 15;
 
   final Set<String> _geocodedPersonIds = {};
-  bool _hasCenteredHighlightPerson = false;
-  int _zoom = 15;
-  static const double _tileSize = 256.0;
-  static const int _gridHalfSize =
-      5; // 11x11 blocos = 2816x2816 px (otimizado para fluidez a 60fps)
-  DateTime? _lastZoomChangeTime;
 
   @override
   void initState() {
     super.initState();
     _highlightPersonId = widget.highlightPersonId;
-  }
-
-  int _lon2tileX(double lon, int z) =>
-      ((lon + 180.0) / 360.0 * (1 << z)).floor();
-
-  int _lat2tileY(double lat, int z) {
-    final latRad = lat.clamp(-85.0511, 85.0511) * math.pi / 180.0;
-    return ((1.0 -
-                math.log(math.tan(latRad) + 1.0 / math.cos(latRad)) / math.pi) /
-            2.0 *
-            (1 << z))
-        .floor();
-  }
-
-  double _lon2pixelX(double lon, int z) =>
-      (lon + 180.0) / 360.0 * (_tileSize * (1 << z));
-
-  double _lat2pixelY(double lat, int z) {
-    final latRad = lat.clamp(-85.0511, 85.0511) * math.pi / 180.0;
-    final sinLat = math.sin(latRad).clamp(-0.9999, 0.9999);
-    return (0.5 - math.log((1.0 + sinLat) / (1.0 - sinLat)) / (4.0 * math.pi)) *
-        (_tileSize * (1 << z));
-  }
-
-  double _pixelX2lon(double px, int z) =>
-      (px / (_tileSize * (1 << z))) * 360.0 - 180.0;
-
-  double _pixelY2lat(double py, int z) {
-    final n = math.pi - (2.0 * math.pi * py) / (_tileSize * (1 << z));
-    return 180.0 / math.pi * math.atan(0.5 * (math.exp(n) - math.exp(-n)));
-  }
-
-  void _changeZoom(
-    int newZoom,
-    BoxConstraints constraints,
-    double originPx,
-    double originPy,
-    double centerLng,
-    double centerLat,
-  ) {
-    final targetZoom = newZoom.clamp(10, 18);
-    if (targetZoom == _zoom) return;
-
-    final currentMatrix = _transformationController.value;
-    final currentScale = currentMatrix.getMaxScaleOnAxis();
-    final effectiveScale = currentScale > 0.01 ? currentScale : 1.0;
-    final dx = currentMatrix.storage[12];
-    final dy = currentMatrix.storage[13];
-
-    final viewportW = constraints.maxWidth > 0 ? constraints.maxWidth : 400.0;
-    final viewportH = constraints.maxHeight > 0 ? constraints.maxHeight : 600.0;
-
-    // Ponto geográfico central atualmente visualizado (compensando a escala do InteractiveViewer)
-    final canvasCenterX = ((viewportW / 2.0) - dx) / effectiveScale;
-    final canvasCenterY = ((viewportH / 2.0) - dy) / effectiveScale;
-    final worldPx = originPx + canvasCenterX;
-    final worldPy = originPy + canvasCenterY;
-    final focalLng = _pixelX2lon(worldPx, _zoom);
-    final focalLat = _pixelY2lat(worldPy, _zoom);
-
-    // Reprojeção para novo nível de resolução 'z'
-    final newCenterTileX = _lon2tileX(centerLng, targetZoom);
-    final newCenterTileY = _lat2tileY(centerLat, targetZoom);
-    final newMinTileX = newCenterTileX - _gridHalfSize;
-    final newMinTileY = newCenterTileY - _gridHalfSize;
-    final newOriginPx = newMinTileX * _tileSize;
-    final newOriginPy = newMinTileY * _tileSize;
-
-    final newWorldPx = _lon2pixelX(focalLng, targetZoom);
-    final newWorldPy = _lat2pixelY(focalLat, targetZoom);
-
-    final newCanvasX = newWorldPx - newOriginPx;
-    final newCanvasY = newWorldPy - newOriginPy;
-
-    final canvasWidth = (_gridHalfSize * 2 + 1) * _tileSize;
-    final canvasHeight = (_gridHalfSize * 2 + 1) * _tileSize;
-    final newDx = ((viewportW / 2.0) - newCanvasX).clamp(
-      viewportW - canvasWidth,
-      0.0,
-    );
-    final newDy = ((viewportH / 2.0) - newCanvasY).clamp(
-      viewportH - canvasHeight,
-      0.0,
-    );
-
-    TileCacheService.instance.cancelZoomExcept(targetZoom);
-
-    setState(() {
-      _zoom = targetZoom;
-    });
-
-    _transformationController.value = Matrix4.translationValues(
-      newDx,
-      newDy,
-      0.0,
-    );
-  }
-
-  @override
-  void dispose() {
-    _transformationController.dispose();
-    super.dispose();
   }
 
   double _calculateDistanceKm(
@@ -175,19 +64,6 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
             (1 - math.cos((lon2 - lon1) * p)) /
             2;
     return 12742 * math.asin(math.sqrt(a));
-  }
-
-  void _recenterMap(
-    double viewportWidth,
-    double viewportHeight,
-    double centerPx,
-    double centerPy,
-  ) {
-    if (viewportWidth > 0 && viewportHeight > 0) {
-      final dx = (viewportWidth / 2.0) - centerPx;
-      final dy = (viewportHeight / 2.0) - centerPy;
-      _transformationController.value = Matrix4.translationValues(dx, dy, 0.0);
-    }
   }
 
   Future<void> _openSingleRoute(PersonEntry person) async {
@@ -854,8 +730,8 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
     int totalSaved = 0;
     int cumulativeDone = 0;
     for (final z in zoomLevels) {
-      final cx = _lon2tileX(cLng, z);
-      final cy = _lat2tileY(cLat, z);
+      final cx = InteractiveMapCanvas.lon2tileX(cLng, z);
+      final cy = InteractiveMapCanvas.lat2tileY(cLat, z);
       final saved = await TileCacheService.instance.preloadArea(
         z: z,
         minX: cx - half,
@@ -1292,37 +1168,6 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
     List<TerritoryLandmark> landmarks,
   ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final geoContacts = contacts
-        .where(
-          (c) =>
-              c.latitude != null &&
-              c.longitude != null &&
-              (c.latitude != 0.0 || c.longitude != 0.0) &&
-              c.latitude!.abs() <= 90 &&
-              c.longitude!.abs() <= 180,
-        )
-        .toList();
-    final geoLandmarks = _showLandmarks
-        ? landmarks
-              .where(
-                (l) =>
-                    l.latitude != null &&
-                    l.longitude != null &&
-                    (l.latitude != 0.0 || l.longitude != 0.0) &&
-                    l.latitude!.abs() <= 90 &&
-                    l.longitude!.abs() <= 180,
-              )
-              .toList()
-        : <TerritoryLandmark>[];
-
-    final allLats = [
-      ...geoContacts.map((c) => c.latitude!),
-      ...geoLandmarks.map((l) => l.latitude!),
-    ]..sort();
-    final allLngs = [
-      ...geoContacts.map((c) => c.longitude!),
-      ...geoLandmarks.map((l) => l.longitude!),
-    ]..sort();
 
     PersonEntry? highlightPerson;
     if (_highlightPersonId != null) {
@@ -1368,469 +1213,36 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
       });
     }
 
-    double centerLat = -23.550520;
-    double centerLng = -46.633308;
-    if (hasHighlightCoords) {
-      // Centraliza no endereço específico da pessoa destacada
-      centerLat = highlightPerson.latitude!;
-      centerLng = highlightPerson.longitude!;
-      _selectedPinPerson ??= highlightPerson;
-    } else if (allLats.isNotEmpty && allLngs.isNotEmpty) {
-      // Usa a mediana para centralizar exatamente no agrupamento principal do território
-      centerLat = allLats[allLats.length ~/ 2];
-      centerLng = allLngs[allLngs.length ~/ 2];
-    }
+    return Stack(
+      children: [
+        InteractiveMapCanvas(
+          contacts: contacts,
+          landmarks: landmarks,
+          highlightPersonId: _highlightPersonId,
+          selectedPerson: _selectedPinPerson,
+          selectedLandmark: _selectedPinLandmark,
+          showLandmarks: _showLandmarks,
+          onPersonSelected: (person) {
+            setState(() {
+              _selectedPinPerson = person;
+              _selectedPinLandmark = null;
+            });
+          },
+          onLandmarkSelected: (landmark) {
+            setState(() {
+              _selectedPinLandmark = landmark;
+              _selectedPinPerson = null;
+            });
+          },
+          onClearHighlight: () {
+            setState(() {
+              _highlightPersonId = null;
+            });
+          },
+          onZoomChanged: (z) => setState(() => _zoom = z),
+        ),
 
-    final centerTileX = _lon2tileX(centerLng, _zoom);
-    final centerTileY = _lat2tileY(centerLat, _zoom);
-
-    // Grade otimizada (11x11 blocos = 2816x2816 px) que cobre 100% da tela em qualquer dispositivo móvel, tablet ou desktop
-    final minTileX = centerTileX - _gridHalfSize;
-    final maxTileX = centerTileX + _gridHalfSize;
-    final minTileY = centerTileY - _gridHalfSize;
-    final maxTileY = centerTileY + _gridHalfSize;
-
-    final originPx = minTileX * _tileSize;
-    final originPy = minTileY * _tileSize;
-
-    final canvasWidth = (_gridHalfSize * 2 + 1) * _tileSize;
-    final canvasHeight = (_gridHalfSize * 2 + 1) * _tileSize;
-
-    final centerPx = _lon2pixelX(centerLng, _zoom) - originPx;
-    final centerPy = _lat2pixelY(centerLat, _zoom) - originPy;
-
-    // Ordena para que o pino destacado seja renderizado por último (no topo de pinos próximos)
-    final orderedContacts = List<PersonEntry>.from(geoContacts);
-    if (_highlightPersonId != null) {
-      orderedContacts.sort((a, b) {
-        if (a.id == _highlightPersonId) return 1;
-        if (b.id == _highlightPersonId) return -1;
-        return 0;
-      });
-    }
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (!_hasCenteredInitialView &&
-            constraints.maxWidth > 0 &&
-            constraints.maxHeight > 0) {
-          _hasCenteredInitialView = true;
-          if (hasHighlightCoords) _hasCenteredHighlightPerson = true;
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              final dx = (constraints.maxWidth / 2.0) - centerPx;
-              final dy = (constraints.maxHeight / 2.0) - centerPy;
-              _transformationController.value = Matrix4.translationValues(
-                dx,
-                dy,
-                0.0,
-              );
-            }
-          });
-        } else if (hasHighlightCoords &&
-            !_hasCenteredHighlightPerson &&
-            constraints.maxWidth > 0 &&
-            constraints.maxHeight > 0) {
-          _hasCenteredHighlightPerson = true;
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              final dx = (constraints.maxWidth / 2.0) - centerPx;
-              final dy = (constraints.maxHeight / 2.0) - centerPy;
-              _transformationController.value = Matrix4.translationValues(
-                dx,
-                dy,
-                0.0,
-              );
-            }
-          });
-        }
-
-        // Calcula o centro focal do viewport atual (onde os olhos do usuário estão agora)
-        final currentMatrix = _transformationController.value;
-        final currentScale = currentMatrix.getMaxScaleOnAxis();
-        final effectiveScale = currentScale > 0.01 ? currentScale : 1.0;
-        final curDx = currentMatrix.storage[12];
-        final curDy = currentMatrix.storage[13];
-        final viewportW = constraints.maxWidth > 0
-            ? constraints.maxWidth
-            : 400.0;
-        final viewportH = constraints.maxHeight > 0
-            ? constraints.maxHeight
-            : 600.0;
-        final canvasCenterX = ((viewportW / 2.0) - curDx) / effectiveScale;
-        final canvasCenterY = ((viewportH / 2.0) - curDy) / effectiveScale;
-        final focalTileX = minTileX + (canvasCenterX / _tileSize).floor();
-        final focalTileY = minTileY + (canvasCenterY / _tileSize).floor();
-
-        // Prioriza blocos do foco do viewport para fora: a área visível carrega imediatamente
-        final tileCoords = <({int x, int y})>[];
-        for (int tx = minTileX; tx <= maxTileX; tx++) {
-          for (int ty = minTileY; ty <= maxTileY; ty++) {
-            tileCoords.add((x: tx, y: ty));
-          }
-        }
-        tileCoords.sort((a, b) {
-          final distA = (a.x - focalTileX).abs() + (a.y - focalTileY).abs();
-          final distB = (b.x - focalTileX).abs() + (b.y - focalTileY).abs();
-          return distA.compareTo(distB);
-        });
-
-        return Stack(
-          children: [
-            ClipRect(
-              child: Listener(
-                behavior: HitTestBehavior.translucent,
-                onPointerSignal: (pointerSignal) {
-                  if (pointerSignal is PointerScrollEvent) {
-                    final now = clock.now();
-                    if (_lastZoomChangeTime == null ||
-                        now.difference(_lastZoomChangeTime!).inMilliseconds >=
-                            100) {
-                      if (pointerSignal.scrollDelta.dy < -2 && _zoom < 18) {
-                        _lastZoomChangeTime = now;
-                        _changeZoom(
-                          _zoom + 1,
-                          constraints,
-                          originPx,
-                          originPy,
-                          centerLng,
-                          centerLat,
-                        );
-                      } else if (pointerSignal.scrollDelta.dy > 2 &&
-                          _zoom > 10) {
-                        _lastZoomChangeTime = now;
-                        _changeZoom(
-                          _zoom - 1,
-                          constraints,
-                          originPx,
-                          originPy,
-                          centerLng,
-                          centerLat,
-                        );
-                      }
-                    }
-                  }
-                },
-                child: GestureDetector(
-                  behavior: HitTestBehavior.translucent,
-                  onDoubleTap: () {
-                    if (_zoom < 18) {
-                      _changeZoom(
-                        _zoom + 1,
-                        constraints,
-                        originPx,
-                        originPy,
-                        centerLng,
-                        centerLat,
-                      );
-                    }
-                  },
-                  child: InteractiveViewer(
-                    transformationController: _transformationController,
-                    constrained: false, // Permite que o mapa ocupe 100% da área sem distorção ou cortes pretos
-                    boundaryMargin: const EdgeInsets.all(
-                      250,
-                    ), // Margem segura para zoom fluido sem travamento
-                    panEnabled: true,
-                    scaleEnabled: true, // Habilita zoom fluido por gesto de pinça na tela e trackpad
-                    trackpadScrollCausesScale: true, // Garante que pinça de trackpad aplique ZOOM em vez de deslizar para os lados
-                    minScale: 0.6,
-                    maxScale: 2.0,
-                    onInteractionEnd: (details) {
-                      final m = _transformationController.value;
-                      final currentScale = m.getMaxScaleOnAxis();
-                      if (currentScale >= 1.25 && _zoom < 18) {
-                        _changeZoom(
-                          _zoom + 1,
-                          constraints,
-                          originPx,
-                          originPy,
-                          centerLng,
-                          centerLat,
-                        );
-                      } else if (currentScale <= 0.8 && _zoom > 10) {
-                        _changeZoom(
-                          _zoom - 1,
-                          constraints,
-                          originPx,
-                          originPy,
-                          centerLng,
-                          centerLat,
-                        );
-                      } else if ((currentScale - 1.0).abs() > 0.05) {
-                        final dx = m.storage[12];
-                        final dy = m.storage[13];
-                        _transformationController.value =
-                            Matrix4.translationValues(dx, dy, 0.0);
-                      }
-                    },
-                    child: Container(
-                      width: canvasWidth,
-                      height: canvasHeight,
-                      color: isDark
-                          ? const Color(0xFF0F172A)
-                          : const Color(0xFFF1F5F9),
-                      child: Stack(
-                        children: [
-                          // Camada de Tiles do OpenStreetMap isolada em RepaintBoundary para movimentação a 60fps sem repintura
-                          RepaintBoundary(
-                            child: Stack(
-                              children: [
-                                for (final coord in tileCoords)
-                                  Positioned(
-                                    key: ValueKey(
-                                      'tile_pos_${_zoom}_${coord.x}_${coord.y}',
-                                    ),
-                                    left: (coord.x - minTileX) * _tileSize,
-                                    top: (coord.y - minTileY) * _tileSize,
-                                    child: CachedTileWidget(
-                                      key: ValueKey(
-                                        'tile_${_zoom}_${coord.x}_${coord.y}',
-                                      ),
-                                      z: _zoom,
-                                      x: coord.x,
-                                      y: coord.y,
-                                      size: _tileSize,
-                                      isDark: isDark,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-
-                          // Renderização dos Marcos / Pontos de Referência geolocalizados
-                          if (_showLandmarks)
-                            RepaintBoundary(
-                              child: Stack(
-                                children: [
-                                  for (int i = 0; i < geoLandmarks.length; i++)
-                                    _buildLandmarkPin(
-                                      geoLandmarks[i],
-                                      i,
-                                      geoLandmarks.length,
-                                      originPx: originPx,
-                                      originPy: originPy,
-                                      canvasWidth: canvasWidth,
-                                      canvasHeight: canvasHeight,
-                                    ),
-                                ],
-                              ),
-                            ),
-
-                          // Renderização de cada pino de contato com coordenadas válidas (destacado por último)
-                          RepaintBoundary(
-                            child: Stack(
-                              children: [
-                                for (int i = 0; i < orderedContacts.length; i++)
-                                  _buildMapPin(
-                                    orderedContacts[i],
-                                    i,
-                                    orderedContacts.length,
-                                    originPx: originPx,
-                                    originPy: originPy,
-                                    canvasWidth: canvasWidth,
-                                    canvasHeight: canvasHeight,
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-            if (_highlightPersonId != null && highlightPerson != null)
-              Positioned(
-                top: 12,
-                left: 12,
-                child: Material(
-                  elevation: 4,
-                  borderRadius: BorderRadius.circular(20),
-                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(20),
-                    onTap: () {
-                      setState(() {
-                        _highlightPersonId = null;
-                      });
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: const Color(0xFFF59E0B),
-                          width: 1.5,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.star,
-                            color: Color(0xFFD97706),
-                            size: 16,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Destacado: ${highlightPerson.name.split(' ').first}',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          const Icon(
-                            Icons.close,
-                            size: 14,
-                            color: AppTheme.textMuted,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-
-            // Controles Flutuantes de Zoom (+ / -) e Centralizar Território
-            Positioned(
-              top: 12,
-              right: 12,
-              child: Column(
-                children: [
-                  FloatingActionButton.small(
-                    heroTag: 'map_zoom_in',
-                    backgroundColor: Colors.white,
-                    foregroundColor: Colors.black87,
-                    tooltip: 'Aproximar Zoom',
-                    onPressed: () {
-                      if (_zoom < 18) {
-                        _changeZoom(
-                          _zoom + 1,
-                          constraints,
-                          originPx,
-                          originPy,
-                          centerLng,
-                          centerLat,
-                        );
-                      }
-                    },
-                    child: const Icon(Icons.add),
-                  ),
-                  const SizedBox(height: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.black87,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      'Z: $_zoom',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  FloatingActionButton.small(
-                    heroTag: 'map_zoom_out',
-                    backgroundColor: Colors.white,
-                    foregroundColor: Colors.black87,
-                    tooltip: 'Afastar Zoom',
-                    onPressed: () {
-                      if (_zoom > 10) {
-                        _changeZoom(
-                          _zoom - 1,
-                          constraints,
-                          originPx,
-                          originPy,
-                          centerLng,
-                          centerLat,
-                        );
-                      }
-                    },
-                    child: const Icon(Icons.remove),
-                  ),
-                  const SizedBox(height: 6),
-                  FloatingActionButton.small(
-                    heroTag: 'map_recenter',
-                    backgroundColor: AppTheme.primaryBlue,
-                    foregroundColor: Colors.white,
-                    tooltip: 'Centralizar Território',
-                    onPressed: () => _recenterMap(
-                      constraints.maxWidth,
-                      constraints.maxHeight,
-                      centerPx,
-                      centerPy,
-                    ),
-                    child: const Icon(Icons.my_location, size: 18),
-                  ),
-                ],
-              ),
-            ),
-
-            // Selo de Atribuição OpenStreetMap
-            Positioned(
-              bottom: 8,
-              left: 8,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.85),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Text(
-                      '© OpenStreetMap contributors',
-                      style: TextStyle(fontSize: 10, color: Colors.black87),
-                    ),
-                  ),
-                  if (contacts.length > geoContacts.length) ...[
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.amber.shade100.withValues(alpha: 0.9),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(
-                          color: Colors.amber.shade600,
-                          width: 0.8,
-                        ),
-                      ),
-                      child: Text(
-                        '${contacts.length - geoContacts.length} contatos sem GPS',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.amber.shade900,
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-
-            // Painel inferior flutuante ao tocar em um Ponto de Referência
+        // Painel inferior flutuante ao tocar em um Ponto de Referência
             if (_selectedPinLandmark != null)
               Positioned(
                 left: 16,
@@ -2132,245 +1544,6 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
               ),
           ],
         );
-      },
-    );
-  }
-
-  Widget _buildLandmarkPin(
-    TerritoryLandmark landmark,
-    int index,
-    int total, {
-    required double originPx,
-    required double originPy,
-    required double canvasWidth,
-    required double canvasHeight,
-  }) {
-    double x;
-    double y;
-
-    final hasGeo =
-        landmark.latitude != null &&
-        landmark.longitude != null &&
-        (landmark.latitude != 0.0 || landmark.longitude != 0.0) &&
-        landmark.latitude!.abs() <= 90 &&
-        landmark.longitude!.abs() <= 180;
-    if (hasGeo) {
-      x = _lon2pixelX(landmark.longitude!, _zoom) - originPx;
-      y = _lat2pixelY(landmark.latitude!, _zoom) - originPy;
-    } else {
-      final radius = 120.0 + (index % 3) * 60.0;
-      final angle = (index * 2 * math.pi) / (total > 0 ? total : 1);
-      x = (canvasWidth / 2) + radius * math.cos(angle);
-      y = (canvasHeight / 2) + radius * math.sin(angle);
-    }
-
-    final isSelected = _selectedPinLandmark?.id == landmark.id;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Positioned(
-      left: (x - 20).clamp(10.0, canvasWidth - 60.0),
-      top: (y - 35).clamp(10.0, canvasHeight - 60.0),
-      child: GestureDetector(
-        onTap: () {
-          setState(() {
-            _selectedPinLandmark = landmark;
-            _selectedPinPerson = null;
-          });
-        },
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              constraints: const BoxConstraints(maxWidth: 120),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? landmark.color
-                    : (isDark ? const Color(0xFF1E293B) : Colors.white),
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Colors.black26,
-                    blurRadius: 4,
-                    offset: Offset(0, 2),
-                  ),
-                ],
-                border: Border.all(color: landmark.color, width: 2),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    landmark.icon,
-                    size: 14,
-                    color: isSelected ? Colors.white : landmark.color,
-                  ),
-                  const SizedBox(width: 4),
-                  Flexible(
-                    child: Text(
-                      landmark.name.split(' ').first,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: isSelected
-                            ? Colors.white
-                            : (isDark ? Colors.white : AppTheme.textDark),
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              landmark.icon,
-              color: landmark.color,
-              size: isSelected ? 34 : 26,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMapPin(
-    PersonEntry person,
-    int index,
-    int total, {
-    required double originPx,
-    required double originPy,
-    required double canvasWidth,
-    required double canvasHeight,
-  }) {
-    double x;
-    double y;
-
-    final hasGeo =
-        person.latitude != null &&
-        person.longitude != null &&
-        (person.latitude != 0.0 || person.longitude != 0.0) &&
-        person.latitude!.abs() <= 90 &&
-        person.longitude!.abs() <= 180;
-    if (hasGeo) {
-      x = _lon2pixelX(person.longitude!, _zoom) - originPx;
-      y = _lat2pixelY(person.latitude!, _zoom) - originPy;
-    } else {
-      final radius = 180.0 + (index % 4) * 60.0;
-      final angle = (index * 2 * math.pi) / (total > 0 ? total : 1);
-      x = (canvasWidth / 2) + radius * math.cos(angle);
-      y = (canvasHeight / 2) + radius * math.sin(angle);
-    }
-
-    final isHighlighted =
-        _highlightPersonId != null && person.id == _highlightPersonId;
-    final isSelected = _selectedPinPerson?.id == person.id;
-    final statusColor = _getStatusColor(person.status);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isForeign =
-        person.tags.toLowerCase().contains('estrangeiro') ||
-        (person.generalNotes ?? '').toLowerCase().contains('idioma') ||
-        (person.generalNotes ?? '').toLowerCase().contains('língua') ||
-        (person.generalNotes ?? '').toLowerCase().contains('estrangeir');
-
-    final Color pinColor;
-    if (isHighlighted) {
-      pinColor = const Color(0xFFD97706);
-    } else if (isSelected) {
-      pinColor = AppTheme.primaryBlue;
-    } else if (isForeign) {
-      pinColor = const Color(0xFF0284C7);
-    } else {
-      pinColor = statusColor;
-    }
-
-    return Positioned(
-      left: (x - (isHighlighted ? 24 : 20)).clamp(10.0, canvasWidth - 70.0),
-      top: (y - (isHighlighted ? 44 : 35)).clamp(10.0, canvasHeight - 70.0),
-      child: GestureDetector(
-        behavior: HitTestBehavior.deferToChild,
-        onTap: () {
-          setState(() {
-            _selectedPinPerson = person;
-            _selectedPinLandmark = null;
-          });
-        },
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              constraints: BoxConstraints(maxWidth: isHighlighted ? 140 : 110),
-              padding: EdgeInsets.symmetric(
-                horizontal: isHighlighted ? 10 : 8,
-                vertical: isHighlighted ? 5 : 4,
-              ),
-              decoration: BoxDecoration(
-                color: isHighlighted
-                    ? const Color(0xFFD97706)
-                    : (isSelected
-                          ? Colors.black87
-                          : (isDark ? const Color(0xFF1E293B) : Colors.white)),
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  if (isHighlighted)
-                    BoxShadow(
-                      color: const Color(0xFFF59E0B).withValues(alpha: 0.65),
-                      blurRadius: 14,
-                      spreadRadius: 3,
-                    )
-                  else
-                    const BoxShadow(
-                      color: Colors.black26,
-                      blurRadius: 4,
-                      offset: Offset(0, 2),
-                    ),
-                ],
-                border: Border.all(
-                  color: isHighlighted ? Colors.white : pinColor,
-                  width: isHighlighted ? 2.5 : 2,
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (isHighlighted) ...[
-                    const Icon(Icons.star, color: Colors.amberAccent, size: 13),
-                    const SizedBox(width: 4),
-                  ] else if (isForeign) ...[
-                    const Text('🌐', style: TextStyle(fontSize: 12)),
-                    const SizedBox(width: 4),
-                  ],
-                  Flexible(
-                    child: Text(
-                      person.name.split(' ').first,
-                      style: TextStyle(
-                        fontSize: isHighlighted ? 12 : 11,
-                        fontWeight: FontWeight.bold,
-                        color: (isHighlighted || isSelected)
-                            ? Colors.white
-                            : (isDark ? Colors.white : AppTheme.textDark),
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              isHighlighted
-                  ? Icons.stars
-                  : (isForeign ? Icons.public : Icons.location_on),
-              color: isHighlighted ? const Color(0xFFD97706) : pinColor,
-              size: isHighlighted ? 44 : (isSelected ? 38 : 30),
-              shadows: isHighlighted
-                  ? [Shadow(color: Colors.amber.shade300, blurRadius: 12)]
-                  : null,
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   Widget _buildGroupedNeighborhoodList(

@@ -39,3 +39,18 @@ Este arquivo contém restrições estritas e instruções persistentes para todo
 ## 6. Segurança e Credenciais
 - NUNCA comite segredos, chaves de serviço Supabase (`service_role key`) ou senhas de usuários no repositório.
 - Apenas chaves públicas de cliente (`anon key`) são permitidas em arquivos de exemplo de configuração.
+- O código cliente (`AppConfig`) deve bloquear expressamente qualquer chave privilegiada (`service_role`, `postgres`, `admin`).
+
+## 7. Privacidade e Diretórios (Zero Diretórios Temporários)
+- NUNCA utilize diretórios temporários do sistema (`Directory.systemTemp` ou `/tmp`) para dados persistentes, gravações de notas de voz ou staging de backups.
+- Toda mídia e backup deve residir no diretório de documentos seguros da aplicação. Se indisponível, deve falhar explicitamente lançando `StorageUnavailableException`.
+- Caminhos absolutos do sistema de arquivos local (`audio_file_path`) NUNCA devem ser transmitidos ao backend ou salvos na nuvem (`SupabaseSyncService.sanitizePayload`).
+
+## 8. Backups Criptográficos Envelope v2
+- Todos os arquivos de backup ministerial devem utilizar Envelope v2 com cifragem AES-256-GCM e derivação PBKDF2-HMAC-SHA256 (100.000 iterações).
+- Restaurações de backup devem utilizar staging transacional em 3 etapas com backup preventivo de arquivos originais (`replacedOriginalsBackup`) para garantir rollback 100% íntegro em caso de falha.
+
+## 9. Sincronização Multi-Dispositivo e Governança P0
+- A sincronização entre dispositivos é obrigatória na v1. Não propor lançamento offline-only.
+- Todas as 10 tabelas de domínio do usuário e o bucket de áudio devem cumprir os 10 cenários obrigatórios de aceitação (3-way merge, outbox durável pós-restart, tombstones sem ressurreição, detecção semântica de concorrência na agenda, e isolamento estrito via RLS `owner_id = auth.uid()`).
+

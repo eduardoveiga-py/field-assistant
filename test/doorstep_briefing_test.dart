@@ -914,5 +914,54 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
+
+    test('TC-29: Enriquecimento com catálogo LFF (título de lição, ponto e data da última visita)', () {
+      final person = _createPerson(lastContactAt: DateTime(2026, 10, 20, 15, 0));
+      final study = _createStudy(
+        publicationId: 'lff-book',
+        language: 'pt',
+        currentLesson: 1,
+        currentParagraph: 2,
+      );
+      final visit = _createVisit(dateTimeField: DateTime(2026, 10, 28, 14, 30));
+
+      final briefing = DoorstepBriefingHelper.build(
+        person: person,
+        linkedStudy: study,
+        latestVisit: visit,
+      );
+
+      expect(briefing.lessonAndPoint, equals('Lição 01, Ponto 2'));
+      expect(briefing.officialLessonTitle, equals('Como a Bíblia pode ajudar você?'));
+      expect(briefing.officialPointTitle, contains('Como a Bíblia pode nos ajudar a ser mais felizes no dia a dia?'));
+      expect(briefing.sectionTitle, isNotNull);
+      expect(briefing.lastVisitDate, equals(DateTime(2026, 10, 28, 14, 30)));
+    });
+
+    testWidgets('TC-W9: Renderização dos títulos oficiais LFF e data da última visita no card', (tester) async {
+      final data = DoorstepBriefingData(
+        lessonAndPoint: 'Lição 01, Ponto 2',
+        officialLessonTitle: 'Como a Bíblia pode ajudar você?',
+        officialPointTitle: '2. A Bíblia responde a perguntas importantes',
+        lastVisitDate: DateTime(2026, 10, 28, 14, 30),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.lightTheme,
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: DoorstepBriefingCard(data: data),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Lição 01, Ponto 2'), findsOneWidget);
+      expect(find.text('Como a Bíblia pode ajudar você?'), findsOneWidget);
+      expect(find.text('2. A Bíblia responde a perguntas importantes'), findsOneWidget);
+      expect(find.text('Última visita: 28/10/2026'), findsOneWidget);
+    });
   });
 }

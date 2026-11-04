@@ -1829,6 +1829,14 @@ class SupabaseSyncService with WidgetsBindingObserver {
           await repository.markSyncOperationSuccess(op.id);
           _lastAttemptTime.remove(op.id);
           success++;
+        } else if (operation == 'HARD_DELETE') {
+          await activeClient
+              .from(tableName)
+              .delete()
+              .eq('id', op.entityId);
+          await repository.markSyncOperationSuccess(op.id);
+          _lastAttemptTime.remove(op.id);
+          success++;
         }
       } on PostgrestException catch (e) {
         _lastAttemptTime[op.id] = DateTime.now();
