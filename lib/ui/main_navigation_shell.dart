@@ -58,7 +58,9 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
     if (!mounted || _autoSyncRunning) return;
     try {
       if (!SupabaseSyncService.isInitialized ||
-          Supabase.instance.client.auth.currentSession == null) return;
+          Supabase.instance.client.auth.currentSession == null) {
+        return;
+      }
       _autoSyncRunning = true;
       final repo = ref.read(repositoryProvider);
       final userId = Supabase.instance.client.auth.currentUser?.id;
