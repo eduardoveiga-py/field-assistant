@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -11,6 +13,9 @@ import '../main_navigation_shell.dart';
 
 enum _AuthGateState { loadingSplash, unauthenticated, authenticated }
 
+
+
+class AuthSplashScreen extends AuthGateShell { const AuthSplashScreen({super.key}); }
 class AuthGateShell extends ConsumerStatefulWidget {
   const AuthGateShell({super.key});
 
@@ -49,6 +54,15 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
     }
 
     if (!mounted) return;
+
+    if (client != null) {
+      final uriStr = Uri.base.toString();
+      if (uriStr.contains('access_token=') || uriStr.contains('refresh_token=') || uriStr.contains('code=')) {
+        try {
+          await client.auth.getSessionFromUrl(Uri.base);
+        } catch (_) {}
+      }
+    }
 
     if (client == null || client.auth.currentSession == null) {
       setState(() {
@@ -165,9 +179,9 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
 }
 
 class SupabaseAuthScreen extends StatefulWidget {
-  final VoidCallback onAuthenticated;
+  final VoidCallback? onAuthenticated;
 
-  const SupabaseAuthScreen({super.key, required this.onAuthenticated});
+    const SupabaseAuthScreen({super.key, this.onAuthenticated});
 
   @override
   State<SupabaseAuthScreen> createState() => _SupabaseAuthScreenState();
