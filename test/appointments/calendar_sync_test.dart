@@ -241,6 +241,12 @@ class MockAppleCalendarProvider extends AppleEventKitProvider {
   Future<bool> isAuthorized() async => authorized;
 
   @override
+  Future<CalendarSyncResult> syncEvents({
+    required AppDatabase db,
+    bool fullSync = false,
+  }) async => CalendarSyncResult(success: true);
+
+  @override
   Future<String?> pushAppointmentToExternal(
     AppDatabase db,
     AppointmentEntry appointment,
