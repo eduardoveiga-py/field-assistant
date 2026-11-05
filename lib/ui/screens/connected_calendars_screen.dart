@@ -5,6 +5,7 @@ import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../../appointments/calendar_provider.dart';
 import '../../appointments/calendar_sync_coordinator.dart';
+import '../providers.dart';
 
 /// Mantém apenas IDs válidos e únicos para os seletores de calendário.
 List<ExternalCalendarItem> uniqueCalendarItems(List<ExternalCalendarItem> items) {
@@ -42,6 +43,7 @@ class _ConnectedCalendarsScreenState
   String? _googleAccount;
   List<ExternalCalendarItem> _googleCalendars = [];
   String? _selectedGoogleCalId;
+  Set<String> _readOnlyGoogleCalIds = {};
 
   bool _isAppleAuthorized = false;
   String? _appleAccount;
@@ -64,12 +66,14 @@ class _ConnectedCalendarsScreenState
     String? gAcc;
     List<ExternalCalendarItem> gCals = [];
     String? gSelectedId;
+    Set<String> gReadOnlyIds = {};
     if (gAuth) {
       gAcc = await coordinator.googleProvider.getConnectedAccountName();
       gCals = uniqueCalendarItems(
         await coordinator.googleProvider.getAvailableCalendars(),
       );
       gSelectedId = await coordinator.googleProvider.getSelectedCalendarId();
+      gReadOnlyIds = await coordinator.googleProvider.getReadOnlyCalendarIds();
     }
 
     // Apple state
@@ -93,8 +97,10 @@ class _ConnectedCalendarsScreenState
         _googleAccount = gAcc;
         _googleCalendars = gCals;
         _selectedGoogleCalId = resolveCalendarSelection(
-          gCals, gSelectedId, google: true,
+          gCals.where((calendar) => !calendar.isReadOnly).toList(),
+          gSelectedId, google: true,
         );
+        _readOnlyGoogleCalIds = gReadOnlyIds;
 
         _isAppleAuthorized = aAuth;
         _appleAccount = aAcc;
@@ -519,7 +525,7 @@ class _ConnectedCalendarsScreenState
                           vertical: 8,
                         ),
                       ),
-                      items: _googleCalendars.map((c) {
+                      items: _googleCalendars.where((calendar) => !calendar.isReadOnly).map((c) {
                         return DropdownMenuItem<String>(
                           value: c.id,
                           child: Text(
@@ -539,6 +545,36 @@ class _ConnectedCalendarsScreenState
                         }
                       },
                     ),
+                    if (_googleCalendars.any((calendar) => calendar.isReadOnly)) ...[
+                      const SizedBox(height: 12),
+                      const Text('Calendários adicionais (somente leitura)',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      const Text('Selecione, por exemplo, seus calendários de feriados.'),
+                      for (final calendar in _googleCalendars.where((c) => c.isReadOnly))
+                        CheckboxListTile(
+                          dense: true,
+                          title: Text(calendar.name),
+                          value: _readOnlyGoogleCalIds.contains(calendar.id),
+                          onChanged: (selected) async {
+                            final ids = Set<String>.of(_readOnlyGoogleCalIds);
+                            if (selected == true) {
+                              ids.add(calendar.id);
+                            } else {
+                              ids.remove(calendar.id);
+                            }
+                            final coordinator = ref.read(calendarSyncCoordinatorProvider);
+                            final db = ref.read(databaseProvider);
+                            await coordinator.googleProvider.setReadOnlyCalendarIds(ids);
+                            if (selected != true) {
+                              await (db.delete(db.externalCalendarEvents)
+                                    ..where((event) => event.provider.equals('google'))
+                                    ..where((event) => event.calendarId.equals(calendar.id)))
+                                  .go();
+                            }
+                            if (mounted) setState(() => _readOnlyGoogleCalIds = ids);
+                          },
+                        ),
+                    ],
                   ],
                 ],
               ),

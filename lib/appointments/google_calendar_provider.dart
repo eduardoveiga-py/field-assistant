@@ -46,6 +46,7 @@ class GoogleCalendarProvider implements CalendarProvider {
       'https://www.googleapis.com/auth/userinfo.email';
   static const String _keySelectedCalendarId = 'google_calendar_selected_id';
   static const String _keyConnectedEmail = 'google_calendar_connected_email';
+  static const String _keyReadOnlyCalendars = 'google_calendar_readonly_ids';
   static const String _keySyncTokenPrefix = 'google_calendar_synctoken_';
 
   GoogleSignInAccount? _currentUser;
@@ -198,15 +199,12 @@ class GoogleCalendarProvider implements CalendarProvider {
 
     if (_currentUser == null) {
       await isAuthorized();
-      if (_currentUser == null) {
-        final authorized = await requestAuthorization();
-        if (!authorized || _currentUser == null) return null;
-      }
+      if (_currentUser == null) return null;
     }
 
     try {
       final headers = await _currentUser!.authorizationClient
-          .authorizationHeaders([_calendarScope], promptIfNecessary: true);
+          .authorizationHeaders([_calendarScope], promptIfNecessary: false);
       if (headers == null) return null;
       final authClient = _AuthenticatedClient(headers);
       return gcal.CalendarApi(authClient);
@@ -270,6 +268,24 @@ class GoogleCalendarProvider implements CalendarProvider {
     await _secureStorage.write(key: _keySelectedCalendarId, value: calendarId);
   }
 
+  Future<Set<String>> getReadOnlyCalendarIds() async {
+    final value = await _secureStorage.read(key: _keyReadOnlyCalendars);
+    if (value == null) return {};
+    try {
+      return (jsonDecode(value) as List).whereType<String>().toSet();
+    } catch (_) {
+      return {};
+    }
+  }
+
+  Future<void> setReadOnlyCalendarIds(Set<String> ids) async {
+    final previous = await getReadOnlyCalendarIds();
+    await _secureStorage.write(key: _keyReadOnlyCalendars, value: jsonEncode(ids.toList()));
+    for (final id in previous.difference(ids)) {
+      await _secureStorage.delete(key: '$_keySyncTokenPrefix$id');
+    }
+  }
+
   @override
   Future<void> disconnect() async {
     try {
@@ -279,6 +295,8 @@ class GoogleCalendarProvider implements CalendarProvider {
     _webAuthHeaders = null;
     _webUserEmail = null;
     await _secureStorage.delete(key: _keySelectedCalendarId);
+    await setReadOnlyCalendarIds({});
+    await _secureStorage.delete(key: _keyReadOnlyCalendars);
     await _secureStorage.delete(key: _keyConnectedEmail);
   }
 
@@ -292,13 +310,40 @@ class GoogleCalendarProvider implements CalendarProvider {
     if (api == null) {
       return CalendarSyncResult(
         success: false,
-        errorMessage:
-            lastError ??
-            'Não foi possível autenticar com a Google Calendar API.',
+        errorMessage: lastError ?? 'Não foi possível autenticar com a Google Calendar API.',
       );
     }
+    final primaryId = await getSelectedCalendarId() ?? 'primary';
+    final calendars = await getAvailableCalendars();
+    final matches = calendars.where((calendar) => calendar.id == primaryId ||
+        (primaryId == 'primary' && calendar.isPrimary)).toList();
+    if (matches.isEmpty || matches.first.isReadOnly) {
+      return CalendarSyncResult(
+        success: false,
+        errorMessage: 'Selecione um calendário Google com permissão de edição nas configurações.',
+      );
+    }
+    final ids = <String>{primaryId, ...await getReadOnlyCalendarIds()};
+    var downloaded = 0;
+    final errors = <String>[];
+    for (final id in ids) {
+      final result = await _syncCalendar(db, api, id, fullSync: fullSync);
+      downloaded += result.eventsDownloaded;
+      if (!result.success) errors.add(result.errorMessage ?? 'Falha ao receber calendário.');
+    }
+    return CalendarSyncResult(
+      success: errors.isEmpty,
+      eventsDownloaded: downloaded,
+      errorMessage: errors.isEmpty ? null : errors.join('; '),
+    );
+  }
 
-    final calendarId = await getSelectedCalendarId() ?? 'primary';
+  Future<CalendarSyncResult> _syncCalendar(
+    AppDatabase db,
+    gcal.CalendarApi api,
+    String calendarId, {
+    required bool fullSync,
+  }) async {
     String? syncToken;
     if (!fullSync) {
       syncToken = await _secureStorage.read(

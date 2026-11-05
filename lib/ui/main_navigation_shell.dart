@@ -1,7 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/app_theme.dart';
+import '../database/app_database.dart';
+import '../appointments/calendar_provider.dart';
+import '../appointments/calendar_sync_coordinator.dart';
+import '../sync/supabase_sync_service.dart';
+import 'providers.dart';
 import '../core/feature_registry.dart';
 import 'screens/today_screen.dart';
 import 'screens/people_screen.dart';
@@ -22,7 +30,95 @@ class MainNavigationShell extends ConsumerStatefulWidget {
       _MainNavigationShellState();
 }
 
-class _MainNavigationShellState extends ConsumerState<MainNavigationShell> {
+class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
+    with WidgetsBindingObserver {
+  Timer? _syncTimer;
+  Timer? _syncDebounce;
+  bool _autoSyncRunning = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _syncTimer = Timer.periodic(const Duration(minutes: 2), (_) => _autoSync());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _autoSync());
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _scheduleSync();
+  }
+
+  void _scheduleSync() {
+    _syncDebounce?.cancel();
+    _syncDebounce = Timer(const Duration(seconds: 5), _autoSync);
+  }
+
+  Future<void> _autoSync() async {
+    if (!mounted || _autoSyncRunning) return;
+    try {
+      if (!SupabaseSyncService.isInitialized ||
+          Supabase.instance.client.auth.currentSession == null) {
+        return;
+      }
+      _autoSyncRunning = true;
+      final repo = ref.read(repositoryProvider);
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      if (userId == null) return;
+      final db = repo.db;
+      const ownerKey = 'automatic_sync_owner_id';
+      final owner = await (db.select(db.appKvStore)
+            ..where((row) => row.key.equals(ownerKey)))
+          .getSingleOrNull();
+      if (owner != null && owner.value != userId) return;
+      if (owner == null) {
+        await db.into(db.appKvStore).insert(
+          AppKvStoreCompanion.insert(key: ownerKey, value: userId),
+        );
+      }
+      final people = await repo.getAllPeople();
+      // Não propaga automaticamente cadastros de demonstração conhecidos.
+      const demoNames = {
+        'Maria Oliveira (Demo)', 'Carlos Pereira (Demo)',
+        'Luciana Martins (Demo)', 'Beatriz Martins (Demo - Filha)',
+      };
+      if (people.any((person) => demoNames.contains(person.name))) return;
+      final appointments = await repo.getAllAppointments();
+      const demoTitles = {'Estudo Bíblico - Maria', 'Revisita - Carlos'};
+      if (appointments.any((appointment) => demoTitles.contains(appointment.title))) {
+        return;
+      }
+      if (!mounted) return;
+      await ref.read(supabaseSyncServiceProvider).sync();
+      if (!mounted) return;
+      final coordinator = ref.read(calendarSyncCoordinatorProvider);
+      final connected = <CalendarProviderType>{};
+      for (final provider in coordinator.allProviders) {
+        if (!await provider.isAuthorized()) continue;
+        if (provider.providerType == CalendarProviderType.appleEventKit &&
+            await provider.getSelectedCalendarId() == null) {
+          continue;
+        }
+        connected.add(provider.providerType);
+      }
+      if (connected.isNotEmpty && mounted) {
+        await coordinator.syncAll(providers: connected);
+      }
+    } catch (error) {
+      debugPrint('Sincronização automática adiada: $error');
+    } finally {
+      _autoSyncRunning = false;
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _syncTimer?.cancel();
+    _syncDebounce?.cancel();
+    super.dispose();
+  }
+
   AppFeature _currentFeature = AppFeature.today;
   bool _showingSettings = false;
 

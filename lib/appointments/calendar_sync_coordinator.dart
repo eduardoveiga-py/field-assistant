@@ -66,8 +66,18 @@ class CalendarSyncCoordinator {
   /// 3. Detecção determinística de conflitos
   /// 4. Processamento da Outbox (pending_upload e propagação de exclusões)
   /// 5. Prevenção absoluta de loops de sincronização
+  Future<CalendarSyncResult>? _activeSync;
+
   Future<CalendarSyncResult> syncAll({
     bool fullSync = false,
+    Set<CalendarProviderType>? providers,
+  }) {
+    return _activeSync ??= _runSyncAll(fullSync: fullSync, providers: providers)
+        .whenComplete(() => _activeSync = null);
+  }
+
+  Future<CalendarSyncResult> _runSyncAll({
+    required bool fullSync,
     Set<CalendarProviderType>? providers,
   }) async {
     int totalDownloaded = 0;

@@ -8,6 +8,7 @@ import 'package:ministerio_pessoal/database/app_database.dart';
 import 'package:ministerio_pessoal/ui/main_navigation_shell.dart';
 import 'package:ministerio_pessoal/ui/providers.dart';
 import 'package:ministerio_pessoal/ui/screens/contacts_map_screen.dart';
+import 'package:ministerio_pessoal/territory/tile_cache/tile_cache_service.dart';
 import 'package:ministerio_pessoal/ui/screens/experiences_screen.dart';
 import 'package:ministerio_pessoal/ui/screens/research_screen.dart';
 import 'package:ministerio_pessoal/appointments/ics_picker_helper.dart';
@@ -287,6 +288,42 @@ void main() {
         await tester.pump(const Duration(milliseconds: 100));
       },
     );
+
+    testWidgets('Zoom mantém o contato próximo ao ponto esperado após arrastar', (tester) async {
+      tester.view.physicalSize = const Size(1024, 768);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final db = AppDatabase.forTesting(NativeDatabase.memory());
+      addTearDown(db.close);
+      addTearDown(() async {
+        await tester.pumpWidget(const SizedBox());
+        await tester.pump(const Duration(milliseconds: 100));
+      });
+      final now = DateTime.now();
+      await db.into(db.people).insert(PeopleCompanion.insert(
+        id: 'zoom-test', name: 'Contatozoom', latitude: const Value(-23.55),
+        longitude: const Value(-46.63), firstContactAt: now, createdAt: now, updatedAt: now,
+      ));
+      await tester.pumpWidget(ProviderScope(
+        overrides: [databaseProvider.overrideWithValue(db)],
+        child: const MaterialApp(home: ContactsMapScreen()),
+      ));
+      await tester.pumpAndSettle();
+      expect(find.byType(CachedTileWidget).evaluate().length, lessThan(100));
+      await tester.drag(find.byType(InteractiveViewer), const Offset(150, 0));
+      await tester.pumpAndSettle();
+      final before = tester.getCenter(find.text('Contatozoom').first);
+      final focal = tester.getCenter(find.byType(InteractiveViewer));
+      await tester.tap(find.byTooltip('Aproximar Zoom'));
+      await tester.pumpAndSettle();
+      final after = tester.getCenter(find.text('Contatozoom').first);
+      expect(after.dx, closeTo(focal.dx + 2 * (before.dx - focal.dx), 50));
+      expect(after.dy, closeTo(focal.dy + 2 * (before.dy - focal.dy), 50));
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(milliseconds: 100));
+    });
 
     testWidgets(
       'ContactsMapScreen auto-geocodes highlighted contact without GPS coordinates',
