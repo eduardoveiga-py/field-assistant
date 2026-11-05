@@ -4,7 +4,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:googleapis/calendar/v3.dart' as gcal;
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
-
+import 'package:flutter/foundation.dart';
 import '../database/app_database.dart';
 import 'calendar_provider.dart';
 
@@ -31,7 +31,7 @@ class GoogleCalendarProvider implements CalendarProvider {
   final GoogleSignIn _googleSignIn;
   final FlutterSecureStorage _secureStorage;
   final Uuid _uuid = const Uuid();
-
+  static const String defaultWebClientId = String.fromEnvironment('GOOGLE_WEB_CLIENT_ID', defaultValue: '424960288105-vi0ig8si59j4rk5j4gdfd9nv2revvitn.apps.googleusercontent.com');
   static const String _calendarScope =
       'https://www.googleapis.com/auth/calendar.events';
   static const String _keySelectedCalendarId = 'google_calendar_selected_id';
@@ -49,7 +49,10 @@ class GoogleCalendarProvider implements CalendarProvider {
   Future<void> _ensureInitialized() async {
     if (_initialized) return;
     try {
-      await _googleSignIn.initialize();
+            if (kIsWeb) {
+         await _googleSignIn.initialize(clientId: defaultWebClientId);
+         } else {
+         await _googleSignIn.initialize();     
     } catch (_) {}
     _initialized = true;
   }
