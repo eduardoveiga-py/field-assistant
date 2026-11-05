@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../sync/supabase_sync_service.dart';
+import 'auth_splash_screen.dart';
 
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
@@ -1251,8 +1254,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ),
           const SizedBox(height: 24),
-
-          // Versão do App e Informações Legais
+_buildSupabaseCard(context),
+          
           Center(
             child: Column(
               children: [
@@ -1282,5 +1285,170 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ],
       ),
     );
+  }  Widget _buildSupabaseCard(BuildContext context) {
+    User? currentUser;
+    try {
+      currentUser = Supabase.instance.client.auth.currentUser;
+    } catch (_) {
+      currentUser = null;
+    }
+    final isConnected = currentUser != null;
+    final userEmail = currentUser?.email ?? 'Nenhum usuário autenticado';
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAlignment.start,
+          children: [
+            Row(
+              children: const [
+                Icon(Icons.cloud_sync, color: Colors.blue),
+                SizedBox(width: 8),
+                Text(
+                  'Conta e Sincronização (Supabase)',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const Divider(),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(
+                  isConnected ? Icons.check_circle : Icons.error_outline,
+                  color: isConnected ? Colors.green : Colors.orange,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  isConnected ? 'Status: Conectado' : 'Status: Não conectado',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: isConnected ? Colors.green : Colors.orange,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text('E-mail: $userEmail', style: const TextStyle(fontSize: 14)),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    try {
+                      await ref.read(supabaseSyncServiceProvider).sync();
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Sincronização concluída com sucesso!')),
+                        );
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Erro ao sincronizar: $e')),
+                        );
+                      }
+                    }
+                  },
+                  icon: const Icon(Icons.sync, size: 18),
+                  label: const Text('Sincronizar Agora'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => _showSupabaseConfigDialog(context),
+                  icon: const Icon(Icons.settings_remote, size: 18),
+                  label: const Text('Configurar Supabase'),
+                ),
+                if (isConnected)
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      try {
+                        await Supabase.instance.client.auth.signOut();
+                        setState(() {});
+                      } catch (_) {}
+                    },
+                    icon: const Icon(Icons.logout, color: Colors.red, size: 18),
+                    label: const Text('Sair da Conta (Logout)', style: TextStyle(color: Colors.red)),
+                  )
+                else
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const SupabaseAuthScreen()),
+                      );
+                    },
+                    icon: const Icon(Icons.login, size: 18),
+                    label: const Text('Fazer Login'),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
+
+  void _showSupabaseConfigDialog(BuildContext context) {
+    final urlController = TextEditingController();
+    final keyController = TextEditingController();
+
+    SupabaseSyncService.getSavedUrl().then((val) {
+      if (val != null) urlController.text = val;
+    });
+    SupabaseSyncService.getSavedAnonKey().then((val) {
+      if (val != null) keyController.text = val;
+    });
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Configurar Supabase'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: urlController,
+                decoration: const InputDecoration(
+                  labelText: 'Supabase URL',
+                  hintText: 'https://xyz.supabase.co',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: keyController,
+                decoration: const InputDecoration(
+                  labelText: 'Supabase Anon Key',
+                ),
+                obscureText: true,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final url = urlController.text.trim();
+                final key = keyController.text.trim();
+                if (url.isNotEmpty && key.isNotEmpty) {
+                  await SupabaseSyncService.initDynamic(url, key);
+                  if (ctx.mounted) Navigator.of(ctx).pop();
+                  setState(() {});
+                }
+              },
+              child: const Text('Salvar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
 }
