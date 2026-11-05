@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Script de Execução Resiliente do Aplicativo Web (Windows PowerShell)
     Ministério Pessoal - Flutter Web

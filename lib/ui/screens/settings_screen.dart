@@ -1285,7 +1285,9 @@ _buildSupabaseCard(context),
         ],
       ),
     );
-  }  Widget _buildSupabaseCard(BuildContext context) {
+  }
+
+  Widget _buildSupabaseCard(BuildContext context) {
     User? currentUser;
     try {
       currentUser = Supabase.instance.client.auth.currentUser;
@@ -1300,7 +1302,7 @@ _buildSupabaseCard(context),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAlAxisignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: const [
@@ -1378,7 +1380,15 @@ _buildSupabaseCard(context),
                   ElevatedButton.icon(
                     onPressed: () {
                       Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const SupSupabaseAuthScreen(onAuthenticated: () { if (Navigator.of(context).canPop()) Navigator.of(context).pop(); setState(() {}); })abaseAuthScreen()),
+                        MaterialPageRoute(
+                          builder: (authContext) => SupabaseAuthScreen(
+                            onAuthenticated: () {
+                              if (!mounted || !authContext.mounted) return;
+                              Navigator.of(authContext).pop();
+                              setState(() {});
+                            },
+                          ),
+                        ),
                       );
                     },
                     icon: const Icon(Icons.login, size: 18),
