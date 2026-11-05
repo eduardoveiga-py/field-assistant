@@ -143,6 +143,7 @@ void main() {
       // Verifica que NavigationBar inferior é usada em tela mobile e NavigationRail não existe
       expect(find.byType(NavigationBar), findsOneWidget);
       expect(find.byType(NavigationRail), findsNothing);
+      expect(find.byTooltip('Salvo Localmente'), findsOneWidget);
 
       // Toca no atalho rápido de Estudos na TodayScreen
       final estudosQuickAction = find.text('Estudos').first;
