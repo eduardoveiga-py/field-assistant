@@ -53,7 +53,7 @@ class GoogleCalendarProvider implements CalendarProvider {
          await _googleSignIn.initialize(clientId: defaultWebClientId);
          } else {
          await _googleSignIn.initialize();     
-    } catch (_) {}
+    } }  catch (_) {}
     _initialized = true;
   }
 
