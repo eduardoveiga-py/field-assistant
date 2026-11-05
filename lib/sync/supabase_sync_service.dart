@@ -1016,6 +1016,10 @@ class SupabaseSyncService {
 
         if (operation == 'INSERT' || operation == 'UPDATE') {
           final remotePayload = toRemotePayload(op.entityType, cleanPayload);
+          final currentUserId = client.auth.currentUser?.id;
+          if (currentUserId != null && currentUserId.isNotEmpty) {
+            remotePayload['owner_id'] = currentUserId;
+          }
           await client.from(tableName).upsert(remotePayload);
 
           if (tableName == 'voice_notes') {

@@ -106,10 +106,22 @@ class _ConnectedCalendarsScreenState
   }
 
   Future<void> _connectGoogle() async {
+    setState(() {
+      _isSyncing = true;
+      _syncMessage = null;
+    });
     final coordinator = ref.read(calendarSyncCoordinatorProvider);
     final authorized = await coordinator.googleProvider.requestAuthorization();
     if (authorized) {
       await _syncNow();
+    } else {
+      if (mounted) {
+        setState(() {
+          _isSyncing = false;
+          _syncMessage =
+              'Aviso: Não foi possível conectar ao Google Calendar (${coordinator.googleProvider.lastError ?? "autorização não concluída"}). Verifique também se a Google Calendar API está ativada no Google Cloud Console.';
+        });
+      }
     }
     await _loadState();
   }
@@ -274,7 +286,6 @@ class _ConnectedCalendarsScreenState
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // Banner explicativo sobre configuração única e sincronização bidirecional
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -339,13 +350,12 @@ class _ConnectedCalendarsScreenState
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                   color: _syncMessage!.startsWith('Aviso')
-                      ? Colors.orange[900]
-                      : Colors.green[900],
+                      ? Colors.orange[400]
+                      : Colors.green[400],
                 ),
               ),
             ),
 
-          // Seção Conflitos (se houver)
           if (_conflicts.isNotEmpty) ...[
             Card(
               color: Colors.amber.withValues(alpha: 0.1),
@@ -440,7 +450,7 @@ class _ConnectedCalendarsScreenState
                               style: TextStyle(
                                 fontSize: 13,
                                 color: _isGoogleAuthorized
-                                    ? Colors.green[700]
+                                    ? Colors.green[500]
                                     : Colors.grey,
                                 fontWeight: _isGoogleAuthorized
                                     ? FontWeight.w600
@@ -554,7 +564,7 @@ class _ConnectedCalendarsScreenState
                               style: TextStyle(
                                 fontSize: 13,
                                 color: _isAppleAuthorized
-                                    ? Colors.green[700]
+                                    ? Colors.green[500]
                                     : Colors.grey,
                                 fontWeight: _isAppleAuthorized
                                     ? FontWeight.w600
@@ -625,7 +635,6 @@ class _ConnectedCalendarsScreenState
           ),
           const SizedBox(height: 24),
 
-          // Botão Sincronizar Tudo
           SizedBox(
             width: double.infinity,
             height: 48,

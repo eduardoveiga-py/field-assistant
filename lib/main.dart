@@ -4,7 +4,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/app_theme.dart';
-import 'ui/main_navigation_shell.dart';
+import 'ui/screens/auth_splash_screen.dart';
 import 'ui/providers.dart';
 
 void main() async {
@@ -15,7 +15,7 @@ void main() async {
     try {
       await Supabase.initialize(
         url: supabaseUrl,
-       // ignore: deprecated_member_use
+        // ignore: deprecated_member_use
         anonKey: supabaseAnonKey,
       );
     } catch (_) {
@@ -44,7 +44,7 @@ class MinisterioPessoalApp extends ConsumerWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: const [Locale('pt', 'BR')],
-      home: const MainNavigationShell(),
+      home: const AuthGateShell(),
     );
   }
 }
