@@ -149,7 +149,9 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
       for (final provider in coordinator.allProviders) {
         if (!await provider.isAuthorized()) continue;
         if (provider.providerType == CalendarProviderType.appleEventKit &&
-            await provider.getSelectedCalendarId() == null) continue;
+            await provider.getSelectedCalendarId() == null) {
+          continue;
+        }
         connected.add(provider.providerType);
       }
       if (!mounted) return;
