@@ -2,7 +2,7 @@
 set SCRIPT_DIR=%~dp0
 setlocal enabledelayedexpansion
 
-set "ARGS="
+set "ARGS="-Port 8080"
 
 :parse_loop
 if "%~1"=="" goto execute
@@ -36,7 +36,7 @@ if /i "!CURR!"=="--server" (
 )
 shift /1
 goto parse_loop
-
+if defined GOOGLE_WEB_CLIENT_ID ( set "ARGS=!ARGS! -GoogleWebClientId %GOOGLE_WEB_CLIENT_ID%" )
 :execute
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%run_web.ps1" !ARGS!
 exit /b %ERRORLEVEL%
