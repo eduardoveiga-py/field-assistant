@@ -6,11 +6,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/app_theme.dart';
 import 'ui/screens/auth_splash_screen.dart';
 import 'ui/providers.dart';
+import 'sync/supabase_sync_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
-  const supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
+  var supabaseUrl = const String.fromEnvironment('SUPABASE_URL');
+  var supabaseAnonKey = const String.fromEnvironment('SUPABASE_ANON_KEY');
+
+  if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
+    final savedUrl = await SupabaseSyncService.getSavedUrl();
+    final savedKey = await SupabaseSyncService.getSavedAnonKey();
+    if (savedUrl != null && savedKey != null && savedUrl.isNotEmpty && savedKey.isNotEmpty) {
+      supabaseUrl = savedUrl;
+      supabaseAnonKey = savedKey;
+    }
+  }
+
   if (supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty) {
     try {
       await Supabase.initialize(
@@ -33,18 +44,20 @@ class MinisterioPessoalApp extends ConsumerWidget {
     final isSunMode = ref.watch(sunModeProvider);
 
     return MaterialApp(
-      title: 'Ministério Pessoal',
+      title: 'Field Assistant',
       debugShowCheckedModeBanner: false,
-      theme: isSunMode ? AppTheme.sunModeTheme : AppTheme.lightTheme,
-      darkTheme: isSunMode ? AppTheme.sunModeTheme : AppTheme.darkTheme,
-      themeMode: isSunMode ? ThemeMode.light : ThemeMode.system,
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: isSunMode ? ThemeMode.light : ThemeMode.dark,
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      supportedLocales: const [Locale('pt', 'BR')],
-      home: const AuthGateShell(),
+      supportedLocales: const [
+        Locale('pt', 'BR'),
+      ],
+      home: const AuthSplashScreen(),
     );
   }
 }
