@@ -13,6 +13,7 @@ import 'activities_screen.dart';
 import 'trash_screen.dart';
 import 'customize_features_screen.dart';
 import 'connected_calendars_screen.dart';
+import 'appointments_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -733,6 +734,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       icon: const Icon(Icons.cloud_sync),
                       label: const Text('Verificar Fila de Sincronização'),
                       onPressed: () => _showSyncQueueModal(context),
+                    ),
+                  ),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.import_export, color: AppTheme.primaryBlue),
+                  title: const Text('Importar / Exportar Calendário'),
+                  subtitle: const Text('Arquivos .ics e URL de calendário.'),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const AppointmentsScreen(calendarToolsOnly: true),
                     ),
                   ),
                 ),

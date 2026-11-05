@@ -88,3 +88,15 @@ class SunModeNotifier extends Notifier<bool> {
 final sunModeProvider = NotifierProvider<SunModeNotifier, bool>(
   SunModeNotifier.new,
 );
+
+// Eventos externos são mantidos separados dos compromissos locais para não
+// gerar uploads duplicados ou contabilizá-los como atividade ministerial.
+final externalCalendarEventsProvider = StreamProvider<List<ExternalCalendarEventEntry>>((ref) {
+  final db = ref.watch(databaseProvider);
+  return db.select(db.externalCalendarEvents).watch();
+});
+
+final calendarEventLinksProvider = StreamProvider<List<CalendarEventLinkEntry>>((ref) {
+  final db = ref.watch(databaseProvider);
+  return db.select(db.calendarEventLinks).watch();
+});

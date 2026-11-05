@@ -9,6 +9,10 @@ import 'package:http/http.dart' as http;
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../../appointments/availability_engine.dart';
+import '../../appointments/calendar_sync_coordinator.dart';
+import '../../appointments/calendar_provider.dart';
+import '../../appointments/external_events_for_display.dart';
+import 'connected_calendars_screen.dart';
 import '../../appointments/ics_calendar_helper.dart';
 import '../../appointments/ics_picker_helper.dart';
 import '../../database/app_database.dart';
@@ -50,7 +54,9 @@ class _CopyWizardRoutine {
 }
 
 class AppointmentsScreen extends ConsumerStatefulWidget {
-  const AppointmentsScreen({super.key});
+  const AppointmentsScreen({super.key, this.calendarToolsOnly = false});
+
+  final bool calendarToolsOnly;
 
   @override
   ConsumerState<AppointmentsScreen> createState() => _AppointmentsScreenState();
@@ -58,6 +64,7 @@ class AppointmentsScreen extends ConsumerStatefulWidget {
 
 class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
   DateTime _selectedDate = DateTime.now();
+  bool _isCalendarSyncing = false;
   String _viewMode = 'Mês'; // 'Mês', 'Semana', 'Dia', 'Lista'
   final ScrollController _timeScrollController = ScrollController();
 
@@ -120,10 +127,53 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scrollToCurrentTime();
-      _checkAutoSyncCalendar();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      if (widget.calendarToolsOnly) {
+        final appointments = await ref.read(appointmentsStreamProvider.future);
+        if (!mounted) return;
+        _showOfficialCalendarSyncModal(context, appointments);
+      } else {
+        _scrollToCurrentTime();
+        _checkAutoSyncCalendar();
+      }
     });
+  }
+
+  Future<void> _syncConnectedCalendars() async {
+    if (_isCalendarSyncing) return;
+    setState(() => _isCalendarSyncing = true);
+    try {
+      final coordinator = ref.read(calendarSyncCoordinatorProvider);
+      final connected = <CalendarProviderType>{};
+      for (final provider in coordinator.allProviders) {
+        if (!await provider.isAuthorized()) continue;
+        if (provider.providerType == CalendarProviderType.appleEventKit &&
+            await provider.getSelectedCalendarId() == null) continue;
+        connected.add(provider.providerType);
+      }
+      if (!mounted) return;
+      if (connected.isEmpty) {
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const ConnectedCalendarsScreen()),
+        );
+        return;
+      }
+      final result = await coordinator.syncAll(fullSync: true, providers: connected);
+      if (!mounted) return;
+      final message = result.success
+          ? 'Sincronização concluída: ${result.eventsDownloaded} recebidos, ${result.eventsUploaded} enviados. ${result.conflictsFound} conflitos.'
+          : 'Falha na sincronização: ${result.errorMessage ?? "erro desconhecido"}';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Falha na sincronização: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isCalendarSyncing = false);
+    }
   }
 
   Future<({int created, int updated})?> _syncFromWebcalUrl(
@@ -1567,6 +1617,20 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
   }
 
   void _showAppointmentActions(BuildContext context, AppointmentEntry appt) {
+    if (appt.id.startsWith('external-calendar:')) {
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(appt.title),
+          content: Text('Evento de calendário conectado (somente leitura).\n'
+              '${AppDateUtils.formatDateTime(appt.startTime)} — '
+              '${AppDateUtils.formatDateTime(appt.endTime)}'
+              '${appt.locationNotes == null ? "" : "\n${appt.locationNotes}"}'),
+          actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Fechar'))],
+        ),
+      );
+      return;
+    }
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -4113,7 +4177,25 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
           (a) => a.personId == null || !passedPersonIds.contains(a.personId),
         )
         .toList();
+    final externalEvents = ref.watch(externalCalendarEventsProvider).value ?? [];
+    final links = ref.watch(calendarEventLinksProvider).value ?? [];
+    final calendarAppts = appointmentsWithExternalEvents(
+      allAppts, externalEvents, links,
+    );
     final allActivities = activitiesAsync.value ?? [];
+
+    if (widget.calendarToolsOnly) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Importar / Exportar Calendário')),
+        body: Center(
+          child: ElevatedButton.icon(
+            onPressed: () => _showOfficialCalendarSyncModal(context, allAppts),
+            icon: const Icon(Icons.import_export),
+            label: const Text('Configurar / Importar'),
+          ),
+        ),
+      );
+    }
 
     final monthActivities = allActivities
         .where(
@@ -4150,9 +4232,8 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
             child: MediaQuery.of(context).size.width < 500
                 ? IconButton(
                     icon: const Icon(Icons.sync_alt),
-                    tooltip: 'Sincronizar Calendários (Google / iCloud / .ics)',
-                    onPressed: () =>
-                        _showOfficialCalendarSyncModal(context, allAppts),
+                    tooltip: 'Sincronizar Calendários',
+                    onPressed: _isCalendarSyncing ? null : _syncConnectedCalendars,
                   )
                 : FilledButton.tonalIcon(
                     style: FilledButton.styleFrom(
@@ -4167,8 +4248,7 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                       'Sincronizar Calendários',
                       style: TextStyle(fontSize: 12),
                     ),
-                    onPressed: () =>
-                        _showOfficialCalendarSyncModal(context, allAppts),
+                    onPressed: _isCalendarSyncing ? null : _syncConnectedCalendars,
                   ),
           ),
           IconButton(
@@ -4193,64 +4273,6 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
       ),
       body: Column(
         children: [
-          // Banner Elegante de Sincronização de Calendários
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 860),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.sync,
-                            size: 16,
-                            color: AppTheme.primaryBlue,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Sincronizar com Google Agenda & Apple (.ics)',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: isDark
-                                    ? const Color(0xFF93C5FD)
-                                    : AppTheme.primaryBlue,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    TextButton.icon(
-                      style: TextButton.styleFrom(
-                        visualDensity: VisualDensity.compact,
-                      ),
-                      icon: const Icon(Icons.sync_alt, size: 14),
-                      label: const Text(
-                        'Configurar / Importar',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      onPressed: () =>
-                          _showOfficialCalendarSyncModal(context, allAppts),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const Divider(height: 1),
-
           // Barra de controles de visualização (Mês, Semana, Dia, Lista)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -4462,14 +4484,8 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
           // Área de visualização do calendário
           Expanded(
             child: appointmentsAsync.when(
-              data: (appts) {
-                final activeAppts = appts
-                    .where(
-                      (a) =>
-                          a.personId == null ||
-                          !passedPersonIds.contains(a.personId),
-                    )
-                    .toList();
+              data: (_) {
+                final activeAppts = calendarAppts;
                 if (_viewMode == 'Mês') {
                   return _buildMonthCalendarView(activeAppts);
                 } else if (_viewMode == 'Semana') {
