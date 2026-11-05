@@ -322,6 +322,7 @@ void main() {
       expect(after.dy, closeTo(focal.dy + 2 * (before.dy - focal.dy), 50));
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(milliseconds: 100));
     });
 
     testWidgets(
