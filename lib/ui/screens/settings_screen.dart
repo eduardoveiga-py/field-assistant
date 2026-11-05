@@ -1343,10 +1343,10 @@ _buildSupabaseCard(context),
                 ElevatedButton.icon(
                   onPressed: () async {
                     try {
-                      await ref.read(supabaseSyncServiceProvider).sync();
+                      final result = await ref.read(supabaseSyncServiceProvider).sync();
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Sincronização concluída com sucesso!')),
+                          SnackBar(content: Text(result.message)),
                         );
                       }
                     } catch (e) {
