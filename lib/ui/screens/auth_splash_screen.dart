@@ -250,12 +250,12 @@ class _SupabaseAuthScreenState extends State<SupabaseAuthScreen> {
             _infoMessage = 'Cadastro realizado! Por favor, verifique seu e-mail para confirmar a conta antes de fazer login.';
           });
         } else {
-          widget.onAuthenticated();
+          widget.onAuthenticated?.call();
         }
       } else {
         final res = await client.auth.signInWithPassword(email: email, password: password);
         if (res.session != null) {
-          widget.onAuthenticated();
+          widget.onAuthenticated?.call();
         } else {
           setState(() {
             _errorMessage = 'Falha ao realizar login. Verifique suas credenciais.';
@@ -308,7 +308,7 @@ class _SupabaseAuthScreenState extends State<SupabaseAuthScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.lock_outline, size: 48, color: AppColors.primary),
+                      const Icon(Icons.lock_outline, size: 48, color: AppTheme.primaryBlue),
                       const SizedBox(height: 12),
                       Text(
                         _isSignUp ? 'Criar Conta' : 'Entrar no Assistente',
