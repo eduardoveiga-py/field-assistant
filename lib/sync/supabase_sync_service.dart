@@ -38,6 +38,23 @@ final supabaseSyncServiceProvider = Provider<SupabaseSyncService>((ref) => Supab
 
 class SupabaseSyncService {
     final Ref? _ref;
+  SupabaseSyncService([this._ref]);
+
+  Future<SyncProcessResult> sync() async {
+    final ref = _ref;
+    if (ref == null) {
+      return const SyncProcessResult(
+        totalProcessed: 0,
+        successCount: 0,
+        failureCount: 1,
+        conflictCount: 0,
+        message: 'Referência de repositório não disponível para sincronização',
+        errors: ['Ref nula no SupabaseSyncService'],
+      );
+    }
+    final repository = ref.read(repositoryProvider);
+    return syncAll(repository);
+  }
   static bool get isInitialized {
     try {
       Supabase.instance.client;
