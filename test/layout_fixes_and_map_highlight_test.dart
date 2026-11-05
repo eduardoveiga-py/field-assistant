@@ -296,6 +296,10 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
       final db = AppDatabase.forTesting(NativeDatabase.memory());
       addTearDown(db.close);
+      addTearDown(() async {
+        await tester.pumpWidget(const SizedBox());
+        await tester.pump(const Duration(milliseconds: 100));
+      });
       final now = DateTime.now();
       await db.into(db.people).insert(PeopleCompanion.insert(
         id: 'zoom-test', name: 'Contatozoom', latitude: const Value(-23.55),
