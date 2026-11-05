@@ -812,7 +812,13 @@ class SupabaseSyncService {
   /// Realiza o ciclo completo de sincronização bidirecional:
   /// 1. Envia mutações locais pendentes da fila (push)
   /// 2. Busca e mescla alterações remotas (pull), respeitando integridade offline-first
-  Future<SyncProcessResult> sync() async {
+  Future<SyncProcessResult>? _activeSync;
+
+  Future<SyncProcessResult> sync() {
+    return _activeSync ??= _runSync().whenComplete(() => _activeSync = null);
+  }
+
+  Future<SyncProcessResult> _runSync() async {
     final pushResult = await processQueue();
     if (!isConfigured) return pushResult;
     final pullResult = await fetchRemoteChanges();

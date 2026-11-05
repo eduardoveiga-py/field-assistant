@@ -47,6 +47,8 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
   final Set<String> _geocodedPersonIds = {};
   bool _hasCenteredHighlightPerson = false;
   int _zoom = 15;
+  double? _viewportCenterLat;
+  double? _viewportCenterLng;
   static const double _tileSize = 256.0;
   DateTime? _lastZoomChangeTime;
 
@@ -92,8 +94,9 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
     double originPx,
     double originPy,
     double centerLng,
-    double centerLat,
-  ) {
+    double centerLat, {
+    Offset? focalPoint,
+  }) {
     final targetZoom = newZoom.clamp(10, 18);
     if (targetZoom == _zoom) return;
 
@@ -107,8 +110,9 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
     final viewportH = constraints.maxHeight > 0 ? constraints.maxHeight : 600.0;
 
     // Ponto geográfico central atualmente visualizado (compensando a escala do InteractiveViewer)
-    final canvasCenterX = ((viewportW / 2.0) - dx) / effectiveScale;
-    final canvasCenterY = ((viewportH / 2.0) - dy) / effectiveScale;
+    final focal = focalPoint ?? Offset(viewportW / 2.0, viewportH / 2.0);
+    final canvasCenterX = (focal.dx - dx) / effectiveScale;
+    final canvasCenterY = (focal.dy - dy) / effectiveScale;
     final worldPx = originPx + canvasCenterX;
     final worldPy = originPy + canvasCenterY;
     final focalLng = _pixelX2lon(worldPx, _zoom);
@@ -116,8 +120,8 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
 
     // Reprojeção para novo nível de resolução 'z'
     const int gridHalfSize = 7;
-    final newCenterTileX = _lon2tileX(centerLng, targetZoom);
-    final newCenterTileY = _lat2tileY(centerLat, targetZoom);
+    final newCenterTileX = _lon2tileX(focalLng, targetZoom);
+    final newCenterTileY = _lat2tileY(focalLat, targetZoom);
     final newMinTileX = newCenterTileX - gridHalfSize;
     final newMinTileY = newCenterTileY - gridHalfSize;
     final newOriginPx = newMinTileX * _tileSize;
@@ -131,17 +135,19 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
 
     final canvasWidth = (gridHalfSize * 2 + 1) * _tileSize;
     final canvasHeight = (gridHalfSize * 2 + 1) * _tileSize;
-    final newDx = ((viewportW / 2.0) - newCanvasX).clamp(
+    final newDx = (focal.dx - newCanvasX).clamp(
       viewportW - canvasWidth,
       0.0,
     );
-    final newDy = ((viewportH / 2.0) - newCanvasY).clamp(
+    final newDy = (focal.dy - newCanvasY).clamp(
       viewportH - canvasHeight,
       0.0,
     );
 
     setState(() {
       _zoom = targetZoom;
+      _viewportCenterLat = focalLat;
+      _viewportCenterLng = focalLng;
     });
 
     _transformationController.value = Matrix4.translationValues(
@@ -174,17 +180,12 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
     return 12742 * math.asin(math.sqrt(a));
   }
 
-  void _recenterMap(
-    double viewportWidth,
-    double viewportHeight,
-    double centerPx,
-    double centerPy,
-  ) {
-    if (viewportWidth > 0 && viewportHeight > 0) {
-      final dx = (viewportWidth / 2.0) - centerPx;
-      final dy = (viewportHeight / 2.0) - centerPy;
-      _transformationController.value = Matrix4.translationValues(dx, dy, 0.0);
-    }
+  void _recenterMap() {
+    setState(() {
+      _viewportCenterLat = null;
+      _viewportCenterLng = null;
+      _hasCenteredInitialView = false;
+    });
   }
 
   Future<void> _openSingleRoute(PersonEntry person) async {
@@ -745,139 +746,23 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
     List<PersonEntry> people,
     List<TerritoryLandmark> landmarks,
   ) async {
-    final validLats = <double>[];
-    final validLngs = <double>[];
-
-    for (final c in people) {
-      if (c.latitude != null &&
-          c.longitude != null &&
-          (c.latitude != 0.0 || c.longitude != 0.0) &&
-          c.latitude!.abs() <= 90 &&
-          c.longitude!.abs() <= 180) {
-        validLats.add(c.latitude!);
-        validLngs.add(c.longitude!);
-      }
-    }
-    for (final l in landmarks) {
-      if (l.latitude != null &&
-          l.longitude != null &&
-          (l.latitude != 0.0 || l.longitude != 0.0) &&
-          l.latitude!.abs() <= 90 &&
-          l.longitude!.abs() <= 180) {
-        validLats.add(l.latitude!);
-        validLngs.add(l.longitude!);
-      }
-    }
-
-    double cLat = -23.550520;
-    double cLng = -46.633308;
-    if (validLats.isNotEmpty) {
-      validLats.sort();
-      validLngs.sort();
-      cLat = validLats[validLats.length ~/ 2];
-      cLng = validLngs[validLngs.length ~/ 2];
-    }
-
-    final zoomLevels = [_zoom - 1, _zoom];
-    const half = 3;
-    final totalExpected = zoomLevels.length * (half * 2 + 1) * (half * 2 + 1);
-    final progressNotifier = ValueNotifier<int>(0);
-
-    showDialog(
+    await showDialog<void>(
       context: context,
-      barrierDismissible: false,
-      builder: (dialogCtx) {
-        return PopScope(
-          canPop: false,
-          child: AlertDialog(
-            title: const Row(
-              children: [
-                Icon(Icons.download_for_offline, color: AppTheme.accentTeal),
-                SizedBox(width: 8),
-                Text('Baixando Mapa Offline', style: TextStyle(fontSize: 16)),
-              ],
-            ),
-            content: ValueListenableBuilder<int>(
-              valueListenable: progressNotifier,
-              builder: (ctx, progress, _) {
-                final pct = totalExpected > 0
-                    ? (progress / totalExpected).clamp(0.0, 1.0)
-                    : 0.0;
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Salvando blocos do território no dispositivo para uso sem internet no campo...',
-                    ),
-                    const SizedBox(height: 14),
-                    LinearProgressIndicator(
-                      value: pct,
-                      minHeight: 8,
-                      borderRadius: BorderRadius.circular(4),
-                      color: AppTheme.accentTeal,
-                      backgroundColor: Colors.grey.shade300,
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          '$progress de $totalExpected blocos',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          '${(pct * 100).toStringAsFixed(0)}%',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.accentTeal,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-        );
-      },
-    );
-
-    int totalSaved = 0;
-    int cumulativeDone = 0;
-    for (final z in zoomLevels) {
-      final cx = _lon2tileX(cLng, z);
-      final cy = _lat2tileY(cLat, z);
-      final saved = await TileCacheService.instance.preloadArea(
-        z: z,
-        minX: cx - half,
-        maxX: cx + half,
-        minY: cy - half,
-        maxY: cy + half,
-        onProgress: (completed, _) {
-          progressNotifier.value = cumulativeDone + completed;
-        },
-      );
-      totalSaved += saved;
-      cumulativeDone += (half * 2 + 1) * (half * 2 + 1);
-    }
-
-    if (context.mounted) {
-      Navigator.of(context, rootNavigator: true).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Sucesso! $totalSaved blocos salvos para uso offline no ministério.',
-          ),
-          backgroundColor: AppTheme.successGreen,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Mapa offline indisponível'),
+        content: const Text(
+          'O fornecedor atual não permite baixar regiões para uso offline. '
+          'Os blocos vistos no navegador também não permanecem salvos após fechar o app. '
+          'É necessário configurar um fornecedor que autorize downloads offline.',
         ),
-      );
-    }
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Entendi'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -1378,15 +1263,16 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
       centerLng = allLngs[allLngs.length ~/ 2];
     }
 
+    centerLat = _viewportCenterLat ?? centerLat;
+    centerLng = _viewportCenterLng ?? centerLng;
+
     final centerTileX = _lon2tileX(centerLng, _zoom);
     final centerTileY = _lat2tileY(centerLat, _zoom);
 
     // Grade ampla (15x15 blocos = 3840x3840 px) que cobre 100% da tela em qualquer dispositivo móvel, tablet ou desktop
     const int gridHalfSize = 7;
     final minTileX = centerTileX - gridHalfSize;
-    final maxTileX = centerTileX + gridHalfSize;
     final minTileY = centerTileY - gridHalfSize;
-    final maxTileY = centerTileY + gridHalfSize;
 
     final originPx = minTileX * _tileSize;
     final originPy = minTileY * _tileSize;
@@ -1463,6 +1349,7 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                           originPy,
                           centerLng,
                           centerLat,
+                          focalPoint: pointerSignal.localPosition,
                         );
                       } else if (pointerSignal.scrollDelta.dy > 2 &&
                           _zoom > 10) {
@@ -1474,6 +1361,7 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                           originPy,
                           centerLng,
                           centerLat,
+                          focalPoint: pointerSignal.localPosition,
                         );
                       }
                     }
@@ -1525,11 +1413,6 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                           centerLng,
                           centerLat,
                         );
-                      } else if ((currentScale - 1.0).abs() > 0.05) {
-                        final dx = m.storage[12];
-                        final dy = m.storage[13];
-                        _transformationController.value =
-                            Matrix4.translationValues(dx, dy, 0.0);
                       }
                     },
                     child: Container(
@@ -1540,22 +1423,39 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                           : const Color(0xFFF1F5F9),
                       child: Stack(
                         children: [
-                          // Camada de Tiles do OpenStreetMap com suporte a cache offline móvel
-                          for (int tx = minTileX; tx <= maxTileX; tx++)
-                            for (int ty = minTileY; ty <= maxTileY; ty++)
-                              Positioned(
-                                key: ValueKey('tile_pos_${_zoom}_${tx}_$ty'),
-                                left: (tx - minTileX) * _tileSize,
-                                top: (ty - minTileY) * _tileSize,
-                                child: CachedTileWidget(
-                                  key: ValueKey('tile_${_zoom}_${tx}_$ty'),
-                                  z: _zoom,
-                                  x: tx,
-                                  y: ty,
-                                  size: _tileSize,
-                                  isDark: isDark,
-                                ),
-                              ),
+                          // Carrega apenas os blocos visíveis e uma margem de segurança.
+                          Positioned.fill(
+                            child: AnimatedBuilder(
+                              animation: _transformationController,
+                              builder: (context, _) {
+                                final matrix = _transformationController.value;
+                                final scale = matrix.getMaxScaleOnAxis();
+                                final safeScale = scale > 0.01 ? scale : 1.0;
+                                final x = matrix.storage[12];
+                                final y = matrix.storage[13];
+                                final left = ((-x / safeScale) / _tileSize).floor() - 1;
+                                final top = ((-y / safeScale) / _tileSize).floor() - 1;
+                                final right = (((constraints.maxWidth - x) / safeScale) / _tileSize).ceil() + 1;
+                                final bottom = (((constraints.maxHeight - y) / safeScale) / _tileSize).ceil() + 1;
+                                return Stack(children: [
+                                  for (int ix = left.clamp(0, 14); ix <= right.clamp(0, 14); ix++)
+                                    for (int iy = top.clamp(0, 14); iy <= bottom.clamp(0, 14); iy++)
+                                      Positioned(
+                                        left: ix * _tileSize,
+                                        top: iy * _tileSize,
+                                        child: CachedTileWidget(
+                                          key: ValueKey('tile_${_zoom}_${minTileX + ix}_${minTileY + iy}'),
+                                          z: _zoom,
+                                          x: minTileX + ix,
+                                          y: minTileY + iy,
+                                          size: _tileSize,
+                                          isDark: isDark,
+                                        ),
+                                      ),
+                                ]);
+                              },
+                            ),
+                          ),
 
                           // Renderização dos Marcos / Pontos de Referência geolocalizados
                           if (_showLandmarks)
@@ -1715,12 +1615,7 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                     backgroundColor: AppTheme.primaryBlue,
                     foregroundColor: Colors.white,
                     tooltip: 'Centralizar Território',
-                    onPressed: () => _recenterMap(
-                      constraints.maxWidth,
-                      constraints.maxHeight,
-                      centerPx,
-                      centerPy,
-                    ),
+                    onPressed: _recenterMap,
                     child: const Icon(Icons.my_location, size: 18),
                   ),
                 ],

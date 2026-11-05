@@ -198,15 +198,12 @@ class GoogleCalendarProvider implements CalendarProvider {
 
     if (_currentUser == null) {
       await isAuthorized();
-      if (_currentUser == null) {
-        final authorized = await requestAuthorization();
-        if (!authorized || _currentUser == null) return null;
-      }
+      if (_currentUser == null) return null;
     }
 
     try {
       final headers = await _currentUser!.authorizationClient
-          .authorizationHeaders([_calendarScope], promptIfNecessary: true);
+          .authorizationHeaders([_calendarScope], promptIfNecessary: false);
       if (headers == null) return null;
       final authClient = _AuthenticatedClient(headers);
       return gcal.CalendarApi(authClient);

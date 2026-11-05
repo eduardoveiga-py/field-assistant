@@ -1245,7 +1245,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                   title: const Text('Dados de Demonstração Isolados'),
                   subtitle: const Text(
-                    'Gera pessoas, visitas, estudos e agenda fictícios para experimentação.',
+                    'Gera pessoas, visitas, estudos e agenda fictícios. A sincronização automática é suspensa enquanto houver pessoas de demonstração identificadas.',
                   ),
                   trailing: TextButton(
                     onPressed: () async {

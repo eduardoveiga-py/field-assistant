@@ -8,16 +8,25 @@ import 'tile_cache_web.dart' if (dart.library.io) 'tile_cache_native.dart';
 class TileCacheService {
   static final TileCacheService instance = TileCacheService._internal();
   TileCacheBackend _backend = getTileBackend();
+  final Map<String, Future<Uint8List?>> _inFlight = {};
 
   TileCacheService._internal();
 
   @visibleForTesting
   set backend(TileCacheBackend b) {
     _backend = b;
+    _inFlight.clear();
   }
 
   Future<Uint8List?> getTileBytes(int z, int x, int y) {
-    return _backend.getTile(z, x, y);
+    final key = '$z/$x/$y';
+    return _inFlight.putIfAbsent(key, () async {
+      try {
+        return await _backend.getTile(z, x, y);
+      } finally {
+        _inFlight.remove(key);
+      }
+    });
   }
 
   Future<void> saveTile(int z, int x, int y, Uint8List bytes) {
@@ -86,6 +95,7 @@ class CachedTileWidget extends StatefulWidget {
 
 class _CachedTileWidgetState extends State<CachedTileWidget> {
   Uint8List? _tileBytes;
+  int _requestId = 0;
 
   @override
   void initState() {
@@ -104,12 +114,13 @@ class _CachedTileWidgetState extends State<CachedTileWidget> {
   }
 
   Future<void> _loadTile() async {
+    final requestId = ++_requestId;
     final bytes = await TileCacheService.instance.getTileBytes(
       widget.z,
       widget.x,
       widget.y,
     );
-    if (mounted) {
+    if (mounted && requestId == _requestId) {
       setState(() {
         _tileBytes = bytes;
       });
@@ -152,7 +163,7 @@ class _CachedTileWidgetState extends State<CachedTileWidget> {
             ),
             const SizedBox(height: 2),
             Text(
-              'Mapa Offline',
+              'Mapa indisponível',
               style: TextStyle(
                 fontSize: 9,
                 fontWeight: FontWeight.w500,

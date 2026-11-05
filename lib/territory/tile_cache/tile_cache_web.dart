@@ -19,10 +19,7 @@ class TileCacheWeb implements TileCacheBackend {
     try {
       final uri = Uri.parse('https://tile.openstreetmap.org/$z/$x/$y.png');
       final res = await http
-          .get(
-            uri,
-            headers: {'User-Agent': 'MinisterioPessoalOfflineTerritorio/1.0'},
-          )
+          .get(uri)
           .timeout(const Duration(seconds: 8));
 
       if (res.statusCode == 200) {
