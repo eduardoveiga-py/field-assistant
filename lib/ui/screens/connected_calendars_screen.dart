@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_theme.dart';
@@ -40,12 +41,15 @@ class _ConnectedCalendarsScreenState
   Future<bool> _showConfigureGoogleClientIdDialog(BuildContext context) async {
     final config = ref.read(appConfigProvider);
     final controller = TextEditingController(text: config.googleWebClientId);
+    final currentOrigin = kIsWeb ? Uri.base.origin : 'http://localhost:8080';
     String? localError;
 
     final result = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) {
+          final isDark = Theme.of(ctx).brightness == Brightness.dark;
+
           return AlertDialog(
             title: const Row(
               children: [
@@ -60,9 +64,71 @@ class _ConnectedCalendarsScreenState
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Para conectar o Google Agenda no navegador Web, informe o Client ID Web '
-                    'gerado no Google Cloud Console com as origens JavaScript autorizadas (ex: http://localhost:PORT).',
+                    'Para autorizar o Google Calendar na Web sem o erro 401 (invalid_client), '
+                    'o Client ID deve ser criado como "Aplicativo da Web" no Google Cloud Console com a origem exata do seu navegador.',
                     style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(Icons.info_outline, size: 16, color: AppTheme.primaryBlue),
+                            SizedBox(width: 6),
+                            Text(
+                              'Origem JavaScript Autorizada Necessária:',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: SelectableText(
+                                currentOrigin,
+                                style: const TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppTheme.primaryBlue,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.copy, size: 16),
+                              tooltip: 'Copiar Origem',
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              onPressed: () {
+                                Clipboard.setData(ClipboardData(text: currentOrigin));
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Origem copiada: $currentOrigin'),
+                                    duration: const Duration(seconds: 2),
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'No console do Google Cloud > Credenciais > Seu Client ID Web, adicione esta URL exata em "Origens JavaScript autorizadas".',
+                          style: TextStyle(fontSize: 10, color: AppTheme.textMuted),
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 16),
                   TextField(
@@ -74,6 +140,14 @@ class _ConnectedCalendarsScreenState
                       prefixIcon: const Icon(Icons.vpn_key_outlined),
                       border: const OutlineInputBorder(),
                     ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Requisitos no Google Cloud Console:\n'
+                    '• Tipo de credencial: "Aplicativo da Web"\n'
+                    '• API ativada: "Google Calendar API"\n'
+                    '• Se em modo de teste: adicione seu e-mail em "Usuários de teste"',
+                    style: TextStyle(fontSize: 11, color: AppTheme.textMuted, height: 1.35),
                   ),
                 ],
               ),
@@ -89,6 +163,14 @@ class _ConnectedCalendarsScreenState
                   if (entered.isEmpty) {
                     setDialogState(() {
                       localError = 'Client ID não pode ser vazio.';
+                    });
+                    return;
+                  }
+
+                  if (!entered.contains('.apps.googleusercontent.com')) {
+                    setDialogState(() {
+                      localError =
+                          'Formato inválido. O Client ID Web deve terminar com .apps.googleusercontent.com (não use chave de API ou client secret).';
                     });
                     return;
                   }
