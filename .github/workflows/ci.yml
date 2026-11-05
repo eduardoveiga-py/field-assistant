@@ -31,7 +31,17 @@ jobs:
         run: flutter pub get
 
       - name: Run Static Analysis
-        run: dart analyze lib test --fatal-infos
+        run: |
+          set +e
+          dart analyze lib test --fatal-infos --format machine > /tmp/dart-analysis.txt
+          status=$?
+          cat /tmp/dart-analysis.txt
+          while IFS='|' read -r severity type code file line column length message; do
+            if [ -n "$message" ]; then
+              echo "::error file=$file,line=$line,col=$column::$code: $message"
+            fi
+          done < /tmp/dart-analysis.txt
+          exit "$status"
 
       - name: Run Automated Tests
         run: flutter test --coverage
