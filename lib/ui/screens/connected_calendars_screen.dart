@@ -566,8 +566,10 @@ class _ConnectedCalendarsScreenState
                             final db = ref.read(databaseProvider);
                             await coordinator.googleProvider.setReadOnlyCalendarIds(ids);
                             if (selected != true) {
-                              await (db.delete(db.externalCalendarEvents)..where((event) =>
-                                  event.provider.equals('google') & event.calendarId.equals(calendar.id))).go();
+                              await (db.delete(db.externalCalendarEvents)
+                                    ..where((event) => event.provider.equals('google'))
+                                    ..where((event) => event.calendarId.equals(calendar.id)))
+                                  .go();
                             }
                             if (mounted) setState(() => _readOnlyGoogleCalIds = ids);
                           },
