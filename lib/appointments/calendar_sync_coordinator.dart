@@ -66,22 +66,29 @@ class CalendarSyncCoordinator {
   /// 3. Detecção determinística de conflitos
   /// 4. Processamento da Outbox (pending_upload e propagação de exclusões)
   /// 5. Prevenção absoluta de loops de sincronização
-  Future<CalendarSyncResult> syncAll({bool fullSync = false}) async {
+  Future<CalendarSyncResult> syncAll({
+    bool fullSync = false,
+    Set<CalendarProviderType>? providers,
+  }) async {
     int totalDownloaded = 0;
     int totalUploaded = 0;
     int totalConflicts = 0;
     final errors = <String>[];
+    final readyProviders = <CalendarProvider>{};
 
     // 1. Download de alterações externas
     for (final provider in allProviders) {
+      if (providers != null && !providers.contains(provider.providerType)) continue;
       final authorized = await provider.isAuthorized();
       if (!authorized) continue;
 
       final res = await provider.syncEvents(db: db, fullSync: fullSync);
       totalDownloaded += res.eventsDownloaded;
       totalUploaded += res.eventsUploaded;
-      if (!res.success && res.errorMessage != null) {
-        errors.add('${provider.providerType.displayName}: ${res.errorMessage}');
+      if (!res.success) {
+        errors.add('${provider.providerType.displayName}: ${res.errorMessage ?? "falha ao receber eventos"}');
+      } else {
+        readyProviders.add(provider);
       }
     }
 
@@ -90,7 +97,9 @@ class CalendarSyncCoordinator {
 
     for (final link in allLinks) {
       final provider = getProviderByName(link.provider);
-      final isProvAuth = provider != null && await provider.isAuthorized();
+      final isProvAuth = provider != null && readyProviders.contains(provider);
+      // Não reconcilia com dados externos possivelmente desatualizados.
+      if (!isProvAuth) continue;
 
       // Caso 1: Vínculo já marcado como deletado no banco (tombstone) e pendente de exclusão externa
       if (link.deletedAt != null) {
@@ -138,7 +147,7 @@ class CalendarSyncCoordinator {
             );
           }
         }
-        if (ok) {
+        if (ok && isProvAuth) {
           await (db.update(
             db.calendarEventLinks,
           )..where((t) => t.id.equals(link.id))).write(
@@ -310,7 +319,7 @@ class CalendarSyncCoordinator {
 
     for (final appt in activeAppointments) {
       for (final provider in allProviders) {
-        if (!await provider.isAuthorized()) continue;
+        if (!readyProviders.contains(provider)) continue;
         final providerName =
             provider.providerType == CalendarProviderType.google
             ? 'google'

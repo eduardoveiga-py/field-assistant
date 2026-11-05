@@ -31,10 +31,28 @@ jobs:
         run: flutter pub get
 
       - name: Run Static Analysis
-        run: dart analyze lib test --fatal-infos
+        run: |
+          set +e
+          dart analyze lib test --fatal-infos --format machine > /tmp/dart-analysis.txt
+          status=$?
+          cat /tmp/dart-analysis.txt
+          while IFS='|' read -r severity type code file line column length message; do
+            if [ -n "$message" ]; then
+              echo "::error file=$file,line=$line,col=$column::$code: $message"
+            fi
+          done < /tmp/dart-analysis.txt
+          exit "$status"
 
       - name: Run Automated Tests
-        run: flutter test --coverage
+        run: |
+          set +e
+          flutter test --coverage --reporter expanded > /tmp/flutter-tests.txt 2>&1
+          status=$?
+          cat /tmp/flutter-tests.txt
+          if [ "$status" -ne 0 ]; then
+            python3 -c 'from pathlib import Path; lines=Path("/tmp/flutter-tests.txt").read_text(errors="replace").splitlines(); hits=[i for i, line in enumerate(lines) if "[E]" in line]; [print("::error::" + "%0A".join(lines[i:i+16]).replace("%", "%25").replace("%250A", "%0A")) for i in hits]'
+          fi
+          exit "$status"
 
       - name: Build Web (Release)
         run: flutter build web --release

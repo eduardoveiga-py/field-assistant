@@ -287,6 +287,7 @@ class GoogleCalendarProvider implements CalendarProvider {
     required AppDatabase db,
     bool fullSync = false,
   }) async {
+    lastError = null;
     final api = await _getCalendarApi();
     if (api == null) {
       return CalendarSyncResult(
@@ -321,6 +322,8 @@ class GoogleCalendarProvider implements CalendarProvider {
             calendarId,
             syncToken: syncToken,
             pageToken: pageToken,
+            singleEvents: true,
+            showDeleted: true,
             maxResults: 250,
           );
         } else {
@@ -334,10 +337,12 @@ class GoogleCalendarProvider implements CalendarProvider {
             timeMin: timeMin,
             timeMax: timeMax,
             singleEvents: true,
+            showDeleted: true,
             maxResults: 250,
           );
         }
 
+        needsFullSync = false;
         pageToken = events.nextPageToken;
         nextSyncToken = events.nextSyncToken;
 
@@ -402,6 +407,8 @@ class GoogleCalendarProvider implements CalendarProvider {
                 description: drift.Value(item.description),
                 startTime: drift.Value(startDt),
                 endTime: drift.Value(endDt),
+                timeZone: drift.Value(item.start?.timeZone),
+                isAllDay: drift.Value(item.start?.date != null),
                 externalStatus: drift.Value(item.status),
                 lastModifiedExternal: drift.Value(item.updated),
                 lastSyncedAt: drift.Value(now),
@@ -414,15 +421,19 @@ class GoogleCalendarProvider implements CalendarProvider {
           }
         }
       } on gcal.DetailedApiRequestError catch (e) {
-        if (e.status == 410) {
+        if (e.status == 410 && syncToken != null && syncToken.isNotEmpty) {
           syncToken = null;
           pageToken = null;
           needsFullSync = true;
           continue;
         } else {
+          if (e.status == 401) {
+            _webAuthHeaders = null;
+            lastError = 'A autorização do Google expirou. Reconecte a conta em Calendários Conectados.';
+          }
           return CalendarSyncResult(
             success: false,
-            errorMessage: 'Erro da API Google (${e.status}): ${e.message}',
+            errorMessage: lastError ?? 'Erro da API Google (${e.status}): ${e.message}',
             eventsDownloaded: downloaded,
           );
         }
@@ -433,7 +444,7 @@ class GoogleCalendarProvider implements CalendarProvider {
           eventsDownloaded: downloaded,
         );
       }
-    } while (pageToken != null);
+    } while (pageToken != null || needsFullSync);
 
     if (nextSyncToken != null) {
       await _secureStorage.write(

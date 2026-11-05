@@ -70,6 +70,7 @@ class MockGoogleCalendarProvider extends GoogleCalendarProvider {
   final Map<String, Map<String, dynamic>> remoteEvents = {};
   int pushCount = 0;
   int deleteCount = 0;
+  bool failDownload = false;
   String? forcePushId;
 
   MockGoogleCalendarProvider({this.authorized = true});
@@ -169,6 +170,9 @@ class MockGoogleCalendarProvider extends GoogleCalendarProvider {
     required AppDatabase db,
     bool fullSync = false,
   }) async {
+    if (failDownload) {
+      return CalendarSyncResult(success: false, errorMessage: 'Download indisponível');
+    }
     int count = 0;
     for (final entry in remoteEvents.values) {
       final extId = entry['id'] as String;
@@ -235,6 +239,12 @@ class MockAppleCalendarProvider extends AppleEventKitProvider {
 
   @override
   Future<bool> isAuthorized() async => authorized;
+
+  @override
+  Future<CalendarSyncResult> syncEvents({
+    required AppDatabase db,
+    bool fullSync = false,
+  }) async => CalendarSyncResult(success: true);
 
   @override
   Future<String?> pushAppointmentToExternal(
@@ -328,6 +338,19 @@ void main() {
 
     tearDown(() async {
       await db.close();
+    });
+
+    test('Não envia compromissos quando o download do provedor falha', () async {
+      await repo.createAppointment(
+        title: 'Compromisso local',
+        startTime: DateTime(2026, 11, 2, 10),
+        endTime: DateTime(2026, 11, 2, 11),
+      );
+      mockGoogle.failDownload = true;
+      final result = await coordinator.syncAll(fullSync: true);
+      expect(result.success, isFalse);
+      expect(result.errorMessage, contains('Download indisponível'));
+      expect(mockGoogle.pushCount, 0);
     });
 
     test('Cenário 1 — Criação local: envio ao Google, gravação do ID externo e idempotência sem duplicação', () async {
