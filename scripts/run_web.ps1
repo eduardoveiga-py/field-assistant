@@ -255,7 +255,8 @@ if ($Mode -eq "web-server") {
     foreach ($flag in $browserFlags) {
         $extraArgs += @("--web-browser-flag", $flag)
     }
-
+    if (Test-Path (Join-Path $ProjectRoot ".env")) { $extraArgs += "--dart-define-from-file=.env" }
+    if ($env:GOOGLE_WEB_CLIENT_ID) { $extraArgs += "--dart-define=GOOGLE_WEB_CLIENT_ID=$env:GOOGLE_WEB_CLIENT_ID" }
     Write-Host "[4/4] Executando flutter run -d $Mode..." -ForegroundColor Green
     & flutter run -d $Mode @extraArgs
 
