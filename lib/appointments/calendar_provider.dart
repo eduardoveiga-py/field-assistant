@@ -25,6 +25,7 @@ class ExternalCalendarItem {
   final String name;
   final String? accountName;
   final bool isReadOnly;
+  final bool isPrimary;
   final Color? color;
 
   ExternalCalendarItem({
@@ -32,6 +33,7 @@ class ExternalCalendarItem {
     required this.name,
     this.accountName,
     this.isReadOnly = false,
+    this.isPrimary = false,
     this.color,
   });
 }

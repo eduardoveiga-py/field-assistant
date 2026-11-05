@@ -229,6 +229,7 @@ class GoogleCalendarProvider implements CalendarProvider {
         return [
           ExternalCalendarItem(
             id: 'primary',
+            isPrimary: true,
             name: 'Agenda Principal ($accountLabel)',
             accountName: accountLabel,
             isReadOnly: false,
@@ -239,7 +240,8 @@ class GoogleCalendarProvider implements CalendarProvider {
         final isReadOnly =
             c.accessRole == 'reader' || c.accessRole == 'freeBusyReader';
         return ExternalCalendarItem(
-          id: c.id ?? 'primary',
+          id: c.id ?? '',
+          isPrimary: c.primary == true,
           name: c.summary ?? 'Google Agenda',
           accountName: accountLabel,
           isReadOnly: isReadOnly,
@@ -249,6 +251,7 @@ class GoogleCalendarProvider implements CalendarProvider {
       return [
         ExternalCalendarItem(
           id: 'primary',
+          isPrimary: true,
           name: 'Principal ($accountLabel)',
           accountName: accountLabel,
           isReadOnly: false,
