@@ -1300,7 +1300,7 @@ _buildSupabaseCard(context),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAlignment.start,
+          crossAxisAlignment: CrossAlAxisignment.start,
           children: [
             Row(
               children: const [
@@ -1378,7 +1378,7 @@ _buildSupabaseCard(context),
                   ElevatedButton.icon(
                     onPressed: () {
                       Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const SupabaseAuthScreen()),
+                        MaterialPageRoute(builder: (_) => const SupSupabaseAuthScreen(onAuthenticated: () { if (Navigator.of(context).canPop()) Navigator.of(context).pop(); setState(() {}); })abaseAuthScreen()),
                       );
                     },
                     icon: const Icon(Icons.login, size: 18),
@@ -1438,7 +1438,7 @@ _buildSupabaseCard(context),
                 final url = urlController.text.trim();
                 final key = keyController.text.trim();
                 if (url.isNotEmpty && key.isNotEmpty) {
-                  await SupabaseSyncService.initDynamic(url, key);
+                          await SupabaseSyncService.initDynamic(url: url, anonKey: key);
                   if (ctx.mounted) Navigator.of(ctx).pop();
                   setState(() {});
                 }
