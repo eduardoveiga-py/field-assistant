@@ -44,7 +44,15 @@ jobs:
           exit "$status"
 
       - name: Run Automated Tests
-        run: flutter test --coverage
+        run: |
+          set +e
+          flutter test --coverage --reporter expanded > /tmp/flutter-tests.txt 2>&1
+          status=$?
+          cat /tmp/flutter-tests.txt
+          if [ "$status" -ne 0 ]; then
+            python3 -c 'from pathlib import Path; lines=Path("/tmp/flutter-tests.txt").read_text(errors="replace").splitlines(); hits=[i for i, line in enumerate(lines) if "[E]" in line]; [print("::error::" + "%0A".join(lines[i:i+16]).replace("%", "%25").replace("%250A", "%0A")) for i in hits]'
+          fi
+          exit "$status"
 
       - name: Build Web (Release)
         run: flutter build web --release
