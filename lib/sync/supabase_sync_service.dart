@@ -7,13 +7,13 @@ import 'package:drift/drift.dart' as drift;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../database/app_database.dart';
 import '../database/repository.dart';
 import '../ui/providers.dart';
 import 'sync_engine.dart';
+import 'supabase_config.dart';
 
 class SyncProcessResult {
   final int totalProcessed;
@@ -48,22 +48,12 @@ class SupabaseSyncService {
     }
   }
 
-  static Future<String?> getSavedUrl() async =>
-      (await SharedPreferences.getInstance()).getString('supabase_url');
-
-  static Future<String?> getSavedAnonKey() async =>
-      (await SharedPreferences.getInstance()).getString('supabase_anon_key');
-
-  static Future<void> saveCredentials(String url, String anonKey) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('supabase_url', url);
-    await prefs.setString('supabase_anon_key', anonKey);
-  }
-
-  static Future<void> initDynamic({required String url, required String anonKey}) async {
-    await saveCredentials(url, anonKey);
+  static Future<void> initialize() async {
     if (!isInitialized) {
-      await Supabase.initialize(url: url, publishableKey: anonKey);
+      await Supabase.initialize(
+        url: SupabaseConfig.url,
+        publishableKey: SupabaseConfig.publishableKey,
+      );
     }
   }
 

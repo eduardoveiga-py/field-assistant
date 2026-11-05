@@ -1,4 +1,3 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,28 +9,11 @@ import 'sync/supabase_sync_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  var supabaseUrl = const String.fromEnvironment('SUPABASE_URL');
-  var supabaseAnonKey = const String.fromEnvironment('SUPABASE_ANON_KEY');
-
-  if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
-    final savedUrl = await SupabaseSyncService.getSavedUrl();
-    final savedKey = await SupabaseSyncService.getSavedAnonKey();
-    if (savedUrl != null && savedKey != null && savedUrl.isNotEmpty && savedKey.isNotEmpty) {
-      supabaseUrl = savedUrl;
-      supabaseAnonKey = savedKey;
-    }
-  }
-
-  if (supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty) {
-    try {
-      await Supabase.initialize(
-        url: supabaseUrl,
-        // ignore: deprecated_member_use
-        anonKey: supabaseAnonKey,
-      );
-    } catch (_) {
-      // Continua em modo offline-first caso a inicializacao falhe
-    }
+  try {
+    await SupabaseSyncService.initialize();
+  } catch (_) {
+    // A tela de login permite tentar novamente se a inicialização falhar.
+    debugPrint('Não foi possível inicializar o Supabase.');
   }
   runApp(const ProviderScope(child: MinisterioPessoalApp()));
 }

@@ -1360,11 +1360,6 @@ _buildSupabaseCard(context),
                   icon: const Icon(Icons.sync, size: 18),
                   label: const Text('Sincronizar Agora'),
                 ),
-                OutlinedButton.icon(
-                  onPressed: () => _showSupabaseConfigDialog(context),
-                  icon: const Icon(Icons.settings_remote, size: 18),
-                  label: const Text('Configurar Supabase'),
-                ),
                 if (isConnected)
                   OutlinedButton.icon(
                     onPressed: () async {
@@ -1399,65 +1394,6 @@ _buildSupabaseCard(context),
           ],
         ),
       ),
-    );
-  }
-
-  void _showSupabaseConfigDialog(BuildContext context) {
-    final urlController = TextEditingController();
-    final keyController = TextEditingController();
-
-    SupabaseSyncService.getSavedUrl().then((val) {
-      if (val != null) urlController.text = val;
-    });
-    SupabaseSyncService.getSavedAnonKey().then((val) {
-      if (val != null) keyController.text = val;
-    });
-
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          title: const Text('Configurar Supabase'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: urlController,
-                decoration: const InputDecoration(
-                  labelText: 'Supabase URL',
-                  hintText: 'https://xyz.supabase.co',
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: keyController,
-                decoration: const InputDecoration(
-                  labelText: 'Supabase Anon Key',
-                ),
-                obscureText: true,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final url = urlController.text.trim();
-                final key = keyController.text.trim();
-                if (url.isNotEmpty && key.isNotEmpty) {
-                          await SupabaseSyncService.initDynamic(url: url, anonKey: key);
-                  if (ctx.mounted) Navigator.of(ctx).pop();
-                  setState(() {});
-                }
-              },
-              child: const Text('Salvar'),
-            ),
-          ],
-        );
-      },
     );
   }
 

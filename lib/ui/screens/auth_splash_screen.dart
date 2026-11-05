@@ -189,34 +189,11 @@ class _SupabaseAuthScreenState extends State<SupabaseAuthScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _urlController = TextEditingController();
-  final _anonKeyController = TextEditingController();
 
   bool _isSignUp = false;
   bool _isLoading = false;
-  bool _showConfig = false;
   String? _errorMessage;
   String? _infoMessage;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadSavedConfig();
-  }
-
-  Future<void> _loadSavedConfig() async {
-    final url = await SupabaseSyncService.getSavedUrl();
-    final key = await SupabaseSyncService.getSavedAnonKey();
-    if (mounted) {
-      setState(() {
-        if (url != null) _urlController.text = url;
-        if (key != null) _anonKeyController.text = key;
-        if (!SupabaseSyncService.isInitialized) {
-          _showConfig = true;
-        }
-      });
-    }
-  }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
@@ -228,14 +205,19 @@ class _SupabaseAuthScreenState extends State<SupabaseAuthScreen> {
     });
 
     try {
-      if (!SupabaseSyncService.isInitialized || _urlController.text.isNotEmpty) {
-        if (_urlController.text.trim().isNotEmpty && _anonKeyController.text.trim().isNotEmpty) {
-          await SupabaseSyncService.initDynamic(
-            url: _urlController.text.trim(),
-            anonKey: _anonKeyController.text.trim(),
-          );
+      if (!SupabaseSyncService.isInitialized) {
+        try {
+          await SupabaseSyncService.initialize();
+        } catch (_) {
+          if (mounted) {
+            setState(() {
+              _errorMessage = 'Não foi possível iniciar a conexão. Verifique sua conexão e tente novamente.';
+            });
+          }
+          return;
         }
       }
+      if (!mounted) return;
 
       final client = Supabase.instance.client;
       final email = _emailController.text.trim();
@@ -243,6 +225,7 @@ class _SupabaseAuthScreenState extends State<SupabaseAuthScreen> {
 
       if (_isSignUp) {
         final res = await client.auth.signUp(email: email, password: password);
+        if (!mounted) return;
         if (res.session == null) {
           setState(() {
             _infoMessage = 'Cadastro realizado! Por favor, verifique seu e-mail para confirmar a conta antes de fazer login.';
@@ -252,6 +235,7 @@ class _SupabaseAuthScreenState extends State<SupabaseAuthScreen> {
         }
       } else {
         final res = await client.auth.signInWithPassword(email: email, password: password);
+        if (!mounted) return;
         if (res.session != null) {
           widget.onAuthenticated?.call();
         } else {
@@ -261,9 +245,11 @@ class _SupabaseAuthScreenState extends State<SupabaseAuthScreen> {
         }
       }
     } catch (e) {
-      setState(() {
-        _errorMessage = 'Erro: ${e.toString()}';
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Erro: ${e.toString()}';
+        });
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -277,8 +263,6 @@ class _SupabaseAuthScreenState extends State<SupabaseAuthScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
-    _urlController.dispose();
-    _anonKeyController.dispose();
     super.dispose();
   }
 
@@ -355,27 +339,6 @@ class _SupabaseAuthScreenState extends State<SupabaseAuthScreen> {
                         validator: (v) => (v == null || v.isEmpty) ? 'Informe a senha' : null,
                       ),
                       const SizedBox(height: 12),
-                      ExpansionTile(
-                        initiallyExpanded: _showConfig,
-                        title: const Text('Configurações do Supabase'),
-                        children: [
-                          TextFormField(
-                            controller: _urlController,
-                            decoration: const InputDecoration(
-                              labelText: 'Supabase URL',
-                              hintText: 'https://xyz.supabase.co',
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          TextFormField(
-                            controller: _anonKeyController,
-                            decoration: const InputDecoration(
-                              labelText: 'Supabase Anon Key',
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                        ],
-                      ),
                       const SizedBox(height: 20),
                       SizedBox(
                         width: double.infinity,

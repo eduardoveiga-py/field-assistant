@@ -4,6 +4,23 @@ Aplicativo multiplataforma (**Web**, **iPhone XR** e **iPad 11 A16**) desenvolvi
 
 ---
 
+## Configuração Supabase
+
+O aplicativo usa a URL e a chave **publishable pública** definidas em
+`lib/sync/supabase_config.dart`. Os usuários informam apenas e-mail e senha.
+Para usar outro projeto em uma compilação, forneça `--dart-define=SUPABASE_URL=...`
+e `--dart-define=SUPABASE_ANON_KEY=...` juntos. Configurações antigas salvas
+localmente não substituem o projeto da compilação.
+
+A chave publishable fica visível no código e no aplicativo: não é um segredo.
+Antes de disponibilizar o aplicativo, verifique no projeto Supabase se RLS e
+políticas de isolamento por usuário estão ativas em todas as tabelas e no
+Storage. Os arquivos em `supabase/migrations` são apenas referência; sua
+presença no repositório não confirma que foram aplicados no projeto. Nunca
+inclua chaves `service_role` ou `secret` no aplicativo.
+
+---
+
 ## 🏛️ Princípios Arquiteturais e Invioláveis
 
 1. **Separação Rígida de Entidades**:
