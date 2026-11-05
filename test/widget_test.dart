@@ -1,11 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:drift/drift.dart' show driftRuntimeOptions;
 import 'package:drift/native.dart';
-import 'package:ministerio_pessoal/main.dart';
+import 'package:ministerio_pessoal/core/app_theme.dart';
+import 'package:ministerio_pessoal/ui/main_navigation_shell.dart';
 import 'package:ministerio_pessoal/database/app_database.dart';
 import 'package:ministerio_pessoal/ui/providers.dart';
+
+// Estes testes exercitam a navegação após a autenticação, sem depender
+// de uma sessão Supabase nem da animação de abertura da tela de login.
+Widget buildNavigationTestApp() {
+  return MaterialApp(
+    theme: AppTheme.lightTheme,
+    darkTheme: AppTheme.darkTheme,
+    themeMode: ThemeMode.dark,
+    localizationsDelegates: const [
+      GlobalMaterialLocalizations.delegate,
+      GlobalWidgetsLocalizations.delegate,
+      GlobalCupertinoLocalizations.delegate,
+    ],
+    supportedLocales: const [Locale('pt', 'BR')],
+    home: const MainNavigationShell(),
+  );
+}
 
 void main() {
   setUpAll(() {
@@ -25,7 +44,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [databaseProvider.overrideWithValue(testDb)],
-          child: const MinisterioPessoalApp(),
+          child: buildNavigationTestApp(),
         ),
       );
 
@@ -115,7 +134,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [databaseProvider.overrideWithValue(testDb)],
-          child: const MinisterioPessoalApp(),
+          child: buildNavigationTestApp(),
         ),
       );
 
@@ -124,6 +143,7 @@ void main() {
       // Verifica que NavigationBar inferior é usada em tela mobile e NavigationRail não existe
       expect(find.byType(NavigationBar), findsOneWidget);
       expect(find.byType(NavigationRail), findsNothing);
+      expect(find.byTooltip('Salvo Localmente'), findsOneWidget);
 
       // Toca no atalho rápido de Estudos na TodayScreen
       final estudosQuickAction = find.text('Estudos').first;
@@ -151,7 +171,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [databaseProvider.overrideWithValue(testDb)],
-          child: const MinisterioPessoalApp(),
+          child: buildNavigationTestApp(),
         ),
       );
 

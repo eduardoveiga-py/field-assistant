@@ -706,9 +706,11 @@ class TodayScreen extends ConsumerWidget {
       return s.status == 'ativo';
     }).length;
 
+    final compactAppBar = MediaQuery.sizeOf(context).width < 520;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Hoje no Ministério'),
+        title: const Text('Hoje no Ministério', overflow: TextOverflow.ellipsis),
         actions: [
           IconButton(
             icon: const Icon(Icons.search),
@@ -742,47 +744,50 @@ class TodayScreen extends ConsumerWidget {
               );
             },
           ),
-          InkWell(
-            onTap: () => _showSyncStatusModal(context, ref),
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: supabaseUser != null
-                    ? AppTheme.successGreen.withValues(alpha: 0.22)
-                    : Colors.white.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
+          Tooltip(
+            message: supabaseUser != null ? 'Supabase Online' : 'Salvo Localmente',
+            child: InkWell(
+              onTap: () => _showSyncStatusModal(context, ref),
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
                   color: supabaseUser != null
-                      ? AppTheme.successGreen.withValues(alpha: 0.55)
-                      : Colors.white.withValues(alpha: 0.25),
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    supabaseUser != null
-                        ? Icons.cloud_done_rounded
-                        : Icons.offline_pin,
-                    size: 14,
+                      ? AppTheme.successGreen.withValues(alpha: 0.22)
+                      : Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
                     color: supabaseUser != null
-                        ? const Color(0xFF4ADE80)
-                        : Colors.white,
+                        ? AppTheme.successGreen.withValues(alpha: 0.55)
+                        : Colors.white.withValues(alpha: 0.25),
                   ),
-                  const SizedBox(width: 5),
-                  Text(
-                    supabaseUser != null
-                        ? 'Supabase Online'
-                        : 'Salvo Localmente',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      supabaseUser != null
+                          ? Icons.cloud_done_rounded
+                          : Icons.offline_pin,
+                      size: 14,
+                      color: supabaseUser != null
+                          ? const Color(0xFF4ADE80)
+                          : Colors.white,
                     ),
-                  ),
-                ],
+                    if (!compactAppBar) const SizedBox(width: 5),
+                    if (!compactAppBar) Text(
+                      supabaseUser != null
+                          ? 'Supabase Online'
+                          : 'Salvo Localmente',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -813,8 +818,9 @@ class TodayScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Wrap(
+              spacing: 12,
+              runSpacing: 4,
               children: [
                 Text(
                   '${AppDateUtils.formatDate(now)} • Foco do Dia',

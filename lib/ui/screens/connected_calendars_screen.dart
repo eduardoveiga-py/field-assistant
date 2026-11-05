@@ -6,6 +6,26 @@ import '../../core/date_utils.dart';
 import '../../appointments/calendar_provider.dart';
 import '../../appointments/calendar_sync_coordinator.dart';
 
+/// Mantém apenas IDs válidos e únicos para os seletores de calendário.
+List<ExternalCalendarItem> uniqueCalendarItems(List<ExternalCalendarItem> items) {
+  final seen = <String>{};
+  return items.where((item) => item.id.isNotEmpty && seen.add(item.id)).toList();
+}
+
+/// Não troca silenciosamente um destino salvo que deixou de estar disponível.
+String? resolveCalendarSelection(
+  List<ExternalCalendarItem> items,
+  String? selectedId, {
+  bool google = false,
+}) {
+  if (items.any((item) => item.id == selectedId)) return selectedId;
+  if (google && selectedId == 'primary') {
+    final primary = items.where((item) => item.isPrimary).toList();
+    if (primary.length == 1) return primary.single.id;
+  }
+  return null;
+}
+
 class ConnectedCalendarsScreen extends ConsumerStatefulWidget {
   const ConnectedCalendarsScreen({super.key});
 
@@ -46,7 +66,9 @@ class _ConnectedCalendarsScreenState
     String? gSelectedId;
     if (gAuth) {
       gAcc = await coordinator.googleProvider.getConnectedAccountName();
-      gCals = await coordinator.googleProvider.getAvailableCalendars();
+      gCals = uniqueCalendarItems(
+        await coordinator.googleProvider.getAvailableCalendars(),
+      );
       gSelectedId = await coordinator.googleProvider.getSelectedCalendarId();
     }
 
@@ -57,7 +79,9 @@ class _ConnectedCalendarsScreenState
     String? aSelectedId;
     if (aAuth) {
       aAcc = await coordinator.appleProvider.getConnectedAccountName();
-      aCals = await coordinator.appleProvider.getAvailableCalendars();
+      aCals = uniqueCalendarItems(
+        await coordinator.appleProvider.getAvailableCalendars(),
+      );
       aSelectedId = await coordinator.appleProvider.getSelectedCalendarId();
     }
 
@@ -68,14 +92,14 @@ class _ConnectedCalendarsScreenState
         _isGoogleAuthorized = gAuth;
         _googleAccount = gAcc;
         _googleCalendars = gCals;
-        _selectedGoogleCalId =
-            gSelectedId ?? (gCals.isNotEmpty ? gCals.first.id : 'primary');
+        _selectedGoogleCalId = resolveCalendarSelection(
+          gCals, gSelectedId, google: true,
+        );
 
         _isAppleAuthorized = aAuth;
         _appleAccount = aAcc;
         _appleCalendars = aCals;
-        _selectedAppleCalId =
-            aSelectedId ?? (aCals.isNotEmpty ? aCals.first.id : null);
+        _selectedAppleCalId = resolveCalendarSelection(aCals, aSelectedId);
 
         _conflicts = pendingConflicts;
       });
@@ -484,7 +508,9 @@ class _ConnectedCalendarsScreenState
                     ),
                     const SizedBox(height: 6),
                     DropdownButtonFormField<String>(
+                      key: ValueKey('google-$_selectedGoogleCalId'),
                       initialValue: _selectedGoogleCalId,
+                      hint: const Text('Selecione um calendário disponível'),
                       isExpanded: true,
                       decoration: const InputDecoration(
                         border: OutlineInputBorder(),
@@ -598,7 +624,9 @@ class _ConnectedCalendarsScreenState
                     ),
                     const SizedBox(height: 6),
                     DropdownButtonFormField<String>(
+                      key: ValueKey('apple-$_selectedAppleCalId'),
                       initialValue: _selectedAppleCalId,
+                      hint: const Text('Selecione um calendário disponível'),
                       isExpanded: true,
                       decoration: const InputDecoration(
                         border: OutlineInputBorder(),

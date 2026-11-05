@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -63,7 +62,6 @@ class TileCacheService {
     return savedCount;
   }
 }
-  int _lonToTileX(double lon, int z) => ((lon + 180.0) / 360.0 * (1 << z)).floor();
 
 /// Widget otimizado para renderizar tiles com cache persistente e fallback offline
 class CachedTileWidget extends StatefulWidget {
