@@ -34,8 +34,10 @@ class SyncProcessResult {
 
   bool get success => failureCount == 0 && errors.isEmpty;
 }
+final supabaseSyncServiceProvider = Provider<SupabaseSyncService>((ref) => SupabaseSyncService(ref));
 
 class SupabaseSyncService {
+    final Ref? _ref;
   static bool get isInitialized {
     try {
       Supabase.instance.client;
