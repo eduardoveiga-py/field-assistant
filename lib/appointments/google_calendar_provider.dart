@@ -314,6 +314,15 @@ class GoogleCalendarProvider implements CalendarProvider {
       );
     }
     final primaryId = await getSelectedCalendarId() ?? 'primary';
+    final calendars = await getAvailableCalendars();
+    final matches = calendars.where((calendar) => calendar.id == primaryId ||
+        (primaryId == 'primary' && calendar.isPrimary)).toList();
+    if (matches.isEmpty || matches.first.isReadOnly) {
+      return CalendarSyncResult(
+        success: false,
+        errorMessage: 'Selecione um calendário Google com permissão de edição nas configurações.',
+      );
+    }
     final ids = <String>{primaryId, ...await getReadOnlyCalendarIds()};
     var downloaded = 0;
     final errors = <String>[];
