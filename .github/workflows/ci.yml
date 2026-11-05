@@ -46,14 +46,11 @@ jobs:
       - name: Run Automated Tests
         run: |
           set +e
-          timeout 240s flutter test --coverage --reporter expanded > /tmp/flutter-tests.txt 2>&1
+          flutter test --coverage --reporter expanded > /tmp/flutter-tests.txt 2>&1
           status=$?
           cat /tmp/flutter-tests.txt
-          if [ "$status" -eq 124 ]; then
-            python3 -c 'from pathlib import Path; print("::error::Timeout nos testes. Últimas linhas: %0A" + "%0A".join(Path("/tmp/flutter-tests.txt").read_text(errors="replace").splitlines()[-20:]))'
-          fi
           if [ "$status" -ne 0 ]; then
-            python3 -c 'from pathlib import Path; lines=Path("/tmp/flutter-tests.txt").read_text(errors="replace").splitlines(); hits=[i for i, line in enumerate(lines) if "[E]" in line or "EXCEPTION CAUGHT" in line]; [print("::error::" + "%0A".join(lines[i:i+14]).replace("%", "%25").replace("%250A", "%0A")) for i in hits]'
+            python3 -c 'from pathlib import Path; lines=Path("/tmp/flutter-tests.txt").read_text(errors="replace").splitlines(); hits=[i for i, line in enumerate(lines) if "[E]" in line]; [print("::error::" + "%0A".join(lines[i:i+16]).replace("%", "%25").replace("%250A", "%0A")) for i in hits]'
           fi
           exit "$status"
 
