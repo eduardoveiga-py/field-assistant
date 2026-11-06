@@ -364,7 +364,7 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
                             scaleEnabled: false,
                             boundaryMargin: EdgeInsets.zero,
                             panEnabled: true,
-                            scaleEnabled: true,
+                            scaleEnabled: false,
                             trackpadScrollCausesScale: false,
                             minScale: 0.65,
                             maxScale: 1.8,

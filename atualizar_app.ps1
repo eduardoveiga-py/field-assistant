@@ -36,7 +36,7 @@ if (Test-Path $pickerPath) {
     $pickerRaw = $pickerRaw.Replace("-3.1190", "-3.1022").Replace("-60.0217", "-67.9397")
     $pickerRaw = $pickerRaw.Replace("Manaus", "Santo Antonio do Ica")
     # Impede que o InteractiveViewer aplique escala simultanea ao scroll do mouse (causa do pulo de km no zoom)
-    $pickerRaw = $pickerRaw.Replace("constrained: false,", "constrained: false, scaleEnabled: false,")
+    $pickerRaw = $pickerRaw.Replace("scaleEnabled: true,", "scaleEnabled: false,")
     if ($pickerRaw.Contains("_hasCenteredInitialView")) {
         $pickerRaw = $pickerRaw.Replace("_transformationController.value = Matrix4.identity();", "_hasCenteredInitialView = false;")
         # Garante que ao mudar _zoom, a camera mantenha o pino/endereco selecionado no centro da tela
@@ -56,7 +56,7 @@ if (Test-Path $contactsMapPath) {
     $mapRaw = $mapRaw.Replace("double? _viewportCenterLat;", "double? _viewportCenterLat = -3.1022;")
     $mapRaw = $mapRaw.Replace("double? _viewportCenterLng;", "double? _viewportCenterLng = -67.9397;")
     # Impede que o InteractiveViewer aplique escala na matriz durante o scroll do mouse
-    $mapRaw = $mapRaw.Replace("constrained: false,", "constrained: false, scaleEnabled: false,")
+    $mapRaw = $mapRaw.Replace("scaleEnabled: true,", "scaleEnabled: false,")
     # Mantem a camera centralizada no ponto atual ao dar zoom ou centralizar
     $mapRaw = $mapRaw.Replace("_transformationController.value = Matrix4.identity();", "_hasCenteredInitialView = false;")
     $mapRaw = [regex]::Replace($mapRaw, "(_zoom\s*=\s*\(_zoom\s*[\+\-]\s*1\)\.clamp\([^\)]+\);)", "if (_selectedPinPerson?.latitude != null && _selectedPinPerson?.longitude != null) { _viewportCenterLat = _selectedPinPerson!.latitude; _viewportCenterLng = _selectedPinPerson!.longitude; } else if (_selectedPinLandmark != null) { _viewportCenterLat = _selectedPinLandmark!.latitude; _viewportCenterLng = _selectedPinLandmark!.longitude; } `$1 _hasCenteredInitialView = false;")

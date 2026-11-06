@@ -1501,7 +1501,7 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                       250,
                     ), // Margem segura para zoom fluido sem travamento
                     panEnabled: true,
-                    scaleEnabled: true, // Habilita zoom fluido por gesto de pinça na tela e trackpad
+                    scaleEnabled: false, // Habilita zoom fluido por gesto de pinça na tela e trackpad
                     trackpadScrollCausesScale: true, // Garante que pinça de trackpad aplique ZOOM em vez de deslizar para os lados
                     minScale: 0.6,
                     maxScale: 2.0,
