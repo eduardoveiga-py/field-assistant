@@ -1453,7 +1453,7 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                     final now = clock.now();
                     if (_lastZoomChangeTime == null ||
                         now.difference(_lastZoomChangeTime!).inMilliseconds >=
-                            100) {
+                            250) {
                       if (pointerSignal.scrollDelta.dy < -2 && _zoom < 18) {
                         _lastZoomChangeTime = now;
                         _changeZoom(

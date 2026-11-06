@@ -3325,6 +3325,14 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
     }
 
     final selectedDayAppts = apptsByDay[_selectedDate.day] ?? [];
+    final holidaysOnSelectedDay = BrazilHolidays.onDay(_selectedDate);
+    final holidaysByDay = {
+      for (final h in BrazilHolidays.inRange(
+        DateTime(year, month, 1),
+        DateTime(year, month, daysInMonth),
+      ))
+        h.date.day,
+    };
 
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -3471,6 +3479,7 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                       cellDate.month == DateTime.now().month &&
                       cellDate.year == DateTime.now().year;
                   final dayAppts = apptsByDay[dayNumber] ?? [];
+                  final isHoliday = holidaysByDay.contains(dayNumber);
 
                   return InkWell(
                     onTap: () {
@@ -3655,6 +3664,49 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                       ],
                     ),
                     const SizedBox(height: 8),
+                    if (holidaysOnSelectedDay.isNotEmpty) ...[
+                      ...holidaysOnSelectedDay.map(
+                        (h) => Container(
+                          width: double.infinity,
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? const Color(0xFF3B2F0B)
+                                : const Color(0xFFFEF3C7),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: isDark
+                                  ? const Color(0xFF92600A)
+                                  : const Color(0xFFF59E0B),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.celebration_outlined,
+                                size: 18,
+                                color: Color(0xFFB45309),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Feriado: ${h.name}',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF92400E),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                     if (selectedDayAppts.isEmpty)
                       Container(
                         padding: const EdgeInsets.all(16),

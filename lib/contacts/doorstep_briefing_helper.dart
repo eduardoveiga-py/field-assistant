@@ -34,6 +34,9 @@ class DoorstepBriefingData {
   /// Duração em segundos da última nota de voz
   final int? voiceNoteDurationSeconds;
 
+  /// Data da última visita realizada com este contato (quando houver)
+  final DateTime? lastVisitDate;
+
   const DoorstepBriefingData({
     this.lessonAndPoint,
     this.jwLibraryUri,
@@ -44,6 +47,7 @@ class DoorstepBriefingData {
     this.audioFilePath,
     this.voiceNoteTranscription,
     this.voiceNoteDurationSeconds,
+    this.lastVisitDate,
   });
 
   bool get hasLessonOrTopic =>
@@ -81,7 +85,8 @@ class DoorstepBriefingData {
           publicationTitle == other.publicationTitle &&
           audioFilePath == other.audioFilePath &&
           voiceNoteTranscription == other.voiceNoteTranscription &&
-          voiceNoteDurationSeconds == other.voiceNoteDurationSeconds;
+          voiceNoteDurationSeconds == other.voiceNoteDurationSeconds &&
+          lastVisitDate == other.lastVisitDate;
 
   @override
   int get hashCode =>

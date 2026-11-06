@@ -353,6 +353,19 @@ class _DoorstepBriefingCardState extends State<DoorstepBriefingCard> {
                       : (isDark ? const Color(0xFF94A3B8) : AppTheme.textMuted),
                 ),
               ),
+              if (data.hasLastVisitDate) ...[
+                const SizedBox(height: 2),
+                Text(
+                  'Última visita: ${AppDateUtils.formatDate(data.lastVisitDate)}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: isSunMode
+                        ? Colors.black
+                        : (isDark ? const Color(0xFF6EE7B7) : const Color(0xFF047857)),
+                  ),
+                ),
+              ],
             ],
           ),
         ),

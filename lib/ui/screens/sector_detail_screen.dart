@@ -108,6 +108,104 @@ class _SectorDetailScreenState extends ConsumerState<SectorDetailScreen> {
     }
   }
 
+  // --- Download offline do mapa do setor inteiro -----------------------------
+
+  static int _lon2tileX(double lon, int z) =>
+      ((lon + 180.0) / 360.0 * (1 << z)).floor();
+
+  static int _lat2tileY(double lat, int z) {
+    final latRad = lat * math.pi / 180.0;
+    return ((1.0 -
+                math.log(math.tan(latRad) + 1.0 / math.cos(latRad)) / math.pi) /
+            2.0 *
+            (1 << z))
+        .floor();
+  }
+
+  Future<void> _downloadSectorOffline() async {
+    // Resolve o centro do setor: tenta geocodificar o nome do bairro na cidade
+    // padrão do território; se falhar, usa Santo Antônio do Içá, AM.
+    double lat = GeolocationHelper.defaultLat;
+    double lng = GeolocationHelper.defaultLng;
+    try {
+      final geo = await GeocodingService.geocodeAddress(
+        '$_currentSectorName, Santo Antônio do Içá, Amazonas, Brasil',
+      );
+      if (geo != null) {
+        lat = geo.latitude;
+        lng = geo.longitude;
+      }
+    } catch (_) {
+      // fallback silencioso para a coordenada padrão
+    }
+
+    const zoomLevels = [13, 14, 15, 16, 17];
+    const half = 4; // janela 9x9 blocos por nível de zoom
+    final totalPerLevel = (half * 2 + 1) * (half * 2 + 1);
+    final totalExpected = zoomLevels.length * totalPerLevel;
+    final progress = ValueNotifier<int>(0);
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Baixando mapa offline'),
+        content: ValueListenableBuilder<int>(
+          valueListenable: progress,
+          builder: (ctx, value, _) => Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              LinearProgressIndicator(
+                value: totalExpected == 0 ? null : value / totalExpected,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '$value de $totalExpected blocos',
+                style: const TextStyle(fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    var saved = 0;
+    var done = 0;
+    try {
+      for (final z in zoomLevels) {
+        final cx = _lon2tileX(lng, z);
+        final cy = _lat2tileY(lat, z);
+        saved += await TileCacheService.instance.preloadArea(
+          z: z,
+          minX: cx - half,
+          maxX: cx + half,
+          minY: cy - half,
+          maxY: cy + half,
+          onProgress: (completed, _) {
+            progress.value = done + completed;
+          },
+        );
+        done += totalPerLevel;
+      }
+    } catch (_) {
+      // falha de rede é ignorada: o que já estava em cache permanece válido
+    }
+
+    if (mounted) {
+      Navigator.of(context, rootNavigator: true).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            saved > 0
+                ? 'Mapa de "$_currentSectorName" salvo: $saved blocos offline.'
+                : 'Nenhum bloco novo — a área já estava em cache offline.',
+          ),
+          backgroundColor: AppTheme.successGreen,
+        ),
+      );
+    }
+  }
+
   void _showEditSectorDialog() {
     final nameController = TextEditingController(text: _currentSectorName);
     final descController = TextEditingController(
@@ -234,6 +332,11 @@ class _SectorDetailScreenState extends ConsumerState<SectorDetailScreen> {
       appBar: AppBar(
         title: Text('Bairro: $_currentSectorName'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.download_for_offline_outlined),
+            tooltip: 'Baixar mapa do setor para uso offline',
+            onPressed: _downloadSectorOffline,
+          ),
           IconButton(
             icon: const Icon(Icons.edit_outlined),
             tooltip: 'Editar Bairro',
