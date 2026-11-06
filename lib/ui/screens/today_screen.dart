@@ -711,6 +711,7 @@ class TodayScreen extends ConsumerWidget {
         title: const Text('Hoje no Ministério'),
         actions: [
           IconButton(
+            visualDensity: VisualDensity.compact,
             icon: const Icon(Icons.search),
             tooltip: 'Busca Global Unificada',
             onPressed: () {
@@ -721,6 +722,7 @@ class TodayScreen extends ConsumerWidget {
             },
           ),
           IconButton(
+            visualDensity: VisualDensity.compact,
             icon: Icon(
               isSunMode ? Icons.wb_sunny : Icons.wb_sunny_outlined,
               color: isSunMode ? Colors.amber : Colors.white,
@@ -746,8 +748,8 @@ class TodayScreen extends ConsumerWidget {
             onTap: () => _showSyncStatusModal(context, ref),
             borderRadius: BorderRadius.circular(16),
             child: Container(
-              margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
               decoration: BoxDecoration(
                 color: supabaseUser != null
                     ? AppTheme.successGreen.withValues(alpha: 0.22)
@@ -771,14 +773,14 @@ class TodayScreen extends ConsumerWidget {
                         ? const Color(0xFF4ADE80)
                         : Colors.white,
                   ),
-                  const SizedBox(width: 5),
+                  const SizedBox(width: 4),
                   Text(
                     supabaseUser != null
                         ? 'Supabase Online'
                         : 'Salvo Localmente',
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 11,
+                      fontSize: 10.5,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -787,6 +789,7 @@ class TodayScreen extends ConsumerWidget {
             ),
           ),
           IconButton(
+            visualDensity: VisualDensity.compact,
             icon: const Icon(Icons.timer_outlined),
             tooltip: 'Atividades e Metas',
             onPressed: () {
@@ -797,6 +800,7 @@ class TodayScreen extends ConsumerWidget {
             },
           ),
           IconButton(
+            visualDensity: VisualDensity.compact,
             icon: const Icon(Icons.settings_outlined),
             tooltip: 'Ajustes e Backup',
             onPressed: () {
@@ -816,14 +820,17 @@ class TodayScreen extends ConsumerWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  '${AppDateUtils.formatDate(now)} • Foco do Dia',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: isDark
-                        ? const Color(0xFFCBD5E1)
-                        : AppTheme.textMuted,
+                Expanded(
+                  child: Text(
+                    '${AppDateUtils.formatDate(now)} • Foco do Dia',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: isDark
+                          ? const Color(0xFFCBD5E1)
+                          : AppTheme.textMuted,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 if (supabaseUser?.email != null)
