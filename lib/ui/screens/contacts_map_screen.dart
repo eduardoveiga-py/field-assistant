@@ -1250,8 +1250,8 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
       });
     }
 
-    double centerLat = -23.550520;
-    double centerLng = -46.633308;
+    double centerLat = -3.1022;
+    double centerLng = -67.9397;
     if (hasHighlightCoords) {
       // Centraliza no endereço específico da pessoa destacada
       centerLat = highlightPerson.latitude!;
