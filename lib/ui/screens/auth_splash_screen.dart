@@ -11,6 +11,10 @@ import '../main_navigation_shell.dart';
 
 enum _AuthGateState { loadingSplash, unauthenticated, authenticated }
 
+class AuthSplashScreen extends AuthGateShell {
+  const AuthSplashScreen({super.key});
+}
+
 class AuthGateShell extends ConsumerStatefulWidget {
   const AuthGateShell({super.key});
 
@@ -35,40 +39,52 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
   }
 
   void _initializeAuthGate() async {
+    final stopwatch = Stopwatch()..start();
     SupabaseClient? client;
     try {
       client = Supabase.instance.client;
     } catch (_) {
-      // Ambiente de teste unitário/widget onde main() não inicializou o Supabase
-      if (mounted) {
-        setState(() {
-          _gateState = _AuthGateState.authenticated;
-        });
-      }
-      return;
+      client = null;
     }
 
-    _authSub = client.auth.onAuthStateChange.listen((data) {
-      if (!mounted) return;
-      final session = data.session;
-      setState(() {
-        _gateState = session != null
-            ? _AuthGateState.authenticated
-            : _AuthGateState.unauthenticated;
-      });
-      if (session != null) {
-        Future.microtask(() {
-          if (mounted) {
-            ref.read(supabaseSyncServiceProvider).sync();
-          }
+    if (client != null) {
+      _authSub = client.auth.onAuthStateChange.listen((data) {
+        if (!mounted) return;
+        final session = data.session;
+        setState(() {
+          _gateState = session != null
+              ? _AuthGateState.authenticated
+              : _AuthGateState.unauthenticated;
         });
-      }
-    });
+        if (session != null) {
+          Future.microtask(() {
+            if (mounted) {
+              ref.read(supabaseSyncServiceProvider).sync();
+            }
+          });
+        }
+      });
+    }
 
-    await Future<void>.delayed(const Duration(milliseconds: 900));
+    // Garante que o Splash Screen fique visível por pelo menos 1200ms
+    final elapsed = stopwatch.elapsedMilliseconds;
+    if (elapsed < 1200) {
+      await Future<void>.delayed(Duration(milliseconds: 1200 - elapsed));
+    }
     if (!mounted) return;
 
-    final session = client.auth.currentSession;
+    if (client != null) {
+      final uriStr = Uri.base.toString();
+      if (uriStr.contains('access_token=') ||
+          uriStr.contains('refresh_token=') ||
+          uriStr.contains('code=')) {
+        try {
+          await client.auth.getSessionFromUrl(Uri.base);
+        } catch (_) {}
+      }
+    }
+
+    final session = client?.auth.currentSession;
     setState(() {
       _gateState = session != null
           ? _AuthGateState.authenticated
@@ -751,6 +767,17 @@ class _SupabaseAuthScreenState extends State<SupabaseAuthScreen> {
                               style: const TextStyle(
                                 color: Color(0xFF93C5FD),
                                 fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          TextButton(
+                            onPressed: _isLoading ? null : widget.onAuthenticated,
+                            child: const Text(
+                              'Continuar em Modo Offline (Sem Conta)',
+                              style: TextStyle(
+                                color: Color(0xFF94A3B8),
+                                fontSize: 13,
                               ),
                             ),
                           ),

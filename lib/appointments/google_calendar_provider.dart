@@ -65,10 +65,14 @@ class GoogleCalendarProvider implements CalendarProvider {
   }
 
   Future<void> setReadOnlyCalendarIds(Set<String> ids) async {
+    final previous = await getReadOnlyCalendarIds();
     await _secureStorage.write(
       key: _keyReadOnlyCalendarIds,
       value: jsonEncode(ids.toList()),
     );
+    for (final id in previous.difference(ids)) {
+      await _secureStorage.delete(key: '$_keySyncTokenPrefix$id');
+    }
   }
 
   GoogleSignInAccount? _currentUser;
@@ -183,7 +187,7 @@ class GoogleCalendarProvider implements CalendarProvider {
       }
 
       _currentUser = await _googleSignIn.authenticate(
-        scopeHint: [_calendarScope],
+        scopeHint: [_calendarScope, _calendarReadonlyScope, _emailScope],
       );
       return _currentUser != null;
     } catch (e) {
@@ -252,6 +256,7 @@ class GoogleCalendarProvider implements CalendarProvider {
         return [
           ExternalCalendarItem(
             id: 'primary',
+            isPrimary: true,
             name: 'Agenda Principal ($accountLabel)',
             accountName: accountLabel,
             isReadOnly: false,
@@ -262,7 +267,8 @@ class GoogleCalendarProvider implements CalendarProvider {
         final isReadOnly =
             c.accessRole == 'reader' || c.accessRole == 'freeBusyReader';
         return ExternalCalendarItem(
-          id: c.id ?? 'primary',
+          id: c.id ?? '',
+          isPrimary: c.primary == true,
           name: c.summary ?? 'Google Agenda',
           accountName: accountLabel,
           isReadOnly: isReadOnly,
@@ -272,6 +278,7 @@ class GoogleCalendarProvider implements CalendarProvider {
       return [
         ExternalCalendarItem(
           id: 'primary',
+          isPrimary: true,
           name: 'Principal ($accountLabel)',
           accountName: accountLabel,
           isReadOnly: false,
@@ -299,6 +306,8 @@ class GoogleCalendarProvider implements CalendarProvider {
     _webAuthHeaders = null;
     _webUserEmail = null;
     await _secureStorage.delete(key: _keySelectedCalendarId);
+    await setReadOnlyCalendarIds({});
+    await _secureStorage.delete(key: _keyReadOnlyCalendarIds);
     await _secureStorage.delete(key: _keyConnectedEmail);
   }
 
@@ -307,6 +316,7 @@ class GoogleCalendarProvider implements CalendarProvider {
     required AppDatabase db,
     bool fullSync = false,
   }) async {
+    lastError = null;
     final api = await _getCalendarApi();
     if (api == null) {
       return CalendarSyncResult(
@@ -317,7 +327,40 @@ class GoogleCalendarProvider implements CalendarProvider {
       );
     }
 
-    final calendarId = await getSelectedCalendarId() ?? 'primary';
+    final primaryId = await getSelectedCalendarId() ?? 'primary';
+    final calendars = await getAvailableCalendars();
+    final matches = calendars.where((calendar) => calendar.id == primaryId ||
+        (primaryId == 'primary' && calendar.isPrimary)).toList();
+    if (matches.isNotEmpty && matches.first.isReadOnly) {
+      return CalendarSyncResult(
+        success: false,
+        errorMessage: 'Selecione um calendário Google com permissão de edição nas configurações.',
+      );
+    }
+
+    final ids = <String>{primaryId, ...await getReadOnlyCalendarIds()};
+    var downloaded = 0;
+    final errors = <String>[];
+    for (final id in ids) {
+      final result = await _syncCalendar(db, api, id, fullSync: fullSync);
+      downloaded += result.eventsDownloaded;
+      if (!result.success && result.errorMessage != null) {
+        errors.add(result.errorMessage!);
+      }
+    }
+    return CalendarSyncResult(
+      success: errors.isEmpty,
+      eventsDownloaded: downloaded,
+      errorMessage: errors.isEmpty ? null : errors.join('; '),
+    );
+  }
+
+  Future<CalendarSyncResult> _syncCalendar(
+    AppDatabase db,
+    gcal.CalendarApi api,
+    String calendarId, {
+    required bool fullSync,
+  }) async {
     String? syncToken;
     if (!fullSync) {
       syncToken = await _secureStorage.read(
@@ -326,9 +369,6 @@ class GoogleCalendarProvider implements CalendarProvider {
     }
 
     int downloaded = 0;
-    int uploaded = 0;
-    int conflicts = 0;
-
     String? pageToken;
     String? nextSyncToken;
     bool needsFullSync = false;
@@ -341,6 +381,8 @@ class GoogleCalendarProvider implements CalendarProvider {
             calendarId,
             syncToken: syncToken,
             pageToken: pageToken,
+            singleEvents: true,
+            showDeleted: true,
             maxResults: 250,
           );
         } else {
@@ -354,10 +396,12 @@ class GoogleCalendarProvider implements CalendarProvider {
             timeMin: timeMin,
             timeMax: timeMax,
             singleEvents: true,
+            showDeleted: true,
             maxResults: 250,
           );
         }
 
+        needsFullSync = false;
         pageToken = events.nextPageToken;
         nextSyncToken = events.nextSyncToken;
 
@@ -422,6 +466,8 @@ class GoogleCalendarProvider implements CalendarProvider {
                 description: drift.Value(item.description),
                 startTime: drift.Value(startDt),
                 endTime: drift.Value(endDt),
+                timeZone: drift.Value(item.start?.timeZone),
+                isAllDay: drift.Value(item.start?.date != null),
                 externalStatus: drift.Value(item.status),
                 lastModifiedExternal: drift.Value(item.updated),
                 lastSyncedAt: drift.Value(now),
@@ -440,9 +486,13 @@ class GoogleCalendarProvider implements CalendarProvider {
           needsFullSync = true;
           continue;
         } else {
+          if (e.status == 401) {
+            _webAuthHeaders = null;
+            lastError = 'A autorização do Google expirou. Reconecte a conta em Calendários Conectados.';
+          }
           return CalendarSyncResult(
             success: false,
-            errorMessage: 'Erro da API Google (${e.status}): ${e.message}',
+            errorMessage: lastError ?? 'Erro da API Google (${e.status}): ${e.message}',
             eventsDownloaded: downloaded,
           );
         }
@@ -453,7 +503,7 @@ class GoogleCalendarProvider implements CalendarProvider {
           eventsDownloaded: downloaded,
         );
       }
-    } while (pageToken != null);
+    } while (pageToken != null || needsFullSync);
 
     if (nextSyncToken != null) {
       await _secureStorage.write(
@@ -465,8 +515,6 @@ class GoogleCalendarProvider implements CalendarProvider {
     return CalendarSyncResult(
       success: true,
       eventsDownloaded: downloaded,
-      eventsUploaded: uploaded,
-      conflictsFound: conflicts,
     );
   }
 

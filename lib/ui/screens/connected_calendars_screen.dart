@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:drift/drift.dart' as drift;
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../../appointments/calendar_provider.dart';
 import '../../appointments/calendar_sync_coordinator.dart';
+import '../providers.dart';
 
 class ConnectedCalendarsScreen extends ConsumerStatefulWidget {
   const ConnectedCalendarsScreen({super.key});
@@ -22,6 +24,7 @@ class _ConnectedCalendarsScreenState
   String? _googleAccount;
   List<ExternalCalendarItem> _googleCalendars = [];
   String? _selectedGoogleCalId;
+  Set<String> _readOnlyGoogleCalIds = {};
 
   bool _isAppleAuthorized = false;
   String? _appleAccount;
@@ -44,10 +47,14 @@ class _ConnectedCalendarsScreenState
     String? gAcc;
     List<ExternalCalendarItem> gCals = [];
     String? gSelectedId;
+    Set<String> gReadOnlyIds = {};
     if (gAuth) {
       gAcc = await coordinator.googleProvider.getConnectedAccountName();
-      gCals = await coordinator.googleProvider.getAvailableCalendars();
+      gCals = uniqueCalendarItems(
+        await coordinator.googleProvider.getAvailableCalendars(),
+      );
       gSelectedId = await coordinator.googleProvider.getSelectedCalendarId();
+      gReadOnlyIds = await coordinator.googleProvider.getReadOnlyCalendarIds();
     }
 
     // Apple state
@@ -57,7 +64,9 @@ class _ConnectedCalendarsScreenState
     String? aSelectedId;
     if (aAuth) {
       aAcc = await coordinator.appleProvider.getConnectedAccountName();
-      aCals = await coordinator.appleProvider.getAvailableCalendars();
+      aCals = uniqueCalendarItems(
+        await coordinator.appleProvider.getAvailableCalendars(),
+      );
       aSelectedId = await coordinator.appleProvider.getSelectedCalendarId();
     }
 
@@ -68,14 +77,22 @@ class _ConnectedCalendarsScreenState
         _isGoogleAuthorized = gAuth;
         _googleAccount = gAcc;
         _googleCalendars = gCals;
-        _selectedGoogleCalId =
-            gSelectedId ?? (gCals.isNotEmpty ? gCals.first.id : 'primary');
+        final writableGoogle = gCals.where((c) => !c.isReadOnly).toList();
+        _selectedGoogleCalId = resolveCalendarSelection(
+          writableGoogle.isNotEmpty ? writableGoogle : gCals,
+          gSelectedId ?? 'primary',
+          google: true,
+        );
+        _readOnlyGoogleCalIds = gReadOnlyIds;
 
         _isAppleAuthorized = aAuth;
         _appleAccount = aAcc;
         _appleCalendars = aCals;
-        _selectedAppleCalId =
-            aSelectedId ?? (aCals.isNotEmpty ? aCals.first.id : null);
+        final writableApple = aCals.where((c) => !c.isReadOnly).toList();
+        _selectedAppleCalId = resolveCalendarSelection(
+          writableApple.isNotEmpty ? writableApple : aCals,
+          aSelectedId,
+        );
 
         _conflicts = pendingConflicts;
       });
@@ -106,10 +123,22 @@ class _ConnectedCalendarsScreenState
   }
 
   Future<void> _connectGoogle() async {
+    setState(() {
+      _isSyncing = true;
+      _syncMessage = null;
+    });
     final coordinator = ref.read(calendarSyncCoordinatorProvider);
     final authorized = await coordinator.googleProvider.requestAuthorization();
     if (authorized) {
       await _syncNow();
+    } else {
+      if (mounted) {
+        setState(() {
+          _isSyncing = false;
+          _syncMessage =
+              'Aviso: Não foi possível conectar ao Google Calendar (${coordinator.googleProvider.lastError ?? "autorização não concluída"}). Verifique também se a Google Calendar API está ativada no Google Cloud Console.';
+        });
+      }
     }
     await _loadState();
   }
@@ -142,7 +171,16 @@ class _ConnectedCalendarsScreenState
     if (confirmed == true) {
       final coordinator = ref.read(calendarSyncCoordinatorProvider);
       await coordinator.googleProvider.disconnect();
-      await _loadState();
+      if (mounted) {
+        setState(() {
+          _isGoogleAuthorized = false;
+          _googleAccount = null;
+          _googleCalendars = [];
+          _selectedGoogleCalId = null;
+          _readOnlyGoogleCalIds = {};
+        });
+        await _loadState();
+      }
     }
   }
 
@@ -474,7 +512,13 @@ class _ConnectedCalendarsScreenState
                     ),
                     const SizedBox(height: 6),
                     DropdownButtonFormField<String>(
-                      initialValue: _selectedGoogleCalId,
+                      key: ValueKey('google-${_selectedGoogleCalId ?? "none"}'),
+                      initialValue: _googleCalendars
+                              .where((c) => !c.isReadOnly)
+                              .any((c) => c.id == _selectedGoogleCalId)
+                          ? _selectedGoogleCalId
+                          : null,
+                      hint: const Text('Selecione um calendário disponível'),
                       isExpanded: true,
                       decoration: const InputDecoration(
                         border: OutlineInputBorder(),
@@ -483,11 +527,13 @@ class _ConnectedCalendarsScreenState
                           vertical: 8,
                         ),
                       ),
-                      items: _googleCalendars.map((c) {
+                      items: _googleCalendars
+                          .where((c) => !c.isReadOnly)
+                          .map((c) {
                         return DropdownMenuItem<String>(
                           value: c.id,
                           child: Text(
-                            '${c.name}${c.isReadOnly ? " (Somente Leitura)" : ""}',
+                            c.name,
                             overflow: TextOverflow.ellipsis,
                           ),
                         );
@@ -503,6 +549,45 @@ class _ConnectedCalendarsScreenState
                         }
                       },
                     ),
+                    if (_googleCalendars.any((calendar) => calendar.isReadOnly)) ...[
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Calendários adicionais (somente leitura):',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      const Text(
+                        'Selecione, por exemplo, seus calendários de feriados para visualização na agenda.',
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 6),
+                      for (final calendar in _googleCalendars.where((c) => c.isReadOnly))
+                        CheckboxListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(calendar.name, style: const TextStyle(fontSize: 13)),
+                          value: _readOnlyGoogleCalIds.contains(calendar.id),
+                          onChanged: (selected) async {
+                            final ids = Set<String>.of(_readOnlyGoogleCalIds);
+                            if (selected == true) {
+                              ids.add(calendar.id);
+                            } else {
+                              ids.remove(calendar.id);
+                            }
+                            final coordinator = ref.read(calendarSyncCoordinatorProvider);
+                            final db = ref.read(databaseProvider);
+                            await coordinator.googleProvider.setReadOnlyCalendarIds(ids);
+                            if (selected != true) {
+                              await (db.delete(db.externalCalendarEvents)..where((event) =>
+                                  event.provider.equals('google') & event.calendarId.equals(calendar.id))).go();
+                            }
+                            if (mounted) setState(() => _readOnlyGoogleCalIds = ids);
+                          },
+                        ),
+                    ],
                   ],
                 ],
               ),
@@ -588,7 +673,13 @@ class _ConnectedCalendarsScreenState
                     ),
                     const SizedBox(height: 6),
                     DropdownButtonFormField<String>(
-                      initialValue: _selectedAppleCalId,
+                      key: ValueKey('apple-${_selectedAppleCalId ?? "none"}'),
+                      initialValue: _appleCalendars
+                              .where((c) => !c.isReadOnly)
+                              .any((c) => c.id == _selectedAppleCalId)
+                          ? _selectedAppleCalId
+                          : null,
+                      hint: const Text('Selecione um calendário disponível'),
                       isExpanded: true,
                       decoration: const InputDecoration(
                         border: OutlineInputBorder(),
@@ -597,11 +688,13 @@ class _ConnectedCalendarsScreenState
                           vertical: 8,
                         ),
                       ),
-                      items: _appleCalendars.map((c) {
+                      items: _appleCalendars
+                          .where((c) => !c.isReadOnly)
+                          .map((c) {
                         return DropdownMenuItem<String>(
                           value: c.id,
                           child: Text(
-                            '${c.name} (${c.accountName ?? "Local"})${c.isReadOnly ? " [Leitura]" : ""}',
+                            '${c.name} (${c.accountName ?? "Local"})',
                             overflow: TextOverflow.ellipsis,
                           ),
                         );

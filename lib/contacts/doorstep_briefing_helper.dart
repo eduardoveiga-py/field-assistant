@@ -144,7 +144,7 @@ class DoorstepBriefingHelper {
       audioFilePath: latestVoiceNote?.audioFilePath,
       voiceNoteTranscription: latestVoiceNote?.transcription,
       voiceNoteDurationSeconds: latestVoiceNote?.audioDurationSeconds,
-      lastVisitDate: latestVisit?.dateTimeField,
+      lastVisitDate: latestVisit?.dateTimeField ?? person.lastContactAt,
     );
   }
 

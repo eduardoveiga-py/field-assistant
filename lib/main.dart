@@ -1,26 +1,18 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/app_theme.dart';
+import 'sync/supabase_sync_service.dart';
 import 'ui/screens/auth_splash_screen.dart';
 import 'ui/providers.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
-  const supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
-  if (supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty) {
-    try {
-      await Supabase.initialize(
-        url: supabaseUrl,
-        // ignore: deprecated_member_use
-        anonKey: supabaseAnonKey,
-      );
-    } catch (_) {
-      // Continua em modo offline-first caso a inicializacao falhe
-    }
+  try {
+    await SupabaseSyncService.initialize();
+  } catch (_) {
+    // Continua em modo offline-first caso a inicialização falhe
   }
   runApp(const ProviderScope(child: MinisterioPessoalApp()));
 }
@@ -44,7 +36,7 @@ class MinisterioPessoalApp extends ConsumerWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: const [Locale('pt', 'BR')],
-      home: const AuthGateShell(),
+      home: const AuthSplashScreen(),
     );
   }
 }
