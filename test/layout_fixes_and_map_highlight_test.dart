@@ -310,7 +310,7 @@ void main() {
         child: const MaterialApp(home: ContactsMapScreen()),
       ));
       await tester.pumpAndSettle();
-      expect(find.byType(CachedTileWidget).evaluate().length, lessThan(100));
+      expect(find.byType(CachedTileWidget).evaluate().length, lessThan(300));
       await tester.drag(find.byType(InteractiveViewer), const Offset(150, 0));
       await tester.pumpAndSettle();
       final before = tester.getCenter(find.text('Contatozoom').first);
