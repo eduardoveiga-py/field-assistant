@@ -3,6 +3,9 @@
 *.log
 *.pyc
 *.swp
+# Voice-note audio artifacts must never be committed (app writes them to app dirs, never to repo root)
+*.m4a
+*.aac
 .DS_Store
 .atom/
 .build/
