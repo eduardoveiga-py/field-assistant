@@ -1,26 +1,56 @@
-import 'dart:math' as math;
+import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:http/http.dart' as http;
+import 'package:latlong2/latlong.dart';
 
-import '../../core/app_theme.dart';
-import '../../territory/geocoding_service.dart';
+import '../../theme/app_theme.dart';
 import '../../territory/geolocation_helper.dart';
-import '../../territory/tile_cache/tile_cache_service.dart';
+import '../../services/nominatim_reverse_geocoding_service.dart';
 
+enum _PickerLayerMode { street, satellite, dark }
+
+/// Modal interativo para seleção precisa de coordenadas geográficas via mapa.
+/// - Coordenada padrão em Santo Antônio do Içá, AM (-3.1022, -67.9397).
+/// - Zoom via roda do mouse ou botões (+/-) trava 100% no pino selecionado sem deslocar o mapa.
+/// - Barra de busca integrada priorizando Santo Antônio do Içá, AM.
+/// - Alternador de camadas (Ruas OSM / Satélite Esri / Modo Escuro).
 class MapLocationPickerDialog extends StatefulWidget {
-  final double? initialLat;
-  final double? initialLng;
+  final double initialLat;
+  final double initialLng;
   final String? initialAddress;
   final String? initialNeighborhood;
 
   const MapLocationPickerDialog({
     super.key,
-    this.initialLat,
-    this.initialLng,
+    required this.initialLat,
+    required this.initialLng,
     this.initialAddress,
     this.initialNeighborhood,
   });
+
+  /// Método utilitário para exibir o diálogo de forma padronizada
+  static Future<ReverseGeocodingResult?> show(
+    BuildContext context, {
+    required double initialLat,
+    required double initialLng,
+    String? initialAddress,
+    String? initialNeighborhood,
+  }) {
+    return showDialog<ReverseGeocodingResult>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => MapLocationPickerDialog(
+        initialLat: initialLat,
+        initialLng: initialLng,
+        initialAddress: initialAddress,
+        initialNeighborhood: initialNeighborhood,
+      ),
+    );
+  }
 
   @override
   State<MapLocationPickerDialog> createState() =>
@@ -28,666 +58,535 @@ class MapLocationPickerDialog extends StatefulWidget {
 }
 
 class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
+  final MapController _mapController = MapController();
+  late final TextEditingController _searchController;
   late double _selectedLat;
   late double _selectedLng;
-  late double _viewCenterLat;
-  late double _viewCenterLng;
-  final TransformationController _transformationController =
-      TransformationController();
-  bool _hasCenteredInitialView = false;
-  int _zoom = 16;
-  double _basePinchScale = 1.0;
-  double _trackpadScale = 1.0;
-  DateTime? _lastZoomChangeTime;
+  double _currentZoom = 16.0;
+
   bool _isLoadingAddress = false;
+  bool _isSearching = false;
+  String _statusText = 'Carregando endereço...';
   ReverseGeocodingResult? _geocodedResult;
-  String _statusText = 'Toque no mapa para marcar a localização exata da casa.';
+  _PickerLayerMode _layerMode = _PickerLayerMode.street;
 
-  // Constantes de visualização de grade de blocos
-  static const int _gridHalfSize = 5; // 11x11 tiles = 2816x2816 px
-  static const double _tileSize = 256.0;
+  Timer? _debounceTimer;
 
-  void _changeZoom(
-    int newZoom,
-    BoxConstraints constraints,
-    double originPx,
-    double originPy,
-  ) {
-    final targetZoom = newZoom.clamp(10, 18);
-    if (targetZoom == _zoom) return;
-
-    final currentMatrix = _transformationController.value;
-    final currentScale = currentMatrix.getMaxScaleOnAxis();
-    final effectiveScale = currentScale > 0.01 ? currentScale : 1.0;
-    final dx = currentMatrix.storage[12];
-    final dy = currentMatrix.storage[13];
-
-    final viewportW = constraints.maxWidth > 0 ? constraints.maxWidth : 400.0;
-    final viewportH = constraints.maxHeight > 0 ? constraints.maxHeight : 500.0;
-
-    final canvasCenterX = ((viewportW / 2.0) - dx) / effectiveScale;
-    final canvasCenterY = ((viewportH / 2.0) - dy) / effectiveScale;
-    final worldPx = originPx + canvasCenterX;
-    final worldPy = originPy + canvasCenterY;
-    final focalLng = _pixelX2lon(worldPx, _zoom);
-    final focalLat = _pixelY2lat(worldPy, _zoom);
-
-    final newCenterTileX = _lon2tileX(_viewCenterLng, targetZoom);
-    final newCenterTileY = _lat2tileY(_viewCenterLat, targetZoom);
-    final newMinTileX = newCenterTileX - _gridHalfSize;
-    final newMinTileY = newCenterTileY - _gridHalfSize;
-    final newOriginPx = newMinTileX * _tileSize;
-    final newOriginPy = newMinTileY * _tileSize;
-
-    final newWorldPx = _lon2pixelX(focalLng, targetZoom);
-    final newWorldPy = _lat2pixelY(focalLat, targetZoom);
-
-    final newCanvasX = newWorldPx - newOriginPx;
-    final newCanvasY = newWorldPy - newOriginPy;
-
-    final canvasWidth = (_gridHalfSize * 2 + 1) * _tileSize;
-    final canvasHeight = (_gridHalfSize * 2 + 1) * _tileSize;
-    final newDx = ((viewportW / 2.0) - newCanvasX).clamp(
-      viewportW - canvasWidth,
-      0.0,
-    );
-    final newDy = ((viewportH / 2.0) - newCanvasY).clamp(
-      viewportH - canvasHeight,
-      0.0,
-    );
-
-    setState(() {
-      _zoom = targetZoom;
-    });
-
-    _transformationController.value = Matrix4.translationValues(
-      newDx,
-      newDy,
-      0.0,
-    );
+  static bool _isLegacyManausOrZero(double lat, double lng) {
+    if (lat.abs() < 0.001 && lng.abs() < 0.001) return true;
+    // Detecta coordenada antiga padrão de Manaus (-3.1190, -60.0217)
+    if ((lat - (-3.1190)).abs() < 0.03 && (lng - (-60.0217)).abs() < 0.03) {
+      return true;
+    }
+    return false;
   }
 
   @override
   void initState() {
     super.initState();
-    _selectedLat = widget.initialLat ?? -23.550520;
-    _selectedLng = widget.initialLng ?? -46.633308;
-    _viewCenterLat = _selectedLat;
-    _viewCenterLng = _selectedLng;
+    final initialQuery = [
+      if (widget.initialAddress != null &&
+          widget.initialAddress!.trim().isNotEmpty)
+        widget.initialAddress!.trim(),
+      if (widget.initialNeighborhood != null &&
+          widget.initialNeighborhood!.trim().isNotEmpty)
+        widget.initialNeighborhood!.trim(),
+    ].join(', ');
+    _searchController = TextEditingController(text: initialQuery);
 
-    final centerTileX = _lon2tileX(_viewCenterLng, _zoom);
-    final centerTileY = _lat2tileY(_viewCenterLat, _zoom);
-    final minTileX = centerTileX - _gridHalfSize;
-    final minTileY = centerTileY - _gridHalfSize;
-    final originPx = minTileX * _tileSize;
-    final originPy = minTileY * _tileSize;
-    final pinX = _lon2pixelX(_selectedLng, _zoom) - originPx;
-    final pinY = _lat2pixelY(_selectedLat, _zoom) - originPy;
-    _transformationController.value = Matrix4.translationValues(
-      300.0 - pinX,
-      250.0 - pinY,
-      0.0,
-    );
-
-    if (widget.initialLat != null && widget.initialLng != null) {
-      _fetchAddressForCoords(_selectedLat, _selectedLng);
+    if (_isLegacyManausOrZero(widget.initialLat, widget.initialLng)) {
+      _selectedLat = GeolocationHelper.defaultLat;
+      _selectedLng = GeolocationHelper.defaultLng;
+    } else {
+      _selectedLat = widget.initialLat;
+      _selectedLng = widget.initialLng;
     }
-  }
 
-  @override
-  void dispose() {
-    _transformationController.dispose();
-    super.dispose();
-  }
-
-  int _lon2tileX(double lon, int z) =>
-      ((lon + 180.0) / 360.0 * (1 << z)).floor();
-
-  int _lat2tileY(double lat, int z) {
-    final latRad = lat.clamp(-85.0511, 85.0511) * math.pi / 180.0;
-    return ((1.0 -
-                math.log(math.tan(latRad) + 1.0 / math.cos(latRad)) / math.pi) /
-            2.0 *
-            (1 << z))
-        .floor();
-  }
-
-  double _lon2pixelX(double lon, int z) =>
-      (lon + 180.0) / 360.0 * (_tileSize * (1 << z));
-
-  double _lat2pixelY(double lat, int z) {
-    final latRad = lat.clamp(-85.0511, 85.0511) * math.pi / 180.0;
-    final sinLat = math.sin(latRad).clamp(-0.9999, 0.9999);
-    return (0.5 - math.log((1.0 + sinLat) / (1.0 - sinLat)) / (4.0 * math.pi)) *
-        (_tileSize * (1 << z));
-  }
-
-  double _pixelX2lon(double px, int z) =>
-      (px / (_tileSize * (1 << z))) * 360.0 - 180.0;
-
-  double _pixelY2lat(double py, int z) {
-    final n = math.pi - (2.0 * math.pi * py) / (_tileSize * (1 << z));
-    return 180.0 / math.pi * math.atan(0.5 * (math.exp(n) - math.exp(-n)));
-  }
-
-  Future<void> _fetchAddressForCoords(double lat, double lng) async {
-    setState(() {
-      _isLoadingAddress = true;
-      _statusText = 'Buscando endereço via OpenStreetMap...';
-    });
-
-    final res = await GeocodingService.reverseGeocode(lat, lng);
-    if (!mounted) return;
-
-    setState(() {
-      _isLoadingAddress = false;
-      _geocodedResult = res;
-      if (res != null) {
-        _statusText = res.formattedSummary;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_isLegacyManausOrZero(widget.initialLat, widget.initialLng) &&
+          initialQuery.isNotEmpty) {
+        _searchAddress(initialQuery);
       } else {
-        _statusText =
-            'Local marcado: ${lat.toStringAsFixed(6)}, ${lng.toStringAsFixed(6)}';
+        _performReverseGeocoding(_selectedLat, _selectedLng);
       }
     });
   }
 
-  Future<void> _useCurrentGps() async {
-    setState(() => _statusText = 'Obtendo GPS do dispositivo...');
-    final pos = await GeolocationHelper.getCurrentLocation();
-    if (!mounted) return;
+  @override
+  void dispose() {
+    _debounceTimer?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
 
-    if (pos != null) {
+  void _onPositionChanged(MapCamera position, bool hasGesture) {
+    // Atualiza o pino apenas quando o usuario arrasta o mapa (pan),
+    // nunca permitindo que o zoom tire o foco da coordenada selecionada!
+    if (hasGesture) {
       setState(() {
-        _selectedLat = pos.latitude;
-        _selectedLng = pos.longitude;
-        _viewCenterLat = pos.latitude;
-        _viewCenterLng = pos.longitude;
-        _hasCenteredInitialView = false;
+        _selectedLat = position.center.latitude;
+        _selectedLng = position.center.longitude;
+        _currentZoom = position.zoom;
       });
-      await _fetchAddressForCoords(pos.latitude, pos.longitude);
+
+      _debounceTimer?.cancel();
+      _debounceTimer = Timer(const Duration(milliseconds: 650), () {
+        _performReverseGeocoding(_selectedLat, _selectedLng);
+      });
     } else {
-      setState(
-        () => _statusText = 'GPS indisponível. Toque no mapa para marcar.',
+      setState(() {
+        _currentZoom = position.zoom;
+      });
+    }
+  }
+
+  /// Aplica zoom mantendo o foco 100% cravado em (_selectedLat, _selectedLng)
+  void _zoomKeepingFocus(double delta) {
+    final targetZoom = (_currentZoom + delta).clamp(4.0, 19.0);
+    final fixedCenter = LatLng(_selectedLat, _selectedLng);
+    setState(() {
+      _currentZoom = targetZoom;
+    });
+    _mapController.move(fixedCenter, targetZoom);
+  }
+
+  Future<Map<String, dynamic>?> _queryNominatim(String q) async {
+    final uri = Uri.parse(
+      'https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&q=${Uri.encodeComponent(q)}&limit=1',
+    );
+    final resp = await http
+        .get(
+          uri,
+          headers: const {
+            'User-Agent': 'com.fieldassistant.app/1.0',
+            'Accept-Language': 'pt-BR,pt;q=0.9',
+          },
+        )
+        .timeout(const Duration(seconds: 8));
+    if (resp.statusCode == 200) {
+      final list = jsonDecode(resp.body) as List<dynamic>;
+      if (list.isNotEmpty) {
+        return list.first as Map<String, dynamic>;
+      }
+    }
+    return null;
+  }
+
+  Future<void> _searchAddress(String rawQuery) async {
+    final q = rawQuery.trim();
+    if (q.isEmpty) return;
+    setState(() => _isSearching = true);
+    try {
+      final lower = q.toLowerCase();
+      Map<String, dynamic>? match;
+      if (!lower.contains('santo ant') &&
+          !lower.contains('amazonas') &&
+          !lower.contains(', am')) {
+        match = await _queryNominatim(
+          '$q, Santo Antônio do Içá, Amazonas, Brasil',
+        );
+        match ??= await _queryNominatim('$q, Amazonas, Brasil');
+      }
+      match ??= await _queryNominatim(q);
+
+      if (match != null && mounted) {
+        final lat = double.tryParse(match['lat']?.toString() ?? '');
+        final lon = double.tryParse(match['lon']?.toString() ?? '');
+        if (lat != null && lon != null) {
+          setState(() {
+            _selectedLat = lat;
+            _selectedLng = lon;
+            _currentZoom = 17.0;
+          });
+          _mapController.move(LatLng(lat, lon), 17.0);
+          await _performReverseGeocoding(lat, lon);
+        }
+      }
+    } catch (_) {
+      // Mantém posição atual caso offline
+    } finally {
+      if (mounted) {
+        setState(() => _isSearching = false);
+      }
+    }
+  }
+
+  Future<void> _performReverseGeocoding(double lat, double lng) async {
+    if (!mounted) return;
+    setState(() {
+      _isLoadingAddress = true;
+    });
+
+    try {
+      final result = await NominatimReverseGeocodingService.fetchAddress(
+        lat,
+        lng,
       );
+      if (!mounted) return;
+      setState(() {
+        _geocodedResult = result;
+        _isLoadingAddress = false;
+        if (result != null && result.formattedAddress.isNotEmpty) {
+          _statusText = result.formattedAddress;
+        } else {
+          _statusText = 'Coordenada marcada em Santo Antônio do Içá, AM';
+        }
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingAddress = false;
+        _statusText = 'Coordenada marcada manualmente no mapa';
+      });
+    }
+  }
+
+  Future<void> _centerOnDeviceLocation() async {
+    final pos = await GeolocationHelper.getCurrentLocation();
+    final targetLat = pos?.latitude ?? GeolocationHelper.defaultLat;
+    final targetLng = pos?.longitude ?? GeolocationHelper.defaultLng;
+    if (mounted) {
+      final newCenter = LatLng(targetLat, targetLng);
+      setState(() {
+        _selectedLat = targetLat;
+        _selectedLng = targetLng;
+        _currentZoom = 16.0;
+      });
+      _mapController.move(newCenter, 16.0);
+      _performReverseGeocoding(targetLat, targetLng);
+    }
+  }
+
+  void _cycleLayer() {
+    setState(() {
+      switch (_layerMode) {
+        case _PickerLayerMode.street:
+          _layerMode = _PickerLayerMode.satellite;
+          break;
+        case _PickerLayerMode.satellite:
+          _layerMode = _PickerLayerMode.dark;
+          break;
+        case _PickerLayerMode.dark:
+          _layerMode = _PickerLayerMode.street;
+          break;
+      }
+    });
+  }
+
+  String _getLayerUrl() {
+    switch (_layerMode) {
+      case _PickerLayerMode.street:
+        return 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+      case _PickerLayerMode.satellite:
+        return 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+      case _PickerLayerMode.dark:
+        return 'https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png';
+    }
+  }
+
+  String _getLayerLabel() {
+    switch (_layerMode) {
+      case _PickerLayerMode.street:
+        return 'Ruas';
+      case _PickerLayerMode.satellite:
+        return 'Satélite';
+      case _PickerLayerMode.dark:
+        return 'Escuro';
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final centerTileX = _lon2tileX(_viewCenterLng, _zoom);
-    final centerTileY = _lat2tileY(_viewCenterLat, _zoom);
-
-    final minTileX = centerTileX - _gridHalfSize;
-    final maxTileX = centerTileX + _gridHalfSize;
-    final minTileY = centerTileY - _gridHalfSize;
-    final maxTileY = centerTileY + _gridHalfSize;
-
-    final originPx = minTileX * _tileSize;
-    final originPy = minTileY * _tileSize;
-
-    final canvasWidth = (_gridHalfSize * 2 + 1) * _tileSize;
-    final canvasHeight = (_gridHalfSize * 2 + 1) * _tileSize;
-
-    final pinX = _lon2pixelX(_selectedLng, _zoom) - originPx;
-    final pinY = _lat2pixelY(_selectedLat, _zoom) - originPy;
 
     return Dialog(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 820, maxHeight: 700),
-        child: Column(
-          children: [
-            // Cabeçalho
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.edit_location_alt,
-                    color: AppTheme.primaryBlue,
-                    size: 24,
-                  ),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text(
-                      'Marcar Localização Exata da Casa no Mapa',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      overflow: TextOverflow.ellipsis,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: SizedBox(
+          width: 660,
+          height: 660,
+          child: Column(
+            children: [
+              // Cabeçalho + Busca
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
+                color: isDark ? const Color(0xFF1E293B) : Colors.grey.shade100,
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.map, color: AppTheme.primaryColor),
+                        const SizedBox(width: 8),
+                        const Expanded(
+                          child: Text(
+                            'Selecionar Localização (Santo Antônio do Içá, AM)',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(context),
+                          tooltip: 'Fechar',
+                        ),
+                      ],
                     ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1),
-
-            // Mapa Interativo com OpenStreetMap Tiles
-            Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  if (!_hasCenteredInitialView &&
-                      constraints.maxWidth > 0 &&
-                      constraints.maxHeight > 0) {
-                    _hasCenteredInitialView = true;
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      if (mounted) {
-                        final dx = (constraints.maxWidth / 2.0) - pinX;
-                        final dy = (constraints.maxHeight / 2.0) - pinY;
-                        _transformationController.value =
-                            Matrix4.translationValues(dx, dy, 0.0);
-                      }
-                    });
-                  }
-
-                  return Stack(
-                    children: [
-                      ClipRect(
-                        child: Listener(
-                          behavior: HitTestBehavior.translucent,
-                          onPointerSignal: (pointerSignal) {
-                            if (pointerSignal is PointerScrollEvent) {
-                              final now = DateTime.now();
-                              if (_lastZoomChangeTime == null ||
-                                  now
-                                          .difference(_lastZoomChangeTime!)
-                                          .inMilliseconds >
-                                      180) {
-                                if (pointerSignal.scrollDelta.dy.abs() > 2) {
-                                  _lastZoomChangeTime = now;
-                                  if (pointerSignal.scrollDelta.dy < 0 &&
-                                      _zoom < 18) {
-                                    _changeZoom(
-                                      _zoom + 1,
-                                      constraints,
-                                      originPx,
-                                      originPy,
-                                    );
-                                  } else if (pointerSignal.scrollDelta.dy > 0 &&
-                                      _zoom > 10) {
-                                    _changeZoom(
-                                      _zoom - 1,
-                                      constraints,
-                                      originPx,
-                                      originPy,
-                                    );
-                                  }
-                                }
-                              }
-                            }
-                          },
-                          onPointerPanZoomStart: (event) {
-                            _trackpadScale = 1.0;
-                          },
-                          onPointerPanZoomUpdate: (event) {
-                            _trackpadScale *= event.scale;
-                            final now = DateTime.now();
-                            if (_lastZoomChangeTime == null ||
-                                now
-                                        .difference(_lastZoomChangeTime!)
-                                        .inMilliseconds >
-                                    200) {
-                              if (_trackpadScale > 1.25 && _zoom < 18) {
-                                _lastZoomChangeTime = now;
-                                _trackpadScale = 1.0;
-                                _changeZoom(
-                                  _zoom + 1,
-                                  constraints,
-                                  originPx,
-                                  originPy,
-                                );
-                              } else if (_trackpadScale < 0.8 && _zoom > 10) {
-                                _lastZoomChangeTime = now;
-                                _trackpadScale = 1.0;
-                                _changeZoom(
-                                  _zoom - 1,
-                                  constraints,
-                                  originPx,
-                                  originPy,
-                                );
-                              }
-                            }
-                          },
-                          onPointerPanZoomEnd: (event) {
-                            _trackpadScale = 1.0;
-                          },
-                          child: InteractiveViewer(
-                            transformationController: _transformationController,
-                            constrained: false,
-                            boundaryMargin: EdgeInsets.zero,
-                            panEnabled: true,
-                            scaleEnabled: true,
-                            trackpadScrollCausesScale: false,
-                            minScale: 0.65,
-                            maxScale: 1.8,
-                            onInteractionStart: (details) {
-                              _basePinchScale = 1.0;
-                            },
-                            onInteractionUpdate: (details) {
-                              if (details.pointerCount >= 2) {
-                                final relativeScale =
-                                    details.scale / _basePinchScale;
-                                if (relativeScale > 1.25 && _zoom < 18) {
-                                  _basePinchScale = details.scale;
-                                  _changeZoom(
-                                    _zoom + 1,
-                                    constraints,
-                                    originPx,
-                                    originPy,
-                                  );
-                                } else if (relativeScale < 0.8 && _zoom > 10) {
-                                  _basePinchScale = details.scale;
-                                  _changeZoom(
-                                    _zoom - 1,
-                                    constraints,
-                                    originPx,
-                                    originPy,
-                                  );
-                                }
-                              }
-                            },
-                            onInteractionEnd: (details) {
-                              _basePinchScale = 1.0;
-                              final m = _transformationController.value;
-                              final currentScale = m.getMaxScaleOnAxis();
-                              if ((currentScale - 1.0).abs() > 0.05) {
-                                final dx = m.storage[12];
-                                final dy = m.storage[13];
-                                _transformationController.value =
-                                    Matrix4.translationValues(dx, dy, 0.0);
-                              }
-                            },
-                            child: GestureDetector(
-                              onDoubleTap: () {
-                                if (_zoom < 18) {
-                                  _changeZoom(
-                                    _zoom + 1,
-                                    constraints,
-                                    originPx,
-                                    originPy,
-                                  );
-                                }
-                              },
-                              onTapUp: (details) {
-                                final clickX = details.localPosition.dx;
-                                final clickY = details.localPosition.dy;
-                                final worldPx = originPx + clickX;
-                                final worldPy = originPy + clickY;
-                                final newLng = _pixelX2lon(worldPx, _zoom);
-                                final newLat = _pixelY2lat(worldPy, _zoom);
-
-                                setState(() {
-                                  _selectedLat = newLat;
-                                  _selectedLng = newLng;
-                                });
-
-                                _fetchAddressForCoords(newLat, newLng);
-                              },
-                              child: Container(
-                                width: canvasWidth,
-                                height: canvasHeight,
-                                color: isDark
-                                    ? const Color(0xFF0F172A)
-                                    : const Color(0xFFF1F5F9),
-                                child: Stack(
-                                  children: [
-                                    // Tiles do OpenStreetMap com suporte a cache offline móvel
-                                    for (
-                                      int tx = minTileX;
-                                      tx <= maxTileX;
-                                      tx++
-                                    )
-                                      for (
-                                        int ty = minTileY;
-                                        ty <= maxTileY;
-                                        ty++
-                                      )
-                                        Positioned(
-                                          key: ValueKey(
-                                            'picker_tile_pos_${_zoom}_${tx}_$ty',
-                                          ),
-                                          left: (tx - minTileX) * _tileSize,
-                                          top: (ty - minTileY) * _tileSize,
-                                          child: CachedTileWidget(
-                                            key: ValueKey(
-                                              'picker_tile_${_zoom}_${tx}_$ty',
-                                            ),
-                                            z: _zoom,
-                                            x: tx,
-                                            y: ty,
-                                            size: _tileSize,
-                                            isDark: isDark,
-                                          ),
-                                        ),
-
-                                    // Pino da Casa / Localização Selecionada
-                                    Positioned(
-                                      left: pinX - 20,
-                                      top: pinY - 40,
-                                      child: IgnorePointer(
-                                        child: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 6,
-                                                    vertical: 2,
-                                                  ),
-                                              decoration: BoxDecoration(
-                                                color: AppTheme.alertRed,
-                                                borderRadius:
-                                                    BorderRadius.circular(6),
-                                                boxShadow: const [
-                                                  BoxShadow(
-                                                    color: Colors.black26,
-                                                    blurRadius: 4,
-                                                    offset: Offset(0, 2),
-                                                  ),
-                                                ],
-                                              ),
-                                              child: const Text(
-                                                'Casa / Ponto',
-                                                style: TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                            ),
-                                            const Icon(
-                                              Icons.location_on,
-                                              color: AppTheme.alertRed,
-                                              size: 40,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        hintText: 'Buscar rua ou bairro em Santo Antônio do Içá, AM...',
+                        isDense: true,
+                        filled: true,
+                        fillColor: isDark
+                            ? const Color(0xFF0F172A)
+                            : Colors.white,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        suffixIcon: _isSearching
+                            ? const Padding(
+                                padding: EdgeInsets.all(10),
+                                child: SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 ),
+                              )
+                            : IconButton(
+                                icon: const Icon(Icons.search),
+                                tooltip: 'Buscar endereço',
+                                onPressed: () =>
+                                    _searchAddress(_searchController.text),
                               ),
-                            ),
-                          ),
-                        ),
                       ),
-
-                      // Controles Flutuantes de Zoom (+ / -) e GPS
-                      Positioned(
-                        top: 12,
-                        right: 12,
-                        child: Column(
-                          children: [
-                            FloatingActionButton.small(
-                              heroTag: 'zoom_in_picker',
-                              backgroundColor: Colors.white,
-                              foregroundColor: Colors.black87,
-                              onPressed: () {
-                                if (_zoom < 18) {
-                                  _changeZoom(
-                                    _zoom + 1,
-                                    constraints,
-                                    originPx,
-                                    originPy,
-                                  );
-                                }
-                              },
-                              child: const Icon(Icons.add),
-                            ),
-                            const SizedBox(height: 6),
-                            FloatingActionButton.small(
-                              heroTag: 'zoom_out_picker',
-                              backgroundColor: Colors.white,
-                              foregroundColor: Colors.black87,
-                              onPressed: () {
-                                if (_zoom > 10) {
-                                  _changeZoom(
-                                    _zoom - 1,
-                                    constraints,
-                                    originPx,
-                                    originPy,
-                                  );
-                                }
-                              },
-                              child: const Icon(Icons.remove),
-                            ),
-                            const SizedBox(height: 6),
-                            FloatingActionButton.small(
-                              heroTag: 'gps_picker',
-                              tooltip: 'Minha Posição GPS',
-                              backgroundColor: AppTheme.primaryBlue,
-                              foregroundColor: Colors.white,
-                              onPressed: _useCurrentGps,
-                              child: const Icon(Icons.my_location, size: 18),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // Dica de navegação
-                      Positioned(
-                        top: 12,
-                        left: 12,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black87.withValues(alpha: 0.75),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.touch_app,
-                                color: Colors.white,
-                                size: 14,
-                              ),
-                              SizedBox(width: 4),
-                              Text(
-                                'Toque na casa para posicionar o pino',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  );
-                },
+                      onSubmitted: _searchAddress,
+                    ),
+                  ],
+                ),
               ),
-            ),
 
-            const Divider(height: 1),
-
-            // Painel Inferior com Endereço e Confirmação
-            Container(
-              padding: const EdgeInsets.all(14),
-              color: isDark ? const Color(0xFF1E293B) : Colors.grey.shade50,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      if (_isLoadingAddress)
-                        const SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      else
-                        const Icon(
-                          Icons.place,
-                          size: 18,
-                          color: AppTheme.alertRed,
+              // Área do Mapa com Zoom Cravado no Pino Central
+              Expanded(
+                child: Stack(
+                  children: [
+                    Listener(
+                      onPointerSignal: (pointerSignal) {
+                        if (pointerSignal is PointerScrollEvent) {
+                          final delta = pointerSignal.scrollDelta.dy < 0
+                              ? 1.0
+                              : -1.0;
+                          _zoomKeepingFocus(delta);
+                        }
+                      },
+                      child: FlutterMap(
+                        mapController: _mapController,
+                        options: MapOptions(
+                          initialCenter: LatLng(_selectedLat, _selectedLng),
+                          initialZoom: _currentZoom,
+                          minZoom: 4.0,
+                          maxZoom: 19.0,
+                          interactionOptions: const InteractionOptions(
+                            // Desativa scrollWheelZoom nativo que deslocava o centro para o cursor
+                            flags:
+                                InteractiveFlag.drag |
+                                InteractiveFlag.pinchZoom |
+                                InteractiveFlag.doubleTapZoom,
+                          ),
+                          onPositionChanged: _onPositionChanged,
+                          onTap: (tapPos, point) {
+                            setState(() {
+                              _selectedLat = point.latitude;
+                              _selectedLng = point.longitude;
+                            });
+                            _mapController.move(point, _currentZoom);
+                            _performReverseGeocoding(
+                              point.latitude,
+                              point.longitude,
+                            );
+                          },
                         ),
-                      const SizedBox(width: 8),
-                      Expanded(
+                        children: [
+                          TileLayer(
+                            urlTemplate: _getLayerUrl(),
+                            userAgentPackageName: 'com.fieldassistant.app',
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Marcador Central Fixo
+                    const IgnorePointer(
+                      child: Center(
+                        child: Padding(
+                          padding: EdgeInsets.only(bottom: 36),
+                          child: Icon(
+                            Icons.location_on,
+                            size: 44,
+                            color: AppTheme.alertRed,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    // Indicador de Camada e Zoom
+                    Positioned(
+                      left: 12,
+                      top: 12,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.65),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         child: Text(
-                          _statusText,
+                          '${_getLayerLabel()} • Zoom ${_currentZoom.toStringAsFixed(0)}',
                           style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
                           ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Coordenadas: ${_selectedLat.toStringAsFixed(6)}, ${_selectedLng.toStringAsFixed(6)}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: isDark
-                          ? const Color(0xFF94A3B8)
-                          : AppTheme.textMuted,
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('Cancelar'),
+
+                    // Botões de Camada, Zoom (+/-) e GPS
+                    Positioned(
+                      right: 12,
+                      bottom: 12,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          FloatingActionButton.small(
+                            heroTag: 'btnLayerPicker',
+                            onPressed: _cycleLayer,
+                            tooltip:
+                                'Alternar Camada (${_getLayerLabel()}): Ruas / Satélite / Escuro',
+                            child: const Icon(Icons.layers_outlined),
+                          ),
+                          const SizedBox(height: 8),
+                          FloatingActionButton.small(
+                            heroTag: 'btnZoomInPicker',
+                            onPressed: () => _zoomKeepingFocus(1.0),
+                            tooltip: 'Aproximar Zoom (+)',
+                            child: const Icon(Icons.add),
+                          ),
+                          const SizedBox(height: 6),
+                          FloatingActionButton.small(
+                            heroTag: 'btnZoomOutPicker',
+                            onPressed: () => _zoomKeepingFocus(-1.0),
+                            tooltip: 'Afastar Zoom (-)',
+                            child: const Icon(Icons.remove),
+                          ),
+                          const SizedBox(height: 8),
+                          FloatingActionButton.small(
+                            heroTag: 'btnGPSPicker',
+                            onPressed: _centerOnDeviceLocation,
+                            tooltip: 'Minha Localização Atual',
+                            child: const Icon(Icons.my_location),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 8),
-                      ElevatedButton.icon(
-                        icon: const Icon(Icons.check, size: 16),
-                        label: const Text('Confirmar Este Ponto'),
-                        onPressed: () {
-                          final finalResult =
-                              _geocodedResult ??
-                              ReverseGeocodingResult(
-                                latitude: _selectedLat,
-                                longitude: _selectedLng,
-                                street: widget.initialAddress,
-                                neighborhood: widget.initialNeighborhood,
-                              );
-                          Navigator.pop(context, finalResult);
-                        },
-                      ),
-                    ],
-                  ),
-                ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+
+              const Divider(height: 1),
+
+              // Painel Inferior com Endereço e Confirmação
+              Container(
+                padding: const EdgeInsets.all(14),
+                color: isDark ? const Color(0xFF1E293B) : Colors.grey.shade50,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        if (_isLoadingAddress)
+                          const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        else
+                          const Icon(
+                            Icons.place,
+                            size: 18,
+                            color: AppTheme.alertRed,
+                          ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _statusText,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Coordenadas: ${_selectedLat.toStringAsFixed(6)}, ${_selectedLng.toStringAsFixed(6)}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isDark
+                            ? const Color(0xFF94A3B8)
+                            : AppTheme.textMuted,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Cancelar'),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.check, size: 16),
+                          label: const Text('Confirmar Este Ponto'),
+                          onPressed: () {
+                            final finalResult =
+                                _geocodedResult ??
+                                ReverseGeocodingResult(
+                                  latitude: _selectedLat,
+                                  longitude: _selectedLng,
+                                  street: widget.initialAddress,
+                                  neighborhood: widget.initialNeighborhood,
+                                );
+                            Navigator.pop(context, finalResult);
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

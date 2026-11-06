@@ -47,8 +47,8 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
   final Set<String> _geocodedPersonIds = {};
   bool _hasCenteredHighlightPerson = false;
   int _zoom = 15;
-  double? _viewportCenterLat;
-  double? _viewportCenterLng;
+  double? _viewportCenterLat = -3.1022;
+  double? _viewportCenterLng = -67.9397;
   static const double _tileSize = 256.0;
   DateTime? _lastZoomChangeTime;
 
@@ -135,14 +135,8 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
 
     final canvasWidth = (gridHalfSize * 2 + 1) * _tileSize;
     final canvasHeight = (gridHalfSize * 2 + 1) * _tileSize;
-    final newDx = (focal.dx - newCanvasX).clamp(
-      viewportW - canvasWidth,
-      0.0,
-    );
-    final newDy = (focal.dy - newCanvasY).clamp(
-      viewportH - canvasHeight,
-      0.0,
-    );
+    final newDx = (focal.dx - newCanvasX).clamp(viewportW - canvasWidth, 0.0);
+    final newDy = (focal.dy - newCanvasY).clamp(viewportH - canvasHeight, 0.0);
 
     setState(() {
       _zoom = targetZoom;
@@ -1433,26 +1427,48 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                                 final safeScale = scale > 0.01 ? scale : 1.0;
                                 final x = matrix.storage[12];
                                 final y = matrix.storage[13];
-                                final left = ((-x / safeScale) / _tileSize).floor() - 1;
-                                final top = ((-y / safeScale) / _tileSize).floor() - 1;
-                                final right = (((constraints.maxWidth - x) / safeScale) / _tileSize).ceil() + 1;
-                                final bottom = (((constraints.maxHeight - y) / safeScale) / _tileSize).ceil() + 1;
-                                return Stack(children: [
-                                  for (int ix = left.clamp(0, 14); ix <= right.clamp(0, 14); ix++)
-                                    for (int iy = top.clamp(0, 14); iy <= bottom.clamp(0, 14); iy++)
-                                      Positioned(
-                                        left: ix * _tileSize,
-                                        top: iy * _tileSize,
-                                        child: CachedTileWidget(
-                                          key: ValueKey('tile_${_zoom}_${minTileX + ix}_${minTileY + iy}'),
-                                          z: _zoom,
-                                          x: minTileX + ix,
-                                          y: minTileY + iy,
-                                          size: _tileSize,
-                                          isDark: isDark,
+                                final left =
+                                    ((-x / safeScale) / _tileSize).floor() - 1;
+                                final top =
+                                    ((-y / safeScale) / _tileSize).floor() - 1;
+                                final right =
+                                    (((constraints.maxWidth - x) / safeScale) /
+                                            _tileSize)
+                                        .ceil() +
+                                    1;
+                                final bottom =
+                                    (((constraints.maxHeight - y) / safeScale) /
+                                            _tileSize)
+                                        .ceil() +
+                                    1;
+                                return Stack(
+                                  children: [
+                                    for (
+                                      int ix = left.clamp(0, 14);
+                                      ix <= right.clamp(0, 14);
+                                      ix++
+                                    )
+                                      for (
+                                        int iy = top.clamp(0, 14);
+                                        iy <= bottom.clamp(0, 14);
+                                        iy++
+                                      )
+                                        Positioned(
+                                          left: ix * _tileSize,
+                                          top: iy * _tileSize,
+                                          child: CachedTileWidget(
+                                            key: ValueKey(
+                                              'tile_${_zoom}_${minTileX + ix}_${minTileY + iy}',
+                                            ),
+                                            z: _zoom,
+                                            x: minTileX + ix,
+                                            y: minTileY + iy,
+                                            size: _tileSize,
+                                            isDark: isDark,
+                                          ),
                                         ),
-                                      ),
-                                ]);
+                                  ],
+                                );
                               },
                             ),
                           ),

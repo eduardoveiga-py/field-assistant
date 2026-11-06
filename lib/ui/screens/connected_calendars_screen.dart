@@ -5,27 +5,6 @@ import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../../appointments/calendar_provider.dart';
 import '../../appointments/calendar_sync_coordinator.dart';
-import '../providers.dart';
-
-/// Mantém apenas IDs válidos e únicos para os seletores de calendário.
-List<ExternalCalendarItem> uniqueCalendarItems(List<ExternalCalendarItem> items) {
-  final seen = <String>{};
-  return items.where((item) => item.id.isNotEmpty && seen.add(item.id)).toList();
-}
-
-/// Não troca silenciosamente um destino salvo que deixou de estar disponível.
-String? resolveCalendarSelection(
-  List<ExternalCalendarItem> items,
-  String? selectedId, {
-  bool google = false,
-}) {
-  if (items.any((item) => item.id == selectedId)) return selectedId;
-  if (google && selectedId == 'primary') {
-    final primary = items.where((item) => item.isPrimary).toList();
-    if (primary.length == 1) return primary.single.id;
-  }
-  return null;
-}
 
 class ConnectedCalendarsScreen extends ConsumerStatefulWidget {
   const ConnectedCalendarsScreen({super.key});
@@ -43,7 +22,6 @@ class _ConnectedCalendarsScreenState
   String? _googleAccount;
   List<ExternalCalendarItem> _googleCalendars = [];
   String? _selectedGoogleCalId;
-  Set<String> _readOnlyGoogleCalIds = {};
 
   bool _isAppleAuthorized = false;
   String? _appleAccount;
@@ -66,14 +44,10 @@ class _ConnectedCalendarsScreenState
     String? gAcc;
     List<ExternalCalendarItem> gCals = [];
     String? gSelectedId;
-    Set<String> gReadOnlyIds = {};
     if (gAuth) {
       gAcc = await coordinator.googleProvider.getConnectedAccountName();
-      gCals = uniqueCalendarItems(
-        await coordinator.googleProvider.getAvailableCalendars(),
-      );
+      gCals = await coordinator.googleProvider.getAvailableCalendars();
       gSelectedId = await coordinator.googleProvider.getSelectedCalendarId();
-      gReadOnlyIds = await coordinator.googleProvider.getReadOnlyCalendarIds();
     }
 
     // Apple state
@@ -83,9 +57,7 @@ class _ConnectedCalendarsScreenState
     String? aSelectedId;
     if (aAuth) {
       aAcc = await coordinator.appleProvider.getConnectedAccountName();
-      aCals = uniqueCalendarItems(
-        await coordinator.appleProvider.getAvailableCalendars(),
-      );
+      aCals = await coordinator.appleProvider.getAvailableCalendars();
       aSelectedId = await coordinator.appleProvider.getSelectedCalendarId();
     }
 
@@ -96,16 +68,14 @@ class _ConnectedCalendarsScreenState
         _isGoogleAuthorized = gAuth;
         _googleAccount = gAcc;
         _googleCalendars = gCals;
-        _selectedGoogleCalId = resolveCalendarSelection(
-          gCals.where((calendar) => !calendar.isReadOnly).toList(),
-          gSelectedId, google: true,
-        );
-        _readOnlyGoogleCalIds = gReadOnlyIds;
+        _selectedGoogleCalId =
+            gSelectedId ?? (gCals.isNotEmpty ? gCals.first.id : 'primary');
 
         _isAppleAuthorized = aAuth;
         _appleAccount = aAcc;
         _appleCalendars = aCals;
-        _selectedAppleCalId = resolveCalendarSelection(aCals, aSelectedId);
+        _selectedAppleCalId =
+            aSelectedId ?? (aCals.isNotEmpty ? aCals.first.id : null);
 
         _conflicts = pendingConflicts;
       });
@@ -272,20 +242,26 @@ class _ConnectedCalendarsScreenState
           TextButton(
             onPressed: () async {
               Navigator.pop(ctx);
-              final coordinator = ref.read(calendarSyncCoordinatorProvider);
-              await coordinator.resolveConflictKeepExternal(conflict);
+              await ref
+                  .read(calendarSyncCoordinatorProvider)
+                  .resolveConflictKeepExternal(conflict);
               await _loadState();
             },
-            child: const Text('Manter Versão Externa'),
+            child: const Text('Usar Versão Externa'),
           ),
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(ctx);
-              final coordinator = ref.read(calendarSyncCoordinatorProvider);
-              await coordinator.resolveConflictKeepLocal(conflict);
+              await ref
+                  .read(calendarSyncCoordinatorProvider)
+                  .resolveConflictKeepLocal(conflict);
               await _loadState();
             },
-            child: const Text('Manter Versão Local'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryBlue,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Manter Versão do App'),
           ),
         ],
       ),
@@ -294,8 +270,6 @@ class _ConnectedCalendarsScreenState
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Calendários Conectados'),
@@ -303,8 +277,8 @@ class _ConnectedCalendarsScreenState
           IconButton(
             icon: _isSyncing
                 ? const SizedBox(
-                    width: 20,
-                    height: 20,
+                    width: 18,
+                    height: 18,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(Icons.sync),
@@ -316,45 +290,35 @@ class _ConnectedCalendarsScreenState
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          // Banner de privacidade pastoral
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: AppTheme.primaryBlue.withValues(alpha: 0.08),
+              color: Colors.teal.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: AppTheme.primaryBlue.withValues(alpha: 0.2),
-              ),
+              border: Border.all(color: Colors.teal.withValues(alpha: 0.3)),
             ),
-            child: Row(
+            child: const Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(
-                  Icons.sync_alt,
-                  color: AppTheme.primaryBlue,
-                  size: 26,
-                ),
-                const SizedBox(width: 12),
+                Icon(Icons.shield_outlined, color: Colors.teal, size: 22),
+                SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Sincronização Bidirecional Automática',
+                      Text(
+                        'Proteção de Dados Pastorais Sensíveis',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                          color: AppTheme.primaryBlue,
+                          fontSize: 13,
+                          color: Colors.teal,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      SizedBox(height: 4),
                       Text(
-                        'Conecte seu Google Calendar ou Apple Calendar uma única vez. As alterações feitas no Field Assistant serão enviadas aos calendários externos, e seus eventos externos aparecerão na sua agenda de forma contínua.',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Theme.of(context).textTheme.bodyMedium?.color
-                              ?.withValues(alpha: 0.85),
-                          height: 1.35,
-                        ),
+                        'Apenas título, horário e endereço são sincronizados. Notas pastorais confidenciais, histórico de visitas e progresso de estudos bíblicos NUNCA são enviados para calendários externos.',
+                        style: TextStyle(fontSize: 12),
                       ),
                     ],
                   ),
@@ -364,81 +328,60 @@ class _ConnectedCalendarsScreenState
           ),
           const SizedBox(height: 16),
 
-          if (_syncMessage != null)
+          if (_syncMessage != null) ...[
             Container(
-              margin: const EdgeInsets.only(bottom: 16),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: _syncMessage!.startsWith('Aviso')
-                    ? Colors.orange.withValues(alpha: 0.15)
-                    : Colors.green.withValues(alpha: 0.15),
+                color: AppTheme.primaryBlue.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
                 _syncMessage!,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
-                  color: _syncMessage!.startsWith('Aviso')
-                      ? Colors.orange[400]
-                      : Colors.green[400],
-                ),
-              ),
-            ),
-
-          if (_conflicts.isNotEmpty) ...[
-            Card(
-              color: Colors.amber.withValues(alpha: 0.1),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: const BorderSide(color: Colors.amber),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.warning, color: Colors.amber),
-                        const SizedBox(width: 8),
-                        Text(
-                          '${_conflicts.length} Conflito(s) Pendente(s)',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Detectamos edições simultâneas que requerem sua escolha para evitar sobrescrita silenciosa:',
-                    ),
-                    const SizedBox(height: 12),
-                    for (final c in _conflicts)
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(c.localAppointment.title),
-                        subtitle: Text(
-                          AppDateUtils.formatDateTime(
-                            c.localAppointment.startTime,
-                          ),
-                        ),
-                        trailing: ElevatedButton(
-                          onPressed: () => _showConflictDialog(c),
-                          child: const Text('Resolver'),
-                        ),
-                      ),
-                  ],
                 ),
               ),
             ),
             const SizedBox(height: 16),
           ],
 
-          // CARD GOOGLE CALENDAR
+          // Seção de Conflitos Pendentes
+          if (_conflicts.isNotEmpty) ...[
+            const Text(
+              'Conflitos Pendentes de Revisão',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+                color: Colors.orange,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ..._conflicts.map(
+              (c) => Card(
+                color: Colors.orange.withValues(alpha: 0.08),
+                child: ListTile(
+                  leading: const Icon(
+                    Icons.warning_amber_rounded,
+                    color: Colors.orange,
+                  ),
+                  title: Text(c.localAppointment.title),
+                  subtitle: Text(
+                    'Modificado em ambos os lados (${c.providerName})',
+                  ),
+                  trailing: TextButton(
+                    onPressed: () => _showConflictDialog(c),
+                    child: const Text('Resolver'),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          // Card Google Calendar
           Card(
+            elevation: 2,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
@@ -449,17 +392,9 @@ class _ConnectedCalendarsScreenState
                 children: [
                   Row(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.red.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(
-                          Icons.calendar_today,
-                          color: Colors.red,
-                          size: 24,
-                        ),
+                      const CircleAvatar(
+                        backgroundColor: Color(0xFF4285F4),
+                        child: Icon(Icons.calendar_today, color: Colors.white),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -475,16 +410,13 @@ class _ConnectedCalendarsScreenState
                             ),
                             Text(
                               _isGoogleAuthorized
-                                  ? (_googleAccount ?? 'Conta Conectada')
+                                  ? 'Conectado: ${_googleAccount ?? "Conta Google"}'
                                   : 'Não conectado',
                               style: TextStyle(
-                                fontSize: 13,
+                                fontSize: 12,
                                 color: _isGoogleAuthorized
-                                    ? Colors.green[500]
+                                    ? Colors.green
                                     : Colors.grey,
-                                fontWeight: _isGoogleAuthorized
-                                    ? FontWeight.w600
-                                    : FontWeight.normal,
                               ),
                             ),
                           ],
@@ -493,88 +425,59 @@ class _ConnectedCalendarsScreenState
                       if (_isGoogleAuthorized)
                         OutlinedButton(
                           onPressed: _disconnectGoogle,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.red,
+                          ),
                           child: const Text('Desconectar'),
                         )
                       else
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.login, size: 18),
-                          label: const Text('Conectar'),
+                        ElevatedButton(
                           onPressed: _connectGoogle,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF4285F4),
+                            foregroundColor: Colors.white,
+                          ),
+                          child: const Text('Conectar'),
                         ),
                     ],
                   ),
                   if (_isGoogleAuthorized && _googleCalendars.isNotEmpty) ...[
                     const Divider(height: 24),
                     const Text(
-                      'Calendário de Destino:',
+                      'Calendário selecionado para sincronização:',
                       style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 8),
                     DropdownButtonFormField<String>(
-                      key: ValueKey('google-$_selectedGoogleCalId'),
-                      initialValue: _selectedGoogleCalId,
-                      hint: const Text('Selecione um calendário disponível'),
-                      isExpanded: true,
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                      ),
-                      items: _googleCalendars.where((calendar) => !calendar.isReadOnly).map((c) {
-                        return DropdownMenuItem<String>(
-                          value: c.id,
-                          child: Text(
-                            '${c.name}${c.isReadOnly ? " (Somente Leitura)" : ""}',
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        );
-                      }).toList(),
+                      initialValue:
+                          _googleCalendars.any(
+                            (c) => c.id == _selectedGoogleCalId,
+                          )
+                          ? _selectedGoogleCalId
+                          : _googleCalendars.first.id,
+                      items: _googleCalendars
+                          .map(
+                            (c) => DropdownMenuItem(
+                              value: c.id,
+                              child: Text(
+                                c.title + (c.isPrimary ? ' (Principal)' : ''),
+                              ),
+                            ),
+                          )
+                          .toList(),
                       onChanged: (val) async {
                         if (val != null) {
-                          setState(() => _selectedGoogleCalId = val);
-                          final coordinator = ref.read(
-                            calendarSyncCoordinatorProvider,
-                          );
-                          await coordinator.googleProvider
+                          await ref
+                              .read(calendarSyncCoordinatorProvider)
+                              .googleProvider
                               .setSelectedCalendarId(val);
+                          setState(() => _selectedGoogleCalId = val);
                         }
                       },
                     ),
-                    if (_googleCalendars.any((calendar) => calendar.isReadOnly)) ...[
-                      const SizedBox(height: 12),
-                      const Text('Calendários adicionais (somente leitura)',
-                          style: TextStyle(fontWeight: FontWeight.bold)),
-                      const Text('Selecione, por exemplo, seus calendários de feriados.'),
-                      for (final calendar in _googleCalendars.where((c) => c.isReadOnly))
-                        CheckboxListTile(
-                          dense: true,
-                          title: Text(calendar.name),
-                          value: _readOnlyGoogleCalIds.contains(calendar.id),
-                          onChanged: (selected) async {
-                            final ids = Set<String>.of(_readOnlyGoogleCalIds);
-                            if (selected == true) {
-                              ids.add(calendar.id);
-                            } else {
-                              ids.remove(calendar.id);
-                            }
-                            final coordinator = ref.read(calendarSyncCoordinatorProvider);
-                            final db = ref.read(databaseProvider);
-                            await coordinator.googleProvider.setReadOnlyCalendarIds(ids);
-                            if (selected != true) {
-                              await (db.delete(db.externalCalendarEvents)
-                                    ..where((event) => event.provider.equals('google'))
-                                    ..where((event) => event.calendarId.equals(calendar.id)))
-                                  .go();
-                            }
-                            if (mounted) setState(() => _readOnlyGoogleCalIds = ids);
-                          },
-                        ),
-                    ],
                   ],
                 ],
               ),
@@ -582,8 +485,9 @@ class _ConnectedCalendarsScreenState
           ),
           const SizedBox(height: 16),
 
-          // CARD APPLE CALENDAR / EVENTKIT
+          // Card Apple Calendar
           Card(
+            elevation: 2,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
@@ -594,18 +498,9 @@ class _ConnectedCalendarsScreenState
                 children: [
                   Row(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: (isDark ? Colors.white : Colors.black)
-                              .withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          Icons.apple,
-                          color: isDark ? Colors.white : Colors.black,
-                          size: 24,
-                        ),
+                      const CircleAvatar(
+                        backgroundColor: Colors.black87,
+                        child: Icon(Icons.apple, color: Colors.white),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -613,7 +508,7 @@ class _ConnectedCalendarsScreenState
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'Apple Calendar / Dispositivo',
+                              'Apple Calendar / iCloud',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
@@ -621,16 +516,13 @@ class _ConnectedCalendarsScreenState
                             ),
                             Text(
                               _isAppleAuthorized
-                                  ? (_appleAccount ?? 'Acesso Autorizado')
-                                  : 'Não autorizado',
+                                  ? 'Conectado: ${_appleAccount ?? "Calendário Nativo iOS/macOS"}'
+                                  : 'Sincronização nativa com EventKit (iOS / macOS)',
                               style: TextStyle(
-                                fontSize: 13,
+                                fontSize: 12,
                                 color: _isAppleAuthorized
-                                    ? Colors.green[500]
+                                    ? Colors.green
                                     : Colors.grey,
-                                fontWeight: _isAppleAuthorized
-                                    ? FontWeight.w600
-                                    : FontWeight.normal,
                               ),
                             ),
                           ],
@@ -639,56 +531,54 @@ class _ConnectedCalendarsScreenState
                       if (_isAppleAuthorized)
                         OutlinedButton(
                           onPressed: _disconnectApple,
-                          child: const Text('Desvincular'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.red,
+                          ),
+                          child: const Text('Desconectar'),
                         )
                       else
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.check, size: 18),
-                          label: const Text('Autorizar'),
+                        ElevatedButton(
                           onPressed: _connectApple,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.black87,
+                            foregroundColor: Colors.white,
+                          ),
+                          child: const Text('Ativar'),
                         ),
                     ],
                   ),
                   if (_isAppleAuthorized && _appleCalendars.isNotEmpty) ...[
                     const Divider(height: 24),
                     const Text(
-                      'Calendário Selecionado no Dispositivo:',
+                      'Calendário Apple selecionado:',
                       style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 8),
                     DropdownButtonFormField<String>(
-                      key: ValueKey('apple-$_selectedAppleCalId'),
-                      initialValue: _selectedAppleCalId,
-                      hint: const Text('Selecione um calendário disponível'),
-                      isExpanded: true,
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                      ),
-                      items: _appleCalendars.map((c) {
-                        return DropdownMenuItem<String>(
-                          value: c.id,
-                          child: Text(
-                            '${c.name} (${c.accountName ?? "Local"})${c.isReadOnly ? " [Leitura]" : ""}',
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        );
-                      }).toList(),
+                      initialValue:
+                          _appleCalendars.any(
+                            (c) => c.id == _selectedAppleCalId,
+                          )
+                          ? _selectedAppleCalId
+                          : _appleCalendars.first.id,
+                      items: _appleCalendars
+                          .map(
+                            (c) => DropdownMenuItem(
+                              value: c.id,
+                              child: Text(c.title),
+                            ),
+                          )
+                          .toList(),
                       onChanged: (val) async {
                         if (val != null) {
+                          await ref
+                              .read(calendarSyncCoordinatorProvider)
+                              .appleProvider
+                              .setSelectedCalendarId(val);
                           setState(() => _selectedAppleCalId = val);
-                          final coordinator = ref.read(
-                            calendarSyncCoordinatorProvider,
-                          );
-                          await coordinator.appleProvider.setSelectedCalendarId(
-                            val,
-                          );
                         }
                       },
                     ),
