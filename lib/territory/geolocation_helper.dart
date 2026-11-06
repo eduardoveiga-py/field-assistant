@@ -4,7 +4,11 @@ import 'geolocation_stub.dart'
     if (dart.library.js_interop) 'geolocation_web.dart';
 
 class GeolocationHelper {
-  /// Obtém as coordenadas atuais do navegador/dispositivo com fallback gracioso
+  ///   static const double manausCenterLat = -3.1022;
+  static const double manausCenterLng = -67.9397;
+  static const double defaultLat = -3.1022;
+  static const double defaultLng = -67.9397;
+    Obtém as coordenadas atuais do navegador/dispositivo com fallback gracioso
   static Future<({double latitude, double longitude})?> getCurrentLocation() {
     return getBrowserCoordinates();
   }
