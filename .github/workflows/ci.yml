@@ -50,7 +50,7 @@ jobs:
           status=$?
           cat /tmp/flutter-tests.txt
           if [ "$status" -ne 0 ]; then
-            python3 -c 'from pathlib import Path; lines=Path("/tmp/flutter-tests.txt").read_text(errors="replace").splitlines(); hits=[i for i, line in enumerate(lines) if "[E]" in line]; [print("::error::" + "%0A".join(lines[i:i+16]).replace("%", "%25").replace("%250A", "%0A")) for i in hits]'
+            python3 -c 'from pathlib import Path; lines=Path("/tmp/flutter-tests.txt").read_text(errors="replace").splitlines(); hits=[i for i, line in enumerate(lines) if "[E]" in line]; exc=[i for i, line in enumerate(lines) if "EXCEPTION" in line or "Expected:" in line or "Actual:" in line]; idxs=sorted(set([j for i in hits+exc for j in range(max(0,i-25), min(len(lines), i+20))])); [print("::error::" + "%0A".join(lines[i:i+8]).replace("%", "%25").replace("%250A", "%0A")) for i in idxs]'
           fi
           exit "$status"
 
