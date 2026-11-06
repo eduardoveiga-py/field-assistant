@@ -52,3 +52,6 @@ app.*.map.json
 .agents/
 android/local.properties
 **/GeneratedPluginRegistrant.java
+
+*.m4p
+*.mp4
