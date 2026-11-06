@@ -8,7 +8,7 @@ class GeolocationHelper {
   static const double manausCenterLng = -67.9397;
   static const double defaultLat = -3.1022;
   static const double defaultLng = -67.9397;
-    Obtém as coordenadas atuais do navegador/dispositivo com fallback gracioso
+    /// Obtém as coordenadas atuais do navegador/dispositivo com fallback gracioso
   static Future<({double latitude, double longitude})?> getCurrentLocation() {
     return getBrowserCoordinates();
   }
