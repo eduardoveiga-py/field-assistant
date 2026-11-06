@@ -1495,8 +1495,7 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                   },
                   child: InteractiveViewer(
                     transformationController: _transformationController,
-                    constrained: false,
-                    scaleEnabled: false, // Permite que o mapa ocupe 100% da área sem distorção ou cortes pretos
+                    constrained: false, // Permite que o mapa ocupe 100% da área sem distorção ou cortes pretos
                     boundaryMargin: const EdgeInsets.all(
                       250,
                     ), // Margem segura para zoom fluido sem travamento

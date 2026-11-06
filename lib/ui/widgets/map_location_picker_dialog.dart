@@ -361,7 +361,6 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
                           child: InteractiveViewer(
                             transformationController: _transformationController,
                             constrained: false,
-                            scaleEnabled: false,
                             boundaryMargin: EdgeInsets.zero,
                             panEnabled: true,
                             scaleEnabled: false,
