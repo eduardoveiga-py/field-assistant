@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ministerio_pessoal/appointments/calendar_provider.dart';
-import 'package:ministerio_pessoal/ui/screens/connected_calendars_screen.dart';
 
 void main() {
   test('Resolve o apelido primary para o calendário principal do Google', () {
