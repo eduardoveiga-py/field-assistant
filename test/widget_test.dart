@@ -145,9 +145,13 @@ void main() {
       expect(find.byType(NavigationRail), findsNothing);
       expect(find.text('Salvo Localmente'), findsOneWidget);
 
-      // Toca no atalho rápido de Estudos na TodayScreen
-      final estudosQuickAction = find.text('Estudos').first;
-      await tester.tap(estudosQuickAction);
+      // Toca no destino Estudos na NavigationBar inferior
+      final estudosNav = find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Estudos'),
+      );
+      expect(estudosNav, findsOneWidget);
+      await tester.tap(estudosNav);
       await tester.pumpAndSettle();
 
       expect(find.text('Estudos Bíblicos'), findsOneWidget);
