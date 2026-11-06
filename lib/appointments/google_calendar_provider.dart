@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'dart:convert';
+
 import 'package:drift/drift.dart' as drift;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -47,6 +49,29 @@ class GoogleCalendarProvider implements CalendarProvider {
   static const String _keySelectedCalendarId = 'google_calendar_selected_id';
   static const String _keyConnectedEmail = 'google_calendar_connected_email';
   static const String _keySyncTokenPrefix = 'google_calendar_synctoken_';
+  static const String _keyReadOnlyCalendarIds = 'google_readonly_calendar_ids';
+
+  /// IDs de calendários marcados como somente leitura (ex.: feriados públicos).
+  Future<Set<String>> getReadOnlyCalendarIds() async {
+    try {
+      final raw = await _secureStorage.read(key: _keyReadOnlyCalendarIds);
+      if (raw == null || raw.trim().isEmpty) return {};
+      final decoded = jsonDecode(raw);
+      if (decoded is List) {
+        return decoded.whereType<String>().toSet();
+      }
+      return {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  Future<void> setReadOnlyCalendarIds(Set<String> ids) async {
+    await _secureStorage.write(
+      key: _keyReadOnlyCalendarIds,
+      value: jsonEncode(ids.toList()),
+    );
+  }
 
   GoogleSignInAccount? _currentUser;
   Map<String, String>? _webAuthHeaders;

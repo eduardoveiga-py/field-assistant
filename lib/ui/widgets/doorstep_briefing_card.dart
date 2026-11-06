@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../contacts/doorstep_briefing_helper.dart';
 import '../../core/app_theme.dart';
+import '../../core/date_utils.dart';
 import '../../voice_notes/audio_recording_service.dart';
 
 /// Card de visualização ultrarrápida (30 segundos) para preparação imediata

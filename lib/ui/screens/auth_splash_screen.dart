@@ -305,7 +305,7 @@ class _SupabaseAuthScreenState extends State<SupabaseAuthScreen> {
           data: name.isNotEmpty ? {'full_name': name} : null,
         );
         if (res.session != null) {
-          widget.onAuthenticated?.call();
+          widget.onAuthenticated();
           return;
         } else {
           // Tenta login imediato caso confirmação de e-mail esteja desativada
@@ -315,7 +315,7 @@ class _SupabaseAuthScreenState extends State<SupabaseAuthScreen> {
               password: password,
             );
             if (signInRes.session != null) {
-              widget.onAuthenticated?.call();
+              widget.onAuthenticated();
               return;
             }
           } catch (_) {}
@@ -330,7 +330,7 @@ class _SupabaseAuthScreenState extends State<SupabaseAuthScreen> {
           password: password,
         );
         if (res.session != null) {
-          widget.onAuthenticated?.call();
+          widget.onAuthenticated();
           return;
         }
       }

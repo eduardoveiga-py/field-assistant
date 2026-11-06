@@ -63,6 +63,7 @@ class DoorstepBriefingData {
       (audioFilePath != null && audioFilePath!.trim().isNotEmpty) ||
       (voiceNoteTranscription != null &&
           voiceNoteTranscription!.trim().isNotEmpty);
+  bool get hasLastVisitDate => lastVisitDate != null;
 
   /// Indica se há pelo menos um dado relevante para exibição no card
   bool get hasAnyData =>
@@ -98,14 +99,16 @@ class DoorstepBriefingData {
       publicationTitle.hashCode ^
       audioFilePath.hashCode ^
       voiceNoteTranscription.hashCode ^
-      voiceNoteDurationSeconds.hashCode;
+      voiceNoteDurationSeconds.hashCode ^
+      lastVisitDate.hashCode;
 
   @override
   String toString() =>
       'DoorstepBriefingData(lessonAndPoint: $lessonAndPoint, jwLibraryUri: $jwLibraryUri, '
       'pendingDoubt: $pendingDoubt, spiritualGoal: $spiritualGoal, empathyNote: $empathyNote, '
       'publicationTitle: $publicationTitle, audioFilePath: $audioFilePath, '
-      'voiceNoteTranscription: $voiceNoteTranscription, voiceNoteDurationSeconds: $voiceNoteDurationSeconds)';
+      'voiceNoteTranscription: $voiceNoteTranscription, voiceNoteDurationSeconds: $voiceNoteDurationSeconds, '
+      'lastVisitDate: $lastVisitDate)';
 }
 
 /// Helper puro responsável por consolidar os dados para o Briefing na Porta.
@@ -141,6 +144,7 @@ class DoorstepBriefingHelper {
       audioFilePath: latestVoiceNote?.audioFilePath,
       voiceNoteTranscription: latestVoiceNote?.transcription,
       voiceNoteDurationSeconds: latestVoiceNote?.audioDurationSeconds,
+      lastVisitDate: latestVisit?.dateTimeField,
     );
   }
 

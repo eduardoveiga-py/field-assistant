@@ -20,6 +20,43 @@ enum SyncDirection {
   const SyncDirection(this.label);
 }
 
+/// Resolve qual calendrier externe deve ser selecionado a partir do ID salvo.
+///
+/// - Se [savedId] for 'primary' e [google] for verdadeiro, retorna o ID do
+///   calendário primário (isPrimary) da conta Google; se não houver, null.
+/// - Se [savedId] existir na lista, retorna ele mesmo.
+/// - Caso contrário, retorna null (não seleciona outro calendário por engano).
+String? resolveCalendarSelection(
+  List<ExternalCalendarItem> calendars,
+  String? savedId, {
+  bool google = false,
+}) {
+  if (savedId == null || savedId.trim().isEmpty) return null;
+  if (savedId == 'primary') {
+    if (!google) return null;
+    for (final c in calendars) {
+      if (c.isPrimary && c.id.isNotEmpty) return c.id;
+    }
+    return null;
+  }
+  for (final c in calendars) {
+    if (c.id == savedId) return c.id;
+  }
+  return null;
+}
+
+/// Remove itens com ID vazio e duplicados (mantém a primeira ocorrência),
+/// preservando a ordem original — usado para montar o seletor de calendários.
+List<ExternalCalendarItem> uniqueCalendarItems(List<ExternalCalendarItem> items) {
+  final seen = <String>{};
+  final result = <ExternalCalendarItem>[];
+  for (final item in items) {
+    if (item.id.trim().isEmpty) continue;
+    if (seen.add(item.id)) result.add(item);
+  }
+  return result;
+}
+
 class ExternalCalendarItem {
   final String id;
   final String name;

@@ -1,10 +1,15 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/app_theme.dart';
 import '../../database/app_database.dart';
+import '../../territory/geocoding_service.dart';
+import '../../territory/geolocation_helper.dart';
 import '../../territory/sector_manager.dart';
+import '../../territory/tile_cache/tile_cache_service.dart';
 import '../providers.dart';
 import 'person_detail_screen.dart';
 
@@ -138,6 +143,7 @@ class _SectorDetailScreenState extends ConsumerState<SectorDetailScreen> {
     } catch (_) {
       // fallback silencioso para a coordenada padrão
     }
+    if (!mounted) return;
 
     const zoomLevels = [13, 14, 15, 16, 17];
     const half = 4; // janela 9x9 blocos por nível de zoom

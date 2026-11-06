@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../../appointments/availability_engine.dart';
+import '../../appointments/brazil_holidays.dart';
 import '../../appointments/calendar_sync_coordinator.dart';
 import '../../appointments/calendar_provider.dart';
 import '../../appointments/external_events_for_display.dart';
@@ -3550,7 +3551,13 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                                   ),
                                 ),
                               ),
-                              if (dayAppts.length > 2)
+                              if (isHoliday)
+                                const Icon(
+                                  Icons.celebration_outlined,
+                                  size: 12,
+                                  color: Color(0xFFB45309),
+                                )
+                              else if (dayAppts.length > 2)
                                 Text(
                                   '+${dayAppts.length - 2}',
                                   style: TextStyle(

@@ -59,7 +59,7 @@ void main() {
   });
 
   group('DoorstepBriefingData.lastVisitDate', () {
-    PersonEntry _person() {
+    PersonEntry person() {
       final now = DateTime(2026, 10, 30, 10, 0);
       return PersonEntry(
         id: 'p-1',
@@ -79,7 +79,7 @@ void main() {
       );
     }
 
-    VisitEntry _visit(DateTime date) {
+    VisitEntry visit(DateTime date) {
       final now = DateTime(2026, 10, 30, 10, 0);
       return VisitEntry(
         id: 'v-1',
@@ -103,9 +103,9 @@ void main() {
     test('build preenche lastVisitDate a partir da última visita', () {
       final visitDate = DateTime(2026, 9, 15, 16, 30);
       final data = DoorstepBriefingHelper.build(
-        person: _person(),
+        person: person(),
         linkedStudy: null,
-        latestVisit: _visit(visitDate),
+        latestVisit: visit(visitDate),
         latestVoiceNote: null,
       );
       expect(data.lastVisitDate, visitDate);
@@ -114,7 +114,7 @@ void main() {
 
     test('build sem visita deixa lastVisitDate nulo', () {
       final data = DoorstepBriefingHelper.build(
-        person: _person(),
+        person: person(),
         linkedStudy: null,
         latestVisit: null,
         latestVoiceNote: null,

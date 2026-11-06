@@ -4,7 +4,7 @@ import 'package:ministerio_pessoal/ui/screens/auth_splash_screen.dart';
 
 void main() {
   testWidgets('Login e cadastro não exigem configuração do Supabase', (tester) async {
-    await tester.pumpWidget(const MaterialApp(home: SupabaseAuthScreen()));
+    await tester.pumpWidget(MaterialApp(home: SupabaseAuthScreen(onAuthenticated: () {})));
     expect(find.text('Entrar no Assistente'), findsOneWidget);
     expect(find.text('E-mail'), findsOneWidget);
     expect(find.text('Senha'), findsOneWidget);
