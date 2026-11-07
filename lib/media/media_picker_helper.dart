@@ -99,7 +99,7 @@ class MediaPickerHelper {
                         if (ctx.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text('Não foi possível abrir a câmera: $e'),
+                              content: Text('Câmera indisponível no ambiente atual ($e). Utilize a Galeria de Fotos ou cole link/base64.'),
                             ),
                           );
                         }

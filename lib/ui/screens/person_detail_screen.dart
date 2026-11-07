@@ -140,7 +140,10 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
               label: const Text('Abrir'),
               onPressed: () async {
                 final uri = Uri.parse(resolved.url!);
-                if (await canLaunchUrl(uri)) {
+                final jwAppUri = Uri.tryParse('jwlibrary:///finder?${uri.query}');
+                if (jwAppUri != null && await canLaunchUrl(jwAppUri)) {
+                  await launchUrl(jwAppUri, mode: LaunchMode.externalApplication);
+                } else if (await canLaunchUrl(uri)) {
                   await launchUrl(uri, mode: LaunchMode.externalApplication);
                 } else if (resolved.fallbackUrl != null) {
                   await launchUrl(
@@ -4595,7 +4598,10 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                           visualDensity: VisualDensity.compact,
                           onPressed: () async {
                             final uri = Uri.parse('tel:${person.phone}');
-                            if (await canLaunchUrl(uri)) {
+                            final jwAppUri = Uri.tryParse('jwlibrary:///finder?${uri.query}');
+                if (jwAppUri != null && await canLaunchUrl(jwAppUri)) {
+                  await launchUrl(jwAppUri, mode: LaunchMode.externalApplication);
+                } else if (await canLaunchUrl(uri)) {
                               await launchUrl(uri);
                             }
                           },
@@ -4614,7 +4620,10 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                               '',
                             );
                             final uri = Uri.parse('https://wa.me/$cleanPhone');
-                            if (await canLaunchUrl(uri)) {
+                            final jwAppUri = Uri.tryParse('jwlibrary:///finder?${uri.query}');
+                if (jwAppUri != null && await canLaunchUrl(jwAppUri)) {
+                  await launchUrl(jwAppUri, mode: LaunchMode.externalApplication);
+                } else if (await canLaunchUrl(uri)) {
                               await launchUrl(
                                 uri,
                                 mode: LaunchMode.externalApplication,

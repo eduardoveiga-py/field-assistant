@@ -82,6 +82,7 @@
 		<string>mailto</string>
 		<string>geo</string>
 		<string>whatsapp</string>
+		<string>jwlibrary</string>
 	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>O aplicativo precisa de acesso à câmera para fotografar anotações, mapas e cartões de território.</string>

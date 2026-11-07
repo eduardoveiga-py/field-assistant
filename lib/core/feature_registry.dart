@@ -79,6 +79,14 @@ enum AppFeature {
     category: FeatureCategory.tools,
     isEssential: false,
   ),
+  ticuna(
+    id: 'ticuna',
+    title: 'Ticuna',
+    description: 'Dicionário teocrático, vocabulário e frases úteis na língua Ticuna',
+    icon: Icons.translate,
+    category: FeatureCategory.tools,
+    isEssential: false,
+  ),
   territoryMaps(
     id: 'territory_maps',
     title: 'Mapas & Territórios',

@@ -6,12 +6,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
-import '../../core/demo_data.dart';
 import '../../contacts/person_hand_off_helper.dart';
 import '../../sync/supabase_sync_service.dart';
 import '../../territory/geocoding_service.dart';
 import '../../territory/sector_manager.dart';
 import '../providers.dart';
+import '../widgets/add_person_dialog.dart';
 import '../widgets/map_location_picker_dialog.dart';
 import 'activities_screen.dart';
 import 'contacts_map_screen.dart';
@@ -62,6 +62,8 @@ class TodayScreen extends ConsumerWidget {
         return 6;
       case AppFeature.notesResearch:
         return 7;
+      case AppFeature.ticuna:
+        return 9;
       case AppFeature.territoryMaps:
         return 1;
     }
@@ -1144,7 +1146,7 @@ class TodayScreen extends ConsumerWidget {
                     color: isDark
                         ? const Color(0xFF60A5FA)
                         : AppTheme.primaryBlue,
-                    onTap: () => _navigateTo(AppFeature.people),
+                    onTap: () => showAddPersonDialog(context, ref),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -1154,7 +1156,10 @@ class TodayScreen extends ConsumerWidget {
                     label: 'Revisitas',
                     themeType: _CardArtworkTheme.returnVisits,
                     color: AppTheme.accentTeal,
-                    onTap: () => _navigateTo(AppFeature.people),
+                    onTap: () {
+                      ref.read(peopleFilterProvider.notifier).state = 'Revisitas';
+                      _navigateTo(AppFeature.people);
+                    },
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -1625,101 +1630,6 @@ class TodayScreen extends ConsumerWidget {
               error: (err, _) => Text('Erro ao carregar contatos: $err'),
             ),
             const SizedBox(height: 24),
-
-            // Card informativo de Demonstração Isolada
-            Card(
-              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.science,
-                          color: isDark
-                              ? const Color(0xFF60A5FA)
-                              : AppTheme.primaryBlue,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Modo de Demonstração Disponível',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: isDark
-                                  ? const Color(0xFF93C5FD)
-                                  : AppTheme.primaryBlue,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Você pode popular o sistema com dados demonstrativos fictícios para testar sem conectar ao Supabase.',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: isDark
-                            ? const Color(0xFFCBD5E1)
-                            : AppTheme.textMuted,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        OutlinedButton.icon(
-                          icon: const Icon(Icons.add_to_photos, size: 18),
-                          label: const Text('Carregar Dados de Demonstração'),
-                          onPressed: () async {
-                            final repo = ref.read(repositoryProvider);
-                            await DemoDataGenerator.populateDemoData(repo);
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Dados de demonstração gerados com sucesso!',
-                                  ),
-                                ),
-                              );
-                            }
-                          },
-                        ),
-                        OutlinedButton.icon(
-                          icon: const Icon(
-                            Icons.delete_outline,
-                            size: 18,
-                            color: AppTheme.alertRed,
-                          ),
-                          label: const Text(
-                            'Remover Demonstração',
-                            style: TextStyle(color: AppTheme.alertRed),
-                          ),
-                          onPressed: () async {
-                            final repo = ref.read(repositoryProvider);
-                            final count = await DemoDataGenerator.clearDemoData(repo);
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    count > 0
-                                        ? 'Dados de demonstração removidos com sucesso!'
-                                        : 'Nenhum dado de demonstração encontrado.',
-                                  ),
-                                ),
-                              );
-                            }
-                          },
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
           ],
         ),
       ),

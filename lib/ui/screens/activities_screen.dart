@@ -397,310 +397,14 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
           final hours = totalSecondsInPeriod ~/ 3600;
           final minutes = (totalSecondsInPeriod % 3600) ~/ 60;
 
-          return Column(
-            children: [
+          return CustomScrollView(
+            slivers: [
               // Card do Cronômetro de Campo com Detecção de Parada e Modo Carrinho (Ideia 2)
-              Card(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                elevation: isDark ? 0 : 2,
-                color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(
-                    color: isDark
-                        ? const Color(0xFF334155)
-                        : const Color(0xFFE2E8F0),
-                  ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                _timerModality == 'testemunho_publico'
-                                    ? Icons.storefront
-                                    : Icons.timer,
-                                color: _timerModality == 'testemunho_publico'
-                                    ? const Color(0xFF7C3AED)
-                                    : AppTheme.primaryBlue,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                _timerModality == 'testemunho_publico'
-                                    ? 'Modo Carrinho / Público'
-                                    : 'Cronômetro de Campo',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                  color: isDark
-                                      ? Colors.white
-                                      : AppTheme.textDark,
-                                ),
-                              ),
-                            ],
-                          ),
-                          DropdownButton<String>(
-                            value: _timerModality,
-                            underline: const SizedBox.shrink(),
-                            dropdownColor: isDark
-                                ? const Color(0xFF1E293B)
-                                : Colors.white,
-                            isDense: true,
-                            items: const [
-                              DropdownMenuItem(
-                                value: 'campo',
-                                child: Text(
-                                  'De Casa em Casa',
-                                  style: TextStyle(fontSize: 12),
-                                ),
-                              ),
-                              DropdownMenuItem(
-                                value: 'testemunho_publico',
-                                child: Text(
-                                  '🛒 Modo Carrinho',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              DropdownMenuItem(
-                                value: 'informal',
-                                child: Text(
-                                  'Informal',
-                                  style: TextStyle(fontSize: 12),
-                                ),
-                              ),
-                              DropdownMenuItem(
-                                value: 'carta_telefone',
-                                child: Text(
-                                  'Cartas/Telefone',
-                                  style: TextStyle(fontSize: 12),
-                                ),
-                              ),
-                            ],
-                            onChanged: (val) {
-                              if (val != null) {
-                                setState(() => _timerModality = val);
-                              }
-                            },
-                          ),
-                        ],
-                      ),
-                      if (_detectPotentialStop) ...[
-                        const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFEF3C7),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: const Color(0xFFF59E0B)),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.coffee,
-                                color: Color(0xFFB45309),
-                                size: 18,
-                              ),
-                              const SizedBox(width: 8),
-                              const Expanded(
-                                child: Text(
-                                  'Parada detectada: Você fez um intervalo ou encerrou o campo?',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Color(0xFF92400E),
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              TextButton(
-                                onPressed: () => setState(
-                                  () => _stoppedNoticeDismissed = true,
-                                ),
-                                child: const Text(
-                                  'Dispensar',
-                                  style: TextStyle(fontSize: 11),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 8),
-                      Text(
-                        AppDateUtils.formatDuration(_timerSeconds),
-                        style: TextStyle(
-                          fontSize: 30,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1.5,
-                          color: _isTimerRunning
-                              ? AppTheme.primaryBlue
-                              : (isDark ? Colors.white : AppTheme.textDark),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _isTimerRunning
-                                  ? Colors.orange
-                                  : AppTheme.primaryBlue,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 6,
-                              ),
-                            ),
-                            icon: Icon(
-                              _isTimerRunning ? Icons.pause : Icons.play_arrow,
-                              size: 18,
-                            ),
-                            label: Text(
-                              _isTimerRunning
-                                  ? 'Pausar'
-                                  : (_timerSeconds > 0
-                                        ? 'Continuar'
-                                        : 'Iniciar Campo'),
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                            onPressed: _toggleTimer,
-                          ),
-                          if (_timerSeconds > 0) ...[
-                            const SizedBox(width: 8),
-                            ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppTheme.successGreen,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6,
-                                ),
-                              ),
-                              icon: const Icon(Icons.check, size: 16),
-                              label: const Text(
-                                'Salvar',
-                                style: TextStyle(fontSize: 12),
-                              ),
-                              onPressed: _saveTimerActivity,
-                            ),
-                            const SizedBox(width: 6),
-                            IconButton(
-                              icon: const Icon(Icons.refresh, size: 18),
-                              tooltip: 'Zerar cronômetro',
-                              onPressed: _resetTimer,
-                            ),
-                          ],
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              // Calculadora de Ritmo Real de Campo do Pioneiro (R2)
-              Builder(
-                builder: (context) {
-                  final now = DateTime.now();
-                  final currentMonthStart = DateTime(now.year, now.month, 1);
-                  final currentMonthEnd = DateTime(
-                    now.year,
-                    now.month + 1,
-                    0,
-                    23,
-                    59,
-                    59,
-                  );
-                  final currentMonthActivities = allActivities
-                      .where(
-                        (a) =>
-                            a.deletedAt == null &&
-                            a.date.isAfter(
-                              currentMonthStart.subtract(
-                                const Duration(seconds: 1),
-                              ),
-                            ) &&
-                            a.date.isBefore(
-                              currentMonthEnd.add(const Duration(seconds: 1)),
-                            ),
-                      )
-                      .toList();
-                  final currentMonthSeconds = currentMonthActivities.fold<int>(
-                    0,
-                    (sum, a) => sum + a.durationSeconds,
-                  );
-                  final currentMonthCompletedHours =
-                      currentMonthSeconds / 3600.0;
-
-                  return PioneerPaceCard(
-                    currentMonthCompletedHours: currentMonthCompletedHours,
-                  );
-                },
-              ),
-
-              // Barra de seleção de período
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                color: isDark
-                    ? const Color(0xFF0F172A)
-                    : const Color(0xFFF1F5F9),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children:
-                        [
-                          'Hoje',
-                          'Esta Semana',
-                          'Este Mês',
-                          'Ano de Serviço',
-                        ].map((p) {
-                          final isSelected = _selectedPeriod == p;
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: FilterChip(
-                              label: Text(
-                                p,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: isSelected
-                                      ? FontWeight.bold
-                                      : FontWeight.normal,
-                                ),
-                              ),
-                              selected: isSelected,
-                              selectedColor: AppTheme.primaryBlue.withValues(
-                                alpha: 0.15,
-                              ),
-                              checkmarkColor: AppTheme.primaryBlue,
-                              onSelected: (_) =>
-                                  setState(() => _selectedPeriod = p),
-                            ),
-                          );
-                        }).toList(),
-                  ),
-                ),
-              ),
-              const Divider(height: 1),
-
-              // Card de Resumo do Período
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              SliverToBoxAdapter(
                 child: Card(
-                  color: isDark
-                      ? const Color(0xFF1E293B)
-                      : const Color(0xFFF8FAFC),
-                  elevation: isDark ? 0 : 1,
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  elevation: isDark ? 0 : 2,
+                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                     side: BorderSide(
@@ -710,54 +414,197 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
                     ),
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
                       children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        Wrap(
+                          alignment: WrapAlignment.spaceBetween,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 8,
+                          runSpacing: 6,
                           children: [
-                            Text(
-                              'Total em $_selectedPeriod',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: isDark
-                                    ? const Color(0xFF94A3B8)
-                                    : AppTheme.textMuted,
-                                fontWeight: FontWeight.bold,
-                              ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  _timerModality == 'testemunho_publico'
+                                      ? Icons.storefront
+                                      : Icons.timer,
+                                  color: _timerModality == 'testemunho_publico'
+                                      ? const Color(0xFF7C3AED)
+                                      : AppTheme.primaryBlue,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _timerModality == 'testemunho_publico'
+                                      ? 'Modo Carrinho / Público'
+                                      : 'Cronômetro de Campo',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                    color: isDark
+                                        ? Colors.white
+                                        : AppTheme.textDark,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '${hours}h ${minutes.toString().padLeft(2, '0')}m',
-                              style: const TextStyle(
-                                fontSize: 26,
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.primaryBlue,
-                              ),
-                            ),
-                            Text(
-                              '${filteredActivities.length} registro(s) de atividade',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: isDark
-                                    ? const Color(0xFF94A3B8)
-                                    : AppTheme.textMuted,
-                              ),
+                            DropdownButton<String>(
+                              value: _timerModality,
+                              underline: const SizedBox.shrink(),
+                              dropdownColor: isDark
+                                  ? const Color(0xFF1E293B)
+                                  : Colors.white,
+                              isDense: true,
+                              items: const [
+                                DropdownMenuItem(
+                                  value: 'campo',
+                                  child: Text(
+                                    'De Casa em Casa',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'testemunho_publico',
+                                  child: Text(
+                                    '🛒 Modo Carrinho',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'informal',
+                                  child: Text(
+                                    'Informal',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'carta_telefone',
+                                  child: Text(
+                                    'Cartas/Telefone',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
+                                ),
+                              ],
+                              onChanged: (val) {
+                                if (val != null) {
+                                  setState(() => _timerModality = val);
+                                }
+                              },
                             ),
                           ],
                         ),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: AppTheme.primaryBlue.withValues(alpha: 0.12),
-                            shape: BoxShape.circle,
+                        if (_detectPotentialStop) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEF3C7),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFFF59E0B)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.coffee,
+                                  color: Color(0xFFB45309),
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 8),
+                                const Expanded(
+                                  child: Text(
+                                    'Parada detectada: Você fez um intervalo ou encerrou o campo?',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Color(0xFF92400E),
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: () => setState(
+                                    () => _stoppedNoticeDismissed = true,
+                                  ),
+                                  child: const Text(
+                                    'Dispensar',
+                                    style: TextStyle(fontSize: 11),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                          child: const Icon(
-                            Icons.timer_outlined,
-                            size: 30,
-                            color: AppTheme.primaryBlue,
+                        ],
+                        const SizedBox(height: 8),
+                        Text(
+                          AppDateUtils.formatDuration(_timerSeconds),
+                          style: TextStyle(
+                            fontSize: 30,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1.5,
+                            color: _isTimerRunning
+                                ? AppTheme.primaryBlue
+                                : (isDark ? Colors.white : AppTheme.textDark),
                           ),
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _isTimerRunning
+                                    ? Colors.orange
+                                    : AppTheme.primaryBlue,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 6,
+                                ),
+                              ),
+                              icon: Icon(
+                                _isTimerRunning ? Icons.pause : Icons.play_arrow,
+                                size: 18,
+                              ),
+                              label: Text(
+                                _isTimerRunning
+                                    ? 'Pausar'
+                                    : (_timerSeconds > 0
+                                          ? 'Continuar'
+                                          : 'Iniciar Campo'),
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                              onPressed: _toggleTimer,
+                            ),
+                            if (_timerSeconds > 0) ...[
+                              const SizedBox(width: 8),
+                              ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppTheme.successGreen,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 6,
+                                  ),
+                                ),
+                                icon: const Icon(Icons.check, size: 16),
+                                label: const Text(
+                                  'Salvar',
+                                  style: TextStyle(fontSize: 12),
+                                ),
+                                onPressed: _saveTimerActivity,
+                              ),
+                              const SizedBox(width: 6),
+                              IconButton(
+                                icon: const Icon(Icons.refresh, size: 18),
+                                tooltip: 'Zerar cronômetro',
+                                onPressed: _resetTimer,
+                              ),
+                            ],
+                          ],
                         ),
                       ],
                     ),
@@ -765,94 +612,269 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
                 ),
               ),
 
-              // Lista de Registros
-              Expanded(
-                child: filteredActivities.isEmpty
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.history_toggle_off,
-                                size: 56,
-                                color: Colors.grey.shade400,
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                'Nenhuma atividade registrada para $_selectedPeriod.',
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  color: AppTheme.textMuted,
-                                  fontSize: 15,
+              // Calculadora de Ritmo Real de Campo do Pioneiro (R2)
+              SliverToBoxAdapter(
+                child: Builder(
+                  builder: (context) {
+                    final now = DateTime.now();
+                    final currentMonthStart = DateTime(now.year, now.month, 1);
+                    final currentMonthEnd = DateTime(
+                      now.year,
+                      now.month + 1,
+                      0,
+                      23,
+                      59,
+                      59,
+                    );
+                    final currentMonthActivities = allActivities
+                        .where(
+                          (a) =>
+                              a.deletedAt == null &&
+                              a.date.isAfter(
+                                currentMonthStart.subtract(
+                                  const Duration(seconds: 1),
                                 ),
+                              ) &&
+                              a.date.isBefore(
+                                currentMonthEnd.add(const Duration(seconds: 1)),
                               ),
-                            ],
-                          ),
-                        ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: filteredActivities.length,
-                        itemBuilder: (context, index) {
-                          final act = filteredActivities[index];
-                          final h = act.durationSeconds ~/ 3600;
-                          final m = (act.durationSeconds % 3600) ~/ 60;
+                        )
+                        .toList();
+                    final currentMonthSeconds = currentMonthActivities.fold<int>(
+                      0,
+                      (sum, a) => sum + a.durationSeconds,
+                    );
+                    final currentMonthCompletedHours =
+                        currentMonthSeconds / 3600.0;
 
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            child: ListTile(
-                              leading: Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.accentTeal.withValues(
-                                    alpha: 0.1,
+                    return PioneerPaceCard(
+                      currentMonthCompletedHours: currentMonthCompletedHours,
+                    );
+                  },
+                ),
+              ),
+
+              // Barra de seleção de período
+              SliverToBoxAdapter(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  color: isDark
+                      ? const Color(0xFF0F172A)
+                      : const Color(0xFFF1F5F9),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children:
+                          [
+                            'Hoje',
+                            'Esta Semana',
+                            'Este Mês',
+                            'Ano de Serviço',
+                          ].map((p) {
+                            final isSelected = _selectedPeriod == p;
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: FilterChip(
+                                label: Text(
+                                  p,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: isSelected
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
                                   ),
-                                  borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: Text(
-                                  h > 0 ? '${h}h ${m}m' : '${m}m',
-                                  style: const TextStyle(
+                                selected: isSelected,
+                                selectedColor: AppTheme.primaryBlue.withValues(
+                                  alpha: 0.15,
+                                ),
+                                checkmarkColor: AppTheme.primaryBlue,
+                                onSelected: (_) =>
+                                    setState(() => _selectedPeriod = p),
+                              ),
+                            );
+                          }).toList(),
+                    ),
+                  ),
+                ),
+              ),
+              const SliverToBoxAdapter(child: Divider(height: 1)),
+
+              // Card de Resumo do Período
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: Card(
+                    color: isDark
+                        ? const Color(0xFF1E293B)
+                        : const Color(0xFFF8FAFC),
+                    elevation: isDark ? 0 : 1,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(
+                        color: isDark
+                            ? const Color(0xFF334155)
+                            : const Color(0xFFE2E8F0),
+                      ),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Total em $_selectedPeriod',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isDark
+                                        ? const Color(0xFF94A3B8)
+                                        : AppTheme.textMuted,
                                     fontWeight: FontWeight.bold,
-                                    color: AppTheme.accentTeal,
                                   ),
                                 ),
-                              ),
-                              title: Text(
-                                _formatModality(act.modality),
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
+                                const SizedBox(height: 4),
+                                Text(
+                                  '${hours}h ${minutes.toString().padLeft(2, '0')}m',
+                                  style: const TextStyle(
+                                    fontSize: 26,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.primaryBlue,
+                                  ),
                                 ),
-                              ),
-                              subtitle: Text(
-                                '${AppDateUtils.formatDate(act.date)}${act.notes != null ? " • ${act.notes}" : ""}',
-                                style: const TextStyle(fontSize: 12),
-                              ),
-                              trailing: IconButton(
-                                icon: const Icon(
-                                  Icons.delete_outline,
-                                  size: 20,
-                                  color: Colors.grey,
+                                Text(
+                                  '${filteredActivities.length} registro(s) de atividade',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: isDark
+                                        ? const Color(0xFF94A3B8)
+                                        : AppTheme.textMuted,
+                                  ),
                                 ),
-                                onPressed: () async {
-                                  final repo = ref.read(repositoryProvider);
-                                  await repo.deleteActivityRecord(act.id);
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'Atividade removida com sucesso.',
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                },
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryBlue.withValues(alpha: 0.12),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.timer_outlined,
+                              size: 30,
+                              color: AppTheme.primaryBlue,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // Lista de Registros
+              if (filteredActivities.isEmpty)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.history_toggle_off,
+                            size: 56,
+                            color: Colors.grey.shade400,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Nenhuma atividade registrada para $_selectedPeriod.',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: AppTheme.textMuted,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                )
+              else
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  sliver: SliverList.builder(
+                    itemCount: filteredActivities.length,
+                    itemBuilder: (context, index) {
+                      final act = filteredActivities[index];
+                      final h = act.durationSeconds ~/ 3600;
+                      final m = (act.durationSeconds % 3600) ~/ 60;
+
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: ListTile(
+                          leading: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppTheme.accentTeal.withValues(
+                                alpha: 0.1,
+                              ),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              h > 0 ? '${h}h ${m}m' : '${m}m',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.accentTeal,
                               ),
                             ),
-                          );
-                        },
-                      ),
+                          ),
+                          title: Text(
+                            _formatModality(act.modality),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          subtitle: Text(
+                            '${AppDateUtils.formatDate(act.date)}${act.notes != null ? " • ${act.notes}" : ""}',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          trailing: IconButton(
+                            icon: const Icon(
+                              Icons.delete_outline,
+                              size: 20,
+                              color: Colors.grey,
+                            ),
+                            onPressed: () async {
+                              final repo = ref.read(repositoryProvider);
+                              await repo.deleteActivityRecord(act.id);
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Atividade removida com sucesso.',
+                                    ),
+                                  ),
+                                );
+                              }
+                            },
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              const SliverToBoxAdapter(
+                child: SizedBox(height: 80),
               ),
             ],
           );

@@ -94,7 +94,7 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
     double centerLng,
     double centerLat,
   ) {
-    final targetZoom = newZoom.clamp(10, 19);
+    final targetZoom = newZoom.clamp(6, 19);
     if (targetZoom == _zoom) return;
 
     final currentMatrix = _transformationController.value;
@@ -1465,7 +1465,7 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                           centerLat,
                         );
                       } else if (pointerSignal.scrollDelta.dy > 2 &&
-                          _zoom > 10) {
+                          _zoom > 6) {
                         _lastZoomChangeTime = now;
                         _changeZoom(
                           _zoom - 1,
@@ -1500,7 +1500,7 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                       250,
                     ), // Margem segura para zoom fluido sem travamento
                     panEnabled: true,
-                    scaleEnabled: false, // Habilita zoom fluido por gesto de pinça na tela e trackpad
+                    scaleEnabled: true, // Habilita zoom fluido por gesto de pinça na tela e trackpad
                     trackpadScrollCausesScale: true, // Garante que pinça de trackpad aplique ZOOM em vez de deslizar para os lados
                     minScale: 0.6,
                     maxScale: 2.0,
@@ -1516,7 +1516,7 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                           centerLng,
                           centerLat,
                         );
-                      } else if (currentScale <= 0.8 && _zoom > 10) {
+                      } else if (currentScale <= 0.8 && _zoom > 6) {
                         _changeZoom(
                           _zoom - 1,
                           constraints,
@@ -1696,7 +1696,7 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                     foregroundColor: Colors.black87,
                     tooltip: 'Afastar Zoom',
                     onPressed: () {
-                      if (_zoom > 10) {
+                      if (_zoom > 6) {
                         _changeZoom(
                           _zoom - 1,
                           constraints,

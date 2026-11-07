@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:drift/drift.dart' as drift;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -86,6 +87,8 @@ class SupabaseSyncService {
     'research_articles',
     'research_tags',
     'territory_sectors',
+    'ticuna_words',
+    'ticuna_phrases',
   ];
 
   SupabaseSyncService({
@@ -169,6 +172,16 @@ class SupabaseSyncService {
         remote[camelToSnake(key)] = value;
       }
     });
+    if (entityType == 'ticuna_words' ||
+        entityType == 'ticuna_phrases' ||
+        entityType == 'ticunaWords' ||
+        entityType == 'ticunaPhrases') {
+      final audioPath = remote['audio_path']?.toString();
+      if (audioPath != null && audioPath.isNotEmpty && !audioPath.startsWith('http')) {
+        final id = remote['id']?.toString() ?? '';
+        remote['audio_path'] = '${id}_pronunciation.m4a';
+      }
+    }
     return remote;
   }
 
@@ -474,6 +487,22 @@ class SupabaseSyncService {
         map['name'] = map['name'] ?? '';
         map['description'] = map['description'];
         break;
+      case 'ticuna_words':
+        map['word'] = map['word'] ?? '';
+        map['translation'] = map['translation'] ?? '';
+        if (map['tags'] is List) {
+          map['tags'] = jsonEncode(map['tags']);
+        }
+        map['tags'] ??= '[]';
+        break;
+      case 'ticuna_phrases':
+        map['phrase'] = map['phrase'] ?? '';
+        map['translation'] = map['translation'] ?? '';
+        if (map['tags'] is List) {
+          map['tags'] = jsonEncode(map['tags']);
+        }
+        map['tags'] ??= '[]';
+        break;
     }
     return map;
   }
@@ -545,6 +574,49 @@ class SupabaseSyncService {
         await db
             .into(db.territorySectors)
             .insert(TerritorySectorEntry.fromJson(map));
+        break;
+      case 'ticuna_words':
+        await db.customInsert(
+          'INSERT OR REPLACE INTO ticuna_words (id, word, translation, phonetics, grammatical_class, example_sentence, example_translation, notes, tags, is_favorite, review_level, review_count, last_reviewed_at, audio_path, audio_duration_seconds, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          variables: [
+            drift.Variable.withString(map['id']?.toString() ?? ''),
+            drift.Variable.withString(map['word']?.toString() ?? ''),
+            drift.Variable.withString(map['translation']?.toString() ?? ''),
+            drift.Variable.withString(map['phonetics']?.toString() ?? ''),
+            drift.Variable.withString(map['grammatical_class']?.toString() ?? map['grammaticalClass']?.toString() ?? ''),
+            drift.Variable.withString(map['example_sentence']?.toString() ?? map['exampleSentence']?.toString() ?? ''),
+            drift.Variable.withString(map['example_translation']?.toString() ?? map['exampleTranslation']?.toString() ?? ''),
+            drift.Variable.withString(map['notes']?.toString() ?? ''),
+            drift.Variable.withString(map['tags'] is List ? jsonEncode(map['tags']) : (map['tags']?.toString() ?? '[]')),
+            drift.Variable.withInt((map['is_favorite'] == 1 || map['is_favorite'] == true || map['isFavorite'] == 1 || map['isFavorite'] == true) ? 1 : 0),
+            drift.Variable.withInt((map['review_level'] as num?)?.toInt() ?? (map['reviewLevel'] as num?)?.toInt() ?? 0),
+            drift.Variable.withInt((map['review_count'] as num?)?.toInt() ?? (map['reviewCount'] as num?)?.toInt() ?? 0),
+            drift.Variable.withString(map['last_reviewed_at']?.toString() ?? map['lastReviewedAt']?.toString() ?? ''),
+            drift.Variable.withString(map['audio_path']?.toString() ?? map['audioPath']?.toString() ?? ''),
+            drift.Variable.withInt((map['audio_duration_seconds'] as num?)?.toInt() ?? (map['audioDurationSeconds'] as num?)?.toInt() ?? 0),
+            drift.Variable.withString(_isoString(map['created_at'] ?? map['createdAt']) ?? DateTime.now().toIso8601String()),
+            drift.Variable.withString(_isoString(map['updated_at'] ?? map['updatedAt']) ?? DateTime.now().toIso8601String()),
+          ],
+        );
+        break;
+      case 'ticuna_phrases':
+        await db.customInsert(
+          'INSERT OR REPLACE INTO ticuna_phrases (id, phrase, translation, category, phonetics, notes, tags, is_favorite, audio_path, audio_duration_seconds, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          variables: [
+            drift.Variable.withString(map['id']?.toString() ?? ''),
+            drift.Variable.withString(map['phrase']?.toString() ?? ''),
+            drift.Variable.withString(map['translation']?.toString() ?? ''),
+            drift.Variable.withString(map['category']?.toString() ?? ''),
+            drift.Variable.withString(map['phonetics']?.toString() ?? ''),
+            drift.Variable.withString(map['notes']?.toString() ?? ''),
+            drift.Variable.withString(map['tags'] is List ? jsonEncode(map['tags']) : (map['tags']?.toString() ?? '[]')),
+            drift.Variable.withInt((map['is_favorite'] == 1 || map['is_favorite'] == true || map['isFavorite'] == 1 || map['isFavorite'] == true) ? 1 : 0),
+            drift.Variable.withString(map['audio_path']?.toString() ?? map['audioPath']?.toString() ?? ''),
+            drift.Variable.withInt((map['audio_duration_seconds'] as num?)?.toInt() ?? (map['audioDurationSeconds'] as num?)?.toInt() ?? 0),
+            drift.Variable.withString(_isoString(map['created_at'] ?? map['createdAt']) ?? DateTime.now().toIso8601String()),
+            drift.Variable.withString(_isoString(map['updated_at'] ?? map['updatedAt']) ?? DateTime.now().toIso8601String()),
+          ],
+        );
         break;
     }
   }
@@ -622,6 +694,49 @@ class SupabaseSyncService {
         await db
             .update(db.territorySectors)
             .replace(TerritorySectorEntry.fromJson(map));
+        break;
+      case 'ticuna_words':
+        await db.customInsert(
+          'INSERT OR REPLACE INTO ticuna_words (id, word, translation, phonetics, grammatical_class, example_sentence, example_translation, notes, tags, is_favorite, review_level, review_count, last_reviewed_at, audio_path, audio_duration_seconds, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          variables: [
+            drift.Variable.withString(map['id']?.toString() ?? ''),
+            drift.Variable.withString(map['word']?.toString() ?? ''),
+            drift.Variable.withString(map['translation']?.toString() ?? ''),
+            drift.Variable.withString(map['phonetics']?.toString() ?? ''),
+            drift.Variable.withString(map['grammatical_class']?.toString() ?? map['grammaticalClass']?.toString() ?? ''),
+            drift.Variable.withString(map['example_sentence']?.toString() ?? map['exampleSentence']?.toString() ?? ''),
+            drift.Variable.withString(map['example_translation']?.toString() ?? map['exampleTranslation']?.toString() ?? ''),
+            drift.Variable.withString(map['notes']?.toString() ?? ''),
+            drift.Variable.withString(map['tags'] is List ? jsonEncode(map['tags']) : (map['tags']?.toString() ?? '[]')),
+            drift.Variable.withInt((map['is_favorite'] == 1 || map['is_favorite'] == true || map['isFavorite'] == 1 || map['isFavorite'] == true) ? 1 : 0),
+            drift.Variable.withInt((map['review_level'] as num?)?.toInt() ?? (map['reviewLevel'] as num?)?.toInt() ?? 0),
+            drift.Variable.withInt((map['review_count'] as num?)?.toInt() ?? (map['reviewCount'] as num?)?.toInt() ?? 0),
+            drift.Variable.withString(map['last_reviewed_at']?.toString() ?? map['lastReviewedAt']?.toString() ?? ''),
+            drift.Variable.withString(map['audio_path']?.toString() ?? map['audioPath']?.toString() ?? ''),
+            drift.Variable.withInt((map['audio_duration_seconds'] as num?)?.toInt() ?? (map['audioDurationSeconds'] as num?)?.toInt() ?? 0),
+            drift.Variable.withString(_isoString(map['created_at'] ?? map['createdAt']) ?? DateTime.now().toIso8601String()),
+            drift.Variable.withString(_isoString(map['updated_at'] ?? map['updatedAt']) ?? DateTime.now().toIso8601String()),
+          ],
+        );
+        break;
+      case 'ticuna_phrases':
+        await db.customInsert(
+          'INSERT OR REPLACE INTO ticuna_phrases (id, phrase, translation, category, phonetics, notes, tags, is_favorite, audio_path, audio_duration_seconds, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          variables: [
+            drift.Variable.withString(map['id']?.toString() ?? ''),
+            drift.Variable.withString(map['phrase']?.toString() ?? ''),
+            drift.Variable.withString(map['translation']?.toString() ?? ''),
+            drift.Variable.withString(map['category']?.toString() ?? ''),
+            drift.Variable.withString(map['phonetics']?.toString() ?? ''),
+            drift.Variable.withString(map['notes']?.toString() ?? ''),
+            drift.Variable.withString(map['tags'] is List ? jsonEncode(map['tags']) : (map['tags']?.toString() ?? '[]')),
+            drift.Variable.withInt((map['is_favorite'] == 1 || map['is_favorite'] == true || map['isFavorite'] == 1 || map['isFavorite'] == true) ? 1 : 0),
+            drift.Variable.withString(map['audio_path']?.toString() ?? map['audioPath']?.toString() ?? ''),
+            drift.Variable.withInt((map['audio_duration_seconds'] as num?)?.toInt() ?? (map['audioDurationSeconds'] as num?)?.toInt() ?? 0),
+            drift.Variable.withString(_isoString(map['created_at'] ?? map['createdAt']) ?? DateTime.now().toIso8601String()),
+            drift.Variable.withString(_isoString(map['updated_at'] ?? map['updatedAt']) ?? DateTime.now().toIso8601String()),
+          ],
+        );
         break;
     }
   }
@@ -725,6 +840,12 @@ class SupabaseSyncService {
           TerritorySectorsCompanion(deletedAt: drift.Value(deletedAt)),
         );
         break;
+      case 'ticuna_words':
+        await db.customStatement('DELETE FROM ticuna_words WHERE id = ?', [id]);
+        break;
+      case 'ticuna_phrases':
+        await db.customStatement('DELETE FROM ticuna_phrases WHERE id = ?', [id]);
+        break;
     }
   }
 
@@ -815,6 +936,28 @@ class SupabaseSyncService {
           db.territorySectors,
         )..where((t) => t.id.equals(id))).getSingleOrNull();
         return row?.toJson();
+      case 'ticuna_words':
+        try {
+          final rows = await db.customSelect(
+            'SELECT * FROM ticuna_words WHERE id = ?',
+            variables: [drift.Variable.withString(id)],
+          ).get();
+          if (rows.isEmpty) return null;
+          return rows.first.data;
+        } catch (_) {
+          return null;
+        }
+      case 'ticuna_phrases':
+        try {
+          final rows = await db.customSelect(
+            'SELECT * FROM ticuna_phrases WHERE id = ?',
+            variables: [drift.Variable.withString(id)],
+          ).get();
+          if (rows.isEmpty) return null;
+          return rows.first.data;
+        } catch (_) {
+          return null;
+        }
       default:
         return null;
     }
@@ -847,6 +990,101 @@ class SupabaseSyncService {
       return true;
     } catch (e) {
       errors.add('Erro no upload de áudio de voice_notes ($id): $e');
+      return false;
+    }
+  }
+
+  Future<bool> _uploadTicunaAudio(
+    String id,
+    String entityType,
+    Map<String, dynamic> cleanPayload,
+    SupabaseClient client,
+    List<String> errors,
+  ) async {
+    try {
+      final audioPath = cleanPayload['audio_path']?.toString();
+      if (audioPath != null && audioPath.isNotEmpty && !audioPath.startsWith('http')) {
+        final file = File(audioPath);
+        if (await file.exists()) {
+          final bytes = await file.readAsBytes();
+          final storageFileName = '${id}_pronunciation.m4a';
+          try {
+            await client.storage.from('ticuna_audio').uploadBinary(
+              storageFileName,
+              bytes,
+              fileOptions: const FileOptions(upsert: true),
+            );
+          } catch (_) {
+            try {
+              await client.storage.from('voice_notes').uploadBinary(
+                'ticuna_$storageFileName',
+                bytes,
+                fileOptions: const FileOptions(upsert: true),
+              );
+            } catch (_) {}
+          }
+        }
+      }
+      return true;
+    } catch (e) {
+      errors.add('Erro no upload de áudio Ticuna ($id): $e');
+      return false;
+    }
+  }
+
+  Future<bool> _downloadTicunaAudio(
+    String id,
+    String table,
+    SupabaseClient client,
+  ) async {
+    try {
+      final storageFileName = '${id}_pronunciation.m4a';
+      Uint8List? bytes;
+      try {
+        bytes = await client.storage
+            .from('ticuna_audio')
+            .download(storageFileName);
+      } catch (_) {
+        try {
+          bytes = await client.storage
+              .from('voice_notes')
+              .download('ticuna_$storageFileName');
+        } catch (_) {}
+      }
+
+      if (bytes != null && bytes.isNotEmpty) {
+        final docsDir = documentsDirectoryProvider != null
+            ? await documentsDirectoryProvider!()
+            : (await getApplicationDocumentsDirectory()).path;
+        final ticunaDir = Directory(p.join(docsDir, 'ticuna_audio'));
+        if (!await ticunaDir.exists()) {
+          await ticunaDir.create(recursive: true);
+        }
+        final localFilePath = p.join(ticunaDir.path, storageFileName);
+        final file = File(localFilePath);
+        await file.writeAsBytes(bytes, flush: true);
+
+        if (table == 'ticuna_words') {
+          await db.customUpdate(
+            'UPDATE ticuna_words SET audio_path = ? WHERE id = ?',
+            variables: [
+              drift.Variable.withString(localFilePath),
+              drift.Variable.withString(id),
+            ],
+          );
+        } else if (table == 'ticuna_phrases') {
+          await db.customUpdate(
+            'UPDATE ticuna_phrases SET audio_path = ? WHERE id = ?',
+            variables: [
+              drift.Variable.withString(localFilePath),
+              drift.Variable.withString(id),
+            ],
+          );
+        }
+        return true;
+      }
+      return false;
+    } catch (_) {
       return false;
     }
   }
@@ -945,6 +1183,8 @@ class SupabaseSyncService {
         await _insertLocalEntry(table, normalized);
         if (table == 'voice_notes' && client != null) {
           await _downloadVoiceNoteAudio(id, client);
+        } else if ((table == 'ticuna_words' || table == 'ticuna_phrases') && client != null) {
+          await _downloadTicunaAudio(id, table, client);
         }
         return true;
       }
@@ -1037,6 +1277,8 @@ class SupabaseSyncService {
             await _updateLocalEntry(table, normalized);
             if (table == 'voice_notes' && client != null) {
               await _downloadVoiceNoteAudio(id, client);
+            } else if ((table == 'ticuna_words' || table == 'ticuna_phrases') && client != null) {
+              await _downloadTicunaAudio(id, table, client);
             }
           }
           return true;
@@ -1297,6 +1539,22 @@ class SupabaseSyncService {
               await repository.markSyncOperationFailed(
                 op.id,
                 'Falha no upload do arquivo binário de áudio para o Storage',
+              );
+              continue;
+            }
+          } else if (tableName == 'ticuna_words' || tableName == 'ticuna_phrases') {
+            final audioOk = await _uploadTicunaAudio(
+              op.entityId,
+              op.entityType,
+              cleanPayload,
+              client,
+              errors,
+            );
+            if (!audioOk) {
+              failure++;
+              await repository.markSyncOperationFailed(
+                op.id,
+                'Falha no upload do arquivo binário de áudio Ticuna para o Storage',
               );
               continue;
             }

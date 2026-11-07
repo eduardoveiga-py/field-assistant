@@ -84,7 +84,7 @@ class PublicationLinkResolver {
       var lessonWebUrl =
           'https://www.jw.org/pt/biblioteca/livros/seja-feliz-para-sempre/licao-$lessonPad/';
       var finderUrl =
-          'https://www.jw.org/finder?srcid=jwlshare&wtlocale=${lang.wtlocale}&pub=${pub.code}&lesson=$lesson';
+          'https://www.jw.org/finder?srcid=jwlshare&wtlocale=${lang.wtlocale}&pub=${pub.code}&midx=$lesson&lesson=$lesson';
 
       if (paragraph != null && paragraph > 0) {
         finderUrl += '&par=$paragraph';
@@ -109,7 +109,7 @@ class PublicationLinkResolver {
         lesson >= 1 &&
         lesson <= 3) {
       var finderUrl =
-          'https://www.jw.org/finder?srcid=jwlshare&wtlocale=${lang.wtlocale}&pub=${pub.code}&lesson=$lesson';
+          'https://www.jw.org/finder?srcid=jwlshare&wtlocale=${lang.wtlocale}&pub=${pub.code}&midx=$lesson&lesson=$lesson';
       var fallbackUrl = lang.officialWebUrl;
       if (paragraph != null && paragraph > 0) {
         finderUrl += '&par=$paragraph';

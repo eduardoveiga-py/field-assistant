@@ -61,13 +61,19 @@ jobs:
       - name: Build Web (Release)
         run: flutter build web --release
 
-      - name: Build Android APK (Release)
-        run: flutter build apk --release
+      - name: Build Android APK (Release arm64-v8a)
+        run: flutter build apk --target-platform android-arm64 --release
 
       - name: Stage Web & Android Release Artifacts
         run: |
           mkdir -p dist
-          cp build/app/outputs/flutter-apk/app-release.apk dist/app-release.apk
+          if [ -f build/app/outputs/flutter-apk/app-arm64-v8a-release.apk ]; then
+            cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk dist/app-arm64-v8a-release.apk
+            cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk dist/app-release.apk
+          else
+            cp build/app/outputs/flutter-apk/app-release.apk dist/app-arm64-v8a-release.apk
+            cp build/app/outputs/flutter-apk/app-release.apk dist/app-release.apk
+          fi
           cd build/web && zip -r ../../dist/web-release.zip . && cd ../..
 
       - name: Upload Web Build Artifact
@@ -79,8 +85,8 @@ jobs:
       - name: Upload Android APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: android-release
-          path: dist/app-release.apk
+          name: android-arm64-release
+          path: dist/app-arm64-v8a-release.apk
 
       - name: Upload Release Dist
         uses: actions/upload-artifact@v4
@@ -157,6 +163,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
+            release-dist/app-arm64-v8a-release.apk
             release-dist/app-release.apk
             ios-dist/app-release-unsigned.ipa
             release-dist/web-release.zip

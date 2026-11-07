@@ -100,3 +100,20 @@ final calendarEventLinksProvider = StreamProvider<List<CalendarEventLinkEntry>>(
   final db = ref.watch(databaseProvider);
   return db.select(db.calendarEventLinks).watch();
 });
+
+class PeopleFilterNotifier extends Notifier<String> {
+  @override
+  String build() => 'Todos';
+
+  @override
+  set state(String value) => super.state = value;
+  @override
+  String get state => super.state;
+}
+
+/// Filtro ativo para a lista de pessoas e contatos ('Todos', 'Revisitas', 'Estudos', etc.)
+final peopleFilterProvider = NotifierProvider<PeopleFilterNotifier, String>(
+  PeopleFilterNotifier.new,
+);
+
+

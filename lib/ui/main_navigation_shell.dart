@@ -19,6 +19,7 @@ import 'screens/studies_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/experiences_screen.dart';
 import 'screens/research_screen.dart';
+import 'screens/ticuna_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/contacts_map_screen.dart';
 
@@ -173,6 +174,10 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
         case 8:
           _showingSettings = true;
           break;
+        case 9:
+          _currentFeature = AppFeature.ticuna;
+          _showingSettings = false;
+          break;
         default:
           _currentFeature = AppFeature.today;
           _showingSettings = false;
@@ -204,6 +209,8 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
         return const ExperiencesScreen();
       case AppFeature.notesResearch:
         return const ResearchScreen();
+      case AppFeature.ticuna:
+        return const TicunaScreen();
       case AppFeature.territoryMaps:
         return const ContactsMapScreen();
     }
@@ -315,6 +322,9 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
       case AppFeature.notesResearch:
         color = const Color(0xFFD97706);
         break;
+      case AppFeature.ticuna:
+        color = const Color(0xFF0D9488);
+        break;
       case AppFeature.territoryMaps:
         color = const Color(0xFF0284C7);
         break;
@@ -378,6 +388,7 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
         AppFeature.dashboard,
         AppFeature.experiences,
         AppFeature.notesResearch,
+        AppFeature.ticuna,
       ];
 
       for (final f in railCandidates) {

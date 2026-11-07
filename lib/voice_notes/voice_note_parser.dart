@@ -265,6 +265,19 @@ class VoiceNoteParser {
     'responder dúvida',
     'responder a duvida',
     'responder a dúvida',
+    'tem duvida',
+    'tem dúvida',
+    'com duvida',
+    'com dúvida',
+    'duvida sobre',
+    'dúvida sobre',
+    'tem uma duvida',
+    'tem uma dúvida',
+    'perguntou sobre',
+    'perguntou por que',
+    'perguntou se',
+    'perguntou',
+    'quis saber',
     'proxima visita',
     'próxima visita',
     'proxima vez',
@@ -1073,7 +1086,7 @@ class VoiceNoteParser {
     final result = <String>[];
 
     final transitionPattern = RegExp(
-      r'(?:\b(?:e|mas)\s+)?(?:ele|ela|eles|elas|o\s+morador|a\s+moradora|a\s+fam[íi]lia|fam[íi]lia)\s+(?:comentou|comentaram|falou|falaram|disse|disseram|mencionou|mencionaram|contou|contaram|pediu|pediram|est[aá]|est[aã]o|passando|vai|v[aã]o|foi|foram|teve|tiveram|mudou|perdeu|perderam)\b|(?:\b(?:e|mas)\s+)?(?:ficou|ficamos|combinamos)\s+(?:de|pendente)\b',
+      r'(?:\b(?:e|mas)\s+)?(?:ele|ela|eles|elas|o\s+morador|a\s+moradora|a\s+fam[íi]lia|fam[íi]lia)\s+(?:comentou|comentaram|falou|falaram|disse|disseram|mencionou|mencionaram|contou|contaram|pediu|pediram|est[aá]|est[aã]o|passando|vai|v[aã]o|foi|foram|teve|tiveram|mudou|perdeu|perderam)\b|(?:\b(?:e|mas)\s+)?(?:ficou|ficamos|combinamos)\s+(?:de|pendente)\b|(?:\b(?:e|mas)\s+)?(?:tem|com)\s+(?:d[úu]vida|uma\s+d[úu]vida)\b|(?:\b(?:e|mas)\s+)?(?:voltar|retornar)\s+(?:na|no|para|em|às|as)\b|(?:\b(?:e|mas)\s+)?(?:marcado|agendado|combinado)\s+para\b',
       caseSensitive: false,
     );
 
@@ -1107,7 +1120,7 @@ class VoiceNoteParser {
 
   static String _truncateAtEmpathyTransition(String text) {
     final pattern = RegExp(
-      r'\s+(?:(?:\be|mas)\s+)?(?:ele|ela|eles|elas|o\s+morador|a\s+moradora|a\s+fam[íi]lia|fam[íi]lia)\s+(?:comentou|comentaram|falou|falaram|disse|disseram|mencionou|mencionaram|contou|contaram|pediu|pediram|est[aá]|est[aã]o|passando|vai|v[aã]o|foi|foram|teve|tiveram|mudou|perdeu|perderam)\b',
+      r'\s+(?:(?:\be|mas)\s+)?(?:ele|ela|eles|elas|o\s+morador|a\s+moradora|a\s+fam[íi]lia|fam[íi]lia)\s+(?:comentou|comentaram|falou|falaram|disse|disseram|mencionou|mencionaram|contou|contaram|pediu|pediram|est[aá]|est[aã]o|passando|vai|v[aã]o|foi|foram|teve|tiveram|mudou|perdeu|perderam)\b|\s+(?:(?:\be|mas)\s+)?(?:voltar|retornar)\s+(?:na|no|para|em|às|as)\b',
       caseSensitive: false,
     );
     final match = pattern.firstMatch(text);

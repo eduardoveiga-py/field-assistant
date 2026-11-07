@@ -59,7 +59,13 @@ class TileCacheNative implements TileCacheBackend {
   bool _isBlockedTile(Uint8List bytes) {
     // Detecta o tile de bloqueio (403) do OpenStreetMap pelo tamanho ou assinatura
     if (bytes.length == _blockedTileByteLength) return true;
-    if (bytes.length < 500) {
+    if (bytes.length >= 5000 && bytes.length <= 8500) {
+      final raw = String.fromCharCodes(bytes.take(2048));
+      if (raw.contains('Blocked') || raw.contains('policy') || raw.contains('volunteer')) {
+        return true;
+      }
+    }
+    if (bytes.length < 1000) {
       try {
         final text = String.fromCharCodes(bytes);
         if (text.contains('Access blocked') || text.contains('osm.wiki/Blocked')) {
@@ -94,7 +100,7 @@ class TileCacheNative implements TileCacheBackend {
       await _acquireDownloadSlot();
       try {
         // 1ª Tentativa: OpenStreetMap oficial com User-Agent plenamente identificado
-        final osmUri = Uri.parse('https://tile.openstreetmap.org/$z/$x/$y.png');
+        final osmUri = Uri.parse('https://basemaps.cartocdn.com/rastertiles/voyager/$z/$x/$y.png');
         try {
           final res = await http
               .get(
@@ -121,7 +127,7 @@ class TileCacheNative implements TileCacheBackend {
         // 2ª Tentativa (Fallback transparente de alta disponibilidade): CARTO Voyager
         // Garante que o mapa nunca fique com blocos amarelos/pretos ou vazio
         final cartoUri = Uri.parse(
-          'https://basemaps.cartocdn.com/rastertiles/voyager/$z/$x/$y.png',
+          'https://tile.openstreetmap.org/$z/$x/$y.png',
         );
         final resCarto = await http
             .get(
