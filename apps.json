@@ -2,23 +2,36 @@
   "name": "Ministério Pessoal",
   "identifier": "com.ministeriopessoal.source",
   "website": "https://github.com/eduardoveiga-py/field-assistant",
-  "subtitle": "Fonte oficial do Ministério Pessoal para LiveContainer e AltStore",
-  "description": "Repositório oficial para download, instalação e atualizações contínuas do aplicativo Ministério Pessoal.",
+  "subtitle": "Fonte oficial do Ministério Pessoal",
+  "description": "Repositório oficial para download, instalação e atualizações do aplicativo Ministério Pessoal no LiveContainer e AltStore.",
   "tintColor": "#1E3A8A",
   "iconURL": "https://raw.githubusercontent.com/eduardoveiga-py/field-assistant/master/web/icons/Icon-512.png",
+  "headerURL": "https://raw.githubusercontent.com/eduardoveiga-py/field-assistant/master/web/icons/Icon-512.png",
   "apps": [
     {
+      "beta": false,
       "name": "Ministério Pessoal",
       "bundleIdentifier": "com.ministeriopessoal.ministerioPessoal",
       "developerName": "Ministério Pessoal",
-      "subtitle": "Gestão eficiente, discreta e offline-first do ministério de campo",
+      "subtitle": "Gestão eficiente e offline-first do ministério de campo",
       "version": "1.0.1",
       "versionDate": "2026-11-07T11:00:00Z",
-      "versionDescription": "Versão estável oficial 1.0.1 com arquitetura offline-first (Drift/SQLite), Briefing na Porta de 30s, anotação rápida por voz com IA determinística, agenda inteligente com feriados brasileiros, sincronização Google/Apple Calendar e mapas offline.",
+      "versionDescription": "Lançamento estável 1.0.1 com arquitetura offline-first (Drift/SQLite), Briefing na Porta de 30s, anotações de voz com IA determinística, agenda inteligente com feriados brasileiros e sincronização multi-dispositivo.",
       "downloadURL": "https://github.com/eduardoveiga-py/field-assistant/releases/latest/download/app-release-unsigned.ipa",
+      "localizedDescription": "Um aplicativo completo, rápido e focado no usuário para organizar contatos, revisitas, estudos bíblicos, compromissos e relatórios mensais.\n\n• Briefing na Porta em 30 segundos\n• Ditado e anotações rápidas por voz\n• Agenda inteligente com detecção de conflitos e feriados nacionais\n• Territórios e mapas com download para uso 100% offline\n• Modo Sol Intenso de alto contraste (WCAG AAA)\n• Relatório e contagem rigorosa de estudos e horas\n• Sincronização multi-dispositivo segura",
       "iconURL": "https://raw.githubusercontent.com/eduardoveiga-py/field-assistant/master/web/icons/Icon-512.png",
       "tintColor": "#1E3A8A",
-      "minOSVersion": "14.0"
+      "category": "utilities",
+      "size": 12571776,
+      "versions": [
+        {
+          "version": "1.0.1",
+          "date": "2026-11-07T11:00:00Z",
+          "localizedDescription": "Lançamento estável 1.0.1 com arquitetura offline-first (Drift/SQLite), Briefing na Porta de 30s, anotações de voz com IA determinística, agenda inteligente com feriados brasileiros e sincronização multi-dispositivo.",
+          "downloadURL": "https://github.com/eduardoveiga-py/field-assistant/releases/latest/download/app-release-unsigned.ipa",
+          "size": 12571776
+        }
+      ]
     }
   ]
 }

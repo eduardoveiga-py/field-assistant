@@ -34,8 +34,8 @@ Acesse a página de **[Releases Oficiais](https://github.com/eduardoveiga-py/fie
 
 Adicione o Ministério Pessoal diretamente como **Fonte (Source)** no **LiveContainer** ou **SideStore/AltStore** para navegar e atualizar o aplicativo internamente:
 
-* **URL da Fonte:** `https://raw.githubusercontent.com/eduardoveiga-py/field-assistant/master/apps.json`
-* **Adicionar ao LiveContainer com 1 Toque:** [Toque aqui para abrir no LiveContainer](livecontainer://sources?url=https://raw.githubusercontent.com/eduardoveiga-py/field-assistant/master/apps.json)
+* **URL da Fonte:** `https://cdn.jsdelivr.net/gh/eduardoveiga-py/field-assistant@master/apps.json`
+* **Adicionar ao LiveContainer com 1 Toque:** [Toque aqui para abrir no LiveContainer](livecontainer://sources?url=https://cdn.jsdelivr.net/gh/eduardoveiga-py/field-assistant@master/apps.json)
 
 > [!TIP]
 > **Modo Offline Sem Conta**: Você não é obrigado a criar nenhuma conta para usar o aplicativo! Ao abrir pela primeira vez, basta tocar em **"Continuar em Modo Offline (Sem Conta)"** e o app funcionará imediatamente com armazenamento local no seu aparelho.
