@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
@@ -46,14 +47,16 @@ class SectorManager {
   final StreamController<List<TerritorySector>> _sectorsController =
       StreamController<List<TerritorySector>>.broadcast();
   Future<void>? _initFuture;
+  bool _initialized = false;
 
   SectorManager(this.db) {
     _initTable();
   }
 
-  Future<void> _initTable() {
+  Future<void> _initTable() async {
+    if (_initialized) return;
     _initFuture ??= _doInitTable();
-    return _initFuture!;
+    await _initFuture;
   }
 
   Future<void> _doInitTable() async {
@@ -106,10 +109,11 @@ class SectorManager {
           ],
         );
       }
-      _refresh();
     } catch (_) {
       // Fallback gracioso
     }
+    _initialized = true;
+    _refresh();
   }
 
   Future<void> _refresh() async {
@@ -181,6 +185,21 @@ class SectorManager {
       description: description,
       createdAt: now,
     );
+
+    try {
+      await db.into(db.syncQueue).insert(
+        SyncQueueCompanion.insert(
+          id: _uuid.v4(),
+          entityType: 'territory_sectors',
+          entityId: id,
+          operation: 'INSERT',
+          payload: jsonEncode(sector.toMap()),
+          createdAt: now,
+          status: const Value('pending'),
+        ),
+      );
+    } catch (_) {}
+
     await _refresh();
     return sector;
   }
@@ -193,6 +212,7 @@ class SectorManager {
   }) async {
     await _initTable();
     final trimmed = newName.trim();
+    final now = DateTime.now();
 
     // Obtém o nome antigo para atualizar contatos associados
     final existingRow = await db
@@ -211,6 +231,25 @@ class SectorManager {
         Variable.withString(id),
       ],
     );
+
+    try {
+      await db.into(db.syncQueue).insert(
+        SyncQueueCompanion.insert(
+          id: _uuid.v4(),
+          entityType: 'territory_sectors',
+          entityId: id,
+          operation: 'UPDATE',
+          payload: jsonEncode({
+            'id': id,
+            'name': trimmed,
+            'description': description,
+            'updated_at': now.toIso8601String(),
+          }),
+          createdAt: now,
+          status: const Value('pending'),
+        ),
+      );
+    } catch (_) {}
 
     // Se fornecido o repositório e o nome mudou, atualiza referências nos contatos
     if (repo != null && oldName != null && oldName != trimmed) {
@@ -233,10 +272,29 @@ class SectorManager {
 
   Future<void> deleteSector(String id) async {
     await _initTable();
+    final now = DateTime.now();
     await db.customUpdate(
       'DELETE FROM territory_sectors WHERE id = ?',
       variables: [Variable.withString(id)],
     );
+
+    try {
+      await db.into(db.syncQueue).insert(
+        SyncQueueCompanion.insert(
+          id: _uuid.v4(),
+          entityType: 'territory_sectors',
+          entityId: id,
+          operation: 'DELETE',
+          payload: jsonEncode({
+            'id': id,
+            'deleted_at': now.toIso8601String(),
+          }),
+          createdAt: now,
+          status: const Value('pending'),
+        ),
+      );
+    } catch (_) {}
+
     await _refresh();
   }
 }

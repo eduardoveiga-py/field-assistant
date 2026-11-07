@@ -102,14 +102,16 @@ class ResearchManager {
   final StreamController<List<ResearchTagItem>> _tagsController =
       StreamController<List<ResearchTagItem>>.broadcast();
   Future<void>? _initFuture;
+  bool _initialized = false;
 
   ResearchManager(this.db) {
     _initTable();
   }
 
-  Future<void> _initTable() {
+  Future<void> _initTable() async {
+    if (_initialized) return;
     _initFuture ??= _doInitTable();
-    return _initFuture!;
+    await _initFuture;
   }
 
   Future<void> _doInitTable() async {
@@ -161,10 +163,10 @@ class ResearchManager {
           );
         }
       }
-
-      _refreshArticles();
-      _refreshTags();
     } catch (_) {}
+    _initialized = true;
+    _refreshArticles();
+    _refreshTags();
   }
 
   Future<void> _refreshArticles() async {
@@ -257,6 +259,20 @@ class ResearchManager {
       updatedAt: now,
     );
 
+    try {
+      await db.into(db.syncQueue).insert(
+        SyncQueueCompanion.insert(
+          id: _uuid.v4(),
+          entityType: 'research_articles',
+          entityId: id,
+          operation: 'INSERT',
+          payload: jsonEncode(item.toMap()),
+          createdAt: now,
+          status: const Value('pending'),
+        ),
+      );
+    } catch (_) {}
+
     await _refreshArticles();
     return item;
   }
@@ -276,15 +292,49 @@ class ResearchManager {
         Variable.withString(item.id),
       ],
     );
+
+    try {
+      await db.into(db.syncQueue).insert(
+        SyncQueueCompanion.insert(
+          id: _uuid.v4(),
+          entityType: 'research_articles',
+          entityId: item.id,
+          operation: 'UPDATE',
+          payload: jsonEncode(item.toMap()),
+          createdAt: now,
+          status: const Value('pending'),
+        ),
+      );
+    } catch (_) {}
+
     await _refreshArticles();
   }
 
   Future<void> deleteArticle(String id) async {
     await _initTable();
+    final now = DateTime.now();
     await db.customUpdate(
       'DELETE FROM research_articles WHERE id = ?',
       variables: [Variable.withString(id)],
     );
+
+    try {
+      await db.into(db.syncQueue).insert(
+        SyncQueueCompanion.insert(
+          id: _uuid.v4(),
+          entityType: 'research_articles',
+          entityId: id,
+          operation: 'DELETE',
+          payload: jsonEncode({
+            'id': id,
+            'deleted_at': now.toIso8601String(),
+          }),
+          createdAt: now,
+          status: const Value('pending'),
+        ),
+      );
+    } catch (_) {}
+
     await _refreshArticles();
   }
 
@@ -305,6 +355,25 @@ class ResearchManager {
     );
 
     final item = ResearchTagItem(id: id, name: trimmed, createdAt: now);
+
+    try {
+      await db.into(db.syncQueue).insert(
+        SyncQueueCompanion.insert(
+          id: _uuid.v4(),
+          entityType: 'research_tags',
+          entityId: id,
+          operation: 'INSERT',
+          payload: jsonEncode({
+            'id': id,
+            'name': trimmed,
+            'created_at': now.toIso8601String(),
+          }),
+          createdAt: now,
+          status: const Value('pending'),
+        ),
+      );
+    } catch (_) {}
+
     await _refreshTags();
     return item;
   }
@@ -312,6 +381,7 @@ class ResearchManager {
   Future<void> updateTag(String id, String newName) async {
     await _initTable();
     final trimmed = newName.trim();
+    final now = DateTime.now();
     final old = await db
         .customSelect(
           'SELECT name FROM research_tags WHERE id = ?',
@@ -324,6 +394,24 @@ class ResearchManager {
       'UPDATE research_tags SET name = ? WHERE id = ?',
       variables: [Variable.withString(trimmed), Variable.withString(id)],
     );
+
+    try {
+      await db.into(db.syncQueue).insert(
+        SyncQueueCompanion.insert(
+          id: _uuid.v4(),
+          entityType: 'research_tags',
+          entityId: id,
+          operation: 'UPDATE',
+          payload: jsonEncode({
+            'id': id,
+            'name': trimmed,
+            'updated_at': now.toIso8601String(),
+          }),
+          createdAt: now,
+          status: const Value('pending'),
+        ),
+      );
+    } catch (_) {}
 
     // Se o nome mudou, atualiza nos artigos que possuem essa tag
     if (oldName != null && oldName != trimmed) {
@@ -354,6 +442,7 @@ class ResearchManager {
 
   Future<void> deleteTag(String id) async {
     await _initTable();
+    final now = DateTime.now();
     final old = await db
         .customSelect(
           'SELECT name FROM research_tags WHERE id = ?',
@@ -366,6 +455,23 @@ class ResearchManager {
       'DELETE FROM research_tags WHERE id = ?',
       variables: [Variable.withString(id)],
     );
+
+    try {
+      await db.into(db.syncQueue).insert(
+        SyncQueueCompanion.insert(
+          id: _uuid.v4(),
+          entityType: 'research_tags',
+          entityId: id,
+          operation: 'DELETE',
+          payload: jsonEncode({
+            'id': id,
+            'deleted_at': now.toIso8601String(),
+          }),
+          createdAt: now,
+          status: const Value('pending'),
+        ),
+      );
+    } catch (_) {}
 
     if (oldName != null) {
       final articles = await getAllArticles();

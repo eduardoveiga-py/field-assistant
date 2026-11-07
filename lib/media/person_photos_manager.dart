@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
@@ -45,14 +46,16 @@ class PersonPhotosManager {
   final StreamController<List<PersonPhotoItem>> _photosController =
       StreamController<List<PersonPhotoItem>>.broadcast();
   Future<void>? _initFuture;
+  bool _initialized = false;
 
   PersonPhotosManager(this.db) {
     _initTable();
   }
 
-  Future<void> _initTable() {
+  Future<void> _initTable() async {
+    if (_initialized) return;
     _initFuture ??= _doInitTable();
-    return _initFuture!;
+    await _initFuture;
   }
 
   Future<void> _doInitTable() async {
@@ -66,8 +69,9 @@ class PersonPhotosManager {
           created_at TEXT NOT NULL
         );
       ''');
-      _refresh();
     } catch (_) {}
+    _initialized = true;
+    _refresh();
   }
 
   Future<void> _refresh() async {
@@ -150,14 +154,30 @@ class PersonPhotosManager {
       ],
     );
 
-    await _refresh();
-    return PersonPhotoItem(
+    final item = PersonPhotoItem(
       id: photoId,
       personId: personId,
       photoType: photoType,
       imageData: imageData,
       createdAt: now,
     );
+
+    try {
+      await db.into(db.syncQueue).insert(
+        SyncQueueCompanion.insert(
+          id: _uuid.v4(),
+          entityType: 'person_photos',
+          entityId: photoId,
+          operation: 'INSERT',
+          payload: jsonEncode(item.toMap()),
+          createdAt: now,
+          status: const Value('pending'),
+        ),
+      );
+    } catch (_) {}
+
+    await _refresh();
+    return item;
   }
 
   Future<void> setPhoto({
@@ -178,17 +198,58 @@ class PersonPhotosManager {
           Variable.withString(photoType),
         ],
       );
+
+      try {
+        await db.into(db.syncQueue).insert(
+          SyncQueueCompanion.insert(
+            id: _uuid.v4(),
+            entityType: 'person_photos',
+            entityId: existing.id,
+            operation: 'UPDATE',
+            payload: jsonEncode({
+              'id': existing.id,
+              'person_id': personId,
+              'photo_type': photoType,
+              'image_data': imageData,
+              'updated_at': now.toIso8601String(),
+            }),
+            createdAt: now,
+            status: const Value('pending'),
+          ),
+        );
+      } catch (_) {}
     } else {
+      final newId = _uuid.v4();
       await db.customInsert(
         'INSERT INTO person_photos (id, person_id, photo_type, image_data, created_at) VALUES (?, ?, ?, ?, ?)',
         variables: [
-          Variable.withString(_uuid.v4()),
+          Variable.withString(newId),
           Variable.withString(personId),
           Variable.withString(photoType),
           Variable.withString(imageData),
           Variable.withString(now.toIso8601String()),
         ],
       );
+
+      try {
+        await db.into(db.syncQueue).insert(
+          SyncQueueCompanion.insert(
+            id: _uuid.v4(),
+            entityType: 'person_photos',
+            entityId: newId,
+            operation: 'INSERT',
+            payload: jsonEncode({
+              'id': newId,
+              'person_id': personId,
+              'photo_type': photoType,
+              'image_data': imageData,
+              'created_at': now.toIso8601String(),
+            }),
+            createdAt: now,
+            status: const Value('pending'),
+          ),
+        );
+      } catch (_) {}
     }
     await _refresh();
   }
@@ -201,6 +262,8 @@ class PersonPhotosManager {
 
   Future<void> deletePhoto(String personId, String photoType) async {
     await _initTable();
+    final now = DateTime.now();
+    final existing = await getPhoto(personId, photoType);
     await db.customUpdate(
       'DELETE FROM person_photos WHERE person_id = ? AND photo_type = ?',
       variables: [
@@ -208,15 +271,54 @@ class PersonPhotosManager {
         Variable.withString(photoType),
       ],
     );
+
+    if (existing != null) {
+      try {
+        await db.into(db.syncQueue).insert(
+          SyncQueueCompanion.insert(
+            id: _uuid.v4(),
+            entityType: 'person_photos',
+            entityId: existing.id,
+            operation: 'DELETE',
+            payload: jsonEncode({
+              'id': existing.id,
+              'deleted_at': now.toIso8601String(),
+            }),
+            createdAt: now,
+            status: const Value('pending'),
+          ),
+        );
+      } catch (_) {}
+    }
+
     await _refresh();
   }
 
   Future<void> deletePhotoById(String photoId) async {
     await _initTable();
+    final now = DateTime.now();
     await db.customUpdate(
       'DELETE FROM person_photos WHERE id = ?',
       variables: [Variable.withString(photoId)],
     );
+
+    try {
+      await db.into(db.syncQueue).insert(
+        SyncQueueCompanion.insert(
+          id: _uuid.v4(),
+          entityType: 'person_photos',
+          entityId: photoId,
+          operation: 'DELETE',
+          payload: jsonEncode({
+            'id': photoId,
+            'deleted_at': now.toIso8601String(),
+          }),
+          createdAt: now,
+          status: const Value('pending'),
+        ),
+      );
+    } catch (_) {}
+
     await _refresh();
   }
 }

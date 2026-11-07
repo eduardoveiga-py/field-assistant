@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
@@ -49,14 +50,16 @@ class FamilyTiesManager {
   final StreamController<List<FamilyTieItem>> _tiesController =
       StreamController<List<FamilyTieItem>>.broadcast();
   Future<void>? _initFuture;
+  bool _initialized = false;
 
   FamilyTiesManager(this.db) {
     _initTable();
   }
 
-  Future<void> _initTable() {
+  Future<void> _initTable() async {
+    if (_initialized) return;
     _initFuture ??= _doInitTable();
-    return _initFuture!;
+    await _initFuture;
   }
 
   Future<void> _doInitTable() async {
@@ -71,8 +74,9 @@ class FamilyTiesManager {
           created_at TEXT NOT NULL
         );
       ''');
-      _refresh();
     } catch (_) {}
+    _initialized = true;
+    _refresh();
   }
 
   Future<void> _refresh() async {
@@ -240,6 +244,20 @@ class FamilyTiesManager {
       createdAt: now,
     );
 
+    try {
+      await db.into(db.syncQueue).insert(
+        SyncQueueCompanion.insert(
+          id: _uuid.v4(),
+          entityType: 'family_ties',
+          entityId: tieId,
+          operation: 'INSERT',
+          payload: jsonEncode(item.toMap()),
+          createdAt: now,
+          status: const Value('pending'),
+        ),
+      );
+    } catch (_) {}
+
     await _refresh();
     return item;
   }
@@ -250,6 +268,7 @@ class FamilyTiesManager {
     String? newRelatedPersonName,
   }) async {
     await _initTable();
+    final now = DateTime.now();
     final existing = await db
         .customSelect(
           'SELECT * FROM family_ties WHERE id = ?',
@@ -270,6 +289,26 @@ class FamilyTiesManager {
         Variable.withString(id),
       ],
     );
+
+    try {
+      await db.into(db.syncQueue).insert(
+        SyncQueueCompanion.insert(
+          id: _uuid.v4(),
+          entityType: 'family_ties',
+          entityId: id,
+          operation: 'UPDATE',
+          payload: jsonEncode({
+            'id': id,
+            'relationship_type': newRelationshipType.trim(),
+            'related_person_name':
+                newRelatedPersonName?.trim() ?? item.relatedPersonName,
+            'updated_at': now.toIso8601String(),
+          }),
+          createdAt: now,
+          status: const Value('pending'),
+        ),
+      );
+    } catch (_) {}
 
     // Atualiza recíproco se vinculado a pessoa cadastrada
     if (item.relatedPersonId != null && item.relatedPersonId!.isNotEmpty) {
@@ -292,6 +331,7 @@ class FamilyTiesManager {
     bool deleteReciprocal = true,
   }) async {
     await _initTable();
+    final now = DateTime.now();
     final existing = await db
         .customSelect(
           'SELECT * FROM family_ties WHERE id = ?',
@@ -305,6 +345,23 @@ class FamilyTiesManager {
         'DELETE FROM family_ties WHERE id = ?',
         variables: [Variable.withString(id)],
       );
+
+      try {
+        await db.into(db.syncQueue).insert(
+          SyncQueueCompanion.insert(
+            id: _uuid.v4(),
+            entityType: 'family_ties',
+            entityId: id,
+            operation: 'DELETE',
+            payload: jsonEncode({
+              'id': id,
+              'deleted_at': now.toIso8601String(),
+            }),
+            createdAt: now,
+            status: const Value('pending'),
+          ),
+        );
+      } catch (_) {}
 
       if (deleteReciprocal &&
           item.relatedPersonId != null &&

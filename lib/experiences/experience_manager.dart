@@ -87,13 +87,16 @@ class ExperienceManager {
       StreamController<List<MinistryExperienceItem>>.broadcast();
   Future<void>? _initFuture;
 
+  bool _initialized = false;
+
   ExperienceManager(this.db) {
     _initTable();
   }
 
-  Future<void> _initTable() {
+  Future<void> _initTable() async {
+    if (_initialized) return;
     _initFuture ??= _doInitTable();
-    return _initFuture!;
+    await _initFuture;
   }
 
   Future<void> _doInitTable() async {
@@ -111,8 +114,9 @@ class ExperienceManager {
           updated_at TEXT NOT NULL
         );
       ''');
-      _refresh();
     } catch (_) {}
+    _initialized = true;
+    _refresh();
   }
 
   Future<void> _refresh() async {
@@ -183,6 +187,20 @@ class ExperienceManager {
       updatedAt: now,
     );
 
+    try {
+      await db.into(db.syncQueue).insert(
+        SyncQueueCompanion.insert(
+          id: _uuid.v4(),
+          entityType: 'ministry_experiences',
+          entityId: id,
+          operation: 'INSERT',
+          payload: jsonEncode(item.toMap()),
+          createdAt: now,
+          status: const Value('pending'),
+        ),
+      );
+    } catch (_) {}
+
     await _refresh();
     return item;
   }
@@ -203,15 +221,49 @@ class ExperienceManager {
         Variable.withString(item.id),
       ],
     );
+
+    try {
+      await db.into(db.syncQueue).insert(
+        SyncQueueCompanion.insert(
+          id: _uuid.v4(),
+          entityType: 'ministry_experiences',
+          entityId: item.id,
+          operation: 'UPDATE',
+          payload: jsonEncode(item.toMap()),
+          createdAt: now,
+          status: const Value('pending'),
+        ),
+      );
+    } catch (_) {}
+
     await _refresh();
   }
 
   Future<void> deleteExperience(String id) async {
     await _initTable();
+    final now = DateTime.now();
     await db.customUpdate(
       'DELETE FROM ministry_experiences WHERE id = ?',
       variables: [Variable.withString(id)],
     );
+
+    try {
+      await db.into(db.syncQueue).insert(
+        SyncQueueCompanion.insert(
+          id: _uuid.v4(),
+          entityType: 'ministry_experiences',
+          entityId: id,
+          operation: 'DELETE',
+          payload: jsonEncode({
+            'id': id,
+            'deleted_at': now.toIso8601String(),
+          }),
+          createdAt: now,
+          status: const Value('pending'),
+        ),
+      );
+    } catch (_) {}
+
     await _refresh();
   }
 }

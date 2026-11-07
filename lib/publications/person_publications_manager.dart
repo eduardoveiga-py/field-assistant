@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
@@ -58,14 +59,16 @@ class PersonPublicationsManager {
   final StreamController<List<PersonPublicationItem>> _controller =
       StreamController<List<PersonPublicationItem>>.broadcast();
   Future<void>? _initFuture;
+  bool _initialized = false;
 
   PersonPublicationsManager(this.db) {
     _initTable();
   }
 
-  Future<void> _initTable() {
+  Future<void> _initTable() async {
+    if (_initialized) return;
     _initFuture ??= _doInitTable();
-    return _initFuture!;
+    await _initFuture;
   }
 
   Future<void> _doInitTable() async {
@@ -82,8 +85,9 @@ class PersonPublicationsManager {
           created_at TEXT NOT NULL
         );
       ''');
-      _refresh();
     } catch (_) {}
+    _initialized = true;
+    _refresh();
   }
 
   Future<void> _refresh() async {
@@ -177,6 +181,20 @@ class PersonPublicationsManager {
       createdAt: now,
     );
 
+    try {
+      await db.into(db.syncQueue).insert(
+        SyncQueueCompanion.insert(
+          id: _uuid.v4(),
+          entityType: 'person_publications',
+          entityId: id,
+          operation: 'INSERT',
+          payload: jsonEncode(item.toMap()),
+          createdAt: now,
+          status: const Value('pending'),
+        ),
+      );
+    } catch (_) {}
+
     await _refresh();
     return item;
   }
@@ -217,6 +235,20 @@ class PersonPublicationsManager {
       createdAt: now,
     );
 
+    try {
+      await db.into(db.syncQueue).insert(
+        SyncQueueCompanion.insert(
+          id: _uuid.v4(),
+          entityType: 'person_publications',
+          entityId: id,
+          operation: 'INSERT',
+          payload: jsonEncode(item.toMap()),
+          createdAt: now,
+          status: const Value('pending'),
+        ),
+      );
+    } catch (_) {}
+
     await _refresh();
     return item;
   }
@@ -227,6 +259,7 @@ class PersonPublicationsManager {
     String? notes,
   }) async {
     await _initTable();
+    final now = DateTime.now();
     if (notes != null) {
       await db.customUpdate(
         'UPDATE person_publications SET status = ?, notes = ? WHERE id = ?',
@@ -242,15 +275,57 @@ class PersonPublicationsManager {
         variables: [Variable.withString(newStatus), Variable.withString(id)],
       );
     }
+
+    try {
+      final payload = <String, dynamic>{
+        'id': id,
+        'status': newStatus,
+        'updated_at': now.toIso8601String(),
+      };
+      if (notes != null) {
+        payload['notes'] = notes;
+      }
+      await db.into(db.syncQueue).insert(
+        SyncQueueCompanion.insert(
+          id: _uuid.v4(),
+          entityType: 'person_publications',
+          entityId: id,
+          operation: 'UPDATE',
+          payload: jsonEncode(payload),
+          createdAt: now,
+          status: const Value('pending'),
+        ),
+      );
+    } catch (_) {}
+
     await _refresh();
   }
 
   Future<void> deletePublication(String id) async {
     await _initTable();
+    final now = DateTime.now();
     await db.customUpdate(
       'DELETE FROM person_publications WHERE id = ?',
       variables: [Variable.withString(id)],
     );
+
+    try {
+      await db.into(db.syncQueue).insert(
+        SyncQueueCompanion.insert(
+          id: _uuid.v4(),
+          entityType: 'person_publications',
+          entityId: id,
+          operation: 'DELETE',
+          payload: jsonEncode({
+            'id': id,
+            'deleted_at': now.toIso8601String(),
+          }),
+          createdAt: now,
+          status: const Value('pending'),
+        ),
+      );
+    } catch (_) {}
+
     await _refresh();
   }
 }

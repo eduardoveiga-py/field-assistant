@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui';
 
+import 'package:drift/drift.dart' as drift;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -8,8 +9,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../appointments/calendar_provider.dart';
 import '../../appointments/calendar_sync_coordinator.dart';
 import '../../core/app_theme.dart';
+import '../../database/app_database.dart';
 import '../../sync/supabase_sync_service.dart';
 import '../main_navigation_shell.dart';
+import '../providers.dart';
 
 enum _AuthGateState { loadingSplash, unauthenticated, authenticated }
 
@@ -53,11 +56,19 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
 
     if (client != null) {
       _latestSession = client.auth.currentSession;
-      _authSub = client.auth.onAuthStateChange.listen((data) {
+      _authSub = client.auth.onAuthStateChange.listen((data) async {
         if (!mounted) return;
         _latestSession = data.session;
-        // Não transiciona prematuramente se a splash screen ainda estiver no tempo mínimo
+        // Não transiciona prematuramente se a splash screen ainda estiver ativa
         if (!_isSplashActive) {
+          if (data.session == null) {
+            try {
+              final db = ref.read(databaseProvider);
+              await (db.delete(db.appKvStore)
+                    ..where((t) => t.key.equals('offline_mode_enabled')))
+                  .go();
+            } catch (_) {}
+          }
           setState(() {
             _gateState = data.session != null
                 ? _AuthGateState.authenticated
@@ -75,15 +86,44 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
       });
     }
 
+    // Trata links mágicos / callback Supabase se presentes na URL
+    if (client != null) {
+      final uriStr = Uri.base.toString();
+      if (uriStr.contains('access_token=') ||
+          uriStr.contains('refresh_token=') ||
+          uriStr.contains('code=')) {
+        try {
+          await client.auth.getSessionFromUrl(Uri.base);
+          _latestSession = client.auth.currentSession;
+        } catch (_) {}
+      }
+    }
+
+    // Verifica se modo offline foi ativado previamente
+    bool isOfflineMode = false;
+    try {
+      final db = ref.read(databaseProvider);
+      final offlineRow = await (db.select(db.appKvStore)
+            ..where((t) => t.key.equals('offline_mode_enabled')))
+          .getSingleOrNull();
+      isOfflineMode = offlineRow?.value == 'true';
+    } catch (_) {}
+
+    final hasSession = (_latestSession ?? client?.auth.currentSession) != null;
+    final shouldAuthenticate = hasSession || isOfflineMode;
+
     if (mounted) {
       setState(() {
-        _statusMessage = 'Sincronizando registros e calendário...';
+        _statusMessage = hasSession
+            ? 'Sincronizando registros e calendário...'
+            : 'Inicializando Assistente de Campo...';
       });
     }
 
-    // Dispara sincronização em segundo plano para Supabase e Calendários externos
-    try {
-      unawaited(
+    // Prepara tarefas de sincronização bidirecional quando autenticado
+    final syncTasks = <Future>[];
+    if (hasSession) {
+      syncTasks.add(
         ref
             .read(supabaseSyncServiceProvider)
             .sync()
@@ -97,10 +137,7 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
               ),
             ),
       );
-    } catch (_) {}
-
-    try {
-      unawaited(
+      syncTasks.add(
         ref
             .read(calendarSyncCoordinatorProvider)
             .syncAll()
@@ -112,36 +149,48 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
               ),
             ),
       );
-    } catch (_) {}
+    }
 
-    // Garante que a Splash Screen permaneça visível por pelo menos 1800ms
+    // Mínimo de 1800ms de exibição visual da Splash Screen (1500ms - 2000ms agradável)
     const minSplashDurationMs = 1800;
-    await Future<void>.delayed(
+    final minTimerFuture = Future<void>.delayed(
       const Duration(milliseconds: minSplashDurationMs),
     );
-    if (!mounted) return;
 
-    if (client != null) {
-      final uriStr = Uri.base.toString();
-      if (uriStr.contains('access_token=') ||
-          uriStr.contains('refresh_token=') ||
-          uriStr.contains('code=')) {
-        try {
-          await client.auth.getSessionFromUrl(Uri.base);
-        } catch (_) {}
+    if (hasSession) {
+      // Usuário autenticado (ex.: abertura em outro dispositivo): aguarda a sincronização na Splash Screen
+      // com timeout de resiliência (5s) para garantir atualização antes de navegar
+      try {
+        await Future.wait([
+          minTimerFuture,
+          Future.wait(syncTasks),
+        ]).timeout(const Duration(milliseconds: 5000), onTimeout: () => []);
+      } catch (_) {}
+
+      if (mounted) {
+        setState(() {
+          _statusMessage = 'Sincronização concluída com sucesso!';
+        });
+        await Future<void>.delayed(const Duration(milliseconds: 150));
       }
+    } else {
+      // Usuário não autenticado ou em modo offline local:
+      // aguarda a duração agradável mínima da Splash antes de seguir
+      await minTimerFuture;
     }
+
+    if (!mounted) return;
 
     _isSplashActive = false;
     _pulseController.stop();
-    final session = _latestSession ?? client?.auth.currentSession;
+
     setState(() {
-      _gateState = session != null
+      _gateState = shouldAuthenticate
           ? _AuthGateState.authenticated
           : _AuthGateState.unauthenticated;
     });
 
-    if (session != null) {
+    if (shouldAuthenticate && hasSession) {
       Future.microtask(() {
         if (mounted) {
           ref.read(supabaseSyncServiceProvider).sync();
@@ -169,7 +218,32 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
         );
       case _AuthGateState.unauthenticated:
         return SupabaseAuthScreen(
-          onAuthenticated: () {
+          onAuthenticated: () async {
+            try {
+              final db = ref.read(databaseProvider);
+              await (db.delete(db.appKvStore)
+                    ..where((t) => t.key.equals('offline_mode_enabled')))
+                  .go();
+            } catch (_) {}
+            if (mounted) {
+              setState(() {
+                _gateState = _AuthGateState.authenticated;
+              });
+              ref.read(supabaseSyncServiceProvider).sync();
+              ref.read(calendarSyncCoordinatorProvider).syncAll();
+            }
+          },
+          onContinueOffline: () async {
+            try {
+              final db = ref.read(databaseProvider);
+              await db.into(db.appKvStore).insertOnConflictUpdate(
+                AppKvStoreCompanion.insert(
+                  key: 'offline_mode_enabled',
+                  value: 'true',
+                  updatedAt: drift.Value(DateTime.now()),
+                ),
+              );
+            } catch (_) {}
             if (mounted) {
               setState(() {
                 _gateState = _AuthGateState.authenticated;
@@ -324,8 +398,13 @@ class _SplashScreenView extends StatelessWidget {
 
 class SupabaseAuthScreen extends StatefulWidget {
   final VoidCallback onAuthenticated;
+  final VoidCallback? onContinueOffline;
 
-  const SupabaseAuthScreen({super.key, required this.onAuthenticated});
+  const SupabaseAuthScreen({
+    super.key,
+    required this.onAuthenticated,
+    this.onContinueOffline,
+  });
 
   @override
   State<SupabaseAuthScreen> createState() => _SupabaseAuthScreenState();
@@ -855,7 +934,10 @@ class _SupabaseAuthScreenState extends State<SupabaseAuthScreen> {
                           ),
                           const SizedBox(height: 6),
                           TextButton(
-                            onPressed: _isLoading ? null : widget.onAuthenticated,
+                            onPressed: _isLoading
+                                ? null
+                                : (widget.onContinueOffline ??
+                                    widget.onAuthenticated),
                             child: const Text(
                               'Continuar em Modo Offline (Sem Conta)',
                               style: TextStyle(

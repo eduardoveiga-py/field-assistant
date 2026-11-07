@@ -93,6 +93,54 @@ void main() {
       // Navega para MainNavigationShell
       expect(find.byType(MainNavigationShell), findsOneWidget);
 
+      // Confirma que gravou offline_mode_enabled no banco
+      final offlineRow = await (testDb.select(testDb.appKvStore)
+            ..where((t) => t.key.equals('offline_mode_enabled')))
+          .getSingleOrNull();
+      expect(offlineRow?.value, equals('true'));
+
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(milliseconds: 100));
+    });
+
+    testWidgets('AuthSplashScreen com offline_mode_enabled navega direto para MainNavigationShell após Splash', (tester) async {
+      final testDb = AppDatabase.forTesting(NativeDatabase.memory());
+      addTearDown(() => testDb.close());
+
+      // Previamente configurado em modo offline
+      await testDb.into(testDb.appKvStore).insert(
+        AppKvStoreCompanion.insert(key: 'offline_mode_enabled', value: 'true'),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            databaseProvider.overrideWithValue(testDb),
+          ],
+          child: const MaterialApp(
+            localizationsDelegates: [
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: [Locale('pt', 'BR')],
+            home: AuthSplashScreen(),
+          ),
+        ),
+      );
+
+      // Exibe Splash Screen no início
+      expect(find.byKey(const ValueKey('splash_screen_view')), findsOneWidget);
+      expect(find.text('Assistente de Campo'), findsOneWidget);
+
+      // Aguarda término da Splash e sincronização
+      await tester.pump(const Duration(milliseconds: 2200));
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // Transiciona direto para MainNavigationShell sem passar pelo login
+      expect(find.byType(MainNavigationShell), findsOneWidget);
+      expect(find.text('Entrar na Conta'), findsNothing);
+
       await tester.pumpWidget(const SizedBox());
       await tester.pump(const Duration(milliseconds: 100));
     });

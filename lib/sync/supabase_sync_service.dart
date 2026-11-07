@@ -79,6 +79,13 @@ class SupabaseSyncService {
     'voice_notes',
     'phone_contacts',
     'territory_landmarks',
+    'family_ties',
+    'ministry_experiences',
+    'person_photos',
+    'person_publications',
+    'research_articles',
+    'research_tags',
+    'territory_sectors',
   ];
 
   SupabaseSyncService({
@@ -224,6 +231,41 @@ class SupabaseSyncService {
       case 'territorylandmarks':
       case 'territory_landmarks':
         return 'territory_landmarks';
+      case 'researchtag':
+      case 'researchtags':
+      case 'research_tag':
+      case 'research_tags':
+        return 'research_tags';
+      case 'researcharticle':
+      case 'researcharticles':
+      case 'research_article':
+      case 'research_articles':
+        return 'research_articles';
+      case 'territorysector':
+      case 'territorysectors':
+      case 'territory_sector':
+      case 'territory_sectors':
+        return 'territory_sectors';
+      case 'familytie':
+      case 'familyties':
+      case 'family_tie':
+      case 'family_ties':
+        return 'family_ties';
+      case 'ministryexperience':
+      case 'ministryexperiences':
+      case 'ministry_experience':
+      case 'ministry_experiences':
+        return 'ministry_experiences';
+      case 'personpublication':
+      case 'personpublications':
+      case 'person_publication':
+      case 'person_publications':
+        return 'person_publications';
+      case 'personphoto':
+      case 'personphotos':
+      case 'person_photo':
+      case 'person_photos':
+        return 'person_photos';
       default:
         return entityType.toLowerCase();
     }
@@ -367,6 +409,71 @@ class SupabaseSyncService {
       case 'territory_landmarks':
         map['category'] ??= 'outro';
         break;
+      case 'family_ties':
+        map['personId'] = map['personId'] ?? map['person_id'] ?? '';
+        map['relatedPersonId'] =
+            map['relatedPersonId'] ?? map['related_person_id'];
+        map['relatedPersonName'] =
+            map['relatedPersonName'] ?? map['related_person_name'] ?? '';
+        map['relationshipType'] =
+            map['relationshipType'] ?? map['relationship_type'] ?? '';
+        break;
+      case 'ministry_experiences':
+        map['title'] = map['title'] ?? '';
+        map['content'] = map['content'] ?? '';
+        map['dateTimeField'] = _isoString(map['dateTimeField']) ??
+            _isoString(map['dateTime']) ??
+            _isoString(map['date_time_field']) ??
+            _isoString(map['date_time']) ??
+            map['createdAt'];
+        if (map['mediaUrls'] is List) {
+          map['mediaUrls'] = jsonEncode(map['mediaUrls']);
+        }
+        if (map['media_urls'] is List) {
+          map['mediaUrls'] = jsonEncode(map['media_urls']);
+        }
+        map['mediaUrls'] ??= '[]';
+        if (map['tags'] is List) {
+          map['tags'] = jsonEncode(map['tags']);
+        }
+        map['tags'] ??= '[]';
+        map['locationOrModality'] =
+            map['locationOrModality'] ?? map['location_or_modality'];
+        break;
+      case 'person_photos':
+        map['personId'] = map['personId'] ?? map['person_id'] ?? '';
+        map['photoType'] = map['photoType'] ?? map['photo_type'] ?? 'person';
+        map['imageData'] = map['imageData'] ?? map['image_data'] ?? '';
+        break;
+      case 'person_publications':
+        map['personId'] = map['personId'] ?? map['person_id'] ?? '';
+        map['publicationTitle'] =
+            map['publicationTitle'] ?? map['publication_title'] ?? '';
+        map['itemType'] = map['itemType'] ?? map['item_type'] ?? 'entregue';
+        map['status'] = map['status'] ?? 'entregue';
+        map['date'] = _isoString(map['date']) ?? map['createdAt'];
+        map['notes'] = map['notes'];
+        break;
+      case 'research_articles':
+        map['title'] = map['title'] ?? '';
+        map['summary'] = map['summary'] ?? '';
+        map['content'] = map['content'] ?? '';
+        if (map['tags'] is List) {
+          map['tags'] = jsonEncode(map['tags']);
+        }
+        map['tags'] ??= '[]';
+        if (map['attachments'] is List) {
+          map['attachments'] = jsonEncode(map['attachments']);
+        }
+        map['attachments'] ??= '[]';
+        break;
+      case 'research_tags':
+        map['name'] = map['name'] ?? '';
+        break;
+      case 'territory_sectors':
+        map['name'] = map['name'] ?? '';
+        map['description'] = map['description'];
+        break;
     }
     return map;
   }
@@ -409,6 +516,35 @@ class SupabaseSyncService {
         await db
             .into(db.territoryLandmarks)
             .insert(TerritoryLandmarkEntry.fromJson(map));
+        break;
+      case 'family_ties':
+        await db.into(db.familyTies).insert(FamilyTieEntry.fromJson(map));
+        break;
+      case 'ministry_experiences':
+        await db
+            .into(db.ministryExperiences)
+            .insert(MinistryExperienceEntry.fromJson(map));
+        break;
+      case 'person_photos':
+        await db.into(db.personPhotos).insert(PersonPhotoEntry.fromJson(map));
+        break;
+      case 'person_publications':
+        await db
+            .into(db.personPublications)
+            .insert(PersonPublicationEntry.fromJson(map));
+        break;
+      case 'research_articles':
+        await db
+            .into(db.researchArticles)
+            .insert(ResearchArticleEntry.fromJson(map));
+        break;
+      case 'research_tags':
+        await db.into(db.researchTags).insert(ResearchTagEntry.fromJson(map));
+        break;
+      case 'territory_sectors':
+        await db
+            .into(db.territorySectors)
+            .insert(TerritorySectorEntry.fromJson(map));
         break;
     }
   }
@@ -457,6 +593,35 @@ class SupabaseSyncService {
         await db
             .update(db.territoryLandmarks)
             .replace(TerritoryLandmarkEntry.fromJson(map));
+        break;
+      case 'family_ties':
+        await db.update(db.familyTies).replace(FamilyTieEntry.fromJson(map));
+        break;
+      case 'ministry_experiences':
+        await db
+            .update(db.ministryExperiences)
+            .replace(MinistryExperienceEntry.fromJson(map));
+        break;
+      case 'person_photos':
+        await db.update(db.personPhotos).replace(PersonPhotoEntry.fromJson(map));
+        break;
+      case 'person_publications':
+        await db
+            .update(db.personPublications)
+            .replace(PersonPublicationEntry.fromJson(map));
+        break;
+      case 'research_articles':
+        await db
+            .update(db.researchArticles)
+            .replace(ResearchArticleEntry.fromJson(map));
+        break;
+      case 'research_tags':
+        await db.update(db.researchTags).replace(ResearchTagEntry.fromJson(map));
+        break;
+      case 'territory_sectors':
+        await db
+            .update(db.territorySectors)
+            .replace(TerritorySectorEntry.fromJson(map));
         break;
     }
   }
@@ -521,6 +686,45 @@ class SupabaseSyncService {
           TerritoryLandmarksCompanion(deletedAt: drift.Value(deletedAt)),
         );
         break;
+      case 'family_ties':
+        await (db.update(db.familyTies)..where((t) => t.id.equals(id))).write(
+          FamilyTiesCompanion(deletedAt: drift.Value(deletedAt)),
+        );
+        break;
+      case 'ministry_experiences':
+        await (db.update(db.ministryExperiences)..where((t) => t.id.equals(id)))
+            .write(
+          MinistryExperiencesCompanion(deletedAt: drift.Value(deletedAt)),
+        );
+        break;
+      case 'person_photos':
+        await (db.update(db.personPhotos)..where((t) => t.id.equals(id))).write(
+          PersonPhotosCompanion(deletedAt: drift.Value(deletedAt)),
+        );
+        break;
+      case 'person_publications':
+        await (db.update(db.personPublications)..where((t) => t.id.equals(id)))
+            .write(
+          PersonPublicationsCompanion(deletedAt: drift.Value(deletedAt)),
+        );
+        break;
+      case 'research_articles':
+        await (db.update(db.researchArticles)..where((t) => t.id.equals(id)))
+            .write(
+          ResearchArticlesCompanion(deletedAt: drift.Value(deletedAt)),
+        );
+        break;
+      case 'research_tags':
+        await (db.update(db.researchTags)..where((t) => t.id.equals(id))).write(
+          ResearchTagsCompanion(deletedAt: drift.Value(deletedAt)),
+        );
+        break;
+      case 'territory_sectors':
+        await (db.update(db.territorySectors)..where((t) => t.id.equals(id)))
+            .write(
+          TerritorySectorsCompanion(deletedAt: drift.Value(deletedAt)),
+        );
+        break;
     }
   }
 
@@ -574,6 +778,41 @@ class SupabaseSyncService {
       case 'territory_landmarks':
         final row = await (db.select(
           db.territoryLandmarks,
+        )..where((t) => t.id.equals(id))).getSingleOrNull();
+        return row?.toJson();
+      case 'family_ties':
+        final row = await (db.select(
+          db.familyTies,
+        )..where((t) => t.id.equals(id))).getSingleOrNull();
+        return row?.toJson();
+      case 'ministry_experiences':
+        final row = await (db.select(
+          db.ministryExperiences,
+        )..where((t) => t.id.equals(id))).getSingleOrNull();
+        return row?.toJson();
+      case 'person_photos':
+        final row = await (db.select(
+          db.personPhotos,
+        )..where((t) => t.id.equals(id))).getSingleOrNull();
+        return row?.toJson();
+      case 'person_publications':
+        final row = await (db.select(
+          db.personPublications,
+        )..where((t) => t.id.equals(id))).getSingleOrNull();
+        return row?.toJson();
+      case 'research_articles':
+        final row = await (db.select(
+          db.researchArticles,
+        )..where((t) => t.id.equals(id))).getSingleOrNull();
+        return row?.toJson();
+      case 'research_tags':
+        final row = await (db.select(
+          db.researchTags,
+        )..where((t) => t.id.equals(id))).getSingleOrNull();
+        return row?.toJson();
+      case 'territory_sectors':
+        final row = await (db.select(
+          db.territorySectors,
         )..where((t) => t.id.equals(id))).getSingleOrNull();
         return row?.toJson();
       default:

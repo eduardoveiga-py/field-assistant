@@ -685,6 +685,24 @@ class AppRepository {
           payload: {'id': p.id, 'deletedAt': now.toIso8601String()},
         );
       }
+
+      final sessions = await (db.select(
+        db.studySessions,
+      )..where((t) => t.studyId.equals(id) & t.deletedAt.isNull())).get();
+      for (final s in sessions) {
+        final updatedS = s.copyWith(
+          deletedAt: Value(now),
+          updatedAt: now,
+          revision: s.revision + 1,
+        );
+        await db.update(db.studySessions).replace(updatedS);
+        await _recordSyncOperation(
+          entityType: 'study_sessions',
+          entityId: s.id,
+          operation: 'DELETE',
+          payload: {'id': s.id, 'deletedAt': now.toIso8601String()},
+        );
+      }
     });
   }
 
@@ -822,6 +840,63 @@ class AppRepository {
     return (db.select(
       db.studySessions,
     )..where((tbl) => tbl.deletedAt.isNull())).get();
+  }
+
+  Future<void> updateStudySession(StudySessionEntry session) async {
+    final existing = await (db.select(
+      db.studySessions,
+    )..where((tbl) => tbl.id.equals(session.id))).getSingleOrNull();
+    final now = DateTime.now();
+    final updated = session.copyWith(
+      updatedAt: now,
+      revision: session.revision + 1,
+    );
+    await db.transaction(() async {
+      await db.update(db.studySessions).replace(updated);
+      await _recordSyncOperation(
+        entityType: 'study_sessions',
+        entityId: updated.id,
+        operation: 'UPDATE',
+        payload: {
+          'id': updated.id,
+          'studyId': updated.studyId,
+          'dateTimeField': updated.dateTimeField.toIso8601String(),
+          'publicationCode': updated.publicationCode,
+          'lessonCovered': updated.lessonCovered,
+          'paragraphsCovered': updated.paragraphsCovered,
+          'sessionNotes': updated.sessionNotes,
+          'pendingQuestions': updated.pendingQuestions,
+          'nextStep': updated.nextStep,
+          'status': updated.status,
+          'participantIds': updated.participantIds,
+          'revision': updated.revision,
+          'updatedAt': now.toIso8601String(),
+        },
+        baseData: existing?.toJson(),
+      );
+    });
+  }
+
+  Future<void> deleteStudySession(String id) async {
+    final session = await (db.select(
+      db.studySessions,
+    )..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
+    if (session == null) return;
+    final now = DateTime.now();
+    final updated = session.copyWith(
+      deletedAt: Value(now),
+      updatedAt: now,
+      revision: session.revision + 1,
+    );
+    await db.transaction(() async {
+      await db.update(db.studySessions).replace(updated);
+      await _recordSyncOperation(
+        entityType: 'study_sessions',
+        entityId: id,
+        operation: 'DELETE',
+        payload: {'id': id, 'deletedAt': now.toIso8601String()},
+      );
+    });
   }
 
   // --------------------------------------------------------------------------
