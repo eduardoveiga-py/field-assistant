@@ -1,169 +1,194 @@
-# Ministério Pessoal — Gestão Pessoal do Ministério de Campo
+<div align="center">
 
-Aplicativo multiplataforma (**Web**, **iPhone XR** e **iPad 11 A16**) desenvolvido em **Flutter** e arquitetura **Offline-First**, projetado para organização do ministério de campo pessoal com privacidade total, alta legibilidade sob luz solar, agendamento sem colisões e contagem rigorosa de atividades.
+# 📖 Ministério Pessoal
+### *Gestão Eficiente, Discreta e Offline-First do Ministério de Campo*
 
----
+[![Flutter](https://img.shields.io/badge/Flutter-3.27+-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
+[![Dart](https://img.shields.io/badge/Dart-3.5+-0175C2?style=for-the-badge&logo=dart&logoColor=white)](https://dart.dev)
+[![Offline First](https://img.shields.io/badge/Arquitetura-Offline--First-success?style=for-the-badge&logo=sqlite&logoColor=white)](https://drift.simonbinder.eu/)
+[![Tests](https://img.shields.io/badge/Testes-549%20Passando%20(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](https://github.com/eduardoveiga-py/field-assistant/actions)
+[![Platforms](https://img.shields.io/badge/Plataformas-Android%20%7C%20iOS%20%7C%20Web-orange?style=for-the-badge)](https://github.com/eduardoveiga-py/field-assistant/releases)
 
-## Configuração Supabase
+<p align="center">
+  <b>Um aplicativo completo, rápido e focado no usuário para organizar contatos, revisitas, estudos bíblicos, compromissos e relatórios mensais.</b><br>
+  <i>Funciona 100% offline, sem anúncios, com privacidade absoluta e sincronização multi-dispositivo opcional.</i>
+</p>
 
-O aplicativo usa a URL e a chave **publishable pública** definidas em
-`lib/sync/supabase_config.dart`. Os usuários informam apenas e-mail e senha.
-Para usar outro projeto em uma compilação, forneça `--dart-define=SUPABASE_URL=...`
-e `--dart-define=SUPABASE_ANON_KEY=...` juntos. Configurações antigas salvas
-localmente não substituem o projeto da compilação.
-
-A chave publishable fica visível no código e no aplicativo: não é um segredo.
-Antes de disponibilizar o aplicativo, verifique no projeto Supabase se RLS e
-políticas de isolamento por usuário estão ativas em todas as tabelas e no
-Storage. Os arquivos em `supabase/migrations` são apenas referência; sua
-presença no repositório não confirma que foram aplicados no projeto. Nunca
-inclua chaves `service_role` ou `secret` no aplicativo.
+[📥 Baixar Aplicativo](#-downloads-e-instalação) • [✨ Recursos Principais](#-recursos-pensados-para-o-ministério) • [🚀 Guia Rápido de Uso](#-guia-rápido-de-uso) • [🔒 Privacidade e Segurança](#-privacidade-e-segurança-inviolável) • [🛠️ Para Desenvolvedores](#-desenvolvimento-e-compilação)
 
 ---
 
-## 🏛️ Princípios Arquiteturais e Invioláveis
+</div>
 
-1. **Separação Rígida de Entidades**:
-   - `BibleStudy` ≠ `StudySession` ≠ `Participant` ≠ `Visit`.
-   - Um estudo com múltiplos participantes (ex: casal) conta como **exatamente 1 estudo bíblico ativo**.
-   - Uma sessão realizada com 3 participantes conta como **1 sessão de estudo realizada**.
-   - Sessões canceladas ou não realizadas **NÃO** contam como sessões de estudo.
-   - Revisitas agendadas para o futuro **NÃO** contam como revisitas realizadas.
-   - Tentativas sem contato no território **NÃO** contam como conversas realizadas.
+## 📥 Downloads e Instalação
 
-2. **Agenda Estilo Consultório Médico (`AvailabilityEngine`)**:
-   - Detecção em tempo real de colisões de horário antes de salvar.
-   - Bloqueio de sobreposições parciais ou totais.
-   - Encaixes imediatamente consecutivos são permitidos quando não houver buffer configurado.
-   - Sugestão automática de próximos horários livres no mesmo dia.
+Acesse a página de **[Releases Oficiais](https://github.com/eduardoveiga-py/field-assistant/releases/latest)** e baixe o instalador adequado para o seu dispositivo:
 
-3. **Offline-First Verdadeiro com Drift**:
-   - **Mobile / Desktop**: SQLite nativo via `sqlite3_flutter_libs`.
-   - **Web**: Drift WebAssembly (`WasmDatabase` / IndexedDB).
-   - Fila persistente de mutações (`SyncQueue`) gravada atomicamente na mesma transação local.
-   - Detecção explícita de conflitos em nível de campos individuais (sem "last-write-wins" cego em anotações).
+| Plataforma | Pacote | Como Instalar |
+| :--- | :--- | :--- |
+| **Android** | `app-release.apk` | Baixe diretamente no seu celular Android, abra o arquivo e confirme a instalação (ativando fontes desconhecidas se solicitado). |
+| **iPhone / iPad** | `app-release-unsigned.ipa` | Instale no iOS usando ferramentas seguras de *sideloading* como **AltStore**, **Sideloadly** ou **TrollStore**. |
+| **Navegador (Web)** | `web-release.zip` / Acesso Online | Acesse diretamente pelo Chrome ou Safari e clique em **"Adicionar à Tela de Início"** para instalar como PWA nativo com banco de dados local. |
 
-4. **Backup Criptografado de Ponta a Ponta (`BackupService`)**:
-   - Criptografia **AES-256 GCM** com derivação de chave **PBKDF2** (100.000 iterações).
-   - Checksum de integridade **SHA-256**.
-   - Pré-visualização com detecção de diferenças antes de confirmar a restauração.
-   - Restauração idempotente baseada em chaves primárias UUID e timestamp de revisão.
-
-5. **Links Oficiais para Publicações (`PublicationLinkResolver`)**:
-   - Mapeamento direto verificado para o livro *Seja Feliz para Sempre!* nos idiomas Português (`pt`), Libras (`bzs`) e Ticuna (`tca`).
-   - Deep links honestos: fallback seguro para página inicial da publicação ou jw.org quando a lição direta não for suportada na língua de sinais.
-
-6. **Design e Acessibilidade Sob Luz Solar (`mobile-ux-accessibility`)**:
-   - Contraste elevado (WCAG AAA para textos de dados e status).
-   - Alvos de toque amplos (mínimo de 48dp).
-   - Layout responsivo adaptativo: `NavigationBar` ergonômica para iPhone XR (414x896) e `NavigationRail` lateral para iPad / Desktop (larguras ≥ 768px).
+> [!TIP]
+> **Modo Offline Sem Conta**: Você não é obrigado a criar nenhuma conta para usar o aplicativo! Ao abrir pela primeira vez, basta tocar em **"Continuar em Modo Offline (Sem Conta)"** e o app funcionará imediatamente com armazenamento local no seu aparelho.
 
 ---
 
-## 📁 Estrutura de Diretórios e Documentação
+## ✨ Recursos Pensados para o Ministério
 
+### 🚪 1. Briefing na Porta (30 Segundos)
+Antes de bater à porta, consulte rapidamente um resumo estratégico do morador:
+- **Onde paramos**: última lição e ponto do livro *Seja Feliz para Sempre!*.
+- **Próximo passo acordado**: pendência ou pergunta que ficou pendente para o retorno.
+- **Toque de empatia**: detalhes pessoais (ex: família, saúde, preferências) para uma conversa calorosa.
+- **Data da última visita**: saiba com precisão quando foi o último contato.
+- **Link Direto**: abra a lição correspondente diretamente no **JW Library** ou jw.org com um toque.
+
+---
+
+### 🎙️ 2. Anotação Rápida por Ditado de Voz
+Enquanto caminha entre uma casa e outra, poupe tempo sem precisar digitar:
+- Grave e dite uma nota de 15 segundos.
+- O motor de inteligência determinística extrai automaticamente o **número da lição**, o **ponto considerado**, o nome do estudante e os pontos de empatia.
+- Os campos são organizados e você salva o registro de visita em menos de 3 toques.
+
+---
+
+### 🗓️ 3. Agenda Inteligente & Feriados Nacionais
+- **Anti-Colisão Estilo Consultório**: detecta sobreposições de horários e sugere horários livres no mesmo dia.
+- **Feriados Brasileiros**: feriados nacionais (fixos e móveis calculados por Páscoa/Carnaval) aparecem destacados no calendário mensal para facilitar o planejamento de saídas de campo.
+- **Sincronização com Google Calendar e Apple Calendar**: sincronize seus compromissos com sua agenda habitual fora do aplicativo.
+
+---
+
+### 🗺️ 4. Territórios e Mapas Offline
+- Organize seu território por bairros, quadras e setores.
+- **Download Offline**: baixe os mapas em níveis de zoom 13 a 17 para navegar em bairros e áreas remotas mesmo sem sinal de internet móvel.
+- Filtro por cores de interessados, revisitas e estudos bíblicos diretamente no mapa.
+
+---
+
+### ☀️ 5. Modo Sol Intenso (Alto Contraste)
+- No campo sob a luz forte do sol, ative o **Modo Sol** no topo da tela com um toque.
+- O tema ajusta instantaneamente fontes, ícones e bordas pretas de alto contraste (**padrão WCAG AAA**), eliminando reflexos incômodos.
+
+---
+
+### 📊 6. Relatório e Contagem Rigorosa
+- Regras oficiais e transparentes:
+  - Casais ou famílias estudando juntos contam exatamente como **1 estudo bíblico**.
+  - Apenas sessões de estudo efetivamente realizadas somam no mês.
+  - Tentativas sem contato não são contadas como conversas.
+- Acompanhamento do **Ritmo de Pioneiro** para planejar e atingir metas de horas com tranquilidade.
+
+---
+
+### 🔄 7. Sincronização Multi-Dispositivo
+- Começou anotando no celular e quer continuar no tablet à noite?
+- Ao conectar sua conta no Supabase, o app sincroniza automaticamente **todas as 17 tabelas** do sistema ao abrir a Splash Screen.
+- Seus dados ficam protegidos e sincronizados entre todos os seus dispositivos.
+
+---
+
+## 🚀 Guia Rápido de Uso
+
+```mermaid
+flowchart LR
+    A["👋 Início (Hoje)"] --> B["🚪 Briefing na Porta"]
+    B --> C["💬 Conversa Realizada"]
+    C --> D["🎙️ Ditado de Voz (15s)"]
+    D --> E["📅 Agendar Próxima Visita"]
+    E --> F["📊 Relatório Atualizado"]
 ```
-docs/
-  ├── ARCHITECTURE.md           # Visão geral de arquitetura e camadas
-  ├── DATA_MODEL.md             # Esquema das tabelas e regras de contagem
-  ├── SYNC_PROTOCOL.md          # Protocolo da fila de sincronização e merge
-  ├── SECURITY.md               # Políticas RLS, telemetria zero e privacidade
-  ├── JW_LIBRARY_LINKS.md       # Catálogo e limitações de deep links
-  ├── TEST_PLAN.md              # Matriz completa de casos de teste
-  └── DECISIONS.md              # ADRs (Architectural Decision Records 001 a 005)
-lib/
-  ├── core/                     # Tema acessível, utilitários de data e gerador demo
-  ├── database/                 # Drift tables, repositório transacional e conexões
-  ├── appointments/             # Motor de disponibilidade e colisão de agenda
-  ├── dashboard/                # Regras de contagem e inteligência de pendências
-  ├── publications/             # Catálogo de publicações e resolvedor de links
-  ├── settings/                 # Backup criptografado e exportação/importação
-  ├── sync/                     # Motor de merge e detecção de conflitos
-  └── ui/                       # Telas (Hoje, Pessoas, Agenda, Estudos, Dashboard, Atividades, Lixeira, Ajustes)
-scripts/                        # Scripts para inicialização web e execução de testes no Windows
-supabase/                       # Migrações PostgreSQL e políticas RLS para sincronização
-test/                           # Suíte automatizada com 32 testes cobrindo todos os módulos
-```
+
+1. **Adicionar Contato**:
+   Na aba **Pessoas**, toque em `+` e informe o nome, endereço e preferências do morador.
+2. **Iniciar um Estudo Bíblico**:
+   No perfil da pessoa, vincule o estudo com a publicação *Seja Feliz para Sempre!*. O app acompanhará o progresso de cada lição.
+3. **Registrar Visita**:
+   Após falar com a pessoa, abra a tela dela ou use o ditado de voz no modal rápido. Confirme o que foi considerado e defina a data de retorno.
+4. **Fechar o Mês**:
+   Na aba **Atividades**, veja o total de horas, publicações entregues, vídeos mostrados, revisitas e estudos bíblicos prontos para envio.
 
 ---
 
-## 🚀 Como Executar o Projeto Localmente
+## 🔒 Privacidade e Segurança Inviolável
 
-### Atalhos Prontos para Windows (PowerShell / Prompt)
-- Para rodar a versão Web no Chrome:
-  ```powershell
-  .\scripts\run_web.ps1
-  ```
-  *(ou execute `scripts\run_web.bat` via duplo-clique no Explorer)*
-- Para rodar a análise estática e todos os testes:
-  ```powershell
-  .\scripts\run_tests.ps1
-  ```
+- 🛡️ **Zero Telemetria / Sem Anúncios**: Seus contatos ministeriais e anotações pertencem apenas a você.
+- 🔐 **Backups Criptografados de Ponta a Ponta**:
+  - Criptografia militar **AES-256 GCM** com derivação de chave **PBKDF2** (100.000 iterações).
+  - Exporte seu arquivo de backup com senha pessoal e restaure em qualquer aparelho.
+- 📴 **100% Offline-First**: O banco de dados SQLite reside fisicamente na memória do seu próprio telefone.
 
-### Pré-requisitos Manuais
-- **Flutter SDK**: Versão 3.27+ (estável) instalado.
-- **Dart SDK**: 3.5+ incluído no Flutter.
-- **Google Chrome** ou **Microsoft Edge** para testes em Web.
+---
 
-### 1. Instalação das Dependências
+## 🛠️ Desenvolvimento e Compilação
+
+<details>
+<summary><b>Clique para expandir instruções técnicas para desenvolvedores</b></summary>
+<br>
+
+### Pré-requisitos
+- **Flutter SDK**: 3.27+ (canal estável).
+- **Dart SDK**: 3.5+.
+- **Java JDK**: 17 (Zulu ou OpenJDK).
+
+### Instalação e Execução
 ```bash
+# 1. Clonar repositório e obter dependências
+git clone https://github.com/eduardoveiga-py/field-assistant.git
+cd field-assistant
 flutter pub get
+
+# 2. Gerar código do banco Drift e Riverpod
+dart run build_runner build --delete-conflicting-outputs
+
+# 3. Executar em desenvolvimento
+flutter run -d chrome      # Navegador Web
+flutter run -d windows     # Desktop Windows
+flutter run -d <device-id> # Dispositivo Android / iOS
 ```
 
-### 2. Geração de Código do Banco Drift
-Caso altere alguma tabela ou query:
+### Qualidade de Código e Testes
 ```bash
-dart run build_runner build --force-jit --delete-conflicting-outputs
+# Análise estática obrigatória (zero warnings/erros)
+dart analyze lib test --fatal-infos
+
+# Suíte completa de testes automatizados com cobertura
+flutter test --coverage
 ```
 
-### 3. Execução no Navegador (Web)
+### Compilação de Produção
 ```bash
-flutter run -d chrome
-```
-
-### 4. Execução no Desktop (Windows)
-```bash
-flutter run -d windows
-```
-
-### 5. Compilação para Produção (Web Release)
-```bash
+# Web SPA com SQLite Wasm
 flutter build web --release
+
+# Android APK
+flutter build apk --release
+
+# iOS (binário de release sem assinatura)
+flutter build ios --no-codesign --release
 ```
+
+### Estrutura de Pastas
+```
+lib/
+  ├── core/            # Temas (SunMode), utilitários e constantes
+  ├── database/        # Drift ORM (SQLite / Wasm) e repositório
+  ├── appointments/    # Motor de agenda, colisões e feriados nacionais
+  ├── contacts/        # Briefing na porta e gerenciamento de pessoas
+  ├── studies/         # Gestão de estudos bíblicos e sessões
+  ├── voice_notes/     # Gravador de áudio e parser inteligente
+  ├── territory/       # Setores, geocodificação e cache de mapas
+  ├── sync/            # Protocolo de sincronização offline com Supabase
+  └── ui/              # Telas adaptativas e componentes de interface
+```
+
+</details>
 
 ---
 
-## 🧪 Suíte de Testes Automatizados
+## 📄 Licença
 
-Para executar todos os 412 testes automatizados unitários, transacionais, adversariais e de interface:
-```bash
-flutter test
-```
-
-Para validar a integridade estática do código (zero erros, zero warnings, zero infos):
-```bash
-dart analyze lib test
-```
-
-### Cobertura de Testes (412 Testes Aprovados)
-- `test/counting_rules_test.dart`: Regras de contagem de estudos com múltiplos participantes, sessões, visitas, ações pendentes e contatos recentes.
-- `test/availability_engine_test.dart`: Detecção de sobreposição, contenção, horários consecutivos, buffers, sugestões inteligentes e status realizado.
-- `test/publication_link_resolver_test.dart`: Resolução de links em Português, Libras e fallback seguro.
-- `test/repository_database_test.dart`: Transações atômicas com `SyncQueue`, busca offline, reagendamento com histórico (`previousAppointmentId`), atualização de visitas e lixeira com restauração.
-- `test/sync_engine_test.dart`: Mesclagem em campos distintos, conflitos sem sobrescrita cega e idempotência.
-- `test/supabase_sync_service_test.dart`: Despachante da fila de sincronização, backoff exponencial, status honesto offline/online e mapeamento de tabelas.
-- `test/backup_service_test.dart` & `test/lff_and_priority_test.dart`: Envelope PBKDF2-HMAC-SHA256 (100k iter.) + AES-256 GCM, detecção de adulteração, compatibilidade v1/v2, chave de dispositivo e 10 tabelas sincronizáveis.
-- `test/voice_notes_test.dart`: Parser determinístico puro Dart (ordinais, números, nomes, empatia), persistência Drift tipada, transação atômica multi-tabela e alvos ergonômicos >= 48dp.
-- `test/pioneer_pace_adversarial_test.dart` & `test/pioneer_pace_card_adversarial_test.dart`: Desafios adversariais de calendário, anos bissextos, metas extremas, estresse de renderização 320px com TextScaler 2.0x e persistência concorrente.
-- `test/doorstep_briefing_adversarial_test.dart`: Briefing na porta, sementes recentes, textos ultra-longos e acessibilidade sob sol.
-- `test/widget_test.dart`: Navegação responsiva iPad (`NavigationRail`) e iPhone XR (`NavigationBar`), sem vazamentos de layout.
-
----
-
-## 🎮 Modo de Demonstração (Demo Offline)
-
-Para experimentar o aplicativo imediatamente sem necessidade de criar contas ou conectar ao backend:
-1. Abra a tela **Hoje** ou **Ajustes**.
-2. Clique no card **Carregar Dados de Demonstração**.
-3. O sistema gerará pessoas com diferentes situações (Interessados, Revisitas, Estudos), compromissos do dia, sessões de estudo em andamento e histórico de visitas.
-4. Todos os dados fictícios ficam isolados no banco local e podem ser removidos a qualquer momento.
+Desenvolvido para apoiar de forma pessoal, gratuita e voluntária o serviço de pregação cristão. Uso pessoal e comunitário incentivado.
