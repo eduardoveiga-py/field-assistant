@@ -61,25 +61,38 @@ jobs:
       - name: Build Web (Release)
         run: flutter build web --release
 
-      - name: Upload Web Build Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: web-release
-          path: build/web
-
       - name: Build Android APK (Release)
         run: flutter build apk --release
 
       - name: Build Android AppBundle (Release)
         run: flutter build appbundle --release
 
+      - name: Stage Web & Android Release Artifacts
+        run: |
+          mkdir -p dist
+          cp build/app/outputs/flutter-apk/app-release.apk dist/app-release.apk
+          cp build/app/outputs/bundle/release/app-release.aab dist/app-release.aab
+          cd build/web && zip -r ../../dist/web-release.zip . && cd ../..
+
+      - name: Upload Web Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-release
+          path: build/web
+
       - name: Upload Android Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: android-release
           path: |
-            build/app/outputs/flutter-apk/app-release.apk
-            build/app/outputs/bundle/release/app-release.aab
+            dist/app-release.apk
+            dist/app-release.aab
+
+      - name: Upload Release Dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-dist
+          path: dist/
 
   ios_build_check:
     name: iOS Build Verification
@@ -105,6 +118,17 @@ jobs:
       - name: Build iOS (No Codesign)
         run: flutter build ios --no-codesign --simulator
 
+      - name: Package iOS Simulator App
+        run: |
+          mkdir -p dist-ios
+          cd build/ios/iphonesimulator && zip -r ../../../dist-ios/ios-simulator-app.zip Runner.app && cd ../../..
+
+      - name: Upload iOS Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-release
+          path: dist-ios/ios-simulator-app.zip
+
   publish_release:
     name: Publish Release Assets
     runs-on: ubuntu-latest
@@ -114,27 +138,24 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Download Web Artifact
+      - name: Download Release Dist Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: web-release
-          path: web-dist
+          name: release-dist
+          path: release-dist
 
-      - name: Package Web Release (Zip)
-        run: |
-          cd web-dist && zip -r ../web-release.zip . && cd ..
-
-      - name: Download Android Artifacts
+      - name: Download iOS Artifact
         uses: actions/download-artifact@v4
         with:
-          name: android-release
-          path: android-dist
+          name: ios-release
+          path: ios-dist
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            web-release.zip
-            android-dist/app-release.apk
-            android-dist/app-release.aab
+            release-dist/web-release.zip
+            release-dist/app-release.apk
+            release-dist/app-release.aab
+            ios-dist/ios-simulator-app.zip
           generate_release_notes: true

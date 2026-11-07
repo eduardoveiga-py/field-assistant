@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Ministerio Pessoal</string>
+	<string>Território</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -26,16 +26,25 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>https</string>
+		<string>http</string>
+		<string>tel</string>
+		<string>mailto</string>
+		<string>geo</string>
+		<string>whatsapp</string>
+	</array>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>O aplicativo precisa de acesso ao microfone para permitir o registro rápido de notas de voz após as visitas.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>O aplicativo utiliza o reconhecimento de fala para transcrever offline as anotações do ministério.</string>
 	<key>NSCalendarsUsageDescription</key>
-	<string>O Field Assistant precisa de acesso ao Calendário para sincronizar compromissos ministeriais de forma bidirecional.</string>
+	<string>O Ministério Pessoal precisa de acesso ao Calendário para sincronizar compromissos ministeriais de forma bidirecional.</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
-	<string>O Field Assistant precisa de acesso completo ao Calendário para exibir eventos e salvar novos compromissos do ministério de campo.</string>
+	<string>O Ministério Pessoal precisa de acesso completo ao Calendário para exibir eventos e salvar novos compromissos do ministério de campo.</string>
 	<key>NSCalendarsWriteOnlyAccessUsageDescription</key>
-	<string>O Field Assistant precisa de permissão para salvar compromissos ministeriais no seu Calendário.</string>
+	<string>O Ministério Pessoal precisa de permissão para salvar compromissos ministeriais no seu Calendário.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
