@@ -27,8 +27,15 @@ Acesse a página de **[Releases Oficiais](https://github.com/eduardoveiga-py/fie
 | Plataforma | Pacote | Como Instalar |
 | :--- | :--- | :--- |
 | **Android** | `app-release.apk` | Baixe diretamente no seu celular Android, abra o arquivo e confirme a instalação (ativando fontes desconhecidas se solicitado). |
-| **iPhone / iPad** | [`app-release-unsigned.ipa`](https://github.com/eduardoveiga-py/field-assistant/releases/latest/download/app-release-unsigned.ipa) | Instale no iOS usando **LiveContainer**, **AltStore**, **SideStore**, **Sideloadly** ou **TrollStore** com suporte a atualizações contínuas via link direto da última versão. |
+| **iPhone / iPad** | [`app-release-unsigned.ipa`](https://github.com/eduardoveiga-py/field-assistant/releases/latest/download/app-release-unsigned.ipa) | Instale no iOS usando **LiveContainer**, **AltStore**, **SideStore**, **Sideloadly** ou **TrollStore** com suporte a atualizações contínuas via link direto da última versão ou como Fonte interna. |
 | **Navegador (Web)** | `web-release.zip` / Acesso Online | Acesse diretamente pelo Chrome ou Safari e clique em **"Adicionar à Tela de Início"** para instalar como PWA nativo com banco de dados local. |
+
+### 📱 Fonte Oficial para LiveContainer & AltStore (iOS)
+
+Adicione o Ministério Pessoal diretamente como **Fonte (Source)** no **LiveContainer** ou **SideStore/AltStore** para navegar e atualizar o aplicativo internamente:
+
+* **URL da Fonte:** `https://raw.githubusercontent.com/eduardoveiga-py/field-assistant/master/apps.json`
+* **Adicionar ao LiveContainer com 1 Toque:** [Toque aqui para abrir no LiveContainer](livecontainer://sources?url=https://raw.githubusercontent.com/eduardoveiga-py/field-assistant/master/apps.json)
 
 > [!TIP]
 > **Modo Offline Sem Conta**: Você não é obrigado a criar nenhuma conta para usar o aplicativo! Ao abrir pela primeira vez, basta tocar em **"Continuar em Modo Offline (Sem Conta)"** e o app funcionará imediatamente com armazenamento local no seu aparelho.

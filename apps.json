@@ -1,0 +1,24 @@
+{
+  "name": "Ministério Pessoal",
+  "identifier": "com.ministeriopessoal.source",
+  "website": "https://github.com/eduardoveiga-py/field-assistant",
+  "subtitle": "Fonte oficial do Ministério Pessoal para LiveContainer e AltStore",
+  "description": "Repositório oficial para download, instalação e atualizações contínuas do aplicativo Ministério Pessoal.",
+  "tintColor": "#1E3A8A",
+  "iconURL": "https://raw.githubusercontent.com/eduardoveiga-py/field-assistant/master/web/icons/Icon-512.png",
+  "apps": [
+    {
+      "name": "Ministério Pessoal",
+      "bundleIdentifier": "com.ministeriopessoal.ministerioPessoal",
+      "developerName": "Ministério Pessoal",
+      "subtitle": "Gestão eficiente, discreta e offline-first do ministério de campo",
+      "version": "1.0.1",
+      "versionDate": "2026-11-07T11:00:00Z",
+      "versionDescription": "Versão estável oficial 1.0.1 com arquitetura offline-first (Drift/SQLite), Briefing na Porta de 30s, anotação rápida por voz com IA determinística, agenda inteligente com feriados brasileiros, sincronização Google/Apple Calendar e mapas offline.",
+      "downloadURL": "https://github.com/eduardoveiga-py/field-assistant/releases/latest/download/app-release-unsigned.ipa",
+      "iconURL": "https://raw.githubusercontent.com/eduardoveiga-py/field-assistant/master/web/icons/Icon-512.png",
+      "tintColor": "#1E3A8A",
+      "minOSVersion": "14.0"
+    }
+  ]
+}
