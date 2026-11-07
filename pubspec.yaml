@@ -1,5 +1,5 @@
 name: ministerio_pessoal
-description: "A new Flutter project."
+description: "Gestão pessoal do ministério de campo: organização de território, revisitas e estudos bíblicos com arquitetura offline-first."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev

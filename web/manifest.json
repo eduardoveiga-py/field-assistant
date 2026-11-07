@@ -1,11 +1,11 @@
 {
-    "name": "ministerio_pessoal",
-    "short_name": "ministerio_pessoal",
+    "name": "Ministério Pessoal — Território",
+    "short_name": "Território",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#0B111E",
+    "theme_color": "#2563EB",
+    "description": "Gestão Pessoal do Ministério de Campo: organização de território, revisitas e estudos bíblicos com arquitetura offline-first.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
