@@ -1495,4 +1495,29 @@ class AppRepository {
       );
     }
   }
+
+  /// Limpa todos os dados locais do aplicativo (util para zerar banco de teste).
+  Future<void> clearAllLocalData() async {
+    await db.transaction(() async {
+      await db.delete(db.people).go();
+      await db.delete(db.visits).go();
+      await db.delete(db.bibleStudies).go();
+      await db.delete(db.studyParticipants).go();
+      await db.delete(db.studySessions).go();
+      await db.delete(db.appointments).go();
+      await db.delete(db.activityRecords).go();
+      await db.delete(db.voiceNotes).go();
+      await db.delete(db.phoneContacts).go();
+      await db.delete(db.territoryLandmarks).go();
+      await db.delete(db.familyTies).go();
+      await db.delete(db.ministryExperiences).go();
+      await db.delete(db.personPhotos).go();
+      await db.delete(db.personPublications).go();
+      await db.delete(db.researchArticles).go();
+      await db.delete(db.researchTags).go();
+      await db.delete(db.territorySectors).go();
+      await db.delete(db.syncQueue).go();
+      await db.delete(db.externalCalendarEvents).go();
+    });
+  }
 }

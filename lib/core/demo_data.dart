@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart';
 import '../database/repository.dart';
 
 class DemoDataGenerator {
@@ -55,7 +56,7 @@ class DemoDataGenerator {
     );
 
     final p4 = await repository.createPerson(
-      name: 'Beatriz Martins (Demo - Filha)',
+      name: 'Beatriz Martins (Demo)',
       status: 'estudo',
       firstContactAt: now.subtract(const Duration(days: 60)),
       generalNotes: 'Participa do estudo da mãe Luciana.',
@@ -168,5 +169,98 @@ class DemoDataGenerator {
       modality: 'campo',
       notes: '[Publicações: 2] [Vídeos: 1] Visitas e revisitas.',
     );
+  }
+
+  static const demoPersonNames = {
+    'Maria Oliveira (Demo)',
+    'Carlos Pereira (Demo)',
+    'Luciana Martins (Demo)',
+    'Beatriz Martins (Demo - Filha)',
+  };
+
+  static const demoStudyTitles = {
+    'Estudo de Maria Oliveira',
+    'Estudo em Família (Luciana e Beatriz)',
+  };
+
+  static const demoAppointmentTitles = {
+    'Estudo Bíblico - Maria',
+    'Revisita - Carlos',
+  };
+
+  /// Verifica se há registros de demonstração no banco.
+  static Future<bool> hasDemoData(AppRepository repository) async {
+    final db = repository.db;
+    final people = await (db.select(db.people)
+          ..where((t) => t.name.like('%(Demo%')))
+        .get();
+    return people.isNotEmpty;
+  }
+
+  /// Remove com segurança todos os registros de teste e demonstração do banco.
+  static Future<int> clearDemoData(AppRepository repository) async {
+    final db = repository.db;
+    var removedCount = 0;
+
+    await db.transaction(() async {
+      // 1. Identifica e exclui pessoas demo e registros dependentes
+      final demoPeople = await (db.select(db.people)
+            ..where((t) => t.name.like('%(Demo%')))
+          .get();
+      final demoPersonIds = demoPeople.map((p) => p.id).toSet();
+
+      if (demoPersonIds.isNotEmpty) {
+        removedCount += demoPeople.length;
+        await (db.delete(db.visits)
+              ..where((t) => t.personId.isIn(demoPersonIds)))
+            .go();
+        await (db.delete(db.appointments)
+              ..where((t) => t.personId.isIn(demoPersonIds)))
+            .go();
+        await (db.delete(db.studyParticipants)
+              ..where((t) => t.personId.isIn(demoPersonIds)))
+            .go();
+        await (db.delete(db.personPhotos)
+              ..where((t) => t.personId.isIn(demoPersonIds)))
+            .go();
+        await (db.delete(db.personPublications)
+              ..where((t) => t.personId.isIn(demoPersonIds)))
+            .go();
+        await (db.delete(db.people)
+              ..where((t) => t.id.isIn(demoPersonIds)))
+            .go();
+      }
+
+      // 2. Identifica e exclui estudos demo
+      final demoStudies = await (db.select(db.bibleStudies)
+            ..where((t) => t.title.isIn(demoStudyTitles)))
+          .get();
+      final demoStudyIds = demoStudies.map((s) => s.id).toSet();
+      if (demoStudyIds.isNotEmpty) {
+        await (db.delete(db.studySessions)
+              ..where((t) => t.studyId.isIn(demoStudyIds)))
+            .go();
+        await (db.delete(db.studyParticipants)
+              ..where((t) => t.studyId.isIn(demoStudyIds)))
+            .go();
+        await (db.delete(db.bibleStudies)
+              ..where((t) => t.id.isIn(demoStudyIds)))
+            .go();
+      }
+
+      // 3. Exclui compromissos demo restantes
+      await (db.delete(db.appointments)
+            ..where((t) => t.title.isIn(demoAppointmentTitles)))
+          .go();
+
+      // 4. Exclui relatórios de atividade de demonstração
+      await (db.delete(db.activityRecords)
+            ..where((t) =>
+                t.notes.like('%[Publicações: 4]%') |
+                t.notes.like('%[Publicações: 2]%')))
+          .go();
+    });
+
+    return removedCount;
   }
 }

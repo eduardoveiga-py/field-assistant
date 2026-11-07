@@ -1243,25 +1243,98 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     Icons.science_outlined,
                     color: Color(0xFF7C3AED),
                   ),
-                  title: const Text('Dados de Demonstração Isolados'),
+                  title: const Text('Dados de Demonstração'),
                   subtitle: const Text(
-                    'Gera pessoas, visitas, estudos e agenda fictícios. A sincronização automática é suspensa enquanto houver pessoas de demonstração identificadas.',
+                    'Gera pessoas, visitas, estudos e agenda fictícios para testes. Você pode remover os registros fictícios a qualquer momento.',
+                  ),
+                  trailing: Wrap(
+                    spacing: 4,
+                    children: [
+                      TextButton(
+                        onPressed: () async {
+                          final repo = ref.read(repositoryProvider);
+                          await DemoDataGenerator.populateDemoData(repo);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Dados de demonstração gerados com sucesso!'),
+                              ),
+                            );
+                          }
+                        },
+                        child: const Text('Gerar'),
+                      ),
+                      TextButton(
+                        style: TextButton.styleFrom(foregroundColor: AppTheme.alertRed),
+                        onPressed: () async {
+                          final repo = ref.read(repositoryProvider);
+                          final count = await DemoDataGenerator.clearDemoData(repo);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  count > 0
+                                      ? 'Dados de demonstração removidos com sucesso!'
+                                      : 'Nenhum dado de demonstração encontrado.',
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                        child: const Text('Remover'),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(
+                    Icons.delete_forever_outlined,
+                    color: AppTheme.alertRed,
+                  ),
+                  title: const Text('Zerar Banco de Dados Local'),
+                  subtitle: const Text(
+                    'Apaga todos os registros locais do aparelho (útil para testes ou recomeçar do zero).',
                   ),
                   trailing: TextButton(
+                    style: TextButton.styleFrom(foregroundColor: AppTheme.alertRed),
                     onPressed: () async {
-                      final repo = ref.read(repositoryProvider);
-                      await DemoDataGenerator.populateDemoData(repo);
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Dados de demonstração gerados com sucesso!',
-                            ),
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Zerar Banco de Dados Local?'),
+                          content: const Text(
+                            'Esta ação apagará permanentemente todos os registros armazenados neste dispositivo.\n\nDeseja continuar?',
                           ),
-                        );
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, false),
+                              child: const Text('Cancelar'),
+                            ),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.alertRed,
+                                foregroundColor: Colors.white,
+                              ),
+                              onPressed: () => Navigator.pop(ctx, true),
+                              child: const Text('Zerar Banco'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirmed == true) {
+                        final repo = ref.read(repositoryProvider);
+                        await repo.clearAllLocalData();
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Banco de dados local zerado com sucesso!'),
+                            ),
+                          );
+                        }
                       }
                     },
-                    child: const Text('Gerar Dados'),
+                    child: const Text('Zerar'),
                   ),
                 ),
               ],

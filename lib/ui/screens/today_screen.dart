@@ -1667,22 +1667,54 @@ class TodayScreen extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    OutlinedButton.icon(
-                      icon: const Icon(Icons.add_to_photos, size: 18),
-                      label: const Text('Carregar Dados de Demonstração'),
-                      onPressed: () async {
-                        final repo = ref.read(repositoryProvider);
-                        await DemoDataGenerator.populateDemoData(repo);
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Dados de demonstração gerados com sucesso!',
-                              ),
-                            ),
-                          );
-                        }
-                      },
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        OutlinedButton.icon(
+                          icon: const Icon(Icons.add_to_photos, size: 18),
+                          label: const Text('Carregar Dados de Demonstração'),
+                          onPressed: () async {
+                            final repo = ref.read(repositoryProvider);
+                            await DemoDataGenerator.populateDemoData(repo);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Dados de demonstração gerados com sucesso!',
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                        ),
+                        OutlinedButton.icon(
+                          icon: const Icon(
+                            Icons.delete_outline,
+                            size: 18,
+                            color: AppTheme.alertRed,
+                          ),
+                          label: const Text(
+                            'Remover Demonstração',
+                            style: TextStyle(color: AppTheme.alertRed),
+                          ),
+                          onPressed: () async {
+                            final repo = ref.read(repositoryProvider);
+                            final count = await DemoDataGenerator.clearDemoData(repo);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    count > 0
+                                        ? 'Dados de demonstração removidos com sucesso!'
+                                        : 'Nenhum dado de demonstração encontrado.',
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                        ),
+                      ],
                     ),
                   ],
                 ),
