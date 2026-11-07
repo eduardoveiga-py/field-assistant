@@ -134,6 +134,15 @@ class DoorstepBriefingHelper {
     final spiritualGoal = _extractSpiritualGoal(person, linkedStudy);
     final empathyNote = _extractEmpathyNote(person, latestVoiceNote);
 
+    final vDate = latestVisit?.dateTimeField;
+    final pDate = person.lastContactAt;
+    final DateTime? lastVisitDate;
+    if (vDate != null && pDate != null) {
+      lastVisitDate = vDate.isAfter(pDate) ? vDate : pDate;
+    } else {
+      lastVisitDate = vDate ?? pDate;
+    }
+
     return DoorstepBriefingData(
       lessonAndPoint: lessonInfo.lessonAndPoint,
       jwLibraryUri: lessonInfo.jwLibraryUri,
@@ -144,7 +153,7 @@ class DoorstepBriefingHelper {
       audioFilePath: latestVoiceNote?.audioFilePath,
       voiceNoteTranscription: latestVoiceNote?.transcription,
       voiceNoteDurationSeconds: latestVoiceNote?.audioDurationSeconds,
-      lastVisitDate: latestVisit?.dateTimeField ?? person.lastContactAt,
+      lastVisitDate: lastVisitDate,
     );
   }
 

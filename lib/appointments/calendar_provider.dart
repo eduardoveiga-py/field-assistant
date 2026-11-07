@@ -37,6 +37,9 @@ String? resolveCalendarSelection(
     for (final c in calendars) {
       if (c.isPrimary && c.id.isNotEmpty) return c.id;
     }
+    for (final c in calendars) {
+      if (c.id == 'primary') return c.id;
+    }
     return null;
   }
   for (final c in calendars) {

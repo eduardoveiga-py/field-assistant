@@ -692,7 +692,9 @@ class _DoorstepBriefingCardState extends State<DoorstepBriefingCard> {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    'Primeiro contato sem histórico registrado. Ao registrar sua conversa, as notas, lição e alvos aparecerão aqui em destaque para o seu próximo retorno.',
+                    data.hasLastVisitDate
+                        ? 'Histórico anterior registrado, mas sem notas de estudo ou pendências cadastradas. Ao registrar sua conversa, as lições e alvos aparecerão aqui em destaque.'
+                        : 'Primeiro contato sem histórico registrado. Ao registrar sua conversa, as notas, lição e alvos aparecerão aqui em destaque para o seu próximo retorno.',
                     style: TextStyle(
                       fontSize: 12,
                       color: isSunMode ? Colors.black87 : AppTheme.textMuted,

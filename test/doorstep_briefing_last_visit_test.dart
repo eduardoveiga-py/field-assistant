@@ -77,6 +77,17 @@ void main() {
       expect(data.hasAnyData, isFalse);
       expect(data.hasLessonOrTopic, isFalse);
     });
+    test('Seleciona a data mais recente quando person.lastContactAt for posterior a latestVisit.dateTimeField', () {
+      final person = makePerson(lastContactAt: testDate);
+      final visit = makeVisit(dateTime: earlierDate);
+      final data = DoorstepBriefingHelper.build(
+        person: person,
+        latestVisit: visit,
+      );
+
+      expect(data.lastVisitDate, testDate);
+      expect(data.hasLastVisitDate, isTrue);
+    });
   });
 
   group('DoorstepBriefingCard - Renderização da Data da Última Visita', () {
@@ -112,6 +123,7 @@ void main() {
       );
 
       expect(find.textContaining('Última visita: 04/11/2026'), findsOneWidget);
+      expect(find.textContaining('Histórico anterior registrado'), findsOneWidget);
     });
   });
 }

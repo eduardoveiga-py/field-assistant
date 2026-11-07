@@ -297,6 +297,21 @@ class GoogleCalendarProvider implements CalendarProvider {
     await _secureStorage.write(key: _keySelectedCalendarId, value: calendarId);
   }
 
+  Future<String> _getEffectiveCalendarId() async {
+    final selected = await getSelectedCalendarId() ?? 'primary';
+    if (selected != 'primary' && selected.trim().isNotEmpty) {
+      return selected;
+    }
+    final calendars = await getAvailableCalendars();
+    final primary = calendars.where((c) => c.isPrimary && c.id.isNotEmpty).toList();
+    if (primary.isNotEmpty) {
+      final canonicalId = primary.first.id;
+      await setSelectedCalendarId(canonicalId);
+      return canonicalId;
+    }
+    return selected;
+  }
+
   @override
   Future<void> disconnect() async {
     try {
@@ -327,7 +342,7 @@ class GoogleCalendarProvider implements CalendarProvider {
       );
     }
 
-    final primaryId = await getSelectedCalendarId() ?? 'primary';
+    final primaryId = await _getEffectiveCalendarId();
     final calendars = await getAvailableCalendars();
     final matches = calendars.where((calendar) => calendar.id == primaryId ||
         (primaryId == 'primary' && calendar.isPrimary)).toList();
@@ -526,7 +541,7 @@ class GoogleCalendarProvider implements CalendarProvider {
     final api = await _getCalendarApi();
     if (api == null) return null;
 
-    final calendarId = await getSelectedCalendarId() ?? 'primary';
+    final calendarId = await _getEffectiveCalendarId();
 
     final link =
         await (db.select(db.calendarEventLinks)..where(
@@ -612,7 +627,7 @@ class GoogleCalendarProvider implements CalendarProvider {
     final api = await _getCalendarApi();
     if (api == null) return false;
 
-    final calendarId = await getSelectedCalendarId() ?? 'primary';
+    final calendarId = await _getEffectiveCalendarId();
     try {
       await api.events.delete(calendarId, externalEventId);
       final now = DateTime.now();

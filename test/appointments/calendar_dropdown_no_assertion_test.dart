@@ -46,6 +46,20 @@ void main() {
       expect(resolvedPrimary, isNull);
     });
 
+    test('resolveCalendarSelection casa ID "primary" literal se constar na lista', () {
+      final calendars = [
+        ExternalCalendarItem(
+          id: 'primary',
+          name: 'Principal Fallback',
+          isPrimary: false,
+          isReadOnly: false,
+        ),
+      ];
+
+      final resolved = resolveCalendarSelection(calendars, 'primary', google: true);
+      expect(resolved, 'primary');
+    });
+
     test('uniqueCalendarItems remove duplicados e strings vazias', () {
       final items = [
         ExternalCalendarItem(id: 'cal-1', name: 'Cal 1'),

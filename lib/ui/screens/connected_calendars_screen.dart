@@ -83,6 +83,12 @@ class _ConnectedCalendarsScreenState
           gSelectedId ?? 'primary',
           google: true,
         );
+        if (gSelectedId == 'primary' &&
+            _selectedGoogleCalId != null &&
+            _selectedGoogleCalId != 'primary') {
+          coordinator.googleProvider
+              .setSelectedCalendarId(_selectedGoogleCalId!);
+        }
         _readOnlyGoogleCalIds = gReadOnlyIds;
 
         _isAppleAuthorized = aAuth;
