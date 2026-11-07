@@ -62,3 +62,14 @@ app.*.map.json
 .agents/
 android/local.properties
 **/GeneratedPluginRegistrant.java
+
+*.m4p
+*.mp4
+
+*.m4a
+*.aac
+*.mp3
+*.wav
+*.webm
+*.mov
+*.ogg
