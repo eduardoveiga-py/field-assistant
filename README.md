@@ -27,7 +27,7 @@ Acesse a página de **[Releases Oficiais](https://github.com/eduardoveiga-py/fie
 | Plataforma | Pacote | Como Instalar |
 | :--- | :--- | :--- |
 | **Android** | `app-release.apk` | Baixe diretamente no seu celular Android, abra o arquivo e confirme a instalação (ativando fontes desconhecidas se solicitado). |
-| **iPhone / iPad** | `app-release-unsigned.ipa` | Instale no iOS usando ferramentas seguras de *sideloading* como **AltStore**, **Sideloadly** ou **TrollStore**. |
+| **iPhone / iPad** | [`app-release-unsigned.ipa`](https://github.com/eduardoveiga-py/field-assistant/releases/latest/download/app-release-unsigned.ipa) | Instale no iOS usando **LiveContainer**, **AltStore**, **SideStore**, **Sideloadly** ou **TrollStore** com suporte a atualizações contínuas via link direto da última versão. |
 | **Navegador (Web)** | `web-release.zip` / Acesso Online | Acesse diretamente pelo Chrome ou Safari e clique em **"Adicionar à Tela de Início"** para instalar como PWA nativo com banco de dados local. |
 
 > [!TIP]
