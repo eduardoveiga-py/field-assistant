@@ -251,6 +251,24 @@ class AppRepository {
         operation: 'DELETE',
         payload: {'id': id, 'deletedAt': now.toIso8601String()},
       );
+
+      final participants = await (db.select(
+        db.studyParticipants,
+      )..where((t) => t.personId.equals(id) & t.deletedAt.isNull())).get();
+      for (final p in participants) {
+        final updatedP = p.copyWith(
+          deletedAt: Value(now),
+          updatedAt: now,
+          revision: p.revision + 1,
+        );
+        await db.update(db.studyParticipants).replace(updatedP);
+        await _recordSyncOperation(
+          entityType: 'study_participants',
+          entityId: p.id,
+          operation: 'DELETE',
+          payload: {'id': p.id, 'deletedAt': now.toIso8601String()},
+        );
+      }
     });
   }
 
@@ -562,6 +580,23 @@ class AppRepository {
           revision: 1,
         );
         await db.into(db.studyParticipants).insert(partEntry);
+        await _recordSyncOperation(
+          entityType: 'study_participants',
+          entityId: partId,
+          operation: 'INSERT',
+          payload: {
+            'id': partEntry.id,
+            'study_id': partEntry.studyId,
+            'studyId': partEntry.studyId,
+            'person_id': partEntry.personId,
+            'personId': partEntry.personId,
+            'is_primary': partEntry.isPrimary,
+            'isPrimary': partEntry.isPrimary,
+            'revision': partEntry.revision,
+            'created_at': partEntry.createdAt.toIso8601String(),
+            'updated_at': partEntry.updatedAt.toIso8601String(),
+          },
+        );
       }
 
       await _recordSyncOperation(
@@ -632,6 +667,24 @@ class AppRepository {
         operation: 'DELETE',
         payload: {'id': id, 'deletedAt': now.toIso8601String()},
       );
+
+      final participants = await (db.select(
+        db.studyParticipants,
+      )..where((t) => t.studyId.equals(id) & t.deletedAt.isNull())).get();
+      for (final p in participants) {
+        final updatedP = p.copyWith(
+          deletedAt: Value(now),
+          updatedAt: now,
+          revision: p.revision + 1,
+        );
+        await db.update(db.studyParticipants).replace(updatedP);
+        await _recordSyncOperation(
+          entityType: 'study_participants',
+          entityId: p.id,
+          operation: 'DELETE',
+          payload: {'id': p.id, 'deletedAt': now.toIso8601String()},
+        );
+      }
     });
   }
 

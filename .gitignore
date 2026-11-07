@@ -3,11 +3,16 @@
 *.log
 *.pyc
 *.swp
-# Voice-note and video artifacts must never be committed
+# Voice-note, audio and video artifacts must never be committed
 *.m4a
 *.aac
 *.m4p
 *.mp4
+*.mp3
+*.wav
+*.webm
+*.mov
+*.ogg
 .DS_Store
 .atom/
 .build/

@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../appointments/calendar_provider.dart';
+import '../../appointments/calendar_sync_coordinator.dart';
 import '../../core/app_theme.dart';
 import '../../sync/supabase_sync_service.dart';
 import '../main_navigation_shell.dart';
@@ -25,6 +27,9 @@ class AuthGateShell extends ConsumerStatefulWidget {
 class _AuthGateShellState extends ConsumerState<AuthGateShell>
     with SingleTickerProviderStateMixin {
   _AuthGateState _gateState = _AuthGateState.loadingSplash;
+  bool _isSplashActive = true;
+  Session? _latestSession;
+  String _statusMessage = 'Inicializando Assistente de Campo...';
   StreamSubscription<AuthState>? _authSub;
   late final AnimationController _pulseController;
 
@@ -39,7 +44,6 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
   }
 
   void _initializeAuthGate() async {
-    final stopwatch = Stopwatch()..start();
     SupabaseClient? client;
     try {
       client = Supabase.instance.client;
@@ -48,29 +52,73 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
     }
 
     if (client != null) {
+      _latestSession = client.auth.currentSession;
       _authSub = client.auth.onAuthStateChange.listen((data) {
         if (!mounted) return;
-        final session = data.session;
-        setState(() {
-          _gateState = session != null
-              ? _AuthGateState.authenticated
-              : _AuthGateState.unauthenticated;
-        });
-        if (session != null) {
-          Future.microtask(() {
-            if (mounted) {
-              ref.read(supabaseSyncServiceProvider).sync();
-            }
+        _latestSession = data.session;
+        // Não transiciona prematuramente se a splash screen ainda estiver no tempo mínimo
+        if (!_isSplashActive) {
+          setState(() {
+            _gateState = data.session != null
+                ? _AuthGateState.authenticated
+                : _AuthGateState.unauthenticated;
           });
+          if (data.session != null) {
+            Future.microtask(() {
+              if (mounted) {
+                ref.read(supabaseSyncServiceProvider).sync();
+                ref.read(calendarSyncCoordinatorProvider).syncAll();
+              }
+            });
+          }
         }
       });
     }
 
-    // Garante que o Splash Screen fique visível por pelo menos 1200ms
-    final elapsed = stopwatch.elapsedMilliseconds;
-    if (elapsed < 1200) {
-      await Future<void>.delayed(Duration(milliseconds: 1200 - elapsed));
+    if (mounted) {
+      setState(() {
+        _statusMessage = 'Sincronizando registros e calendário...';
+      });
     }
+
+    // Dispara sincronização em segundo plano para Supabase e Calendários externos
+    try {
+      unawaited(
+        ref
+            .read(supabaseSyncServiceProvider)
+            .sync()
+            .catchError(
+              (_) => const SyncProcessResult(
+                totalProcessed: 0,
+                successCount: 0,
+                failureCount: 0,
+                conflictCount: 0,
+                message: 'Modo offline ou sem conexão',
+              ),
+            ),
+      );
+    } catch (_) {}
+
+    try {
+      unawaited(
+        ref
+            .read(calendarSyncCoordinatorProvider)
+            .syncAll()
+            .catchError(
+              (_) => CalendarSyncResult(
+                success: false,
+                eventsDownloaded: 0,
+                eventsUploaded: 0,
+              ),
+            ),
+      );
+    } catch (_) {}
+
+    // Garante que a Splash Screen permaneça visível por pelo menos 1800ms
+    const minSplashDurationMs = 1800;
+    await Future<void>.delayed(
+      const Duration(milliseconds: minSplashDurationMs),
+    );
     if (!mounted) return;
 
     if (client != null) {
@@ -84,7 +132,9 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
       }
     }
 
-    final session = client?.auth.currentSession;
+    _isSplashActive = false;
+    _pulseController.stop();
+    final session = _latestSession ?? client?.auth.currentSession;
     setState(() {
       _gateState = session != null
           ? _AuthGateState.authenticated
@@ -95,6 +145,7 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
       Future.microtask(() {
         if (mounted) {
           ref.read(supabaseSyncServiceProvider).sync();
+          ref.read(calendarSyncCoordinatorProvider).syncAll();
         }
       });
     }
@@ -111,7 +162,11 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
   Widget build(BuildContext context) {
     switch (_gateState) {
       case _AuthGateState.loadingSplash:
-        return _SplashScreenView(pulseAnimation: _pulseController);
+        return _SplashScreenView(
+          pulseAnimation: _pulseController,
+          statusMessage: _statusMessage,
+          version: 'v1.0.0',
+        );
       case _AuthGateState.unauthenticated:
         return SupabaseAuthScreen(
           onAuthenticated: () {
@@ -120,6 +175,7 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
                 _gateState = _AuthGateState.authenticated;
               });
               ref.read(supabaseSyncServiceProvider).sync();
+              ref.read(calendarSyncCoordinatorProvider).syncAll();
             }
           },
         );
@@ -131,13 +187,21 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
 
 class _SplashScreenView extends StatelessWidget {
   final Animation<double> pulseAnimation;
+  final String statusMessage;
+  final String version;
 
-  const _SplashScreenView({required this.pulseAnimation});
+  const _SplashScreenView({
+    required this.pulseAnimation,
+    this.statusMessage = 'Inicializando Assistente de Campo...',
+    this.version = 'v1.0.0',
+  });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: const ValueKey('splash_screen_scaffold'),
       body: Container(
+        key: const ValueKey('splash_screen_view'),
         width: double.infinity,
         height: double.infinity,
         decoration: const BoxDecoration(
@@ -223,12 +287,31 @@ class _SplashScreenView extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               Text(
-                'Verificando login no Supabase...',
+                statusMessage,
+                key: const ValueKey('splash_status_message'),
                 style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.white.withValues(alpha: 0.6),
+                  fontSize: 12.5,
+                  color: Colors.white.withValues(alpha: 0.75),
+                  letterSpacing: 0.2,
+                ),
+              ),
+              const SizedBox(height: 18),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white12),
+                ),
+                child: Text(
+                  '$version • Offline-First',
+                  style: TextStyle(
+                    fontSize: 11,
+                    letterSpacing: 0.5,
+                    color: Colors.white.withValues(alpha: 0.55),
+                  ),
                 ),
               ),
             ],
