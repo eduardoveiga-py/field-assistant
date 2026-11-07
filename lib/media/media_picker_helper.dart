@@ -1,6 +1,8 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../core/app_theme.dart';
 
@@ -67,19 +69,40 @@ class MediaPickerHelper {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     onTap: () async {
-                      final result = await pickImageFromBrowser(
-                        useCamera: true,
-                      );
-                      if (result != null && result.isNotEmpty) {
-                        if (ctx.mounted) Navigator.pop(ctx, result);
-                      } else if (result == null && ctx.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Câmera física disponível no navegador/dispositivo móvel. No desktop, você pode colar o link ou base64 abaixo.',
-                            ),
-                          ),
+                      try {
+                        final picker = ImagePicker();
+                        final XFile? file = await picker.pickImage(
+                          source: ImageSource.camera,
+                          maxWidth: 1920,
+                          maxHeight: 1920,
+                          imageQuality: 85,
                         );
+                        if (file != null) {
+                          final bytes = await file.readAsBytes();
+                          final base64String = base64Encode(bytes);
+                          final mimeType = file.mimeType ?? 'image/jpeg';
+                          if (ctx.mounted) {
+                            Navigator.pop(ctx, 'data:$mimeType;base64,$base64String');
+                          }
+                          return;
+                        }
+                      } catch (e) {
+                        if (kIsWeb) {
+                          final result = await pickImageFromBrowser(
+                            useCamera: true,
+                          );
+                          if (result != null && result.isNotEmpty && ctx.mounted) {
+                            Navigator.pop(ctx, result);
+                            return;
+                          }
+                        }
+                        if (ctx.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Não foi possível abrir a câmera: $e'),
+                            ),
+                          );
+                        }
                       }
                     },
                   ),
@@ -113,19 +136,40 @@ class MediaPickerHelper {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     onTap: () async {
-                      final result = await pickImageFromBrowser(
-                        useCamera: false,
-                      );
-                      if (result != null && result.isNotEmpty) {
-                        if (ctx.mounted) Navigator.pop(ctx, result);
-                      } else if (result == null && ctx.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Seletor nativo disponível no navegador/dispositivo móvel. No desktop, você pode colar o link ou base64 abaixo.',
-                            ),
-                          ),
+                      try {
+                        final picker = ImagePicker();
+                        final XFile? file = await picker.pickImage(
+                          source: ImageSource.gallery,
+                          maxWidth: 1920,
+                          maxHeight: 1920,
+                          imageQuality: 85,
                         );
+                        if (file != null) {
+                          final bytes = await file.readAsBytes();
+                          final base64String = base64Encode(bytes);
+                          final mimeType = file.mimeType ?? 'image/jpeg';
+                          if (ctx.mounted) {
+                            Navigator.pop(ctx, 'data:$mimeType;base64,$base64String');
+                          }
+                          return;
+                        }
+                      } catch (e) {
+                        if (kIsWeb) {
+                          final result = await pickImageFromBrowser(
+                            useCamera: false,
+                          );
+                          if (result != null && result.isNotEmpty && ctx.mounted) {
+                            Navigator.pop(ctx, result);
+                            return;
+                          }
+                        }
+                        if (ctx.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Não foi possível abrir a galeria: $e'),
+                            ),
+                          );
+                        }
                       }
                     },
                   ),

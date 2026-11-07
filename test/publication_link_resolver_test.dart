@@ -48,6 +48,21 @@ void main() {
         expect(resolved.precision, equals(LinkPrecision.referenceOnly));
         expect(resolved.displayText, contains('Salmo 23'));
       });
+
+      test('TC-PUB-04: Navegação direta com parâmetro de lição e parágrafo/ponto', () {
+        final resolved = PublicationLinkResolver.resolve(
+          publicationId: 'lff-book',
+          languageCode: 'pt',
+          lesson: 8,
+          paragraph: 3,
+        );
+
+        expect(resolved.url, contains('pub=lff'));
+        expect(resolved.url, contains('lesson=8'));
+        expect(resolved.url, contains('par=3'));
+        expect(resolved.fallbackUrl, contains('licao-08/#p3'));
+        expect(resolved.displayText, contains('Lição 8, § 3'));
+      });
     },
   );
 }

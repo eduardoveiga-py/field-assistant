@@ -43,34 +43,51 @@ class _ConnectedCalendarsScreenState
     final coordinator = ref.read(calendarSyncCoordinatorProvider);
 
     // Google state
-    final gAuth = await coordinator.googleProvider.isAuthorized();
+    bool gAuth = false;
+    try {
+      gAuth = await coordinator.googleProvider.isAuthorized();
+    } catch (e) {
+      debugPrint('Erro ao verificar autorizacao do Google: $e');
+    }
     String? gAcc;
     List<ExternalCalendarItem> gCals = [];
     String? gSelectedId;
     Set<String> gReadOnlyIds = {};
     if (gAuth) {
-      gAcc = await coordinator.googleProvider.getConnectedAccountName();
-      gCals = uniqueCalendarItems(
-        await coordinator.googleProvider.getAvailableCalendars(),
-      );
-      gSelectedId = await coordinator.googleProvider.getSelectedCalendarId();
-      gReadOnlyIds = await coordinator.googleProvider.getReadOnlyCalendarIds();
+      try {
+        gAcc = await coordinator.googleProvider.getConnectedAccountName();
+        gCals = uniqueCalendarItems(
+          await coordinator.googleProvider.getAvailableCalendars(),
+        );
+        gSelectedId = await coordinator.googleProvider.getSelectedCalendarId();
+        gReadOnlyIds = await coordinator.googleProvider.getReadOnlyCalendarIds();
+      } catch (e) {
+        debugPrint('Erro ao obter dados do Google Calendar: $e');
+      }
     }
 
     // Apple state
-    final aAuth = await coordinator.appleProvider.isAuthorized();
+    bool aAuth = false;
+    try {
+      aAuth = await coordinator.appleProvider.isAuthorized();
+    } catch (_) {}
     String? aAcc;
     List<ExternalCalendarItem> aCals = [];
     String? aSelectedId;
     if (aAuth) {
-      aAcc = await coordinator.appleProvider.getConnectedAccountName();
-      aCals = uniqueCalendarItems(
-        await coordinator.appleProvider.getAvailableCalendars(),
-      );
-      aSelectedId = await coordinator.appleProvider.getSelectedCalendarId();
+      try {
+        aAcc = await coordinator.appleProvider.getConnectedAccountName();
+        aCals = uniqueCalendarItems(
+          await coordinator.appleProvider.getAvailableCalendars(),
+        );
+        aSelectedId = await coordinator.appleProvider.getSelectedCalendarId();
+      } catch (_) {}
     }
 
-    final pendingConflicts = await coordinator.getPendingConflicts();
+    List<CalendarConflictItem> pendingConflicts = [];
+    try {
+      pendingConflicts = await coordinator.getPendingConflicts();
+    } catch (_) {}
 
     if (mounted) {
       setState(() {
@@ -111,20 +128,30 @@ class _ConnectedCalendarsScreenState
       _syncMessage = null;
     });
 
-    final coordinator = ref.read(calendarSyncCoordinatorProvider);
-    final result = await coordinator.syncAll();
+    try {
+      final coordinator = ref.read(calendarSyncCoordinatorProvider);
+      final result = await coordinator.syncAll();
 
-    if (mounted) {
-      setState(() {
-        _isSyncing = false;
-        if (result.success) {
-          _syncMessage =
-              'Sincronização concluída com sucesso! (${result.eventsDownloaded} recebidos, ${result.eventsUploaded} enviados)';
-        } else {
-          _syncMessage = 'Aviso: ${result.errorMessage}';
-        }
-      });
-      await _loadState();
+      if (mounted) {
+        setState(() {
+          _isSyncing = false;
+          if (result.success) {
+            _syncMessage =
+                'Sincronização concluída com sucesso! (${result.eventsDownloaded} recebidos, ${result.eventsUploaded} enviados)';
+          } else {
+            _syncMessage = 'Aviso: ${result.errorMessage}';
+          }
+        });
+        await _loadState();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isSyncing = false;
+          _syncMessage = 'Aviso durante sincronização: $e';
+        });
+        await _loadState();
+      }
     }
   }
 
@@ -133,20 +160,31 @@ class _ConnectedCalendarsScreenState
       _isSyncing = true;
       _syncMessage = null;
     });
-    final coordinator = ref.read(calendarSyncCoordinatorProvider);
-    final authorized = await coordinator.googleProvider.requestAuthorization();
-    if (authorized) {
-      await _syncNow();
-    } else {
+    try {
+      final coordinator = ref.read(calendarSyncCoordinatorProvider);
+      final authorized = await coordinator.googleProvider.requestAuthorization();
+      if (authorized) {
+        await _syncNow();
+      } else {
+        if (mounted) {
+          setState(() {
+            _isSyncing = false;
+            _syncMessage =
+                'Aviso: Não foi possível conectar ao Google Calendar (${coordinator.googleProvider.lastError ?? "autorização não concluída"}). Verifique também se a Google Calendar API está ativada no Google Cloud Console.';
+          });
+        }
+      }
+    } catch (e) {
       if (mounted) {
         setState(() {
           _isSyncing = false;
-          _syncMessage =
-              'Aviso: Não foi possível conectar ao Google Calendar (${coordinator.googleProvider.lastError ?? "autorização não concluída"}). Verifique também se a Google Calendar API está ativada no Google Cloud Console.';
+          _syncMessage = 'Aviso ao conectar ao Google Agenda: $e';
         });
       }
     }
-    await _loadState();
+    if (mounted) {
+      await _loadState();
+    }
   }
 
   Future<void> _disconnectGoogle() async {
@@ -175,8 +213,12 @@ class _ConnectedCalendarsScreenState
     );
 
     if (confirmed == true) {
-      final coordinator = ref.read(calendarSyncCoordinatorProvider);
-      await coordinator.googleProvider.disconnect();
+      try {
+        final coordinator = ref.read(calendarSyncCoordinatorProvider);
+        await coordinator.googleProvider.disconnect();
+      } catch (e) {
+        debugPrint('Erro ao desconectar Google: $e');
+      }
       if (mounted) {
         setState(() {
           _isGoogleAuthorized = false;
@@ -191,18 +233,47 @@ class _ConnectedCalendarsScreenState
   }
 
   Future<void> _connectApple() async {
-    final coordinator = ref.read(calendarSyncCoordinatorProvider);
-    final authorized = await coordinator.appleProvider.requestAuthorization();
-    if (authorized) {
-      await _syncNow();
+    setState(() {
+      _isSyncing = true;
+      _syncMessage = null;
+    });
+    try {
+      final coordinator = ref.read(calendarSyncCoordinatorProvider);
+      final authorized = await coordinator.appleProvider.requestAuthorization();
+      if (authorized) {
+        await _syncNow();
+      } else {
+        if (mounted) {
+          setState(() {
+            _isSyncing = false;
+            _syncMessage =
+                'Aviso: Permissão para acessar os Calendários da Apple não foi concedida.';
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isSyncing = false;
+          _syncMessage = 'Aviso ao conectar Calendários Apple: $e';
+        });
+      }
     }
-    await _loadState();
+    if (mounted) {
+      await _loadState();
+    }
   }
 
   Future<void> _disconnectApple() async {
-    final coordinator = ref.read(calendarSyncCoordinatorProvider);
-    await coordinator.appleProvider.disconnect();
-    await _loadState();
+    try {
+      final coordinator = ref.read(calendarSyncCoordinatorProvider);
+      await coordinator.appleProvider.disconnect();
+    } catch (e) {
+      debugPrint('Erro ao desconectar Apple Calendar: $e');
+    }
+    if (mounted) {
+      await _loadState();
+    }
   }
 
   void _showConflictDialog(CalendarConflictItem conflict) {

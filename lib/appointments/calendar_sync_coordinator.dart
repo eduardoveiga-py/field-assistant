@@ -89,16 +89,20 @@ class CalendarSyncCoordinator {
     // 1. Download de alterações externas
     for (final provider in allProviders) {
       if (providers != null && !providers.contains(provider.providerType)) continue;
-      final authorized = await provider.isAuthorized();
-      if (!authorized) continue;
+      try {
+        final authorized = await provider.isAuthorized();
+        if (!authorized) continue;
 
-      final res = await provider.syncEvents(db: db, fullSync: fullSync);
-      totalDownloaded += res.eventsDownloaded;
-      totalUploaded += res.eventsUploaded;
-      if (!res.success) {
-        errors.add('${provider.providerType.displayName}: ${res.errorMessage ?? "falha ao receber eventos"}');
-      } else {
-        readyProviders.add(provider);
+        final res = await provider.syncEvents(db: db, fullSync: fullSync);
+        totalDownloaded += res.eventsDownloaded;
+        totalUploaded += res.eventsUploaded;
+        if (!res.success) {
+          errors.add('${provider.providerType.displayName}: ${res.errorMessage ?? "falha ao receber eventos"}');
+        } else {
+          readyProviders.add(provider);
+        }
+      } catch (e) {
+        errors.add('${provider.providerType.displayName}: $e');
       }
     }
 
@@ -372,9 +376,11 @@ class CalendarSyncCoordinator {
   /// Propaga criação ou alteração de um compromisso local para os calendários externos conectados
   Future<void> pushLocalAppointment(AppointmentEntry appointment) async {
     for (final provider in allProviders) {
-      if (await provider.isAuthorized()) {
-        await provider.pushAppointmentToExternal(db, appointment);
-      }
+      try {
+        if (await provider.isAuthorized()) {
+          await provider.pushAppointmentToExternal(db, appointment);
+        }
+      } catch (_) {}
     }
   }
 
@@ -389,8 +395,12 @@ class CalendarSyncCoordinator {
 
     for (final link in links) {
       final provider = getProviderByName(link.provider);
-      if (provider != null && await provider.isAuthorized()) {
-        await provider.deleteExternalEvent(db, link.externalEventId);
+      if (provider != null) {
+        try {
+          if (await provider.isAuthorized()) {
+            await provider.deleteExternalEvent(db, link.externalEventId);
+          }
+        } catch (_) {}
       }
       await (db.update(
         db.calendarEventLinks,

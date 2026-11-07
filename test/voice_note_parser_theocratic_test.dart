@@ -119,6 +119,53 @@ void main() {
       expect(n3.empathyNote, isNotNull);
       expect(n3.empathyNote!.toLowerCase(), contains('gravidez'));
     });
+
+    test('TC-PARSER-POS-06: Converte números por extenso ("lição oito" -> 8) e pontos compostos', () {
+      final note1 = VoiceNoteParser.parse('Consideramos a lição oito hoje.');
+      expect(note1.lesson, equals(8));
+
+      final note2 = VoiceNoteParser.parse('Paramos na lição oito e ponto três com o morador.');
+      expect(note2.lesson, equals(8));
+      expect(note2.point, equals(3));
+
+      final note3 = VoiceNoteParser.parse('Estudo na lição vinte e quatro, ponto cinco.');
+      expect(note3.lesson, equals(24));
+      expect(note3.point, equals(5));
+
+      final note4 = VoiceNoteParser.parse('Dona Maria, décima oitava lição.');
+      expect(note4.lesson, equals(18));
+
+      final note5 = VoiceNoteParser.parse('Paramos na lição 8 § 3.');
+      expect(note5.lesson, equals(8));
+      expect(note5.point, equals(3));
+
+      final note6 = VoiceNoteParser.parse('Lição oito e § três.');
+      expect(note6.lesson, equals(8));
+      expect(note6.point, equals(3));
+    });
+
+    test('TC-PARSER-POS-07: Captura contexto de vida e dificuldades ("família passando necessidade")', () {
+      final note1 = VoiceNoteParser.parse('Ele comentou que a família está passando necessidade.');
+      expect(note1.empathyNote, isNotNull);
+      expect(note1.empathyNote!.toLowerCase(), contains('necessidade'));
+
+      final note2 = VoiceNoteParser.parse('Estudo com o Carlos, lição oito e ponto três, família passando necessidade no momento.');
+      expect(note2.lesson, equals(8));
+      expect(note2.point, equals(3));
+      expect(note2.empathyNote, isNotNull);
+      expect(note2.empathyNote!.toLowerCase(), contains('necessidade'));
+
+      final note3 = VoiceNoteParser.parse('Morador relatou dificuldade financeira e desemprego.');
+      expect(note3.empathyNote, isNotNull);
+      expect(note3.empathyNote!.toLowerCase(), contains('dificuldade'));
+
+      final note4 = VoiceNoteParser.parse('Estudamos lição oito e ponto três a família está passando necessidade.');
+      expect(note4.lesson, equals(8));
+      expect(note4.point, equals(3));
+      expect(note4.empathyNote, isNotNull);
+      expect(note4.empathyNote!.toLowerCase(), contains('necessidade'));
+      expect(note4.studentName, isNull);
+    });
   });
 
   group('VoiceNotesManager Visit & Study Integration Rules', () {

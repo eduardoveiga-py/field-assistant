@@ -44,7 +44,7 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
   String _statusText = 'Toque no mapa para marcar a localização exata da casa.';
 
   // Constantes de visualização de grade de blocos
-  static const int _gridHalfSize = 5; // 11x11 tiles = 2816x2816 px
+  static const int _gridHalfSize = 3; // 7x7 tiles = 1792x1792 px
   static const double _tileSize = 256.0;
 
   void _changeZoom(
@@ -53,7 +53,7 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
     double originPx,
     double originPy,
   ) {
-    final targetZoom = newZoom.clamp(10, 18);
+    final targetZoom = newZoom.clamp(10, 19);
     if (targetZoom == _zoom) return;
 
     final currentMatrix = _transformationController.value;
@@ -374,7 +374,7 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
                               if (details.pointerCount >= 2) {
                                 final relativeScale =
                                     details.scale / _basePinchScale;
-                                if (relativeScale > 1.25 && _zoom < 18) {
+                                if (relativeScale > 1.25 && _zoom < 19) {
                                   _basePinchScale = details.scale;
                                   _changeZoom(
                                     _zoom + 1,
@@ -406,7 +406,7 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
                             },
                             child: GestureDetector(
                               onDoubleTap: () {
-                                if (_zoom < 18) {
+                                if (_zoom < 19) {
                                   _changeZoom(
                                     _zoom + 1,
                                     constraints,
@@ -530,7 +530,7 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
                               backgroundColor: Colors.white,
                               foregroundColor: Colors.black87,
                               onPressed: () {
-                                if (_zoom < 18) {
+                                if (_zoom < 19) {
                                   _changeZoom(
                                     _zoom + 1,
                                     constraints,

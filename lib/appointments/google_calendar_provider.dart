@@ -94,7 +94,7 @@ class GoogleCalendarProvider implements CalendarProvider {
         await _googleSignIn.initialize(clientId: defaultWebClientId);
         _webUserEmail ??= await _secureStorage.read(key: _keyConnectedEmail);
       } else {
-        await _googleSignIn.initialize();
+        await _googleSignIn.initialize(clientId: defaultWebClientId);
       }
     } catch (e) {
       lastError = e.toString();

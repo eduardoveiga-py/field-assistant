@@ -79,13 +79,17 @@ class PublicationLinkResolver {
     // Para Português e outros idiomas textuais
     if (pub.id == 'lff-book' && lesson != null && lesson >= 1 && lesson <= 60) {
       // Formato oficial do buscador e compartilhamento JW para Lições do livro LFF
-      // Exemplo de link canônico verificado: https://www.jw.org/finder?srcid=jwlshare&wtlocale=T&pub=lff&docid=1102021200 + lesson
-      // URL web direta de acesso à lição em português:
+      // Exemplo de link canônico verificado: https://www.jw.org/finder?srcid=jwlshare&wtlocale=T&pub=lff&lesson=X&par=Y
       final lessonPad = lesson.toString().padLeft(2, '0');
-      final lessonWebUrl =
+      var lessonWebUrl =
           'https://www.jw.org/pt/biblioteca/livros/seja-feliz-para-sempre/licao-$lessonPad/';
-      final finderUrl =
+      var finderUrl =
           'https://www.jw.org/finder?srcid=jwlshare&wtlocale=${lang.wtlocale}&pub=${pub.code}&lesson=$lesson';
+
+      if (paragraph != null && paragraph > 0) {
+        finderUrl += '&par=$paragraph';
+        lessonWebUrl += '#p$paragraph';
+      }
 
       return ResolvedLink(
         url: finderUrl,
@@ -94,9 +98,9 @@ class PublicationLinkResolver {
         displayText: display.toString(),
         isSignLanguage: false,
         note: paragraph != null
-            ? 'Abertura direta garantida até a Lição $lesson. A localização do parágrafo $paragraph deve ser conferida na página.'
+            ? 'Abertura direta garantida até a Lição $lesson, ponto/parágrafo $paragraph no JW Library.'
             : 'Abre diretamente a Lição $lesson.',
-        isDirectParagraphSupported: false, // Deep linking específico para número de parágrafo não é documentado oficialmente pela API pública
+        isDirectParagraphSupported: false,
       );
     }
 
@@ -104,15 +108,24 @@ class PublicationLinkResolver {
         lesson != null &&
         lesson >= 1 &&
         lesson <= 3) {
-      final finderUrl =
+      var finderUrl =
           'https://www.jw.org/finder?srcid=jwlshare&wtlocale=${lang.wtlocale}&pub=${pub.code}&lesson=$lesson';
+      var fallbackUrl = lang.officialWebUrl;
+      if (paragraph != null && paragraph > 0) {
+        finderUrl += '&par=$paragraph';
+        if (fallbackUrl != null) {
+          fallbackUrl += '#p$paragraph';
+        }
+      }
       return ResolvedLink(
         url: finderUrl,
-        fallbackUrl: lang.officialWebUrl,
+        fallbackUrl: fallbackUrl,
         precision: LinkPrecision.directLesson,
         displayText: display.toString(),
         isSignLanguage: false,
-        note: 'Abre a Lição $lesson da brochura introdutória.',
+        note: paragraph != null
+            ? 'Abre a Lição $lesson, ponto/parágrafo $paragraph da brochura introdutória no JW Library.'
+            : 'Abre a Lição $lesson da brochura introdutória.',
         isDirectParagraphSupported: false,
       );
     }

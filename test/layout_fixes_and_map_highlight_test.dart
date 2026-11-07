@@ -12,6 +12,7 @@ import 'package:ministerio_pessoal/territory/tile_cache/tile_cache_service.dart'
 import 'package:ministerio_pessoal/ui/screens/experiences_screen.dart';
 import 'package:ministerio_pessoal/ui/screens/research_screen.dart';
 import 'package:ministerio_pessoal/appointments/ics_picker_helper.dart';
+import 'package:ministerio_pessoal/ui/widgets/map_location_picker_dialog.dart';
 
 void main() {
   setUpAll(() {
@@ -366,6 +367,32 @@ void main() {
         expect(find.text('Destacado: Carlos'), findsOneWidget);
         expect(tester.takeException(), isNull);
 
+        await tester.pumpWidget(const SizedBox());
+        await tester.pump(const Duration(milliseconds: 100));
+      },
+    );
+
+    testWidgets(
+      'MapLocationPickerDialog allows zooming up to level 19 without errors',
+      (tester) async {
+        await tester.pumpWidget(
+          const MaterialApp(
+            home: Scaffold(
+              body: MapLocationPickerDialog(
+                initialLat: -23.550520,
+                initialLng: -46.633308,
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(MapLocationPickerDialog), findsOneWidget);
+        final zoomInBtn = find.byType(FloatingActionButton).first;
+        for (int i = 0; i < 6; i++) {
+          await tester.tap(zoomInBtn);
+          await tester.pumpAndSettle();
+        }
+        expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox());
         await tester.pump(const Duration(milliseconds: 100));
       },

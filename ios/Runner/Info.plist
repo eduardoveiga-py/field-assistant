@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Território</string>
+	<string>Ministério Pessoal</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -24,6 +24,54 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>CFBundleIcons</key>
+	<dict>
+		<key>CFBundlePrimaryIcon</key>
+		<dict>
+			<key>CFBundleIconFiles</key>
+			<array>
+				<string>AppIcon</string>
+				<string>AppIcon60x60</string>
+			</array>
+			<key>CFBundleIconName</key>
+			<string>AppIcon</string>
+		</dict>
+	</dict>
+	<key>CFBundleIcons~ipad</key>
+	<dict>
+		<key>CFBundlePrimaryIcon</key>
+		<dict>
+			<key>CFBundleIconFiles</key>
+			<array>
+				<string>AppIcon</string>
+				<string>AppIcon76x76</string>
+			</array>
+			<key>CFBundleIconName</key>
+			<string>AppIcon</string>
+		</dict>
+	</dict>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIconFiles</key>
+	<array>
+		<string>AppIcon</string>
+		<string>AppIcon60x60</string>
+		<string>AppIcon76x76</string>
+		<string>Icon-App-1024x1024@1x</string>
+	</array>
+	<key>GIDClientID</key>
+	<string>424960288105-vi0ig8si59j4rk5j4gdfd9nv2revvitn.apps.googleusercontent.com</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.424960288105-vi0ig8si59j4rk5j4gdfd9nv2revvitn</string>
+			</array>
+		</dict>
+	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>LSApplicationQueriesSchemes</key>
@@ -35,6 +83,10 @@
 		<string>geo</string>
 		<string>whatsapp</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>O aplicativo precisa de acesso à câmera para fotografar anotações, mapas e cartões de território.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>O aplicativo precisa de acesso à galeria de fotos para anexar imagens aos contatos e territórios.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>O aplicativo precisa de acesso ao microfone para permitir o registro rápido de notas de voz após as visitas.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>

@@ -94,7 +94,7 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
     double centerLng,
     double centerLat,
   ) {
-    final targetZoom = newZoom.clamp(10, 18);
+    final targetZoom = newZoom.clamp(10, 19);
     if (targetZoom == _zoom) return;
 
     final currentMatrix = _transformationController.value;
@@ -115,7 +115,7 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
     final focalLat = _pixelY2lat(worldPy, _zoom);
 
     // Reprojeção para novo nível de resolução 'z'
-    const int gridHalfSize = 7;
+    const int gridHalfSize = 3;
     final newCenterTileX = _lon2tileX(centerLng, targetZoom);
     final newCenterTileY = _lat2tileY(centerLat, targetZoom);
     final newMinTileX = newCenterTileX - gridHalfSize;
@@ -1382,7 +1382,7 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
     final centerTileY = _lat2tileY(centerLat, _zoom);
 
     // Grade ampla (15x15 blocos = 3840x3840 px) que cobre 100% da tela em qualquer dispositivo móvel, tablet ou desktop
-    const int gridHalfSize = 7;
+    const int gridHalfSize = 3;
     final minTileX = centerTileX - gridHalfSize;
     final maxTileX = centerTileX + gridHalfSize;
     final minTileY = centerTileY - gridHalfSize;
@@ -1454,7 +1454,7 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                     if (_lastZoomChangeTime == null ||
                         now.difference(_lastZoomChangeTime!).inMilliseconds >=
                             250) {
-                      if (pointerSignal.scrollDelta.dy < -2 && _zoom < 18) {
+                      if (pointerSignal.scrollDelta.dy < -2 && _zoom < 19) {
                         _lastZoomChangeTime = now;
                         _changeZoom(
                           _zoom + 1,
@@ -1482,7 +1482,7 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                 child: GestureDetector(
                   behavior: HitTestBehavior.translucent,
                   onDoubleTap: () {
-                    if (_zoom < 18) {
+                    if (_zoom < 19) {
                       _changeZoom(
                         _zoom + 1,
                         constraints,
@@ -1507,7 +1507,7 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                     onInteractionEnd: (details) {
                       final m = _transformationController.value;
                       final currentScale = m.getMaxScaleOnAxis();
-                      if (currentScale >= 1.25 && _zoom < 18) {
+                      if (currentScale >= 1.25 && _zoom < 19) {
                         _changeZoom(
                           _zoom + 1,
                           constraints,
@@ -1657,7 +1657,7 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                     foregroundColor: Colors.black87,
                     tooltip: 'Aproximar Zoom',
                     onPressed: () {
-                      if (_zoom < 18) {
+                      if (_zoom < 19) {
                         _changeZoom(
                           _zoom + 1,
                           constraints,

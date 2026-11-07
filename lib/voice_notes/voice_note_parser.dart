@@ -316,6 +316,24 @@ class VoiceNoteParser {
     'empresa',
     'familia',
     'família',
+    'passando necessidade',
+    'necessidade',
+    'necessidades',
+    'dificuldade financeira',
+    'dificuldades financeiras',
+    'dificuldade',
+    'dificuldades',
+    'problema financeiro',
+    'problemas financeiros',
+    'passando aperto',
+    'aperto financeiro',
+    'falta de alimento',
+    'cesta basica',
+    'cesta básica',
+    'sem emprego',
+    'sem trabalho',
+    'precisando de ajuda',
+    'crise financeira',
     'filho',
     'filha',
     'filhos',
@@ -481,6 +499,10 @@ class VoiceNoteParser {
     'irma',
     'morador',
     'moradora',
+    'familia',
+    'família',
+    'casal',
+    'pessoal',
     'estudante',
     'campo',
     'territorio',
@@ -661,12 +683,13 @@ class VoiceNoteParser {
       return true;
     }
 
-    // 2. Se antes de "capítulo" houver um livro da Bíblia
-    for (final book in _bibleBooks) {
-      if (before.trimRight().endsWith(book) ||
-          RegExp(r'\b' + RegExp.escape(book) + r'\s*(?:do\s+livro\s+de\s+)?$')
-              .hasMatch(before.trim())) {
-        return true;
+    // 2. Se antes de "capítulo" houver um livro da Bíblia como palavra inteira
+    if (matchedText.contains('cap')) {
+      for (final book in _bibleBooks) {
+        if (RegExp(r'\b' + RegExp.escape(book) + r'\s*(?:do\s+livro\s+de\s+)?$', caseSensitive: false)
+            .hasMatch(before.trim())) {
+          return true;
+        }
       }
     }
 
@@ -746,7 +769,7 @@ class VoiceNoteParser {
 
     // Dezenas compostas ordinais: "vigésimo primeiro", "trigésima segunda", etc.
     final ordinalCompoundReg = RegExp(
-      r'^(vig[ée]sim[oa]|trig[ée]sim[oa]|quadrag[ée]sim[oa]|quinquag[ée]sim[oa]|sexag[ée]sim[oa])\s+([a-zà-ú]+)$',
+      r'^(vig[ée]sim[oa]|trig[ée]sim[oa]|quadrag[ée]sim[oa]|quinquag[ée]sim[oa]|sexag[ée]sim[oa]|d[ée]cim[oa])\s+([a-zà-ú]+)$',
     );
     final ordMatch = ordinalCompoundReg.firstMatch(clean);
     if (ordMatch != null) {
@@ -757,6 +780,13 @@ class VoiceNoteParser {
       if (tensVal != null && unitsVal != null) {
         return tensVal + unitsVal;
       }
+    }
+
+    // Se houver múltiplas palavras (ex.: "oito e ponto", "oito com o"),
+    // avalia se a primeira palavra é um número individual válido:
+    final words = clean.split(RegExp(r'\s+'));
+    if (words.isNotEmpty && _numberWords.containsKey(words.first)) {
+      return _numberWords[words.first];
     }
 
     return null;
@@ -868,7 +898,7 @@ class VoiceNoteParser {
     }
 
     final primaryWordPattern = RegExp(
-      r'(?:li[cç][aã]o|cap[ií]tulo)\s*(?:n[º°.]\s*|n[uú]mero\s*)?([a-zà-ú]+(?:\s+e\s+[a-zà-ú]+|\s+[a-zà-ú]+)?)',
+      r'(?:li[cç][aã]o|cap[ií]tulo)\s*(?:n[º°.]\s*|n[uú]mero\s*)?((?:vinte|trinta|quarenta|cinquenta|cincoenta|sessenta|setenta|oitenta|noventa)\s+e\s+[a-zà-ú]+|(?:vig[ée]sim[oa]|trig[ée]sim[oa]|quadrag[ée]sim[oa]|quinquag[ée]sim[oa]|sexag[ée]sim[oa]|d[ée]cim[oa])\s+[a-zà-ú]+|[a-zà-ú]+)',
       caseSensitive: false,
     );
     for (final m in primaryWordPattern.allMatches(text)) {
@@ -892,7 +922,7 @@ class VoiceNoteParser {
     }
 
     final reverseWordPattern = RegExp(
-      r'([a-zà-ú]+(?:\s+e\s+[a-zà-ú]+|\s+[a-zà-ú]+)?)\s+(?:li[cç][aã]o|cap[ií]tulo)',
+      r'((?:vinte|trinta|quarenta|cinquenta|cincoenta|sessenta|setenta|oitenta|noventa)\s+e\s+[a-zà-ú]+|(?:vig[ée]sim[oa]|trig[ée]sim[oa]|quadrag[ée]sim[oa]|quinquag[ée]sim[oa]|sexag[ée]sim[oa]|d[ée]cim[oa])\s+[a-zà-ú]+|[a-zà-ú]+)\s+(?:li[cç][aã]o|cap[ií]tulo)',
       caseSensitive: false,
     );
     for (final m in reverseWordPattern.allMatches(text)) {
@@ -916,7 +946,7 @@ class VoiceNoteParser {
     }
 
     final secondaryWordPattern = RegExp(
-      r'\bestudo\b\s*(?:n[º°.]\s*|n[uú]mero\s*)?([a-zà-ú]+(?:\s+e\s+[a-zà-ú]+|\s+[a-zà-ú]+)?)',
+      r'\bestudo\b\s*(?:n[º°.]\s*|n[uú]mero\s*)?((?:vinte|trinta|quarenta|cinquenta|cincoenta|sessenta|setenta|oitenta|noventa)\s+e\s+[a-zà-ú]+|(?:vig[ée]sim[oa]|trig[ée]sim[oa]|quadrag[ée]sim[oa]|quinquag[ée]sim[oa]|sexag[ée]sim[oa]|d[ée]cim[oa])\s+[a-zà-ú]+|[a-zà-ú]+)',
       caseSensitive: false,
     );
     for (final m in secondaryWordPattern.allMatches(text)) {
@@ -932,9 +962,9 @@ class VoiceNoteParser {
   }
 
   static int? _extractPoint(String text) {
-    // 1. Ordem direta: "ponto 3", "parágrafo 4", "ponto terceiro"
+    // 1. Ordem direta: "ponto 3", "parágrafo 4", "ponto terceiro", "§ 3"
     final digitsPattern = RegExp(
-      r'(?:ponto|par[aá]grafo|se[cç][aã]o)\s*(?:n[º°.]\s*|n[uú]mero\s*)?(\d{1,3})',
+      r'(?:ponto|par[aá]grafo|se[cç][aã]o|§)\s*(?:n[º°.]\s*|n[uú]mero\s*)?(\d{1,3})',
       caseSensitive: false,
     );
     for (final m in digitsPattern.allMatches(text)) {
@@ -944,7 +974,7 @@ class VoiceNoteParser {
     }
 
     final wordPattern = RegExp(
-      r'(?:ponto|par[aá]grafo|se[cç][aã]o)\s*(?:n[º°.]\s*|n[uú]mero\s*)?([a-zà-ú]+(?:\s+e\s+[a-zà-ú]+|\s+[a-zà-ú]+)?)',
+      r'(?:ponto|par[aá]grafo|se[cç][aã]o|§)\s*(?:n[º°.]\s*|n[uú]mero\s*)?((?:vinte|trinta|quarenta|cinquenta|cincoenta|sessenta|setenta|oitenta|noventa)\s+e\s+[a-zà-ú]+|(?:vig[ée]sim[oa]|trig[ée]sim[oa]|quadrag[ée]sim[oa]|quinquag[ée]sim[oa]|sexag[ée]sim[oa]|d[ée]cim[oa])\s+[a-zà-ú]+|[a-zà-ú]+)',
       caseSensitive: false,
     );
     for (final m in wordPattern.allMatches(text)) {
@@ -958,7 +988,7 @@ class VoiceNoteParser {
 
     // 2. Ordem inversa: "3º ponto", "4º parágrafo", "terceiro ponto"
     final reverseDigitsPattern = RegExp(
-      r'(\d{1,3})\s*(?:[ºª°a-z\.]*\s+)?(?:ponto|par[aá]grafo|se[cç][aã]o)',
+      r'(\d{1,3})\s*(?:[ºª°a-z\.]*\s+)?(?:ponto|par[aá]grafo|se[cç][aã]o|§)',
       caseSensitive: false,
     );
     for (final m in reverseDigitsPattern.allMatches(text)) {
@@ -968,7 +998,7 @@ class VoiceNoteParser {
     }
 
     final reverseWordPattern = RegExp(
-      r'([a-zà-ú]+(?:\s+e\s+[a-zà-ú]+|\s+[a-zà-ú]+)?)\s+(?:ponto|par[aá]grafo|se[cç][aã]o)',
+      r'((?:vinte|trinta|quarenta|cinquenta|cincoenta|sessenta|setenta|oitenta|noventa)\s+e\s+[a-zà-ú]+|(?:vig[ée]sim[oa]|trig[ée]sim[oa]|quadrag[ée]sim[oa]|quinquag[ée]sim[oa]|sexag[ée]sim[oa]|d[ée]cim[oa])\s+[a-zà-ú]+|[a-zà-ú]+)\s+(?:ponto|par[aá]grafo|se[cç][aã]o|§)',
       caseSensitive: false,
     );
     for (final m in reverseWordPattern.allMatches(text)) {
@@ -1043,7 +1073,7 @@ class VoiceNoteParser {
     final result = <String>[];
 
     final transitionPattern = RegExp(
-      r'(?:\b(?:e|mas)\s+)?(?:ele|ela)\s+(?:comentou|falou|disse|mencionou|contou|pediu|est[aá]|vai|foi|teve|mudou|perdeu)\b|(?:\b(?:e|mas)\s+)?(?:ficou|ficamos|combinamos)\s+(?:de|pendente)\b',
+      r'(?:\b(?:e|mas)\s+)?(?:ele|ela|eles|elas|o\s+morador|a\s+moradora|a\s+fam[íi]lia|fam[íi]lia)\s+(?:comentou|comentaram|falou|falaram|disse|disseram|mencionou|mencionaram|contou|contaram|pediu|pediram|est[aá]|est[aã]o|passando|vai|v[aã]o|foi|foram|teve|tiveram|mudou|perdeu|perderam)\b|(?:\b(?:e|mas)\s+)?(?:ficou|ficamos|combinamos)\s+(?:de|pendente)\b',
       caseSensitive: false,
     );
 
@@ -1077,7 +1107,7 @@ class VoiceNoteParser {
 
   static String _truncateAtEmpathyTransition(String text) {
     final pattern = RegExp(
-      r'\s+(?:(?:\be|mas)\s+)?(?:ele|ela)\s+(?:comentou|falou|disse|mencionou|contou|pediu|est[aá]|vai|foi|teve|mudou|perdeu)\b',
+      r'\s+(?:(?:\be|mas)\s+)?(?:ele|ela|eles|elas|o\s+morador|a\s+moradora|a\s+fam[íi]lia|fam[íi]lia)\s+(?:comentou|comentaram|falou|falaram|disse|disseram|mencionou|mencionaram|contou|contaram|pediu|pediram|est[aá]|est[aã]o|passando|vai|v[aã]o|foi|foram|teve|tiveram|mudou|perdeu|perderam)\b',
       caseSensitive: false,
     );
     final match = pattern.firstMatch(text);
@@ -1089,7 +1119,7 @@ class VoiceNoteParser {
 
   static bool _containsWord(String text, String word) {
     final pattern = RegExp(
-      r'\b' + RegExp.escape(word) + r'\b',
+      r'(?:^|[^\wà-úÀ-Ú])' + RegExp.escape(word) + r'(?:$|[^\wà-úÀ-Ú])',
       caseSensitive: false,
     );
     return pattern.hasMatch(text);

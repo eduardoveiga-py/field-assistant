@@ -50,13 +50,19 @@ class TileCacheService {
     required int maxY,
     void Function(int completed, int total)? onProgress,
   }) async {
-    int total = (maxX - minX + 1) * (maxY - minY + 1);
+    final maxCoord = (1 << z) - 1;
+    final actualMinX = (minX <= maxX ? minX : maxX).clamp(0, maxCoord);
+    final actualMaxX = (minX <= maxX ? maxX : minX).clamp(0, maxCoord);
+    final actualMinY = (minY <= maxY ? minY : maxY).clamp(0, maxCoord);
+    final actualMaxY = (minY <= maxY ? maxY : minY).clamp(0, maxCoord);
+
+    int total = (actualMaxX - actualMinX + 1) * (actualMaxY - actualMinY + 1);
     if (total <= 0) return 0;
     int completed = 0;
     int savedCount = 0;
 
-    for (int x = minX; x <= maxX; x++) {
-      for (int y = minY; y <= maxY; y++) {
+    for (int x = actualMinX; x <= actualMaxX; x++) {
+      for (int y = actualMinY; y <= actualMaxY; y++) {
         try {
           final bytes = await _backend.getTile(z, x, y);
           if (bytes != null && bytes.isNotEmpty) {
