@@ -51,3 +51,10 @@ Este arquivo contém restrições estritas e instruções persistentes para todo
 - NUNCA dependa exclusivamente das fontes padrão do sistema operacional para renderizar caracteres com múltiplos diacríticos combinantes.
 - É obrigatório manter `fontFamilyFallback: TicunaUnicodeHelper.fontFallback` (com `Noto Sans` e `Charis SIL`) configurado no `AppTheme` e injetado no `web/index.html`.
 - Ao salvar e recuperar termos e frases Ticuna no Drift/SQLite, garanta a normalização Unicode canônica (NFC/NFD) para evitar duplicatas e inconsistências de busca.
+
+## 9. Provedores de Mapas e Cache de Tiles (Resiliência Offline e Livre de Chaves)
+- NUNCA aponte tiles primários ou fallbacks para provedores proprietários que exijam chaves de API restritas (como CARTO sem chave, Mapbox ou Stadia sem cota pública permanente) sem autenticação formal, pois provedores como a CARTO retornam HTTP 200 com marcas d'água de erro embutidas no PNG.
+- O OpenStreetMap oficial (`https://tile.openstreetmap.org/`) é o provedor primário obrigatório, com OpenStreetMap France (`https://a.tile.openstreetmap.fr/osmfr/`) como fallback de contingência verificado.
+- O cache de tiles nativo e web deve implementar auto-cura: rejeitar e expurgar do disco arquivos de 2049, 2513 ou 6725 bytes, arquivos vazios (0 bytes) e respostas com ETag de marca d'água (`wm-`).
+- A concorrência máxima de download para o OpenStreetMap deve respeitar estritamente o limite de 2 conexões simultâneas da Tile Usage Policy do OSM.
+
