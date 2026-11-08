@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 
@@ -11,17 +11,27 @@ TileCacheBackend getTileBackend() => TileCacheNative();
 
 class TileCacheNative implements TileCacheBackend {
   Directory? _cacheDir;
+  final http.Client? httpClient;
   static const int _blockedTileByteLength = 6725;
   static const String _userAgent =
       'MinisterioPessoal/1.0.1 (https://github.com/eduardoveiga-py/field-assistant; eduardofaturistatuper@gmail.com)';
 
-  // Limite de concorrência para downloads online (máx. 4 conexões simultâneas)
+  // Limite de concorrência para downloads online (máx. 2 conexões simultâneas)
   // em total conformidade com a Tile Usage Policy do OpenStreetMap.
   static int _activeDownloads = 0;
   static final List<Completer<void>> _downloadQueue = [];
 
+  @visibleForTesting
+  static int get activeDownloads => _activeDownloads;
+
+  @visibleForTesting
+  static void resetQueue() {
+    _activeDownloads = 0;
+    _downloadQueue.clear();
+  }
+
   static Future<void> _acquireDownloadSlot() async {
-    if (_activeDownloads < 4) {
+    if (_activeDownloads < 2) {
       _activeDownloads++;
       return;
     }
@@ -34,12 +44,13 @@ class TileCacheNative implements TileCacheBackend {
     if (_downloadQueue.isNotEmpty) {
       final next = _downloadQueue.removeAt(0);
       next.complete();
-    } else {
+    } else if (_activeDownloads > 0) {
       _activeDownloads--;
     }
   }
 
-  TileCacheNative({Directory? customDir}) : _cacheDir = customDir;
+  TileCacheNative({Directory? customDir, this.httpClient})
+      : _cacheDir = customDir;
 
   Future<Directory> _getDir() async {
     if (_cacheDir != null) return _cacheDir!;
@@ -57,24 +68,35 @@ class TileCacheNative implements TileCacheBackend {
   }
 
   bool _isBlockedTile(Uint8List bytes) {
+    if (bytes.isEmpty) return true;
+
+    // Detecta tiles com marca d'água de erro da CARTO (2049 bytes claro, 2513 bytes escuro)
+    if (bytes.length == 2049 || bytes.length == 2513) return true;
+
     // Detecta o tile de bloqueio (403) do OpenStreetMap pelo tamanho ou assinatura
     if (bytes.length == _blockedTileByteLength) return true;
     if (bytes.length >= 5000 && bytes.length <= 8500) {
       final raw = String.fromCharCodes(bytes.take(2048));
-      if (raw.contains('Blocked') || raw.contains('policy') || raw.contains('volunteer')) {
+      if (raw.contains('Blocked') ||
+          raw.contains('policy') ||
+          raw.contains('volunteer')) {
         return true;
       }
     }
     if (bytes.length < 1000) {
       try {
         final text = String.fromCharCodes(bytes);
-        if (text.contains('Access blocked') || text.contains('osm.wiki/Blocked')) {
+        if (text.contains('Access blocked') ||
+            text.contains('osm.wiki/Blocked')) {
           return true;
         }
       } catch (_) {}
     }
     return false;
   }
+
+  @visibleForTesting
+  bool isBlockedTile(Uint8List bytes) => _isBlockedTile(bytes);
 
   @override
   Future<Uint8List?> getTile(int z, int x, int y) async {
@@ -83,7 +105,8 @@ class TileCacheNative implements TileCacheBackend {
       final file = _getTileFile(dir, z, x, y);
       if (await file.exists()) {
         final bytes = await file.readAsBytes();
-        // Se o arquivo em cache for o bloco de erro/bloqueio 403, remove e tenta baixar novamente
+        // Se o arquivo em cache for o bloco de erro/bloqueio 403 ou marca d'água CARTO,
+        // remove do armazenamento e tenta baixar novamente uma versão limpa
         if (!_isBlockedTile(bytes)) {
           return bytes;
         }
@@ -92,17 +115,19 @@ class TileCacheNative implements TileCacheBackend {
         } catch (_) {}
       }
 
-      // Do not make live HTTP calls during automated tests
-      if (Platform.environment.containsKey('FLUTTER_TEST')) {
+      // Do not make live HTTP calls during automated tests unless a custom client is provided
+      if (httpClient == null && Platform.environment.containsKey('FLUTTER_TEST')) {
         return null;
       }
 
       await _acquireDownloadSlot();
+      final client = httpClient ?? http.Client();
+      final shouldCloseClient = httpClient == null;
       try {
         // 1ª Tentativa: OpenStreetMap oficial com User-Agent plenamente identificado
-        final osmUri = Uri.parse('https://basemaps.cartocdn.com/rastertiles/voyager/$z/$x/$y.png');
+        final osmUri = Uri.parse('https://tile.openstreetmap.org/$z/$x/$y.png');
         try {
-          final res = await http
+          final res = await client
               .get(
                 osmUri,
                 headers: {
@@ -112,7 +137,13 @@ class TileCacheNative implements TileCacheBackend {
               )
               .timeout(const Duration(seconds: 5));
 
+          final etag = res.headers['etag']?.toLowerCase() ?? '';
+          final isWatermarked = etag.contains('wm-') ||
+              res.bodyBytes.length == 2049 ||
+              res.bodyBytes.length == 2513;
+
           final isOsmBlocked = res.headers.containsKey('x-blocked') ||
+              isWatermarked ||
               res.bodyBytes.length == _blockedTileByteLength ||
               _isBlockedTile(res.bodyBytes);
 
@@ -124,26 +155,43 @@ class TileCacheNative implements TileCacheBackend {
           // Falha transitória de rede; prossegue para fallback
         }
 
-        // 2ª Tentativa (Fallback transparente de alta disponibilidade): CARTO Voyager
-        // Garante que o mapa nunca fique com blocos amarelos/pretos ou vazio
-        final cartoUri = Uri.parse(
-          'https://tile.openstreetmap.org/$z/$x/$y.png',
+        // 2ª Tentativa (Fallback transparente de alta disponibilidade): OSM France
+        // Garante que o mapa nunca fique com blocos vazios ou indisponíveis
+        final fallbackUri = Uri.parse(
+          'https://a.tile.openstreetmap.fr/osmfr/$z/$x/$y.png',
         );
-        final resCarto = await http
-            .get(
-              cartoUri,
-              headers: {
-                'User-Agent': _userAgent,
-                'Accept': 'image/png,image/*',
-              },
-            )
-            .timeout(const Duration(seconds: 6));
+        try {
+          final resFallback = await client
+              .get(
+                fallbackUri,
+                headers: {
+                  'User-Agent': _userAgent,
+                  'Accept': 'image/png,image/*',
+                },
+              )
+              .timeout(const Duration(seconds: 6));
 
-        if (resCarto.statusCode == 200 && !_isBlockedTile(resCarto.bodyBytes)) {
-          await saveTile(z, x, y, resCarto.bodyBytes);
-          return resCarto.bodyBytes;
+          final fallbackEtag = resFallback.headers['etag']?.toLowerCase() ?? '';
+          final isFallbackWatermarked = fallbackEtag.contains('wm-') ||
+              resFallback.bodyBytes.length == 2049 ||
+              resFallback.bodyBytes.length == 2513;
+
+          final isFallbackBlocked = resFallback.headers.containsKey('x-blocked') ||
+              isFallbackWatermarked ||
+              resFallback.bodyBytes.length == _blockedTileByteLength ||
+              _isBlockedTile(resFallback.bodyBytes);
+
+          if (resFallback.statusCode == 200 && !isFallbackBlocked) {
+            await saveTile(z, x, y, resFallback.bodyBytes);
+            return resFallback.bodyBytes;
+          }
+        } catch (_) {
+          // Falha de rede no fallback
         }
       } finally {
+        if (shouldCloseClient) {
+          client.close();
+        }
         _releaseDownloadSlot();
       }
     } catch (_) {
@@ -154,6 +202,17 @@ class TileCacheNative implements TileCacheBackend {
 
   @override
   Future<void> saveTile(int z, int x, int y, Uint8List bytes) async {
+    // Rejeita salvar arquivos vazios, com bloqueio ou com marca d'água de erro (2049 / 2513 bytes)
+    if (_isBlockedTile(bytes)) {
+      try {
+        final dir = await _getDir();
+        final file = _getTileFile(dir, z, x, y);
+        if (await file.exists()) {
+          await file.delete();
+        }
+      } catch (_) {}
+      return;
+    }
     try {
       final dir = await _getDir();
       final file = _getTileFile(dir, z, x, y);
@@ -169,7 +228,20 @@ class TileCacheNative implements TileCacheBackend {
     try {
       final dir = await _getDir();
       final file = _getTileFile(dir, z, x, y);
-      return await file.exists();
+      if (await file.exists()) {
+        final len = await file.length();
+        if (len == 0 ||
+            len == 2049 ||
+            len == 2513 ||
+            len == _blockedTileByteLength) {
+          try {
+            await file.delete();
+          } catch (_) {}
+          return false;
+        }
+        return true;
+      }
+      return false;
     } catch (_) {
       return false;
     }
@@ -186,7 +258,17 @@ class TileCacheNative implements TileCacheBackend {
         followLinks: false,
       )) {
         if (entity is File && entity.path.endsWith('.png')) {
-          count++;
+          final len = await entity.length();
+          if (len == 0 ||
+              len == 2049 ||
+              len == 2513 ||
+              len == _blockedTileByteLength) {
+            try {
+              await entity.delete();
+            } catch (_) {}
+          } else {
+            count++;
+          }
         }
       }
       return count;

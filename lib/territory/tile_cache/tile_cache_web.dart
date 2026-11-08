@@ -1,5 +1,4 @@
-import 'dart:typed_data';
-
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import 'tile_cache_interface.dart';
@@ -12,7 +11,14 @@ class TileCacheWeb implements TileCacheBackend {
   static const String _userAgent =
       'MinisterioPessoal/1.0.1 (https://github.com/eduardoveiga-py/field-assistant; eduardofaturistatuper@gmail.com)';
 
+  final http.Client? httpClient;
+
+  TileCacheWeb({this.httpClient});
+
   bool _isBlockedTile(Uint8List bytes) {
+    if (bytes.isEmpty) return true;
+    // Detecta tiles com marca d'água de erro da CARTO (2049 bytes claro, 2513 bytes escuro)
+    if (bytes.length == 2049 || bytes.length == 2513) return true;
     if (bytes.length == _blockedTileByteLength) return true;
     if (bytes.length < 500) {
       try {
@@ -25,6 +31,9 @@ class TileCacheWeb implements TileCacheBackend {
     return false;
   }
 
+  @visibleForTesting
+  bool isBlockedTile(Uint8List bytes) => _isBlockedTile(bytes);
+
   @override
   Future<Uint8List?> getTile(int z, int x, int y) async {
     final key = '$z/$x/$y';
@@ -36,11 +45,14 @@ class TileCacheWeb implements TileCacheBackend {
       _cache.remove(key);
     }
 
+    final client = httpClient ?? http.Client();
+    final shouldCloseClient = httpClient == null;
+
     try {
       // 1ª Tentativa: OpenStreetMap oficial
       final uri = Uri.parse('https://tile.openstreetmap.org/$z/$x/$y.png');
       try {
-        final res = await http.get(
+        final res = await client.get(
           uri,
           headers: {
             'User-Agent': _userAgent,
@@ -48,7 +60,13 @@ class TileCacheWeb implements TileCacheBackend {
           },
         ).timeout(const Duration(seconds: 5));
 
+        final etag = res.headers['etag']?.toLowerCase() ?? '';
+        final isWatermarked = etag.contains('wm-') ||
+            res.bodyBytes.length == 2049 ||
+            res.bodyBytes.length == 2513;
+
         final isOsmBlocked = res.headers.containsKey('x-blocked') ||
+            isWatermarked ||
             res.bodyBytes.length == _blockedTileByteLength ||
             _isBlockedTile(res.bodyBytes);
 
@@ -58,40 +76,71 @@ class TileCacheWeb implements TileCacheBackend {
         }
       } catch (_) {}
 
-      // 2ª Tentativa: Fallback CARTO Voyager
-      final cartoUri = Uri.parse(
-        'https://basemaps.cartocdn.com/rastertiles/voyager/$z/$x/$y.png',
+      // 2ª Tentativa: Fallback OSM France (alta disponibilidade)
+      final fallbackUri = Uri.parse(
+        'https://a.tile.openstreetmap.fr/osmfr/$z/$x/$y.png',
       );
-      final resCarto = await http.get(
-        cartoUri,
-        headers: {
-          'User-Agent': _userAgent,
-          'Accept': 'image/png,image/*',
-        },
-      ).timeout(const Duration(seconds: 6));
+      try {
+        final resFallback = await client.get(
+          fallbackUri,
+          headers: {
+            'User-Agent': _userAgent,
+            'Accept': 'image/png,image/*',
+          },
+        ).timeout(const Duration(seconds: 6));
 
-      if (resCarto.statusCode == 200 && !_isBlockedTile(resCarto.bodyBytes)) {
-        _cache[key] = resCarto.bodyBytes;
-        return resCarto.bodyBytes;
+        final fallbackEtag = resFallback.headers['etag']?.toLowerCase() ?? '';
+        final isFallbackWatermarked = fallbackEtag.contains('wm-') ||
+            resFallback.bodyBytes.length == 2049 ||
+            resFallback.bodyBytes.length == 2513;
+
+        final isFallbackBlocked = resFallback.headers.containsKey('x-blocked') ||
+            isFallbackWatermarked ||
+            resFallback.bodyBytes.length == _blockedTileByteLength ||
+            _isBlockedTile(resFallback.bodyBytes);
+
+        if (resFallback.statusCode == 200 && !isFallbackBlocked) {
+          _cache[key] = resFallback.bodyBytes;
+          return resFallback.bodyBytes;
+        }
+      } catch (_) {}
+    } catch (_) {} finally {
+      if (shouldCloseClient) {
+        client.close();
       }
-    } catch (_) {}
+    }
     return null;
   }
 
   @override
   Future<void> saveTile(int z, int x, int y, Uint8List bytes) async {
-    if (!_isBlockedTile(bytes)) {
-      _cache['$z/$x/$y'] = bytes;
+    final key = '$z/$x/$y';
+    if (_isBlockedTile(bytes)) {
+      _cache.remove(key);
+      return;
     }
+    _cache[key] = bytes;
   }
 
   @override
   Future<bool> isTileCached(int z, int x, int y) async {
-    return _cache.containsKey('$z/$x/$y');
+    final key = '$z/$x/$y';
+    final bytes = _cache[key];
+    if (bytes == null || _isBlockedTile(bytes)) {
+      _cache.remove(key);
+      return false;
+    }
+    return true;
   }
 
   @override
   Future<int> getCachedTileCount() async {
+    _cache.removeWhere((_, bytes) => _isBlockedTile(bytes));
     return _cache.length;
+  }
+
+  @visibleForTesting
+  static void clearCache() {
+    _cache.clear();
   }
 }
