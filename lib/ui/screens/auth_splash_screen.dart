@@ -9,6 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../appointments/calendar_provider.dart';
 import '../../appointments/calendar_sync_coordinator.dart';
 import '../../core/app_theme.dart';
+import '../../core/app_version.dart';
 import '../../database/app_database.dart';
 import '../../sync/supabase_sync_service.dart';
 import '../main_navigation_shell.dart';
@@ -214,7 +215,7 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
         return _SplashScreenView(
           pulseAnimation: _pulseController,
           statusMessage: _statusMessage,
-          version: 'v1.0.0',
+          version: AppVersion.displayVersion,
         );
       case _AuthGateState.unauthenticated:
         return SupabaseAuthScreen(
@@ -267,7 +268,7 @@ class _SplashScreenView extends StatelessWidget {
   const _SplashScreenView({
     required this.pulseAnimation,
     this.statusMessage = 'Inicializando Assistente de Campo...',
-    this.version = 'v1.0.0',
+    this.version = AppVersion.displayVersion,
   });
 
   @override

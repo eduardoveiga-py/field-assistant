@@ -6,8 +6,11 @@ import '../../sync/supabase_sync_service.dart';
 import 'auth_splash_screen.dart';
 
 import '../../core/app_theme.dart';
+import '../../core/app_version.dart';
 import '../../core/date_utils.dart';
 import '../../core/demo_data.dart';
+import '../../core/update_checker_service.dart';
+import '../../core/i18n/app_locale_strings.dart';
 import '../providers.dart';
 import 'activities_screen.dart';
 import 'trash_screen.dart';
@@ -1369,13 +1372,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ),
           const SizedBox(height: 24),
-_buildSupabaseCard(context),
-          
+          _buildSupabaseCard(context),
+          const SizedBox(height: 16),
+          _buildLanguageSelectorCard(context),
+          const SizedBox(height: 16),
+          _buildUpdateCheckerCard(context),
+          const SizedBox(height: 24),
+
           Center(
             child: Column(
               children: [
                 Text(
-                  'Ministério Pessoal • v1.0.0 (Offline-First)',
+                  '${AppVersion.appName} • ${AppVersion.fullDisplayVersion} (Offline-First)',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
@@ -1386,7 +1394,7 @@ _buildSupabaseCard(context),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Construído para iPhone XR, iPad 11 A16 e Windows Web',
+                  'Lançamento: ${AppVersion.releaseDate} • Otimizado para iPhone, iPadOS, Android e Web',
                   style: TextStyle(
                     fontSize: 11,
                     color: isDark
@@ -1398,6 +1406,242 @@ _buildSupabaseCard(context),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildLanguageSelectorCard(BuildContext context) {
+    final currentLocale = ref.watch(appLocaleTypeProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.language, color: AppTheme.primaryBlue),
+                SizedBox(width: 8),
+                Text(
+                  'Idioma do Aplicativo (i18n)',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Alterne entre os idiomas suportados com suporte offline completo.',
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: AppLocaleType.values.map((loc) {
+                final isSelected = loc == currentLocale;
+                return ChoiceChip(
+                  label: Text('${loc.flagEmoji} ${loc.label}'),
+                  selected: isSelected,
+                  selectedColor: AppTheme.primaryBlue.withValues(alpha: 0.2),
+                  onSelected: (val) {
+                    if (val) {
+                      ref.read(appLocaleTypeProvider.notifier).setLocale(loc);
+                    }
+                  },
+                );
+              }).toList(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  bool _isCheckingUpdate = false;
+  AppUpdateInfo? _checkedUpdateInfo;
+  String? _updateError;
+
+  Widget _buildUpdateCheckerCard(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.system_update_rounded, color: Color(0xFF2563EB)),
+                SizedBox(width: 8),
+                Text(
+                  'Atualizações do Aplicativo',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Versão Atual: ${AppVersion.fullDisplayVersion} (${AppVersion.releaseDate})',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Verifique novas versões no GitHub Releases ou catálogo LiveContainer.',
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted,
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (_checkedUpdateInfo != null) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: _checkedUpdateInfo!.hasUpdate
+                      ? const Color(0xFF2563EB).withValues(alpha: isDark ? 0.3 : 0.1)
+                      : const Color(0xFF16A34A).withValues(alpha: isDark ? 0.3 : 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: _checkedUpdateInfo!.hasUpdate
+                        ? const Color(0xFF2563EB).withValues(alpha: 0.5)
+                        : const Color(0xFF16A34A).withValues(alpha: 0.5),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          _checkedUpdateInfo!.hasUpdate
+                              ? Icons.download_for_offline_rounded
+                              : Icons.check_circle_rounded,
+                          color: _checkedUpdateInfo!.hasUpdate
+                              ? const Color(0xFF2563EB)
+                              : const Color(0xFF16A34A),
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _checkedUpdateInfo!.hasUpdate
+                                ? 'Nova Versão Disponível: v${_checkedUpdateInfo!.latestVersion}'
+                                : 'Você já está usando a versão mais recente!',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (_checkedUpdateInfo!.hasUpdate) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        'Lançamento: ${_checkedUpdateInfo!.releaseDate} • ${_checkedUpdateInfo!.formattedSize}',
+                        style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _checkedUpdateInfo!.releaseNotes,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 11),
+                      ),
+                      const SizedBox(height: 10),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2563EB),
+                          foregroundColor: Colors.white,
+                        ),
+                        icon: const Icon(Icons.install_mobile_rounded, size: 18),
+                        label: const Text('Atualizar Agora'),
+                        onPressed: () {
+                          ref
+                              .read(updateCheckerServiceProvider)
+                              .launchUpdate(_checkedUpdateInfo!);
+                        },
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (_updateError != null) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.red.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  _updateError!,
+                  style: const TextStyle(color: Colors.red, fontSize: 12),
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                icon: _isCheckingUpdate
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh, size: 18),
+                label: Text(_isCheckingUpdate
+                    ? 'Verificando atualizações...'
+                    : 'Verificar Atualizações Agora'),
+                onPressed: _isCheckingUpdate
+                    ? null
+                    : () async {
+                        setState(() {
+                          _isCheckingUpdate = true;
+                          _updateError = null;
+                        });
+                        try {
+                          final info = await ref
+                              .read(updateCheckStateProvider.notifier)
+                              .check(force: true);
+                          if (mounted) {
+                            setState(() {
+                              _checkedUpdateInfo = info;
+                            });
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            setState(() {
+                              _updateError = 'Falha ao buscar atualizações: $e';
+                            });
+                          }
+                        } finally {
+                          if (mounted) {
+                            setState(() {
+                              _isCheckingUpdate = false;
+                            });
+                          }
+                        }
+                      },
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Nota técnica: No iOS/LiveContainer, as políticas de sandbox impedem a auto-substituição do binário em execução; tocar em atualizar abre diretamente a fonte oficial no LiveContainer.',
+              style: TextStyle(
+                fontSize: 10.5,
+                color: isDark ? const Color(0xFF94A3B8) : AppTheme.textMuted,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

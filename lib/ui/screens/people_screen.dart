@@ -17,6 +17,7 @@ import '../../media/person_photos_manager.dart';
 import '../../media/media_picker_helper.dart';
 import '../../contacts/recent_seeds_helper.dart';
 import '../widgets/recent_seed_badge.dart';
+import '../widgets/screen_hero_accent_band.dart';
 import '../widgets/add_person_dialog.dart';
 
 export '../widgets/add_person_dialog.dart';
@@ -437,6 +438,7 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Pessoas e Contatos'),
+        bottom: ScreenHeroAccentBand.people(),
         actions: [
           IconButton(
             icon: const Icon(Icons.phone_forwarded),

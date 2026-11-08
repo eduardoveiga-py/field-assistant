@@ -22,6 +22,7 @@ import '../../settings/app_settings_manager.dart';
 import '../providers.dart';
 import 'person_detail_screen.dart';
 import '../../appointments/plan_b_recommender.dart';
+import '../widgets/screen_hero_accent_band.dart';
 import '../widgets/plan_b_dialog.dart';
 
 class _CopyWizardRoutine {
@@ -4287,6 +4288,7 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Agenda do Ministério'),
+        bottom: ScreenHeroAccentBand.agenda(),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 6),

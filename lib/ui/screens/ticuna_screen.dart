@@ -7,6 +7,8 @@ import '../../ticuna/ticuna_providers.dart';
 import '../../ticuna/ticuna_unicode_helper.dart';
 import '../../ticuna/widgets/ticuna_audio_player_widget.dart';
 import '../../ticuna/widgets/ticuna_diacritics_bar.dart';
+import '../../ticuna/widgets/ministry_situational_phrases_sheet.dart';
+import '../widgets/screen_hero_accent_band.dart';
 
 class TicunaScreen extends ConsumerStatefulWidget {
   const TicunaScreen({super.key});
@@ -134,6 +136,12 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
           ],
         ),
         actions: [
+          // Botão Frases Situacionais & Comparador Multilíngue
+          IconButton(
+            tooltip: 'Frases Situacionais do Ministério & Comparador',
+            icon: const Icon(Icons.forum_outlined, color: Color(0xFF0D9488)),
+            onPressed: () => MinistrySituationalPhrasesSheet.show(context),
+          ),
           // Botão Treinar / Flashcards (AnkiDroid)
           IconButton(
             tooltip: 'Modo Flashcards (Treinar Vocabulário)',
@@ -210,6 +218,7 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
       ),
       body: Column(
         children: [
+          ScreenHeroAccentBand.languages(),
           // Barra de Pesquisa e Filtros
           _buildSearchAndFilterHeader(context, allTags: allTags, isDark: isDark),
 
@@ -317,7 +326,47 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
               onCharacterInserted: (_) => setState(() {}),
             ),
           ],
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
+
+          // Atalho rápido para Frases Situacionais e Comparador Multilíngue
+          InkWell(
+            onTap: () => MinistrySituationalPhrasesSheet.show(context),
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              margin: const EdgeInsets.symmetric(vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFF0D9488).withValues(alpha: isDark ? 0.25 : 0.12),
+                    const Color(0xFF059669).withValues(alpha: isDark ? 0.20 : 0.08),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: const Color(0xFF0D9488).withValues(alpha: 0.3),
+                ),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.auto_stories, size: 16, color: Color(0xFF0D9488)),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '6 Frases Situacionais do Ministério & Comparador Multilíngue',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0D9488),
+                      ),
+                    ),
+                  ),
+                  Icon(Icons.arrow_forward_ios, size: 12, color: Color(0xFF0D9488)),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
 
           // Linha de Chips de Filtro
           SingleChildScrollView(

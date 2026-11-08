@@ -81,8 +81,8 @@ enum AppFeature {
   ),
   ticuna(
     id: 'ticuna',
-    title: 'Ticuna',
-    description: 'Dicionário teocrático, vocabulário e frases úteis na língua Ticuna',
+    title: 'Idiomas & Tradução',
+    description: 'Assistente linguístico teocrático, língua Ticuna, frases situacionais e repetição espaçada',
     icon: Icons.translate,
     category: FeatureCategory.tools,
     isEssential: false,

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 
+import '../../core/app_version.dart';
 import 'tile_cache_interface.dart';
 
 TileCacheBackend getTileBackend() => TileCacheNative();
@@ -13,8 +14,7 @@ class TileCacheNative implements TileCacheBackend {
   Directory? _cacheDir;
   final http.Client? httpClient;
   static const int _blockedTileByteLength = 6725;
-  static const String _userAgent =
-      'MinisterioPessoal/1.0.1 (https://github.com/eduardoveiga-py/field-assistant; eduardofaturistatuper@gmail.com)';
+  static const String _userAgent = AppVersion.userAgent;
 
   // Limite de concorrência para downloads online (máx. 2 conexões simultâneas)
   // em total conformidade com a Tile Usage Policy do OpenStreetMap.

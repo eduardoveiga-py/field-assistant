@@ -35,6 +35,7 @@ import '../widgets/doorstep_briefing_card.dart';
 import '../../voice_notes/voice_notes_manager.dart';
 import '../../voice_notes/voice_note_models.dart';
 import '../widgets/quick_voice_note_dialog.dart';
+import '../widgets/doorstep_return_booking_dialog.dart';
 import '../../core/feature_registry.dart';
 
 class PersonDetailScreen extends ConsumerStatefulWidget {
@@ -5068,6 +5069,26 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0D9488),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              icon: const Icon(Icons.near_me_outlined),
+              label: const Text(
+                'Agendar Retorno na Porta (Proximidade)',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              onPressed: () => DoorstepReturnBookingDialog.show(context, person),
+            ),
           ),
           const SizedBox(height: 8),
           SizedBox(

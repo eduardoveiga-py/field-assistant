@@ -12,18 +12,12 @@ permissions:
   contents: write
 
 jobs:
-  analyze_and_test:
-    name: Flutter Analyze, Test & Build (Web/Android APK)
+  test_and_lint:
+    name: Flutter Analyze & Test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'zulu'
-          java-version: '17'
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -57,6 +51,29 @@ jobs:
             python3 -c 'from pathlib import Path; lines=Path("/tmp/flutter-tests.txt").read_text(errors="replace").splitlines(); hits=[i for i,line in enumerate(lines) if ("[E]" in line or "EXCEPTION" in line or "Expected:" in line or "Actual:" in line or "Some tests failed" in line or "timed out" in line.lower())]; [print("::error::" + "%0A".join(lines[max(0,i-6):i+14]).replace("%", "%25")) for i in hits[:6]]'
           fi
           exit "$status"
+
+  build_android_and_web:
+    name: Build Web & Android APK
+    runs-on: ubuntu-latest
+    needs: [ test_and_lint ]
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
 
       - name: Build Web (Release)
         run: flutter build web --release
@@ -97,6 +114,7 @@ jobs:
   ios_build_check:
     name: iOS Build Verification & IPA Packaging
     runs-on: macos-latest
+    needs: [ test_and_lint ]
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -127,7 +145,7 @@ jobs:
           cp ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-60x60@2x.png dist-ios/Payload/Runner.app/AppIcon60x60.png
           cp ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-60x60@2x.png dist-ios/Payload/Runner.app/AppIcon60x60@2x.png
           cp ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-76x76@2x.png dist-ios/Payload/Runner.app/AppIcon76x76.png
-          cp ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-76x76@2x.png dist-ios/Payload/Runner.app/AppIcon76x76@2x.png
+          cp ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-76x76@2x.png dist-ios/Payload/Runner.app/AppIcon76x76.png
           cp ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-76x76@2x.png dist-ios/Payload/Runner.app/AppIcon76x76@2x~ipad.png
           cp ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-1024x1024@1x.png dist-ios/Payload/Runner.app/Icon-App-1024x1024@1x.png
           cd dist-ios && zip -r app-release-unsigned.ipa Payload && rm -rf Payload && cd ..
@@ -141,7 +159,7 @@ jobs:
   publish_release:
     name: Publish Release Assets
     runs-on: ubuntu-latest
-    needs: [ analyze_and_test, ios_build_check ]
+    needs: [ build_android_and_web, ios_build_check ]
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
       - name: Checkout Code

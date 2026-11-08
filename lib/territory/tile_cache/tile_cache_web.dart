@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import '../../core/app_version.dart';
 import 'tile_cache_interface.dart';
 
 TileCacheBackend getTileBackend() => TileCacheWeb();
@@ -8,8 +9,7 @@ TileCacheBackend getTileBackend() => TileCacheWeb();
 class TileCacheWeb implements TileCacheBackend {
   static final Map<String, Uint8List> _cache = {};
   static const int _blockedTileByteLength = 6725;
-  static const String _userAgent =
-      'MinisterioPessoal/1.0.1 (https://github.com/eduardoveiga-py/field-assistant; eduardofaturistatuper@gmail.com)';
+  static const String _userAgent = AppVersion.userAgent;
 
   final http.Client? httpClient;
 

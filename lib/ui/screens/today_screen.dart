@@ -18,6 +18,7 @@ import 'contacts_map_screen.dart';
 import 'person_detail_screen.dart';
 import 'sector_detail_screen.dart';
 import '../../core/feature_registry.dart';
+import '../../core/update_checker_service.dart';
 import 'settings_screen.dart';
 import 'global_search_screen.dart';
 import 'next_actions_screen.dart';
@@ -819,6 +820,133 @@ class TodayScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Saudação Contextual Dinâmica e Elegante
+            Builder(
+              builder: (ctx) {
+                final hour = now.hour;
+                final String greetingTitle = hour < 12
+                    ? 'Bom dia no ministério!'
+                    : (hour < 18 ? 'Boa tarde de serviço!' : 'Boa noite!');
+                final String greetingSubtitle = hour < 12
+                    ? 'Que Jeová abençoe seu ministério nesta manhã.'
+                    : (hour < 18
+                        ? 'Renove suas forças para as revisitas da tarde.'
+                        : 'Hora de revisar as conversas e bênçãos do dia.');
+                final IconData greetingIcon = hour < 12
+                    ? Icons.wb_sunny_rounded
+                    : (hour < 18 ? Icons.wb_twilight_rounded : Icons.nights_stay_rounded);
+                final Color greetingColor = hour < 12
+                    ? const Color(0xFFF59E0B)
+                    : (hour < 18 ? const Color(0xFFEA580C) : const Color(0xFF6366F1));
+
+                final updateInfo = ref.watch(updateCheckStateProvider).value;
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (updateInfo != null && updateInfo.hasUpdate)
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              const Color(0xFF2563EB).withValues(alpha: isDark ? 0.35 : 0.15),
+                              const Color(0xFF7C3AED).withValues(alpha: isDark ? 0.30 : 0.10),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: const Color(0xFF3B82F6).withValues(alpha: 0.5),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.system_update_rounded, color: Color(0xFF2563EB), size: 22),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Atualização Disponível: v${updateInfo.latestVersion}',
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                  ),
+                                  const Text(
+                                    'Toque para instalar a nova versão.',
+                                    style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF2563EB),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                minimumSize: Size.zero,
+                              ),
+                              onPressed: () {
+                                ref.read(updateCheckerServiceProvider).launchUpdate(updateInfo);
+                              },
+                              child: const Text('Atualizar', style: TextStyle(fontSize: 12)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: isDark
+                              ? [
+                                  const Color(0xFF1E293B).withValues(alpha: 0.7),
+                                  const Color(0xFF0F172A).withValues(alpha: 0.5),
+                                ]
+                              : [
+                                  greetingColor.withValues(alpha: 0.08),
+                                  Colors.white,
+                                ],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: greetingColor.withValues(alpha: isDark ? 0.25 : 0.2),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(greetingIcon, color: greetingColor, size: 24),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  greetingTitle,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                Text(
+                                  greetingSubtitle,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: AppTheme.textMuted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ministerio_pessoal/core/app_version.dart';
 import 'package:ministerio_pessoal/database/app_database.dart';
 import 'package:ministerio_pessoal/ui/main_navigation_shell.dart';
 import 'package:ministerio_pessoal/ui/providers.dart';
@@ -40,7 +41,7 @@ void main() {
       expect(find.byKey(const ValueKey('splash_screen_view')), findsOneWidget);
       expect(find.text('Assistente de Campo'), findsOneWidget);
       expect(find.text('Ministério Pessoal • Sincronização em Nuvem'), findsOneWidget);
-      expect(find.text('v1.0.0 • Offline-First'), findsOneWidget);
+      expect(find.text('${AppVersion.displayVersion} • Offline-First'), findsOneWidget);
       expect(find.byType(LinearProgressIndicator), findsOneWidget);
       expect(find.text('Entrar na Conta'), findsNothing);
 

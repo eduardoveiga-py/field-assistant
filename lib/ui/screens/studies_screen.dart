@@ -18,6 +18,7 @@ import '../providers.dart';
 import '../widgets/global_appointment_scheduling_section.dart';
 import '../../publications/lff_book_catalog.dart';
 import '../../dashboard/student_priority_engine.dart';
+import '../widgets/screen_hero_accent_band.dart';
 import 'person_detail_screen.dart';
 
 class StudiesScreen extends ConsumerStatefulWidget {
@@ -2177,7 +2178,10 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Estudos Bíblicos')),
+      appBar: AppBar(
+        title: const Text('Estudos Bíblicos'),
+        bottom: ScreenHeroAccentBand.studies(),
+      ),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: AppTheme.primaryBlue,
         foregroundColor: Colors.white,
