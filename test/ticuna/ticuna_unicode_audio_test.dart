@@ -17,24 +17,27 @@ void main() {
   });
 
   group('TicunaUnicodeHelper - Normalização e Diacríticos Compostos', () {
-    test('Valida todos os 12 caracteres especiais de referência (Imagens 2 e 3)', () {
-      // Linha 1: ĩ, ü̃, ǘ̃, ũ, ã́, ẽ, Ĩ, Ü̃, Ǘ̃
-      expect(TicunaUnicodeHelper.row1.length, equals(9));
+    test('Valida todos os 12 caracteres especiais de referência (Imagens 2 e 3 e WOL)', () {
+      // Linha 1 (6 minúsculas canônicas): ĩ, ü̃, ü̃́, ũ, ã́, ẽ
+      expect(TicunaUnicodeHelper.row1.length, equals(6));
       expect(TicunaUnicodeHelper.row1[0], equals('ĩ'));
-      expect(TicunaUnicodeHelper.row1[1], equals('ü̃'));
-      expect(TicunaUnicodeHelper.row1[2], equals('ǘ̃'));
+      expect(TicunaUnicodeHelper.row1[1], equals('ü\u0303'));
+      expect(TicunaUnicodeHelper.row1[2], equals('ü\u0303\u0301'));
       expect(TicunaUnicodeHelper.row1[3], equals('ũ'));
-      expect(TicunaUnicodeHelper.row1[4], equals('ã́'));
+      expect(TicunaUnicodeHelper.row1[4], equals('ã\u0301'));
       expect(TicunaUnicodeHelper.row1[5], equals('ẽ'));
-      expect(TicunaUnicodeHelper.row1[6], equals('Ĩ'));
-      expect(TicunaUnicodeHelper.row1[7], equals('Ü̃'));
-      expect(TicunaUnicodeHelper.row1[8], equals('Ǘ̃'));
 
-      // Linha 2: Ũ, Ã́, Ẽ
-      expect(TicunaUnicodeHelper.row2.length, equals(3));
-      expect(TicunaUnicodeHelper.row2[0], equals('Ũ'));
-      expect(TicunaUnicodeHelper.row2[1], equals('Ã́'));
-      expect(TicunaUnicodeHelper.row2[2], equals('Ẽ'));
+      // Linha 2 (6 maiúsculas canônicas): Ĩ, Ü̃, Ü̃́, Ũ, Ã́, Ẽ
+      expect(TicunaUnicodeHelper.row2.length, equals(6));
+      expect(TicunaUnicodeHelper.row2[0], equals('Ĩ'));
+      expect(TicunaUnicodeHelper.row2[1], equals('Ü\u0303'));
+      expect(TicunaUnicodeHelper.row2[2], equals('Ü\u0303\u0301'));
+      expect(TicunaUnicodeHelper.row2[3], equals('Ũ'));
+      expect(TicunaUnicodeHelper.row2[4], equals('Ã\u0301'));
+      expect(TicunaUnicodeHelper.row2[5], equals('Ẽ'));
+
+      // Valida que canonicalVowels contém exatamente os 12 glifos canônicos do WOL
+      expect(TicunaUnicodeHelper.canonicalVowels.length, equals(12));
     });
 
     test('Normaliza sequências decompostas e compostas para forma canônica estável', () {
@@ -42,27 +45,32 @@ void main() {
       final raw1 = 'ü\u0303'; // u com trema + til
       final raw2 = 'ã\u0301'; // a com til + agudo
       final raw3 = 'Duü\u0303';
+      final raw4 = 'ü\u0301\u0303'; // u trema + agudo + til
 
       final norm1 = TicunaUnicodeHelper.normalize(raw1);
       final norm2 = TicunaUnicodeHelper.normalize(raw2);
       final norm3 = TicunaUnicodeHelper.normalize(raw3);
+      final norm4 = TicunaUnicodeHelper.normalize(raw4);
 
-      expect(norm1, equals('ü̃'));
-      expect(norm2, equals('ã́'));
-      expect(norm3, equals('Duü̃'));
+      expect(norm1, equals('ü\u0303'));
+      expect(norm2, equals('ã\u0301'));
+      expect(norm3, equals('Duü\u0303'));
+      expect(norm4, equals('ü\u0303\u0301'));
     });
 
     test('Converte diacríticos espaçados/soltos (~, ´, ¨) colados na vogal em acentos combinados empilhados', () {
       expect(TicunaUnicodeHelper.normalize('ü~'), equals('ü\u0303'));
       expect(TicunaUnicodeHelper.normalize('Ü~'), equals('Ü\u0303'));
-      expect(TicunaUnicodeHelper.normalize('ǘ~'), equals('ǘ\u0303'));
-      expect(TicunaUnicodeHelper.normalize('Ǘ~'), equals('Ǘ\u0303'));
+      expect(TicunaUnicodeHelper.normalize('ǘ~'), equals('ü\u0303\u0301'));
+      expect(TicunaUnicodeHelper.normalize('Ǘ~'), equals('Ü\u0303\u0301'));
       expect(TicunaUnicodeHelper.normalize('ã´'), equals('ã\u0301'));
       expect(TicunaUnicodeHelper.normalize('Ã´'), equals('Ã\u0301'));
       expect(TicunaUnicodeHelper.normalize('i~'), equals('ĩ'));
       expect(TicunaUnicodeHelper.normalize('u~'), equals('ũ'));
       expect(TicunaUnicodeHelper.normalize('e~'), equals('ẽ'));
       expect(TicunaUnicodeHelper.normalize('Duü~'), equals('Duü\u0303'));
+      expect(TicunaUnicodeHelper.normalize('ü\u0303´'), equals('ü\u0303\u0301'));
+      expect(TicunaUnicodeHelper.normalize('Ü\u0303´'), equals('Ü\u0303\u0301'));
     });
 
     test('TicunaInputFormatter formata em tempo real durante a digitação', () {
@@ -178,7 +186,7 @@ void main() {
 
     test('Grava termo com caracteres acentuados empilhados no banco fielmente', () async {
       final item = await repo.addWord(
-        word: 'Ǘ̃recura',
+        word: 'Ü\u0303\u0301recura',
         translation: 'Palavra / Teste Diacrítico',
         phonetics: 'ü-re-cu-ra',
         grammaticalClass: 'Substantivo',
@@ -188,7 +196,7 @@ void main() {
 
       final words = await repo.getAllWords();
       final saved = words.firstWhere((w) => w.id == item.id);
-      expect(saved.word, equals('Ǘ̃recura'));
+      expect(saved.word, equals('Ü\u0303\u0301recura'));
       expect(saved.audioPath, equals('/local/test_audio.m4a'));
       expect(saved.audioDurationSeconds, equals(4));
 

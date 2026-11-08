@@ -27,12 +27,12 @@ class TicunaDiacriticsBar extends StatelessWidget {
     this.compact = false,
   });
 
-  /// Linha 1 de caracteres da imagem de referência (9 teclas):
-  /// ĩ, ü̃, ǘ̃, ũ, ã́, ẽ, Ĩ, Ü̃, Ǘ̃
+  /// Linha 1 de caracteres especiais canônicos do WOL (6 minúsculas):
+  /// ĩ, ü̃, ü̃́, ũ, ã́, ẽ
   static const List<String> row1 = TicunaUnicodeHelper.row1;
 
-  /// Linha 2 de caracteres da imagem de referência (3 teclas):
-  /// Ũ, Ã́, Ẽ
+  /// Linha 2 de caracteres especiais canônicos do WOL (6 maiúsculas):
+  /// Ĩ, Ü̃, Ü̃́, Ũ, Ã́, Ẽ
   static const List<String> row2 = TicunaUnicodeHelper.row2;
 
   /// Insere o caractere na posição exata da seleção ou cursor do TextEditingController.

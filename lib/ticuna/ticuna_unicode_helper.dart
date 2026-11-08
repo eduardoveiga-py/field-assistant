@@ -9,13 +9,16 @@ class TicunaUnicodeHelper {
   /// Famílias de fontes em cadeia de fallback com suporte a OpenType GPOS
   /// (posicionamento de glifos mark-to-base e mark-to-mark para múltiplos diacríticos).
   static const List<String> fontFallback = [
+    '.AppleSystemUIFont',
+    '-apple-system',
+    'Helvetica Neue',
+    'Arial Unicode MS',
     'Gentium Plus',
     'Charis SIL',
     'Doulos SIL',
     'Noto Sans',
     'Segoe UI Historic',
     'Lucida Sans Unicode',
-    'Arial Unicode MS',
     'DejaVu Sans',
     'Calibri',
     'Segoe UI',
@@ -24,29 +27,32 @@ class TicunaUnicodeHelper {
     'sans-serif',
   ];
 
-  /// Linha 1 de caracteres especiais da língua Ticuna (9 teclas):
-  /// ĩ, ü̃, ǘ̃, ũ, ã́, ẽ, Ĩ, Ü̃, Ǘ̃
+  /// Linha 1 de caracteres especiais da língua Ticuna canônicos do WOL (6 minúsculas):
+  /// ĩ, ü̃, ü̃́, ũ, ã́, ẽ
   static const List<String> row1 = [
     'ĩ', // U+0129 (precomposto)
     'ü\u0303', // U+00FC + U+0303 (ü com til centralizado acima)
-    'ǘ\u0303', // U+01D8 + U+0303 (ǘ com til centralizado acima)
+    'ü\u0303\u0301', // U+00FC + U+0303 + U+0301 (ü com til e agudo perfeitamente empilhados como no WOL)
     'ũ', // U+0169 (precomposto)
     'ã\u0301', // U+00E3 + U+0301 (ã com acento agudo)
     'ẽ', // U+1EBD (precomposto)
-    'Ĩ', // U+0128 (precomposto)
-    'Ü\u0303', // U+00DC + U+0303 (Ü com til)
-    'Ǘ\u0303', // U+01D7 + U+0303 (Ǘ com til)
   ];
 
-  /// Linha 2 de caracteres especiais da língua Ticuna (3 teclas):
-  /// Ũ, Ã́, Ẽ
+  /// Linha 2 de caracteres especiais da língua Ticuna canônicos do WOL (6 maiúsculas):
+  /// Ĩ, Ü̃, Ü̃́, Ũ, Ã́, Ẽ
   static const List<String> row2 = [
+    'Ĩ', // U+0128 (precomposto)
+    'Ü\u0303', // U+00DC + U+0303 (Ü com til)
+    'Ü\u0303\u0301', // U+00DC + U+0303 + U+0301 (Ü com til e agudo perfeitamente empilhados como no WOL)
     'Ũ', // U+0168 (precomposto)
     'Ã\u0301', // U+00C3 + U+0301 (Ã com acento agudo)
     'Ẽ', // U+1EBC (precomposto)
   ];
 
-  /// Normaliza texto para a forma canônica estável do Ticuna,
+  /// Todas as 12 vogais canônicas acentuadas da língua Ticuna presentes no WOL.
+  static const List<String> canonicalVowels = [...row1, ...row2];
+
+  /// Normaliza texto para a forma canônica estável do Ticuna (idêntica ao WOL jw.org),
   /// garantindo que qualquer variação de entrada (teclado virtual, digitação manual,
   /// diacríticos soltos/espaçados como ~ ou ´, copiar e colar) seja convertida
   /// fielmente para a sequência Unicode correta com acentos centralizados.
@@ -57,17 +63,29 @@ class TicunaUnicodeHelper {
     // 1. Converte diacríticos soltos/espaçados (~, ˜, ´, ¨) colados na vogal
     // que causam o defeito "diacrítico separado ao lado da letra"
     result = result
-        // Variações de ǘ̃ (u com trema + agudo + til)
-        .replaceAll('ǘ~', 'ǘ\u0303')
-        .replaceAll('ǘ˜', 'ǘ\u0303')
-        .replaceAll('Ǘ~', 'Ǘ\u0303')
-        .replaceAll('Ǘ˜', 'Ǘ\u0303')
-        .replaceAll('ü\u0301~', 'ǘ\u0303')
-        .replaceAll('ü\u0301˜', 'ǘ\u0303')
-        .replaceAll('Ü\u0301~', 'Ǘ\u0303')
-        .replaceAll('Ü\u0301˜', 'Ǘ\u0303')
-        .replaceAll('ü~\u0301', 'ǘ\u0303')
-        .replaceAll('Ü~\u0301', 'Ǘ\u0303')
+        // Variações de ü̃́ (u com trema + til + agudo canônico do WOL)
+        .replaceAll('ǘ\u0303', 'ü\u0303\u0301')
+        .replaceAll('ǘ~', 'ü\u0303\u0301')
+        .replaceAll('ǘ˜', 'ü\u0303\u0301')
+        .replaceAll('ǘ´', 'ü\u0303\u0301')
+        .replaceAll('Ǘ\u0303', 'Ü\u0303\u0301')
+        .replaceAll('Ǘ~', 'Ü\u0303\u0301')
+        .replaceAll('Ǘ˜', 'Ü\u0303\u0301')
+        .replaceAll('Ǘ´', 'Ü\u0303\u0301')
+        .replaceAll('ü\u0301~', 'ü\u0303\u0301')
+        .replaceAll('ü\u0301˜', 'ü\u0303\u0301')
+        .replaceAll('Ü\u0301~', 'Ü\u0303\u0301')
+        .replaceAll('Ü\u0301˜', 'Ü\u0303\u0301')
+        .replaceAll('ü~\u0301', 'ü\u0303\u0301')
+        .replaceAll('Ü~\u0301', 'Ü\u0303\u0301')
+        .replaceAll('ü~´', 'ü\u0303\u0301')
+        .replaceAll('Ü~´', 'Ü\u0303\u0301')
+        .replaceAll('ü´~', 'ü\u0303\u0301')
+        .replaceAll('Ü´~', 'Ü\u0303\u0301')
+        .replaceAll('ü\u0303´', 'ü\u0303\u0301')
+        .replaceAll('Ü\u0303´', 'Ü\u0303\u0301')
+        .replaceAll('ü\u0303\'', 'ü\u0303\u0301')
+        .replaceAll('Ü\u0303\'', 'Ü\u0303\u0301')
         // Variações de ü̃ (u com trema + til)
         .replaceAll('ü~', 'ü\u0303')
         .replaceAll('ü˜', 'ü\u0303')
@@ -106,21 +124,21 @@ class TicunaUnicodeHelper {
         .replaceAll('O~', 'Õ')
         .replaceAll('O˜', 'Õ');
 
-    // 2. Normaliza variações decompostas e permutações de combining characters
+    // 2. Normaliza variações decompostas e permutações de combining characters para a forma exata do WOL
     result = result
-        // Permutações triplas para ǘ̃ e Ǘ̃
-        .replaceAll('u\u0308\u0301\u0303', 'ǘ\u0303')
-        .replaceAll('u\u0308\u0303\u0301', 'ǘ\u0303')
-        .replaceAll('u\u0303\u0308\u0301', 'ǘ\u0303')
-        .replaceAll('u\u0301\u0308\u0303', 'ǘ\u0303')
-        .replaceAll('ü\u0301\u0303', 'ǘ\u0303')
-        .replaceAll('ü\u0303\u0301', 'ǘ\u0303')
-        .replaceAll('U\u0308\u0301\u0303', 'Ǘ\u0303')
-        .replaceAll('U\u0308\u0303\u0301', 'Ǘ\u0303')
-        .replaceAll('U\u0303\u0308\u0301', 'Ǘ\u0303')
-        .replaceAll('U\u0301\u0308\u0303', 'Ǘ\u0303')
-        .replaceAll('Ü\u0301\u0303', 'Ǘ\u0303')
-        .replaceAll('Ü\u0303\u0301', 'Ǘ\u0303')
+        // Permutações triplas para ü̃́ e Ü̃́ (ü\u0303\u0301 e Ü\u0303\u0301)
+        .replaceAll('u\u0308\u0301\u0303', 'ü\u0303\u0301')
+        .replaceAll('u\u0308\u0303\u0301', 'ü\u0303\u0301')
+        .replaceAll('u\u0303\u0308\u0301', 'ü\u0303\u0301')
+        .replaceAll('u\u0301\u0308\u0303', 'ü\u0303\u0301')
+        .replaceAll('ü\u0301\u0303', 'ü\u0303\u0301')
+        .replaceAll('ü\u0303\u0301', 'ü\u0303\u0301')
+        .replaceAll('U\u0308\u0301\u0303', 'Ü\u0303\u0301')
+        .replaceAll('U\u0308\u0303\u0301', 'Ü\u0303\u0301')
+        .replaceAll('U\u0303\u0308\u0301', 'Ü\u0303\u0301')
+        .replaceAll('U\u0301\u0308\u0303', 'Ü\u0303\u0301')
+        .replaceAll('Ü\u0301\u0303', 'Ü\u0303\u0301')
+        .replaceAll('Ü\u0303\u0301', 'Ü\u0303\u0301')
         // Permutações duplas para ü̃ e Ü̃
         .replaceAll('u\u0308\u0303', 'ü\u0303')
         .replaceAll('u\u0303\u0308', 'ü\u0303')

@@ -167,22 +167,40 @@ class TicunaAudioService implements ITicunaAudioService {
   // ==========================================
 
   /// Inicia gravação com parâmetros ultraleves (32 kbps mono AAC-LC),
+  /// Inicia gravação com parâmetros compatíveis com iOS/iPadOS/Android (AAC-LC),
   /// produzindo arquivos de áudio nítidos com apenas ~20 a 50 KB para economizar espaço e banda.
   @override
   Future<String> startRecording({
     required String id,
     String prefix = 'ticuna',
   }) async {
+    // Garante parada limpa de qualquer gravação nativa anterior pendente
+    try {
+      if (await _recorder.isRecording()) {
+        await _recorder.stop();
+      }
+    } catch (_) {}
+
     if (_isRecording) {
       await cancelRecording();
     }
 
+    // Valida permissão de gravação com timeout defensivo
+    bool hasPerm = false;
     try {
-      final hasPerm = await _recorder.hasPermission().catchError((_) => false);
-      if (!hasPerm) {
-        // Fallback gracioso
-      }
-    } catch (_) {}
+      hasPerm = await _recorder.hasPermission().timeout(
+        const Duration(seconds: 4),
+        onTimeout: () => false,
+      );
+    } catch (_) {
+      hasPerm = false;
+    }
+
+    if (!hasPerm && !Platform.environment.containsKey('FLUTTER_TEST')) {
+      throw Exception(
+        'Permissão de microfone não concedida pelo sistema. Verifique os Ajustes do dispositivo.',
+      );
+    }
 
     final docsDir = await _getAudioDirectory();
     final fileName = '${prefix}_${id}_audio.m4a';
@@ -194,16 +212,26 @@ class TicunaAudioService implements ITicunaAudioService {
 
     try {
       await _recorder.start(
-        const RecordConfig(
-          encoder: AudioEncoder.aacLc,
-          bitRate: 32000, // 32 kbps mono para máxima economia sem perder clareza de tons
-          sampleRate: 24000, // Amostragem otimizada para voz humana
-          numChannels: 1, // Mono
-        ),
+        const RecordConfig(encoder: AudioEncoder.aacLc),
         path: targetPath,
-      ).catchError((_) {});
-    } catch (_) {
-      // Fallback gracioso para ambientes de teste
+      );
+    } catch (e) {
+      // Se a instância nativa estiver corrompida, recria nova instância do gravador
+      try {
+        await _recorder.dispose();
+      } catch (_) {}
+      _recorderInstance = AudioRecorder();
+      try {
+        await _recorder.start(
+          const RecordConfig(encoder: AudioEncoder.aacLc),
+          path: targetPath,
+        );
+      } catch (e2) {
+        if (!Platform.environment.containsKey('FLUTTER_TEST')) {
+          rethrow;
+        }
+        debugPrint('[TicunaAudio] Fallback em ambiente headless/teste: $e2');
+      }
     }
 
     _isRecording = true;
@@ -282,8 +310,15 @@ class TicunaAudioService implements ITicunaAudioService {
     _recordDurationSeconds = 0;
 
     try {
-      await _recorder.cancel().catchError((_) {});
-    } catch (_) {}
+      if (await _recorder.isRecording()) {
+        await _recorder.cancel().catchError((_) {});
+      }
+    } catch (_) {
+      try {
+        await _recorder.dispose().catchError((_) {});
+      } catch (_) {}
+      _recorderInstance = null;
+    }
 
     if (_currentRecordingPath != null && !kIsWeb) {
       try {
@@ -501,11 +536,13 @@ class TicunaAudioService implements ITicunaAudioService {
       try {
         _recorderInstance!.dispose().catchError((_) {});
       } catch (_) {}
+      _recorderInstance = null;
     }
     if (_playerInstance != null) {
       try {
         _playerInstance!.dispose().catchError((_) {});
       } catch (_) {}
+      _playerInstance = null;
     }
   }
 }

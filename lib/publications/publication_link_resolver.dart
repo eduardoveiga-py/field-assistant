@@ -79,12 +79,14 @@ class PublicationLinkResolver {
     // Para Português e outros idiomas textuais
     if (pub.id == 'lff-book' && lesson != null && lesson >= 1 && lesson <= 60) {
       // Formato oficial do buscador e compartilhamento JW para Lições do livro LFF
-      // Exemplo de link canônico verificado: https://www.jw.org/finder?srcid=jwlshare&wtlocale=T&pub=lff&lesson=X&par=Y
+      // Exemplo de link canônico verificado: https://www.jw.org/finder?srcid=jwlshare&wtlocale=T&prefer=lang&pub=lff&lesson=1&docid=1102021201&par=3
+      final docId = 1102021200 + lesson;
+      final partNumber = lesson <= 12 ? 1 : lesson <= 33 ? 2 : lesson <= 47 ? 3 : 4;
       final lessonPad = lesson.toString().padLeft(2, '0');
       var lessonWebUrl =
-          'https://www.jw.org/pt/biblioteca/livros/seja-feliz-para-sempre/licao-$lessonPad/';
+          'https://www.jw.org/pt/biblioteca/livros/seja-feliz-para-sempre/parte-$partNumber/licao-$lessonPad/';
       var finderUrl =
-          'https://www.jw.org/finder?srcid=jwlshare&wtlocale=${lang.wtlocale}&pub=${pub.code}&midx=$lesson&lesson=$lesson';
+          'https://www.jw.org/finder?srcid=jwlshare&wtlocale=${lang.wtlocale}&prefer=lang&pub=${pub.code}&lesson=$lesson&docid=$docId';
 
       if (paragraph != null && paragraph > 0) {
         finderUrl += '&par=$paragraph';
@@ -98,9 +100,9 @@ class PublicationLinkResolver {
         displayText: display.toString(),
         isSignLanguage: false,
         note: paragraph != null
-            ? 'Abertura direta garantida até a Lição $lesson, ponto/parágrafo $paragraph no JW Library.'
-            : 'Abre diretamente a Lição $lesson.',
-        isDirectParagraphSupported: false,
+            ? 'Abertura direta garantida na Lição $lesson, parágrafo $paragraph no JW Library.'
+            : 'Abre diretamente a Lição $lesson no JW Library.',
+        isDirectParagraphSupported: paragraph != null && paragraph > 0,
       );
     }
 
@@ -108,25 +110,26 @@ class PublicationLinkResolver {
         lesson != null &&
         lesson >= 1 &&
         lesson <= 3) {
+      final docId = 1102021200 + lesson;
+      final lessonPad = lesson.toString().padLeft(2, '0');
+      var lessonWebUrl =
+          'https://www.jw.org/pt/biblioteca/livros/seja-feliz-para-sempre/parte-1/licao-$lessonPad/';
       var finderUrl =
-          'https://www.jw.org/finder?srcid=jwlshare&wtlocale=${lang.wtlocale}&pub=${pub.code}&midx=$lesson&lesson=$lesson';
-      var fallbackUrl = lang.officialWebUrl;
+          'https://www.jw.org/finder?srcid=jwlshare&wtlocale=${lang.wtlocale}&prefer=lang&pub=${pub.code}&lesson=$lesson&docid=$docId';
       if (paragraph != null && paragraph > 0) {
         finderUrl += '&par=$paragraph';
-        if (fallbackUrl != null) {
-          fallbackUrl += '#p$paragraph';
-        }
+        lessonWebUrl += '#p$paragraph';
       }
       return ResolvedLink(
         url: finderUrl,
-        fallbackUrl: fallbackUrl,
+        fallbackUrl: lessonWebUrl,
         precision: LinkPrecision.directLesson,
         displayText: display.toString(),
         isSignLanguage: false,
         note: paragraph != null
-            ? 'Abre a Lição $lesson, ponto/parágrafo $paragraph da brochura introdutória no JW Library.'
-            : 'Abre a Lição $lesson da brochura introdutória.',
-        isDirectParagraphSupported: false,
+            ? 'Abre a Lição $lesson, parágrafo $paragraph da brochura introdutória no JW Library.'
+            : 'Abre a Lição $lesson da brochura introdutória no JW Library.',
+        isDirectParagraphSupported: paragraph != null && paragraph > 0,
       );
     }
 

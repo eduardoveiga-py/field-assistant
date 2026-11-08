@@ -47,6 +47,8 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
   final Set<String> _geocodedPersonIds = {};
   bool _hasCenteredHighlightPerson = false;
   int _zoom = 15;
+  double? _activeCenterLng;
+  double? _activeCenterLat;
   static const double _tileSize = 256.0;
   DateTime? _lastZoomChangeTime;
 
@@ -91,8 +93,6 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
     BoxConstraints constraints,
     double originPx,
     double originPy,
-    double centerLng,
-    double centerLat,
   ) {
     final targetZoom = newZoom.clamp(6, 19);
     if (targetZoom == _zoom) return;
@@ -114,10 +114,10 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
     final focalLng = _pixelX2lon(worldPx, _zoom);
     final focalLat = _pixelY2lat(worldPy, _zoom);
 
-    // Reprojeção para novo nível de resolução 'z'
+    // Reprojeção para novo nível de resolução 'z' centrando exatamente no ponto focal
     const int gridHalfSize = 3;
-    final newCenterTileX = _lon2tileX(centerLng, targetZoom);
-    final newCenterTileY = _lat2tileY(centerLat, targetZoom);
+    final newCenterTileX = _lon2tileX(focalLng, targetZoom);
+    final newCenterTileY = _lat2tileY(focalLat, targetZoom);
     final newMinTileX = newCenterTileX - gridHalfSize;
     final newMinTileY = newCenterTileY - gridHalfSize;
     final newOriginPx = newMinTileX * _tileSize;
@@ -131,16 +131,19 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
 
     final canvasWidth = (gridHalfSize * 2 + 1) * _tileSize;
     final canvasHeight = (gridHalfSize * 2 + 1) * _tileSize;
+    const margin = 250.0;
     final newDx = ((viewportW / 2.0) - newCanvasX).clamp(
-      viewportW - canvasWidth,
-      0.0,
+      viewportW - canvasWidth - margin,
+      margin,
     );
     final newDy = ((viewportH / 2.0) - newCanvasY).clamp(
-      viewportH - canvasHeight,
-      0.0,
+      viewportH - canvasHeight - margin,
+      margin,
     );
 
     setState(() {
+      _activeCenterLng = focalLng;
+      _activeCenterLat = focalLat;
       _zoom = targetZoom;
     });
 
@@ -180,6 +183,10 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
     double centerPx,
     double centerPy,
   ) {
+    setState(() {
+      _activeCenterLat = null;
+      _activeCenterLng = null;
+    });
     if (viewportWidth > 0 && viewportHeight > 0) {
       final dx = (viewportWidth / 2.0) - centerPx;
       final dy = (viewportHeight / 2.0) - centerPy;
@@ -771,14 +778,19 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
 
     double cLat = -23.550520;
     double cLng = -46.633308;
-    if (validLats.isNotEmpty) {
+    if (_activeCenterLat != null && _activeCenterLng != null) {
+      cLat = _activeCenterLat!;
+      cLng = _activeCenterLng!;
+    } else if (validLats.isNotEmpty) {
       validLats.sort();
       validLngs.sort();
       cLat = validLats[validLats.length ~/ 2];
       cLng = validLngs[validLngs.length ~/ 2];
     }
 
-    final zoomLevels = [_zoom - 1, _zoom];
+    final zoomLevels = [_zoom - 1, _zoom, _zoom + 1]
+        .where((z) => z >= 6 && z <= 19)
+        .toList();
     const half = 3;
     final totalExpected = zoomLevels.length * (half * 2 + 1) * (half * 2 + 1);
     final progressNotifier = ValueNotifier<int>(0);
@@ -1378,8 +1390,11 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
       centerLng = allLngs[allLngs.length ~/ 2];
     }
 
-    final centerTileX = _lon2tileX(centerLng, _zoom);
-    final centerTileY = _lat2tileY(centerLat, _zoom);
+    final effectiveCenterLat = _activeCenterLat ?? centerLat;
+    final effectiveCenterLng = _activeCenterLng ?? centerLng;
+
+    final centerTileX = _lon2tileX(effectiveCenterLng, _zoom);
+    final centerTileY = _lat2tileY(effectiveCenterLat, _zoom);
 
     // Grade ampla (15x15 blocos = 3840x3840 px) que cobre 100% da tela em qualquer dispositivo móvel, tablet ou desktop
     const int gridHalfSize = 3;
@@ -1461,8 +1476,6 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                           constraints,
                           originPx,
                           originPy,
-                          centerLng,
-                          centerLat,
                         );
                       } else if (pointerSignal.scrollDelta.dy > 2 &&
                           _zoom > 6) {
@@ -1472,8 +1485,6 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                           constraints,
                           originPx,
                           originPy,
-                          centerLng,
-                          centerLat,
                         );
                       }
                     }
@@ -1488,8 +1499,6 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                         constraints,
                         originPx,
                         originPy,
-                        centerLng,
-                        centerLat,
                       );
                     }
                   },
@@ -1507,29 +1516,40 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                     onInteractionEnd: (details) {
                       final m = _transformationController.value;
                       final currentScale = m.getMaxScaleOnAxis();
-                      if (currentScale >= 1.25 && _zoom < 19) {
-                        _changeZoom(
-                          _zoom + 1,
-                          constraints,
-                          originPx,
-                          originPy,
-                          centerLng,
-                          centerLat,
-                        );
-                      } else if (currentScale <= 0.8 && _zoom > 6) {
-                        _changeZoom(
-                          _zoom - 1,
-                          constraints,
-                          originPx,
-                          originPy,
-                          centerLng,
-                          centerLat,
-                        );
-                      } else if ((currentScale - 1.0).abs() > 0.05) {
-                        final dx = m.storage[12];
-                        final dy = m.storage[13];
-                        _transformationController.value =
-                            Matrix4.translationValues(dx, dy, 0.0);
+                      final effectiveScale =
+                          currentScale > 0.01 ? currentScale : 1.0;
+                      final dx = m.storage[12];
+                      final dy = m.storage[13];
+                      final canvasCenterX =
+                          ((constraints.maxWidth / 2.0) - dx) / effectiveScale;
+                      final canvasCenterY =
+                          ((constraints.maxHeight / 2.0) - dy) / effectiveScale;
+                      final worldPx = originPx + canvasCenterX;
+                      final worldPy = originPy + canvasCenterY;
+                      _activeCenterLng = _pixelX2lon(worldPx, _zoom);
+                      _activeCenterLat = _pixelY2lat(worldPy, _zoom);
+
+                      final now = clock.now();
+                      if (_lastZoomChangeTime == null ||
+                          now.difference(_lastZoomChangeTime!).inMilliseconds >=
+                              250) {
+                        if (currentScale >= 1.35 && _zoom < 19) {
+                          _lastZoomChangeTime = now;
+                          _changeZoom(
+                            _zoom + 1,
+                            constraints,
+                            originPx,
+                            originPy,
+                          );
+                        } else if (currentScale <= 0.75 && _zoom > 6) {
+                          _lastZoomChangeTime = now;
+                          _changeZoom(
+                            _zoom - 1,
+                            constraints,
+                            originPx,
+                            originPy,
+                          );
+                        }
                       }
                     },
                     child: Container(
@@ -1663,8 +1683,6 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                           constraints,
                           originPx,
                           originPy,
-                          centerLng,
-                          centerLat,
                         );
                       }
                     },
@@ -1702,8 +1720,6 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                           constraints,
                           originPx,
                           originPy,
-                          centerLng,
-                          centerLat,
                         );
                       }
                     },

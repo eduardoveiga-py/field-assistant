@@ -17,9 +17,10 @@ void main() {
         expect(resolved.url, contains('jw.org/finder?srcid=jwlshare'));
         expect(resolved.url, contains('pub=lff'));
         expect(resolved.url, contains('lesson=5'));
-        expect(resolved.fallbackUrl, contains('licao-05'));
-        // Transparência: o deep link direto para o número do parágrafo NÃO é prometido
-        expect(resolved.isDirectParagraphSupported, isFalse);
+        expect(resolved.url, contains('docid=1102021205'));
+        expect(resolved.url, contains('par=3'));
+        expect(resolved.fallbackUrl, contains('parte-1/licao-05/#p3'));
+        expect(resolved.isDirectParagraphSupported, isTrue);
         expect(resolved.note, contains('Lição 5'));
       });
 
@@ -59,9 +60,40 @@ void main() {
 
         expect(resolved.url, contains('pub=lff'));
         expect(resolved.url, contains('lesson=8'));
+        expect(resolved.url, contains('docid=1102021208'));
         expect(resolved.url, contains('par=3'));
-        expect(resolved.fallbackUrl, contains('licao-08/#p3'));
+        expect(resolved.fallbackUrl, contains('parte-1/licao-08/#p3'));
         expect(resolved.displayText, contains('Lição 8, § 3'));
+        expect(resolved.isDirectParagraphSupported, isTrue);
+      });
+
+      test('TC-PUB-05: Lições em outras partes mapeiam corretamente as seções canônicas', () {
+        final resPart2 = PublicationLinkResolver.resolve(
+          publicationId: 'lff-book',
+          languageCode: 'pt',
+          lesson: 15,
+          paragraph: 2,
+        );
+        expect(resPart2.url, contains('docid=1102021215'));
+        expect(resPart2.fallbackUrl, contains('parte-2/licao-15/#p2'));
+
+        final resPart3 = PublicationLinkResolver.resolve(
+          publicationId: 'lff-book',
+          languageCode: 'pt',
+          lesson: 35,
+          paragraph: 4,
+        );
+        expect(resPart3.url, contains('docid=1102021235'));
+        expect(resPart3.fallbackUrl, contains('parte-3/licao-35/#p4'));
+
+        final resPart4 = PublicationLinkResolver.resolve(
+          publicationId: 'lff-book',
+          languageCode: 'pt',
+          lesson: 50,
+          paragraph: 1,
+        );
+        expect(resPart4.url, contains('docid=1102021250'));
+        expect(resPart4.fallbackUrl, contains('parte-4/licao-50/#p1'));
       });
     },
   );

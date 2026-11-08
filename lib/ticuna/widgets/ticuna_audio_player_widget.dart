@@ -359,14 +359,34 @@ class _TicunaRecordingBottomSheetState
   bool _recording = false;
   int _seconds = 0;
   Timer? _timer;
+  StreamSubscription<int>? _durationSub;
   TicunaRecordingResult? _result;
   bool _isPlayingPreview = false;
   double _previewSpeed = 1.0;
   bool _isSaving = false;
 
   @override
+  void initState() {
+    super.initState();
+    final audioService = ref.read(ticunaAudioServiceProvider);
+    _durationSub = audioService.recordingDurationStream.listen((sec) {
+      if (!mounted) return;
+      setState(() {
+        _seconds = sec;
+        if (sec >= 15 && _recording) {
+          _stop();
+        }
+      });
+    });
+  }
+
+  @override
   void dispose() {
     _timer?.cancel();
+    _durationSub?.cancel();
+    if (_recording) {
+      ref.read(ticunaAudioServiceProvider).cancelRecording();
+    }
     super.dispose();
   }
 
@@ -378,33 +398,66 @@ class _TicunaRecordingBottomSheetState
       _result = null;
     });
 
-    await audioService.startRecording(
-      id: widget.id,
-      prefix: widget.isPhrase ? 'phrase' : 'word',
-    );
-
+    // Inicia imediatamente o timer visual para garantir resposta tátil imediata
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (!mounted) return;
+      if (!_recording) {
+        t.cancel();
+        return;
+      }
       setState(() {
-        _seconds++;
+        if (_seconds < 15) {
+          _seconds++;
+        }
         if (_seconds >= 15) {
           _stop();
         }
       });
     });
+
+    try {
+      await audioService.startRecording(
+        id: widget.id,
+        prefix: widget.isPhrase ? 'phrase' : 'word',
+      );
+    } catch (e) {
+      debugPrint('[TicunaRecording] Falha ao iniciar gravação: $e');
+      if (mounted) {
+        _timer?.cancel();
+        setState(() {
+          _recording = false;
+          _seconds = 0;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao iniciar microfone: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _stop() async {
     _timer?.cancel();
     final audioService = ref.read(ticunaAudioServiceProvider);
-    final res = await audioService.stopRecording();
+    try {
+      final res = await audioService.stopRecording();
 
-    if (mounted) {
-      setState(() {
-        _recording = false;
-        _result = res;
-      });
+      if (mounted) {
+        setState(() {
+          _recording = false;
+          _result = res;
+        });
+      }
+    } catch (e) {
+      debugPrint('[TicunaRecording] Erro ao finalizar gravação: $e');
+      if (mounted) {
+        setState(() {
+          _recording = false;
+        });
+      }
     }
   }
 
@@ -437,28 +490,31 @@ class _TicunaRecordingBottomSheetState
       final repo = ref.read(ticunaRepositoryProvider);
       final audioService = ref.read(ticunaAudioServiceProvider);
 
-      // Salva no banco local Drift
-      if (widget.isPhrase) {
-        await repo.updatePhraseAudio(
-          widget.id,
-          _result!.filePath,
-          durationSeconds: _result!.durationSeconds,
-        );
-      } else {
-        await repo.updateWordAudio(
-          widget.id,
-          _result!.filePath,
-          durationSeconds: _result!.durationSeconds,
+      // Salva no banco local Drift apenas se o registro já existir (edição de palavra/frase já salva)
+      final isTemporaryDraft = widget.id.startsWith('word_') || widget.id.startsWith('phrase_');
+      if (!isTemporaryDraft) {
+        if (widget.isPhrase) {
+          await repo.updatePhraseAudio(
+            widget.id,
+            _result!.filePath,
+            durationSeconds: _result!.durationSeconds,
+          );
+        } else {
+          await repo.updateWordAudio(
+            widget.id,
+            _result!.filePath,
+            durationSeconds: _result!.durationSeconds,
+          );
+        }
+
+        // Envia em segundo plano para o Supabase Storage se conectado
+        unawaited(
+          audioService.uploadToSupabase(
+            id: widget.id,
+            localFilePath: _result!.filePath,
+          ),
         );
       }
-
-      // Envia em segundo plano para o Supabase Storage se conectado
-      unawaited(
-        audioService.uploadToSupabase(
-          id: widget.id,
-          localFilePath: _result!.filePath,
-        ),
-      );
 
       widget.onSaved(_result!.filePath, _result!.durationSeconds);
 

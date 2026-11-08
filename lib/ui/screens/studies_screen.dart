@@ -280,10 +280,22 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
               );
             },
           ),
+          if (resolved.fallbackUrl != null)
+            TextButton.icon(
+              icon: const Icon(Icons.language, size: 16),
+              label: const Text('No Navegador'),
+              onPressed: () async {
+                final uri = Uri.parse(resolved.fallbackUrl!);
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+                if (ctx.mounted) Navigator.pop(ctx);
+              },
+            ),
           if (resolved.url != null)
             ElevatedButton.icon(
               icon: const Icon(Icons.open_in_new, size: 16),
-              label: const Text('Abrir'),
+              label: const Text('No JW Library'),
               onPressed: () async {
                 final uri = Uri.parse(resolved.url!);
                 if (await canLaunchUrl(uri)) {

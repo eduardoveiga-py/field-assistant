@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../ticuna/ticuna_unicode_helper.dart';
+
 class AppTheme {
   // Cores de alto contraste e legibilidade sob sol intenso
   static const Color primaryBlue = Color(0xFF1E3A8A); // Azul profundo elegante
@@ -35,6 +37,7 @@ class AppTheme {
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
+      fontFamilyFallback: TicunaUnicodeHelper.fontFallback,
       colorScheme: ColorScheme.fromSeed(
         seedColor: primaryBlue,
         brightness: Brightness.light,
@@ -112,6 +115,7 @@ class AppTheme {
   static ThemeData get darkTheme {
     return ThemeData(
       useMaterial3: true,
+      fontFamilyFallback: TicunaUnicodeHelper.fontFallback,
       colorScheme: ColorScheme.fromSeed(
         seedColor: primaryBlue,
         brightness: Brightness.dark,
