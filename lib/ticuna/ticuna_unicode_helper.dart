@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 /// Utilitário central de renderização tipográfica e normalização canônica Unicode
 /// para os caracteres especiais e diacríticos sobrepostos da língua Ticuna.
@@ -9,14 +10,14 @@ class TicunaUnicodeHelper {
   /// Famílias de fontes em cadeia de fallback com suporte a OpenType GPOS
   /// (posicionamento de glifos mark-to-base e mark-to-mark para múltiplos diacríticos).
   static const List<String> fontFallback = [
+    'Noto Sans',
+    'Charis SIL',
+    'Gentium Plus',
+    'Doulos SIL',
     '.AppleSystemUIFont',
     '-apple-system',
     'Helvetica Neue',
     'Arial Unicode MS',
-    'Gentium Plus',
-    'Charis SIL',
-    'Doulos SIL',
-    'Noto Sans',
     'Segoe UI Historic',
     'Lucida Sans Unicode',
     'DejaVu Sans',
@@ -144,6 +145,20 @@ class TicunaUnicodeHelper {
         .replaceAll('u\u0303\u0308', 'ü\u0303')
         .replaceAll('U\u0308\u0303', 'Ü\u0303')
         .replaceAll('U\u0303\u0308', 'Ü\u0303')
+        // Variações onde trema foi colado sobre ũ/Ũ
+        .replaceAll('ũ\u0308\u0301', 'ü\u0303\u0301')
+        .replaceAll('ũ\u0301\u0308', 'ü\u0303\u0301')
+        .replaceAll('Ũ\u0308\u0301', 'Ü\u0303\u0301')
+        .replaceAll('Ũ\u0301\u0308', 'Ü\u0303\u0301')
+        .replaceAll('ũ\u0308', 'ü\u0303')
+        .replaceAll('Ũ\u0308', 'Ü\u0303')
+        .replaceAll('ũ¨', 'ü\u0303')
+        .replaceAll('Ũ¨', 'Ü\u0303')
+        // Correção defensiva para o termo canônico "Duü̃" (pessoa/gente) caso digitado como Duũũ ou Duũ
+        .replaceAll('Duũũ', 'Duü\u0303')
+        .replaceAll('duũũ', 'duü\u0303')
+        .replaceAll('Duũ', 'Duü\u0303')
+        .replaceAll('duũ', 'duü\u0303')
         // Permutações para ã́ e Ã́
         .replaceAll('a\u0303\u0301', 'ã\u0301')
         .replaceAll('a\u0301\u0303', 'ã\u0301')
@@ -178,14 +193,32 @@ class TicunaUnicodeHelper {
     TextDecoration? decoration,
     double? height,
   }) {
-    return TextStyle(
-      fontSize: fontSize,
-      fontWeight: fontWeight,
-      color: color,
-      letterSpacing: letterSpacing,
-      fontStyle: fontStyle,
-      decoration: decoration,
-      height: height,
+    TextStyle style;
+    if (GoogleFonts.config.allowRuntimeFetching) {
+      style = GoogleFonts.notoSans(
+        textStyle: TextStyle(
+          fontSize: fontSize,
+          fontWeight: fontWeight,
+          color: color,
+          letterSpacing: letterSpacing,
+          fontStyle: fontStyle,
+          decoration: decoration,
+          height: height,
+        ),
+      );
+    } else {
+      style = TextStyle(
+        fontFamily: 'Noto Sans',
+        fontSize: fontSize,
+        fontWeight: fontWeight,
+        color: color,
+        letterSpacing: letterSpacing,
+        fontStyle: fontStyle,
+        decoration: decoration,
+        height: height,
+      );
+    }
+    return style.copyWith(
       fontFamilyFallback: fontFallback,
     );
   }

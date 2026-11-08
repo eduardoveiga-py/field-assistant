@@ -133,6 +133,13 @@ class TicunaRepository {
         await db.customStatement('ALTER TABLE ticuna_phrases ADD COLUMN audio_duration_seconds INTEGER;');
       } catch (_) {}
 
+      // Normalização defensiva para recuperar termos canônicos corrigidos
+      try {
+        await db.customStatement(
+          "UPDATE ticuna_words SET word = 'Duü\u0303', phonetics = 'du-ü\u0303 [nasal]', example_sentence = 'Duü\u0303 meã' WHERE word = 'Duũ' OR word = 'Duũũ' OR word LIKE 'Duũ%' OR word LIKE 'duũ%';",
+        );
+      } catch (_) {}
+
       // Seed inicial de tags e vocabulário caso tabelas estejam vazias
       final wordsCount = await db
           .customSelect('SELECT COUNT(*) AS count FROM ticuna_words')

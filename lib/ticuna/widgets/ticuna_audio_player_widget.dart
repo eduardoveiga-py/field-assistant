@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -431,7 +432,9 @@ class _TicunaRecordingBottomSheetState
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erro ao iniciar microfone: $e'),
+            content: Text(
+              'Erro ao iniciar microfone: ${e.toString().replaceAll('Exception: ', '')}',
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -523,7 +526,7 @@ class _TicunaRecordingBottomSheetState
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Pronúncia salva! (${(_result!.fileSizeBytes / 1024).toStringAsFixed(1)} KB - AAC otimizado)',
+              'Pronúncia salva! (${(_result!.fileSizeBytes / 1024).toStringAsFixed(1)} KB - ${kIsWeb ? 'WebM' : 'AAC'} otimizado)',
             ),
             duration: const Duration(seconds: 2),
           ),

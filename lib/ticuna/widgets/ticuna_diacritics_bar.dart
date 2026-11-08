@@ -154,6 +154,37 @@ class TicunaDiacriticsBar extends StatelessWidget {
     );
   }
 
+  static String getCharDescription(String char) {
+    switch (char) {
+      case 'ĩ':
+        return 'ĩ (i com til)';
+      case 'ü\u0303':
+        return 'ü̃ (ü com til)';
+      case 'ü\u0303\u0301':
+        return 'ü̃́ (ü com til e agudo)';
+      case 'ũ':
+        return 'ũ (u com til)';
+      case 'ã\u0301':
+        return 'ã́ (ã com agudo)';
+      case 'ẽ':
+        return 'ẽ (e com til)';
+      case 'Ĩ':
+        return 'Ĩ (I maiúsculo com til)';
+      case 'Ü\u0303':
+        return 'Ü̃ (Ü maiúsculo com til)';
+      case 'Ü\u0303\u0301':
+        return 'Ü̃́ (Ü maiúsculo com til e agudo)';
+      case 'Ũ':
+        return 'Ũ (U maiúsculo com til)';
+      case 'Ã\u0301':
+        return 'Ã́ (Ã maiúsculo com agudo)';
+      case 'Ẽ':
+        return 'Ẽ (E maiúsculo com til)';
+      default:
+        return char;
+    }
+  }
+
   Widget _buildKeyButton({
     required String char,
     required Color bgColor,
@@ -162,36 +193,39 @@ class TicunaDiacriticsBar extends StatelessWidget {
   }) {
     return Padding(
       padding: const EdgeInsets.only(right: 6),
-      child: Material(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(8),
-        child: InkWell(
+      child: Tooltip(
+        message: getCharDescription(char),
+        child: Material(
+          color: bgColor,
           borderRadius: BorderRadius.circular(8),
-          onTap: () => _handleTap(char),
-          child: Container(
-            constraints: const BoxConstraints(
-              minWidth: 44,
-              minHeight: 48,
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: borderColor, width: 1.2),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 1,
-                  offset: const Offset(0, 1),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: () => _handleTap(char),
+            child: Container(
+              constraints: const BoxConstraints(
+                minWidth: 46,
+                minHeight: 48,
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: borderColor, width: 1.2),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 1,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                char,
+                style: TicunaUnicodeHelper.textStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: textColor,
                 ),
-              ],
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              char,
-              style: TicunaUnicodeHelper.textStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w500,
-                color: textColor,
               ),
             ),
           ),

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:drift/drift.dart' show driftRuntimeOptions;
 import 'package:drift/native.dart';
 import 'package:ministerio_pessoal/database/app_database.dart';
@@ -14,6 +15,7 @@ import 'package:ministerio_pessoal/ticuna/widgets/ticuna_audio_player_widget.dar
 void main() {
   setUpAll(() {
     driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
+    GoogleFonts.config.allowRuntimeFetching = false;
   });
 
   group('TicunaUnicodeHelper - Normalização e Diacríticos Compostos', () {
@@ -71,6 +73,26 @@ void main() {
       expect(TicunaUnicodeHelper.normalize('Duü~'), equals('Duü\u0303'));
       expect(TicunaUnicodeHelper.normalize('ü\u0303´'), equals('ü\u0303\u0301'));
       expect(TicunaUnicodeHelper.normalize('Ü\u0303´'), equals('Ü\u0303\u0301'));
+    });
+
+    test('Garante que ü̃ NUNCA é substituído por ũ e que termos canônicos são preservados', () {
+      // ü̃ e ũ são fonemas distintos na língua Ticuna
+      expect(TicunaUnicodeHelper.normalize('ü\u0303'), equals('ü\u0303'));
+      expect(TicunaUnicodeHelper.normalize('ü\u0303\u0301'), equals('ü\u0303\u0301'));
+      expect(TicunaUnicodeHelper.normalize('ũ'), equals('ũ'));
+      expect(TicunaUnicodeHelper.normalize('Ũ'), equals('Ũ'));
+      expect(TicunaUnicodeHelper.normalize('Duü\u0303'), equals('Duü\u0303'));
+
+      // Se o usuário digitou acidentalmente com trema sobre ũ, normaliza para ü̃
+      expect(TicunaUnicodeHelper.normalize('ũ\u0308'), equals('ü\u0303'));
+      expect(TicunaUnicodeHelper.normalize('Ũ\u0308'), equals('Ü\u0303'));
+      expect(TicunaUnicodeHelper.normalize('ũ¨'), equals('ü\u0303'));
+      expect(TicunaUnicodeHelper.normalize('Ũ¨'), equals('Ü\u0303'));
+      expect(TicunaUnicodeHelper.normalize('ũ\u0308\u0301'), equals('ü\u0303\u0301'));
+
+      // Recuperação do termo canônico "Duü̃" (pessoa/gente)
+      expect(TicunaUnicodeHelper.normalize('Duũũ'), equals('Duü\u0303'));
+      expect(TicunaUnicodeHelper.normalize('Duũ'), equals('Duü\u0303'));
     });
 
     test('TicunaInputFormatter formata em tempo real durante a digitação', () {
@@ -167,6 +189,22 @@ void main() {
 
       final file = File(path);
       expect(await file.exists(), isFalse);
+    });
+
+    test('TicunaAudioService real suporta play/pause/stop e deleteAudioFile defensivamente', () async {
+      final realService = TicunaAudioService();
+      addTearDown(realService.dispose);
+
+      // Reprodução com URL blob simulada
+      await realService.play('blob:http://localhost:8080/fake-blob-uuid', speed: 1.0);
+      expect(realService.currentPlaybackSpeed, equals(1.0));
+
+      await realService.pause();
+      await realService.stop();
+
+      // deleteAudioFile com blob ou vazio retorna true defensivamente
+      expect(await realService.deleteAudioFile('blob:http://localhost/test'), isTrue);
+      expect(await realService.deleteAudioFile(''), isFalse);
     });
   });
 
@@ -281,6 +319,29 @@ void main() {
       queue = await db.select(db.syncQueue).get();
       expect(queue.last.entityType, equals('ticuna_phrases'));
       expect(queue.last.operation, equals('DELETE'));
+    });
+
+    test('Migra automaticamente termos corrompidos com diacríticos como Duũ para o canônico Duü̃', () async {
+      // Cria instância nova de repositório após inserção forçada de dado corrompido
+      await db.customInsert(
+        "INSERT INTO ticuna_words (id, word, translation, phonetics, example_sentence, created_at, updated_at) "
+        "VALUES ('legacy_corrupt_1', 'Duũ', 'Gente / Pessoa', 'du-u', 'Duũ meã', '2026-01-01', '2026-01-01')",
+      );
+      await db.customInsert(
+        "INSERT INTO ticuna_words (id, word, translation, phonetics, example_sentence, created_at, updated_at) "
+        "VALUES ('legacy_corrupt_2', 'Duũũ', 'Gente', 'du-u', 'Duũũ meã', '2026-01-01', '2026-01-01')",
+      );
+
+      final freshRepo = TicunaRepository(db);
+      final words = await freshRepo.getAllWords();
+
+      final w1 = words.firstWhere((w) => w.id == 'legacy_corrupt_1');
+      expect(w1.word, equals('Duü\u0303'));
+      expect(w1.phonetics, equals('du-ü\u0303 [nasal]'));
+      expect(w1.exampleSentence, equals('Duü\u0303 meã'));
+
+      final w2 = words.firstWhere((w) => w.id == 'legacy_corrupt_2');
+      expect(w2.word, equals('Duü\u0303'));
     });
   });
 

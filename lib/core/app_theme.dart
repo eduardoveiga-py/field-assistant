@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../ticuna/ticuna_unicode_helper.dart';
 
@@ -37,6 +38,9 @@ class AppTheme {
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
+      fontFamily: GoogleFonts.config.allowRuntimeFetching
+          ? GoogleFonts.notoSans().fontFamily
+          : 'Noto Sans',
       fontFamilyFallback: TicunaUnicodeHelper.fontFallback,
       colorScheme: ColorScheme.fromSeed(
         seedColor: primaryBlue,
@@ -115,6 +119,9 @@ class AppTheme {
   static ThemeData get darkTheme {
     return ThemeData(
       useMaterial3: true,
+      fontFamily: GoogleFonts.config.allowRuntimeFetching
+          ? GoogleFonts.notoSans().fontFamily
+          : 'Noto Sans',
       fontFamilyFallback: TicunaUnicodeHelper.fontFallback,
       colorScheme: ColorScheme.fromSeed(
         seedColor: primaryBlue,

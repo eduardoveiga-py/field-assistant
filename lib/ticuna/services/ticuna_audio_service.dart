@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -189,30 +190,55 @@ class TicunaAudioService implements ITicunaAudioService {
     bool hasPerm = false;
     try {
       hasPerm = await _recorder.hasPermission().timeout(
-        const Duration(seconds: 4),
+        Duration(seconds: kIsWeb ? 15 : 4),
         onTimeout: () => false,
       );
     } catch (_) {
       hasPerm = false;
     }
 
-    if (!hasPerm && !Platform.environment.containsKey('FLUTTER_TEST')) {
+    bool isTestEnv = false;
+    if (!kIsWeb) {
+      try {
+        isTestEnv = Platform.environment.containsKey('FLUTTER_TEST');
+      } catch (_) {}
+    }
+
+    if (!hasPerm && !isTestEnv && !kIsWeb) {
       throw Exception(
         'Permissão de microfone não concedida pelo sistema. Verifique os Ajustes do dispositivo.',
       );
     }
 
-    final docsDir = await _getAudioDirectory();
-    final fileName = '${prefix}_${id}_audio.m4a';
-    final targetPath = '${docsDir.path}/$fileName';
+    String targetPath;
+    if (kIsWeb) {
+      targetPath = '${prefix}_${id}_audio.webm';
+    } else {
+      final docsDir = await _getAudioDirectory();
+      final fileName = '${prefix}_${id}_audio.m4a';
+      targetPath = docsDir != null ? '${docsDir.path}/$fileName' : fileName;
+    }
     _currentRecordingPath = targetPath;
 
     _recordDurationSeconds = 0;
     _recordingStartedAt = DateTime.now();
 
+    RecordConfig config;
+    if (kIsWeb) {
+      if (await _recorder.isEncoderSupported(AudioEncoder.opus)) {
+        config = const RecordConfig(encoder: AudioEncoder.opus);
+      } else if (await _recorder.isEncoderSupported(AudioEncoder.aacLc)) {
+        config = const RecordConfig(encoder: AudioEncoder.aacLc);
+      } else {
+        config = const RecordConfig(encoder: AudioEncoder.wav);
+      }
+    } else {
+      config = const RecordConfig(encoder: AudioEncoder.aacLc);
+    }
+
     try {
       await _recorder.start(
-        const RecordConfig(encoder: AudioEncoder.aacLc),
+        config,
         path: targetPath,
       );
     } catch (e) {
@@ -223,14 +249,14 @@ class TicunaAudioService implements ITicunaAudioService {
       _recorderInstance = AudioRecorder();
       try {
         await _recorder.start(
-          const RecordConfig(encoder: AudioEncoder.aacLc),
+          config,
           path: targetPath,
         );
       } catch (e2) {
-        if (!Platform.environment.containsKey('FLUTTER_TEST')) {
+        if (!isTestEnv && !kIsWeb) {
           rethrow;
         }
-        debugPrint('[TicunaAudio] Fallback em ambiente headless/teste: $e2');
+        debugPrint('[TicunaAudio] Fallback em ambiente headless/web/teste: $e2');
       }
     }
 
@@ -276,7 +302,10 @@ class TicunaAudioService implements ITicunaAudioService {
     final recordedAt = _recordingStartedAt ?? DateTime.now();
 
     int sizeBytes = 0;
-    if (!kIsWeb && path.isNotEmpty) {
+    if (!kIsWeb &&
+        path.isNotEmpty &&
+        !path.startsWith('blob:') &&
+        !path.startsWith('http')) {
       try {
         final file = File(path);
         if (await file.exists()) {
@@ -320,7 +349,10 @@ class TicunaAudioService implements ITicunaAudioService {
       _recorderInstance = null;
     }
 
-    if (_currentRecordingPath != null && !kIsWeb) {
+    if (_currentRecordingPath != null &&
+        !kIsWeb &&
+        !_currentRecordingPath!.startsWith('blob:') &&
+        !_currentRecordingPath!.startsWith('http')) {
       try {
         final file = File(_currentRecordingPath!);
         if (await file.exists()) {
@@ -346,7 +378,10 @@ class TicunaAudioService implements ITicunaAudioService {
 
     try {
       Source source;
-      if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
+      if (kIsWeb ||
+          pathOrUrl.startsWith('http://') ||
+          pathOrUrl.startsWith('https://') ||
+          pathOrUrl.startsWith('blob:')) {
         source = UrlSource(pathOrUrl);
       } else if (pathOrUrl.startsWith('asset://') ||
           pathOrUrl.startsWith('assets/')) {
@@ -413,7 +448,9 @@ class TicunaAudioService implements ITicunaAudioService {
       await stop();
     }
 
-    if (!kIsWeb) {
+    if (!kIsWeb &&
+        !filePath.startsWith('blob:') &&
+        !filePath.startsWith('http')) {
       try {
         final file = File(filePath);
         if (await file.exists()) {
@@ -437,11 +474,26 @@ class TicunaAudioService implements ITicunaAudioService {
   }) async {
     try {
       final client = Supabase.instance.client;
-      final file = File(localFilePath);
-      if (!await file.exists()) return null;
+      Uint8List bytes;
 
-      final bytes = await file.readAsBytes();
-      final storageFileName = '${id}_pronunciation.m4a';
+      if (kIsWeb ||
+          localFilePath.startsWith('blob:') ||
+          localFilePath.startsWith('http')) {
+        if (localFilePath.startsWith('blob:') ||
+            localFilePath.startsWith('http')) {
+          final res = await http.get(Uri.parse(localFilePath));
+          bytes = res.bodyBytes;
+        } else {
+          return null;
+        }
+      } else {
+        final file = File(localFilePath);
+        if (!await file.exists()) return null;
+        bytes = await file.readAsBytes();
+      }
+
+      final ext = kIsWeb ? 'webm' : 'm4a';
+      final storageFileName = '${id}_pronunciation.$ext';
 
       try {
         await client.storage.from(bucket).uploadBinary(
@@ -458,7 +510,8 @@ class TicunaAudioService implements ITicunaAudioService {
       }
 
       try {
-        final publicUrl = client.storage.from(bucket).getPublicUrl(storageFileName);
+        final publicUrl =
+            client.storage.from(bucket).getPublicUrl(storageFileName);
         return publicUrl;
       } catch (_) {
         return storageFileName;
@@ -477,6 +530,12 @@ class TicunaAudioService implements ITicunaAudioService {
       final client = Supabase.instance.client;
       final storageFileName = '${id}_pronunciation.m4a';
 
+      if (kIsWeb) {
+        final publicUrl =
+            client.storage.from(bucket).getPublicUrl(storageFileName);
+        return publicUrl;
+      }
+
       Uint8List? bytes;
       try {
         bytes = await client.storage.from(bucket).download(storageFileName);
@@ -490,9 +549,11 @@ class TicunaAudioService implements ITicunaAudioService {
 
       if (bytes != null && bytes.isNotEmpty) {
         final docsDir = await _getAudioDirectory();
-        final localFile = File('${docsDir.path}/$storageFileName');
-        await localFile.writeAsBytes(bytes, flush: true);
-        return localFile.path;
+        if (docsDir != null) {
+          final localFile = File('${docsDir.path}/$storageFileName');
+          await localFile.writeAsBytes(bytes, flush: true);
+          return localFile.path;
+        }
       }
     } catch (_) {}
     return null;
@@ -502,7 +563,8 @@ class TicunaAudioService implements ITicunaAudioService {
   // AUXILIARES
   // ==========================================
 
-  Future<Directory> _getAudioDirectory() async {
+  Future<Directory?> _getAudioDirectory() async {
+    if (kIsWeb) return null;
     try {
       final appDir = await getApplicationDocumentsDirectory();
       final audioDir = Directory('${appDir.path}/ticuna_audio');
@@ -511,12 +573,16 @@ class TicunaAudioService implements ITicunaAudioService {
       }
       return audioDir;
     } catch (_) {
-      final sysTemp = Directory.systemTemp;
-      final audioDir = Directory('${sysTemp.path}/ticuna_audio');
-      if (!await audioDir.exists()) {
-        await audioDir.create(recursive: true);
+      try {
+        final sysTemp = Directory.systemTemp;
+        final audioDir = Directory('${sysTemp.path}/ticuna_audio');
+        if (!await audioDir.exists()) {
+          await audioDir.create(recursive: true);
+        }
+        return audioDir;
+      } catch (_) {
+        return null;
       }
-      return audioDir;
     }
   }
 
@@ -591,8 +657,9 @@ class FakeTicunaAudioService implements ITicunaAudioService {
     String prefix = 'ticuna',
   }) async {
     _isRecording = true;
+    final basePath = kIsWeb ? 'virtual_audio' : Directory.systemTemp.path;
     _currentRecordingPath =
-        '${Directory.systemTemp.path}/${prefix}_${id}_audio.m4a';
+        '$basePath/${prefix}_${id}_audio.m4a';
     _durationSeconds = 0;
     _recordDurationController.add(0);
     return _currentRecordingPath!;
@@ -604,10 +671,15 @@ class FakeTicunaAudioService implements ITicunaAudioService {
     _isRecording = false;
     _durationSeconds = _durationSeconds > 0 ? _durationSeconds : 3;
 
-    final path = _currentRecordingPath ?? '${Directory.systemTemp.path}/test_audio.m4a';
-    final file = File(path);
-    if (!await file.exists()) {
-      await file.writeAsBytes(List<int>.filled(64, 0));
+    final basePath = kIsWeb ? 'virtual_audio' : Directory.systemTemp.path;
+    final path = _currentRecordingPath ?? '$basePath/test_audio.m4a';
+    if (!kIsWeb) {
+      try {
+        final file = File(path);
+        if (!await file.exists()) {
+          await file.writeAsBytes(List<int>.filled(64, 0));
+        }
+      } catch (_) {}
     }
 
     return TicunaRecordingResult(
@@ -621,11 +693,13 @@ class FakeTicunaAudioService implements ITicunaAudioService {
   @override
   Future<void> cancelRecording() async {
     _isRecording = false;
-    if (_currentRecordingPath != null) {
-      final file = File(_currentRecordingPath!);
-      if (await file.exists()) {
-        await file.delete();
-      }
+    if (_currentRecordingPath != null && !kIsWeb) {
+      try {
+        final file = File(_currentRecordingPath!);
+        if (await file.exists()) {
+          await file.delete();
+        }
+      } catch (_) {}
     }
     _currentRecordingPath = null;
   }
@@ -658,11 +732,13 @@ class FakeTicunaAudioService implements ITicunaAudioService {
 
   @override
   Future<bool> deleteAudioFile(String? filePath) async {
-    if (filePath != null && filePath.isNotEmpty) {
-      final file = File(filePath);
-      if (await file.exists()) {
-        await file.delete();
-      }
+    if (filePath != null && filePath.isNotEmpty && !kIsWeb) {
+      try {
+        final file = File(filePath);
+        if (await file.exists()) {
+          await file.delete();
+        }
+      } catch (_) {}
     }
     return true;
   }
@@ -681,7 +757,8 @@ class FakeTicunaAudioService implements ITicunaAudioService {
     required String id,
     String bucket = 'ticuna_audio',
   }) async {
-    return '${Directory.systemTemp.path}/${id}_pronunciation.m4a';
+    final basePath = kIsWeb ? 'virtual_audio' : Directory.systemTemp.path;
+    return '$basePath/${id}_pronunciation.m4a';
   }
 
   @override

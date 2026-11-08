@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:drift/drift.dart' show driftRuntimeOptions;
 import 'package:drift/native.dart';
 import 'package:ministerio_pessoal/core/app_theme.dart';
@@ -48,6 +49,7 @@ Widget buildTestApp({
 void main() {
   setUpAll(() {
     driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
+    GoogleFonts.config.allowRuntimeFetching = false;
   });
 
   group('TicunaDiacriticsBar - Teclado Virtual de Caracteres Especiais', () {
