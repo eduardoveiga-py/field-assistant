@@ -39,3 +39,15 @@ Este arquivo contém restrições estritas e instruções persistentes para todo
 ## 6. Segurança e Credenciais
 - NUNCA comite segredos, chaves de serviço Supabase (`service_role key`) ou senhas de usuários no repositório.
 - Apenas chaves públicas de cliente (`anon key`) são permitidas em arquivos de exemplo de configuração.
+
+
+## 7. Compatibilidade Multiplataforma e Web-Safe (kIsWeb)
+- NUNCA acesse `Platform.environment`, `Platform.isIOS`, `Platform.isAndroid` ou qualquer API de `dart:io` sem antes proteger o fluxo com `if (!kIsWeb)`.
+- No Flutter Web (Wasm/CanvasKit), o acesso a `Platform` lança imediatamente `Unsupported operation: _Namespace`, quebrando fluxos de gravação de áudio, câmera e banco.
+- Em reprodutores de áudio (`AudioPlayer`) e gravadores (`AudioRecorder`), trate áudios na Web exclusivamente através de `UrlSource(blobUrl)` ou buffers em memória, reservando `DeviceFileSource` e caminhos de arquivo locais apenas para mobile nativo e desktop.
+
+## 8. Tipografia e Diacríticos Complexos / Indígenas (Língua Ticuna)
+- O suporte à língua Ticuna exige a correta exibição e persistência das 12 vogais canônicas com diacríticos empilhados (ex: `ĩ`, `ü̃`, `ü̃́`, `ũ`, `ã́`, `ẽ`, `Ĩ`, `Ü̃`, `Ü̃́`, `Ũ`, `Ã́`, `Ẽ`).
+- NUNCA dependa exclusivamente das fontes padrão do sistema operacional para renderizar caracteres com múltiplos diacríticos combinantes.
+- É obrigatório manter `fontFamilyFallback: TicunaUnicodeHelper.fontFallback` (com `Noto Sans` e `Charis SIL`) configurado no `AppTheme` e injetado no `web/index.html`.
+- Ao salvar e recuperar termos e frases Ticuna no Drift/SQLite, garanta a normalização Unicode canônica (NFC/NFD) para evitar duplicatas e inconsistências de busca.
