@@ -168,3 +168,7 @@ jobs:
             ios-dist/app-release-unsigned.ipa
             release-dist/web-release.zip
           generate_release_notes: true
+
+      - name: Invalidate jsDelivr CDN Cache for apps.json
+        run: |
+          curl -fsSL -X GET "https://purge.jsdelivr.net/gh/${{ github.repository }}@master/apps.json" || true

@@ -24,7 +24,7 @@
       "iconURL": "https://cdn.jsdelivr.net/gh/eduardoveiga-py/field-assistant@master/web/icons/Icon-512.png",
       "tintColor": "#1E3A8A",
       "category": "utilities",
-      "size": 12571776,
+      "size": 13428010,
       "minOSVersion": "14.0",
       "versions": [
         {
@@ -32,7 +32,7 @@
           "date": "2026-11-08",
           "localizedDescription": "Lançamento oficial 1.1.0: nova aba Língua Ticuna com dicionário e frases úteis, repetição espaçada estilo Anki, suporte tipográfico completo com Noto Sans e Charis SIL para as 12 vogais canônicas com acentuação GPOS combinada, teclado virtual com diacríticos, gravação e reprodução de áudio segura para Web/iPad (kIsWeb e UrlSource), atalhos de cadastro direto e revisitas filtradas na página inicial.",
           "downloadURL": "https://github.com/eduardoveiga-py/field-assistant/releases/latest/download/app-release-unsigned.ipa",
-          "size": 12571776,
+          "size": 13428010,
           "minOSVersion": "14.0"
         },
         {
