@@ -397,7 +397,11 @@ class RealAudioPlayerService implements AudioPlayerService {
   Future<void> play(String filePath) async {
     try {
       Source source;
-      if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+      if (kIsWeb ||
+          filePath.startsWith('http://') ||
+          filePath.startsWith('https://') ||
+          filePath.startsWith('blob:') ||
+          filePath.startsWith('data:')) {
         source = UrlSource(filePath);
       } else if (filePath.startsWith('asset://') ||
           filePath.startsWith('assets/')) {
