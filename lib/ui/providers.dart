@@ -9,6 +9,7 @@ import '../projects/project_manager.dart';
 import '../knowledge/knowledge_manager.dart';
 import '../core/biometric_auth_service.dart';
 import '../inbox/jw_email_service.dart';
+import '../appointments/availability_engine.dart';
 
 // Provider do Banco Drift
 final databaseProvider = Provider<AppDatabase>((ref) {
@@ -130,6 +131,13 @@ final appointmentsStreamProvider = StreamProvider<List<AppointmentEntry>>((
 ) {
   final repo = ref.watch(repositoryProvider);
   return repo.watchAppointments();
+});
+
+/// Provedor reativo de conflitos de horário pós-sincronização
+final activeAppointmentConflictsProvider =
+    Provider<List<AppointmentConflictPair>>((ref) {
+  final appointments = ref.watch(appointmentsStreamProvider).value ?? [];
+  return AvailabilityEngine.findActiveConflicts(appointments);
 });
 
 final activitiesStreamProvider = StreamProvider<List<ActivityRecordEntry>>((

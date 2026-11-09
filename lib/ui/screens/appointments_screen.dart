@@ -23,6 +23,7 @@ import '../providers.dart';
 import 'person_detail_screen.dart';
 import 'project_detail_screen.dart';
 import 'tasks_screen.dart';
+import '../widgets/schedule_conflict_resolution_banner.dart';
 import '../../appointments/plan_b_recommender.dart';
 import '../widgets/screen_hero_accent_band.dart';
 import '../widgets/plan_b_dialog.dart';
@@ -4538,6 +4539,10 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
       ),
       body: Column(
         children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: ScheduleConflictResolutionBanner(),
+          ),
           // Barra de controles de visualização (Mês, Semana, Dia, Lista)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

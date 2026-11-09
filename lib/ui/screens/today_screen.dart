@@ -23,6 +23,7 @@ import 'settings_screen.dart';
 import 'global_search_screen.dart';
 import 'next_actions_screen.dart';
 import 'inbox_screen.dart';
+import '../widgets/schedule_conflict_resolution_banner.dart';
 import 'tasks_screen.dart';
 import 'knowledge_base_screen.dart';
 import '../widgets/quick_capture_sheet.dart';
@@ -852,6 +853,7 @@ class TodayScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const ScheduleConflictResolutionBanner(),
             // Saudação Contextual Dinâmica e Elegante
             Builder(
               builder: (ctx) {

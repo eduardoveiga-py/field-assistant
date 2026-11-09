@@ -416,5 +416,65 @@ void main() {
       );
       expect(resFree.isAvailable, isTrue);
     });
+
+    test('findActiveConflicts identifica sobreposição entre dois agendamentos ativos no mesmo dia', () {
+      final now = DateTime(2026, 11, 14, 10, 0);
+      final appts = [
+        AppointmentEntry(
+          id: 'appt_1',
+          personId: 'p1',
+          title: 'Estudo com João',
+          date: DateTime(2026, 11, 14),
+          startTime: DateTime(2026, 11, 14, 10, 0),
+          endTime: DateTime(2026, 11, 14, 11, 0),
+          status: 'scheduled',
+          appointmentType: 'Estudo Bíblico',
+          createdAt: now,
+          updatedAt: now,
+          revision: 1,
+        ),
+        AppointmentEntry(
+          id: 'appt_2',
+          personId: 'p2',
+          title: 'Revisita com Carlos',
+          date: DateTime(2026, 11, 14),
+          startTime: DateTime(2026, 11, 14, 10, 30),
+          endTime: DateTime(2026, 11, 14, 11, 15),
+          status: 'scheduled',
+          appointmentType: 'Revisita',
+          createdAt: now,
+          updatedAt: now,
+          revision: 1,
+        ),
+        AppointmentEntry(
+          id: 'appt_3',
+          personId: 'p3',
+          title: 'Visita Cancelada',
+          date: DateTime(2026, 11, 14),
+          startTime: DateTime(2026, 11, 14, 10, 0),
+          endTime: DateTime(2026, 11, 14, 11, 0),
+          status: 'cancelado',
+          appointmentType: 'Revisita',
+          createdAt: now,
+          updatedAt: now,
+          revision: 1,
+        ),
+      ];
+
+      final conflicts = AvailabilityEngine.findActiveConflicts(appts);
+      expect(conflicts.length, equals(1));
+      expect(conflicts.first.appointmentA.id, equals('appt_1'));
+      expect(conflicts.first.appointmentB.id, equals('appt_2'));
+
+      // Verifica sugestão de horário vago alternativo via Plano B
+      final avail = AvailabilityEngine.checkAvailability(
+        startTime: appts[1].startTime,
+        durationMinutes: 45,
+        existingAppointments: [appts[0]],
+      );
+      expect(avail.isAvailable, isFalse);
+      expect(avail.suggestedAlternativeSlots, isNotEmpty);
+      expect(avail.suggestedAlternativeSlots.first.hour, greaterThanOrEqualTo(11));
+    });
   });
 }

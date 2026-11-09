@@ -16,6 +16,23 @@ class AvailabilityResult {
   });
 }
 
+/// Representa um par de compromissos com sobreposição de horários detectada pós-sincronização
+class AppointmentConflictPair {
+  final AppointmentEntry appointmentA;
+  final AppointmentEntry appointmentB;
+  final DateTime collisionDate;
+
+  const AppointmentConflictPair({
+    required this.appointmentA,
+    required this.appointmentB,
+    required this.collisionDate,
+  });
+
+  String get conflictKey => appointmentA.id.compareTo(appointmentB.id) < 0
+      ? '${appointmentA.id}_${appointmentB.id}'
+      : '${appointmentB.id}_${appointmentA.id}';
+}
+
 class AvailabilityEngine {
   static const int defaultDayStartHour = 8;
   static const int defaultDayEndHour = 20;
@@ -278,5 +295,59 @@ class AvailabilityEngine {
       return DateTime(next.year, next.month, next.day, startHour, 0);
     }
     return dt;
+  }
+
+  /// Detecta pares de compromissos ativos que colidem entre si no mesmo dia
+  static List<AppointmentConflictPair> findActiveConflicts(
+    List<AppointmentEntry> appointments, {
+    int bufferMinutes = 0,
+  }) {
+    final active = appointments.where((a) {
+      if (a.deletedAt != null) return false;
+      final st = a.status.toLowerCase();
+      return st != 'cancelado' &&
+          st != 'nao_realizado' &&
+          st != 'reagendado' &&
+          st != 'realizado' &&
+          st != 'concluido' &&
+          st != 'concluído';
+    }).toList();
+
+    final pairs = <AppointmentConflictPair>[];
+    final seen = <String>{};
+
+    for (int i = 0; i < active.length; i++) {
+      for (int j = i + 1; j < active.length; j++) {
+        final a = active[i];
+        final b = active[j];
+
+        // Se são em dias diferentes, não colidem
+        if (a.date.year != b.date.year ||
+            a.date.month != b.date.month ||
+            a.date.day != b.date.day) {
+          continue;
+        }
+
+        final effectiveStartA =
+            a.startTime.subtract(Duration(minutes: bufferMinutes));
+        final effectiveEndA = a.endTime.add(Duration(minutes: bufferMinutes));
+
+        final hasOverlap = effectiveStartA.isBefore(b.endTime) &&
+            effectiveEndA.isAfter(b.startTime);
+        if (hasOverlap) {
+          final pair = AppointmentConflictPair(
+            appointmentA: a,
+            appointmentB: b,
+            collisionDate: a.date,
+          );
+          if (!seen.contains(pair.conflictKey)) {
+            seen.add(pair.conflictKey);
+            pairs.add(pair);
+          }
+        }
+      }
+    }
+
+    return pairs;
   }
 }
