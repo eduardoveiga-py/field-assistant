@@ -10,6 +10,7 @@ import 'package:encrypt/encrypt.dart' as enc;
 import 'package:drift/drift.dart' show Value;
 import 'package:uuid/uuid.dart';
 
+import '../core/sync_timestamp.dart';
 import '../database/app_database.dart';
 import '../database/repository.dart';
 
@@ -686,6 +687,40 @@ class BackupService {
     );
   }
 
+  static const Set<String> _dateFieldNames = {
+    'createdAt', 'created_at',
+    'updatedAt', 'updated_at',
+    'deletedAt', 'deleted_at',
+    'date', 'dateTimeField', 'date_time_field',
+    'firstContactAt', 'first_contact_at',
+    'lastContactAt', 'last_contact_at',
+    'nextActionAt', 'next_action_at',
+    'suggestedReturnDate', 'suggested_return_date',
+    'startedAt', 'started_at',
+    'lastSessionAt', 'last_session_at',
+    'nextPlannedAt', 'next_planned_at',
+    'startTime', 'start_time',
+    'endTime', 'end_time',
+    'lastModifiedExternal', 'last_modified_external',
+    'lastSyncedAt', 'last_synced_at',
+    'lastReviewedAt', 'last_reviewed_at',
+  };
+
+  Map<String, dynamic> _normalizePayloadDates(Map<String, dynamic> payload) {
+    final result = Map<String, dynamic>.from(payload);
+    for (final entry in result.entries) {
+      final key = entry.key;
+      final val = entry.value;
+      if (_dateFieldNames.contains(key) && val != null) {
+        final iso = SyncTimestamp.toIso8601String(val);
+        if (iso != null) {
+          result[key] = iso;
+        }
+      }
+    }
+    return result;
+  }
+
   bool _shouldReconstituteSyncQueue = false;
 
   Future<void> _reconstituteSyncQueue(
@@ -696,6 +731,7 @@ class BackupService {
   ) async {
     if (!_shouldReconstituteSyncQueue) return;
     try {
+      final normalized = _normalizePayloadDates(payload);
       await repository.db
           .into(repository.db.syncQueue)
           .insert(
@@ -704,7 +740,7 @@ class BackupService {
               entityType: entityType,
               entityId: entityId,
               operation: operation,
-              payload: jsonEncode(payload),
+              payload: jsonEncode(normalized),
               createdAt: DateTime.now(),
               status: const Value('pending'),
             ),
@@ -1360,7 +1396,17 @@ class BackupService {
         // 22. Fila de Sincronização (SyncQueue)
         final syncQueueRows = (data['syncQueue'] as List<dynamic>?) ?? [];
         for (final item in syncQueueRows) {
-          final entry = SyncQueueEntry.fromJson(item as Map<String, dynamic>);
+          final rawMap = Map<String, dynamic>.from(item as Map<String, dynamic>);
+          if (rawMap.containsKey('payload') && rawMap['payload'] is String) {
+            try {
+              final decodedPayload = jsonDecode(rawMap['payload'] as String);
+              if (decodedPayload is Map<String, dynamic>) {
+                final normalized = _normalizePayloadDates(decodedPayload);
+                rawMap['payload'] = jsonEncode(normalized);
+              }
+            } catch (_) {}
+          }
+          final entry = SyncQueueEntry.fromJson(rawMap);
           final existing = await (db.select(
             db.syncQueue,
           )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();

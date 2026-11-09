@@ -5,16 +5,27 @@ import '../../core/app_theme.dart';
 import '../models/multilingual_models.dart';
 import '../services/multilingual_assistant_service.dart';
 
+import '../../ui/widgets/adaptive_ministry_sheet.dart';
+
 /// Modal e Painel Interativo de Frases Situacionais para o Ministério e Comparador Multilíngue
 class MinistrySituationalPhrasesSheet extends ConsumerStatefulWidget {
-  const MinistrySituationalPhrasesSheet({super.key});
+  final bool isEmbedded;
+  const MinistrySituationalPhrasesSheet({super.key, this.isEmbedded = false});
 
   static Future<void> show(BuildContext context) {
-    return showModalBottomSheet(
+    return showAdaptiveMinistrySheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const MinistrySituationalPhrasesSheet(),
+      title: 'Frases Situacionais do Ministério',
+      subtitle: '6 Momentos-Chave • Ticuna, Português & Español',
+      titleLeading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF059669).withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Text('🏹', style: TextStyle(fontSize: 22)),
+      ),
+      builder: (ctx, _) => const MinistrySituationalPhrasesSheet(isEmbedded: true),
     );
   }
 
@@ -64,83 +75,71 @@ class _MinistrySituationalPhrasesSheetState
             ? MinistryPhrasesCatalog.byMoment(_selectedMoment!)
             : MinistryPhrasesCatalog.phrases);
 
-    return DraggableScrollableSheet(
-      initialChildSize: 0.88,
-      minChildSize: 0.5,
-      maxChildSize: 0.95,
-      builder: (ctx, scrollController) => Container(
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E293B) : Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.25),
-              blurRadius: 16,
-              offset: const Offset(0, -4),
+    final content = Column(
+      children: [
+        if (!widget.isEmbedded) ...[
+          // Handle bar
+          const SizedBox(height: 12),
+          Center(
+            child: Container(
+              width: 48,
+              height: 5,
+              decoration: BoxDecoration(
+                color: isDark ? Colors.grey[700] : Colors.grey[300],
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
-          ],
-        ),
-        child: Column(
-          children: [
-            // Handle bar
-            const SizedBox(height: 12),
-            Center(
-              child: Container(
-                width: 48,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.grey[700] : Colors.grey[300],
-                  borderRadius: BorderRadius.circular(10),
+          ),
+          const SizedBox(height: 12),
+
+          // Header
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF059669).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text('🏹', style: TextStyle(fontSize: 22)),
                 ),
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // Header
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF059669).withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Text('🏹', style: TextStyle(fontSize: 22)),
-                  ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Frases Situacionais do Ministério',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Frases Situacionais do Ministério',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
                         ),
-                        Text(
-                          '6 Momentos-Chave • Ticuna, Português & Español',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppTheme.textMuted,
-                          ),
+                      ),
+                      Text(
+                        '6 Momentos-Chave • Ticuna, Português & Español',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.textMuted,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ],
-              ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
+          ),
+          const SizedBox(height: 12),
+        ] else ...[
+          const SizedBox(height: 12),
+        ],
 
-            // Search Bar & Language Selector
+        // Search Bar & Language Selector
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: TextField(
@@ -310,7 +309,6 @@ class _MinistrySituationalPhrasesSheetState
                       ),
                     )
                   : ListView.builder(
-                      controller: scrollController,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
                         vertical: 8,
@@ -323,7 +321,29 @@ class _MinistrySituationalPhrasesSheetState
                     ),
             ),
           ],
+        );
+
+    if (widget.isEmbedded) {
+      return content;
+    }
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.88,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      builder: (ctx, scrollController) => Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.25),
+              blurRadius: 16,
+              offset: const Offset(0, -4),
+            ),
+          ],
         ),
+        child: content,
       ),
     );
   }

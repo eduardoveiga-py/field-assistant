@@ -24,6 +24,7 @@ import '../../territory/territory_data_port_service.dart';
 import '../../reports/web_downloader.dart';
 import '../widgets/screen_hero_accent_band.dart';
 import 'person_detail_screen.dart';
+import 'download_maps_screen.dart';
 
 class ContactsMapScreen extends ConsumerStatefulWidget {
   final String? highlightPersonId;
@@ -55,6 +56,10 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
   double? _activeCenterLat;
   static const double _tileSize = 256.0;
   DateTime? _lastZoomChangeTime;
+  double _rotation = 0.0; // Rotação 2D (em radianos) estilo Organic Maps
+  bool _isFullscreen = false; // Modo Tela Cheia
+  ({double latitude, double longitude})? _userGpsLocation; // Localização GPS
+  bool _isLocatingUser = false;
 
   @override
   void initState() {
@@ -196,6 +201,59 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
       final dy = (viewportHeight / 2.0) - centerPy;
       _transformationController.value = Matrix4.translationValues(dx, dy, 0.0);
     }
+  }
+
+  Widget _buildMetricScaleBar(double effectiveScale, double latitude, int zoom) {
+    final latRad = latitude.clamp(-85.0, 85.0) * math.pi / 180.0;
+    final scale = effectiveScale > 0.01 ? effectiveScale : 1.0;
+    final metersPerPixel = (156543.03392 * math.cos(latRad) / math.pow(2, zoom)) / scale;
+
+    const thresholds = [10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000];
+    int selectedMeters = 200;
+    for (final t in thresholds) {
+      final px = t / metersPerPixel;
+      if (px >= 40 && px <= 130) {
+        selectedMeters = t;
+        break;
+      }
+    }
+    final barWidth = (selectedMeters / metersPerPixel).clamp(40.0, 140.0);
+    final label = selectedMeters >= 1000 ? '${selectedMeters ~/ 1000} km' : '$selectedMeters m';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.65),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 9,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Container(
+            width: barWidth,
+            height: 3,
+            decoration: const BoxDecoration(
+              border: Border(
+                left: BorderSide(color: Colors.white, width: 2),
+                right: BorderSide(color: Colors.white, width: 2),
+                bottom: BorderSide(color: Colors.white, width: 2),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _openSingleRoute(PersonEntry person) async {
@@ -749,151 +807,6 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
         ),
       ),
     );
-  }
-
-  Future<void> _downloadOfflineTiles(
-    BuildContext context,
-    List<PersonEntry> people,
-    List<TerritoryLandmark> landmarks,
-  ) async {
-    final validLats = <double>[];
-    final validLngs = <double>[];
-
-    for (final c in people) {
-      if (c.latitude != null &&
-          c.longitude != null &&
-          (c.latitude != 0.0 || c.longitude != 0.0) &&
-          c.latitude!.abs() <= 90 &&
-          c.longitude!.abs() <= 180) {
-        validLats.add(c.latitude!);
-        validLngs.add(c.longitude!);
-      }
-    }
-    for (final l in landmarks) {
-      if (l.latitude != null &&
-          l.longitude != null &&
-          (l.latitude != 0.0 || l.longitude != 0.0) &&
-          l.latitude!.abs() <= 90 &&
-          l.longitude!.abs() <= 180) {
-        validLats.add(l.latitude!);
-        validLngs.add(l.longitude!);
-      }
-    }
-
-    double cLat = -23.550520;
-    double cLng = -46.633308;
-    if (_activeCenterLat != null && _activeCenterLng != null) {
-      cLat = _activeCenterLat!;
-      cLng = _activeCenterLng!;
-    } else if (validLats.isNotEmpty) {
-      validLats.sort();
-      validLngs.sort();
-      cLat = validLats[validLats.length ~/ 2];
-      cLng = validLngs[validLngs.length ~/ 2];
-    }
-
-    final zoomLevels = [_zoom - 1, _zoom, _zoom + 1]
-        .where((z) => z >= 6 && z <= 19)
-        .toList();
-    const half = 3;
-    final totalExpected = zoomLevels.length * (half * 2 + 1) * (half * 2 + 1);
-    final progressNotifier = ValueNotifier<int>(0);
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogCtx) {
-        return PopScope(
-          canPop: false,
-          child: AlertDialog(
-            title: const Row(
-              children: [
-                Icon(Icons.download_for_offline, color: AppTheme.accentTeal),
-                SizedBox(width: 8),
-                Text('Baixando Mapa Offline', style: TextStyle(fontSize: 16)),
-              ],
-            ),
-            content: ValueListenableBuilder<int>(
-              valueListenable: progressNotifier,
-              builder: (ctx, progress, _) {
-                final pct = totalExpected > 0
-                    ? (progress / totalExpected).clamp(0.0, 1.0)
-                    : 0.0;
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Salvando blocos do território no dispositivo para uso sem internet no campo...',
-                    ),
-                    const SizedBox(height: 14),
-                    LinearProgressIndicator(
-                      value: pct,
-                      minHeight: 8,
-                      borderRadius: BorderRadius.circular(4),
-                      color: AppTheme.accentTeal,
-                      backgroundColor: Colors.grey.shade300,
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          '$progress de $totalExpected blocos',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          '${(pct * 100).toStringAsFixed(0)}%',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.accentTeal,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-        );
-      },
-    );
-
-    int totalSaved = 0;
-    int cumulativeDone = 0;
-    for (final z in zoomLevels) {
-      final cx = _lon2tileX(cLng, z);
-      final cy = _lat2tileY(cLat, z);
-      final saved = await TileCacheService.instance.preloadArea(
-        z: z,
-        minX: cx - half,
-        maxX: cx + half,
-        minY: cy - half,
-        maxY: cy + half,
-        onProgress: (completed, _) {
-          progressNotifier.value = cumulativeDone + completed;
-        },
-      );
-      totalSaved += saved;
-      cumulativeDone += (half * 2 + 1) * (half * 2 + 1);
-    }
-
-    if (context.mounted) {
-      Navigator.of(context, rootNavigator: true).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Sucesso! $totalSaved blocos salvos para uso offline no ministério.',
-          ),
-          backgroundColor: AppTheme.successGreen,
-        ),
-      );
-    }
   }
 
   void _showCoverageAnalysisModal(BuildContext context, List<PersonEntry> people) {
@@ -1510,44 +1423,51 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Mapa dos Contatos e Território'),
-        bottom: ScreenHeroAccentBand.territory(),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.map_outlined),
-            tooltip: 'Ver Mapa Interativo',
-            onPressed: () {
-              setState(() {
-                _viewMode = 'Mapa Interativo';
-              });
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.view_agenda_outlined),
-            tooltip: 'Ver em Lista / Bairros',
-            onPressed: () {
-              setState(() {
-                _viewMode = 'Lista / Bairros';
-              });
-            },
-          ),
-          PopupMenuButton<String>(
-            tooltip: 'Mais Opções do Mapa',
-            constraints: const BoxConstraints(minWidth: 260, maxWidth: 360),
-            onSelected: (val) {
-              final people = peopleAsync.value ?? [];
-              if (val == 'pdf') {
-                final sectors = ref.read(sectorsStreamProvider).value ?? [];
-                ReportExportService.exportContactsMapPdf(
-                  context: context,
-                  people: people,
-                  landmarks: landmarks,
-                  sectors: sectors,
-                );
-              } else if (val == 'offline') {
-                _downloadOfflineTiles(context, people, landmarks);
-              } else if (val == 'google_maps') {
+      appBar: _isFullscreen
+          ? null
+          : AppBar(
+              title: const Text('Mapa dos Contatos e Território'),
+              bottom: ScreenHeroAccentBand.territory(),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.download_for_offline),
+                  tooltip: 'Baixar Mapas Offline',
+                  onPressed: () => DownloadMapsScreen.show(context),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.map_outlined),
+                  tooltip: 'Ver Mapa Interativo',
+                  onPressed: () {
+                    setState(() {
+                      _viewMode = 'Mapa Interativo';
+                    });
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.view_agenda_outlined),
+                  tooltip: 'Ver em Lista / Bairros',
+                  onPressed: () {
+                    setState(() {
+                      _viewMode = 'Lista / Bairros';
+                    });
+                  },
+                ),
+                PopupMenuButton<String>(
+                  tooltip: 'Mais Opções do Mapa',
+                  constraints: const BoxConstraints(minWidth: 260, maxWidth: 360),
+                  onSelected: (val) {
+                    final people = peopleAsync.value ?? [];
+                    if (val == 'pdf') {
+                      final sectors = ref.read(sectorsStreamProvider).value ?? [];
+                      ReportExportService.exportContactsMapPdf(
+                        context: context,
+                        people: people,
+                        landmarks: landmarks,
+                        sectors: sectors,
+                      );
+                    } else if (val == 'offline') {
+                      DownloadMapsScreen.show(context);
+                    } else if (val == 'google_maps') {
                 _openStandardGoogleMaps(people, landmarks);
               } else if (val == 'landmark') {
                 _showAddLandmarkModal(context);
@@ -1917,16 +1837,20 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          '${filtered.length} contatos • ${landmarks.length} marcos de referência',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: isDark
-                                ? const Color(0xFFCBD5E1)
-                                : AppTheme.textMuted,
+                        Expanded(
+                          child: Text(
+                            '${filtered.length} contatos • ${landmarks.length} marcos de referência',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: isDark
+                                  ? const Color(0xFFCBD5E1)
+                                  : AppTheme.textMuted,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                        const SizedBox(width: 8),
                         Row(
                           children: [
                             OutlinedButton.icon(
@@ -2260,7 +2184,17 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                       );
                     }
                   },
-                  child: InteractiveViewer(
+                  onScaleUpdate: (details) {
+                    if (details.pointerCount >= 2 && details.rotation.abs() > 0.005) {
+                      setState(() {
+                        _rotation += details.rotation;
+                      });
+                    }
+                  },
+                  child: Transform.rotate(
+                    angle: _rotation,
+                    origin: Offset(constraints.maxWidth / 2, constraints.maxHeight / 2),
+                    child: InteractiveViewer(
                     transformationController: _transformationController,
                     constrained: false, // Permite que o mapa ocupe 100% da área sem distorção ou cortes pretos
                     boundaryMargin: const EdgeInsets.all(
@@ -2348,6 +2282,60 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                                 canvasHeight: canvasHeight,
                               ),
 
+                          // Ponto Azul Pulsante de Localização GPS Nativa (Regra 12)
+                          if (_userGpsLocation != null) ...[
+                            () {
+                              final userX = _lon2pixelX(_userGpsLocation!.longitude, _zoom) - originPx;
+                              final userY = _lat2pixelY(_userGpsLocation!.latitude, _zoom) - originPy;
+                              return Positioned(
+                                left: userX - 22,
+                                top: userY - 22,
+                                child: IgnorePointer(
+                                  child: Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      Container(
+                                        width: 44,
+                                        height: 44,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: Colors.blue.withValues(alpha: 0.22),
+                                          border: Border.all(
+                                            color: Colors.blueAccent.withValues(alpha: 0.5),
+                                            width: 1.5,
+                                          ),
+                                        ),
+                                      ),
+                                      Transform.rotate(
+                                        angle: -_rotation,
+                                        child: CustomPaint(
+                                          size: const Size(28, 28),
+                                          painter: _GpsHeadingConePainter(),
+                                        ),
+                                      ),
+                                      Container(
+                                        width: 14,
+                                        height: 14,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: const Color(0xFF2563EB),
+                                          border: Border.all(color: Colors.white, width: 2.5),
+                                          boxShadow: const [
+                                            BoxShadow(
+                                              color: Colors.black38,
+                                              blurRadius: 4,
+                                              offset: Offset(0, 1),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }(),
+                          ],
+
                           // Camada de Sobreposição Translúcida de Zonas Esquecidas (>90 dias sem visita)
                           for (final p in orderedContacts) ...[
                             () {
@@ -2415,6 +2403,7 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                 ),
               ),
             ),
+          ),
 
             if (_highlightPersonId != null && highlightPerson != null)
               Positioned(
@@ -2472,12 +2461,82 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                 ),
               ),
 
-            // Controles Flutuantes de Zoom (+ / -) e Centralizar Território
+            // Controles Flutuantes de Zoom (+ / -), Bússola, Tela Cheia e Localização
             Positioned(
               top: 12,
               right: 12,
               child: Column(
                 children: [
+                  // Bússola Interativa (Norte Magnético estilo Organic Maps)
+                  if (_rotation.abs() > 0.01) ...[
+                    FloatingActionButton.small(
+                      heroTag: 'map_compass',
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.red.shade700,
+                      tooltip: 'Norte Magnético (Toque para redefinir para 0°)',
+                      onPressed: () {
+                        setState(() {
+                          _rotation = 0.0;
+                        });
+                      },
+                      child: Transform.rotate(
+                        angle: -_rotation,
+                        child: const Icon(
+                          Icons.navigation_rounded,
+                          size: 20,
+                          color: Colors.red,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                  ],
+
+                  // Botão Tela Cheia (Fullscreen toggle para iPads/tablets)
+                  FloatingActionButton.small(
+                    heroTag: 'map_fullscreen',
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.black87,
+                    tooltip: _isFullscreen ? 'Sair da Tela Cheia' : 'Modo Tela Cheia',
+                    onPressed: () {
+                      setState(() {
+                        _isFullscreen = !_isFullscreen;
+                      });
+                    },
+                    child: Icon(_isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen),
+                  ),
+                  const SizedBox(height: 6),
+
+                  // Botão Minha Localização GPS
+                  FloatingActionButton.small(
+                    heroTag: 'map_gps_locate',
+                    backgroundColor: _isLocatingUser ? AppTheme.accentTeal : Colors.white,
+                    foregroundColor: _isLocatingUser ? Colors.white : Colors.blue.shade700,
+                    tooltip: 'Minha Localização GPS',
+                    onPressed: () async {
+                      setState(() => _isLocatingUser = true);
+                      final loc = await GeolocationHelper.getCurrentLocation();
+                      if (loc != null && mounted) {
+                        setState(() {
+                          _userGpsLocation = loc;
+                          _isLocatingUser = false;
+                        });
+                        final targetPx = _lon2pixelX(loc.longitude, _zoom) - originPx;
+                        final targetPy = _lat2pixelY(loc.latitude, _zoom) - originPy;
+                        _recenterMap(constraints.maxWidth, constraints.maxHeight, targetPx, targetPy);
+                      } else if (mounted) {
+                        setState(() => _isLocatingUser = false);
+                      }
+                    },
+                    child: _isLocatingUser
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.my_location, size: 18),
+                  ),
+                  const SizedBox(height: 6),
+
                   FloatingActionButton.small(
                     heroTag: 'map_zoom_in',
                     backgroundColor: Colors.white,
@@ -2544,58 +2603,69 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                       centerPx,
                       centerPy,
                     ),
-                    child: const Icon(Icons.my_location, size: 18),
+                    child: const Icon(Icons.filter_center_focus, size: 18),
                   ),
                 ],
               ),
             ),
 
-            // Selo de Atribuição OpenStreetMap
+            // Barra de Escala Métrica Dinâmica e Selo de Atribuição OSM
             Positioned(
               bottom: 8,
               left: 8,
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.85),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Text(
-                      '© OpenStreetMap contributors',
-                      style: TextStyle(fontSize: 10, color: Colors.black87),
-                    ),
+                  _buildMetricScaleBar(
+                    _transformationController.value.getMaxScaleOnAxis(),
+                    effectiveCenterLat,
+                    _zoom,
                   ),
-                  if (contacts.length > geoContacts.length) ...[
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.amber.shade100.withValues(alpha: 0.9),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(
-                          color: Colors.amber.shade600,
-                          width: 0.8,
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.85),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          '© OpenStreetMap contributors',
+                          style: TextStyle(fontSize: 10, color: Colors.black87),
                         ),
                       ),
-                      child: Text(
-                        '${contacts.length - geoContacts.length} contatos sem GPS',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.amber.shade900,
+                      if (contacts.length > geoContacts.length) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.shade100.withValues(alpha: 0.9),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                              color: Colors.amber.shade600,
+                              width: 0.8,
+                            ),
+                          ),
+                          child: Text(
+                            '${contacts.length - geoContacts.length} contatos sem GPS',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.amber.shade900,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  ],
+                      ],
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -3301,3 +3371,33 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
     }
   }
 }
+
+class _GpsHeadingConePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          Colors.blueAccent.withValues(alpha: 0.4),
+          Colors.blueAccent.withValues(alpha: 0.0),
+        ],
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+
+    final path = Path()
+      ..moveTo(size.width / 2, size.height / 2)
+      ..lineTo(0, 0)
+      ..arcToPoint(
+        Offset(size.width, 0),
+        radius: Radius.circular(size.width / 2),
+      )
+      ..close();
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+

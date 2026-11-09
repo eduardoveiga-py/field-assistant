@@ -1,3 +1,4 @@
+import 'dart:ui' show Locale;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../database/app_database.dart';
@@ -14,6 +15,17 @@ enum AppLocaleType {
   final String flagEmoji;
 
   const AppLocaleType(this.code, this.label, this.flagEmoji);
+
+  Locale get toLocale {
+    switch (this) {
+      case AppLocaleType.enUS:
+        return const Locale('en', 'US');
+      case AppLocaleType.esES:
+        return const Locale('es', 'ES');
+      case AppLocaleType.ptBR:
+        return const Locale('pt', 'BR');
+    }
+  }
 
   static AppLocaleType fromCode(String? code) {
     if (code == null) return AppLocaleType.ptBR;
@@ -53,7 +65,7 @@ abstract class AppLocaleStrings {
   String get navNotes => 'Anotações & Pesquisas';
   String get navLanguages => 'Idiomas & Tradução';
   String get navTerritoryMaps => 'Mapas & Territórios';
-  String get navSettings => 'Configurações';
+  String get navSettings => 'Ajustes';
 
   // Greeting Contextual
   String get greetingMorning => 'Bom dia, irmão! Que Jeová abençoe seu ministério nesta manhã.';

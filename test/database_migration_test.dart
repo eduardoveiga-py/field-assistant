@@ -72,7 +72,7 @@ void main() {
 
       // Dispara migração abrindo o banco e realizando query
       final ver = await appDb.customSelect('PRAGMA user_version;').getSingle();
-      expect(ver.read<int>('user_version'), equals(4));
+      expect(ver.read<int>('user_version'), equals(appDb.schemaVersion));
 
       // 3. Valida migração de dados de app_settings_kv para app_kv_store
       final kvManager = AppSettingsManager(appDb);
@@ -181,7 +181,7 @@ void main() {
 
       // Dispara a migração
       final ver = await appDb.customSelect('PRAGMA user_version;').getSingle();
-      expect(ver.read<int>('user_version'), equals(4));
+      expect(ver.read<int>('user_version'), equals(appDb.schemaVersion));
 
       // Verifica 100% de preservação dos dados legados de ministry_experiences
       final experiences = await appDb.select(appDb.ministryExperiences).get();
@@ -360,7 +360,7 @@ void main() {
       );
 
       final ver = await appDb.customSelect('PRAGMA user_version;').getSingle();
-      expect(ver.read<int>('user_version'), equals(4));
+      expect(ver.read<int>('user_version'), equals(appDb.schemaVersion));
 
       // 3. Validação individual exaustiva de cada uma das 8 tabelas:
       // Tabela 1: family_ties
@@ -431,7 +431,7 @@ void main() {
       final verReopened = await appDbReopened
           .customSelect('PRAGMA user_version;')
           .getSingle();
-      expect(verReopened.read<int>('user_version'), equals(4));
+      expect(verReopened.read<int>('user_version'), equals(appDbReopened.schemaVersion));
       expect(
         (await appDbReopened.select(appDbReopened.familyTies).get()).length,
         equals(1),
@@ -476,7 +476,7 @@ void main() {
       final appDb = AppDatabase.forTesting(NativeDatabase.opened(sqliteDb));
 
       final ver = await appDb.customSelect('PRAGMA user_version;').getSingle();
-      expect(ver.read<int>('user_version'), equals(4));
+      expect(ver.read<int>('user_version'), equals(appDb.schemaVersion));
 
       // Verifica que os dados foram preservados e a coluna pending_resolution existe e é acessível
       final link = await (appDb.select(
@@ -499,6 +499,48 @@ void main() {
         appDb.calendarEventLinks,
       )..where((t) => t.id.equals('link_v3'))).getSingle();
       expect(updated.pendingResolution, equals('keep_local'));
+
+      await appDb.close();
+    });
+
+    test('TC-MIG-05: Migração incremental v4 para v5 com AppLanguages e SyncQueue.lastAttemptAt', () async {
+      final sqliteDb = sql.sqlite3.openInMemory();
+
+      sqliteDb.execute('PRAGMA user_version = 4;');
+      sqliteDb.execute('''
+        CREATE TABLE sync_queue (
+          id TEXT NOT NULL PRIMARY KEY,
+          entity_type TEXT NOT NULL,
+          entity_id TEXT NOT NULL,
+          operation TEXT NOT NULL,
+          payload TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          status TEXT NOT NULL DEFAULT 'pending',
+          attempts INTEGER NOT NULL DEFAULT 0,
+          last_error TEXT
+        );
+      ''');
+      sqliteDb.execute('''
+        INSERT INTO sync_queue (id, entity_type, entity_id, operation, payload, created_at)
+        VALUES ('q_v4', 'people', 'p_1', 'INSERT', '{}', 1700000000000);
+      ''');
+
+      final appDb = AppDatabase.forTesting(NativeDatabase.opened(sqliteDb));
+
+      final ver = await appDb.customSelect('PRAGMA user_version;').getSingle();
+      expect(ver.read<int>('user_version'), equals(5));
+
+      // 1. Verifica coluna last_attempt_at em sync_queue
+      final qRow = await (appDb.select(appDb.syncQueue)..where((t) => t.id.equals('q_v4'))).getSingle();
+      expect(qRow.id, equals('q_v4'));
+      expect(qRow.lastAttemptAt, isNull);
+
+      // 2. Verifica se a tabela app_languages foi criada e Ticuna foi semeada como padrão
+      final languages = await appDb.select(appDb.appLanguages).get();
+      expect(languages.length, equals(1));
+      expect(languages.first.id, equals('tca'));
+      expect(languages.first.name, equals('Ticuna (Magüta)'));
+      expect(languages.first.isDefault, isTrue);
 
       await appDb.close();
     });

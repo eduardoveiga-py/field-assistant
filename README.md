@@ -3,7 +3,7 @@
 # 📖 Ministério Pessoal
 ### *Gestão Eficiente, Discreta e Offline-First do Ministério de Campo*
 
-[![Versão](https://img.shields.io/badge/Versão-1.2.0%20(Build%205)-blue?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/eduardoveiga-py/field-assistant/releases/latest)
+[![Versão](https://img.shields.io/badge/Versão-1.2.1%20(Build%206)-blue?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/eduardoveiga-py/field-assistant/releases/latest)
 [![Flutter](https://img.shields.io/badge/Flutter-3.27+-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-3.5+-0175C2?style=for-the-badge&logo=dart&logoColor=white)](https://dart.dev)
 [![Offline First](https://img.shields.io/badge/Arquitetura-Offline--First-success?style=for-the-badge&logo=sqlite&logoColor=white)](https://drift.simonbinder.eu/)
@@ -260,6 +260,34 @@ flowchart LR
 ---
 
 ## 📋 Histórico de Lançamentos e Changelog
+
+### 🚀 Versão 1.2.1 (Build 6) — 09/11/2026
+- **Componentes Adaptativos (Regra 10)**:
+  - Implementação do componente universal `showAdaptiveMinistrySheet`: em telas > 600pt (iPads, tablets e navegadores desktop), renderiza como `Dialog` flutuante centralizado (`maxWidth: 720`, `maxHeight: 0.85 * viewportHeight`), cantos 100% arredondados (`BorderRadius.circular(24)`), sombra e botão "✕" de fechar no topo, eliminando a janela vertical infinita. Em telas mobile (<= 600pt), utiliza folha inferior com limite estrito de 88% da altura.
+  - Ativação plena de internacionalização em `main.dart` observando `appLocaleTypeProvider` e plugging dinâmico de `appStringsProvider` no `MainNavigationShell`.
+- **Assistente de Idiomas Dinâmico no Drift (Regra 11 - Schema v5)**:
+  - Nova tabela `AppLanguages` integrada com persistência local SQLite, mantendo 100% dos dados legados e seeding do Ticuna (`tca`) como língua padrão.
+  - Seletor Pill interativo no AppBar da aba de Idiomas (`🏹 Ticuna (Magüta) ▾`).
+  - Modal `+ Novo Idioma` com atalhos de 1-toque para línguas pré-catalogadas (`🌿 Guajajara` e `🌳 Yanomami`) a partir do `LanguageRegistry`.
+  - Barra de diacríticos dinâmica (`TicunaDiacriticsBar`) que exibe em tempo real os caracteres especiais do idioma ativo e auto-oculta para idiomas sem diacríticos.
+  - Filtragem dinâmica de vocabulário, frases de campo e flashcards SM-2 pelo `language_id` ativo.
+- **Motor Cartográfico de Alto Desempenho estilo Organic Maps (Regra 12 & Imagem 2)**:
+  - Rotação 2D contínua em qualquer ângulo ($360^\circ$) por gesto de dois dedos na tela.
+  - Bússola interativa na tela com agulha apontada para o Norte Magnético e reset instantâneo para 0° ao tocar.
+  - Barra de escala métrica dinâmica (50m, 200m, 1 km, 5 km) recalculada em tempo real com base na latitude e zoom.
+  - Botão flutuante de Tela Cheia (Fullscreen toggle) para expansão imersiva e ocultação de barras de navegação no iPad.
+  - GPS nativo de alta precisão no iPadOS e Android: ponto azul pulsante com raio de precisão e cone de orientação (heading), com permissões em `AndroidManifest.xml` e `Info.plist`.
+  - Gerenciador "Baixar Mapas" completo idêntico à Imagem 2: campo de busca `Localizar mapa`, seção `Baixado (X MB)`, catálogo hierárquico por país/estado (ex.: Brasil > Amazonas — Santo Antônio do Içá & Alto Solimões), barra de progresso em MB e botão `Atualizar tudo`. Suporte consolidado a arquivos SQLite `.mbtiles` servidos localmente com tempo de resposta ultrarrápido (<0.2ms) e zero risco de banimento de IP no OSM.
+- **Auditoria Crítica de Sincronização e Resiliência (C1 a C5)**:
+  - C1: Backoff exponencial real na `sync_queue` com limite de até 5 tentativas (`last_attempt_at`), transicionando para dead-letter queue `'failed'` com opção de reprocessamento manual.
+  - C2: Ciclo de sincronização pull-before-push com pré-verificação de revisão remota antes de upsert, merge 3-way e substituição de exclusão cega por soft-delete (`deleted_at`).
+  - C3: Substituição do executor fantasma na Web por `_SafeWebUnavailableQueryExecutor`, interrompendo silenciosos descartes de escrita.
+  - C4: Utilitário universal `SyncTimestamp.parse(dynamic v)` tolerante a inteiros em milissegundos, segundos, instâncias `DateTime` e ISO-8601.
+  - C5: Normalização estrita de payloads para formato ISO-8601 na restauração de backups (`backup_service.dart`), eliminando erro 400 do PostgREST.
+- **Hardening de Segurança e Auditoria (A1 a A10, M1 a M13)**:
+  - Validação de integridade criptográfica SHA-256 no verificador de atualizações.
+  - Limpeza completa de PII em User-Agent e credenciais hardcoded.
+  - 100% de testes automatizados passando e 0 issues no `dart analyze`.
 
 ### 🚀 Versão 1.2.0 (Build 5) — 08/11/2026
 - **Centralização de Versão**:

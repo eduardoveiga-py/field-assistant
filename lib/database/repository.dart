@@ -1481,19 +1481,37 @@ class AppRepository {
     );
   }
 
-  Future<void> markSyncOperationFailed(String id, String error) async {
+  Future<void> markSyncOperationFailed(
+    String id,
+    String error, {
+    bool forceFailed = false,
+  }) async {
     final op = await (db.select(
       db.syncQueue,
     )..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
     if (op != null) {
+      final nextAttempts = op.attempts + 1;
       await (db.update(db.syncQueue)..where((tbl) => tbl.id.equals(id))).write(
         SyncQueueCompanion(
-          status: const Value('failed'),
-          attempts: Value(op.attempts + 1),
+          status: Value((forceFailed || nextAttempts >= 5) ? 'failed' : 'pending'),
+          attempts: Value(nextAttempts),
           lastError: Value(error),
+          lastAttemptAt: Value(DateTime.now()),
         ),
       );
     }
+  }
+
+  /// Reinicia todas as operações com falha definitiva ('failed' - dead letter) para nova tentativa
+  Future<int> retryAllFailedOperations() async {
+    return (db.update(db.syncQueue)..where((tbl) => tbl.status.equals('failed'))).write(
+      SyncQueueCompanion(
+        status: const Value('pending'),
+        attempts: const Value(0),
+        lastError: const Value(null),
+        lastAttemptAt: Value(DateTime.now()),
+      ),
+    );
   }
 
   /// Limpa todos os dados locais do aplicativo (util para zerar banco de teste).
@@ -1518,6 +1536,64 @@ class AppRepository {
       await db.delete(db.territorySectors).go();
       await db.delete(db.syncQueue).go();
       await db.delete(db.externalCalendarEvents).go();
+      await db.delete(db.appLanguages).go();
     });
+  }
+
+  // --------------------------------------------------------------------------
+  // MÓDULO: IDIOMAS (FASE 2 / REGRA 11)
+  // --------------------------------------------------------------------------
+  Future<List<AppLanguageEntry>> getAllLanguages() {
+    return (db.select(db.appLanguages)
+          ..orderBy([
+            (t) => OrderingTerm(expression: t.isDefault, mode: OrderingMode.desc),
+            (t) => OrderingTerm(expression: t.name, mode: OrderingMode.asc),
+          ]))
+        .get();
+  }
+
+  Stream<List<AppLanguageEntry>> watchAllLanguages() {
+    return (db.select(db.appLanguages)
+          ..orderBy([
+            (t) => OrderingTerm(expression: t.isDefault, mode: OrderingMode.desc),
+            (t) => OrderingTerm(expression: t.name, mode: OrderingMode.asc),
+          ]))
+        .watch();
+  }
+
+  Future<AppLanguageEntry?> getLanguageById(String id) {
+    return (db.select(db.appLanguages)..where((tbl) => tbl.id.equals(id)))
+        .getSingleOrNull();
+  }
+
+  Future<void> createLanguage({
+    required String id,
+    required String name,
+    required String code,
+    required String symbol,
+    String? diacritics,
+    bool isDefault = false,
+  }) {
+    final now = DateTime.now();
+    return db.into(db.appLanguages).insert(
+      AppLanguagesCompanion.insert(
+        id: id,
+        name: name,
+        code: code,
+        symbol: symbol,
+        diacritics: diacritics != null ? Value(diacritics) : const Value.absent(),
+        isDefault: Value(isDefault),
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+  }
+
+  Future<void> createLanguageCompanion(AppLanguagesCompanion companion) {
+    return db.into(db.appLanguages).insert(companion);
+  }
+
+  Future<void> deleteLanguage(String id) async {
+    await (db.delete(db.appLanguages)..where((tbl) => tbl.id.equals(id))).go();
   }
 }

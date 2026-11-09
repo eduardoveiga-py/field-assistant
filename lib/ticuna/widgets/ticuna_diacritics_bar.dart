@@ -19,12 +19,16 @@ class TicunaDiacriticsBar extends StatelessWidget {
   /// Se deve exibir borda e fundo estilizados de teclado virtual.
   final bool compact;
 
+  /// Lista dinâmica de diacríticos do idioma ativo. Se vazia, a barra é ocultada.
+  final List<String>? diacritics;
+
   const TicunaDiacriticsBar({
     super.key,
     this.controller,
     this.onCharacterInserted,
     this.label,
     this.compact = false,
+    this.diacritics,
   });
 
   /// Linha 1 de caracteres especiais canônicos do WOL (6 minúsculas):
@@ -67,6 +71,22 @@ class TicunaDiacriticsBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final effectiveDiacritics = diacritics;
+    if (effectiveDiacritics != null && effectiveDiacritics.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final List<String> displayRow1;
+    final List<String> displayRow2;
+    if (effectiveDiacritics != null) {
+      final mid = (effectiveDiacritics.length / 2).ceil();
+      displayRow1 = effectiveDiacritics.sublist(0, mid);
+      displayRow2 = effectiveDiacritics.sublist(mid);
+    } else {
+      displayRow1 = row1;
+      displayRow2 = row2;
+    }
+
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final keyBgColor = isDark
@@ -124,7 +144,7 @@ class TicunaDiacriticsBar extends StatelessWidget {
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
-              children: row1.map((char) {
+              children: displayRow1.map((char) {
                 return _buildKeyButton(
                   char: char,
                   bgColor: keyBgColor,
@@ -134,21 +154,23 @@ class TicunaDiacriticsBar extends StatelessWidget {
               }).toList(),
             ),
           ),
-          const SizedBox(height: 6),
-          // Linha 2 de teclas rápidas
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: row2.map((char) {
-                return _buildKeyButton(
-                  char: char,
-                  bgColor: keyBgColor,
-                  borderColor: keyBorderColor,
-                  textColor: textColor,
-                );
-              }).toList(),
+          if (displayRow2.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            // Linha 2 de teclas rápidas
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: displayRow2.map((char) {
+                  return _buildKeyButton(
+                    char: char,
+                    bgColor: keyBgColor,
+                    borderColor: keyBorderColor,
+                    textColor: textColor,
+                  );
+                }).toList(),
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );

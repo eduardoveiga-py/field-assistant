@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/app_theme.dart';
+import '../core/i18n/app_locale_strings.dart';
 import '../database/app_database.dart';
 import '../appointments/calendar_provider.dart';
 import '../appointments/calendar_sync_coordinator.dart';
@@ -356,9 +357,35 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
     );
   }
 
+  String _getFeatureLabel(AppFeature f, AppLocaleStrings strings) {
+    switch (f) {
+      case AppFeature.today:
+        return strings.navToday;
+      case AppFeature.people:
+        return strings.navPeople;
+      case AppFeature.phones:
+        return strings.navPhones;
+      case AppFeature.agenda:
+        return strings.navAgenda;
+      case AppFeature.studies:
+        return strings.navStudies.split(' ').first;
+      case AppFeature.dashboard:
+        return strings.navDashboard.split(' ').first;
+      case AppFeature.experiences:
+        return strings.navExperiences.split(' ').first;
+      case AppFeature.notesResearch:
+        return strings.navNotes.split(' ').first;
+      case AppFeature.ticuna:
+        return strings.navLanguages.split(' ').first;
+      case AppFeature.territoryMaps:
+        return strings.navTerritoryMaps.split(' ').first;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final activeFeatures = ref.watch(activeFeaturesProvider);
+    final strings = ref.watch(appStringsProvider);
 
     // Se a feature atual foi desativada e não estamos em ajustes, redireciona com segurança para Hoje
     if (!_showingSettings && !activeFeatures.contains(_currentFeature)) {
@@ -398,8 +425,8 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
             icon: Icon(f.icon),
             selectedIcon: Icon(f.icon),
             label: Text(
-              f.title.split(' ').first,
-            ), // Hoje, Pessoas, Telefones, Agenda, Estudos, Estatísticas, etc.
+              _getFeatureLabel(f, strings),
+            ),
           ),
         );
         railFeatures.add(f);
@@ -407,10 +434,10 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
 
       // Adiciona Ajustes no final do Rail
       railDestinations.add(
-        const NavigationRailDestination(
-          icon: Icon(Icons.settings_outlined),
-          selectedIcon: Icon(Icons.settings),
-          label: Text('Ajustes'),
+        NavigationRailDestination(
+          icon: const Icon(Icons.settings_outlined),
+          selectedIcon: const Icon(Icons.settings),
+          label: Text(strings.navSettings.split(' ').first),
         ),
       );
       railFeatures.add(null);
@@ -498,7 +525,7 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
         NavigationDestination(
           icon: Icon(f.icon, size: 22),
           selectedIcon: Icon(f.icon, size: 22),
-          label: f.title.split(' ').first,
+          label: _getFeatureLabel(f, strings),
         ),
       );
     }

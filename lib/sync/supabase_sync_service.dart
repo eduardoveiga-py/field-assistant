@@ -10,6 +10,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/sync_timestamp.dart';
 import '../database/app_database.dart';
 import '../database/repository.dart';
 import '../ui/providers.dart';
@@ -746,9 +747,7 @@ class SupabaseSyncService {
     String id,
     dynamic deletedAtVal,
   ) async {
-    final deletedAt = deletedAtVal is DateTime
-        ? deletedAtVal
-        : DateTime.tryParse(deletedAtVal?.toString() ?? '') ?? DateTime.now();
+    final deletedAt = SyncTimestamp.parse(deletedAtVal) ?? DateTime.now();
     switch (table) {
       case 'people':
         await (db.update(db.people)..where((t) => t.id.equals(id))).write(
@@ -1392,12 +1391,8 @@ class SupabaseSyncService {
           final localRev = localMap['revision'] as int? ?? 1;
           final remoteRev = normalized['revision'] as int? ?? 1;
 
-          DateTime? localUpdated = localUpdatedAtStr != null
-              ? DateTime.tryParse(localUpdatedAtStr)
-              : null;
-          DateTime? remoteUpdated = remoteUpdatedAtStr != null
-              ? DateTime.tryParse(remoteUpdatedAtStr)
-              : null;
+          DateTime? localUpdated = SyncTimestamp.parse(localUpdatedAtStr);
+          DateTime? remoteUpdated = SyncTimestamp.parse(remoteUpdatedAtStr);
 
           final isRemoteNewer = remoteUpdated != null && localUpdated != null
               ? (remoteUpdated.isAfter(localUpdated) ||
@@ -1431,18 +1426,19 @@ class SupabaseSyncService {
   }
 
   Future<SyncProcessResult> _runSync() async {
-    final pushResult = await processQueue();
-    if (!isConfigured) return pushResult;
+    // C2: Pull-before-push: busca alterações remotas antes de enviar mutações locais
     final pullResult = await fetchRemoteChanges();
-    final allErrors = [...pushResult.errors, ...pullResult.errors];
+    if (!isConfigured) return pullResult;
+    final pushResult = await processQueue();
+    final allErrors = [...pullResult.errors, ...pushResult.errors];
     return SyncProcessResult(
-      totalProcessed: pushResult.totalProcessed + pullResult.totalProcessed,
-      successCount: pushResult.successCount + pullResult.successCount,
-      failureCount: pushResult.failureCount + pullResult.failureCount,
-      conflictCount: pushResult.conflictCount + pullResult.conflictCount,
+      totalProcessed: pullResult.totalProcessed + pushResult.totalProcessed,
+      successCount: pullResult.successCount + pushResult.successCount,
+      failureCount: pullResult.failureCount + pushResult.failureCount,
+      conflictCount: pullResult.conflictCount + pushResult.conflictCount,
       errors: allErrors,
       message:
-          'Sincronização bidirecional: ${pushResult.successCount} enviados, ${pullResult.successCount} recebidos.',
+          'Sincronização bidirecional: ${pullResult.successCount} recebidos, ${pushResult.successCount} enviados.',
     );
   }
 
@@ -1484,9 +1480,7 @@ class SupabaseSyncService {
             await (db.select(db.appKvStore)
                   ..where((t) => t.key.equals('last_synced_at_$table')))
                 .getSingleOrNull();
-        final lastSyncedAt = kvRow != null
-            ? DateTime.tryParse(kvRow.value)
-            : null;
+        final lastSyncedAt = SyncTimestamp.parse(kvRow?.value);
 
         int offset = 0;
         const pageSize = 100;
@@ -1512,9 +1506,7 @@ class SupabaseSyncService {
             totalProcessed++;
             final map = rawItem as Map<String, dynamic>;
             final updatedAtRaw = map['updated_at'] ?? map['updatedAt'];
-            final dt = updatedAtRaw != null
-                ? DateTime.tryParse(updatedAtRaw.toString())
-                : null;
+            final dt = SyncTimestamp.parse(updatedAtRaw);
 
             final applied = await _applyRemoteRecord(
               table: table,
@@ -1639,7 +1631,8 @@ class SupabaseSyncService {
 
       final backoffSeconds = pow(2, op.attempts).clamp(1, 300).toInt();
       final now = DateTime.now();
-      if (now.difference(op.createdAt).inSeconds < backoffSeconds &&
+      final lastAttempt = (op as dynamic).lastAttemptAt as DateTime? ?? op.createdAt;
+      if (now.difference(lastAttempt).inSeconds < backoffSeconds &&
           op.attempts > 0) {
         continue;
       }
@@ -1652,6 +1645,60 @@ class SupabaseSyncService {
         final operation = op.operation.toUpperCase();
 
         if (operation == 'INSERT' || operation == 'UPDATE') {
+          // C2: Pré-verificação de revisão remota antes de qualquer upsert e merge 3-way
+          try {
+            final remoteRows = await client
+                .from(tableName)
+                .select()
+                .eq('id', op.entityId)
+                .limit(1);
+            if (remoteRows.isNotEmpty) {
+              final remoteRecord = remoteRows.first;
+              final normalizedRemote = normalizeRemotePayload(remoteRecord);
+              final remoteRev = normalizedRemote['revision'] as int? ?? 1;
+              final localRev = cleanPayload['revision'] as int? ?? 1;
+              final remoteUpdated = SyncTimestamp.parse(
+                normalizedRemote['updatedAt'] ?? normalizedRemote['updated_at'],
+              );
+              final localUpdated = SyncTimestamp.parse(
+                cleanPayload['updatedAt'] ?? cleanPayload['updated_at'],
+              );
+
+              if (remoteRev > localRev ||
+                  (remoteUpdated != null &&
+                      localUpdated != null &&
+                      remoteUpdated.isAfter(localUpdated))) {
+                final baseData = rawPayload.containsKey('_base') &&
+                        rawPayload['_base'] is Map
+                    ? normalizeRemotePayload(
+                        rawPayload['_base'] as Map<String, dynamic>,
+                      )
+                    : <String, dynamic>{};
+                final mergeResult = SyncEngine.mergeEntities(
+                  entityType: op.entityType,
+                  entityId: op.entityId,
+                  localData: cleanPayload,
+                  remoteData: normalizedRemote,
+                  baseData: baseData,
+                );
+                if (mergeResult.hasConflict) {
+                  conflicts++;
+                  _setStatus(SyncStatus.conflict);
+                  final err =
+                      'Conflito de mesclagem 3-way detectado em ${op.entityType} (${op.entityId})';
+                  errors.add(err);
+                  await repository.markSyncOperationFailed(op.id, err);
+                  continue;
+                } else {
+                  cleanPayload.addAll(mergeResult.mergedData);
+                  await _updateLocalEntry(tableName, mergeResult.mergedData);
+                }
+              }
+            }
+          } catch (_) {
+            // Caso a verificação falhe por ausência de conectividade, prossegue
+          }
+
           final remotePayload = toRemotePayload(op.entityType, cleanPayload);
           final currentUserId = client.auth.currentUser?.id;
           if (currentUserId != null && currentUserId.isNotEmpty) {
@@ -1670,6 +1717,7 @@ class SupabaseSyncService {
               await repository.markSyncOperationFailed(
                 op.id,
                 'Falha no upload do arquivo binário de áudio para o Storage',
+                forceFailed: true,
               );
               continue;
             }
@@ -1694,7 +1742,12 @@ class SupabaseSyncService {
           await repository.markSyncOperationSuccess(op.id);
           success++;
         } else if (operation == 'DELETE') {
-          await client.from(tableName).delete().eq('id', op.entityId);
+          // C2: Substitui DELETE cego por soft-delete (deleted_at)
+          final nowIso = DateTime.now().toUtc().toIso8601String();
+          await client
+              .from(tableName)
+              .update({'deleted_at': nowIso})
+              .eq('id', op.entityId);
           await repository.markSyncOperationSuccess(op.id);
           success++;
         }

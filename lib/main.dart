@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/app_theme.dart';
+import 'core/i18n/app_locale_strings.dart';
 import 'sync/supabase_sync_service.dart';
 import 'ui/screens/auth_splash_screen.dart';
 import 'ui/providers.dart';
@@ -23,10 +24,12 @@ class MinisterioPessoalApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isSunMode = ref.watch(sunModeProvider);
+    final currentLocale = ref.watch(appLocaleTypeProvider);
 
     return MaterialApp(
       title: 'Ministério Pessoal',
       debugShowCheckedModeBanner: false,
+      locale: currentLocale.toLocale,
       theme: isSunMode ? AppTheme.sunModeTheme : AppTheme.lightTheme,
       darkTheme: isSunMode ? AppTheme.sunModeTheme : AppTheme.darkTheme,
       themeMode: isSunMode ? ThemeMode.light : ThemeMode.system,
@@ -35,7 +38,11 @@ class MinisterioPessoalApp extends ConsumerWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      supportedLocales: const [Locale('pt', 'BR')],
+      supportedLocales: const [
+        Locale('pt', 'BR'),
+        Locale('en', 'US'),
+        Locale('es', 'ES'),
+      ],
       home: const AuthSplashScreen(),
     );
   }

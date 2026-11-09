@@ -107,6 +107,7 @@ class TicunaRepository {
           last_reviewed_at TEXT,
           audio_path TEXT,
           audio_duration_seconds INTEGER,
+          language_id TEXT DEFAULT 'tca',
           created_at TEXT NOT NULL,
           updated_at TEXT NOT NULL
         );
@@ -124,6 +125,7 @@ class TicunaRepository {
           is_favorite INTEGER NOT NULL DEFAULT 0,
           audio_path TEXT,
           audio_duration_seconds INTEGER,
+          language_id TEXT DEFAULT 'tca',
           created_at TEXT NOT NULL,
           updated_at TEXT NOT NULL
         );
@@ -149,6 +151,11 @@ class TicunaRepository {
         AppLogger.debug('Coluna audio_duration_seconds em ticuna_words já existe ou inicializada: $e');
       }
       try {
+        await db.customStatement("ALTER TABLE ticuna_words ADD COLUMN language_id TEXT DEFAULT 'tca';");
+      } catch (e) {
+        AppLogger.debug('Coluna language_id em ticuna_words já existe ou inicializada: $e');
+      }
+      try {
         await db.customStatement('ALTER TABLE ticuna_phrases ADD COLUMN audio_path TEXT;');
       } catch (e) {
         AppLogger.debug('Coluna audio_path em ticuna_phrases já existe ou inicializada: $e');
@@ -157,6 +164,11 @@ class TicunaRepository {
         await db.customStatement('ALTER TABLE ticuna_phrases ADD COLUMN audio_duration_seconds INTEGER;');
       } catch (e) {
         AppLogger.debug('Coluna audio_duration_seconds em ticuna_phrases já existe ou inicializada: $e');
+      }
+      try {
+        await db.customStatement("ALTER TABLE ticuna_phrases ADD COLUMN language_id TEXT DEFAULT 'tca';");
+      } catch (e) {
+        AppLogger.debug('Coluna language_id em ticuna_phrases já existe ou inicializada: $e');
       }
 
       // Normalização defensiva para recuperar termos canônicos corrigidos
@@ -585,6 +597,7 @@ class TicunaRepository {
     bool isFavorite = false,
     String? audioPath,
     int? audioDurationSeconds,
+    String? languageId,
   }) async {
     await _initTables();
     final now = DateTime.now();
@@ -609,6 +622,7 @@ class TicunaRepository {
       reviewCount: 0,
       audioPath: audioPath,
       audioDurationSeconds: audioDurationSeconds,
+      languageId: languageId ?? 'tca',
       createdAt: now,
       updatedAt: now,
     );
@@ -628,9 +642,9 @@ class TicunaRepository {
         id, word, translation, phonetics, grammatical_class,
         example_sentence, example_translation, notes, tags,
         is_favorite, review_level, review_count, last_reviewed_at,
-        audio_path, audio_duration_seconds,
+        audio_path, audio_duration_seconds, language_id,
         created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ''',
       variables: [
         Variable.withString(item.id),
@@ -648,6 +662,7 @@ class TicunaRepository {
         Variable.withString(item.lastReviewedAt?.toIso8601String() ?? ''),
         Variable.withString(item.audioPath ?? ''),
         Variable.withInt(item.audioDurationSeconds ?? 0),
+        Variable.withString(item.languageId ?? 'tca'),
         Variable.withString(item.createdAt.toIso8601String()),
         Variable.withString(item.updatedAt.toIso8601String()),
       ],
@@ -675,6 +690,7 @@ class TicunaRepository {
           last_reviewed_at = ?,
           audio_path = ?,
           audio_duration_seconds = ?,
+          language_id = ?,
           updated_at = ?
         WHERE id = ?
         ''',
@@ -695,6 +711,7 @@ class TicunaRepository {
           Variable.withString(item.lastReviewedAt?.toIso8601String() ?? ''),
           Variable.withString(item.audioPath ?? ''),
           Variable.withInt(item.audioDurationSeconds ?? 0),
+          Variable.withString(item.languageId ?? 'tca'),
           Variable.withString(now.toIso8601String()),
           Variable.withString(item.id),
         ],
@@ -900,6 +917,7 @@ class TicunaRepository {
     bool isFavorite = false,
     String? audioPath,
     int? audioDurationSeconds,
+    String? languageId,
   }) async {
     await _initTables();
     final now = DateTime.now();
@@ -914,6 +932,7 @@ class TicunaRepository {
       isFavorite: isFavorite,
       audioPath: audioPath,
       audioDurationSeconds: audioDurationSeconds,
+      languageId: languageId ?? 'tca',
       createdAt: now,
       updatedAt: now,
     );
@@ -932,8 +951,8 @@ class TicunaRepository {
       INSERT OR REPLACE INTO ticuna_phrases (
         id, phrase, translation, category, phonetics, notes,
         tags, is_favorite, audio_path, audio_duration_seconds,
-        created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        language_id, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ''',
       variables: [
         Variable.withString(item.id),
@@ -946,6 +965,7 @@ class TicunaRepository {
         Variable.withInt(item.isFavorite ? 1 : 0),
         Variable.withString(item.audioPath ?? ''),
         Variable.withInt(item.audioDurationSeconds ?? 0),
+        Variable.withString(item.languageId ?? 'tca'),
         Variable.withString(item.createdAt.toIso8601String()),
         Variable.withString(item.updatedAt.toIso8601String()),
       ],
@@ -968,6 +988,7 @@ class TicunaRepository {
           is_favorite = ?,
           audio_path = ?,
           audio_duration_seconds = ?,
+          language_id = ?,
           updated_at = ?
         WHERE id = ?
         ''',
@@ -981,6 +1002,7 @@ class TicunaRepository {
           Variable.withInt(item.isFavorite ? 1 : 0),
           Variable.withString(item.audioPath ?? ''),
           Variable.withInt(item.audioDurationSeconds ?? 0),
+          Variable.withString(item.languageId ?? 'tca'),
           Variable.withString(now.toIso8601String()),
           Variable.withString(item.id),
         ],

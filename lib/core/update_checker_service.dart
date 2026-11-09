@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:crypto/crypto.dart' as crypto;
+
 import 'app_logger.dart';
 import 'app_version.dart';
 
@@ -30,6 +32,7 @@ class AppUpdateInfo {
   final String minOSVersion;
   final bool isLiveContainerCompatible;
   final String? errorMessage;
+  final String? sha256;
 
   const AppUpdateInfo({
     this.status = UpdateCheckStatus.upToDate,
@@ -44,6 +47,7 @@ class AppUpdateInfo {
     this.minOSVersion = '14.0',
     this.isLiveContainerCompatible = true,
     this.errorMessage,
+    this.sha256,
   });
 
   factory AppUpdateInfo.upToDate({
@@ -52,6 +56,7 @@ class AppUpdateInfo {
     String? downloadUrl,
     String? releaseDate,
     String? releaseNotes,
+    String? sha256,
   }) {
     final cur = currentVersion ?? AppVersion.version;
     return AppUpdateInfo(
@@ -63,6 +68,7 @@ class AppUpdateInfo {
       releaseNotes: releaseNotes ?? 'Você já está utilizando a versão mais recente do Ministério Pessoal.',
       downloadUrl: downloadUrl ?? AppVersion.latestIpaDownloadUrl,
       sourceCatalogUrl: AppVersion.appsJsonUrl,
+      sha256: sha256,
     );
   }
 
@@ -79,6 +85,7 @@ class AppUpdateInfo {
     int? sizeBytes,
     String minOSVersion = '14.0',
     bool isLiveContainerCompatible = true,
+    String? sha256,
   }) {
     return AppUpdateInfo(
       status: UpdateCheckStatus.updateAvailable,
@@ -92,6 +99,7 @@ class AppUpdateInfo {
       sizeBytes: sizeBytes,
       minOSVersion: minOSVersion,
       isLiveContainerCompatible: isLiveContainerCompatible,
+      sha256: sha256,
     );
   }
 
@@ -136,6 +144,13 @@ class AppUpdateInfo {
     if (sizeBytes == null || sizeBytes! <= 0) return 'Tamanho sob consulta';
     final mb = sizeBytes! / (1024 * 1024);
     return '${mb.toStringAsFixed(1)} MB';
+  }
+
+  /// Valida o checksum SHA-256 de um binário recebido com o hash esperado
+  static bool verifySha256(List<int> bytes, String expectedHash) {
+    if (expectedHash.trim().isEmpty) return false;
+    final digest = crypto.sha256.convert(bytes);
+    return digest.toString().toLowerCase() == expectedHash.trim().toLowerCase();
   }
 }
 

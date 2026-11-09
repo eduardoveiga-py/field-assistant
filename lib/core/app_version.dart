@@ -50,7 +50,7 @@ class AppVersion {
   /// User-Agent oficial para requisições externas (OSM, APIs, Nominatim)
   /// em estrita conformidade com as políticas do OpenStreetMap.
   static const String userAgent =
-      'MinisterioPessoal/$version (https://github.com/eduardoveiga-py/field-assistant; eduardofaturistatuper@gmail.com)';
+      'MinisterioPessoal/$version (https://github.com/eduardoveiga-py/field-assistant)';
 
   /// Compara duas versões semânticas (ex: '1.2.0' vs '1.1.1').
   /// Retorna:

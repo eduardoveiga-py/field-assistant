@@ -98,6 +98,8 @@
 	<string>O Ministério Pessoal precisa de acesso completo ao Calendário para exibir eventos e salvar novos compromissos do ministério de campo.</string>
 	<key>NSCalendarsWriteOnlyAccessUsageDescription</key>
 	<string>O Ministério Pessoal precisa de permissão para salvar compromissos ministeriais no seu Calendário.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>O aplicativo precisa de acesso à localização para exibir sua posição no mapa de territórios e auxiliar na navegação durante o ministério de campo.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

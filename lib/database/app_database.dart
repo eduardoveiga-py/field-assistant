@@ -29,6 +29,7 @@ part 'app_database.g.dart';
     StudentManualOrder,
     ExternalCalendarEvents,
     CalendarEventLinks,
+    AppLanguages,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -37,12 +38,13 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (Migrator m) async {
       await m.createAll();
+      await _seedDefaultLanguage();
     },
     onUpgrade: (Migrator m, int from, int to) async {
       if (from < 2) {
@@ -78,6 +80,14 @@ class AppDatabase extends _$AppDatabase {
         await _createTableIfNotExists(m, calendarEventLinks);
         await _migrateCalendarEventLinksPendingResolution(m);
       }
+      if (from < 5) {
+        // Migração incremental da versão 4 para a versão 5 (Regra 11):
+        // Adiciona a tabela AppLanguages com Ticuna como padrão e coluna last_attempt_at em SyncQueue
+        await _createTableIfNotExists(m, syncQueue);
+        await _createTableIfNotExists(m, appLanguages);
+        await _migrateSyncQueueLastAttemptAt(m);
+        await _seedDefaultLanguage();
+      }
     },
   );
 
@@ -94,6 +104,38 @@ class AppDatabase extends _$AppDatabase {
         calendarEventLinks.pendingResolution,
       );
     }
+  }
+
+  Future<void> _migrateSyncQueueLastAttemptAt(Migrator m) async {
+    final columns = await customSelect(
+      "PRAGMA table_info(sync_queue)",
+    ).get();
+    final colNames = columns.map((c) => c.read<String>('name')).toSet();
+    if (colNames.isNotEmpty && !colNames.contains('last_attempt_at')) {
+      await m.addColumn(syncQueue, syncQueue.lastAttemptAt);
+    }
+  }
+
+  Future<void> _seedDefaultLanguage() async {
+    try {
+      final existing = await (select(appLanguages)..where((t) => t.id.equals('tca'))).getSingleOrNull();
+      if (existing == null) {
+        await into(appLanguages).insertOnConflictUpdate(
+          AppLanguagesCompanion.insert(
+            id: 'tca',
+            name: 'Ticuna (Magüta)',
+            code: 'tca',
+            symbol: '🏹',
+            diacritics: const Value(
+              '["ĩ","ü̃","ü̃́","ũ","ã́","ẽ","Ĩ","Ü̃","Ü̃́","Ũ","Ã́","Ẽ"]',
+            ),
+            isDefault: const Value(true),
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          ),
+        );
+      }
+    } catch (_) {}
   }
 
   Future<void> _migrateLandmarksColumns() async {

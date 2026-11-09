@@ -24,6 +24,7 @@ class TicunaWord {
   final DateTime? lastReviewedAt; // Data da última revisão
   final String? audioPath; // Caminho do áudio local ou remoto da pronúncia
   final int? audioDurationSeconds; // Duração em segundos da pronúncia gravada
+  final String? languageId; // Código/ID do idioma (ex: 'tca', 'gub', 'yan')
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -43,6 +44,7 @@ class TicunaWord {
     this.lastReviewedAt,
     this.audioPath,
     this.audioDurationSeconds,
+    this.languageId = 'tca',
     required this.createdAt,
     required this.updatedAt,
   });
@@ -95,6 +97,7 @@ class TicunaWord {
     DateTime? lastReviewedAt,
     String? audioPath,
     int? audioDurationSeconds,
+    String? languageId,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -114,6 +117,7 @@ class TicunaWord {
       lastReviewedAt: lastReviewedAt ?? this.lastReviewedAt,
       audioPath: audioPath ?? this.audioPath,
       audioDurationSeconds: audioDurationSeconds ?? this.audioDurationSeconds,
+      languageId: languageId ?? this.languageId,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -135,6 +139,7 @@ class TicunaWord {
     'last_reviewed_at': lastReviewedAt?.toIso8601String(),
     'audio_path': audioPath,
     'audio_duration_seconds': audioDurationSeconds,
+    'language_id': languageId ?? 'tca',
     'created_at': createdAt.toIso8601String(),
     'updated_at': updatedAt.toIso8601String(),
   };
@@ -173,6 +178,7 @@ class TicunaWord {
           ? (map['audio_path'] as String).trim()
           : null,
       audioDurationSeconds: (map['audio_duration_seconds'] as num?)?.toInt(),
+      languageId: map['language_id'] as String? ?? 'tca',
       createdAt: DateTime.tryParse(map['created_at'] as String? ?? '') ?? DateTime.now(),
       updatedAt: DateTime.tryParse(map['updated_at'] as String? ?? '') ?? DateTime.now(),
     );
@@ -191,6 +197,7 @@ class TicunaPhrase {
   final bool isFavorite; // Marcador de favorito
   final String? audioPath; // Caminho do áudio local ou remoto da pronúncia
   final int? audioDurationSeconds; // Duração em segundos da pronúncia gravada
+  final String? languageId; // Código/ID do idioma
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -205,6 +212,7 @@ class TicunaPhrase {
     this.isFavorite = false,
     this.audioPath,
     this.audioDurationSeconds,
+    this.languageId = 'tca',
     required this.createdAt,
     required this.updatedAt,
   });
@@ -220,6 +228,7 @@ class TicunaPhrase {
     bool? isFavorite,
     String? audioPath,
     int? audioDurationSeconds,
+    String? languageId,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -234,6 +243,7 @@ class TicunaPhrase {
       isFavorite: isFavorite ?? this.isFavorite,
       audioPath: audioPath ?? this.audioPath,
       audioDurationSeconds: audioDurationSeconds ?? this.audioDurationSeconds,
+      languageId: languageId ?? this.languageId,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -250,6 +260,7 @@ class TicunaPhrase {
     'is_favorite': isFavorite ? 1 : 0,
     'audio_path': audioPath,
     'audio_duration_seconds': audioDurationSeconds,
+    'language_id': languageId ?? 'tca',
     'created_at': createdAt.toIso8601String(),
     'updated_at': updatedAt.toIso8601String(),
   };
@@ -281,6 +292,7 @@ class TicunaPhrase {
           ? (map['audio_path'] as String).trim()
           : null,
       audioDurationSeconds: (map['audio_duration_seconds'] as num?)?.toInt(),
+      languageId: map['language_id'] as String? ?? 'tca',
       createdAt: DateTime.tryParse(map['created_at'] as String? ?? '') ?? DateTime.now(),
       updatedAt: DateTime.tryParse(map['updated_at'] as String? ?? '') ?? DateTime.now(),
     );

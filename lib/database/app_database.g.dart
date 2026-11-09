@@ -6304,6 +6304,18 @@ class $SyncQueueTable extends SyncQueue
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _lastAttemptAtMeta = const VerificationMeta(
+    'lastAttemptAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastAttemptAt =
+      GeneratedColumn<DateTime>(
+        'last_attempt_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _attemptsMeta = const VerificationMeta(
     'attempts',
   );
@@ -6345,6 +6357,7 @@ class $SyncQueueTable extends SyncQueue
     operation,
     payload,
     createdAt,
+    lastAttemptAt,
     attempts,
     lastError,
     status,
@@ -6406,6 +6419,15 @@ class $SyncQueueTable extends SyncQueue
     } else if (isInserting) {
       context.missing(_createdAtMeta);
     }
+    if (data.containsKey('last_attempt_at')) {
+      context.handle(
+        _lastAttemptAtMeta,
+        lastAttemptAt.isAcceptableOrUnknown(
+          data['last_attempt_at']!,
+          _lastAttemptAtMeta,
+        ),
+      );
+    }
     if (data.containsKey('attempts')) {
       context.handle(
         _attemptsMeta,
@@ -6457,6 +6479,10 @@ class $SyncQueueTable extends SyncQueue
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
       )!,
+      lastAttemptAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_attempt_at'],
+      ),
       attempts: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}attempts'],
@@ -6485,6 +6511,7 @@ class SyncQueueEntry extends DataClass implements Insertable<SyncQueueEntry> {
   final String operation;
   final String payload;
   final DateTime createdAt;
+  final DateTime? lastAttemptAt;
   final int attempts;
   final String? lastError;
   final String status;
@@ -6495,6 +6522,7 @@ class SyncQueueEntry extends DataClass implements Insertable<SyncQueueEntry> {
     required this.operation,
     required this.payload,
     required this.createdAt,
+    this.lastAttemptAt,
     required this.attempts,
     this.lastError,
     required this.status,
@@ -6508,6 +6536,9 @@ class SyncQueueEntry extends DataClass implements Insertable<SyncQueueEntry> {
     map['operation'] = Variable<String>(operation);
     map['payload'] = Variable<String>(payload);
     map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || lastAttemptAt != null) {
+      map['last_attempt_at'] = Variable<DateTime>(lastAttemptAt);
+    }
     map['attempts'] = Variable<int>(attempts);
     if (!nullToAbsent || lastError != null) {
       map['last_error'] = Variable<String>(lastError);
@@ -6524,6 +6555,9 @@ class SyncQueueEntry extends DataClass implements Insertable<SyncQueueEntry> {
       operation: Value(operation),
       payload: Value(payload),
       createdAt: Value(createdAt),
+      lastAttemptAt: lastAttemptAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastAttemptAt),
       attempts: Value(attempts),
       lastError: lastError == null && nullToAbsent
           ? const Value.absent()
@@ -6544,6 +6578,7 @@ class SyncQueueEntry extends DataClass implements Insertable<SyncQueueEntry> {
       operation: serializer.fromJson<String>(json['operation']),
       payload: serializer.fromJson<String>(json['payload']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      lastAttemptAt: serializer.fromJson<DateTime?>(json['lastAttemptAt']),
       attempts: serializer.fromJson<int>(json['attempts']),
       lastError: serializer.fromJson<String?>(json['lastError']),
       status: serializer.fromJson<String>(json['status']),
@@ -6559,6 +6594,7 @@ class SyncQueueEntry extends DataClass implements Insertable<SyncQueueEntry> {
       'operation': serializer.toJson<String>(operation),
       'payload': serializer.toJson<String>(payload),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'lastAttemptAt': serializer.toJson<DateTime?>(lastAttemptAt),
       'attempts': serializer.toJson<int>(attempts),
       'lastError': serializer.toJson<String?>(lastError),
       'status': serializer.toJson<String>(status),
@@ -6572,6 +6608,7 @@ class SyncQueueEntry extends DataClass implements Insertable<SyncQueueEntry> {
     String? operation,
     String? payload,
     DateTime? createdAt,
+    Value<DateTime?> lastAttemptAt = const Value.absent(),
     int? attempts,
     Value<String?> lastError = const Value.absent(),
     String? status,
@@ -6582,6 +6619,9 @@ class SyncQueueEntry extends DataClass implements Insertable<SyncQueueEntry> {
     operation: operation ?? this.operation,
     payload: payload ?? this.payload,
     createdAt: createdAt ?? this.createdAt,
+    lastAttemptAt: lastAttemptAt.present
+        ? lastAttemptAt.value
+        : this.lastAttemptAt,
     attempts: attempts ?? this.attempts,
     lastError: lastError.present ? lastError.value : this.lastError,
     status: status ?? this.status,
@@ -6596,6 +6636,9 @@ class SyncQueueEntry extends DataClass implements Insertable<SyncQueueEntry> {
       operation: data.operation.present ? data.operation.value : this.operation,
       payload: data.payload.present ? data.payload.value : this.payload,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      lastAttemptAt: data.lastAttemptAt.present
+          ? data.lastAttemptAt.value
+          : this.lastAttemptAt,
       attempts: data.attempts.present ? data.attempts.value : this.attempts,
       lastError: data.lastError.present ? data.lastError.value : this.lastError,
       status: data.status.present ? data.status.value : this.status,
@@ -6611,6 +6654,7 @@ class SyncQueueEntry extends DataClass implements Insertable<SyncQueueEntry> {
           ..write('operation: $operation, ')
           ..write('payload: $payload, ')
           ..write('createdAt: $createdAt, ')
+          ..write('lastAttemptAt: $lastAttemptAt, ')
           ..write('attempts: $attempts, ')
           ..write('lastError: $lastError, ')
           ..write('status: $status')
@@ -6626,6 +6670,7 @@ class SyncQueueEntry extends DataClass implements Insertable<SyncQueueEntry> {
     operation,
     payload,
     createdAt,
+    lastAttemptAt,
     attempts,
     lastError,
     status,
@@ -6640,6 +6685,7 @@ class SyncQueueEntry extends DataClass implements Insertable<SyncQueueEntry> {
           other.operation == this.operation &&
           other.payload == this.payload &&
           other.createdAt == this.createdAt &&
+          other.lastAttemptAt == this.lastAttemptAt &&
           other.attempts == this.attempts &&
           other.lastError == this.lastError &&
           other.status == this.status);
@@ -6652,6 +6698,7 @@ class SyncQueueCompanion extends UpdateCompanion<SyncQueueEntry> {
   final Value<String> operation;
   final Value<String> payload;
   final Value<DateTime> createdAt;
+  final Value<DateTime?> lastAttemptAt;
   final Value<int> attempts;
   final Value<String?> lastError;
   final Value<String> status;
@@ -6663,6 +6710,7 @@ class SyncQueueCompanion extends UpdateCompanion<SyncQueueEntry> {
     this.operation = const Value.absent(),
     this.payload = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.lastAttemptAt = const Value.absent(),
     this.attempts = const Value.absent(),
     this.lastError = const Value.absent(),
     this.status = const Value.absent(),
@@ -6675,6 +6723,7 @@ class SyncQueueCompanion extends UpdateCompanion<SyncQueueEntry> {
     required String operation,
     required String payload,
     required DateTime createdAt,
+    this.lastAttemptAt = const Value.absent(),
     this.attempts = const Value.absent(),
     this.lastError = const Value.absent(),
     this.status = const Value.absent(),
@@ -6692,6 +6741,7 @@ class SyncQueueCompanion extends UpdateCompanion<SyncQueueEntry> {
     Expression<String>? operation,
     Expression<String>? payload,
     Expression<DateTime>? createdAt,
+    Expression<DateTime>? lastAttemptAt,
     Expression<int>? attempts,
     Expression<String>? lastError,
     Expression<String>? status,
@@ -6704,6 +6754,7 @@ class SyncQueueCompanion extends UpdateCompanion<SyncQueueEntry> {
       if (operation != null) 'operation': operation,
       if (payload != null) 'payload': payload,
       if (createdAt != null) 'created_at': createdAt,
+      if (lastAttemptAt != null) 'last_attempt_at': lastAttemptAt,
       if (attempts != null) 'attempts': attempts,
       if (lastError != null) 'last_error': lastError,
       if (status != null) 'status': status,
@@ -6718,6 +6769,7 @@ class SyncQueueCompanion extends UpdateCompanion<SyncQueueEntry> {
     Value<String>? operation,
     Value<String>? payload,
     Value<DateTime>? createdAt,
+    Value<DateTime?>? lastAttemptAt,
     Value<int>? attempts,
     Value<String?>? lastError,
     Value<String>? status,
@@ -6730,6 +6782,7 @@ class SyncQueueCompanion extends UpdateCompanion<SyncQueueEntry> {
       operation: operation ?? this.operation,
       payload: payload ?? this.payload,
       createdAt: createdAt ?? this.createdAt,
+      lastAttemptAt: lastAttemptAt ?? this.lastAttemptAt,
       attempts: attempts ?? this.attempts,
       lastError: lastError ?? this.lastError,
       status: status ?? this.status,
@@ -6758,6 +6811,9 @@ class SyncQueueCompanion extends UpdateCompanion<SyncQueueEntry> {
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
+    if (lastAttemptAt.present) {
+      map['last_attempt_at'] = Variable<DateTime>(lastAttemptAt.value);
+    }
     if (attempts.present) {
       map['attempts'] = Variable<int>(attempts.value);
     }
@@ -6782,6 +6838,7 @@ class SyncQueueCompanion extends UpdateCompanion<SyncQueueEntry> {
           ..write('operation: $operation, ')
           ..write('payload: $payload, ')
           ..write('createdAt: $createdAt, ')
+          ..write('lastAttemptAt: $lastAttemptAt, ')
           ..write('attempts: $attempts, ')
           ..write('lastError: $lastError, ')
           ..write('status: $status, ')
@@ -15976,6 +16033,514 @@ class CalendarEventLinksCompanion
   }
 }
 
+class $AppLanguagesTable extends AppLanguages
+    with TableInfo<$AppLanguagesTable, AppLanguageEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $AppLanguagesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _codeMeta = const VerificationMeta('code');
+  @override
+  late final GeneratedColumn<String> code = GeneratedColumn<String>(
+    'code',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _symbolMeta = const VerificationMeta('symbol');
+  @override
+  late final GeneratedColumn<String> symbol = GeneratedColumn<String>(
+    'symbol',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _diacriticsMeta = const VerificationMeta(
+    'diacritics',
+  );
+  @override
+  late final GeneratedColumn<String> diacritics = GeneratedColumn<String>(
+    'diacritics',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  );
+  static const VerificationMeta _isDefaultMeta = const VerificationMeta(
+    'isDefault',
+  );
+  @override
+  late final GeneratedColumn<bool> isDefault = GeneratedColumn<bool>(
+    'is_default',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_default" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    name,
+    code,
+    symbol,
+    diacritics,
+    isDefault,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'app_languages';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<AppLanguageEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('code')) {
+      context.handle(
+        _codeMeta,
+        code.isAcceptableOrUnknown(data['code']!, _codeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_codeMeta);
+    }
+    if (data.containsKey('symbol')) {
+      context.handle(
+        _symbolMeta,
+        symbol.isAcceptableOrUnknown(data['symbol']!, _symbolMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_symbolMeta);
+    }
+    if (data.containsKey('diacritics')) {
+      context.handle(
+        _diacriticsMeta,
+        diacritics.isAcceptableOrUnknown(data['diacritics']!, _diacriticsMeta),
+      );
+    }
+    if (data.containsKey('is_default')) {
+      context.handle(
+        _isDefaultMeta,
+        isDefault.isAcceptableOrUnknown(data['is_default']!, _isDefaultMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  AppLanguageEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return AppLanguageEntry(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      code: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}code'],
+      )!,
+      symbol: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}symbol'],
+      )!,
+      diacritics: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}diacritics'],
+      )!,
+      isDefault: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_default'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $AppLanguagesTable createAlias(String alias) {
+    return $AppLanguagesTable(attachedDatabase, alias);
+  }
+}
+
+class AppLanguageEntry extends DataClass
+    implements Insertable<AppLanguageEntry> {
+  final String id;
+  final String name;
+  final String code;
+  final String symbol;
+  final String diacritics;
+  final bool isDefault;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  const AppLanguageEntry({
+    required this.id,
+    required this.name,
+    required this.code,
+    required this.symbol,
+    required this.diacritics,
+    required this.isDefault,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    map['code'] = Variable<String>(code);
+    map['symbol'] = Variable<String>(symbol);
+    map['diacritics'] = Variable<String>(diacritics);
+    map['is_default'] = Variable<bool>(isDefault);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  AppLanguagesCompanion toCompanion(bool nullToAbsent) {
+    return AppLanguagesCompanion(
+      id: Value(id),
+      name: Value(name),
+      code: Value(code),
+      symbol: Value(symbol),
+      diacritics: Value(diacritics),
+      isDefault: Value(isDefault),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory AppLanguageEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return AppLanguageEntry(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      code: serializer.fromJson<String>(json['code']),
+      symbol: serializer.fromJson<String>(json['symbol']),
+      diacritics: serializer.fromJson<String>(json['diacritics']),
+      isDefault: serializer.fromJson<bool>(json['isDefault']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'code': serializer.toJson<String>(code),
+      'symbol': serializer.toJson<String>(symbol),
+      'diacritics': serializer.toJson<String>(diacritics),
+      'isDefault': serializer.toJson<bool>(isDefault),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  AppLanguageEntry copyWith({
+    String? id,
+    String? name,
+    String? code,
+    String? symbol,
+    String? diacritics,
+    bool? isDefault,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => AppLanguageEntry(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    code: code ?? this.code,
+    symbol: symbol ?? this.symbol,
+    diacritics: diacritics ?? this.diacritics,
+    isDefault: isDefault ?? this.isDefault,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  AppLanguageEntry copyWithCompanion(AppLanguagesCompanion data) {
+    return AppLanguageEntry(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      code: data.code.present ? data.code.value : this.code,
+      symbol: data.symbol.present ? data.symbol.value : this.symbol,
+      diacritics: data.diacritics.present
+          ? data.diacritics.value
+          : this.diacritics,
+      isDefault: data.isDefault.present ? data.isDefault.value : this.isDefault,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AppLanguageEntry(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('code: $code, ')
+          ..write('symbol: $symbol, ')
+          ..write('diacritics: $diacritics, ')
+          ..write('isDefault: $isDefault, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    name,
+    code,
+    symbol,
+    diacritics,
+    isDefault,
+    createdAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is AppLanguageEntry &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.code == this.code &&
+          other.symbol == this.symbol &&
+          other.diacritics == this.diacritics &&
+          other.isDefault == this.isDefault &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class AppLanguagesCompanion extends UpdateCompanion<AppLanguageEntry> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<String> code;
+  final Value<String> symbol;
+  final Value<String> diacritics;
+  final Value<bool> isDefault;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const AppLanguagesCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.code = const Value.absent(),
+    this.symbol = const Value.absent(),
+    this.diacritics = const Value.absent(),
+    this.isDefault = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  AppLanguagesCompanion.insert({
+    required String id,
+    required String name,
+    required String code,
+    required String symbol,
+    this.diacritics = const Value.absent(),
+    this.isDefault = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name),
+       code = Value(code),
+       symbol = Value(symbol),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<AppLanguageEntry> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<String>? code,
+    Expression<String>? symbol,
+    Expression<String>? diacritics,
+    Expression<bool>? isDefault,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (code != null) 'code': code,
+      if (symbol != null) 'symbol': symbol,
+      if (diacritics != null) 'diacritics': diacritics,
+      if (isDefault != null) 'is_default': isDefault,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  AppLanguagesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<String>? code,
+    Value<String>? symbol,
+    Value<String>? diacritics,
+    Value<bool>? isDefault,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return AppLanguagesCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      code: code ?? this.code,
+      symbol: symbol ?? this.symbol,
+      diacritics: diacritics ?? this.diacritics,
+      isDefault: isDefault ?? this.isDefault,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (code.present) {
+      map['code'] = Variable<String>(code.value);
+    }
+    if (symbol.present) {
+      map['symbol'] = Variable<String>(symbol.value);
+    }
+    if (diacritics.present) {
+      map['diacritics'] = Variable<String>(diacritics.value);
+    }
+    if (isDefault.present) {
+      map['is_default'] = Variable<bool>(isDefault.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AppLanguagesCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('code: $code, ')
+          ..write('symbol: $symbol, ')
+          ..write('diacritics: $diacritics, ')
+          ..write('isDefault: $isDefault, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -16014,6 +16579,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $ExternalCalendarEventsTable(this);
   late final $CalendarEventLinksTable calendarEventLinks =
       $CalendarEventLinksTable(this);
+  late final $AppLanguagesTable appLanguages = $AppLanguagesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -16041,6 +16607,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     studentManualOrder,
     externalCalendarEvents,
     calendarEventLinks,
+    appLanguages,
   ];
 }
 
@@ -20485,6 +21052,7 @@ typedef $$SyncQueueTableCreateCompanionBuilder = SyncQueueCompanion Function({
   required String operation,
   required String payload,
   required DateTime createdAt,
+  Value<DateTime?> lastAttemptAt,
   Value<int> attempts,
   Value<String?> lastError,
   Value<String> status,
@@ -20497,6 +21065,7 @@ typedef $$SyncQueueTableUpdateCompanionBuilder = SyncQueueCompanion Function({
   Value<String> operation,
   Value<String> payload,
   Value<DateTime> createdAt,
+  Value<DateTime?> lastAttemptAt,
   Value<int> attempts,
   Value<String?> lastError,
   Value<String> status,
@@ -20539,6 +21108,11 @@ class $$SyncQueueTableFilterComposer
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastAttemptAt => $composableBuilder(
+    column: $table.lastAttemptAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -20597,6 +21171,11 @@ class $$SyncQueueTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<DateTime> get lastAttemptAt => $composableBuilder(
+    column: $table.lastAttemptAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get attempts => $composableBuilder(
     column: $table.attempts,
     builder: (column) => ColumnOrderings(column),
@@ -20641,6 +21220,11 @@ class $$SyncQueueTableAnnotationComposer
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get lastAttemptAt => $composableBuilder(
+    column: $table.lastAttemptAt,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<int> get attempts =>
       $composableBuilder(column: $table.attempts, builder: (column) => column);
@@ -20689,6 +21273,7 @@ class $$SyncQueueTableTableManager
                 Value<String> operation = const Value.absent(),
                 Value<String> payload = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime?> lastAttemptAt = const Value.absent(),
                 Value<int> attempts = const Value.absent(),
                 Value<String?> lastError = const Value.absent(),
                 Value<String> status = const Value.absent(),
@@ -20700,6 +21285,7 @@ class $$SyncQueueTableTableManager
                 operation: operation,
                 payload: payload,
                 createdAt: createdAt,
+                lastAttemptAt: lastAttemptAt,
                 attempts: attempts,
                 lastError: lastError,
                 status: status,
@@ -20713,6 +21299,7 @@ class $$SyncQueueTableTableManager
                 required String operation,
                 required String payload,
                 required DateTime createdAt,
+                Value<DateTime?> lastAttemptAt = const Value.absent(),
                 Value<int> attempts = const Value.absent(),
                 Value<String?> lastError = const Value.absent(),
                 Value<String> status = const Value.absent(),
@@ -20724,6 +21311,7 @@ class $$SyncQueueTableTableManager
                 operation: operation,
                 payload: payload,
                 createdAt: createdAt,
+                lastAttemptAt: lastAttemptAt,
                 attempts: attempts,
                 lastError: lastError,
                 status: status,
@@ -25763,6 +26351,274 @@ typedef $$CalendarEventLinksTableProcessedTableManager =
       CalendarEventLinkEntry,
       PrefetchHooks Function()
     >;
+typedef $$AppLanguagesTableCreateCompanionBuilder =
+    AppLanguagesCompanion Function({
+      required String id,
+      required String name,
+      required String code,
+      required String symbol,
+      Value<String> diacritics,
+      Value<bool> isDefault,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$AppLanguagesTableUpdateCompanionBuilder =
+    AppLanguagesCompanion Function({
+      Value<String> id,
+      Value<String> name,
+      Value<String> code,
+      Value<String> symbol,
+      Value<String> diacritics,
+      Value<bool> isDefault,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$AppLanguagesTableFilterComposer
+    extends Composer<_$AppDatabase, $AppLanguagesTable> {
+  $$AppLanguagesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get code => $composableBuilder(
+    column: $table.code,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get symbol => $composableBuilder(
+    column: $table.symbol,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get diacritics => $composableBuilder(
+    column: $table.diacritics,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isDefault => $composableBuilder(
+    column: $table.isDefault,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$AppLanguagesTableOrderingComposer
+    extends Composer<_$AppDatabase, $AppLanguagesTable> {
+  $$AppLanguagesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get code => $composableBuilder(
+    column: $table.code,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get symbol => $composableBuilder(
+    column: $table.symbol,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get diacritics => $composableBuilder(
+    column: $table.diacritics,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isDefault => $composableBuilder(
+    column: $table.isDefault,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$AppLanguagesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $AppLanguagesTable> {
+  $$AppLanguagesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get code =>
+      $composableBuilder(column: $table.code, builder: (column) => column);
+
+  GeneratedColumn<String> get symbol =>
+      $composableBuilder(column: $table.symbol, builder: (column) => column);
+
+  GeneratedColumn<String> get diacritics => $composableBuilder(
+    column: $table.diacritics,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isDefault =>
+      $composableBuilder(column: $table.isDefault, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$AppLanguagesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $AppLanguagesTable,
+          AppLanguageEntry,
+          $$AppLanguagesTableFilterComposer,
+          $$AppLanguagesTableOrderingComposer,
+          $$AppLanguagesTableAnnotationComposer,
+          $$AppLanguagesTableCreateCompanionBuilder,
+          $$AppLanguagesTableUpdateCompanionBuilder,
+          (
+            AppLanguageEntry,
+            BaseReferences<_$AppDatabase, $AppLanguagesTable, AppLanguageEntry>,
+          ),
+          AppLanguageEntry,
+          PrefetchHooks Function()
+        > {
+  $$AppLanguagesTableTableManager(_$AppDatabase db, $AppLanguagesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$AppLanguagesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$AppLanguagesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$AppLanguagesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String> code = const Value.absent(),
+                Value<String> symbol = const Value.absent(),
+                Value<String> diacritics = const Value.absent(),
+                Value<bool> isDefault = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => AppLanguagesCompanion(
+                id: id,
+                name: name,
+                code: code,
+                symbol: symbol,
+                diacritics: diacritics,
+                isDefault: isDefault,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String name,
+                required String code,
+                required String symbol,
+                Value<String> diacritics = const Value.absent(),
+                Value<bool> isDefault = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => AppLanguagesCompanion.insert(
+                id: id,
+                name: name,
+                code: code,
+                symbol: symbol,
+                diacritics: diacritics,
+                isDefault: isDefault,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$AppLanguagesTable, AppLanguageEntry>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $AppLanguagesTable,
+                    AppLanguageEntry
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$AppLanguagesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $AppLanguagesTable,
+      AppLanguageEntry,
+      $$AppLanguagesTableFilterComposer,
+      $$AppLanguagesTableOrderingComposer,
+      $$AppLanguagesTableAnnotationComposer,
+      $$AppLanguagesTableCreateCompanionBuilder,
+      $$AppLanguagesTableUpdateCompanionBuilder,
+      (
+        AppLanguageEntry,
+        BaseReferences<_$AppDatabase, $AppLanguagesTable, AppLanguageEntry>,
+      ),
+      AppLanguageEntry,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -25814,4 +26670,6 @@ class $AppDatabaseManager {
       );
   $$CalendarEventLinksTableTableManager get calendarEventLinks =>
       $$CalendarEventLinksTableTableManager(_db, _db.calendarEventLinks);
+  $$AppLanguagesTableTableManager get appLanguages =>
+      $$AppLanguagesTableTableManager(_db, _db.appLanguages);
 }

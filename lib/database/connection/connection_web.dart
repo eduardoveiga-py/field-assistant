@@ -158,18 +158,23 @@ QueryExecutor constructDb({bool inMemory = false}) {
       );
     }
 
-    // 3. Fallback de Segurança Robusto: Evita crash de tela vermelha quando o ambiente Web bloqueia totalmente WebAssembly
+    // 3. Fallback de Segurança Robusto: Evita crash de tela vermelha e impede perda silenciosa de dados
     developer.log(
-      'AVISO [DriftWeb]: Não foi possível carregar ou compilar os binários WebAssembly (sqlite3.wasm / drift_worker.js). '
-      'Executando em modo degradado de segurança para evitar travamento da interface.',
+      'ERRO CRÍTICO [DriftWeb]: Não foi possível carregar os binários WebAssembly (sqlite3.wasm / drift_worker.js). '
+      'Executando em modo somente-leitura de segurança para proteger a integridade dos dados.',
       name: 'DriftWeb',
     );
-    return _FallbackWebQueryExecutor();
+    return _SafeWebUnavailableQueryExecutor();
   });
 }
 
-/// Executor de contingência para evitar falhas fatais na UI caso WebAssembly seja totalmente bloqueado no navegador
-class _FallbackWebQueryExecutor extends QueryExecutor {
+/// Executor de segurança estrita para a Web: impede perda silenciosa de dados
+/// caso WebAssembly/IndexedDB não estejam disponíveis no navegador.
+class _SafeWebUnavailableQueryExecutor extends QueryExecutor {
+  static const String _unsupportedWriteMsg =
+      'O armazenamento local no navegador requer suporte a WebAssembly e IndexedDB ativos. '
+      'Escritas foram interrompidas com segurança para evitar perda de dados do ministério.';
+
   @override
   SqlDialect get dialect => SqlDialect.sqlite;
 
@@ -180,13 +185,23 @@ class _FallbackWebQueryExecutor extends QueryExecutor {
   }
 
   @override
-  Future<void> runCustom(String statement, [List<Object?>? args]) async {}
+  Future<void> runCustom(String statement, [List<Object?>? args]) async {
+    final lower = statement.trim().toLowerCase();
+    if (lower.startsWith('select') || lower.startsWith('pragma')) {
+      return;
+    }
+    throw StateError(_unsupportedWriteMsg);
+  }
 
   @override
-  Future<int> runDelete(String statement, List<Object?> args) async => 0;
+  Future<int> runDelete(String statement, List<Object?> args) async {
+    throw StateError(_unsupportedWriteMsg);
+  }
 
   @override
-  Future<int> runInsert(String statement, List<Object?> args) async => 0;
+  Future<int> runInsert(String statement, List<Object?> args) async {
+    throw StateError(_unsupportedWriteMsg);
+  }
 
   @override
   Future<List<Map<String, Object?>>> runSelect(
@@ -195,26 +210,30 @@ class _FallbackWebQueryExecutor extends QueryExecutor {
   ) async => [];
 
   @override
-  Future<int> runUpdate(String statement, List<Object?> args) async => 0;
+  Future<int> runUpdate(String statement, List<Object?> args) async {
+    throw StateError(_unsupportedWriteMsg);
+  }
 
   @override
-  Future<void> runBatched(BatchedStatements statements) async {}
+  Future<void> runBatched(BatchedStatements statements) async {
+    throw StateError(_unsupportedWriteMsg);
+  }
 
   @override
   Future<void> close() async {}
 
   @override
   TransactionExecutor beginTransaction() =>
-      _FallbackWebTransactionExecutor(this);
+      _SafeWebUnavailableTransactionExecutor(this);
 
   @override
   QueryExecutor beginExclusive() => this;
 }
 
-class _FallbackWebTransactionExecutor extends QueryExecutor
+class _SafeWebUnavailableTransactionExecutor extends QueryExecutor
     implements TransactionExecutor {
-  final _FallbackWebQueryExecutor _parent;
-  _FallbackWebTransactionExecutor(this._parent);
+  final _SafeWebUnavailableQueryExecutor _parent;
+  _SafeWebUnavailableTransactionExecutor(this._parent);
 
   @override
   SqlDialect get dialect => _parent.dialect;

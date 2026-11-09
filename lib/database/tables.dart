@@ -191,6 +191,8 @@ class SyncQueue extends Table {
   TextColumn get operation => text()(); // INSERT, UPDATE, DELETE
   TextColumn get payload => text()(); // JSON string
   DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get lastAttemptAt =>
+      dateTime().nullable().named('last_attempt_at')();
   IntColumn get attempts => integer().withDefault(const Constant(0))();
   TextColumn get lastError => text().nullable()();
   TextColumn get status => text().withDefault(
@@ -488,6 +490,23 @@ class CalendarEventLinks extends Table {
   DateTimeColumn get updatedAt => dateTime().named('updated_at')();
   DateTimeColumn get deletedAt => dateTime().nullable().named('deleted_at')();
   IntColumn get revision => integer().withDefault(const Constant(1))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DataClassName('AppLanguageEntry')
+class AppLanguages extends Table {
+  TextColumn get id => text()(); // UUID v4 ou code (ex: 'tca', 'gub', 'yan')
+  TextColumn get name => text()(); // ex: 'Ticuna (Magüta)', 'Guajajara (Tenetehara)'
+  TextColumn get code => text()(); // ISO 639-3 (ex: 'tca')
+  TextColumn get symbol => text()(); // Emoji/ícone (ex: '🏹', '🌿')
+  TextColumn get diacritics =>
+      text().withDefault(const Constant('[]'))(); // JSON array com caracteres especiais
+  BoolColumn get isDefault =>
+      boolean().withDefault(const Constant(false)).named('is_default')();
+  DateTimeColumn get createdAt => dateTime().named('created_at')();
+  DateTimeColumn get updatedAt => dateTime().named('updated_at')();
 
   @override
   Set<Column> get primaryKey => {id};

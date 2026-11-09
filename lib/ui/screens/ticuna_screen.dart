@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../database/app_database.dart';
+import '../../ticuna/models/multilingual_models.dart';
 import '../../ticuna/models/ticuna_models.dart';
 import '../../ticuna/ticuna_providers.dart';
 import '../../ticuna/ticuna_unicode_helper.dart';
 import '../../ticuna/widgets/ticuna_audio_player_widget.dart';
 import '../../ticuna/widgets/ticuna_diacritics_bar.dart';
 import '../../ticuna/widgets/ministry_situational_phrases_sheet.dart';
+import '../providers.dart';
+import '../widgets/adaptive_ministry_sheet.dart';
 import '../widgets/screen_hero_accent_band.dart';
 
 class TicunaScreen extends ConsumerStatefulWidget {
@@ -49,15 +53,34 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
     final wordsAsync = ref.watch(ticunaWordsStreamProvider);
     final phrasesAsync = ref.watch(ticunaPhrasesStreamProvider);
     final tagsAsync = ref.watch(ticunaTagsStreamProvider);
+    final languagesAsync = ref.watch(languagesStreamProvider);
+    final activeLang = ref.watch(currentActiveLanguageProvider);
 
     final allWords = wordsAsync.value ?? [];
     final allPhrases = phrasesAsync.value ?? [];
     final allTags = tagsAsync.value ?? [];
+    final allLanguages = languagesAsync.value ?? [activeLang];
+    final activeDiacritics = parseLanguageDiacritics(activeLang.diacritics);
+
+    // Filtrar pelo idioma ativo
+    final langWords = allWords.where((w) {
+      if (activeLang.id == 'tca') {
+        return w.languageId == null || w.languageId == 'tca';
+      }
+      return w.languageId == activeLang.id;
+    }).toList();
+
+    final langPhrases = allPhrases.where((p) {
+      if (activeLang.id == 'tca') {
+        return p.languageId == null || p.languageId == 'tca';
+      }
+      return p.languageId == activeLang.id;
+    }).toList();
 
     // Filtros aplicados
     final searchQuery = _searchController.text.trim().toLowerCase();
 
-    final filteredWords = allWords.where((w) {
+    final filteredWords = langWords.where((w) {
       if (_onlyFavorites && !w.isFavorite) return false;
       if (_selectedTag != null &&
           _selectedTag != 'Todos' &&
@@ -80,7 +103,7 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
       return true;
     }).toList();
 
-    final filteredPhrases = allPhrases.where((p) {
+    final filteredPhrases = langPhrases.where((p) {
       if (_onlyFavorites && !p.isFavorite) return false;
       if (_selectedTag != null &&
           _selectedTag != 'Todos' &&
@@ -104,38 +127,73 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: const Color(0xFF0D9488).withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(
-                Icons.translate,
-                color: Color(0xFF0D9488),
-                size: 22,
+        title: InkWell(
+          onTap: () => _showLanguageSelectorModal(context, allLanguages, activeLang),
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0D9488).withValues(alpha: isDark ? 0.22 : 0.12),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: const Color(0xFF0D9488).withValues(alpha: 0.35),
               ),
             ),
-            const SizedBox(width: 10),
-            const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'Língua Ticuna',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  activeLang.symbol,
+                  style: const TextStyle(fontSize: 18),
                 ),
-                Text(
-                  'Dicionário & Frases de Campo',
-                  style: TextStyle(fontSize: 11, color: Colors.grey),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              activeLang.id == 'tca' ? 'Língua Ticuna' : activeLang.name,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                          const Icon(
+                            Icons.arrow_drop_down,
+                            size: 18,
+                            color: Color(0xFF0D9488),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        'Dicionário & Frases de Campo',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
-          ],
+          ),
         ),
         actions: [
+          // Botão Seletor / Gerenciador de Idiomas
+          IconButton(
+            tooltip: 'Gerenciar Idiomas & + Novo Idioma',
+            icon: const Icon(Icons.language_rounded, color: Color(0xFF0D9488)),
+            onPressed: () => _showLanguageSelectorModal(context, allLanguages, activeLang),
+          ),
           // Botão Frases Situacionais & Comparador Multilíngue
           IconButton(
             tooltip: 'Frases Situacionais do Ministério & Comparador',
@@ -147,15 +205,15 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
             tooltip: 'Modo Flashcards (Treinar Vocabulário)',
             icon: const Icon(Icons.school_outlined, color: Color(0xFF0D9488)),
             onPressed: () {
-              if (allWords.isEmpty) {
+              if (langWords.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Cadastre palavras no dicionário para treinar!'),
+                  SnackBar(
+                    content: Text('Cadastre palavras em ${activeLang.name} para treinar!'),
                   ),
                 );
                 return;
               }
-              _showFlashcardStudyModal(context, allWords);
+              _showFlashcardStudyModal(context, langWords);
             },
           ),
           // Botão Importar / Exportar
@@ -183,7 +241,7 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                 children: [
                   const Icon(Icons.menu_book, size: 18),
                   const SizedBox(width: 8),
-                  Text('Dicionário (${allWords.length})'),
+                  Text('Dicionário (${langWords.length})'),
                 ],
               ),
             ),
@@ -193,7 +251,7 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                 children: [
                   const Icon(Icons.forum_outlined, size: 18),
                   const SizedBox(width: 8),
-                  Text('Frases Úteis (${allPhrases.length})'),
+                  Text('Frases Úteis (${langPhrases.length})'),
                 ],
               ),
             ),
@@ -210,9 +268,19 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
         ),
         onPressed: () {
           if (_tabController.index == 0) {
-            _showWordFormDialog(context, allTags: allTags);
+            _showWordFormDialog(
+              context,
+              allTags: allTags,
+              activeLang: activeLang,
+              activeDiacritics: activeDiacritics,
+            );
           } else {
-            _showPhraseFormDialog(context, allTags: allTags);
+            _showPhraseFormDialog(
+              context,
+              allTags: allTags,
+              activeLang: activeLang,
+              activeDiacritics: activeDiacritics,
+            );
           }
         },
       ),
@@ -220,7 +288,13 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
         children: [
           ScreenHeroAccentBand.languages(),
           // Barra de Pesquisa e Filtros
-          _buildSearchAndFilterHeader(context, allTags: allTags, isDark: isDark),
+          _buildSearchAndFilterHeader(
+            context,
+            allTags: allTags,
+            isDark: isDark,
+            activeLang: activeLang,
+            activeDiacritics: activeDiacritics,
+          ),
 
           // Visualização de Conteúdo pelas Abas
           Expanded(
@@ -248,6 +322,8 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
     BuildContext context, {
     required List<TicunaTag> allTags,
     required bool isDark,
+    required AppLanguageEntry activeLang,
+    required List<String> activeDiacritics,
   }) {
     return Container(
       color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
@@ -265,8 +341,8 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
             inputFormatters: const [TicunaInputFormatter()],
             decoration: InputDecoration(
               hintText: _tabController.index == 0
-                  ? 'Buscar termo em Ticuna ou tradução...'
-                  : 'Buscar frases, saudações ou expressões...',
+                  ? 'Buscar termo em ${activeLang.name} ou tradução...'
+                  : 'Buscar frases ou expressões em ${activeLang.name}...',
               prefixIcon: const Icon(Icons.search, size: 20),
               suffixIcon: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -280,23 +356,26 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                         });
                       },
                     ),
-                  IconButton(
-                    icon: Icon(
-                      _showSearchDiacritics
-                          ? Icons.keyboard_hide_outlined
-                          : Icons.keyboard_outlined,
-                      size: 20,
-                      color: _showSearchDiacritics
-                          ? const Color(0xFF0D9488)
-                          : (isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                  if (activeDiacritics.isNotEmpty)
+                    IconButton(
+                      icon: Icon(
+                        _showSearchDiacritics
+                            ? Icons.keyboard_hide_outlined
+                            : Icons.keyboard_outlined,
+                        size: 20,
+                        color: _showSearchDiacritics
+                            ? const Color(0xFF0D9488)
+                            : (isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                      ),
+                      tooltip: activeLang.id == 'tca'
+                          ? 'Teclado Especial Ticuna'
+                          : 'Teclado Especial (${activeLang.name})',
+                      onPressed: () {
+                        setState(() {
+                          _showSearchDiacritics = !_showSearchDiacritics;
+                        });
+                      },
                     ),
-                    tooltip: 'Teclado Especial Ticuna',
-                    onPressed: () {
-                      setState(() {
-                        _showSearchDiacritics = !_showSearchDiacritics;
-                      });
-                    },
-                  ),
                 ],
               ),
               contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -317,11 +396,12 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
             ),
             onChanged: (_) => setState(() {}),
           ),
-          if (_showSearchDiacritics) ...[
+          if (_showSearchDiacritics && activeDiacritics.isNotEmpty) ...[
             const SizedBox(height: 8),
             TicunaDiacriticsBar(
               controller: _searchController,
               compact: true,
+              diacritics: activeDiacritics,
               label: 'Inserir Caractere Especial na Pesquisa:',
               onCharacterInserted: (_) => setState(() {}),
             ),
@@ -997,7 +1077,13 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
     BuildContext context, {
     TicunaWord? wordToEdit,
     required List<TicunaTag> allTags,
+    AppLanguageEntry? activeLang,
+    List<String>? activeDiacritics,
   }) {
+    final AppLanguageEntry lang =
+        activeLang ?? ref.read(currentActiveLanguageProvider);
+    final diacritics = activeDiacritics ?? parseLanguageDiacritics(lang.diacritics);
+
     final wordController = TextEditingController(text: wordToEdit?.word ?? '');
     final translationController =
         TextEditingController(text: wordToEdit?.translation ?? '');
@@ -1030,7 +1116,11 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
               children: [
                 const Icon(Icons.menu_book, color: Color(0xFF0D9488)),
                 const SizedBox(width: 8),
-                Text(wordToEdit != null ? 'Editar Termo Ticuna' : 'Novo Termo Ticuna'),
+                Text(
+                  wordToEdit != null
+                      ? (lang.id == 'tca' ? 'Editar Termo Ticuna' : 'Editar Termo (${lang.name})')
+                      : (lang.id == 'tca' ? 'Novo Termo Ticuna' : 'Novo Termo (${lang.name})'),
+                ),
               ],
             ),
             content: SizedBox(
@@ -1040,14 +1130,17 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // BARRA DE CARACTERES ESPECIAIS TICUNA (Imagem em anexo)
-                    TicunaDiacriticsBar(
-                      controller: activeController,
-                      label: 'Teclas Especiais Ticuna (Toque para inserir):',
-                    ),
-                    const SizedBox(height: 14),
+                    // BARRA DE CARACTERES ESPECIAIS DO IDIOMA
+                    if (diacritics.isNotEmpty) ...[
+                      TicunaDiacriticsBar(
+                        controller: activeController,
+                        diacritics: diacritics,
+                        label: 'Teclas Especiais (${lang.name}):',
+                      ),
+                      const SizedBox(height: 14),
+                    ],
 
-                    // Termo em Ticuna
+                    // Termo no idioma
                     TextField(
                       controller: wordController,
                       autofocus: true,
@@ -1056,8 +1149,10 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                         color: isDark ? Colors.white : Colors.black87,
                       ),
                       inputFormatters: const [TicunaInputFormatter()],
-                      decoration: const InputDecoration(
-                        labelText: 'Palavra ou Termo em Ticuna *',
+                      decoration: InputDecoration(
+                        labelText: lang.id == 'tca'
+                            ? 'Palavra ou Termo em Ticuna *'
+                            : 'Palavra ou Termo (${lang.name}) *',
                         hintText: 'Ex: Taemãẽ, Tamaü, Tupana, Duü̃...',
                       ),
                       onTap: () => setDialogState(() => activeController = wordController),
@@ -1266,6 +1361,7 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                       tags: selectedTags,
                       audioPath: formAudioPath,
                       audioDurationSeconds: formAudioDuration,
+                      languageId: lang.id,
                     );
                   } else {
                     await repo.updateWord(
@@ -1311,7 +1407,13 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
     BuildContext context, {
     TicunaPhrase? phraseToEdit,
     required List<TicunaTag> allTags,
+    AppLanguageEntry? activeLang,
+    List<String>? activeDiacritics,
   }) {
+    final AppLanguageEntry lang =
+        activeLang ?? ref.read(currentActiveLanguageProvider);
+    final diacritics = activeDiacritics ?? parseLanguageDiacritics(lang.diacritics);
+
     final phraseController = TextEditingController(text: phraseToEdit?.phrase ?? '');
     final translationController =
         TextEditingController(text: phraseToEdit?.translation ?? '');
@@ -1339,7 +1441,11 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
               children: [
                 const Icon(Icons.forum_outlined, color: Color(0xFF0D9488)),
                 const SizedBox(width: 8),
-                Text(phraseToEdit != null ? 'Editar Frase Útil' : 'Nova Frase Útil'),
+                Text(
+                  phraseToEdit != null
+                      ? (lang.id == 'tca' ? 'Editar Frase Útil Ticuna' : 'Editar Frase Útil (${lang.name})')
+                      : (lang.id == 'tca' ? 'Nova Frase Útil Ticuna' : 'Nova Frase Útil (${lang.name})'),
+                ),
               ],
             ),
             content: SizedBox(
@@ -1349,14 +1455,17 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // BARRA DE CARACTERES ESPECIAIS TICUNA
-                    TicunaDiacriticsBar(
-                      controller: activeController,
-                      label: 'Teclas Especiais Ticuna (Toque para inserir):',
-                    ),
-                    const SizedBox(height: 14),
+                    // BARRA DE CARACTERES ESPECIAIS DO IDIOMA
+                    if (diacritics.isNotEmpty) ...[
+                      TicunaDiacriticsBar(
+                        controller: activeController,
+                        diacritics: diacritics,
+                        label: 'Teclas Especiais (${lang.name}):',
+                      ),
+                      const SizedBox(height: 14),
+                    ],
 
-                    // Frase em Ticuna
+                    // Frase no idioma
                     TextField(
                       controller: phraseController,
                       autofocus: true,
@@ -1366,8 +1475,10 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                         color: isDark ? Colors.white : Colors.black87,
                       ),
                       inputFormatters: const [TicunaInputFormatter()],
-                      decoration: const InputDecoration(
-                        labelText: 'Frase em Ticuna *',
+                      decoration: InputDecoration(
+                        labelText: lang.id == 'tca'
+                            ? 'Frase em Ticuna *'
+                            : 'Frase em ${lang.name} *',
                         hintText: 'Ex: Tamaü! Ku meã pe\'ĩ?',
                       ),
                       onTap: () =>
@@ -1536,6 +1647,7 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                       tags: selectedTags,
                       audioPath: formAudioPath,
                       audioDurationSeconds: formAudioDuration,
+                      languageId: lang.id,
                     );
                   } else {
                     await repo.updatePhrase(
@@ -2311,6 +2423,352 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
               }
             },
             child: const Text('Excluir', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==========================================
+  // GESTÃO DINÂMICA DE IDIOMAS (DRIFT REGRA 11)
+  // ==========================================
+
+  void _showLanguageSelectorModal(
+    BuildContext context,
+    List<AppLanguageEntry> languages,
+    AppLanguageEntry currentLang,
+  ) {
+    showAdaptiveMinistrySheet(
+      context: context,
+      title: 'Idiomas do Ministério',
+      subtitle: 'Selecione o idioma ativo ou cadastre um novo',
+      titleLeading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0D9488).withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Text('🏹', style: TextStyle(fontSize: 22)),
+      ),
+      builder: (ctx, scrollController) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return ListView(
+          controller: scrollController,
+          shrinkWrap: true,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0D9488),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                icon: const Icon(Icons.add_circle_outline),
+                label: const Text(
+                  '+ Novo Idioma',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _showAddLanguageDialog(context);
+                },
+              ),
+            ),
+            const Divider(),
+            ...languages.map((lang) {
+              final isCurrent = lang.id == currentLang.id;
+              final diacriticsList = parseLanguageDiacritics(lang.diacritics);
+              return Container(
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                decoration: BoxDecoration(
+                  color: isCurrent
+                      ? const Color(0xFF0D9488).withValues(alpha: isDark ? 0.2 : 0.1)
+                      : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isCurrent
+                        ? const Color(0xFF0D9488)
+                        : (isDark ? Colors.white12 : Colors.grey.shade300),
+                    width: isCurrent ? 1.5 : 1.0,
+                  ),
+                ),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: const Color(0xFF0D9488).withValues(alpha: 0.15),
+                    child: Text(
+                      lang.symbol,
+                      style: const TextStyle(fontSize: 20),
+                    ),
+                  ),
+                  title: Row(
+                    children: [
+                      Text(
+                        lang.name,
+                        style: TextStyle(
+                          fontWeight: isCurrent ? FontWeight.bold : FontWeight.w600,
+                        ),
+                      ),
+                      if (lang.isDefault) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text(
+                            'Padrão',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.amber,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  subtitle: Text(
+                    '${lang.code.toUpperCase()} • ${diacriticsList.isNotEmpty ? "${diacriticsList.length} caracteres especiais" : "Sem diacríticos"}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                    ),
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (isCurrent)
+                        const Icon(
+                          Icons.check_circle,
+                          color: Color(0xFF0D9488),
+                          size: 24,
+                        ),
+                      if (!lang.isDefault && !isCurrent)
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                          tooltip: 'Excluir idioma',
+                          onPressed: () => _confirmDeleteLanguage(context, lang),
+                        ),
+                    ],
+                  ),
+                  onTap: () {
+                    ref.read(activeLanguageProvider.notifier).state = lang;
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Idioma ativo: ${lang.symbol} ${lang.name}'),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  },
+                ),
+              );
+            }),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showAddLanguageDialog(BuildContext context) {
+    final nameCtrl = TextEditingController();
+    final codeCtrl = TextEditingController();
+    final symbolCtrl = TextEditingController();
+    final diacriticsCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          void applyPreset(LanguageMetadata preset) {
+            setDialogState(() {
+              nameCtrl.text = '${preset.name} (${preset.nativeName})';
+              codeCtrl.text = preset.code;
+              symbolCtrl.text = preset.symbol;
+              diacriticsCtrl.text = preset.diacritics.join(', ');
+            });
+          }
+
+          return AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.add_circle, color: Color(0xFF0D9488)),
+                SizedBox(width: 8),
+                Text('+ Novo Idioma no Drift'),
+              ],
+            ),
+            content: SizedBox(
+              width: 500,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Atalhos Pré-Catalogados (1-Toque):',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        ActionChip(
+                          avatar: const Text('🌿'),
+                          label: const Text('Guajajara (Tenetehara)'),
+                          onPressed: () => applyPreset(LanguageRegistry.guajajara),
+                        ),
+                        ActionChip(
+                          avatar: const Text('🌳'),
+                          label: const Text('Yanomami (Yanomamõ)'),
+                          onPressed: () => applyPreset(LanguageRegistry.yanomami),
+                        ),
+                      ],
+                    ),
+                    const Divider(height: 24),
+                    TextField(
+                      controller: nameCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Nome do Idioma *',
+                        hintText: 'Ex: Guajajara, Yanomami, Wapichana',
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: TextField(
+                            controller: codeCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Código ISO *',
+                              hintText: 'Ex: gub, yan',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          flex: 1,
+                          child: TextField(
+                            controller: symbolCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Símbolo / Emoji',
+                              hintText: 'Ex: 🌿',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: diacriticsCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Caracteres Especiais / Diacríticos (separados por vírgula)',
+                        hintText: 'Ex: à, è, ì, ò, ù, ỹ, \'',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogCtx),
+                child: const Text('Cancelar'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0D9488),
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: () async {
+                  final name = nameCtrl.text.trim();
+                  final code = codeCtrl.text.trim().toLowerCase();
+                  final symbol = symbolCtrl.text.trim().isEmpty ? '🌐' : symbolCtrl.text.trim();
+                  final diacriticsText = diacriticsCtrl.text.trim();
+
+                  if (name.isEmpty || code.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Preencha o nome e o código do idioma.'),
+                      ),
+                    );
+                    return;
+                  }
+
+                  final messenger = ScaffoldMessenger.of(context);
+                  final dialogNav = Navigator.of(dialogCtx);
+                  final repo = ref.read(repositoryProvider);
+                  await repo.createLanguage(
+                    id: code,
+                    name: name,
+                    code: code,
+                    symbol: symbol,
+                    diacritics: diacriticsText.isNotEmpty ? diacriticsText : null,
+                    isDefault: false,
+                  );
+
+                  final newEntry = AppLanguageEntry(
+                    id: code,
+                    name: name,
+                    code: code,
+                    symbol: symbol,
+                    diacritics: diacriticsText,
+                    isDefault: false,
+                    createdAt: DateTime.now(),
+                    updatedAt: DateTime.now(),
+                  );
+                  ref.read(activeLanguageProvider.notifier).state = newEntry;
+
+                  dialogNav.pop();
+                  messenger.showSnackBar(
+                    SnackBar(
+                      content: Text('Idioma "$symbol $name" criado e ativado com sucesso!'),
+                    ),
+                  );
+                },
+                child: const Text('Cadastrar Idioma'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  void _confirmDeleteLanguage(BuildContext context, AppLanguageEntry lang) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Excluir Idioma?'),
+        content: Text('Deseja excluir "${lang.symbol} ${lang.name}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
+              final dialogNav = Navigator.of(ctx);
+              final sheetNav = Navigator.of(context);
+              await ref.read(repositoryProvider).deleteLanguage(lang.id);
+              final current = ref.read(activeLanguageProvider);
+              if (current?.id == lang.id) {
+                ref.read(activeLanguageProvider.notifier).state = null;
+              }
+              dialogNav.pop();
+              sheetNav.pop();
+              messenger.showSnackBar(
+                SnackBar(content: Text('Idioma ${lang.name} removido.')),
+              );
+            },
+            child: const Text('Excluir'),
           ),
         ],
       ),
