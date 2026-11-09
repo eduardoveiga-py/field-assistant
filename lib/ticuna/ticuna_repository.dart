@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import '../core/app_logger.dart';
 import '../database/app_database.dart';
 import 'models/ticuna_models.dart';
 import 'ticuna_unicode_helper.dart';
@@ -38,6 +39,12 @@ class TicunaRepository {
 
   Future<void>? _initFuture;
   bool _initialized = false;
+  bool _initializationFailed = false;
+  String? _initializationError;
+
+  bool get isInitialized => _initialized;
+  bool get hasInitializationFailed => _initializationFailed;
+  String? get initializationError => _initializationError;
 
   TicunaRepository(this.db) {
     _initTables();
@@ -45,7 +52,11 @@ class TicunaRepository {
 
   Future<void> _initTables() async {
     if (_initialized) return;
-    _initFuture ??= _doInitTables();
+    if (_initializationFailed) {
+      _initFuture = _doInitTables();
+    } else {
+      _initFuture ??= _doInitTables();
+    }
     await _initFuture;
   }
 
@@ -67,7 +78,14 @@ class TicunaRepository {
           status: const Value('pending'),
         ),
       );
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.error(
+        'Erro ao enfileirar operação na syncQueue ($entityType / $entityId / $operation): $e',
+        e,
+        st,
+      );
+      rethrow;
+    }
   }
 
   Future<void> _doInitTables() async {
@@ -119,26 +137,36 @@ class TicunaRepository {
         );
       ''');
 
-      // Migrações tolerantes a falhas caso colunas não existam em bancos preexistentes
+      // Migrações idempotentes caso colunas já existam em bancos preexistentes
       try {
         await db.customStatement('ALTER TABLE ticuna_words ADD COLUMN audio_path TEXT;');
-      } catch (_) {}
+      } catch (e) {
+        AppLogger.debug('Coluna audio_path em ticuna_words já existe ou inicializada: $e');
+      }
       try {
         await db.customStatement('ALTER TABLE ticuna_words ADD COLUMN audio_duration_seconds INTEGER;');
-      } catch (_) {}
+      } catch (e) {
+        AppLogger.debug('Coluna audio_duration_seconds em ticuna_words já existe ou inicializada: $e');
+      }
       try {
         await db.customStatement('ALTER TABLE ticuna_phrases ADD COLUMN audio_path TEXT;');
-      } catch (_) {}
+      } catch (e) {
+        AppLogger.debug('Coluna audio_path em ticuna_phrases já existe ou inicializada: $e');
+      }
       try {
         await db.customStatement('ALTER TABLE ticuna_phrases ADD COLUMN audio_duration_seconds INTEGER;');
-      } catch (_) {}
+      } catch (e) {
+        AppLogger.debug('Coluna audio_duration_seconds em ticuna_phrases já existe ou inicializada: $e');
+      }
 
       // Normalização defensiva para recuperar termos canônicos corrigidos
       try {
         await db.customStatement(
           "UPDATE ticuna_words SET word = 'Duü\u0303', phonetics = 'du-ü\u0303 [nasal]', example_sentence = 'Duü\u0303 meã' WHERE word = 'Duũ' OR word = 'Duũũ' OR word LIKE 'Duũ%' OR word LIKE 'duũ%';",
         );
-      } catch (_) {}
+      } catch (e, st) {
+        AppLogger.warning('Aviso na normalização de termos canônicos Ticuna: $e', e, st);
+      }
 
       // Seed inicial de tags e vocabulário caso tabelas estejam vazias
       final wordsCount = await db
@@ -147,9 +175,20 @@ class TicunaRepository {
       if (wordsCount.read<int>('count') == 0) {
         await _seedInitialData();
       }
-    } catch (_) {}
-    _initialized = true;
-    _refreshAll();
+      _initialized = true;
+      _initializationFailed = false;
+      _initializationError = null;
+      _refreshAll();
+    } catch (e, st) {
+      _initialized = false;
+      _initializationFailed = true;
+      _initializationError = e.toString();
+      AppLogger.error(
+        'Falha ao inicializar tabelas Ticuna: $e',
+        e,
+        st,
+      );
+    }
   }
 
   Future<void> _seedInitialData() async {
@@ -449,7 +488,9 @@ class TicunaRepository {
       if (!_wordsController.isClosed) {
         _wordsController.add(list);
       }
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.error('Erro ao atualizar stream de palavras Ticuna: $e', e, st);
+    }
   }
 
   Future<void> _refreshPhrases() async {
@@ -458,7 +499,9 @@ class TicunaRepository {
       if (!_phrasesController.isClosed) {
         _phrasesController.add(list);
       }
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.error('Erro ao atualizar stream de frases Ticuna: $e', e, st);
+    }
   }
 
   Future<void> _refreshTags() async {
@@ -467,7 +510,9 @@ class TicunaRepository {
       if (!_tagsController.isClosed) {
         _tagsController.add(list);
       }
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.error('Erro ao atualizar stream de tags Ticuna: $e', e, st);
+    }
   }
 
   // ==========================================
@@ -517,7 +562,8 @@ class TicunaRepository {
       }
 
       return list;
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.error('Erro ao buscar palavras Ticuna: $e', e, st);
       return [];
     }
   }
@@ -567,8 +613,10 @@ class TicunaRepository {
       updatedAt: now,
     );
 
-    await _insertWordDirect(item);
-    await _enqueueSync('ticuna_words', item.id, 'INSERT', item.toMap());
+    await db.transaction(() async {
+      await _insertWordDirect(item);
+      await _enqueueSync('ticuna_words', item.id, 'INSERT', item.toMap());
+    });
     await _refreshWords();
     return item;
   }
@@ -609,58 +657,62 @@ class TicunaRepository {
   Future<void> updateWord(TicunaWord item) async {
     await _initTables();
     final now = DateTime.now();
-    await db.customUpdate(
-      '''
-      UPDATE ticuna_words SET
-        word = ?,
-        translation = ?,
-        phonetics = ?,
-        grammatical_class = ?,
-        example_sentence = ?,
-        example_translation = ?,
-        notes = ?,
-        tags = ?,
-        is_favorite = ?,
-        review_level = ?,
-        review_count = ?,
-        last_reviewed_at = ?,
-        audio_path = ?,
-        audio_duration_seconds = ?,
-        updated_at = ?
-      WHERE id = ?
-      ''',
-      variables: [
-        Variable.withString(TicunaUnicodeHelper.normalize(item.word.trim())),
-        Variable.withString(item.translation.trim()),
-        Variable.withString(item.phonetics?.trim() ?? ''),
-        Variable.withString(item.grammaticalClass?.trim() ?? ''),
-        Variable.withString(item.exampleSentence != null
-            ? TicunaUnicodeHelper.normalize(item.exampleSentence!.trim())
-            : ''),
-        Variable.withString(item.exampleTranslation?.trim() ?? ''),
-        Variable.withString(item.notes?.trim() ?? ''),
-        Variable.withString(jsonEncode(item.tags)),
-        Variable.withInt(item.isFavorite ? 1 : 0),
-        Variable.withInt(item.reviewLevel),
-        Variable.withInt(item.reviewCount),
-        Variable.withString(item.lastReviewedAt?.toIso8601String() ?? ''),
-        Variable.withString(item.audioPath ?? ''),
-        Variable.withInt(item.audioDurationSeconds ?? 0),
-        Variable.withString(now.toIso8601String()),
-        Variable.withString(item.id),
-      ],
-    );
-    await _enqueueSync('ticuna_words', item.id, 'UPDATE', item.toMap());
+    await db.transaction(() async {
+      await db.customUpdate(
+        '''
+        UPDATE ticuna_words SET
+          word = ?,
+          translation = ?,
+          phonetics = ?,
+          grammatical_class = ?,
+          example_sentence = ?,
+          example_translation = ?,
+          notes = ?,
+          tags = ?,
+          is_favorite = ?,
+          review_level = ?,
+          review_count = ?,
+          last_reviewed_at = ?,
+          audio_path = ?,
+          audio_duration_seconds = ?,
+          updated_at = ?
+        WHERE id = ?
+        ''',
+        variables: [
+          Variable.withString(TicunaUnicodeHelper.normalize(item.word.trim())),
+          Variable.withString(item.translation.trim()),
+          Variable.withString(item.phonetics?.trim() ?? ''),
+          Variable.withString(item.grammaticalClass?.trim() ?? ''),
+          Variable.withString(item.exampleSentence != null
+              ? TicunaUnicodeHelper.normalize(item.exampleSentence!.trim())
+              : ''),
+          Variable.withString(item.exampleTranslation?.trim() ?? ''),
+          Variable.withString(item.notes?.trim() ?? ''),
+          Variable.withString(jsonEncode(item.tags)),
+          Variable.withInt(item.isFavorite ? 1 : 0),
+          Variable.withInt(item.reviewLevel),
+          Variable.withInt(item.reviewCount),
+          Variable.withString(item.lastReviewedAt?.toIso8601String() ?? ''),
+          Variable.withString(item.audioPath ?? ''),
+          Variable.withInt(item.audioDurationSeconds ?? 0),
+          Variable.withString(now.toIso8601String()),
+          Variable.withString(item.id),
+        ],
+      );
+      await _enqueueSync('ticuna_words', item.id, 'UPDATE', item.toMap());
+    });
     await _refreshWords();
   }
 
   Future<void> deleteWord(String id) async {
     await _initTables();
-    await db.customUpdate(
-      'DELETE FROM ticuna_words WHERE id = ?',
-      variables: [Variable.withString(id)],
-    );
-    await _enqueueSync('ticuna_words', id, 'DELETE', {'id': id});
+    await db.transaction(() async {
+      await db.customUpdate(
+        'DELETE FROM ticuna_words WHERE id = ?',
+        variables: [Variable.withString(id)],
+      );
+      await _enqueueSync('ticuna_words', id, 'DELETE', {'id': id});
+    });
     await _refreshWords();
   }
 
@@ -671,39 +723,29 @@ class TicunaRepository {
   }) async {
     await _initTables();
     final now = DateTime.now();
-    await db.customUpdate(
-      '''
-      UPDATE ticuna_words SET
-        audio_path = ?,
-        audio_duration_seconds = ?,
-        updated_at = ?
-      WHERE id = ?
-      ''',
-      variables: [
-        Variable.withString(audioPath ?? ''),
-        Variable.withInt(durationSeconds ?? 0),
-        Variable.withString(now.toIso8601String()),
-        Variable.withString(wordId),
-      ],
-    );
-    try {
-      await db.into(db.syncQueue).insert(
-        SyncQueueCompanion.insert(
-          id: _uuid.v4(),
-          entityType: 'ticuna_words',
-          entityId: wordId,
-          operation: 'UPDATE',
-          payload: jsonEncode({
-            'id': wordId,
-            'audio_path': audioPath,
-            'audio_duration_seconds': durationSeconds,
-            'updated_at': now.toIso8601String(),
-          }),
-          createdAt: now,
-          status: const Value('pending'),
-        ),
+    await db.transaction(() async {
+      await db.customUpdate(
+        '''
+        UPDATE ticuna_words SET
+          audio_path = ?,
+          audio_duration_seconds = ?,
+          updated_at = ?
+        WHERE id = ?
+        ''',
+        variables: [
+          Variable.withString(audioPath ?? ''),
+          Variable.withInt(durationSeconds ?? 0),
+          Variable.withString(now.toIso8601String()),
+          Variable.withString(wordId),
+        ],
       );
-    } catch (_) {}
+      await _enqueueSync('ticuna_words', wordId, 'UPDATE', {
+        'id': wordId,
+        'audio_path': audioPath,
+        'audio_duration_seconds': durationSeconds,
+        'updated_at': now.toIso8601String(),
+      });
+    });
     await _refreshWords();
   }
 
@@ -720,14 +762,23 @@ class TicunaRepository {
 
     if (rows.isNotEmpty) {
       final current = rows.first.read<int>('is_favorite') == 1;
-      await db.customUpdate(
-        'UPDATE ticuna_words SET is_favorite = ?, updated_at = ? WHERE id = ?',
-        variables: [
-          Variable.withInt(current ? 0 : 1),
-          Variable.withString(DateTime.now().toIso8601String()),
-          Variable.withString(id),
-        ],
-      );
+      final newFav = current ? 0 : 1;
+      final now = DateTime.now();
+      await db.transaction(() async {
+        await db.customUpdate(
+          'UPDATE ticuna_words SET is_favorite = ?, updated_at = ? WHERE id = ?',
+          variables: [
+            Variable.withInt(newFav),
+            Variable.withString(now.toIso8601String()),
+            Variable.withString(id),
+          ],
+        );
+        await _enqueueSync('ticuna_words', id, 'UPDATE', {
+          'id': id,
+          'is_favorite': newFav == 1,
+          'updated_at': now.toIso8601String(),
+        });
+      });
       await _refreshWords();
     }
   }
@@ -755,23 +806,32 @@ class TicunaRepository {
       if (newLevel > 5) newLevel = 5;
 
       final now = DateTime.now();
-      await db.customUpdate(
-        '''
-        UPDATE ticuna_words SET
-          review_level = ?,
-          review_count = ?,
-          last_reviewed_at = ?,
-          updated_at = ?
-        WHERE id = ?
-        ''',
-        variables: [
-          Variable.withInt(newLevel),
-          Variable.withInt(currentCount + 1),
-          Variable.withString(now.toIso8601String()),
-          Variable.withString(now.toIso8601String()),
-          Variable.withString(id),
-        ],
-      );
+      await db.transaction(() async {
+        await db.customUpdate(
+          '''
+          UPDATE ticuna_words SET
+            review_level = ?,
+            review_count = ?,
+            last_reviewed_at = ?,
+            updated_at = ?
+          WHERE id = ?
+          ''',
+          variables: [
+            Variable.withInt(newLevel),
+            Variable.withInt(currentCount + 1),
+            Variable.withString(now.toIso8601String()),
+            Variable.withString(now.toIso8601String()),
+            Variable.withString(id),
+          ],
+        );
+        await _enqueueSync('ticuna_words', id, 'UPDATE', {
+          'id': id,
+          'review_level': newLevel,
+          'review_count': currentCount + 1,
+          'last_reviewed_at': now.toIso8601String(),
+          'updated_at': now.toIso8601String(),
+        });
+      });
       await _refreshWords();
     }
   }
@@ -819,7 +879,8 @@ class TicunaRepository {
       }
 
       return list;
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.error('Erro ao buscar frases Ticuna: $e', e, st);
       return [];
     }
   }
@@ -857,8 +918,10 @@ class TicunaRepository {
       updatedAt: now,
     );
 
-    await _insertPhraseDirect(item);
-    await _enqueueSync('ticuna_phrases', item.id, 'INSERT', item.toMap());
+    await db.transaction(() async {
+      await _insertPhraseDirect(item);
+      await _enqueueSync('ticuna_phrases', item.id, 'INSERT', item.toMap());
+    });
     await _refreshPhrases();
     return item;
   }
@@ -892,36 +955,38 @@ class TicunaRepository {
   Future<void> updatePhrase(TicunaPhrase item) async {
     await _initTables();
     final now = DateTime.now();
-    await db.customUpdate(
-      '''
-      UPDATE ticuna_phrases SET
-        phrase = ?,
-        translation = ?,
-        category = ?,
-        phonetics = ?,
-        notes = ?,
-        tags = ?,
-        is_favorite = ?,
-        audio_path = ?,
-        audio_duration_seconds = ?,
-        updated_at = ?
-      WHERE id = ?
-      ''',
-      variables: [
-        Variable.withString(TicunaUnicodeHelper.normalize(item.phrase.trim())),
-        Variable.withString(item.translation.trim()),
-        Variable.withString(item.category?.trim() ?? ''),
-        Variable.withString(item.phonetics?.trim() ?? ''),
-        Variable.withString(item.notes?.trim() ?? ''),
-        Variable.withString(jsonEncode(item.tags)),
-        Variable.withInt(item.isFavorite ? 1 : 0),
-        Variable.withString(item.audioPath ?? ''),
-        Variable.withInt(item.audioDurationSeconds ?? 0),
-        Variable.withString(now.toIso8601String()),
-        Variable.withString(item.id),
-      ],
-    );
-    await _enqueueSync('ticuna_phrases', item.id, 'UPDATE', item.toMap());
+    await db.transaction(() async {
+      await db.customUpdate(
+        '''
+        UPDATE ticuna_phrases SET
+          phrase = ?,
+          translation = ?,
+          category = ?,
+          phonetics = ?,
+          notes = ?,
+          tags = ?,
+          is_favorite = ?,
+          audio_path = ?,
+          audio_duration_seconds = ?,
+          updated_at = ?
+        WHERE id = ?
+        ''',
+        variables: [
+          Variable.withString(TicunaUnicodeHelper.normalize(item.phrase.trim())),
+          Variable.withString(item.translation.trim()),
+          Variable.withString(item.category?.trim() ?? ''),
+          Variable.withString(item.phonetics?.trim() ?? ''),
+          Variable.withString(item.notes?.trim() ?? ''),
+          Variable.withString(jsonEncode(item.tags)),
+          Variable.withInt(item.isFavorite ? 1 : 0),
+          Variable.withString(item.audioPath ?? ''),
+          Variable.withInt(item.audioDurationSeconds ?? 0),
+          Variable.withString(now.toIso8601String()),
+          Variable.withString(item.id),
+        ],
+      );
+      await _enqueueSync('ticuna_phrases', item.id, 'UPDATE', item.toMap());
+    });
     await _refreshPhrases();
   }
 
@@ -932,39 +997,29 @@ class TicunaRepository {
   }) async {
     await _initTables();
     final now = DateTime.now();
-    await db.customUpdate(
-      '''
-      UPDATE ticuna_phrases SET
-        audio_path = ?,
-        audio_duration_seconds = ?,
-        updated_at = ?
-      WHERE id = ?
-      ''',
-      variables: [
-        Variable.withString(audioPath ?? ''),
-        Variable.withInt(durationSeconds ?? 0),
-        Variable.withString(now.toIso8601String()),
-        Variable.withString(phraseId),
-      ],
-    );
-    try {
-      await db.into(db.syncQueue).insert(
-        SyncQueueCompanion.insert(
-          id: _uuid.v4(),
-          entityType: 'ticuna_phrases',
-          entityId: phraseId,
-          operation: 'UPDATE',
-          payload: jsonEncode({
-            'id': phraseId,
-            'audio_path': audioPath,
-            'audio_duration_seconds': durationSeconds,
-            'updated_at': now.toIso8601String(),
-          }),
-          createdAt: now,
-          status: const Value('pending'),
-        ),
+    await db.transaction(() async {
+      await db.customUpdate(
+        '''
+        UPDATE ticuna_phrases SET
+          audio_path = ?,
+          audio_duration_seconds = ?,
+          updated_at = ?
+        WHERE id = ?
+        ''',
+        variables: [
+          Variable.withString(audioPath ?? ''),
+          Variable.withInt(durationSeconds ?? 0),
+          Variable.withString(now.toIso8601String()),
+          Variable.withString(phraseId),
+        ],
       );
-    } catch (_) {}
+      await _enqueueSync('ticuna_phrases', phraseId, 'UPDATE', {
+        'id': phraseId,
+        'audio_path': audioPath,
+        'audio_duration_seconds': durationSeconds,
+        'updated_at': now.toIso8601String(),
+      });
+    });
     await _refreshPhrases();
   }
 
@@ -974,11 +1029,13 @@ class TicunaRepository {
 
   Future<void> deletePhrase(String id) async {
     await _initTables();
-    await db.customUpdate(
-      'DELETE FROM ticuna_phrases WHERE id = ?',
-      variables: [Variable.withString(id)],
-    );
-    await _enqueueSync('ticuna_phrases', id, 'DELETE', {'id': id});
+    await db.transaction(() async {
+      await db.customUpdate(
+        'DELETE FROM ticuna_phrases WHERE id = ?',
+        variables: [Variable.withString(id)],
+      );
+      await _enqueueSync('ticuna_phrases', id, 'DELETE', {'id': id});
+    });
     await _refreshPhrases();
   }
 
@@ -991,14 +1048,23 @@ class TicunaRepository {
 
     if (rows.isNotEmpty) {
       final current = rows.first.read<int>('is_favorite') == 1;
-      await db.customUpdate(
-        'UPDATE ticuna_phrases SET is_favorite = ?, updated_at = ? WHERE id = ?',
-        variables: [
-          Variable.withInt(current ? 0 : 1),
-          Variable.withString(DateTime.now().toIso8601String()),
-          Variable.withString(id),
-        ],
-      );
+      final newFav = current ? 0 : 1;
+      final now = DateTime.now();
+      await db.transaction(() async {
+        await db.customUpdate(
+          'UPDATE ticuna_phrases SET is_favorite = ?, updated_at = ? WHERE id = ?',
+          variables: [
+            Variable.withInt(newFav),
+            Variable.withString(now.toIso8601String()),
+            Variable.withString(id),
+          ],
+        );
+        await _enqueueSync('ticuna_phrases', id, 'UPDATE', {
+          'id': id,
+          'is_favorite': newFav == 1,
+          'updated_at': now.toIso8601String(),
+        });
+      });
       await _refreshPhrases();
     }
   }
@@ -1014,7 +1080,8 @@ class TicunaRepository {
         'SELECT * FROM ticuna_tags ORDER BY name ASC',
       ).get();
       return rows.map((r) => TicunaTag.fromMap(r.data)).toList();
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.error('Erro ao buscar tags Ticuna: $e', e, st);
       return [];
     }
   }
@@ -1154,7 +1221,8 @@ class TicunaRepository {
         tagsCount: tagsImported,
         success: true,
       );
-    } catch (e) {
+    } catch (e, st) {
+      AppLogger.error('Erro ao importar backup JSON Ticuna: $e', e, st);
       return TicunaImportResult(
         wordsCount: 0,
         phrasesCount: 0,
@@ -1322,7 +1390,8 @@ class TicunaRepository {
         tagsCount: 0,
         success: true,
       );
-    } catch (e) {
+    } catch (e, st) {
+      AppLogger.error('Erro ao importar CSV Ticuna: $e', e, st);
       return TicunaImportResult(
         wordsCount: 0,
         phrasesCount: 0,

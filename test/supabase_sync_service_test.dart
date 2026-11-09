@@ -10,6 +10,7 @@ import 'package:ministerio_pessoal/database/app_database.dart';
 import 'package:ministerio_pessoal/database/repository.dart';
 import 'package:ministerio_pessoal/sync/supabase_sync_service.dart';
 import 'package:ministerio_pessoal/sync/sync_engine.dart';
+import 'package:ministerio_pessoal/ticuna/ticuna_repository.dart';
 import 'package:path/path.dart' as p;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -574,18 +575,16 @@ void main() {
 
       final mockClient = MockClient((request) async {
         final path = request.url.path;
-        if (path.contains(
-              '/storage/v1/object/voice_notes/vn_upload_test.m4a',
-            ) &&
+        if (path.contains('/storage/v1/object/voice_notes') &&
+            path.contains('vn_upload_test.m4a') &&
             request.method == 'POST') {
           storageUploadCalled = true;
           return mockJsonResponse(request, {
             'Key': 'voice_notes/vn_upload_test.m4a',
           });
         }
-        if (path.contains(
-              '/storage/v1/object/voice_notes/vn_download_test.m4a',
-            ) &&
+        if (path.contains('/storage/v1/object/voice_notes') &&
+            path.contains('vn_download_test.m4a') &&
             request.method == 'GET') {
           storageDownloadCalled = true;
           return mockBinaryResponse(
@@ -827,9 +826,8 @@ void main() {
             },
           ], contentRange: '0-0/1');
         }
-        if (path.contains(
-          '/storage/v1/object/voice_notes/vn_pending_dl_1.m4a',
-        )) {
+        if (path.contains('/storage/v1/object/voice_notes') &&
+            path.contains('vn_pending_dl_1.m4a')) {
           if (!allowDownload) {
             return http.Response('Network timeout on audio', 504);
           } else {
@@ -890,6 +888,85 @@ void main() {
               ))
               .getSingleOrNull();
       expect(pendingKeyAfter, isNull);
+    });
+
+    test('8. Download de áudio Ticuna falha, registra pendência e retryPendingMediaDownloads recupera com sucesso', () async {
+      final tempDir = Directory.systemTemp.createTempSync('ticuna_pending_test_');
+      addTearDown(() => tempDir.deleteSync(recursive: true));
+
+      bool allowDownload = false;
+      bool deleteCalled = false;
+
+      final mockClient = MockClient((request) async {
+        final path = request.url.path;
+        if (path.contains('/storage/v1/object/ticuna_audio') || path.contains('/storage/v1/object/voice_notes')) {
+          if (request.method == 'DELETE') {
+            deleteCalled = true;
+            return mockJsonResponse(request, {'message': 'Deleted'});
+          }
+          if (path.contains('word_ticuna_dl_1_pronunciation.m4a')) {
+            if (!allowDownload) {
+              return http.Response('Storage unavailable', 503);
+            } else {
+              return mockBinaryResponse(
+                request,
+                utf8.encode('TICUNA_PRONUNCIATION_AUDIO_BYTES'),
+                contentType: 'audio/m4a',
+              );
+            }
+          }
+        }
+        if (path.contains('/rest/v1/ticuna_words')) {
+          return mockJsonResponse(request, [
+            {
+              'id': 'word_ticuna_dl_1',
+              'word': 'Duü\u0303',
+              'translation': 'Pessoa',
+              'created_at': DateTime.now().toIso8601String(),
+              'updated_at': DateTime.now().toIso8601String(),
+            }
+          ], contentRange: '0-0/1');
+        }
+        return mockJsonResponse(request, []);
+      });
+
+      final customSync = SupabaseSyncService(
+        db: db,
+        repository: repo,
+        clientOverride: SupabaseClient(
+          'https://mock.supabase.co',
+          'dummy-key-xyz',
+          httpClient: mockClient,
+        ),
+        documentsDirectoryProvider: () async => tempDir.path,
+      );
+
+      final ticunaRepo = TicunaRepository(db);
+      await ticunaRepo.getAllWords(); // Garante inicialização das tabelas no SQLite
+
+      // 1. Pull inicial: metadado da palavra chega, mas download de áudio falha com 503
+      final pullRes = await customSync.fetchRemoteChanges();
+      expect(pullRes.successCount, greaterThanOrEqualTo(1));
+
+      // Verifica pendência registrada no AppKvStore
+      final pendingKey = await (db.select(db.appKvStore)
+        ..where((t) => t.key.equals('pending_ticuna_audio_download_ticuna_words_word_ticuna_dl_1'))).getSingleOrNull();
+      expect(pendingKey, isNotNull);
+
+      // 2. Conexão restabelecida: autoriza download e recupera via retryPendingMediaDownloads
+      allowDownload = true;
+      final recovered = await customSync.retryPendingMediaDownloads();
+      expect(recovered, equals(1));
+
+      // Pendência deve ter sido consumida
+      final pendingAfter = await (db.select(db.appKvStore)
+        ..where((t) => t.key.equals('pending_ticuna_audio_download_ticuna_words_word_ticuna_dl_1'))).getSingleOrNull();
+      expect(pendingAfter, isNull);
+
+      // 3. Testa deleção de áudio com user folder prefix
+      final deleted = await customSync.deleteTicunaAudio('word_ticuna_dl_1');
+      expect(deleted, isTrue);
+      expect(deleteCalled, isTrue);
     });
   });
 }

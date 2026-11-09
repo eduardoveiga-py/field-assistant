@@ -126,6 +126,55 @@ void main() {
       expect(match.distanceMeters, lessThan(25.0));
       expect(match.nameSimilarity, greaterThan(0.7));
     });
+
+    test('5. calculateCoverage separa os 3 indicadores: residências, contatos e conversas efetivas', () {
+      final p1 = PersonEntry(
+        id: 'p1', name: 'Maria da Silva', address: 'Rua das Flores, 10', firstContactAt: baseDate,
+        status: 'interessado', tags: '[]', createdAt: baseDate, updatedAt: baseDate, revision: 1,
+      );
+      final p2 = PersonEntry(
+        id: 'p2', name: 'João da Silva', address: 'Rua das Flores, 10', firstContactAt: baseDate,
+        status: 'revisita', tags: '[]', createdAt: baseDate, updatedAt: baseDate, revision: 1,
+      );
+      final p3 = PersonEntry(
+        id: 'p3', name: 'Lucas Costa', address: 'Rua dos Rios, 20', firstContactAt: baseDate,
+        status: 'estudo', tags: '[]', createdAt: baseDate, updatedAt: baseDate, revision: 1,
+      );
+      final p4 = PersonEntry(
+        id: 'p4', name: 'Ana Ticuna', address: 'Comunidade Umariaçu', firstContactAt: baseDate,
+        status: 'interessado', tags: '[]', createdAt: baseDate, updatedAt: baseDate, revision: 1,
+      );
+
+      final visits = [
+        VisitEntry(
+          id: 'v1', personId: 'p1', dateTimeField: baseDate.subtract(const Duration(days: 5)),
+          contactType: 'presencial', result: 'conversa_agradavel', createdAt: baseDate, updatedAt: baseDate, revision: 1,
+        ),
+        VisitEntry(
+          id: 'v2', personId: 'p3', dateTimeField: baseDate.subtract(const Duration(days: 10)),
+          contactType: 'tentativa_sem_contato', result: 'ausente', createdAt: baseDate, updatedAt: baseDate, revision: 1,
+        ),
+      ];
+
+      final report = TerritoryCoverageEngine.calculateCoverage(
+        people: [p1, p2, p3, p4],
+        visits: visits,
+        referenceDate: baseDate,
+      );
+
+      expect(report.totalUniqueAddresses, equals(3));
+      expect(report.workedUniqueAddresses, equals(2));
+      expect(report.addressCoveragePercent, closeTo(66.7, 0.2));
+
+      expect(report.totalPeople, equals(4));
+      expect(report.visitedPeopleCount, equals(2));
+      expect(report.peopleCoveragePercent, equals(50.0));
+
+      expect(report.effectiveConversationCount, equals(1));
+      expect(report.attemptWithoutContactCount, equals(1));
+      expect(report.peopleWithEffectiveConversation, equals(1));
+      expect(report.conversationCoveragePercent, equals(25.0));
+    });
   });
 
   group('TerritoryDataPortService (KML, GeoJSON, CSV)', () {
@@ -234,6 +283,113 @@ void main() {
       expect(recommendations, isNotEmpty);
       expect(recommendations.first.title, contains('Gabriel Torres'));
       expect(recommendations.first.hasConflict, isFalse);
+    });
+
+    test('2. suggestSlots suporta modo de deslocamento fluvial (barco / voadeira)', () {
+      final target = PersonEntry(
+        id: 'target-boat', name: 'Raimundo Ribeirinho', firstContactAt: baseDate,
+        status: 'revisita', tags: '[]', createdAt: baseDate,
+        updatedAt: baseDate, revision: 1, latitude: -3.4215, longitude: -65.8520,
+        preferredSchedule: 'Sábado 10:00',
+      );
+
+      final neighbor = PersonEntry(
+        id: 'neighbor-boat', name: 'Maria Ribeirinha', firstContactAt: baseDate,
+        status: 'estudo', tags: '[]', createdAt: baseDate,
+        updatedAt: baseDate, revision: 1, latitude: -3.4400, longitude: -65.8700,
+      );
+
+      final nextSaturday = DateTime(2026, 11, 14, 10, 0);
+      final existingAppt = AppointmentEntry(
+        id: 'appt-boat', personId: 'neighbor-boat', title: 'Estudo Fluvial',
+        startTime: nextSaturday, endTime: nextSaturday.add(const Duration(minutes: 60)),
+        durationMinutes: 60, status: 'agendado', isProvisional: false,
+        createdAt: baseDate, updatedAt: baseDate, revision: 0,
+      );
+
+      final recommendations = DoorstepProximityEngine.suggestSlots(
+        targetPerson: target,
+        allPeople: [target, neighbor],
+        existingAppointments: [existingAppt],
+        externalEvents: [],
+        referenceNow: baseDate,
+        travelMode: DoorstepTravelMode.boat,
+        customBufferMinutes: 40,
+      );
+
+      expect(recommendations, isNotEmpty);
+      expect(recommendations.first.travelMode, equals(DoorstepTravelMode.boat));
+      expect(recommendations.first.estimatedTravelMinutes, greaterThanOrEqualTo(10));
+    });
+
+    test('3. suggestSlots detecta proximidade por endereço/bairro para contatos sem GPS', () {
+      final target = PersonEntry(
+        id: 'target-nogps', name: 'João Batista', address: 'Comunidade Umariaçu, Travessa 2', firstContactAt: baseDate,
+        status: 'revisita', tags: '[]', createdAt: baseDate,
+        updatedAt: baseDate, revision: 1, latitude: null, longitude: null,
+        preferredSchedule: 'Domingo 09:00',
+      );
+
+      final neighbor = PersonEntry(
+        id: 'neighbor-nogps', name: 'Tereza Batista', address: 'Comunidade Umariaçu, Casa 15', firstContactAt: baseDate,
+        status: 'estudo', tags: '[]', createdAt: baseDate,
+        updatedAt: baseDate, revision: 1, latitude: null, longitude: null,
+      );
+
+      final nextSunday = DateTime(2026, 11, 15, 9, 0);
+      final existingAppt = AppointmentEntry(
+        id: 'appt-nogps', personId: 'neighbor-nogps', title: 'Estudo Tereza',
+        startTime: nextSunday, endTime: nextSunday.add(const Duration(minutes: 60)),
+        durationMinutes: 60, status: 'agendado', isProvisional: false,
+        createdAt: baseDate, updatedAt: baseDate, revision: 0,
+      );
+
+      final recommendations = DoorstepProximityEngine.suggestSlots(
+        targetPerson: target,
+        allPeople: [target, neighbor],
+        existingAppointments: [existingAppt],
+        externalEvents: [],
+        referenceNow: baseDate,
+      );
+
+      expect(recommendations, isNotEmpty);
+      expect(recommendations.any((r) => r.isProximitySuggested), isTrue);
+    });
+
+    test('4. suggestSlots não sugere retorno quando coordenadas GPS excedem raio máximo, mesmo com mesmo bairro no endereço', () {
+      final target = PersonEntry(
+        id: 'target-far', name: 'Alfeu Ramos', address: 'Bairro Centro, Rua A, 100', firstContactAt: baseDate,
+        status: 'revisita', tags: '[]', createdAt: baseDate,
+        updatedAt: baseDate, revision: 1, latitude: -3.0000, longitude: -60.0000,
+        preferredSchedule: 'Segunda 14:00',
+      );
+
+      final neighborFar = PersonEntry(
+        id: 'neighbor-far', name: 'Bento Ramos', address: 'Bairro Centro, Rua Z, 900', firstContactAt: baseDate,
+        status: 'estudo', tags: '[]', createdAt: baseDate,
+        updatedAt: baseDate, revision: 1, latitude: -3.1500, longitude: -60.1500, // ~23 km de distância
+      );
+
+      final nextMonday = DateTime(2026, 11, 16, 14, 0);
+      final existingAppt = AppointmentEntry(
+        id: 'appt-far', personId: 'neighbor-far', title: 'Estudo Bento',
+        startTime: nextMonday, endTime: nextMonday.add(const Duration(minutes: 60)),
+        durationMinutes: 60, status: 'agendado', isProvisional: false,
+        createdAt: baseDate, updatedAt: baseDate, revision: 0,
+      );
+
+      final recommendations = DoorstepProximityEngine.suggestSlots(
+        targetPerson: target,
+        allPeople: [target, neighborFar],
+        existingAppointments: [existingAppt],
+        externalEvents: [],
+        referenceNow: baseDate,
+        travelMode: DoorstepTravelMode.walking, // Raio max a pé: 1.5 km
+      );
+
+      // Não deve sugerir proximidade física porque a distância real (23 km) excede em muito o raio a pé (1.5 km)
+      final proximitySlots = recommendations.where((r) => r.isProximitySuggested).toList();
+      expect(proximitySlots, isEmpty);
     });
   });
 

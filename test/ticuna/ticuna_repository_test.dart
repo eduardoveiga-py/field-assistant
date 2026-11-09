@@ -42,6 +42,23 @@ void main() {
       expect(tags.any((t) => t.name == 'Ministério'), isTrue);
       expect(tags.any((t) => t.name == 'Saudações'), isTrue);
     });
+
+    test('Estado explícito de inicialização bem-sucedida', () async {
+      expect(repo.isInitialized, isTrue);
+      expect(repo.hasInitializationFailed, isFalse);
+      expect(repo.initializationError, isNull);
+    });
+
+    test('Registra falha explícita quando a inicialização das tabelas falha', () async {
+      final brokenDb = _FailingDatabase();
+      final brokenRepo = TicunaRepository(brokenDb);
+      final words = await brokenRepo.getAllWords();
+      expect(words, isEmpty);
+      expect(brokenRepo.isInitialized, isFalse);
+      expect(brokenRepo.hasInitializationFailed, isTrue);
+      expect(brokenRepo.initializationError, contains('Simulated database corruption'));
+      await brokenDb.close();
+    });
   });
 
   group('TicunaRepository - Dicionário (CRUD & Anki Spaced Repetition)', () {
@@ -254,5 +271,67 @@ void main() {
       expect(w2.intervalDays, equals(7));
       expect(w2.isDueForReview, isFalse);
     });
+
+    test('Operações de mutação registram na syncQueue para todas as ações (add, fav, review, delete)', () async {
+      final initialQueue = await db.select(db.syncQueue).get();
+      final initialCount = initialQueue.length;
+
+      final item = await repo.addWord(word: 'SyncWord', translation: 'Palavra Sync');
+      var q = await db.select(db.syncQueue).get();
+      expect(q.length, equals(initialCount + 1));
+      expect(q.last.operation, equals('INSERT'));
+
+      await repo.toggleWordFavorite(item.id);
+      q = await db.select(db.syncQueue).get();
+      expect(q.length, equals(initialCount + 2));
+      expect(q.last.operation, equals('UPDATE'));
+
+      await repo.recordWordReview(item.id, 2);
+      q = await db.select(db.syncQueue).get();
+      expect(q.length, equals(initialCount + 3));
+      expect(q.last.operation, equals('UPDATE'));
+
+      await repo.deleteWord(item.id);
+      q = await db.select(db.syncQueue).get();
+      expect(q.length, equals(initialCount + 4));
+      expect(q.last.operation, equals('DELETE'));
+    });
   });
+
+  group('TicunaRepository - Transações e Integridade de Sincronização', () {
+    test('Rollback atômico: se syncQueue falha, mutação em ticuna_words não é persistida', () async {
+      final testDb = AppDatabase.forTesting(NativeDatabase.memory());
+      final testRepo = TicunaRepository(testDb);
+      await testRepo.getAllWords(); // aguarda inicialização das tabelas
+
+      // Adiciona trigger no SQLite que falha toda inserção na sync_queue
+      await testDb.customStatement('''
+        CREATE TRIGGER test_fail_sync_insert BEFORE INSERT ON sync_queue
+        BEGIN
+          SELECT RAISE(ABORT, 'Simulated sync_queue write failure');
+        END;
+      ''');
+
+      // Tentativa de adicionar palavra deve falhar devido à trigger
+      await expectLater(
+        () => testRepo.addWord(word: 'PalavraNaoSalva', translation: 'Nao deve existir'),
+        throwsA(isA<Exception>()),
+      );
+
+      // Garante que a transação fez rollback e a palavra NUNCA foi gravada em ticuna_words
+      final words = await testRepo.getAllWords(searchQuery: 'PalavraNaoSalva');
+      expect(words, isEmpty);
+
+      await testDb.close();
+    });
+  });
+}
+
+class _FailingDatabase extends AppDatabase {
+  _FailingDatabase() : super.forTesting(NativeDatabase.memory());
+
+  @override
+  Future<void> customStatement(String statement, [List<dynamic>? args]) {
+    throw Exception('Simulated database corruption / I/O error');
+  }
 }

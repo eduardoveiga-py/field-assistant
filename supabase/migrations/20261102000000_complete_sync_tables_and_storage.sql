@@ -1,4 +1,4 @@
-﻿CREATE TABLE IF NOT EXISTS public.voice_notes (
+CREATE TABLE IF NOT EXISTS public.voice_notes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     owner_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     title TEXT,
@@ -61,4 +61,14 @@ CREATE POLICY "Users can access their own voice_notes storage objects"
     FOR ALL
     USING (bucket_id = 'voice_notes' AND auth.uid() = (storage.foldername(name))[1]::uuid)
     WITH CHECK (bucket_id = 'voice_notes' AND auth.uid() = (storage.foldername(name))[1]::uuid);
+
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('ticuna_audio', 'ticuna_audio', false)
+ON CONFLICT (id) DO NOTHING;
+
+CREATE POLICY "Users can access their own ticuna_audio storage objects"
+    ON storage.objects
+    FOR ALL
+    USING (bucket_id = 'ticuna_audio' AND auth.uid() = (storage.foldername(name))[1]::uuid)
+    WITH CHECK (bucket_id = 'ticuna_audio' AND auth.uid() = (storage.foldername(name))[1]::uuid);
 

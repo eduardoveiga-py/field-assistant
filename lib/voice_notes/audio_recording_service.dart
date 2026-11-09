@@ -23,6 +23,9 @@ class RecordingResult {
 
   /// Duração em segundos arredondada
   int get durationSeconds => duration.inSeconds;
+
+  /// Valida se o arquivo possui bytes reais gravados no disco
+  bool get fileIntegrityValid => fileSize > 0;
 }
 
 /// Contrato desacoplado para gravação de áudio.
@@ -50,6 +53,8 @@ class RealAudioRecordingService implements AudioRecordingService {
 
   final StreamController<int> _durationController =
       StreamController<int>.broadcast();
+
+  RecordingResult? _lastResult;
 
   @override
   bool get isRecording => _isRecording;
@@ -81,13 +86,17 @@ class RealAudioRecordingService implements AudioRecordingService {
       await cancelRecording();
     }
 
-    final hasPerm = await hasPermission();
+    var hasPerm = await hasPermission();
+    if (!hasPerm) {
+      hasPerm = await requestPermission();
+    }
     if (!hasPerm) {
       throw Exception('Permissão de gravação de áudio negada');
     }
 
     _elapsedSeconds = 0;
     _startedAt = DateTime.now();
+    _lastResult = null;
 
     if (customPath != null && customPath.isNotEmpty) {
       _currentFilePath = customPath;
@@ -117,7 +126,7 @@ class RealAudioRecordingService implements AudioRecordingService {
 
     _durationController.add(0);
     _timer?.cancel();
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) async {
       if (!_isRecording) {
         timer.cancel();
         return;
@@ -128,6 +137,8 @@ class RealAudioRecordingService implements AudioRecordingService {
       }
       if (_elapsedSeconds >= 30) {
         timer.cancel();
+        // Interrompe o gravador de verdade ao atingir 30 segundos
+        await stopRecording();
       }
     });
 
@@ -136,7 +147,7 @@ class RealAudioRecordingService implements AudioRecordingService {
 
   @override
   Future<RecordingResult?> stopRecording() async {
-    if (!_isRecording) return null;
+    if (!_isRecording) return _lastResult;
 
     _timer?.cancel();
     _timer = null;
@@ -156,21 +167,21 @@ class RealAudioRecordingService implements AudioRecordingService {
     if (!kIsWeb) {
       try {
         final file = File(path);
-        if (file.existsSync()) {
+        if (await file.exists()) {
           size = await file.length();
         }
-      } catch (_) {}
-    }
-    if (size == 0) {
-      size = 1024 * (_elapsedSeconds.clamp(1, 30));
+      } catch (_) {
+        size = 0;
+      }
     }
 
-    return RecordingResult(
+    _lastResult = RecordingResult(
       filePath: path,
       duration: duration,
       fileSize: size,
       recordedAt: recordedAt,
     );
+    return _lastResult;
   }
 
   @override
@@ -193,6 +204,7 @@ class RealAudioRecordingService implements AudioRecordingService {
       } catch (_) {}
     }
     _currentFilePath = null;
+    _lastResult = null;
   }
 
   @override
@@ -215,6 +227,15 @@ class LocalAudioRecordingService implements AudioRecordingService {
   int _elapsedSeconds = 0;
   DateTime? _startedAt;
   String? _currentFilePath;
+  RecordingResult? _lastResult;
+  bool _hasPermission = true;
+  bool _autoGrantOnRequest = false;
+  Future<bool> Function()? onRequestPermission;
+
+  void setPermission(bool granted, {bool autoGrantOnRequest = false}) {
+    _hasPermission = granted;
+    _autoGrantOnRequest = autoGrantOnRequest;
+  }
 
   final StreamController<int> _durationController =
       StreamController<int>.broadcast();
@@ -226,10 +247,21 @@ class LocalAudioRecordingService implements AudioRecordingService {
   Stream<int> get recordingDurationStream => _durationController.stream;
 
   @override
-  Future<bool> hasPermission() async => true;
+  Future<bool> hasPermission() async => _hasPermission;
 
   @override
-  Future<bool> requestPermission() async => true;
+  Future<bool> requestPermission() async {
+    if (onRequestPermission != null) {
+      final res = await onRequestPermission!();
+      _hasPermission = res;
+      return res;
+    }
+    if (_autoGrantOnRequest) {
+      _hasPermission = true;
+      return true;
+    }
+    return _hasPermission;
+  }
 
   @override
   Future<String> startRecording({String? customPath}) async {
@@ -237,9 +269,18 @@ class LocalAudioRecordingService implements AudioRecordingService {
       await cancelRecording();
     }
 
+    var hasPerm = await hasPermission();
+    if (!hasPerm) {
+      hasPerm = await requestPermission();
+    }
+    if (!hasPerm) {
+      throw Exception('Permissão de gravação de áudio negada');
+    }
+
     _isRecording = true;
     _elapsedSeconds = 0;
     _startedAt = DateTime.now();
+    _lastResult = null;
 
     if (customPath != null && customPath.isNotEmpty) {
       _currentFilePath = customPath;
@@ -263,7 +304,7 @@ class LocalAudioRecordingService implements AudioRecordingService {
 
     _durationController.add(0);
     _timer?.cancel();
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) async {
       if (!_isRecording) {
         timer.cancel();
         return;
@@ -275,6 +316,7 @@ class LocalAudioRecordingService implements AudioRecordingService {
       // Limite máximo de segurança para nota rápida: 30 segundos
       if (_elapsedSeconds >= 30) {
         timer.cancel();
+        await stopRecording();
       }
     });
 
@@ -283,7 +325,7 @@ class LocalAudioRecordingService implements AudioRecordingService {
 
   @override
   Future<RecordingResult?> stopRecording() async {
-    if (!_isRecording) return null;
+    if (!_isRecording) return _lastResult;
 
     _timer?.cancel();
     _timer = null;
@@ -294,27 +336,24 @@ class LocalAudioRecordingService implements AudioRecordingService {
     final path = _currentFilePath ?? 'voice_note_${_uuid.v4()}.m4a';
 
     int size = 0;
-    if (!kIsWeb && path.startsWith('/')) {
+    if (!kIsWeb && !path.startsWith('web_storage://')) {
       try {
         final file = File(path);
-        if (!file.existsSync()) {
-          // Grava cabeçalho mínimo simulado para arquivo offline
-          await file.writeAsBytes(List<int>.filled(64, 0));
+        if (await file.exists()) {
+          size = await file.length();
         }
-        size = await file.length();
       } catch (_) {
-        size = 1024 * (_elapsedSeconds.clamp(1, 30));
+        size = 0;
       }
-    } else {
-      size = 1024 * (_elapsedSeconds.clamp(1, 30));
     }
 
-    return RecordingResult(
+    _lastResult = RecordingResult(
       filePath: path,
       duration: duration,
       fileSize: size,
       recordedAt: recordedAt,
     );
+    return _lastResult;
   }
 
   @override
@@ -326,7 +365,7 @@ class LocalAudioRecordingService implements AudioRecordingService {
 
     if (_currentFilePath != null &&
         !kIsWeb &&
-        _currentFilePath!.startsWith('/')) {
+        !_currentFilePath!.startsWith('web_storage://')) {
       try {
         final file = File(_currentFilePath!);
         if (file.existsSync()) {
@@ -335,6 +374,21 @@ class LocalAudioRecordingService implements AudioRecordingService {
       } catch (_) {}
     }
     _currentFilePath = null;
+    _lastResult = null;
+  }
+
+  /// Método de teste para avançar o tempo e testar a interrupção automática aos 30 segundos
+  Future<void> simulateElapsedSeconds(int seconds) async {
+    if (!_isRecording) return;
+    _elapsedSeconds = seconds;
+    if (!_durationController.isClosed) {
+      _durationController.add(_elapsedSeconds);
+    }
+    if (_elapsedSeconds >= 30) {
+      _timer?.cancel();
+      _timer = null;
+      await stopRecording();
+    }
   }
 
   @override

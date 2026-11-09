@@ -963,6 +963,15 @@ class SupabaseSyncService {
     }
   }
 
+  /// Resolve a pasta correspondente ao UUID do usuário autenticado para armazenamento seguro
+  String _resolveStorageFolder(SupabaseClient client) {
+    final uid = client.auth.currentUser?.id ?? client.auth.currentSession?.user.id;
+    if (uid != null && uid.isNotEmpty) {
+      return uid;
+    }
+    return '00000000-0000-0000-0000-000000000000';
+  }
+
   Future<bool> _uploadVoiceNoteAudio(
     String id,
     SupabaseClient client,
@@ -976,11 +985,13 @@ class SupabaseSyncService {
         final file = File(vn.audioFilePath!);
         if (await file.exists()) {
           final bytes = await file.readAsBytes();
-          final storageFileName = id.endsWith('.m4a') ? id : '$id.m4a';
+          final userFolder = _resolveStorageFolder(client);
+          final rawFileName = id.endsWith('.m4a') ? id : '$id.m4a';
+          final storagePath = '$userFolder/$rawFileName';
           await client.storage
               .from('voice_notes')
               .uploadBinary(
-                storageFileName,
+                storagePath,
                 bytes,
                 fileOptions: const FileOptions(upsert: true),
               );
@@ -1007,21 +1018,26 @@ class SupabaseSyncService {
         final file = File(audioPath);
         if (await file.exists()) {
           final bytes = await file.readAsBytes();
-          final storageFileName = '${id}_pronunciation.m4a';
+          final userFolder = _resolveStorageFolder(client);
+          final rawFileName = '${id}_pronunciation.m4a';
+          final storagePath = '$userFolder/$rawFileName';
           try {
             await client.storage.from('ticuna_audio').uploadBinary(
-              storageFileName,
+              storagePath,
               bytes,
               fileOptions: const FileOptions(upsert: true),
             );
-          } catch (_) {
+          } catch (e1) {
             try {
               await client.storage.from('voice_notes').uploadBinary(
-                'ticuna_$storageFileName',
+                '$userFolder/ticuna_$rawFileName',
                 bytes,
                 fileOptions: const FileOptions(upsert: true),
               );
-            } catch (_) {}
+            } catch (e2) {
+              errors.add('Erro no upload de áudio Ticuna ($id) em ambos os buckets (ticuna_audio: $e1; voice_notes: $e2)');
+              return false;
+            }
           }
         }
       }
@@ -1038,18 +1054,32 @@ class SupabaseSyncService {
     SupabaseClient client,
   ) async {
     try {
-      final storageFileName = '${id}_pronunciation.m4a';
+      final userFolder = _resolveStorageFolder(client);
+      final rawFileName = '${id}_pronunciation.m4a';
+      final storagePath = '$userFolder/$rawFileName';
       Uint8List? bytes;
       try {
         bytes = await client.storage
             .from('ticuna_audio')
-            .download(storageFileName);
+            .download(storagePath);
       } catch (_) {
         try {
           bytes = await client.storage
-              .from('voice_notes')
-              .download('ticuna_$storageFileName');
-        } catch (_) {}
+              .from('ticuna_audio')
+              .download(rawFileName);
+        } catch (_) {
+          try {
+            bytes = await client.storage
+                .from('voice_notes')
+                .download('$userFolder/ticuna_$rawFileName');
+          } catch (_) {
+            try {
+              bytes = await client.storage
+                  .from('voice_notes')
+                  .download('ticuna_$rawFileName');
+            } catch (_) {}
+          }
+        }
       }
 
       if (bytes != null && bytes.isNotEmpty) {
@@ -1060,7 +1090,7 @@ class SupabaseSyncService {
         if (!await ticunaDir.exists()) {
           await ticunaDir.create(recursive: true);
         }
-        final localFilePath = p.join(ticunaDir.path, storageFileName);
+        final localFilePath = p.join(ticunaDir.path, rawFileName);
         final file = File(localFilePath);
         await file.writeAsBytes(bytes, flush: true);
 
@@ -1081,21 +1111,45 @@ class SupabaseSyncService {
             ],
           );
         }
+        // Remove chave pendente se existir
+        await (db.delete(db.appKvStore)
+          ..where((t) => t.key.equals('pending_ticuna_audio_download_${table}_$id'))).go();
         return true;
       }
-      return false;
-    } catch (_) {
+      throw Exception('Arquivo de áudio Ticuna não disponível no storage: $id');
+    } catch (e) {
+      try {
+        await db.into(db.appKvStore).insertOnConflictUpdate(
+              AppKvStoreCompanion.insert(
+                key: 'pending_ticuna_audio_download_${table}_$id',
+                value: DateTime.now().toUtc().toIso8601String(),
+                updatedAt: drift.Value(DateTime.now()),
+              ),
+            );
+      } catch (_) {}
       return false;
     }
   }
 
   Future<bool> _downloadVoiceNoteAudio(String id, SupabaseClient client) async {
     try {
-      final storageFileName = id.endsWith('.m4a') ? id : '$id.m4a';
-      final bytes = await client.storage
-          .from('voice_notes')
-          .download(storageFileName);
-      if (bytes.isNotEmpty) {
+      final userFolder = _resolveStorageFolder(client);
+      final rawFileName = id.endsWith('.m4a') ? id : '$id.m4a';
+      final storagePath = '$userFolder/$rawFileName';
+      Uint8List? bytes;
+      try {
+        bytes = await client.storage
+            .from('voice_notes')
+            .download(storagePath);
+      } catch (_) {
+        try {
+          bytes = await client.storage
+              .from('voice_notes')
+              .download(rawFileName);
+        } catch (_) {}
+      }
+
+      if (bytes != null && bytes.isNotEmpty) {
         final docsDir = documentsDirectoryProvider != null
             ? await documentsDirectoryProvider!()
             : (await getApplicationDocumentsDirectory()).path;
@@ -1103,7 +1157,7 @@ class SupabaseSyncService {
         if (!await voiceNotesDir.exists()) {
           await voiceNotesDir.create(recursive: true);
         }
-        final localFilePath = p.join(voiceNotesDir.path, storageFileName);
+        final localFilePath = p.join(voiceNotesDir.path, rawFileName);
         final file = File(localFilePath);
         await file.writeAsBytes(bytes, flush: true);
 
@@ -1117,7 +1171,7 @@ class SupabaseSyncService {
         )..where((t) => t.key.equals('pending_audio_download_$id'))).go();
         return true;
       }
-      return false;
+      throw Exception('Arquivo de áudio não disponível para download no storage: $id');
     } catch (e) {
       // Registra a nota no AppKvStore para retentativa resiliente posterior
       try {
@@ -1135,6 +1189,66 @@ class SupabaseSyncService {
     }
   }
 
+  /// Exclui o arquivo de áudio de uma nota de voz no Supabase Storage
+  Future<bool> deleteVoiceNoteAudio(String id) async {
+    if (!isConfigured) return false;
+    SupabaseClient? client;
+    try {
+      client = clientOverride ?? Supabase.instance.client;
+    } catch (_) {
+      return false;
+    }
+    return _deleteVoiceNoteAudio(id, client);
+  }
+
+  Future<bool> _deleteVoiceNoteAudio(String id, SupabaseClient client) async {
+    try {
+      final userFolder = _resolveStorageFolder(client);
+      final rawFileName = id.endsWith('.m4a') ? id : '$id.m4a';
+      await client.storage.from('voice_notes').remove([
+        '$userFolder/$rawFileName',
+        rawFileName,
+      ]);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Exclui o arquivo de pronúncia Ticuna no Supabase Storage
+  Future<bool> deleteTicunaAudio(String id) async {
+    if (!isConfigured) return false;
+    SupabaseClient? client;
+    try {
+      client = clientOverride ?? Supabase.instance.client;
+    } catch (_) {
+      return false;
+    }
+    return _deleteTicunaAudio(id, client);
+  }
+
+  Future<bool> _deleteTicunaAudio(String id, SupabaseClient client) async {
+    try {
+      final userFolder = _resolveStorageFolder(client);
+      final rawFileName = '${id}_pronunciation.m4a';
+      try {
+        await client.storage.from('ticuna_audio').remove([
+          '$userFolder/$rawFileName',
+          rawFileName,
+        ]);
+      } catch (_) {}
+      try {
+        await client.storage.from('voice_notes').remove([
+          '$userFolder/ticuna_$rawFileName',
+          'ticuna_$rawFileName',
+        ]);
+      } catch (_) {}
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Retenta o download de áudios que falharam durante a recepção de metadados
   Future<int> retryPendingMediaDownloads() async {
     if (!isConfigured) return 0;
@@ -1145,16 +1259,33 @@ class SupabaseSyncService {
       return 0;
     }
 
-    final pendingRows = await (db.select(
+    final pendingVoiceNotes = await (db.select(
       db.appKvStore,
     )..where((t) => t.key.like('pending_audio_download_%'))).get();
 
     int recovered = 0;
-    for (final row in pendingRows) {
+    for (final row in pendingVoiceNotes) {
       final id = row.key.replaceFirst('pending_audio_download_', '');
       final ok = await _downloadVoiceNoteAudio(id, client);
       if (ok) recovered++;
     }
+
+    final pendingTicuna = await (db.select(
+      db.appKvStore,
+    )..where((t) => t.key.like('pending_ticuna_audio_download_%'))).get();
+
+    for (final row in pendingTicuna) {
+      final suffix = row.key.replaceFirst('pending_ticuna_audio_download_', '');
+      final parts = suffix.split('_');
+      // Esperado: ticuna_words_ID ou ticuna_phrases_ID
+      if (parts.length >= 3) {
+        final table = '${parts[0]}_${parts[1]}';
+        final id = parts.sublist(2).join('_');
+        final ok = await _downloadTicunaAudio(id, table, client);
+        if (ok) recovered++;
+      }
+    }
+
     return recovered;
   }
 

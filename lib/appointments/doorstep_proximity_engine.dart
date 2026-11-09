@@ -1,6 +1,27 @@
 import 'dart:math' as math;
 import '../database/app_database.dart';
 
+/// Modalidade de deslocamento no território para cálculo de rotas e segurança
+enum DoorstepTravelMode {
+  walking('A pé', 15, 1500, 4.5),
+  driving('Veículo / Moto', 25, 10000, 30.0),
+  boat('Embarcação / Barco', 35, 15000, 15.0);
+
+  final String label;
+  final int defaultBufferMinutes;
+  final double maxRadiusMeters;
+  final double averageSpeedKmh;
+
+  const DoorstepTravelMode(
+    this.label,
+    this.defaultBufferMinutes,
+    this.maxRadiusMeters,
+    this.averageSpeedKmh,
+  );
+}
+
+typedef TravelMode = DoorstepTravelMode;
+
 /// Recomendação de horário para retorno / revisita na porta
 class DoorstepSlotRecommendation {
   final DateTime startTime;
@@ -9,6 +30,8 @@ class DoorstepSlotRecommendation {
   final String reasonLabel;
   final double? distanceMeters;
   final int travelBufferMinutes;
+  final int? estimatedTravelMinutes;
+  final DoorstepTravelMode travelMode;
   final bool hasConflict;
   final String? conflictDetails;
 
@@ -19,6 +42,8 @@ class DoorstepSlotRecommendation {
     required this.reasonLabel,
     this.distanceMeters,
     this.travelBufferMinutes = 15,
+    this.estimatedTravelMinutes,
+    this.travelMode = DoorstepTravelMode.walking,
     this.hasConflict = false,
     this.conflictDetails,
   });
@@ -30,6 +55,12 @@ class DoorstepSlotRecommendation {
     }
     return '${(distanceMeters! / 1000.0).toStringAsFixed(1)}km de distância';
   }
+
+  /// Indica se este slot foi sugerido por proximidade física ou geográfica
+  bool get isProximitySuggested =>
+      distanceMeters != null ||
+      reasonLabel.contains('Mesmo setor') ||
+      reasonLabel.contains('Próximo');
 }
 
 /// Motor de agendamento por proximidade física e detecção de rotas
@@ -43,12 +74,15 @@ class DoorstepProximityEngine {
     required List<AppointmentEntry> existingAppointments,
     List<ExternalCalendarEventEntry> externalEvents = const [],
     DateTime? referenceNow,
+    DoorstepTravelMode travelMode = DoorstepTravelMode.walking,
+    int? customBufferMinutes,
   }) {
     final now = referenceNow ?? DateTime.now();
     final recommendations = <DoorstepSlotRecommendation>[];
     final peopleMap = {for (final p in allPeople) p.id: p};
+    final bufferMinutes = customBufferMinutes ?? travelMode.defaultBufferMinutes;
 
-    // 1. Procura compromissos nos próximos 7 dias que tenham pessoas geograficamente próximas
+    // 1. Procura compromissos nos próximos 7 dias que tenham pessoas geograficamente próximas ou no mesmo endereço
     final upcomingAppts = existingAppointments
         .where((a) =>
             a.deletedAt == null &&
@@ -76,26 +110,47 @@ class DoorstepProximityEngine {
         );
       }
 
-      // Se estiver próximo (< 1km) ou no mesmo endereço/bairro
-      final sameNeighborhood = _isSameNeighborhood(targetPerson.address, otherPerson.address);
-      if ((dist != null && dist <= 1200) || sameNeighborhood) {
-        // Sugere 15 min após o término do compromisso anterior
-        final candidateStart = appt.endTime.add(const Duration(minutes: 15));
+      // Se georreferenciado, respeita estritamente o raio da modalidade de transporte.
+      // Se não georreferenciado, sugere apenas quando o endereço/setor/comunidade for coincidente.
+      final bool isWithinReach;
+      if (dist != null) {
+        isWithinReach = dist <= travelMode.maxRadiusMeters;
+      } else {
+        isWithinReach = _isSameNeighborhood(targetPerson.address, otherPerson.address);
+      }
+
+      if (isWithinReach) {
+        final int estMinutes = dist != null
+            ? ((dist / 1000.0) / travelMode.averageSpeedKmh * 60.0).ceil().clamp(5, 120)
+            : bufferMinutes;
+
+        // Sugere o horário após o término do compromisso anterior respeitando o buffer de deslocamento
+        final candidateStart = appt.endTime.add(Duration(minutes: bufferMinutes));
         final candidateEnd = candidateStart.add(const Duration(minutes: 30));
 
         final conflict = _checkConflict(candidateStart, candidateEnd, existingAppointments, externalEvents);
 
         if (!_hasSlotOverlap(candidateStart, candidateEnd, recommendations)) {
+          final String reason;
+          if (dist != null) {
+            final distStr = dist < 1000
+                ? '${dist.toStringAsFixed(0)}m'
+                : '${(dist / 1000).toStringAsFixed(1)}km';
+            reason = 'Próximo de ${otherPerson.name} ($distStr • ${travelMode.label})';
+          } else {
+            reason = 'Mesmo setor/endereço que ${otherPerson.name} (${otherPerson.address ?? "conhecido"})';
+          }
+
           recommendations.add(
             DoorstepSlotRecommendation(
               startTime: candidateStart,
               endTime: candidateEnd,
               title: 'Revisita com ${targetPerson.name}',
-              reasonLabel: dist != null
-                  ? 'Próximo de ${otherPerson.name} (${dist < 1000 ? "${dist.toStringAsFixed(0)}m" : "${(dist / 1000).toStringAsFixed(1)}km"})'
-                  : 'Mesmo setor/bairro que ${otherPerson.name}',
+              reasonLabel: reason,
               distanceMeters: dist,
-              travelBufferMinutes: 15,
+              travelBufferMinutes: bufferMinutes,
+              estimatedTravelMinutes: estMinutes,
+              travelMode: travelMode,
               hasConflict: conflict != null,
               conflictDetails: conflict,
             ),
@@ -257,13 +312,31 @@ class DoorstepProximityEngine {
 
   static bool _isSameNeighborhood(String? addr1, String? addr2) {
     if (addr1 == null || addr2 == null) return false;
-    final a1 = addr1.toLowerCase();
-    final a2 = addr2.toLowerCase();
+    final a1 = addr1.toLowerCase().trim();
+    final a2 = addr2.toLowerCase().trim();
+    if (a1.isEmpty || a2.isEmpty) return false;
+    if (a1 == a2) return true;
+
     final parts1 = a1.split(RegExp(r'[,-]')).map((p) => p.trim()).where((p) => p.length >= 3);
     for (final p in parts1) {
       if (a2.contains(p)) return true;
     }
-    return false;
+
+    const stopWords = {
+      'rua', 'avenida', 'av', 'travessa', 'trav', 'alameda', 'beco', 'bairro',
+      'comunidade', 'ramal', 'rio', 'igarapé', 'igarape', 'sitio', 'sítio',
+      'vila', 'estrada', 'km', 'nº', 'no', 'casa', 'ap', 'apto'
+    };
+    final tokens1 = a1
+        .split(RegExp(r'[\s,.-]+'))
+        .where((t) => t.length >= 3 && !stopWords.contains(t))
+        .toSet();
+    final tokens2 = a2
+        .split(RegExp(r'[\s,.-]+'))
+        .where((t) => t.length >= 3 && !stopWords.contains(t))
+        .toSet();
+
+    return tokens1.intersection(tokens2).isNotEmpty;
   }
 
   static double _haversineMeters(double lat1, double lon1, double lat2, double lon2) {

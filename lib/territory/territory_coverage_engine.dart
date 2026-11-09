@@ -30,6 +30,22 @@ class TerritoryCoverageReport {
   final double coverageIndexPercent; // 0.0 a 100.0%
   final List<PersonEntry> forgottenAddresses;
 
+  // 1. Cobertura de Residências (endereços físicos únicos trabalhados vs total conhecido)
+  final int totalUniqueAddresses;
+  final int workedUniqueAddresses;
+  final double addressCoveragePercent;
+
+  // 2. Cobertura de Contatos Cadastrados (pessoas registradas que receberam visita)
+  final int totalPeople;
+  final int visitedPeopleCount;
+  final double peopleCoveragePercent;
+
+  // 3. Cobertura de Conversas Efetivas (excluindo tentativas sem contato)
+  final int effectiveConversationCount;
+  final int attemptWithoutContactCount;
+  final int peopleWithEffectiveConversation;
+  final double conversationCoveragePercent;
+
   const TerritoryCoverageReport({
     required this.totalAddresses,
     required this.workedRecentlyCount,
@@ -38,6 +54,16 @@ class TerritoryCoverageReport {
     required this.neverVisitedCount,
     required this.coverageIndexPercent,
     required this.forgottenAddresses,
+    this.totalUniqueAddresses = 0,
+    this.workedUniqueAddresses = 0,
+    this.addressCoveragePercent = 0.0,
+    this.totalPeople = 0,
+    this.visitedPeopleCount = 0,
+    this.peopleCoveragePercent = 0.0,
+    this.effectiveConversationCount = 0,
+    this.attemptWithoutContactCount = 0,
+    this.peopleWithEffectiveConversation = 0,
+    this.conversationCoveragePercent = 0.0,
   });
 
   String get ratingLabel {
@@ -79,6 +105,33 @@ class DuplicateAddressMatch {
 class TerritoryCoverageEngine {
   TerritoryCoverageEngine._();
 
+  /// Verifica se uma visita foi apenas uma tentativa sem contato efetivo
+  static bool isAttemptWithoutContact(VisitEntry v) {
+    final type = v.contactType.toLowerCase();
+    final res = v.result.toLowerCase();
+    return type == 'tentativa_sem_contato' ||
+        type.contains('tentativa') ||
+        type.contains('ausente') ||
+        type.contains('nao_atendido') ||
+        res.contains('não estava') ||
+        res.contains('nao estava') ||
+        res.contains('ausente') ||
+        res.contains('não atendeu') ||
+        res.contains('nao atendeu');
+  }
+
+  /// Normaliza chave de residência para agrupar pessoas no mesmo endereço ou coordenadas
+  static String getResidenceKey(PersonEntry p) {
+    final addr = p.address?.trim().toLowerCase() ?? '';
+    if (addr.isNotEmpty) {
+      return 'addr_$addr';
+    }
+    if (p.latitude != null && p.longitude != null) {
+      return 'geo_${p.latitude!.toStringAsFixed(4)}_${p.longitude!.toStringAsFixed(4)}';
+    }
+    return 'person_${p.id}';
+  }
+
   /// Calcula a distância Haversine em metros entre duas coordenadas geográficas
   static double haversineDistanceMeters(
     double lat1,
@@ -102,7 +155,10 @@ class TerritoryCoverageEngine {
 
   static double _deg2rad(double deg) => deg * (math.pi / 180.0);
 
-  /// Calcula o Índice de Cobertura (IC) e detecta zonas esquecidas
+  /// Calcula o Índice de Cobertura (IC) separando em 3 indicadores objetivos:
+  /// 1. Cobertura de Residências: endereços físicos únicos trabalhados vs total conhecido
+  /// 2. Cobertura de Contatos Cadastrados: pessoas registradas que receberam visita nos últimos 90 dias
+  /// 3. Cobertura de Conversas Efetivas: pessoas com contato real no período (excluindo ausentes)
   static TerritoryCoverageReport calculateCoverage({
     required List<PersonEntry> people,
     required List<VisitEntry> visits,
@@ -120,16 +176,43 @@ class TerritoryCoverageEngine {
         neverVisitedCount: 0,
         coverageIndexPercent: 0.0,
         forgottenAddresses: [],
+        totalUniqueAddresses: 0,
+        workedUniqueAddresses: 0,
+        addressCoveragePercent: 0.0,
+        totalPeople: 0,
+        visitedPeopleCount: 0,
+        peopleCoveragePercent: 0.0,
+        effectiveConversationCount: 0,
+        attemptWithoutContactCount: 0,
+        peopleWithEffectiveConversation: 0,
+        conversationCoveragePercent: 0.0,
       );
     }
 
-    // Mapeia última visita por pessoa
+    // 1. Mapeia última visita por pessoa e identifica se houve conversa efetiva
     final Map<String, DateTime> lastVisitMap = {};
+    final Map<String, DateTime> lastEffectiveConversationMap = {};
+    int totalEffectiveCount = 0;
+    int totalAttemptCount = 0;
+
     for (final v in visits) {
       if (v.deletedAt != null) continue;
       final existing = lastVisitMap[v.personId];
       if (existing == null || v.dateTimeField.isAfter(existing)) {
         lastVisitMap[v.personId] = v.dateTimeField;
+      }
+
+      final diffDays = now.difference(v.dateTimeField).inDays;
+      final isRecentPeriod = diffDays >= 0 && diffDays <= 90;
+
+      if (isAttemptWithoutContact(v)) {
+        if (isRecentPeriod) totalAttemptCount++;
+      } else {
+        if (isRecentPeriod) totalEffectiveCount++;
+        final effExisting = lastEffectiveConversationMap[v.personId];
+        if (effExisting == null || v.dateTimeField.isAfter(effExisting)) {
+          lastEffectiveConversationMap[v.personId] = v.dateTimeField;
+        }
       }
     }
 
@@ -139,7 +222,15 @@ class TerritoryCoverageEngine {
     int neverVisited = 0;
     final List<PersonEntry> forgottenList = [];
 
+    // Mapeamento de residências físicas únicas
+    final Set<String> allResidenceKeys = {};
+    final Set<String> workedResidenceKeys = {};
+    final Set<String> peopleWithEffectiveInPeriod = {};
+
     for (final p in validPeople) {
+      final resKey = getResidenceKey(p);
+      allResidenceKeys.add(resKey);
+
       final last = lastVisitMap[p.id];
       if (last == null) {
         neverVisited++;
@@ -149,16 +240,43 @@ class TerritoryCoverageEngine {
         final diffDays = now.difference(last).inDays;
         if (diffDays <= 30) {
           workedRecently++;
+          workedResidenceKeys.add(resKey);
         } else if (diffDays <= 90) {
           workedStandard++;
+          workedResidenceKeys.add(resKey);
         } else {
           forgotten++;
           forgottenList.add(p);
         }
       }
+
+      final lastEff = lastEffectiveConversationMap[p.id];
+      if (lastEff != null && now.difference(lastEff).inDays <= 90) {
+        peopleWithEffectiveInPeriod.add(p.id);
+      }
     }
 
-    // IC considera trabalhados recentemente e padrão (últimos 90 dias)
+    // 1. Cobertura de Residências (únicas)
+    final totalUniqueAddresses = allResidenceKeys.length;
+    final workedUniqueAddresses = workedResidenceKeys.length;
+    final double addressCoveragePercent = totalUniqueAddresses > 0
+        ? double.parse(((workedUniqueAddresses / totalUniqueAddresses) * 100.0).toStringAsFixed(1))
+        : 0.0;
+
+    // 2. Cobertura de Contatos Cadastrados
+    final totalPeople = validPeople.length;
+    final visitedPeopleCount = workedRecently + workedStandard;
+    final double peopleCoveragePercent = totalPeople > 0
+        ? double.parse(((visitedPeopleCount / totalPeople) * 100.0).toStringAsFixed(1))
+        : 0.0;
+
+    // 3. Cobertura de Conversas Efetivas
+    final peopleWithEff = peopleWithEffectiveInPeriod.length;
+    final double conversationCoveragePercent = totalPeople > 0
+        ? double.parse(((peopleWithEff / totalPeople) * 100.0).toStringAsFixed(1))
+        : 0.0;
+
+    // IC canônico ponderado
     final double ic = ((workedRecently + workedStandard) / validPeople.length) * 100.0;
 
     return TerritoryCoverageReport(
@@ -169,6 +287,16 @@ class TerritoryCoverageEngine {
       neverVisitedCount: neverVisited,
       coverageIndexPercent: double.parse(ic.toStringAsFixed(1)),
       forgottenAddresses: forgottenList,
+      totalUniqueAddresses: totalUniqueAddresses,
+      workedUniqueAddresses: workedUniqueAddresses,
+      addressCoveragePercent: addressCoveragePercent,
+      totalPeople: totalPeople,
+      visitedPeopleCount: visitedPeopleCount,
+      peopleCoveragePercent: peopleCoveragePercent,
+      effectiveConversationCount: totalEffectiveCount,
+      attemptWithoutContactCount: totalAttemptCount,
+      peopleWithEffectiveConversation: peopleWithEff,
+      conversationCoveragePercent: conversationCoveragePercent,
     );
   }
 

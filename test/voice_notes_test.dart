@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -753,5 +754,95 @@ void main() {
         expect(err, isNull);
       },
     );
+  });
+
+  group('AudioRecordingService Hardening & Integrity', () {
+    test('1. Interrompe gravação de áudio ao atingir 30 segundos', () async {
+      final recorder = LocalAudioRecordingService();
+      await recorder.startRecording();
+      expect(recorder.isRecording, isTrue);
+
+      await recorder.simulateElapsedSeconds(29);
+      expect(recorder.isRecording, isTrue);
+
+      await recorder.simulateElapsedSeconds(30);
+      expect(recorder.isRecording, isFalse);
+
+      final result = await recorder.stopRecording();
+      expect(result, isNotNull);
+      expect(result!.duration.inSeconds, equals(30));
+    });
+
+    test('2. Não inventa tamanho de arquivo e valida integridade no disco', () async {
+      final recorder = LocalAudioRecordingService();
+      // Cria arquivo temporário real
+      final tempDir = Directory.systemTemp.createTempSync('audio_test_');
+      final tempFile = File('${tempDir.path}/test_audio.m4a');
+      tempFile.writeAsBytesSync(List.filled(2048, 65)); // 2 KB reais
+
+      await recorder.startRecording(customPath: tempFile.path);
+      await recorder.simulateElapsedSeconds(5);
+      final result = await recorder.stopRecording();
+
+      expect(result, isNotNull);
+      expect(result!.fileSize, equals(2048));
+      expect(result.fileIntegrityValid, isTrue);
+      expect(result.fileSize, isNot(equals(1024 * 5))); // Não inventa 1024 * elapsed
+
+      // Limpa arquivo
+      tempDir.deleteSync(recursive: true);
+    });
+
+    test('3. Retorna tamanho zero e integridade inválida quando arquivo não existe no disco', () async {
+      final recorder = LocalAudioRecordingService();
+      await recorder.startRecording(customPath: '/caminho/inexistente/sem_audio.m4a');
+      await recorder.simulateElapsedSeconds(10);
+      final result = await recorder.stopRecording();
+
+      expect(result, isNotNull);
+      expect(result!.fileSize, equals(0));
+      expect(result.fileIntegrityValid, isFalse);
+      expect(result.fileSize, isNot(equals(1024 * 10))); // Nunca inventa 1024 * elapsed
+    });
+
+    test('4. Solicita permissão quando hasPermission é false e lança exceção se negada', () async {
+      final recorder = LocalAudioRecordingService();
+      recorder.setPermission(false);
+      expect(await recorder.hasPermission(), isFalse);
+
+      await expectLater(
+        recorder.startRecording(),
+        throwsA(isA<Exception>().having((e) => e.toString(), 'msg', contains('negada'))),
+      );
+
+      // Concede permissão e tenta novamente
+      recorder.setPermission(true);
+      expect(await recorder.hasPermission(), isTrue);
+      final path = await recorder.startRecording();
+      expect(path, isNotEmpty);
+      await recorder.cancelRecording();
+    });
+
+    test('5. cancelRecording descarta gravação e limpa _lastResult para stopRecording retornar null', () async {
+      final recorder = LocalAudioRecordingService();
+      await recorder.startRecording();
+      expect(recorder.isRecording, isTrue);
+
+      await recorder.cancelRecording();
+      expect(recorder.isRecording, isFalse);
+
+      final result = await recorder.stopRecording();
+      expect(result, isNull);
+    });
+
+    test('6. requestPermission com autoGrantOnRequest permite concessão reativa de permissão', () async {
+      final recorder = LocalAudioRecordingService();
+      recorder.setPermission(false, autoGrantOnRequest: true);
+
+      expect(await recorder.hasPermission(), isFalse);
+      final granted = await recorder.requestPermission();
+      expect(granted, isTrue);
+      expect(await recorder.hasPermission(), isTrue);
+    });
   });
 }

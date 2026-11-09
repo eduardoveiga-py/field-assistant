@@ -1500,75 +1500,103 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             const SizedBox(height: 12),
             if (_checkedUpdateInfo != null) ...[
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: _checkedUpdateInfo!.hasUpdate
-                      ? const Color(0xFF2563EB).withValues(alpha: isDark ? 0.3 : 0.1)
-                      : const Color(0xFF16A34A).withValues(alpha: isDark ? 0.3 : 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: _checkedUpdateInfo!.hasUpdate
-                        ? const Color(0xFF2563EB).withValues(alpha: 0.5)
-                        : const Color(0xFF16A34A).withValues(alpha: 0.5),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+              Builder(
+                builder: (context) {
+                  final status = _checkedUpdateInfo!.status;
+                  final Color cardColor;
+                  final IconData cardIcon;
+                  final String cardTitle;
+
+                  switch (status) {
+                    case UpdateCheckStatus.updateAvailable:
+                      cardColor = const Color(0xFF2563EB);
+                      cardIcon = Icons.download_for_offline_rounded;
+                      cardTitle = 'Nova Versão Disponível: v${_checkedUpdateInfo!.latestVersion}';
+                      break;
+                    case UpdateCheckStatus.upToDate:
+                      cardColor = const Color(0xFF16A34A);
+                      cardIcon = Icons.check_circle_rounded;
+                      cardTitle = 'Você já está usando a versão mais recente!';
+                      break;
+                    case UpdateCheckStatus.sourceUnavailable:
+                      cardColor = const Color(0xFFD97706);
+                      cardIcon = Icons.cloud_off_rounded;
+                      cardTitle = 'Fonte de atualização indisponível';
+                      break;
+                    case UpdateCheckStatus.checkFailed:
+                      cardColor = const Color(0xFFDC2626);
+                      cardIcon = Icons.error_outline_rounded;
+                      cardTitle = 'Não foi possível verificar';
+                      break;
+                  }
+
+                  return Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: cardColor.withValues(alpha: isDark ? 0.3 : 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: cardColor.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(
-                          _checkedUpdateInfo!.hasUpdate
-                              ? Icons.download_for_offline_rounded
-                              : Icons.check_circle_rounded,
-                          color: _checkedUpdateInfo!.hasUpdate
-                              ? const Color(0xFF2563EB)
-                              : const Color(0xFF16A34A),
-                          size: 20,
+                        Row(
+                          children: [
+                            Icon(
+                              cardIcon,
+                              color: cardColor,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                cardTitle,
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            _checkedUpdateInfo!.hasUpdate
-                                ? 'Nova Versão Disponível: v${_checkedUpdateInfo!.latestVersion}'
-                                : 'Você já está usando a versão mais recente!',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        if (_checkedUpdateInfo!.hasUpdate) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            'Lançamento: ${_checkedUpdateInfo!.releaseDate} • ${_checkedUpdateInfo!.formattedSize}',
+                            style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
                           ),
-                        ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _checkedUpdateInfo!.releaseNotes,
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 11),
+                          ),
+                          const SizedBox(height: 10),
+                          ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF2563EB),
+                              foregroundColor: Colors.white,
+                            ),
+                            icon: const Icon(Icons.install_mobile_rounded, size: 18),
+                            label: const Text('Atualizar Agora'),
+                            onPressed: () {
+                              ref
+                                  .read(updateCheckerServiceProvider)
+                                  .launchUpdate(_checkedUpdateInfo!);
+                            },
+                          ),
+                        ] else if (status != UpdateCheckStatus.upToDate) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            _checkedUpdateInfo!.releaseNotes,
+                            style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                          ),
+                        ],
                       ],
                     ),
-                    if (_checkedUpdateInfo!.hasUpdate) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        'Lançamento: ${_checkedUpdateInfo!.releaseDate} • ${_checkedUpdateInfo!.formattedSize}',
-                        style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _checkedUpdateInfo!.releaseNotes,
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 11),
-                      ),
-                      const SizedBox(height: 10),
-                      ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2563EB),
-                          foregroundColor: Colors.white,
-                        ),
-                        icon: const Icon(Icons.install_mobile_rounded, size: 18),
-                        label: const Text('Atualizar Agora'),
-                        onPressed: () {
-                          ref
-                              .read(updateCheckerServiceProvider)
-                              .launchUpdate(_checkedUpdateInfo!);
-                        },
-                      ),
-                    ],
-                  ],
-                ),
+                  );
+                },
               ),
               const SizedBox(height: 12),
             ],

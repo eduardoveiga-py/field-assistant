@@ -8,6 +8,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/app_logger.dart';
+
 /// Resultado de uma gravação de pronúncia Ticuna.
 class TicunaRecordingResult {
   final String filePath;
@@ -493,30 +495,38 @@ class TicunaAudioService implements ITicunaAudioService {
       }
 
       final ext = kIsWeb ? 'webm' : 'm4a';
-      final storageFileName = '${id}_pronunciation.$ext';
+      final userFolder = client.auth.currentUser?.id ?? client.auth.currentSession?.user.id ?? '00000000-0000-0000-0000-000000000000';
+      final rawFileName = '${id}_pronunciation.$ext';
+      final storagePath = '$userFolder/$rawFileName';
 
       try {
         await client.storage.from(bucket).uploadBinary(
-          storageFileName,
+          storagePath,
           bytes,
           fileOptions: const FileOptions(upsert: true),
         );
-      } catch (_) {
-        await client.storage.from('voice_notes').uploadBinary(
-          'ticuna_$storageFileName',
-          bytes,
-          fileOptions: const FileOptions(upsert: true),
-        );
+      } catch (e1) {
+        try {
+          await client.storage.from('voice_notes').uploadBinary(
+            '$userFolder/ticuna_$rawFileName',
+            bytes,
+            fileOptions: const FileOptions(upsert: true),
+          );
+        } catch (e2) {
+          AppLogger.error('Falha ao enviar áudio Ticuna para $bucket ($e1) e fallback voice_notes ($e2)');
+          return null;
+        }
       }
 
       try {
         final publicUrl =
-            client.storage.from(bucket).getPublicUrl(storageFileName);
+            client.storage.from(bucket).getPublicUrl(storagePath);
         return publicUrl;
       } catch (_) {
-        return storageFileName;
+        return storagePath;
       }
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.error('Erro inesperado no upload de áudio Ticuna ($id): $e', e, st);
       return null;
     }
   }
@@ -528,34 +538,48 @@ class TicunaAudioService implements ITicunaAudioService {
   }) async {
     try {
       final client = Supabase.instance.client;
-      final storageFileName = '${id}_pronunciation.m4a';
+      final userFolder = client.auth.currentUser?.id ?? client.auth.currentSession?.user.id ?? '00000000-0000-0000-0000-000000000000';
+      final rawFileName = '${id}_pronunciation.m4a';
+      final storagePath = '$userFolder/$rawFileName';
 
       if (kIsWeb) {
         final publicUrl =
-            client.storage.from(bucket).getPublicUrl(storageFileName);
+            client.storage.from(bucket).getPublicUrl(storagePath);
         return publicUrl;
       }
 
       Uint8List? bytes;
       try {
-        bytes = await client.storage.from(bucket).download(storageFileName);
+        bytes = await client.storage.from(bucket).download(storagePath);
       } catch (_) {
         try {
-          bytes = await client.storage
-              .from('voice_notes')
-              .download('ticuna_$storageFileName');
-        } catch (_) {}
+          bytes = await client.storage.from(bucket).download(rawFileName);
+        } catch (_) {
+          try {
+            bytes = await client.storage
+                .from('voice_notes')
+                .download('$userFolder/ticuna_$rawFileName');
+          } catch (_) {
+            try {
+              bytes = await client.storage
+                  .from('voice_notes')
+                  .download('ticuna_$rawFileName');
+            } catch (_) {}
+          }
+        }
       }
 
       if (bytes != null && bytes.isNotEmpty) {
         final docsDir = await _getAudioDirectory();
         if (docsDir != null) {
-          final localFile = File('${docsDir.path}/$storageFileName');
+          final localFile = File('${docsDir.path}/$rawFileName');
           await localFile.writeAsBytes(bytes, flush: true);
           return localFile.path;
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.warning('Falha no download de áudio Ticuna ($id): $e', e, st);
+    }
     return null;
   }
 

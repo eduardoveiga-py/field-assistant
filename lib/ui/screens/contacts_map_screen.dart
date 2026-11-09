@@ -1009,6 +1009,89 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                   ],
                 ),
               ),
+              const SizedBox(height: 12),
+              // Três Métricas Independentes (Residências, Contatos, Conversas Efetivas)
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0D9488).withValues(alpha: isDark ? 0.2 : 0.08),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFF0D9488).withValues(alpha: 0.3)),
+                      ),
+                      child: Column(
+                        children: [
+                          const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.home_work_outlined, size: 14, color: Color(0xFF0D9488)),
+                              SizedBox(width: 4),
+                              Text('Residências', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text('${report.addressCoveragePercent.toStringAsFixed(0)}%', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0D9488))),
+                          Text('${report.workedUniqueAddresses}/${report.totalUniqueAddresses}', style: const TextStyle(fontSize: 10, color: AppTheme.textMuted)),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryBlue.withValues(alpha: isDark ? 0.2 : 0.08),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppTheme.primaryBlue.withValues(alpha: 0.3)),
+                      ),
+                      child: Column(
+                        children: [
+                          const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.people_outline, size: 14, color: AppTheme.primaryBlue),
+                              SizedBox(width: 4),
+                              Text('Contatos', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text('${report.peopleCoveragePercent.toStringAsFixed(0)}%', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.primaryBlue)),
+                          Text('${report.visitedPeopleCount}/${report.totalPeople}', style: const TextStyle(fontSize: 10, color: AppTheme.textMuted)),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF16A34A).withValues(alpha: isDark ? 0.2 : 0.08),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFF16A34A).withValues(alpha: 0.3)),
+                      ),
+                      child: Column(
+                        children: [
+                          const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.forum_outlined, size: 14, color: Color(0xFF16A34A)),
+                              SizedBox(width: 4),
+                              Text('Conversas', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text('${report.conversationCoveragePercent.toStringAsFixed(0)}%', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF16A34A))),
+                          Text('${report.peopleWithEffectiveConversation}/${report.totalPeople}', style: const TextStyle(fontSize: 10, color: AppTheme.textMuted)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 16),
               Text(
                 'Zonas Esquecidas (>90 dias sem visita): ${report.forgottenAddresses.length}',
@@ -1451,10 +1534,11 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
           ),
           PopupMenuButton<String>(
             tooltip: 'Mais Opções do Mapa',
+            constraints: const BoxConstraints(minWidth: 260, maxWidth: 360),
             onSelected: (val) {
               final people = peopleAsync.value ?? [];
               if (val == 'pdf') {
-                final sectors = ref.watch(sectorsStreamProvider).value ?? [];
+                final sectors = ref.read(sectorsStreamProvider).value ?? [];
                 ReportExportService.exportContactsMapPdf(
                   context: context,
                   people: people,
@@ -1488,7 +1572,12 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                   children: [
                     Icon(Icons.analytics_outlined, size: 18, color: AppTheme.primaryBlue),
                     SizedBox(width: 8),
-                    Text('Índice de Cobertura (IC) & Zonas'),
+                    Expanded(
+                      child: Text(
+                        'Índice de Cobertura (IC) & Zonas',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1498,7 +1587,12 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                   children: [
                     Icon(Icons.compare_arrows, size: 18, color: Color(0xFFD97706)),
                     SizedBox(width: 8),
-                    Text('Detectar Duplicidades (<25m)'),
+                    Expanded(
+                      child: Text(
+                        'Detectar Duplicidades (<25m)',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1509,7 +1603,12 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                   children: [
                     Icon(Icons.file_upload_outlined, size: 18, color: Color(0xFF0D9488)),
                     SizedBox(width: 8),
-                    Text('Importar Território (KML/GeoJSON/CSV)'),
+                    Expanded(
+                      child: Text(
+                        'Importar Território (KML/GeoJSON/CSV)',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1519,7 +1618,12 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                   children: [
                     Icon(Icons.share_location, size: 18, color: Color(0xFF16A34A)),
                     SizedBox(width: 8),
-                    Text('Exportar KML (Google Earth)'),
+                    Expanded(
+                      child: Text(
+                        'Exportar KML (Google Earth)',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1529,7 +1633,12 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                   children: [
                     Icon(Icons.data_object, size: 18, color: Color(0xFF7C3AED)),
                     SizedBox(width: 8),
-                    Text('Exportar GeoJSON Padrão'),
+                    Expanded(
+                      child: Text(
+                        'Exportar GeoJSON Padrão',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1539,7 +1648,12 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                   children: [
                     Icon(Icons.table_chart_outlined, size: 18, color: Color(0xFF0284C7)),
                     SizedBox(width: 8),
-                    Text('Exportar Planilha (CSV)'),
+                    Expanded(
+                      child: Text(
+                        'Exportar Planilha (CSV)',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1550,7 +1664,12 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                   children: [
                     Icon(Icons.picture_as_pdf, size: 18),
                     SizedBox(width: 8),
-                    Text('Exportar Mapa Geral (PDF)'),
+                    Expanded(
+                      child: Text(
+                        'Exportar Mapa Geral (PDF)',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1560,7 +1679,12 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                   children: [
                     Icon(Icons.download_for_offline_outlined, size: 18),
                     SizedBox(width: 8),
-                    Text('Baixar Mapa Offline'),
+                    Expanded(
+                      child: Text(
+                        'Baixar Mapa Offline',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1570,7 +1694,12 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                   children: [
                     Icon(Icons.public, size: 18),
                     SizedBox(width: 8),
-                    Text('Abrir no Google Maps'),
+                    Expanded(
+                      child: Text(
+                        'Abrir no Google Maps',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1580,7 +1709,12 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                   children: [
                     Icon(Icons.add_location_alt_outlined, size: 18),
                     SizedBox(width: 8),
-                    Text('+ Ponto de Referência'),
+                    Expanded(
+                      child: Text(
+                        '+ Ponto de Referência',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                   ],
                 ),
               ),
