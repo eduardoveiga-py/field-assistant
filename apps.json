@@ -16,9 +16,9 @@
       "bundleIdentifier": "com.ministeriopessoal.ministerioPessoal",
       "developerName": "Ministério Pessoal",
       "subtitle": "Gestão eficiente e offline-first do ministério de campo",
-      "version": "1.2.0",
+      "version": "1.2.1",
       "versionDate": "2026-11-08",
-      "versionDescription": "Lançamento oficial 1.2.0: atualizador automático integrado com verificação em tempo real via GitHub e LiveContainer, Assistente Linguístico expandido para múltiplos idiomas indígenas (Ticuna, Guajajara, Yanomami) com frases situacionais do ministério, comparador multilíngue, mapa territorial inteligente com cálculo do Índice de Cobertura (IC), detecção de zonas esquecidas (>90 dias) e duplicatas fonéticas/geográficas (<25m), importação/exportação KML/GeoJSON/CSV, agendamento de retorno na porta por proximidade e internacionalização (i18n) PT-BR, EN e ES.",
+      "versionDescription": "Lançamento oficial 1.2.1: resolução completa da auditoria — isolamento RLS de áudio no Supabase Storage ($userId/$id.m4a) e bucket ticuna_audio, seleção estrita de APK no Android e IPA no iOS com diferenciação de 4 estados, parada física do gravador aos 30s com validação real de bytes, índice de cobertura triplo (residências, contatos e conversas efetivas), agendamento por proximidade com modos de transporte (a pé, veículo, embarcação) e endereços sem GPS, transações atômicas de sincronização no Ticuna e correção do overflow de menu no mapa.",
       "downloadURL": "https://github.com/eduardoveiga-py/field-assistant/releases/latest/download/app-release-unsigned.ipa",
       "localizedDescription": "Um aplicativo completo, rápido e focado no usuário para organizar contatos, revisitas, estudos bíblicos, compromissos e relatórios mensais.\n\n• Briefing na Porta em 30 segundos\n• Assistente Linguístico Multilíngue (Ticuna, Guajajara e outros) com frases situacionais e SRS\n• Ditado e anotações rápidas por voz\n• Agenda inteligente com agendamento por proximidade e detecção de conflitos\n• Territórios e mapas com Índice de Cobertura (IC), zonas esquecidas e importação KML/GeoJSON/CSV\n• Verificador de atualizações integrado com suporte direto ao LiveContainer\n• Modo Sol Intenso de alto contraste (WCAG AAA)\n• Relatório e contagem rigorosa de estudos e horas\n• Sincronização multi-dispositivo segura",
       "iconURL": "https://cdn.jsdelivr.net/gh/eduardoveiga-py/field-assistant@master/web/icons/Icon-512.png",
@@ -27,6 +27,14 @@
       "size": 13435260,
       "minOSVersion": "14.0",
       "versions": [
+        {
+          "version": "1.2.1",
+          "date": "2026-11-08",
+          "localizedDescription": "Lançamento oficial 1.2.1: resolução completa da auditoria — isolamento RLS de áudio no Supabase Storage ($userId/$id.m4a) e bucket ticuna_audio, seleção estrita de APK no Android e IPA no iOS com diferenciação de 4 estados, parada física do gravador aos 30s com validação real de bytes, índice de cobertura triplo (residências, contatos e conversas efetivas), agendamento por proximidade com modos de transporte (a pé, veículo, embarcação) e endereços sem GPS, transações atômicas de sincronização no Ticuna e correção do overflow de menu no mapa.",
+          "downloadURL": "https://github.com/eduardoveiga-py/field-assistant/releases/latest/download/app-release-unsigned.ipa",
+          "size": 13435260,
+          "minOSVersion": "14.0"
+        },
         {
           "version": "1.2.0",
           "date": "2026-11-08",

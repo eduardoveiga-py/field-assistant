@@ -4,10 +4,10 @@ class AppVersion {
   AppVersion._();
 
   /// Versão Semântica Oficial (Major.Minor.Patch)
-  static const String version = '1.2.0';
+  static const String version = '1.2.1';
 
   /// Número sequencial da compilação (build number)
-  static const int buildNumber = 5;
+  static const int buildNumber = 6;
 
   /// Prefixo canônico para exibição em interfaces
   static const String displayVersion = 'v$version';
