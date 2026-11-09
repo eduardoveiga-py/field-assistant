@@ -2556,7 +2556,7 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                     ],
                   ),
                   onTap: () {
-                    ref.read(activeLanguageProvider.notifier).state = lang;
+                    ref.read(activeLanguageProvider.notifier).selectLanguage(lang);
                     Navigator.pop(ctx);
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
@@ -2722,7 +2722,7 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                     createdAt: DateTime.now(),
                     updatedAt: DateTime.now(),
                   );
-                  ref.read(activeLanguageProvider.notifier).state = newEntry;
+                  await ref.read(activeLanguageProvider.notifier).selectLanguage(newEntry);
 
                   dialogNav.pop();
                   messenger.showSnackBar(

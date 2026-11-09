@@ -46,6 +46,7 @@ class ProjectManager {
     String? iconName,
     String? originInboxId,
     DateTime? targetDate,
+    List<String> tags = const [],
   }) async {
     final id = _uuid.v4();
     final now = DateTime.now();
@@ -61,6 +62,7 @@ class ProjectManager {
       iconName: drift.Value(iconName ?? 'folder'),
       originInboxId: drift.Value(originInboxId),
       targetDate: drift.Value(targetDate),
+      metadata: drift.Value(jsonEncode({'tags': tags})),
       createdAt: now,
       updatedAt: now,
     );
@@ -81,6 +83,7 @@ class ProjectManager {
     String? colorHex,
     String? iconName,
     DateTime? targetDate,
+    List<String>? tags,
   }) async {
     final now = DateTime.now();
     final companion = ProjectsCompanion(
@@ -92,6 +95,7 @@ class ProjectManager {
       colorHex: colorHex != null ? drift.Value(colorHex) : const drift.Value.absent(),
       iconName: iconName != null ? drift.Value(iconName) : const drift.Value.absent(),
       targetDate: targetDate != null ? drift.Value(targetDate) : const drift.Value.absent(),
+      metadata: tags != null ? drift.Value(jsonEncode({'tags': tags})) : const drift.Value.absent(),
       updatedAt: drift.Value(now),
     );
 

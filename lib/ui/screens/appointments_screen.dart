@@ -21,6 +21,8 @@ import '../../reports/web_downloader.dart';
 import '../../settings/app_settings_manager.dart';
 import '../providers.dart';
 import 'person_detail_screen.dart';
+import 'project_detail_screen.dart';
+import 'tasks_screen.dart';
 import '../../appointments/plan_b_recommender.dart';
 import '../widgets/screen_hero_accent_band.dart';
 import '../widgets/plan_b_dialog.dart';
@@ -60,6 +62,20 @@ class AppointmentsScreen extends ConsumerStatefulWidget {
 
   final bool calendarToolsOnly;
 
+  static bool isMinistryAppointment(AppointmentEntry appt) =>
+      _AppointmentsScreenState.isMinistryAppointment(appt);
+
+  static List<AppointmentEntry> projectTasksAndProjectsToAppointments(
+    List<AppointmentEntry> appointments,
+    List<TaskEntry> tasks,
+    List<ProjectEntry> projects,
+  ) =>
+      _AppointmentsScreenState._appointmentsWithTasksAndProjects(
+        appointments,
+        tasks,
+        projects,
+      );
+
   @override
   ConsumerState<AppointmentsScreen> createState() => _AppointmentsScreenState();
 }
@@ -71,6 +87,9 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
   final ScrollController _timeScrollController = ScrollController();
 
   static bool isMinistryAppointment(AppointmentEntry appt) {
+    if (appt.id.startsWith('task:') || appt.id.startsWith('project:')) {
+      return false;
+    }
     final titleLower = appt.title.toLowerCase();
     final notesLower = (appt.locationNotes ?? '').toLowerCase();
     if (titleLower.contains('ausência') ||
@@ -90,6 +109,12 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
   }
 
   static Color _getAppointmentActivityColor(AppointmentEntry appt) {
+    if (appt.id.startsWith('task:')) {
+      return const Color(0xFF0284C7); // Sky Blue para tarefas
+    }
+    if (appt.id.startsWith('project:')) {
+      return const Color(0xFF6366F1); // Indigo para projetos
+    }
     final titleLower = appt.title.toLowerCase();
     if (titleLower.contains('viagem')) return const Color(0xFF0D9488); // Teal
     if (titleLower.contains('ausência') || titleLower.contains('ausencia')) {
@@ -1621,6 +1646,116 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
   }
 
   void _showAppointmentActions(BuildContext context, AppointmentEntry appt) {
+    if (appt.id.startsWith('task:')) {
+      final taskId = appt.id.replaceFirst('task:', '');
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(appt.title),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Data Limite: ${AppDateUtils.formatDate(appt.startTime)}',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              if (appt.locationNotes != null) ...[
+                const SizedBox(height: 8),
+                Text(appt.locationNotes!),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Fechar'),
+            ),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.check_circle_outline),
+              label: const Text('Concluir'),
+              onPressed: () async {
+                Navigator.pop(ctx);
+                await ref.read(taskManagerProvider).toggleTaskComplete(taskId, completed: true);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Tarefa marcada como concluída!')),
+                  );
+                }
+              },
+            ),
+            FilledButton.icon(
+              icon: const Icon(Icons.open_in_new),
+              label: const Text('Ver Tarefas'),
+              onPressed: () {
+                Navigator.pop(ctx);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const TasksScreen()),
+                );
+              },
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+    if (appt.id.startsWith('project:')) {
+      final projectId = appt.id.replaceFirst('project:', '');
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(appt.title),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Prazo do Projeto: ${AppDateUtils.formatDate(appt.startTime)}',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              if (appt.locationNotes != null) ...[
+                const SizedBox(height: 8),
+                Text(appt.locationNotes!),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Fechar'),
+            ),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.check_circle_outline),
+              label: const Text('Concluir'),
+              onPressed: () async {
+                Navigator.pop(ctx);
+                await ref.read(projectManagerProvider).updateProjectStatus(projectId, 'completed');
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Projeto marcado como concluído!')),
+                  );
+                }
+              },
+            ),
+            FilledButton.icon(
+              icon: const Icon(Icons.folder_open),
+              label: const Text('Abrir Projeto'),
+              onPressed: () {
+                Navigator.pop(ctx);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ProjectDetailScreen(projectId: projectId),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      );
+      return;
+    }
     if (appt.id.startsWith('external-calendar:')) {
       showDialog<void>(
         context: context,
@@ -4224,6 +4359,68 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
     );
   }
 
+  static List<AppointmentEntry> _appointmentsWithTasksAndProjects(
+    List<AppointmentEntry> appointments,
+    List<TaskEntry> tasks,
+    List<ProjectEntry> projects,
+  ) {
+    final taskAppts = <AppointmentEntry>[];
+    for (final task in tasks) {
+      if (task.dueDate == null || task.status == 'completed' || task.status == 'cancelled') continue;
+      final due = task.dueDate!;
+      final start = (due.hour != 0 || due.minute != 0)
+          ? due
+          : DateTime(due.year, due.month, due.day, 9, 0);
+      final end = start.add(const Duration(hours: 1));
+      taskAppts.add(
+        AppointmentEntry(
+          id: 'task:${task.id}',
+          title: '📋 ${task.title}',
+          startTime: start,
+          endTime: end,
+          durationMinutes: 60,
+          status: 'planejado',
+          locationNotes: 'Prazo de Tarefa • Prioridade: ${task.priority}${task.description != null ? "\n${task.description}" : ""}',
+          isProvisional: false,
+          createdAt: task.createdAt,
+          updatedAt: task.updatedAt,
+          revision: task.revision,
+        ),
+      );
+    }
+
+    final projectAppts = <AppointmentEntry>[];
+    for (final project in projects) {
+      if (project.targetDate == null || project.status == 'completed' || project.status == 'archived') continue;
+      final target = project.targetDate!;
+      final start = (target.hour != 0 || target.minute != 0)
+          ? target
+          : DateTime(target.year, target.month, target.day, 10, 0);
+      final end = start.add(const Duration(hours: 1));
+      projectAppts.add(
+        AppointmentEntry(
+          id: 'project:${project.id}',
+          title: '🎯 ${project.name}',
+          startTime: start,
+          endTime: end,
+          durationMinutes: 60,
+          status: 'planejado',
+          locationNotes: 'Prazo do Projeto${project.description != null ? "\n${project.description}" : ""}',
+          isProvisional: false,
+          createdAt: project.createdAt,
+          updatedAt: project.updatedAt,
+          revision: project.revision,
+        ),
+      );
+    }
+
+    return [
+      ...appointments,
+      ...taskAppts,
+      ...projectAppts,
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final appointmentsAsync = ref.watch(appointmentsStreamProvider);
@@ -4241,8 +4438,13 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
         .toList();
     final externalEvents = ref.watch(externalCalendarEventsProvider).value ?? [];
     final links = ref.watch(calendarEventLinksProvider).value ?? [];
-    final calendarAppts = appointmentsWithExternalEvents(
+    final pendingTasks = ref.watch(pendingTasksStreamProvider).value ?? [];
+    final activeProjects = ref.watch(activeProjectsStreamProvider).value ?? [];
+    final withExternal = appointmentsWithExternalEvents(
       allAppts, externalEvents, links,
+    );
+    final calendarAppts = _appointmentsWithTasksAndProjects(
+      withExternal, pendingTasks, activeProjects,
     );
     final allActivities = activitiesAsync.value ?? [];
 

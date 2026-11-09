@@ -86,6 +86,8 @@ class TaskManager {
     DateTime? scheduledAt,
     String? recurrenceRule,
     int? durationMinutes,
+    List<String>? tags,
+    List<Map<String, dynamic>>? attachments,
   }) async {
     final now = DateTime.now();
     final companion = TasksCompanion(
@@ -102,6 +104,8 @@ class TaskManager {
       scheduledAt: scheduledAt != null ? drift.Value(scheduledAt) : const drift.Value.absent(),
       recurrenceRule: recurrenceRule != null ? drift.Value(recurrenceRule) : const drift.Value.absent(),
       durationMinutes: durationMinutes != null ? drift.Value(durationMinutes) : const drift.Value.absent(),
+      attachments: attachments != null ? drift.Value(jsonEncode(attachments)) : const drift.Value.absent(),
+      metadata: tags != null ? drift.Value(jsonEncode({'tags': tags})) : const drift.Value.absent(),
       updatedAt: drift.Value(now),
     );
 

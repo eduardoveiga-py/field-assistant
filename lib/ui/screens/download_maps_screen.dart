@@ -170,7 +170,7 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
                 child: ListView(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   children: [
-                    // Seção: Baixado (X MB)
+                    // Seção: Baixado (X MB) — Estilo Orgânico com contagem de regiões
                     if (installedRegions.isNotEmpty) ...[
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 8),
@@ -191,6 +191,48 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
                               size: 18,
                             ),
                           ],
+                        ),
+                      ),
+                      // Card resumo do País no topo com total de mapas instalados (ex: Brasil 1 de 23)
+                      Card(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        elevation: 0,
+                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(
+                            color: isDark ? Colors.white12 : Colors.grey.shade300,
+                          ),
+                        ),
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                          leading: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(Icons.sync_rounded, color: Colors.amber),
+                          ),
+                          title: const Text(
+                            'Brasil',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                          ),
+                          subtitle: Text(
+                            'Mapas: ${installedRegions.length} de ${allRegions.length}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                            ),
+                          ),
+                          trailing: Text(
+                            MBTilesService.instance.formattedTotalDownloadedSize,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.accentTeal,
+                              fontSize: 13,
+                            ),
+                          ),
                         ),
                       ),
                       ...installedRegions.map((r) => _buildInstalledRegionCard(r, isDark)),
@@ -236,6 +278,86 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
               ),
             ],
           ),
+          bottomNavigationBar: installedRegions.isNotEmpty
+              ? Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                    border: Border(
+                      top: BorderSide(
+                        color: isDark ? Colors.white12 : Colors.grey.shade300,
+                      ),
+                    ),
+                  ),
+                  child: SafeArea(
+                    child: Row(
+                      children: [
+                        const Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 24),
+                        const SizedBox(width: 10),
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Atualizar mapas',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                            ),
+                            Text(
+                              '${MBTilesService.instance.formattedTotalDownloadedSize} instalados',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Spacer(),
+                        ElevatedButton.icon(
+                          onPressed: _isUpdatingAll
+                              ? null
+                              : () async {
+                                  final messenger = ScaffoldMessenger.of(context);
+                                  setState(() => _isUpdatingAll = true);
+                                  await MBTilesService.instance.updateAll(
+                                    onProgress: (name, p) {
+                                      if (mounted) {
+                                        setState(() => _updatingRegionName = name);
+                                      }
+                                    },
+                                  );
+                                  if (mounted) {
+                                    setState(() {
+                                      _isUpdatingAll = false;
+                                      _updatingRegionName = null;
+                                    });
+                                    messenger.showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Todos os mapas foram atualizados com sucesso!'),
+                                        backgroundColor: AppTheme.successGreen,
+                                      ),
+                                    );
+                                  }
+                                },
+                          icon: _isUpdatingAll
+                              ? const SizedBox(
+                                  width: 12,
+                                  height: 12,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                )
+                              : const Icon(Icons.sync_rounded, size: 16),
+                          label: Text(_isUpdatingAll ? 'Atualizando...' : 'Atualizar tudo'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.accentTeal,
+                            foregroundColor: Colors.white,
+                            visualDensity: VisualDensity.compact,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : null,
         );
       },
     );

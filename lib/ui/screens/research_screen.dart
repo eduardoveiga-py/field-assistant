@@ -5,7 +5,9 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/app_theme.dart';
 import '../../media/media_picker_helper.dart';
+import '../../reports/web_downloader.dart';
 import '../../research/research_manager.dart';
+import '../widgets/rich_markdown_toolbar.dart';
 
 class ResearchScreen extends ConsumerStatefulWidget {
   const ResearchScreen({super.key});
@@ -217,6 +219,85 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
     );
   }
 
+  void _showExportArticleModal(BuildContext context, ResearchArticleItem article) {
+    final mdContent = '# ${article.title}\n\n'
+        '**Resumo:** ${article.summary}\n'
+        '${article.tags.isNotEmpty ? '**Tags:** ${article.tags.map((t) => '#$t').join(' ')}\n' : ''}'
+        '\n---\n\n'
+        '${article.content}';
+
+    final plainText = '${article.title}\n\n'
+        'RESUMO:\n${article.summary}\n\n'
+        'CONTEÚDO:\n${article.content}';
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.copy, color: AppTheme.primaryBlue),
+                title: const Text('Copiar Texto Formatado (Markdown)'),
+                subtitle: const Text('Copia título, resumo e conteúdo em Markdown'),
+                onTap: () {
+                  Clipboard.setData(ClipboardData(text: mdContent));
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Pesquisa copiada como Markdown!')),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.text_snippet_outlined, color: AppTheme.primaryBlue),
+                title: const Text('Copiar Texto Puro'),
+                subtitle: const Text('Copia o texto sem marcação para a área de transferência'),
+                onTap: () {
+                  Clipboard.setData(ClipboardData(text: plainText));
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Pesquisa copiada como texto puro!')),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.download, color: AppTheme.primaryBlue),
+                title: const Text('Baixar Arquivo Markdown (.md)'),
+                subtitle: const Text('Salva o artigo localmente com formatação'),
+                onTap: () {
+                  final safeName = article.title.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+                  FileDownloader.download('$safeName.md', mdContent);
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Download do arquivo .md concluído!')),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.file_download_outlined, color: AppTheme.primaryBlue),
+                title: const Text('Baixar Arquivo de Texto (.txt)'),
+                subtitle: const Text('Salva o artigo em formato de texto simples'),
+                onTap: () {
+                  final safeName = article.title.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+                  FileDownloader.download('$safeName.txt', plainText);
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Download do arquivo .txt concluído!')),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showReadMoreDialog(BuildContext context, ResearchArticleItem article) {
     showModalBottomSheet(
       context: context,
@@ -392,6 +473,12 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       OutlinedButton.icon(
+                        icon: const Icon(Icons.file_download_outlined, size: 16),
+                        label: const Text('Exportar'),
+                        onPressed: () => _showExportArticleModal(context, article),
+                      ),
+                      const SizedBox(width: 8),
+                      OutlinedButton.icon(
                         icon: const Icon(Icons.copy, size: 16),
                         label: const Text('Copiar Texto'),
                         onPressed: () {
@@ -527,6 +614,8 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                               maxLines: 2,
                             ),
                             const SizedBox(height: 12),
+                            RichMarkdownToolbar(controller: contentController),
+                            const SizedBox(height: 6),
                             TextField(
                               controller: contentController,
                               decoration: const InputDecoration(
@@ -1100,29 +1189,39 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                                     )
                                   else
                                     const SizedBox.shrink(),
-                                  ElevatedButton.icon(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppTheme.primaryBlue,
-                                      foregroundColor: Colors.white,
-                                      visualDensity: VisualDensity.compact,
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 4,
+                                  Row(
+                                    children: [
+                                      IconButton(
+                                        visualDensity: VisualDensity.compact,
+                                        icon: const Icon(Icons.file_download_outlined, size: 18, color: AppTheme.primaryBlue),
+                                        tooltip: 'Exportar Pesquisa',
+                                        onPressed: () => _showExportArticleModal(context, item),
                                       ),
-                                    ),
-                                    icon: const Icon(
-                                      Icons.chrome_reader_mode,
-                                      size: 14,
-                                    ),
-                                    label: const Text(
-                                      'Leia mais',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
+                                      ElevatedButton.icon(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: AppTheme.primaryBlue,
+                                          foregroundColor: Colors.white,
+                                          visualDensity: VisualDensity.compact,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 4,
+                                          ),
+                                        ),
+                                        icon: const Icon(
+                                          Icons.chrome_reader_mode,
+                                          size: 14,
+                                        ),
+                                        label: const Text(
+                                          'Leia mais',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        onPressed: () =>
+                                            _showReadMoreDialog(context, item),
                                       ),
-                                    ),
-                                    onPressed: () =>
-                                        _showReadMoreDialog(context, item),
+                                    ],
                                   ),
                                 ],
                               ),

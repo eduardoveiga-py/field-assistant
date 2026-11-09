@@ -99,6 +99,10 @@ class KnowledgeManager {
     await _recordSyncQueue(id, 'knowledge_notes', 'UPDATE');
   }
 
+  Future<KnowledgeNoteEntry?> getNoteById(String id) async {
+    return (db.select(db.knowledgeNotes)..where((t) => t.id.equals(id))).getSingleOrNull();
+  }
+
   Future<void> togglePinNote(String id) async {
     final current = await (db.select(db.knowledgeNotes)..where((t) => t.id.equals(id))).getSingleOrNull();
     if (current == null) return;
@@ -216,6 +220,29 @@ class KnowledgeManager {
     await _recordSyncQueue(id, 'knowledge_questions', 'UPDATE');
   }
 
+  Future<void> updateQuestion(
+    String id, {
+    String? question,
+    String? context,
+    String? answer,
+    String? status,
+    String? category,
+  }) async {
+    final now = DateTime.now();
+    final companion = KnowledgeQuestionsCompanion(
+      question: question != null ? drift.Value(question.trim()) : const drift.Value.absent(),
+      context: context != null ? drift.Value(context.trim()) : const drift.Value.absent(),
+      answer: answer != null ? drift.Value(answer.trim()) : const drift.Value.absent(),
+      status: status != null ? drift.Value(status) : const drift.Value.absent(),
+      category: category != null ? drift.Value(category) : const drift.Value.absent(),
+      answeredAt: answer != null && answer.trim().isNotEmpty ? drift.Value(now) : const drift.Value.absent(),
+      updatedAt: drift.Value(now),
+    );
+
+    await (db.update(db.knowledgeQuestions)..where((t) => t.id.equals(id))).write(companion);
+    await _recordSyncQueue(id, 'knowledge_questions', 'UPDATE');
+  }
+
   Future<void> softDeleteQuestion(String id) async {
     final now = DateTime.now();
     await (db.update(db.knowledgeQuestions)..where((t) => t.id.equals(id))).write(
@@ -319,6 +346,26 @@ class KnowledgeManager {
     await _recordSyncQueue(id, 'knowledge_documents', 'DELETE');
   }
 
+  Future<void> updateDocument(
+    String id, {
+    String? title,
+    String? description,
+    String? category,
+    List<String>? tags,
+  }) async {
+    final now = DateTime.now();
+    final companion = KnowledgeDocumentsCompanion(
+      title: title != null ? drift.Value(title.trim()) : const drift.Value.absent(),
+      description: description != null ? drift.Value(description.trim()) : const drift.Value.absent(),
+      category: category != null ? drift.Value(category) : const drift.Value.absent(),
+      tags: tags != null ? drift.Value(jsonEncode(tags)) : const drift.Value.absent(),
+      updatedAt: drift.Value(now),
+    );
+
+    await (db.update(db.knowledgeDocuments)..where((t) => t.id.equals(id))).write(companion);
+    await _recordSyncQueue(id, 'knowledge_documents', 'UPDATE');
+  }
+
   Stream<List<KnowledgeDocumentEntry>> watchDocuments({
     String? category,
     String? query,
@@ -388,6 +435,30 @@ class KnowledgeManager {
       ),
     );
     await _recordSyncQueue(id, 'knowledge_resources', 'DELETE');
+  }
+
+  Future<void> updateResource(
+    String id, {
+    String? title,
+    String? resourceType,
+    String? url,
+    String? description,
+    String? category,
+    List<String>? tags,
+  }) async {
+    final now = DateTime.now();
+    final companion = KnowledgeResourcesCompanion(
+      title: title != null ? drift.Value(title.trim()) : const drift.Value.absent(),
+      resourceType: resourceType != null ? drift.Value(resourceType) : const drift.Value.absent(),
+      url: url != null ? drift.Value(url.trim()) : const drift.Value.absent(),
+      description: description != null ? drift.Value(description.trim()) : const drift.Value.absent(),
+      category: category != null ? drift.Value(category) : const drift.Value.absent(),
+      tags: tags != null ? drift.Value(jsonEncode(tags)) : const drift.Value.absent(),
+      updatedAt: drift.Value(now),
+    );
+
+    await (db.update(db.knowledgeResources)..where((t) => t.id.equals(id))).write(companion);
+    await _recordSyncQueue(id, 'knowledge_resources', 'UPDATE');
   }
 
   Stream<List<KnowledgeResourceEntry>> watchResources({

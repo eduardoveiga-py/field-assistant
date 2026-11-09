@@ -9,6 +9,7 @@ import '../../core/app_theme.dart';
 import '../../voice_notes/audio_recording_service.dart';
 import '../providers.dart';
 import 'adaptive_ministry_sheet.dart';
+import 'rich_markdown_toolbar.dart';
 
 /// Modal adaptativo de captura rápida do Módulo A — Inbox Universal.
 /// Permite capturar pensamentos, ditados de áudio (até 5 min) e documentos/fotos
@@ -276,8 +277,9 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> with Sing
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+    return SingleChildScrollView(
+      physics: const ClampingScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -305,7 +307,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> with Sing
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
           // Categorias Sugeridas
           SingleChildScrollView(
@@ -324,11 +326,11 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> with Sing
               ],
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
 
           // Conteúdo Dinâmico por Aba
           SizedBox(
-            height: 180,
+            height: 210,
             child: TabBarView(
               controller: _tabController,
               children: [
@@ -338,7 +340,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> with Sing
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
           // Botão Salvar
           ElevatedButton.icon(
@@ -346,7 +348,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> with Sing
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primaryBlue,
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 14),
+              padding: const EdgeInsets.symmetric(vertical: 12),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               elevation: 2,
             ),
@@ -387,18 +389,27 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> with Sing
   }
 
   Widget _buildTextTab(bool isDark) {
-    return TextField(
-      controller: _textController,
-      autofocus: true,
-      maxLines: 5,
-      decoration: InputDecoration(
-        hintText: 'O que você está pensando ou precisa registrar sem perder o foco?...',
-        hintStyle: TextStyle(color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8), fontSize: 14),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        filled: true,
-        fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-        contentPadding: const EdgeInsets.all(14),
-      ),
+    return Column(
+      children: [
+        RichMarkdownToolbar(controller: _textController),
+        const SizedBox(height: 6),
+        Expanded(
+          child: TextField(
+            controller: _textController,
+            autofocus: true,
+            maxLines: null,
+            expands: true,
+            decoration: InputDecoration(
+              hintText: 'O que você está pensando ou precisa registrar sem perder o foco?...',
+              hintStyle: TextStyle(color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8), fontSize: 14),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              filled: true,
+              fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+              contentPadding: const EdgeInsets.all(14),
+            ),
+          ),
+        ),
+      ],
     );
   }
 

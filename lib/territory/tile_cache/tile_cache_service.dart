@@ -6,13 +6,72 @@ import '../mbtiles/mbtiles_service.dart';
 import 'tile_cache_interface.dart';
 import 'tile_cache_web.dart' if (dart.library.io) 'tile_cache_native.dart';
 
+/// Estilos de camada de mapa compatíveis com Organic Maps e navegação teocrática
+enum MapLayerStyle {
+  standard(
+    'standard',
+    'Padrão (OSM)',
+    'Ruas, bairros e povoados com alta clareza cartográfica',
+    Icons.map_outlined,
+  ),
+  satellite(
+    'satellite',
+    'Satélite (Esri World)',
+    'Fotografia aérea real para identificar telhados, trilhas e rios',
+    Icons.satellite_alt_rounded,
+  ),
+  topo(
+    'topo',
+    'Topográfico (Relevo)',
+    'Curvas de nível e hidrografia para áreas rurais e ribeirinhas',
+    Icons.terrain_rounded,
+  ),
+  dark(
+    'dark',
+    'Modo Noturno (Carto)',
+    'Contraste elevado para economia de bateria e ministério à noite',
+    Icons.dark_mode_outlined,
+  );
+
+  final String id;
+  final String label;
+  final String description;
+  final IconData icon;
+
+  const MapLayerStyle(this.id, this.label, this.description, this.icon);
+}
+
 class TileCacheService {
   static final TileCacheService instance = TileCacheService._internal();
   TileCacheBackend _backend = getTileBackend();
   final Map<String, Future<Uint8List?>> _inFlight = {};
   static final Map<String, Uint8List> _memoryCache = {};
+  MapLayerStyle _activeStyle = MapLayerStyle.standard;
 
   TileCacheService._internal();
+
+  MapLayerStyle get activeStyle => _activeStyle;
+
+  void setLayerStyle(MapLayerStyle style) {
+    if (_activeStyle != style) {
+      _activeStyle = style;
+      _memoryCache.clear();
+      _inFlight.clear();
+    }
+  }
+
+  String getTileUrl(int z, int x, int y) {
+    switch (_activeStyle) {
+      case MapLayerStyle.satellite:
+        return 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/$z/$y/$x';
+      case MapLayerStyle.topo:
+        return 'https://tile.opentopomap.org/$z/$x/$y.png';
+      case MapLayerStyle.dark:
+        return 'https://a.basemaps.cartocdn.com/dark_all/$z/$x/$y.png';
+      case MapLayerStyle.standard:
+        return 'https://tile.openstreetmap.org/$z/$x/$y.png';
+    }
+  }
 
   @visibleForTesting
   set backend(TileCacheBackend b) {
@@ -23,6 +82,22 @@ class TileCacheService {
 
   static Uint8List? getFromMemory(int z, int x, int y) {
     return _memoryCache['$z/$x/$y'];
+  }
+
+  /// Retorna bloco pai de menor resolução quando o nível atual ainda está carregando,
+  /// eliminando 100% dos piscas/flashes cinzas na tela durante o zoom estilo Organic Maps.
+  static Uint8List? getFallbackFromMemory(int z, int x, int y) {
+    final exact = _memoryCache['$z/$x/$y'];
+    if (exact != null) return exact;
+    if (z > 1) {
+      final parent = _memoryCache['${z - 1}/${x >> 1}/${y >> 1}'];
+      if (parent != null) return parent;
+    }
+    if (z > 2) {
+      final grandParent = _memoryCache['${z - 2}/${x >> 2}/${y >> 2}'];
+      if (grandParent != null) return grandParent;
+    }
+    return null;
   }
 
   Future<Uint8List?> getTileBytes(int z, int x, int y) {
@@ -134,8 +209,9 @@ class _CachedTileWidgetState extends State<CachedTileWidget> {
   @override
   void initState() {
     super.initState();
-    _tileBytes = TileCacheService.getFromMemory(widget.z, widget.x, widget.y);
-    if (_tileBytes == null) {
+    _tileBytes = TileCacheService.getFromMemory(widget.z, widget.x, widget.y) ??
+        TileCacheService.getFallbackFromMemory(widget.z, widget.x, widget.y);
+    if (TileCacheService.getFromMemory(widget.z, widget.x, widget.y) == null) {
       _loadTile();
     }
   }
@@ -146,8 +222,13 @@ class _CachedTileWidgetState extends State<CachedTileWidget> {
     if (oldWidget.z != widget.z ||
         oldWidget.x != widget.x ||
         oldWidget.y != widget.y) {
-      _tileBytes = TileCacheService.getFromMemory(widget.z, widget.x, widget.y);
-      if (_tileBytes == null) {
+      final exact = TileCacheService.getFromMemory(widget.z, widget.x, widget.y);
+      if (exact != null) {
+        _tileBytes = exact;
+      } else {
+        // Preserva o tile anterior ou obtém fallback em memória do zoom adjacente
+        _tileBytes = _tileBytes ??
+            TileCacheService.getFallbackFromMemory(widget.z, widget.x, widget.y);
         _loadTile();
       }
     }

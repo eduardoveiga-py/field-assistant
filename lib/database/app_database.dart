@@ -110,6 +110,9 @@ class AppDatabase extends _$AppDatabase {
         await _migrateResearchArticlesContextColumns(m);
       }
     },
+    beforeOpen: (details) async {
+      await _seedDefaultLanguage();
+    },
   );
 
   Future<void> _migrateAppointmentsTaskId(Migrator m) async {
@@ -173,22 +176,75 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> _seedDefaultLanguage() async {
     try {
-      final existing = await (select(appLanguages)..where((t) => t.id.equals('tca'))).getSingleOrNull();
-      if (existing == null) {
-        await into(appLanguages).insertOnConflictUpdate(
-          AppLanguagesCompanion.insert(
-            id: 'tca',
-            name: 'Ticuna (Magüta)',
-            code: 'tca',
-            symbol: '🏹',
-            diacritics: const Value(
-              '["ĩ","ü̃","ü̃́","ũ","ã́","ẽ","Ĩ","Ü̃","Ü̃́","Ũ","Ã́","Ẽ"]',
-            ),
-            isDefault: const Value(true),
-            createdAt: DateTime.now(),
-            updatedAt: DateTime.now(),
+      final now = DateTime.now();
+      final catalog = [
+        AppLanguagesCompanion.insert(
+          id: 'tca',
+          name: 'Ticuna (Magüta)',
+          code: 'tca',
+          symbol: '🏹',
+          diacritics: const Value(
+            '["ĩ","ü̃","ü̃́","ũ","ã́","ẽ","Ĩ","Ü̃","Ü̃́","Ũ","Ã́","Ẽ"]',
           ),
-        );
+          isDefault: const Value(true),
+          createdAt: now,
+          updatedAt: now,
+        ),
+        AppLanguagesCompanion.insert(
+          id: 'por',
+          name: 'Português',
+          code: 'por',
+          symbol: '🇧🇷',
+          diacritics: const Value('[]'),
+          isDefault: const Value(false),
+          createdAt: now,
+          updatedAt: now,
+        ),
+        AppLanguagesCompanion.insert(
+          id: 'spa',
+          name: 'Español',
+          code: 'spa',
+          symbol: '🇪🇸',
+          diacritics: const Value(
+            '["ñ","á","é","í","ó","ú","ü","¡","¿"]',
+          ),
+          isDefault: const Value(false),
+          createdAt: now,
+          updatedAt: now,
+        ),
+        AppLanguagesCompanion.insert(
+          id: 'gub',
+          name: 'Guajajara (Tenetehara)',
+          code: 'gub',
+          symbol: '🌿',
+          diacritics: const Value(
+            '["à","è","ì","ò","ù","ỹ","\'"]',
+          ),
+          isDefault: const Value(false),
+          createdAt: now,
+          updatedAt: now,
+        ),
+        AppLanguagesCompanion.insert(
+          id: 'yan',
+          name: 'Yanomami (Yanomamõ)',
+          code: 'yan',
+          symbol: '🌳',
+          diacritics: const Value(
+            '["ë","ɨ","th","rh"]',
+          ),
+          isDefault: const Value(false),
+          createdAt: now,
+          updatedAt: now,
+        ),
+      ];
+
+      for (final item in catalog) {
+        final existing = await (select(appLanguages)
+              ..where((t) => t.id.equals(item.id.value)))
+            .getSingleOrNull();
+        if (existing == null) {
+          await into(appLanguages).insertOnConflictUpdate(item);
+        }
       }
     } catch (_) {}
   }

@@ -46,6 +46,7 @@ class GoogleCalendarProvider implements CalendarProvider {
       'https://www.googleapis.com/auth/userinfo.email';
   static const String _keySelectedCalendarId = 'google_calendar_selected_id';
   static const String _keyConnectedEmail = 'google_calendar_connected_email';
+  static const String _keyUserExplicitlyConnected = 'google_calendar_explicitly_connected';
   static const String _keySyncTokenPrefix = 'google_calendar_synctoken_';
   static const String _keyReadOnlyCalendarIds = 'google_readonly_calendar_ids';
 
@@ -125,6 +126,11 @@ class GoogleCalendarProvider implements CalendarProvider {
   @override
   Future<bool> isAuthorized() async {
     try {
+      final explicitlyConnected = await _secureStorage.read(key: _keyUserExplicitlyConnected);
+      if (explicitlyConnected != 'true') {
+        return false;
+      }
+
       await _ensureInitialized();
       if (kIsWeb) {
         if (_webAuthHeaders != null && _webAuthHeaders!.isNotEmpty) {
@@ -142,9 +148,13 @@ class GoogleCalendarProvider implements CalendarProvider {
           }
           return true;
         }
+        _webUserEmail ??= await _secureStorage.read(key: _keyConnectedEmail);
+        return _webUserEmail != null;
       }
       _currentUser ??= await _googleSignIn.attemptLightweightAuthentication();
-      return _currentUser != null;
+      if (_currentUser != null) return true;
+      final savedEmail = await _secureStorage.read(key: _keyConnectedEmail);
+      return savedEmail != null && savedEmail.isNotEmpty;
     } catch (_) {
       return false;
     }
@@ -165,6 +175,7 @@ class GoogleCalendarProvider implements CalendarProvider {
         if (headers != null && headers.isNotEmpty) {
           _webAuthHeaders = headers;
           await _fetchAndSaveWebUserEmail(headers);
+          await _secureStorage.write(key: _keyUserExplicitlyConnected, value: 'true');
           return true;
         }
         if (_googleSignIn.supportsAuthenticate()) {
@@ -178,6 +189,10 @@ class GoogleCalendarProvider implements CalendarProvider {
                   _calendarReadonlyScope,
                 ], promptIfNecessary: true);
             _webUserEmail = _currentUser!.email;
+            if (_webUserEmail != null && _webUserEmail!.isNotEmpty) {
+              await _secureStorage.write(key: _keyConnectedEmail, value: _webUserEmail!);
+            }
+            await _secureStorage.write(key: _keyUserExplicitlyConnected, value: 'true');
             return _webAuthHeaders != null;
           }
         }
@@ -189,7 +204,14 @@ class GoogleCalendarProvider implements CalendarProvider {
       _currentUser = await _googleSignIn.authenticate(
         scopeHint: [_calendarScope, _calendarReadonlyScope, _emailScope],
       );
-      return _currentUser != null;
+      if (_currentUser != null) {
+        if (_currentUser!.email.isNotEmpty) {
+          await _secureStorage.write(key: _keyConnectedEmail, value: _currentUser!.email);
+        }
+        await _secureStorage.write(key: _keyUserExplicitlyConnected, value: 'true');
+        return true;
+      }
+      return false;
     } catch (e) {
       lastError = e.toString();
       return false;
@@ -213,7 +235,7 @@ class GoogleCalendarProvider implements CalendarProvider {
     if (kIsWeb) {
       if (_webAuthHeaders == null || _webAuthHeaders!.isEmpty) {
         final ok = await isAuthorized();
-        if (!ok && (_webAuthHeaders == null || _webAuthHeaders!.isEmpty)) {
+        if (!ok || _webAuthHeaders == null || _webAuthHeaders!.isEmpty) {
           return null;
         }
       }
@@ -224,16 +246,15 @@ class GoogleCalendarProvider implements CalendarProvider {
     }
 
     if (_currentUser == null) {
-      await isAuthorized();
-      if (_currentUser == null) {
-        final authorized = await requestAuthorization();
-        if (!authorized || _currentUser == null) return null;
+      final ok = await isAuthorized();
+      if (!ok || _currentUser == null) {
+        return null; // Nunca abre popup espontâneo em segundo plano
       }
     }
 
     try {
       final headers = await _currentUser!.authorizationClient
-          .authorizationHeaders([_calendarScope], promptIfNecessary: true);
+          .authorizationHeaders([_calendarScope], promptIfNecessary: false);
       if (headers == null) return null;
       final authClient = _AuthenticatedClient(headers);
       return gcal.CalendarApi(authClient);
@@ -324,6 +345,7 @@ class GoogleCalendarProvider implements CalendarProvider {
     await setReadOnlyCalendarIds({});
     await _secureStorage.delete(key: _keyReadOnlyCalendarIds);
     await _secureStorage.delete(key: _keyConnectedEmail);
+    await _secureStorage.delete(key: _keyUserExplicitlyConnected);
   }
 
   @override

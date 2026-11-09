@@ -7,6 +7,8 @@ import '../inbox/inbox_manager.dart';
 import '../tasks/task_manager.dart';
 import '../projects/project_manager.dart';
 import '../knowledge/knowledge_manager.dart';
+import '../core/biometric_auth_service.dart';
+import '../inbox/jw_email_service.dart';
 
 // Provider do Banco Drift
 final databaseProvider = Provider<AppDatabase>((ref) {
@@ -44,6 +46,21 @@ final unprocessedInboxStreamProvider = StreamProvider<List<InboxEntry>>((ref) {
 final unprocessedInboxCountProvider = StreamProvider<int>((ref) {
   final inboxManager = ref.watch(inboxManagerProvider);
   return inboxManager.watchUnprocessedCount();
+});
+
+final biometricAuthServiceProvider = Provider<BiometricAuthService>((ref) {
+  return BiometricAuthService();
+});
+
+final jwEmailServiceProvider = Provider<JwEmailService>((ref) {
+  final db = ref.watch(databaseProvider);
+  final biometric = ref.watch(biometricAuthServiceProvider);
+  return JwEmailService(db: db, biometricAuth: biometric);
+});
+
+final retainedEmailsStreamProvider = StreamProvider<List<JwEmailMessage>>((ref) {
+  final emailService = ref.watch(jwEmailServiceProvider);
+  return emailService.watchRetainedEmails();
 });
 
 // ==========================================
@@ -189,3 +206,36 @@ class PeopleFilterNotifier extends Notifier<String> {
 final peopleFilterProvider = NotifierProvider<PeopleFilterNotifier, String>(
   PeopleFilterNotifier.new,
 );
+
+class ShortcutsCategoryNotifier extends Notifier<String> {
+  @override
+  String build() => 'principais';
+
+  @override
+  set state(String value) => super.state = value;
+  @override
+  String get state => super.state;
+}
+
+/// Categoria ativa de atalhos rápidos na Home Screen ('principais', 'ministerio', 'produtividade', 'todos')
+final todayShortcutsCategoryProvider = NotifierProvider<ShortcutsCategoryNotifier, String>(
+  ShortcutsCategoryNotifier.new,
+);
+
+class MapFullscreenNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  @override
+  set state(bool value) => super.state = value;
+  @override
+  bool get state => super.state;
+
+  void toggle() => state = !state;
+}
+
+/// Modo tela cheia imersivo para o mapa dos territórios
+final isMapFullscreenProvider = NotifierProvider<MapFullscreenNotifier, bool>(
+  MapFullscreenNotifier.new,
+);
+

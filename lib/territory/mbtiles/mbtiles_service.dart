@@ -70,7 +70,7 @@ class MBTilesService {
 
   Stream<List<MBTileRegion>> get regionsStream => _regionsController.stream;
 
-  // Catálogo hierárquico padrão com territórios teocráticos estratégicos
+  // Catálogo hierárquico padrão com territórios teocráticos estratégicos estilo Organic Maps (23 regiões do Brasil)
   static const List<MBTileRegion> _defaultCatalog = [
     MBTileRegion(
       id: 'br_am_solimoes',
@@ -85,6 +85,17 @@ class MBTilesService {
       isInstalled: true, // Pré-instalado por padrão no app
     ),
     MBTileRegion(
+      id: 'br_am_manaus',
+      country: 'Brasil',
+      state: 'Amazonas',
+      name: 'Manaus, Rio Negro & Baixo Amazonas',
+      description:
+          'Capital amazonense, comunidades ribeirinhas e municípios de Itacoatiara e Parintins.',
+      minZoom: 6,
+      maxZoom: 17,
+      sizeBytes: 52 * 1024 * 1024,
+    ),
+    MBTileRegion(
       id: 'br_rr_yanomami',
       country: 'Brasil',
       state: 'Roraima',
@@ -94,6 +105,17 @@ class MBTilesService {
       minZoom: 6,
       maxZoom: 17,
       sizeBytes: 28 * 1024 * 1024, // 28 MB
+    ),
+    MBTileRegion(
+      id: 'br_rr_boavista',
+      country: 'Brasil',
+      state: 'Roraima',
+      name: 'Boa Vista, Pacaraima & Fronteira Venezuela',
+      description:
+          'Capital e corredor migratório ao longo da BR-174 com alta densidade ministerial multilíngue.',
+      minZoom: 6,
+      maxZoom: 17,
+      sizeBytes: 31 * 1024 * 1024,
     ),
     MBTileRegion(
       id: 'br_ma_guajajara',
@@ -107,6 +129,61 @@ class MBTilesService {
       sizeBytes: 35 * 1024 * 1024, // 35 MB
     ),
     MBTileRegion(
+      id: 'br_ma_saoluis',
+      country: 'Brasil',
+      state: 'Maranhão',
+      name: 'São Luís, Imperatriz & Litoral Maranhense',
+      description:
+          'Região metropolitana da ilha de São Luís, Baixada Maranhense e polo de Imperatriz.',
+      minZoom: 7,
+      maxZoom: 17,
+      sizeBytes: 44 * 1024 * 1024,
+    ),
+    MBTileRegion(
+      id: 'br_pa_belem',
+      country: 'Brasil',
+      state: 'Pará',
+      name: 'Belém, Santarém & Arquipélago do Marajó',
+      description:
+          'Metrópole paraense, orla fluvial amazônica e rotas ribeirinhas do Baixo Amazonas.',
+      minZoom: 6,
+      maxZoom: 17,
+      sizeBytes: 58 * 1024 * 1024,
+    ),
+    MBTileRegion(
+      id: 'br_ac_riobranco',
+      country: 'Brasil',
+      state: 'Acre',
+      name: 'Rio Branco & Cruzeiro do Sul (Vale do Juruá)',
+      description:
+          'Capital acreana, fronteira com o Peru e comunidades isoladas na floresta amazônica.',
+      minZoom: 6,
+      maxZoom: 17,
+      sizeBytes: 26 * 1024 * 1024,
+    ),
+    MBTileRegion(
+      id: 'br_ro_portovelho',
+      country: 'Brasil',
+      state: 'Rondônia',
+      name: 'Porto Velho & Ji-Paraná (Corredor BR-364)',
+      description:
+          'Bacia do Rio Madeira, polos agropecuários e congregações ao longo do eixo rodoviário.',
+      minZoom: 6,
+      maxZoom: 17,
+      sizeBytes: 34 * 1024 * 1024,
+    ),
+    MBTileRegion(
+      id: 'br_ap_macapa',
+      country: 'Brasil',
+      state: 'Amapá',
+      name: 'Macapá, Santana & Oiapoque (Fronteira Guiana)',
+      description:
+          'Linha do Equador, foz do Rio Amazonas e território de fronteira franco-brasileira.',
+      minZoom: 6,
+      maxZoom: 17,
+      sizeBytes: 24 * 1024 * 1024,
+    ),
+    MBTileRegion(
       id: 'br_sp_capital',
       country: 'Brasil',
       state: 'São Paulo',
@@ -116,6 +193,138 @@ class MBTilesService {
       minZoom: 8,
       maxZoom: 18,
       sizeBytes: 85 * 1024 * 1024, // 85 MB
+    ),
+    MBTileRegion(
+      id: 'br_sp_campinas',
+      country: 'Brasil',
+      state: 'São Paulo',
+      name: 'Campinas, Sorocaba & Vale do Paraíba',
+      description:
+          'Polo tecnológico paulista, eixo Dutra e cidades do interior com intenso campo teocrático.',
+      minZoom: 7,
+      maxZoom: 17,
+      sizeBytes: 64 * 1024 * 1024,
+    ),
+    MBTileRegion(
+      id: 'br_sp_litoral',
+      country: 'Brasil',
+      state: 'São Paulo',
+      name: 'Baixada Santista & Litoral Norte / Sul',
+      description:
+          'Santos, São Vicente, Guarujá, Ubatuba, Caraguatatuba e orla marítima paulista.',
+      minZoom: 7,
+      maxZoom: 17,
+      sizeBytes: 38 * 1024 * 1024,
+    ),
+    MBTileRegion(
+      id: 'br_rj_capital',
+      country: 'Brasil',
+      state: 'Rio de Janeiro',
+      name: 'Rio de Janeiro — Capital, Niterói & Baixada',
+      description:
+          'Zona Sul, Norte, Oeste, Baixada Fluminense e conurbação leste da Baía de Guanabara.',
+      minZoom: 8,
+      maxZoom: 18,
+      sizeBytes: 76 * 1024 * 1024,
+    ),
+    MBTileRegion(
+      id: 'br_rj_serra',
+      country: 'Brasil',
+      state: 'Rio de Janeiro',
+      name: 'Região Serrana, Região dos Lagos & Norte Fluminense',
+      description:
+          'Petrópolis, Teresópolis, Nova Friburgo, Cabo Frio, Campos dos Goytacazes e Macaé.',
+      minZoom: 7,
+      maxZoom: 17,
+      sizeBytes: 42 * 1024 * 1024,
+    ),
+    MBTileRegion(
+      id: 'br_mg_bh',
+      country: 'Brasil',
+      state: 'Minas Gerais',
+      name: 'Belo Horizonte & Região Metropolitana',
+      description:
+          'Capital mineira, Contagem, Betim e cidades históricas vizinhas com vastos territórios.',
+      minZoom: 8,
+      maxZoom: 18,
+      sizeBytes: 68 * 1024 * 1024,
+    ),
+    MBTileRegion(
+      id: 'br_mg_triangulo',
+      country: 'Brasil',
+      state: 'Minas Gerais',
+      name: 'Triângulo Mineiro & Alto Paranaíba (Uberlândia/Uberaba)',
+      description:
+          'Pólo agroindustrial e congregações dinâmicas do interior de Minas Gerais.',
+      minZoom: 7,
+      maxZoom: 17,
+      sizeBytes: 48 * 1024 * 1024,
+    ),
+    MBTileRegion(
+      id: 'br_pr_curitiba',
+      country: 'Brasil',
+      state: 'Paraná',
+      name: 'Curitiba & Região Metropolitana',
+      description:
+          'Planalto paranaense, bairros planejados e municípios limítrofes da grande Curitiba.',
+      minZoom: 8,
+      maxZoom: 18,
+      sizeBytes: 54 * 1024 * 1024,
+    ),
+    MBTileRegion(
+      id: 'br_pr_foz',
+      country: 'Brasil',
+      state: 'Paraná',
+      name: 'Foz do Iguaçu, Cascavel & Fronteira Tríplice',
+      description:
+          'Território internacional fronteiriço com Paraguai e Argentina e oeste do Paraná.',
+      minZoom: 7,
+      maxZoom: 17,
+      sizeBytes: 39 * 1024 * 1024,
+    ),
+    MBTileRegion(
+      id: 'br_rs_portoalegre',
+      country: 'Brasil',
+      state: 'Rio Grande do Sul',
+      name: 'Porto Alegre, Vale dos Sinos & Serra Gaúcha',
+      description:
+          'Capital gaúcha, Caxias do Sul, Bento Gonçalves e cidades de colonização europeia.',
+      minZoom: 7,
+      maxZoom: 17,
+      sizeBytes: 62 * 1024 * 1024,
+    ),
+    MBTileRegion(
+      id: 'br_sc_floripa',
+      country: 'Brasil',
+      state: 'Santa Catarina',
+      name: 'Florianópolis, Joinville & Vale do Itajaí (Blumenau)',
+      description:
+          'Ilha e continente catarinense, pólo fabril do norte e vale têxtil europeu.',
+      minZoom: 7,
+      maxZoom: 17,
+      sizeBytes: 47 * 1024 * 1024,
+    ),
+    MBTileRegion(
+      id: 'br_ba_salvador',
+      country: 'Brasil',
+      state: 'Bahia',
+      name: 'Salvador, Recôncavo & Feira de Santana',
+      description:
+          'Primeira capital do Brasil, Baía de Todos os Santos e maior entroncamento do Nordeste.',
+      minZoom: 7,
+      maxZoom: 17,
+      sizeBytes: 59 * 1024 * 1024,
+    ),
+    MBTileRegion(
+      id: 'br_df_brasilia',
+      country: 'Brasil',
+      state: 'Distrito Federal & Goiás',
+      name: 'Brasília (DF), Entorno Metropolitano & Goiânia',
+      description:
+          'Planalto Central, Plano Piloto, Cidades Satélites e conurbação de Goiânia/Aparecida.',
+      minZoom: 7,
+      maxZoom: 17,
+      sizeBytes: 55 * 1024 * 1024,
     ),
   ];
 

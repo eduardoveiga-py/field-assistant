@@ -1,7 +1,11 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../appointments/calendar_sync_coordinator.dart';
+import '../../database/app_database.dart';
+import '../../inbox/jw_email_service.dart';
 import '../../sync/supabase_sync_service.dart';
 import 'auth_splash_screen.dart';
 
@@ -27,13 +31,64 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   DateTime? _lastBackupAt;
+  String? _googleAccountEmail;
+  bool _isGoogleConnected = false;
+  final TextEditingController _jwEmailCtrl = TextEditingController();
+  final TextEditingController _jwPasswordCtrl = TextEditingController();
+  final TextEditingController _jwHostCtrl = TextEditingController(text: 'mail.jw.org');
+  final TextEditingController _jwPortCtrl = TextEditingController(text: '993');
+  bool _isTestingJwEmail = false;
 
   @override
   void initState() {
     super.initState();
-    Future.microtask(() {
+    Future.microtask(() async {
       ref.read(backupServiceProvider).performSilentBackupIfNeeded();
+      await _loadGoogleStatus();
+      await _loadJwEmailConfig();
     });
+  }
+
+  @override
+  void dispose() {
+    _jwEmailCtrl.dispose();
+    _jwPasswordCtrl.dispose();
+    _jwHostCtrl.dispose();
+    _jwPortCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadGoogleStatus() async {
+    try {
+      final coordinator = ref.read(calendarSyncCoordinatorProvider);
+      final isAuth = await coordinator.googleProvider.isAuthorized();
+      final account = await coordinator.googleProvider.getConnectedAccountName();
+      if (mounted) {
+        setState(() {
+          _isGoogleConnected = isAuth;
+          _googleAccountEmail = account;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _loadJwEmailConfig() async {
+    try {
+      final db = ref.read(repositoryProvider).db;
+      final email = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_imap_email'))).getSingleOrNull();
+      final pass = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_imap_password'))).getSingleOrNull();
+      final host = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_imap_host'))).getSingleOrNull();
+      final port = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_imap_port'))).getSingleOrNull();
+
+      if (mounted) {
+        setState(() {
+          if (email != null) _jwEmailCtrl.text = email.value;
+          if (pass != null) _jwPasswordCtrl.text = pass.value;
+          if (host != null && host.value.isNotEmpty) _jwHostCtrl.text = host.value;
+          if (port != null && port.value.isNotEmpty) _jwPortCtrl.text = port.value;
+        });
+      }
+    } catch (_) {}
   }
 
   // Modal para cadastro de Eventos Teocráticos e Datas Especiais
@@ -773,9 +828,69 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     );
                   },
                 ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.account_circle, color: Color(0xFF4285F4)),
+                  title: const Text('Conta Google Conectada'),
+                  subtitle: Text(_isGoogleConnected
+                      ? 'Conectado como: ${_googleAccountEmail ?? "Conta ativa"}'
+                      : 'Nenhuma conta Google conectada'),
+                  trailing: _isGoogleConnected
+                      ? Wrap(
+                          spacing: 4,
+                          children: [
+                            TextButton(
+                              onPressed: () async {
+                                final coord = ref.read(calendarSyncCoordinatorProvider);
+                                final ok = await coord.googleProvider.requestAuthorization();
+                                if (ok) await _loadGoogleStatus();
+                              },
+                              child: const Text('Trocar'),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.link_off, color: Colors.redAccent),
+                              tooltip: 'Desconectar Conta Google',
+                              onPressed: () async {
+                                final coord = ref.read(calendarSyncCoordinatorProvider);
+                                await coord.googleProvider.disconnect();
+                                await _loadGoogleStatus();
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Conta Google desconectada com sucesso.')),
+                                );
+                              },
+                            ),
+                          ],
+                        )
+                      : ElevatedButton.icon(
+                          icon: const Icon(Icons.login, size: 16),
+                          label: const Text('Conectar'),
+                          onPressed: () async {
+                            final coord = ref.read(calendarSyncCoordinatorProvider);
+                            final ok = await coord.googleProvider.requestAuthorization();
+                            if (ok) {
+                              await _loadGoogleStatus();
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Conta Google conectada com sucesso!')),
+                              );
+                            }
+                          },
+                        ),
+                ),
               ],
             ),
           ),
+
+          const SizedBox(height: 20),
+
+          // Seção: E-mail Teocrático e JW Pub (IMAP)
+          const Text(
+            'E-mail Teocrático JW.org (JW Pub / IMAP)',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          _buildJwEmailConfigCard(isDark),
 
           const SizedBox(height: 20),
 
@@ -1776,6 +1891,198 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     icon: const Icon(Icons.login, size: 18),
                     label: const Text('Fazer Login'),
                   ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildJwEmailConfigCard(bool isDark) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.mark_email_unread_outlined, color: AppTheme.primaryBlue, size: 22),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Sincronização e Retenção Permanente (IMAP)',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Insira suas credenciais teocráticas para sincronizar mensagens e cartas do Hub/JW.org com retenção imune à purga de 90 dias.',
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted,
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _jwEmailCtrl,
+              decoration: const InputDecoration(
+                labelText: 'E-mail Teocrático *',
+                hintText: 'ex: usuario@jw.org ou usuario@jwpub.org',
+                prefixIcon: Icon(Icons.email_outlined, size: 18),
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.emailAddress,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _jwPasswordCtrl,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Senha ou Senha de Aplicativo *',
+                prefixIcon: Icon(Icons.lock_outline, size: 18),
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: TextField(
+                    controller: _jwHostCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Servidor IMAP',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  flex: 1,
+                  child: TextField(
+                    controller: _jwPortCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Porta',
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: TextInputType.number,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryBlue,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    icon: _isTestingJwEmail
+                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Icon(Icons.save_outlined, size: 18),
+                    label: Text(_isTestingJwEmail ? 'Testando Conexão...' : 'Testar Conexão e Salvar'),
+                    onPressed: _isTestingJwEmail
+                        ? null
+                        : () async {
+                            final email = _jwEmailCtrl.text.trim();
+                            final pass = _jwPasswordCtrl.text;
+                            final host = _jwHostCtrl.text.trim().isNotEmpty ? _jwHostCtrl.text.trim() : 'mail.jw.org';
+                            final port = int.tryParse(_jwPortCtrl.text.trim()) ?? 993;
+
+                            if (email.isEmpty || pass.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Preencha o e-mail e a senha.')),
+                              );
+                              return;
+                            }
+
+                            setState(() => _isTestingJwEmail = true);
+                            try {
+                              final client = const JwImapClient();
+                              await client.fetchRemoteEmails(
+                                host: host,
+                                port: port,
+                                username: email,
+                                password: pass,
+                              );
+
+                              final db = ref.read(repositoryProvider).db;
+                              await db.into(db.appKvStore).insertOnConflictUpdate(
+                                AppKvStoreCompanion.insert(
+                                  key: 'jw_imap_email',
+                                  value: email,
+                                  updatedAt: Value(DateTime.now()),
+                                ),
+                              );
+                              await db.into(db.appKvStore).insertOnConflictUpdate(
+                                AppKvStoreCompanion.insert(
+                                  key: 'jw_imap_password',
+                                  value: pass,
+                                  updatedAt: Value(DateTime.now()),
+                                ),
+                              );
+                              await db.into(db.appKvStore).insertOnConflictUpdate(
+                                AppKvStoreCompanion.insert(
+                                  key: 'jw_imap_host',
+                                  value: host,
+                                  updatedAt: Value(DateTime.now()),
+                                ),
+                              );
+                              await db.into(db.appKvStore).insertOnConflictUpdate(
+                                AppKvStoreCompanion.insert(
+                                  key: 'jw_imap_port',
+                                  value: port.toString(),
+                                  updatedAt: Value(DateTime.now()),
+                                ),
+                              );
+
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Configurações de e-mail JW.org salvas com sucesso!')),
+                                );
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Erro ao salvar ou testar: $e')),
+                                );
+                              }
+                            } finally {
+                              if (mounted) setState(() => _isTestingJwEmail = false);
+                            }
+                          },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.clear, size: 16),
+                  label: const Text('Limpar'),
+                  onPressed: () async {
+                    final db = ref.read(repositoryProvider).db;
+                    await (db.delete(db.appKvStore)..where((t) => t.key.equals('jw_imap_email'))).go();
+                    await (db.delete(db.appKvStore)..where((t) => t.key.equals('jw_imap_password'))).go();
+                    await (db.delete(db.appKvStore)..where((t) => t.key.equals('jw_imap_host'))).go();
+                    await (db.delete(db.appKvStore)..where((t) => t.key.equals('jw_imap_port'))).go();
+                    setState(() {
+                      _jwEmailCtrl.clear();
+                      _jwPasswordCtrl.clear();
+                      _jwHostCtrl.text = 'mail.jw.org';
+                      _jwPortCtrl.text = '993';
+                    });
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Configurações removidas.')),
+                      );
+                    }
+                  },
+                ),
               ],
             ),
           ],

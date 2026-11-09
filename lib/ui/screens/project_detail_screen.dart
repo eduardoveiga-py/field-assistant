@@ -1,11 +1,14 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_theme.dart';
 import '../../database/app_database.dart';
 import '../../projects/project_manager.dart';
+import '../../tasks/task_manager.dart';
 import '../providers.dart';
 import '../widgets/adaptive_ministry_sheet.dart';
+import '../widgets/rich_markdown_toolbar.dart';
 
 /// Tela de Detalhes de um Projeto do Módulo B.
 /// Exibe objetivos, cálculo de progresso %, tarefas vinculadas, notas e recursos.
@@ -242,22 +245,40 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                           margin: EdgeInsets.zero,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           child: CheckboxListTile(
-                            value: task.status == "completed",
+                            value: task.isCompleted,
                             activeColor: AppTheme.primaryBlue,
                             onChanged: (val) => taskMgr.toggleTaskComplete(task.id, completed: val),
                             title: Text(
                               task.title,
                               style: TextStyle(
-                                decoration: task.status == "completed" ? TextDecoration.lineThrough : null,
+                                decoration: task.isCompleted ? TextDecoration.lineThrough : null,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                            subtitle: task.dueDate != null
-                                ? Text(
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (task.description != null && task.description!.isNotEmpty) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    task.description!,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                    ),
+                                  ),
+                                ],
+                                if (task.dueDate != null) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
                                     'Vencimento: ${_formatDate(task.dueDate!)}',
                                     style: const TextStyle(fontSize: 11),
-                                  )
-                                : null,
+                                  ),
+                                ],
+                              ],
+                            ),
                             secondary: _priorityIcon(task.priority),
                           ),
                         );
@@ -275,6 +296,8 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
   void _showAddTaskModal(ProjectEntry project) {
     final titleCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
+    final tagsCtrl = TextEditingController();
     String priority = 'normal';
     DateTime? dueDate;
 
@@ -285,7 +308,9 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       builder: (ctx, scroll) {
         return StatefulBuilder(
           builder: (ctx, setModalState) {
-            return Padding(
+            return SingleChildScrollView(
+              controller: scroll,
+              physics: const ClampingScrollPhysics(),
               padding: const EdgeInsets.all(20),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -296,6 +321,27 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                     autofocus: true,
                     decoration: const InputDecoration(
                       labelText: 'O que precisa ser feito?',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: tagsCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Tags (separadas por vírgula)',
+                      hintText: 'Ex: pregação, pioneiro, visita',
+                      prefixIcon: Icon(Icons.tag, size: 18),
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  RichMarkdownToolbar(controller: descCtrl),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: descCtrl,
+                    maxLines: 2,
+                    decoration: const InputDecoration(
+                      labelText: 'Descrição ou detalhes (Markdown)',
                       border: OutlineInputBorder(),
                     ),
                   ),
@@ -335,13 +381,16 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                     onPressed: () async {
                       final title = titleCtrl.text.trim();
                       if (title.isEmpty) return;
+                      final rawTags = tagsCtrl.text.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
                       final taskMgr = ref.read(taskManagerProvider);
                       await taskMgr.createTask(
                         title: title,
+                        description: descCtrl.text.trim().isNotEmpty ? descCtrl.text.trim() : null,
                         projectId: project.id,
                         category: project.category,
                         priority: priority,
                         dueDate: dueDate,
+                        tags: rawTags,
                       );
                       if (ctx.mounted) Navigator.of(ctx).pop();
                     },
@@ -358,12 +407,128 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
   void _handleMenuAction(String action, ProjectEntry project) async {
     final projectMgr = ref.read(projectManagerProvider);
-    if (action == 'complete') {
+    if (action == 'edit') {
+      _showEditProjectModal(project);
+    } else if (action == 'complete') {
       await projectMgr.updateProjectStatus(project.id, 'completed');
     } else if (action == 'delete') {
       await projectMgr.softDeleteProject(project.id);
       if (mounted) Navigator.of(context).pop();
     }
+  }
+
+  void _showEditProjectModal(ProjectEntry project) {
+    final nameCtrl = TextEditingController(text: project.name);
+    final objCtrl = TextEditingController(text: project.objective ?? '');
+    List<String> existingTags = [];
+    try {
+      final meta = jsonDecode(project.metadata) as Map<String, dynamic>;
+      if (meta['tags'] is List) {
+        existingTags = (meta['tags'] as List).map((e) => e.toString()).toList();
+      }
+    } catch (_) {}
+    final tagsCtrl = TextEditingController(text: existingTags.join(', '));
+    String category = project.category;
+    DateTime? targetDate = project.targetDate;
+
+    showAdaptiveMinistrySheet(
+      context: context,
+      title: 'Editar Projeto',
+      titleLeading: const Icon(Icons.edit_note, color: Color(0xFF3B82F6)),
+      builder: (ctx, scroll) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            return SingleChildScrollView(
+              controller: scroll,
+              physics: const ClampingScrollPhysics(),
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    controller: nameCtrl,
+                    decoration: const InputDecoration(labelText: 'Nome do Projeto', border: OutlineInputBorder()),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: tagsCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Tags (separadas por vírgula)',
+                      hintText: 'Ex: pregação, pioneiro, reforma',
+                      prefixIcon: Icon(Icons.tag, size: 18),
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  RichMarkdownToolbar(controller: objCtrl),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: objCtrl,
+                    maxLines: 3,
+                    decoration: const InputDecoration(labelText: 'Objetivo Principal (Markdown)', border: OutlineInputBorder()),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    initialValue: ['ministry', 'personal', 'study'].contains(category) ? category : 'ministry',
+                    decoration: const InputDecoration(labelText: 'Categoria', border: OutlineInputBorder()),
+                    items: const [
+                      DropdownMenuItem(value: 'ministry', child: Text('Ministério')),
+                      DropdownMenuItem(value: 'personal', child: Text('Pessoal')),
+                      DropdownMenuItem(value: 'study', child: Text('Estudo')),
+                    ],
+                    onChanged: (v) => setModalState(() => category = v ?? 'ministry'),
+                  ),
+                  const SizedBox(height: 12),
+                  ListTile(
+                    title: Text(targetDate == null ? 'Definir Prazo / Meta (Opcional)' : 'Meta: ${_formatDate(targetDate!)}'),
+                    trailing: targetDate != null
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, size: 18),
+                            onPressed: () => setModalState(() => targetDate = null),
+                          )
+                        : const Icon(Icons.flag_outlined),
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: targetDate ?? DateTime.now().add(const Duration(days: 30)),
+                        firstDate: DateTime.now(),
+                        lastDate: DateTime.now().add(const Duration(days: 730)),
+                      );
+                      if (picked != null) setModalState(() => targetDate = picked);
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF3B82F6),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    onPressed: () async {
+                      final name = nameCtrl.text.trim();
+                      if (name.isEmpty) return;
+                      final rawTags = tagsCtrl.text.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+                      final projMgr = ref.read(projectManagerProvider);
+                      await projMgr.updateProject(
+                        project.id,
+                        name: name,
+                        objective: objCtrl.text.trim().isNotEmpty ? objCtrl.text.trim() : null,
+                        category: category,
+                        targetDate: targetDate,
+                        tags: rawTags,
+                      );
+                      if (ctx.mounted) Navigator.of(ctx).pop();
+                    },
+                    child: const Text('Salvar Alterações', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Widget _priorityIcon(String priority) {

@@ -399,6 +399,13 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
     }
 
     final isTabletOrDesktop = MediaQuery.of(context).size.width >= 768;
+    final isMapFullscreen = ref.watch(isMapFullscreenProvider);
+
+    if (isMapFullscreen && _currentFeature == AppFeature.territoryMaps && !_showingSettings) {
+      return Scaffold(
+        body: _buildScreenForCurrentState(),
+      );
+    }
 
     if (isTabletOrDesktop) {
       // Lista completa de destinos do NavigationRail para Desktop/Tablet

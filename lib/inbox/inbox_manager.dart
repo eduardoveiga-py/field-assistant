@@ -113,6 +113,29 @@ class InboxManager {
     return (await (db.select(db.inboxEntries)..where((t) => t.id.equals(id))).getSingle());
   }
 
+  /// Edição de uma entrada da Inbox existente
+  Future<void> updateEntry(
+    String id, {
+    String? content,
+    String? suggestedCategory,
+    List<Map<String, dynamic>>? attachments,
+    String? status,
+    Map<String, dynamic>? metadata,
+  }) async {
+    final now = DateTime.now();
+    final companion = InboxEntriesCompanion(
+      content: content != null ? drift.Value(content.trim()) : const drift.Value.absent(),
+      suggestedCategory: suggestedCategory != null ? drift.Value(suggestedCategory) : const drift.Value.absent(),
+      attachments: attachments != null ? drift.Value(jsonEncode(attachments)) : const drift.Value.absent(),
+      status: status != null ? drift.Value(status) : const drift.Value.absent(),
+      metadata: metadata != null ? drift.Value(jsonEncode(metadata)) : const drift.Value.absent(),
+      updatedAt: drift.Value(now),
+    );
+
+    await (db.update(db.inboxEntries)..where((t) => t.id.equals(id))).write(companion);
+    await _recordSyncQueue(id, 'UPDATE', companion);
+  }
+
   // ==========================================
   // CONSULTAS REATIVAS (STREAMS)
   // ==========================================

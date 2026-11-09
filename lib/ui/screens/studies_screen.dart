@@ -21,6 +21,8 @@ import '../../publications/lff_book_catalog.dart';
 import '../../dashboard/student_priority_engine.dart';
 import '../widgets/screen_hero_accent_band.dart';
 import 'person_detail_screen.dart';
+import '../../media/person_photos_manager.dart';
+import '../../media/media_picker_helper.dart';
 
 class StudiesScreen extends ConsumerStatefulWidget {
   const StudiesScreen({super.key});
@@ -33,10 +35,22 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
   String _selectedStatusFilter =
       'Ativos'; // 'Ativos', 'Prioridade & Progresso', 'Encerrados'
   final Map<String, int> _manualOrderMap = {};
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  String? _selectedPubFilter;
+  String? _selectedTagFilter;
+  final Set<String> _expandedStudyIds = {};
 
   @override
   void initState() {
     super.initState();
+    _searchController.addListener(() {
+      if (mounted) {
+        setState(() {
+          _searchQuery = _searchController.text.trim().toLowerCase();
+        });
+      }
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final db = ref.read(repositoryProvider).db;
       final loaded = await StudentPriorityEngine.loadManualOrder(db);
@@ -46,6 +60,12 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
         });
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   void _showEndStudyDialog(BuildContext context, BibleStudyEntry study) {
@@ -1143,6 +1163,7 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
   // Modal para criar novo estudo bíblico (compatível com primeiro uso e estudos já em andamento)
   void _showNewStudyDialog(BuildContext context) {
     final titleController = TextEditingController();
+    final tagsController = TextEditingController();
     String selectedPublicationId = 'lff-book';
     String selectedLanguage = 'pt';
     String selectedFrequency = 'semanal';
@@ -1210,6 +1231,15 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                     decoration: const InputDecoration(
                       labelText: 'Identificação / Título do estudo *',
                       hintText: 'Ex: Estudo da Família Lima',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: tagsController,
+                    decoration: const InputDecoration(
+                      labelText: 'Tags / Marcadores (separados por vírgula)',
+                      hintText: 'Ex: Batismo, Jovem, Família, Pioneiro',
+                      prefixIcon: Icon(Icons.label_outline, size: 20),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -1475,6 +1505,9 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                     currentLesson: lesson,
                     currentParagraph: paragraph,
                     frequency: selectedFrequency,
+                    learningGoals: tagsController.text.trim().isNotEmpty
+                        ? tagsController.text.trim()
+                        : null,
                     participantPersonIds: selectedPeopleIds,
                   );
 
@@ -1512,6 +1545,7 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
   // Modal para editar dados de um estudo bíblico existente
   void _showEditStudyDialog(BuildContext context, BibleStudyEntry study) {
     final titleController = TextEditingController(text: study.title);
+    final tagsController = TextEditingController(text: study.learningGoals ?? '');
     String selectedPublicationId = study.publicationId;
     String selectedLanguage = study.language;
     String selectedFrequency = study.frequency;
@@ -1546,6 +1580,15 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                     controller: titleController,
                     decoration: const InputDecoration(
                       labelText: 'Título do estudo *',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: tagsController,
+                    decoration: const InputDecoration(
+                      labelText: 'Tags / Marcadores (separados por vírgula)',
+                      hintText: 'Ex: Batismo, Jovem, Família',
+                      prefixIcon: Icon(Icons.label_outline, size: 20),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -1761,6 +1804,11 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                       currentLesson: Value(lesson),
                       currentParagraph: Value(paragraph),
                       frequency: selectedFrequency,
+                      learningGoals: Value(
+                        tagsController.text.trim().isNotEmpty
+                            ? tagsController.text.trim()
+                            : null,
+                      ),
                     ),
                   );
 
@@ -1784,12 +1832,65 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
     );
   }
 
+  Widget _buildStudentAvatar({
+    required String? personId,
+    required String fallbackName,
+    required List<PersonEntry> people,
+    required List<PersonPhotoItem> allPhotos,
+    double size = 40,
+  }) {
+    PersonEntry? person = personId != null ? people.firstWhereOrNull((p) => p.id == personId) : null;
+    if (person == null && fallbackName.isNotEmpty) {
+      final cleanFallback = fallbackName
+          .replaceAll(RegExp(r'^(Estudo\s*(-|–|:)?\s*)', caseSensitive: false), '')
+          .trim()
+          .toLowerCase();
+      person = people.firstWhereOrNull((p) =>
+          p.name.trim().toLowerCase() == fallbackName.trim().toLowerCase() ||
+          p.name.trim().toLowerCase() == cleanFallback);
+    }
+    final displayName = person?.name ?? fallbackName;
+    const color = AppTheme.primaryBlue;
+
+    if (person != null) {
+      final personPhoto = allPhotos
+          .firstWhereOrNull((p) => p.personId == person!.id && p.photoType == 'person');
+
+      if (personPhoto != null && personPhoto.imageData.isNotEmpty) {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(size / 2),
+          child: MediaPickerHelper.buildThumbnail(
+            personPhoto.imageData,
+            width: size,
+            height: size,
+            borderRadius: BorderRadius.circular(size / 2),
+          ),
+        );
+      }
+    }
+
+    final initial = displayName.trim().isNotEmpty ? displayName.trim()[0].toUpperCase() : '?';
+    return CircleAvatar(
+      radius: size / 2,
+      backgroundColor: color.withValues(alpha: 0.12),
+      child: Text(
+        initial,
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          color: color,
+          fontSize: size * 0.42,
+        ),
+      ),
+    );
+  }
+
   Widget _buildPriorityAndProgressView({
     required List<BibleStudyEntry> activeStudies,
     required List<StudyParticipantEntry> participants,
     required List<PersonEntry> people,
     required List<StudySessionEntry> sessions,
     required List<AppointmentEntry> appointments,
+    required List<PersonPhotoItem> allPhotos,
     required bool isDark,
   }) {
     if (activeStudies.isEmpty) {
@@ -1897,268 +1998,297 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                   priorityIcon = Icons.warning_amber_rounded;
               }
 
+              final isExpanded = _expandedStudyIds.contains(study.id);
               return Card(
                 key: ValueKey(study.id),
                 margin: const EdgeInsets.only(bottom: 12),
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 28,
-                            height: 28,
-                            decoration: BoxDecoration(
-                              color: isDark
-                                  ? const Color(0xFF334155)
-                                  : const Color(0xFFE2E8F0),
-                              shape: BoxShape.circle,
-                            ),
-                            alignment: Alignment.center,
-                            child: Text(
-                              '#${item.manualRank}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: () {
+                    setState(() {
+                      if (isExpanded) {
+                        _expandedStudyIds.remove(study.id);
+                      } else {
+                        _expandedStudyIds.add(study.id);
+                      }
+                    });
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 28,
+                              height: 28,
+                              decoration: BoxDecoration(
+                                color: isDark
+                                    ? const Color(0xFF334155)
+                                    : const Color(0xFFE2E8F0),
+                                shape: BoxShape.circle,
                               ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              study.title,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: priorityColor.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: priorityColor.withValues(alpha: 0.4),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  priorityIcon,
-                                  size: 14,
-                                  color: priorityColor,
+                              alignment: Alignment.center,
+                              child: Text(
+                                '#${item.manualRank}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
                                 ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  item.priorityTier,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            _buildStudentAvatar(
+                              personId: item.primaryPerson.id,
+                              fallbackName: study.title,
+                              people: people,
+                              allPhotos: allPhotos,
+                              size: 32,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                study.title,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: priorityColor.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: priorityColor.withValues(alpha: 0.4),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    priorityIcon,
+                                    size: 14,
                                     color: priorityColor,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    item.priorityTier,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: priorityColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(
+                              isExpanded ? Icons.expand_less : Icons.expand_more,
+                              size: 20,
+                              color: Colors.grey,
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(Icons.drag_indicator, color: Colors.grey),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Estudante: ${item.primaryPerson.name}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDark
+                                ? const Color(0xFFCBD5E1)
+                                : AppTheme.textMuted,
+                          ),
+                        ),
+                        if (isExpanded) ...[
+                          const SizedBox(height: 8),
+                          // Progresso LFF
+                          if (study.publicationId == 'lff-book') ...[
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    study.currentLesson != null
+                                        ? 'Lição ${study.currentLesson}: ${lffLesson?.title ?? "Seja Feliz Para Sempre!"}'
+                                        : 'Livro Seja Feliz Para Sempre!',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                Text(
+                                  '${item.progressPercent.toStringAsFixed(1)}%',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.accentTeal,
                                   ),
                                 ),
                               ],
                             ),
-                          ),
-                          const SizedBox(width: 4),
-                          const Icon(Icons.drag_indicator, color: Colors.grey),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Estudante: ${item.primaryPerson.name}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isDark
-                              ? const Color(0xFFCBD5E1)
-                              : AppTheme.textMuted,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      // Progresso LFF
-                      if (study.publicationId == 'lff-book') ...[
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                study.currentLesson != null
-                                    ? 'Lição ${study.currentLesson}: ${lffLesson?.title ?? "Seja Feliz Para Sempre!"}'
-                                    : 'Livro Seja Feliz Para Sempre!',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
+                            const SizedBox(height: 4),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: LinearProgressIndicator(
+                                value: item.progressPercent / 100.0,
+                                minHeight: 6,
+                                backgroundColor: isDark
+                                    ? const Color(0xFF334155)
+                                    : const Color(0xFFE2E8F0),
+                                valueColor: const AlwaysStoppedAnimation<Color>(
+                                  AppTheme.accentTeal,
                                 ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            Text(
-                              '${item.progressPercent.toStringAsFixed(1)}%',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.accentTeal,
-                              ),
-                            ),
+                            const SizedBox(height: 8),
                           ],
-                        ),
-                        const SizedBox(height: 4),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: LinearProgressIndicator(
-                            value: item.progressPercent / 100.0,
-                            minHeight: 6,
-                            backgroundColor: isDark
-                                ? const Color(0xFF334155)
-                                : const Color(0xFFE2E8F0),
-                            valueColor: const AlwaysStoppedAnimation<Color>(
-                              AppTheme.accentTeal,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                      ],
-                      // Chips de métricas de prioridade
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 4,
-                        children: [
-                          if (item.frequency == 'duas_vezes_semana')
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFFEF3C7),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: const Text(
-                                '🔥 2x / semana',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFFB45309),
-                                ),
-                              ),
-                            ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: isDark
-                                  ? const Color(0xFF1E293B)
-                                  : const Color(0xFFF1F5F9),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              item.velocityLabel,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: isDark
-                                    ? const Color(0xFFCBD5E1)
-                                    : AppTheme.textMuted,
-                              ),
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: isDark
-                                  ? const Color(0xFF1E293B)
-                                  : const Color(0xFFF1F5F9),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              item.daysSinceLastSession != null
-                                  ? 'Última: ${item.daysSinceLastSession}d atrás'
-                                  : 'Sem sessões ainda',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: isDark
-                                    ? const Color(0xFFCBD5E1)
-                                    : AppTheme.textMuted,
-                              ),
-                            ),
-                          ),
-                          if (item.spiritualGoalsMetCount > 0)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFDCFCE7),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                '🎯 ${item.spiritualGoalsMetCount} meta(s)',
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF166534),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              icon: const Icon(Icons.person, size: 16),
-                              label: const Text(
-                                'Contato',
-                                style: TextStyle(fontSize: 12),
-                              ),
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => PersonDetailScreen(
-                                      personId: item.primaryPerson.id,
+                          // Chips de métricas de prioridade
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            children: [
+                              if (item.frequency == 'duas_vezes_semana')
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFEF3C7),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: const Text(
+                                    '🔥 2x / semana',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFFB45309),
                                     ),
                                   ),
-                                );
-                              },
-                            ),
+                                ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isDark
+                                      ? const Color(0xFF1E293B)
+                                      : const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  item.velocityLabel,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: isDark
+                                        ? const Color(0xFFCBD5E1)
+                                        : AppTheme.textMuted,
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isDark
+                                      ? const Color(0xFF1E293B)
+                                      : const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  item.daysSinceLastSession != null
+                                      ? 'Última: ${item.daysSinceLastSession}d atrás'
+                                      : 'Sem sessões ainda',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: isDark
+                                        ? const Color(0xFFCBD5E1)
+                                        : AppTheme.textMuted,
+                                  ),
+                                ),
+                              ),
+                              if (item.spiritualGoalsMetCount > 0)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFDCFCE7),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    '🎯 ${item.spiritualGoalsMetCount} meta(s)',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF166534),
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF7C3AED),
-                                foregroundColor: Colors.white,
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  icon: const Icon(Icons.person, size: 16),
+                                  label: const Text(
+                                    'Contato',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => PersonDetailScreen(
+                                          personId: item.primaryPerson.id,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
                               ),
-                              icon: const Icon(
-                                Icons.playlist_add_check,
-                                size: 16,
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF7C3AED),
+                                    foregroundColor: Colors.white,
+                                  ),
+                                  icon: const Icon(
+                                    Icons.playlist_add_check,
+                                    size: 16,
+                                  ),
+                                  label: const Text(
+                                    'Registrar Sessão',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
+                                  onPressed: () =>
+                                      _showRecordSessionDialog(context, study),
+                                ),
                               ),
-                              label: const Text(
-                                'Registrar Sessão',
-                                style: TextStyle(fontSize: 12),
-                              ),
-                              onPressed: () =>
-                                  _showRecordSessionDialog(context, study),
-                            ),
+                            ],
                           ),
                         ],
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               );
@@ -2176,6 +2306,7 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
     final people = ref.watch(peopleStreamProvider).value ?? [];
     final sessions = ref.watch(studySessionsStreamProvider).value ?? [];
     final appointments = ref.watch(appointmentsStreamProvider).value ?? [];
+    final allPhotos = ref.watch(personPhotosStreamProvider).value ?? [];
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -2211,23 +2342,125 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
               .where((s) => s.status != 'ativo')
               .toList();
 
-          final filtered = studies.where((s) {
-            if (_selectedStatusFilter == 'Ativos') {
-              return s.status == 'ativo';
-            } else if (_selectedStatusFilter == 'Encerrados') {
-              return s.status != 'ativo';
+          // Coleta de publicações e tags disponíveis
+          final usedPubIds = studies.map((s) => s.publicationId).toSet().toList();
+          final Set<String> allAvailableTags = {};
+          for (final s in studies) {
+            if (s.learningGoals != null && s.learningGoals!.trim().isNotEmpty) {
+              for (final raw in s.learningGoals!.split(RegExp(r'[,;]'))) {
+                final clean = raw.trim();
+                if (clean.isNotEmpty && clean.length <= 30) {
+                  allAvailableTags.add(clean);
+                }
+              }
             }
-            return false;
+          }
+          for (final p in people) {
+            if (p.tags.isNotEmpty) {
+              try {
+                final tList = (jsonDecode(p.tags) as List).cast<String>();
+                allAvailableTags.addAll(
+                  tList.map((t) => t.trim()).where((t) => t.isNotEmpty && t.length <= 30),
+                );
+              } catch (_) {}
+            }
+          }
+
+          final filtered = studies.where((s) {
+            if (_selectedStatusFilter == 'Ativos' || _selectedStatusFilter == 'Prioridade & Progresso') {
+              if (s.status != 'ativo') return false;
+            } else if (_selectedStatusFilter == 'Encerrados') {
+              if (s.status == 'ativo') return false;
+            }
+
+            if (_selectedPubFilter != null && s.publicationId != _selectedPubFilter) {
+              return false;
+            }
+
+            if (_selectedTagFilter != null) {
+              bool matchesTag = false;
+              if (s.learningGoals != null &&
+                  s.learningGoals!.toLowerCase().contains(_selectedTagFilter!.toLowerCase())) {
+                matchesTag = true;
+              }
+              if (!matchesTag) {
+                final parts = participants.where((p) => p.studyId == s.id);
+                for (final part in parts) {
+                  final person = people.firstWhereOrNull((p) => p.id == part.personId);
+                  if (person != null && person.tags.isNotEmpty) {
+                    try {
+                      final tList = (jsonDecode(person.tags) as List).cast<String>();
+                      if (tList.any((t) => t.trim().toLowerCase() == _selectedTagFilter!.toLowerCase())) {
+                        matchesTag = true;
+                        break;
+                      }
+                    } catch (_) {}
+                  }
+                }
+              }
+              if (!matchesTag) return false;
+            }
+
+            if (_searchQuery.isNotEmpty) {
+              final pub = PublicationCatalog.getById(s.publicationId);
+              final pubTitle = pub?.title.toLowerCase() ?? '';
+              final titleMatch = s.title.toLowerCase().contains(_searchQuery);
+              final pubMatch = pubTitle.contains(_searchQuery) ||
+                  s.publicationId.toLowerCase().contains(_searchQuery);
+              final goalsMatch =
+                  s.learningGoals?.toLowerCase().contains(_searchQuery) ?? false;
+              final notesMatch =
+                  s.manualReference?.toLowerCase().contains(_searchQuery) ?? false;
+
+              final studyParts = participants.where((p) => p.studyId == s.id);
+              final studentMatch = studyParts.any((part) {
+                final person = people.firstWhereOrNull((p) => p.id == part.personId);
+                return person != null && person.name.toLowerCase().contains(_searchQuery);
+              });
+
+              if (!titleMatch && !pubMatch && !goalsMatch && !notesMatch && !studentMatch) {
+                return false;
+              }
+            }
+
+            return true;
           }).toList();
 
           return Column(
             children: [
+              // Barra de Pesquisa
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Pesquisar estudante, publicação ou tags...',
+                    prefixIcon: const Icon(Icons.search, size: 20),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, size: 18),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() => _searchQuery = '');
+                            },
+                          )
+                        : null,
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    filled: true,
+                    fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+              ),
+
+              // Chips de Status Principal
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                 color: isDark ? const Color(0xFF0F172A) : Colors.white,
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
@@ -2276,15 +2509,117 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                   ),
                 ),
               ),
+
+              // Filtros Secundários de Publicações e Tags
+              if (usedPubIds.length > 1 || allAvailableTags.isNotEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  color: isDark ? const Color(0xFF0F172A) : Colors.white,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        if (usedPubIds.length > 1) ...[
+                          FilterChip(
+                            label: const Text('Todas as Publicações', style: TextStyle(fontSize: 11)),
+                            selected: _selectedPubFilter == null,
+                            onSelected: (_) => setState(() => _selectedPubFilter = null),
+                          ),
+                          const SizedBox(width: 6),
+                          ...usedPubIds.map((pubId) {
+                            final pub = PublicationCatalog.getById(pubId);
+                            final title = pub?.title ?? pubId;
+                            final shortTitle = title.length > 22 ? '${title.substring(0, 20)}...' : title;
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 6),
+                              child: FilterChip(
+                                label: Text(shortTitle, style: const TextStyle(fontSize: 11)),
+                                selected: _selectedPubFilter == pubId,
+                                onSelected: (val) => setState(() => _selectedPubFilter = val ? pubId : null),
+                              ),
+                            );
+                          }),
+                          const SizedBox(width: 8),
+                        ],
+                        if (allAvailableTags.isNotEmpty) ...[
+                          FilterChip(
+                            avatar: const Icon(Icons.label_outline, size: 14),
+                            label: const Text('Todas as Tags', style: TextStyle(fontSize: 11)),
+                            selected: _selectedTagFilter == null,
+                            onSelected: (_) => setState(() => _selectedTagFilter = null),
+                          ),
+                          const SizedBox(width: 6),
+                          ...allAvailableTags.map((tag) => Padding(
+                                padding: const EdgeInsets.only(right: 6),
+                                child: FilterChip(
+                                  label: Text('#$tag', style: const TextStyle(fontSize: 11)),
+                                  selected: _selectedTagFilter == tag,
+                                  onSelected: (val) => setState(() => _selectedTagFilter = val ? tag : null),
+                                ),
+                              )),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+
+              // Barra de contagem e botão para recolher/expandir todos os cards
+              if (filtered.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '${filtered.length} estudo(s) encontrado(s)',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      TextButton.icon(
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        icon: Icon(
+                          _expandedStudyIds.length >= filtered.length
+                              ? Icons.unfold_less
+                              : Icons.unfold_more,
+                          size: 16,
+                        ),
+                        label: Text(
+                          _expandedStudyIds.length >= filtered.length
+                              ? 'Recolher Todos'
+                              : 'Expandir Todos',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            if (_expandedStudyIds.length >= filtered.length) {
+                              _expandedStudyIds.clear();
+                            } else {
+                              _expandedStudyIds.addAll(filtered.map((s) => s.id));
+                            }
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+
               const Divider(height: 1),
               Expanded(
                 child: _selectedStatusFilter == 'Prioridade & Progresso'
                     ? _buildPriorityAndProgressView(
-                        activeStudies: activeStudies,
+                        activeStudies: filtered,
                         participants: participants,
                         people: people,
                         sessions: sessions,
                         appointments: appointments,
+                        allPhotos: allPhotos,
                         isDark: isDark,
                       )
                     : filtered.isEmpty
@@ -2301,9 +2636,11 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                               ),
                               const SizedBox(height: 12),
                               Text(
-                                _selectedStatusFilter == 'Ativos'
-                                    ? 'Nenhum estudo bíblico ativo no momento.\nToque em "+ Novo Estudo" para registrar.'
-                                    : 'Nenhum estudo encerrado ou concluído.',
+                                _searchQuery.isNotEmpty || _selectedPubFilter != null || _selectedTagFilter != null
+                                    ? 'Nenhum estudo corresponde aos filtros ou pesquisa.'
+                                    : (_selectedStatusFilter == 'Ativos'
+                                        ? 'Nenhum estudo bíblico ativo no momento.\nToque em "+ Novo Estudo" para registrar.'
+                                        : 'Nenhum estudo encerrado ou concluído.'),
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   color: isDark
@@ -2338,452 +2675,561 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                             }
                           }
 
+                          final studyParts = participants.where((p) => p.studyId == study.id).toList();
+                          final primaryPersonId = studyParts.isNotEmpty ? studyParts.first.personId : null;
+                          final primaryPerson = primaryPersonId != null ? people.firstWhereOrNull((p) => p.id == primaryPersonId) : null;
+                          final isExpanded = _expandedStudyIds.contains(study.id);
+
+                          // Tags para este estudo
+                          final studyTags = <String>[];
+                          if (study.learningGoals != null && study.learningGoals!.trim().isNotEmpty) {
+                            for (final raw in study.learningGoals!.split(RegExp(r'[,;]'))) {
+                              final clean = raw.trim();
+                              if (clean.isNotEmpty && !studyTags.contains(clean)) {
+                                studyTags.add(clean);
+                              }
+                            }
+                          }
+                          if (primaryPerson != null && primaryPerson.tags.isNotEmpty) {
+                            try {
+                              final pTags = (jsonDecode(primaryPerson.tags) as List).cast<String>();
+                              for (final t in pTags) {
+                                final clean = t.trim();
+                                if (clean.isNotEmpty && !studyTags.contains(clean)) {
+                                  studyTags.add(clean);
+                                }
+                              }
+                            } catch (_) {}
+                          }
+
                           return Card(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            child: Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          study.title,
-                                          style: const TextStyle(
-                                            fontSize: 17,
-                                            fontWeight: FontWeight.bold,
+                            margin: const EdgeInsets.only(bottom: 10),
+                            clipBehavior: Clip.antiAlias,
+                            child: InkWell(
+                              onTap: () {
+                                setState(() {
+                                  if (isExpanded) {
+                                    _expandedStudyIds.remove(study.id);
+                                  } else {
+                                    _expandedStudyIds.add(study.id);
+                                  }
+                                });
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.all(14),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Cabeçalho sempre visível
+                                    Row(
+                                      crossAxisAlignment: CrossAxisAlignment.center,
+                                      children: [
+                                        _buildStudentAvatar(
+                                          personId: primaryPersonId,
+                                          fallbackName: study.title,
+                                          people: people,
+                                          allPhotos: allPhotos,
+                                          size: 40,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                study.title,
+                                                style: const TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                              if (primaryPerson != null && primaryPerson.name != study.title)
+                                                Text(
+                                                  primaryPerson.name,
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                                  ),
+                                                ),
+                                            ],
                                           ),
                                         ),
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(
-                                          Icons.edit_outlined,
-                                          color: AppTheme.primaryBlue,
-                                          size: 20,
+                                        IconButton(
+                                          icon: const Icon(
+                                            Icons.edit_outlined,
+                                            color: AppTheme.primaryBlue,
+                                            size: 20,
+                                          ),
+                                          tooltip: 'Editar Dados do Estudo',
+                                          onPressed: () => _showEditStudyDialog(
+                                            context,
+                                            study,
+                                          ),
                                         ),
-                                        tooltip: 'Editar Dados do Estudo',
-                                        onPressed: () => _showEditStudyDialog(
-                                          context,
-                                          study,
-                                        ),
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(
-                                          Icons.account_box_outlined,
-                                          color: AppTheme.primaryBlue,
-                                          size: 22,
-                                        ),
-                                        tooltip:
-                                            'Ver Cadastro e Opções da Pessoa',
-                                        onPressed: () async {
-                                          final parts = await ref
-                                              .read(repositoryProvider)
-                                              .getParticipantsForStudy(
-                                                study.id,
+                                        IconButton(
+                                          icon: const Icon(
+                                            Icons.account_box_outlined,
+                                            color: AppTheme.primaryBlue,
+                                            size: 22,
+                                          ),
+                                          tooltip: 'Ver Cadastro e Opções da Pessoa',
+                                          onPressed: () async {
+                                            final parts = await ref
+                                                .read(repositoryProvider)
+                                                .getParticipantsForStudy(study.id);
+                                            if (parts.isNotEmpty && context.mounted) {
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (_) => PersonDetailScreen(
+                                                    personId: parts.first.personId,
+                                                  ),
+                                                ),
                                               );
-                                          if (parts.isNotEmpty &&
-                                              context.mounted) {
-                                            Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder: (_) =>
-                                                    PersonDetailScreen(
-                                                      personId:
-                                                          parts.first.personId,
-                                                    ),
-                                              ),
-                                            );
-                                          }
-                                        },
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 4,
+                                            }
+                                          },
                                         ),
-                                        decoration: BoxDecoration(
-                                          color: study.status == 'ativo'
-                                              ? AppTheme.successGreen
-                                                    .withValues(alpha: 0.1)
-                                              : (isDark
-                                                    ? const Color(0xFF334155)
-                                                    : Colors.grey.shade200),
-                                          borderRadius: BorderRadius.circular(
-                                            6,
+                                        IconButton(
+                                          icon: Icon(
+                                            isExpanded
+                                                ? Icons.keyboard_arrow_up
+                                                : Icons.keyboard_arrow_down,
+                                            color: AppTheme.primaryBlue,
                                           ),
+                                          tooltip: isExpanded
+                                              ? 'Recolher detalhes'
+                                              : 'Expandir detalhes',
+                                          onPressed: () {
+                                            setState(() {
+                                              if (isExpanded) {
+                                                _expandedStudyIds.remove(study.id);
+                                              } else {
+                                                _expandedStudyIds.add(study.id);
+                                              }
+                                            });
+                                          },
                                         ),
-                                        child: Text(
-                                          study.status.toUpperCase(),
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                            color: study.status == 'ativo'
-                                                ? AppTheme.successGreen
-                                                : (isDark
-                                                      ? const Color(0xFFCBD5E1)
-                                                      : Colors.grey.shade700),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    pub?.title ?? study.publicationId,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: isDark
-                                          ? const Color(0xFFCBD5E1)
-                                          : AppTheme.textMuted,
+                                      ],
                                     ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 8),
-                                  FutureBuilder<List<StudyParticipantEntry>>(
-                                    future: ref
-                                        .read(repositoryProvider)
-                                        .getParticipantsForStudy(study.id),
-                                    builder: (context, partSnap) {
-                                      final parts = partSnap.data ?? [];
-                                      if (parts.isEmpty) {
-                                        return const SizedBox.shrink();
-                                      }
-                                      final people =
-                                          ref
-                                              .watch(peopleStreamProvider)
-                                              .value ??
-                                          [];
-                                      final peopleMap = {
-                                        for (var p in people) p.id: p.name,
-                                      };
-                                      final names = parts
-                                          .map(
-                                            (p) =>
-                                                peopleMap[p.personId] ??
-                                                'Participante',
-                                          )
-                                          .join(', ');
-                                      return InkWell(
-                                        onTap: () {
-                                          if (parts.isNotEmpty) {
-                                            Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder: (_) =>
-                                                    PersonDetailScreen(
-                                                      personId:
-                                                          parts.first.personId,
-                                                    ),
-                                              ),
-                                            );
-                                          }
-                                        },
-                                        borderRadius: BorderRadius.circular(6),
-                                        child: Container(
+                                    const SizedBox(height: 8),
+
+                                    // Linha de Badges Compactos (visível mesmo recolhido para leitura rápida)
+                                    Wrap(
+                                      spacing: 6,
+                                      runSpacing: 6,
+                                      crossAxisAlignment: WrapCrossAlignment.center,
+                                      children: [
+                                        Container(
                                           padding: const EdgeInsets.symmetric(
-                                            horizontal: 8,
-                                            vertical: 5,
-                                          ),
-                                          margin: const EdgeInsets.only(
-                                            bottom: 8,
+                                            horizontal: 7,
+                                            vertical: 3,
                                           ),
                                           decoration: BoxDecoration(
-                                            color: AppTheme.primaryBlue
-                                                .withValues(alpha: 0.08),
-                                            borderRadius: BorderRadius.circular(
-                                              6,
+                                            color: study.status == 'ativo'
+                                                ? AppTheme.successGreen.withValues(alpha: 0.12)
+                                                : (isDark
+                                                    ? const Color(0xFF334155)
+                                                    : Colors.grey.shade200),
+                                            borderRadius: BorderRadius.circular(5),
+                                          ),
+                                          child: Text(
+                                            study.status.toUpperCase(),
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                              color: study.status == 'ativo'
+                                                  ? AppTheme.successGreen
+                                                  : (isDark
+                                                      ? const Color(0xFFCBD5E1)
+                                                      : Colors.grey.shade700),
                                             ),
-                                            border: Border.all(
-                                              color: AppTheme.primaryBlue
-                                                  .withValues(alpha: 0.2),
+                                          ),
+                                        ),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 7,
+                                            vertical: 3,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: AppTheme.primaryBlue.withValues(alpha: 0.08),
+                                            borderRadius: BorderRadius.circular(5),
+                                          ),
+                                          child: Text(
+                                            '📖 ${pub?.title ?? study.publicationId}',
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                              color: AppTheme.primaryBlue,
                                             ),
+                                          ),
+                                        ),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 7,
+                                            vertical: 3,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: isDark
+                                                ? const Color(0xFF1E293B)
+                                                : const Color(0xFFE2E8F0),
+                                            borderRadius: BorderRadius.circular(5),
+                                          ),
+                                          child: Text(
+                                            study.currentLesson != null
+                                                ? 'Lição ${study.currentLesson}${study.currentParagraph != null ? ' • § ${study.currentParagraph}' : ''}'
+                                                : 'Não iniciada',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                                            ),
+                                          ),
+                                        ),
+                                        ...studyTags.map((tag) => Container(
+                                              padding: const EdgeInsets.symmetric(
+                                                horizontal: 6,
+                                                vertical: 2,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: Colors.purple.withValues(alpha: 0.08),
+                                                borderRadius: BorderRadius.circular(4),
+                                                border: Border.all(
+                                                  color: Colors.purple.withValues(alpha: 0.25),
+                                                  width: 0.8,
+                                                ),
+                                              ),
+                                              child: Text(
+                                                '#$tag',
+                                                style: const TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.purple,
+                                                ),
+                                              ),
+                                            )),
+                                      ],
+                                    ),
+
+                                    // Conteúdo Expandido (abre apenas com um clique/toque economizando espaço vertical)
+                                    if (isExpanded) ...[
+                                      const Divider(height: 20),
+                                      FutureBuilder<List<StudyParticipantEntry>>(
+                                        future: ref
+                                            .read(repositoryProvider)
+                                            .getParticipantsForStudy(study.id),
+                                        builder: (context, partSnap) {
+                                          final parts = partSnap.data ?? [];
+                                          if (parts.isEmpty) {
+                                            return const SizedBox.shrink();
+                                          }
+                                          final people =
+                                              ref.watch(peopleStreamProvider).value ?? [];
+                                          final peopleMap = {
+                                            for (var p in people) p.id: p.name,
+                                          };
+                                          final names = parts
+                                              .map(
+                                                (p) => peopleMap[p.personId] ?? 'Participante',
+                                              )
+                                              .join(', ');
+                                          return InkWell(
+                                            onTap: () {
+                                              if (parts.isNotEmpty) {
+                                                Navigator.push(
+                                                  context,
+                                                  MaterialPageRoute(
+                                                    builder: (_) => PersonDetailScreen(
+                                                      personId: parts.first.personId,
+                                                    ),
+                                                  ),
+                                                );
+                                              }
+                                            },
+                                            borderRadius: BorderRadius.circular(6),
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(
+                                                horizontal: 8,
+                                                vertical: 5,
+                                              ),
+                                              margin: const EdgeInsets.only(bottom: 8),
+                                              decoration: BoxDecoration(
+                                                color: AppTheme.primaryBlue.withValues(alpha: 0.08),
+                                                borderRadius: BorderRadius.circular(6),
+                                                border: Border.all(
+                                                  color: AppTheme.primaryBlue.withValues(alpha: 0.2),
+                                                ),
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  const Icon(
+                                                    Icons.people_alt_outlined,
+                                                    size: 16,
+                                                    color: AppTheme.primaryBlue,
+                                                  ),
+                                                  const SizedBox(width: 6),
+                                                  Expanded(
+                                                    child: Text(
+                                                      'Participam: $names',
+                                                      style: const TextStyle(
+                                                        fontSize: 12,
+                                                        fontWeight: FontWeight.w600,
+                                                        color: AppTheme.primaryBlue,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  const Icon(
+                                                    Icons.arrow_forward_ios,
+                                                    size: 11,
+                                                    color: AppTheme.primaryBlue,
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.all(10),
+                                        decoration: BoxDecoration(
+                                          color: isDark
+                                              ? const Color(0xFF1E293B)
+                                              : const Color(0xFFF1F5F9),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceAround,
+                                          children: [
+                                            Column(
+                                              children: [
+                                                Text(
+                                                  'Lição Atual',
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: isDark
+                                                        ? const Color(0xFFCBD5E1)
+                                                        : AppTheme.textMuted,
+                                                  ),
+                                                ),
+                                                Text(
+                                                  study.currentLesson != null
+                                                      ? 'Lição ${study.currentLesson}'
+                                                      : 'Não iniciada',
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            Column(
+                                              children: [
+                                                Text(
+                                                  study.publicationId == 'lff-book' ||
+                                                          study.publicationId == 'lff-brochure'
+                                                      ? 'Ponto Atual'
+                                                      : 'Parágrafo',
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: isDark
+                                                        ? const Color(0xFFCBD5E1)
+                                                        : AppTheme.textMuted,
+                                                  ),
+                                                ),
+                                                Text(
+                                                  study.currentParagraph != null
+                                                      ? (study.publicationId == 'lff-book' ||
+                                                              study.publicationId == 'lff-brochure'
+                                                          ? 'Ponto ${study.currentParagraph}'
+                                                          : '§ ${study.currentParagraph}')
+                                                      : '—',
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            Column(
+                                              children: [
+                                                Text(
+                                                  'Idioma',
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: isDark
+                                                        ? const Color(0xFFCBD5E1)
+                                                        : AppTheme.textMuted,
+                                                  ),
+                                                ),
+                                                Text(
+                                                  study.language.toUpperCase(),
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      if (endReason != null) ...[
+                                        const SizedBox(height: 8),
+                                        Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFFEF3C7),
+                                            borderRadius: BorderRadius.circular(6),
                                           ),
                                           child: Row(
                                             children: [
                                               const Icon(
-                                                Icons.people_alt_outlined,
+                                                Icons.info_outline,
+                                                color: Color(0xFFB45309),
                                                 size: 16,
-                                                color: AppTheme.primaryBlue,
                                               ),
                                               const SizedBox(width: 6),
                                               Expanded(
                                                 child: Text(
-                                                  'Participam: $names',
+                                                  'Motivo do Encerramento: $endReason',
                                                   style: const TextStyle(
                                                     fontSize: 12,
-                                                    fontWeight: FontWeight.w600,
-                                                    color: AppTheme.primaryBlue,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Color(0xFF92400E),
                                                   ),
                                                 ),
-                                              ),
-                                              const Icon(
-                                                Icons.arrow_forward_ios,
-                                                size: 11,
-                                                color: AppTheme.primaryBlue,
                                               ),
                                             ],
                                           ),
                                         ),
-                                      );
-                                    },
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.all(10),
-                                    decoration: BoxDecoration(
-                                      color: isDark
-                                          ? const Color(0xFF1E293B)
-                                          : const Color(0xFFF1F5F9),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceAround,
-                                      children: [
-                                        Column(
-                                          children: [
-                                            Text(
-                                              'Lição Atual',
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                color: isDark
-                                                    ? const Color(0xFFCBD5E1)
-                                                    : AppTheme.textMuted,
-                                              ),
-                                            ),
-                                            Text(
-                                              study.currentLesson != null
-                                                  ? 'Lição ${study.currentLesson}'
-                                                  : 'Não iniciada',
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        Column(
-                                          children: [
-                                            Text(
-                                              study.publicationId ==
-                                                          'lff-book' ||
-                                                      study.publicationId ==
-                                                          'lff-brochure'
-                                                  ? 'Ponto Atual'
-                                                  : 'Parágrafo',
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                color: isDark
-                                                    ? const Color(0xFFCBD5E1)
-                                                    : AppTheme.textMuted,
-                                              ),
-                                            ),
-                                            Text(
-                                              study.currentParagraph != null
-                                                  ? (study.publicationId ==
-                                                                'lff-book' ||
-                                                            study.publicationId ==
-                                                                'lff-brochure'
-                                                        ? 'Ponto ${study.currentParagraph}'
-                                                        : '§ ${study.currentParagraph}')
-                                                  : '—',
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        Column(
-                                          children: [
-                                            Text(
-                                              'Idioma',
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                color: isDark
-                                                    ? const Color(0xFFCBD5E1)
-                                                    : AppTheme.textMuted,
-                                              ),
-                                            ),
-                                            Text(
-                                              study.language.toUpperCase(),
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
                                       ],
-                                    ),
-                                  ),
-                                  if (endReason != null) ...[
-                                    const SizedBox(height: 8),
-                                    Container(
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFFEF3C7),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: Row(
+                                      const SizedBox(height: 12),
+                                      Row(
                                         children: [
-                                          const Icon(
-                                            Icons.info_outline,
-                                            color: Color(0xFFB45309),
-                                            size: 16,
-                                          ),
-                                          const SizedBox(width: 6),
                                           Expanded(
-                                            child: Text(
-                                              'Motivo do Encerramento: $endReason',
-                                              style: const TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.bold,
-                                                color: Color(0xFF92400E),
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                  const SizedBox(height: 12),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: OutlinedButton.icon(
-                                          style: OutlinedButton.styleFrom(
-                                            foregroundColor:
-                                                AppTheme.primaryBlue,
-                                            side: const BorderSide(
-                                              color: AppTheme.primaryBlue,
-                                            ),
-                                          ),
-                                          icon: const Icon(
-                                            Icons.person_outline,
-                                            size: 16,
-                                          ),
-                                          label: const Text(
-                                            'Ver Cadastro & Opções',
-                                          ),
-                                          onPressed: () async {
-                                            final parts = await ref
-                                                .read(repositoryProvider)
-                                                .getParticipantsForStudy(
-                                                  study.id,
-                                                );
-                                            if (parts.isNotEmpty &&
-                                                context.mounted) {
-                                              Navigator.push(
-                                                context,
-                                                MaterialPageRoute(
-                                                  builder: (_) =>
-                                                      PersonDetailScreen(
-                                                        personId: parts
-                                                            .first
-                                                            .personId,
-                                                      ),
+                                            child: OutlinedButton.icon(
+                                              style: OutlinedButton.styleFrom(
+                                                foregroundColor: AppTheme.primaryBlue,
+                                                side: const BorderSide(
+                                                  color: AppTheme.primaryBlue,
                                                 ),
-                                              );
-                                            } else if (context.mounted) {
-                                              ScaffoldMessenger.of(context)
-                                                  .showSnackBar(
+                                              ),
+                                              icon: const Icon(
+                                                Icons.person_outline,
+                                                size: 16,
+                                              ),
+                                              label: const Text(
+                                                'Ver Cadastro & Opções',
+                                              ),
+                                              onPressed: () async {
+                                                final parts = await ref
+                                                    .read(repositoryProvider)
+                                                    .getParticipantsForStudy(
+                                                      study.id,
+                                                    );
+                                                if (parts.isNotEmpty && context.mounted) {
+                                                  Navigator.push(
+                                                    context,
+                                                    MaterialPageRoute(
+                                                      builder: (_) => PersonDetailScreen(
+                                                        personId: parts.first.personId,
+                                                      ),
+                                                    ),
+                                                  );
+                                                } else if (context.mounted) {
+                                                  ScaffoldMessenger.of(context).showSnackBar(
                                                     const SnackBar(
                                                       content: Text(
                                                         'Nenhum contato vinculado diretamente a este estudo.',
                                                       ),
                                                     ),
                                                   );
-                                            }
-                                          },
-                                        ),
+                                                }
+                                              },
+                                            ),
+                                          ),
+                                        ],
                                       ),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: OutlinedButton.icon(
+                                              icon: const Icon(
+                                                Icons.menu_book,
+                                                size: 16,
+                                              ),
+                                              label: const Text(
+                                                'Abrir no JW Library',
+                                              ),
+                                              onPressed: () => _openPublicationLink(
+                                                context,
+                                                study,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: ElevatedButton.icon(
+                                              icon: const Icon(
+                                                Icons.playlist_add_check,
+                                                size: 16,
+                                              ),
+                                              label: const Text('Sessão'),
+                                              onPressed: study.status == 'ativo'
+                                                  ? () => _showRecordSessionDialog(
+                                                      context,
+                                                      study,
+                                                    )
+                                                  : null,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      if (study.status == 'ativo')
+                                        SizedBox(
+                                          width: double.infinity,
+                                          child: OutlinedButton.icon(
+                                            style: OutlinedButton.styleFrom(
+                                              foregroundColor: AppTheme.alertRed,
+                                              side: const BorderSide(
+                                                color: AppTheme.alertRed,
+                                              ),
+                                              visualDensity: VisualDensity.compact,
+                                            ),
+                                            icon: const Icon(
+                                              Icons.stop_circle_outlined,
+                                              size: 16,
+                                            ),
+                                            label: const Text(
+                                              'Encerrar Estudo (com motivo)',
+                                              style: TextStyle(fontSize: 12),
+                                            ),
+                                            onPressed: () =>
+                                                _showEndStudyDialog(context, study),
+                                          ),
+                                        )
+                                      else
+                                        SizedBox(
+                                          width: double.infinity,
+                                          child: ElevatedButton.icon(
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: AppTheme.successGreen,
+                                              foregroundColor: Colors.white,
+                                              visualDensity: VisualDensity.compact,
+                                            ),
+                                            icon: const Icon(
+                                              Icons.refresh,
+                                              size: 16,
+                                            ),
+                                            label: const Text(
+                                              'Reativar Estudo Bíblico',
+                                              style: TextStyle(fontSize: 12),
+                                            ),
+                                            onPressed: () =>
+                                                _reactivateStudy(context, study),
+                                          ),
+                                        ),
                                     ],
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: OutlinedButton.icon(
-                                          icon: const Icon(
-                                            Icons.menu_book,
-                                            size: 16,
-                                          ),
-                                          label: const Text(
-                                            'Abrir no JW Library',
-                                          ),
-                                          onPressed: () => _openPublicationLink(
-                                            context,
-                                            study,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: ElevatedButton.icon(
-                                          icon: const Icon(
-                                            Icons.playlist_add_check,
-                                            size: 16,
-                                          ),
-                                          label: const Text('Sessão'),
-                                          onPressed: study.status == 'ativo'
-                                              ? () => _showRecordSessionDialog(
-                                                  context,
-                                                  study,
-                                                )
-                                              : null,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 8),
-                                  if (study.status == 'ativo')
-                                    SizedBox(
-                                      width: double.infinity,
-                                      child: OutlinedButton.icon(
-                                        style: OutlinedButton.styleFrom(
-                                          foregroundColor: AppTheme.alertRed,
-                                          side: const BorderSide(
-                                            color: AppTheme.alertRed,
-                                          ),
-                                          visualDensity: VisualDensity.compact,
-                                        ),
-                                        icon: const Icon(
-                                          Icons.stop_circle_outlined,
-                                          size: 16,
-                                        ),
-                                        label: const Text(
-                                          'Encerrar Estudo (com motivo)',
-                                          style: TextStyle(fontSize: 12),
-                                        ),
-                                        onPressed: () =>
-                                            _showEndStudyDialog(context, study),
-                                      ),
-                                    )
-                                  else
-                                    SizedBox(
-                                      width: double.infinity,
-                                      child: ElevatedButton.icon(
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor:
-                                              AppTheme.successGreen,
-                                          foregroundColor: Colors.white,
-                                          visualDensity: VisualDensity.compact,
-                                        ),
-                                        icon: const Icon(
-                                          Icons.refresh,
-                                          size: 16,
-                                        ),
-                                        label: const Text(
-                                          'Reativar Estudo Bíblico',
-                                          style: TextStyle(fontSize: 12),
-                                        ),
-                                        onPressed: () =>
-                                            _reactivateStudy(context, study),
-                                      ),
-                                    ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
                           );

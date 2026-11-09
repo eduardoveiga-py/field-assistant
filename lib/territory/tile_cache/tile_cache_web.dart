@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 
 import '../../core/app_version.dart';
 import 'tile_cache_interface.dart';
+import 'tile_cache_service.dart';
 
 TileCacheBackend getTileBackend() => TileCacheWeb();
 
@@ -49,8 +50,8 @@ class TileCacheWeb implements TileCacheBackend {
     final shouldCloseClient = httpClient == null;
 
     try {
-      // 1ª Tentativa: OpenStreetMap oficial
-      final uri = Uri.parse('https://tile.openstreetmap.org/$z/$x/$y.png');
+      // 1ª Tentativa: Provedor de azulejos oficial com estilo selecionado
+      final uri = Uri.parse(TileCacheService.instance.getTileUrl(z, x, y));
       try {
         final res = await client.get(
           uri,

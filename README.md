@@ -7,7 +7,7 @@
 [![Flutter](https://img.shields.io/badge/Flutter-3.27+-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-3.5+-0175C2?style=for-the-badge&logo=dart&logoColor=white)](https://dart.dev)
 [![Offline First](https://img.shields.io/badge/Arquitetura-Offline--First-success?style=for-the-badge&logo=sqlite&logoColor=white)](https://drift.simonbinder.eu/)
-[![Testes](https://img.shields.io/badge/Testes-670%2B%20Passando%20(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](https://github.com/eduardoveiga-py/field-assistant/actions)
+[![Testes](https://img.shields.io/badge/Testes-693%2B%20Passando%20(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](https://github.com/eduardoveiga-py/field-assistant/actions)
 [![Plataformas](https://img.shields.io/badge/Plataformas-Android%20%7C%20iOS%20%7C%20Web-orange?style=for-the-badge)](https://github.com/eduardoveiga-py/field-assistant/releases)
 
 <p align="center">
@@ -225,6 +225,73 @@ Enquanto caminha entre uma residência e outra, registre tudo sem precisar digit
 
 ---
 
+### 📋 14. Tarefas & Projetos com Pesquisa, Tags, Filtros e Descrição Visível
+- **Pesquisa e Filtros Ágeis**: barra de pesquisa dedicada combinada com filtros rápidos por prioridade, categoria e tags.
+- **Descrição Visível no Card**: a descrição detalhada das tarefas agora é exibida diretamente no card da tarefa (resolvendo o problema de visualização truncada), acompanhada de badges de prazos e tags.
+- **Editor Rico com Markdown & Imagens**: criação e edição de tarefas e projetos agora contam com o `RichMarkdownToolbar` completo, permitindo formatação avançada, listas e inclusão de imagens.
+- **Anexos Universais**: tarefas suportam anexos com abertura direta no Visualizador Universal.
+
+---
+
+### 📧 15. Inbox, E-mail Teocrático (JW Pub) & Trava Biométrica Global
+- **Trava Biométrica em Toda a Aba Inbox**: proteção integral de segurança (Face ID / Touch ID / PIN) exigida logo ao abrir a tela de Inbox, protegendo capturas, notas, e-mails e cartas.
+- **Configuração IMAP JW.org nas Configurações**: formulário completo para sincronização com o e-mail teocrático (`mail.jw.org`, porta `993`, com credenciais salvas de forma segura no banco local e botão "Testar Conexão e Salvar").
+- **Edição Completa de Capturas**: qualquer item capturado no Inbox pode ser editado (conteúdo, categoria, metadados) via modal dedicado.
+- **Retenção Permanente Imune à Purga**: mensagens e correspondências permanecem salvas localmente no Drift SQLite, imunes à purga remota de 90 dias do servidor.
+- **Visualização Universal de Anexos**: qualquer anexo de e-mail ou nota abre diretamente no leitor nativo integrado.
+
+---
+
+### 📚 16. Base de Conhecimento: Tags, Clamping, Leitor Imersivo & Correção de PDFs
+- **Tags e Filtros**: suporte completo a tags com chips interativos para filtrar Notas, Dúvidas, Documentos e Recursos.
+- **Cards com Altura Máxima Clamped**: visual organizado e compacto que nunca transborda verticalmente.
+- **Leitor Dedicado em Modal (`showKnowledgeItemReader`)**: ao clicar em qualquer card, abre-se uma tela imersiva de leitura com Markdown estilizado, imagens inline, badges de links e tags.
+- **Correção Definitiva de Leitura de PDFs**: visualizador com fallback inteligente integrado via `PdfPreview` (pacote `printing`), permitindo visualizar qualquer PDF local sem depender de aplicativos externos falharem.
+- **Editor Rico em Dúvidas e Recursos**: `RichMarkdownToolbar` incorporado em todas as seções para formatação de texto, imagens e links teocráticos.
+
+---
+
+### 📖 17. Estudos Bíblicos: Pesquisa, Filtros, Tags e Cards Recolhíveis/Expandíveis
+- **Cards Recolhíveis e Expansíveis (1 Toque)**: economize espaço vertical de forma dramática no celular ou tablet. Em modo compacto, os cards mostram avatar, estudante, publicação, lição/parágrafo e badges essenciais. Ao tocar, expandem suavemente para exibir participantes, histórico de lições e botões de ação.
+- **Expandir / Recolher Todos**: botão no topo da lista para alternar todos os estudos simultaneamente.
+- **Pesquisa em Tempo Real**: localize rapidamente qualquer estudo por nome do estudante, título, publicação ou tags.
+- **Filtros por Publicação e Tags**: filtre por publicação específica (*Seja Feliz para Sempre!* livro ou brochura) e por marcadores/metas teocráticas (#Batismo, #Família, etc.).
+- **Gestão de Tags de Estudo**: campos dedicados para definir marcadores tanto na criação quanto na edição do estudo bíblico.
+
+---
+
+### 🖼️ 18. Visualizador Universal de Anexos
+- **Suporte Multiformato Nativo em Todo o App**:
+  - 📄 **PDFs**: renderizados de forma nítida com navegação de páginas e zoom via `PdfPreview`.
+  - 🖼️ **Imagens (JPG, PNG, WebP)**: visualização em tela cheia com zoom interativo por pinça (`InteractiveViewer`) e rotação.
+  - 🎵 **Áudio (M4A, MP3, WAV, AAC)**: reprodutor de áudio integrado com barra de progresso, botão play/pause e tempo decorrido.
+  - 📝 **Documentos de Texto e Markdown**: visualizador monospaçado estilizado com botão de cópia.
+  - 🔗 **Fallback do Sistema**: opção "Abrir em App Externo" integrada para formatos complementares.
+
+---
+
+### ✍️ 19. Editor Rico com Imagens Inline & Links Teocráticos (JW.org)
+- **Barra de Formatação `RichMarkdownToolbar`**:
+  - 🖼️ **Inserir Imagem**: escolha da galeria, câmera ou URL, inserindo sintaxe de markdown `![legenda](caminho)`.
+  - 📖 **Inserir Link de Publicação / Vídeo**: insere links formatados para jw.org e JW Library (`[📖 Título](url)` ou `[🎥 Título](url)`).
+  - Suporte completo em Experiências no Ministério, Notas, Tarefas, Projetos, Dúvidas e Recursos.
+
+---
+
+### 🔒 20. Google Calendar: Persistência de Sessão e Eliminação de Popups Recorrentes
+- **Sessão Persistente**: a conta Google selecionada fica armazenada em cache persistente local (`AppKvStore`), evitando que a janela de seleção de conta do Google seja exibida repetidamente ao navegar no aplicativo.
+- **Gerenciamento em Configurações**: a aba Configurações permite visualizar a conta atualmente conectada, alternar de conta com 1 toque ("Trocar") ou desconectar ("Desconectar").
+- **Chamadas Silenciosas**: sincronizações em segundo plano utilizam verificação não intrusiva (`promptIfNecessary: false`), garantindo paz ao usuário durante o uso do aplicativo.
+
+---
+
+### 🎓 21. Fotos e Avatares de Estudantes Bíblicos
+- **Consistência Visual**: na aba **Estudos Bíblicos**, cada card de estudante exibe a foto do estudante ou seu avatar circular com iniciais, exatamente idêntico à aba **Pessoas**.
+- **Resiliência na Busca**: suporte a vínculo por participante ou correspondência direta do nome do estudante/morador com fotos cadastradas.
+- Presente tanto na visualização priorizada (Visão Geral de Progresso) quanto na lista completa de estudos ativos e concluídos.
+
+---
+
 ## 🚀 Guia Rápido de Uso
 
 ```mermaid
@@ -260,6 +327,42 @@ flowchart LR
 ---
 
 ## 📋 Histórico de Lançamentos e Changelog
+
+### 🚀 Versão 1.3.1 (Build 8) — 09/11/2026: Paridade Cartográfica Organic Maps, Extensibilidade Multilíngue e Hardening de Módulos
+- **Paridade Cartográfica Avançada com Organic Maps (Anti-Flicker, Camadas, Bússola e 23 Regiões)**:
+  - **Eliminação Total de Flashes no Zoom**: Implementação de pirâmide de blocos com cache de fallback multinível (`getFallbackFromMemory`): ao alterar o zoom, o mapa preserva e escala o bloco pai ($z-1$ / $z-2$) em memória até o carregamento assíncrono do bloco exato, eliminando 100% da tela cinza piscando.
+  - **4 Camadas e Estilos de Mapas Selecionáveis**: Botão flutuante de camadas (`Icons.layers_rounded`) permitindo alternar instantaneamente entre:
+    - 🗺️ *Padrão (OpenStreetMap)*: Ruas, números e povoados com máxima legibilidade.
+    - 🛰️ *Satélite (Esri World Imagery)*: Fotografia aérea de alta resolução para identificar telhados, trilhas e rios na Amazônia.
+    - 🏔️ *Topográfico (OpenTopoMap)*: Curvas de nível, relevo e hidrografia para zonas rurais e ribeirinhas.
+    - 🌙 *Modo Noturno (Carto Dark)*: Alto contraste para economia de bateria e ministério noturno.
+  - **Catálogo de 23 Regiões do Brasil no Gerenciador de Downloads**: Estrutura idêntica ao Organic Maps (`Brasil — Mapas: 1 de 23`), cobrindo todos os estados e eixos estratégicos (Santo Antônio do Içá, Yanomami, Guajajara, Manaus, São Paulo, Rio, Curitiba, Brasília, etc.), com resumo de megabytes instalados e barra de rodapé persistente com botão "Atualizar tudo".
+  - **Toque Longo para Marcações**: Gesto de pressão longa em qualquer ponto do mapa captura as coordenadas $(lat, lng)$ e abre o formulário de cadastro de marcadores com endereço e coordenadas já preenchidos.
+  - **Bússola Magnética & Rotação Contínua**: Agulha apontando para o Norte magnético ($360^\circ$); toque rápido redefine para $0^\circ$ e toque longo gira $90^\circ$ em sentido horário.
+  - **Modo Tela Cheia 100% Imersivo**: Oculta o `NavigationRail` no iPad/Desktop e o `NavigationBar` no Mobile, dedicando a tela inteira exclusivamente ao mapa com botão flutuante de saída.
+  - **Escala Métrica Dinâmica**: Barra métrica estilo colchete (`|────────|`) com cálculo geodésico em tempo real de metros por pixel em função da latitude e zoom.
+
+- **Extensibilidade Multilíngue Persistente & Criação de Idiomas**:
+  - Persistência reativa do idioma ativo no SQLite via `AppKvStore` (`active_language_code`), mantendo a escolha do usuário entre sessões e reinicializações.
+  - Seeding formal de 5 idiomas teocráticos padrão no banco Drift (`tca` Ticuna [Padrão], `por` Português, `spa` Espanhol, `gub` Guajajara e `yan` Yanomami) executado no `beforeOpen` de migração.
+  - Barra dinâmica de caracteres especiais (diacríticos) ajustada automaticamente conforme o idioma selecionado.
+  - Sistema extensível para cadastrar e gerenciar novos idiomas indígenas e estrangeiros dentro do aplicativo com símbolos, diacríticos customizados e vocabulário individualizado.
+
+- **Visualizador Universal Multi-Formato (`UniversalAttachmentViewerDialog`)**:
+  - Visualizador integrado para todos os formatos de anexos: PDFs via `PdfPreview` (com zoom contínuo, impressão e compartilhamento), imagens interativas com zoom gestual, áudios com player dedicado e textos/markdown. Resolve em definitivo o erro de abertura externa de documentos (ex.: `CIN - Eduardo Veiga.pdf`).
+
+- **Persistência de Autenticação Google & Supressão de Popups**:
+  - Verificação de autorização explícita (`_keyUserExplicitlyConnected`) antes de checagens silenciosas do Google Calendar, extinguindo o popup recorrente em localhost e web.
+  - Gerenciamento de conta Google centralizado em Configurações com opções para alternar e desconectar conta.
+
+- **Bloqueio Biométrico na Inbox & E-mail JW.org**:
+  - Proteção biométrica/PIN na tela inteira da Inbox Universal (`BiometricAuthService`).
+  - Formulário completo para conexão de e-mail JW.org (`mail.jw.org`, porta 993) em Configurações com teste de conectividade, remoção e retenção local permanente.
+
+- **Tarefas e Estudos Aprimorados**:
+  - Exibição de descrição detalhada diretamente nos cards de tarefas com busca e filtros por tags.
+  - Cards de estudos bíblicos retráteis/expansíveis com 1 toque para economia de espaço vertical, com foto/avatar colorido idêntico à aba Pessoas.
+  - Barra de edição avançada `RichMarkdownToolbar` em todo o aplicativo com inserção de fotos e links teocráticos formatados (`[📖 ...]`, `[🎥 ...]`).
 
 ### 🚀 Versão 1.3.0 (Build 7) — 09/11/2026: A Grande Evolução Estratégica Integrada
 - **MÓDULO A — Inbox Universal**:

@@ -504,14 +504,26 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
     return 'Geral';
   }
 
-  // Modal para criar novo Ponto de Referência / Marco no território
-  void _showAddLandmarkModal(BuildContext context) {
+  // Modal para criar novo Ponto de Referência / Marco / Marcação no território estilo Organic Maps
+  void _showAddLandmarkModal(
+    BuildContext context, {
+    double? initialLat,
+    double? initialLng,
+  }) {
     final nameController = TextEditingController();
-    final addressController = TextEditingController();
+    final addressController = TextEditingController(
+      text: initialLat != null && initialLng != null
+          ? 'Marcação: ${initialLat.toStringAsFixed(5)}, ${initialLng.toStringAsFixed(5)}'
+          : '',
+    );
     final notesController = TextEditingController();
-    final latController = TextEditingController();
-    final lngController = TextEditingController();
-    String selectedCategory = 'padaria';
+    final latController = TextEditingController(
+      text: initialLat != null ? initialLat.toStringAsFixed(6) : '',
+    );
+    final lngController = TextEditingController(
+      text: initialLng != null ? initialLng.toStringAsFixed(6) : '',
+    );
+    String selectedCategory = initialLat != null ? 'outro' : 'padaria';
 
     showDialog(
       context: context,
@@ -519,11 +531,11 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
         builder: (ctx, setDialogState) {
           final dialogIsDark = Theme.of(ctx).brightness == Brightness.dark;
           return AlertDialog(
-            title: const Row(
+            title: Row(
               children: [
-                Icon(Icons.add_location_alt, color: AppTheme.accentTeal),
-                SizedBox(width: 8),
-                Text('Novo Ponto de Referência'),
+                const Icon(Icons.add_location_alt, color: AppTheme.accentTeal),
+                const SizedBox(width: 8),
+                Text(initialLat != null ? 'Nova Marcação no Mapa' : 'Novo Ponto de Referência'),
               ],
             ),
             content: SingleChildScrollView(
@@ -788,6 +800,76 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
           );
         },
       ),
+    );
+  }
+
+  void _showMapLayerStylesModal(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        final currentStyle = TileCacheService.instance.activeStyle;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Camadas e Estilos do Mapa',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                for (final style in MapLayerStyle.values)
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: currentStyle == style
+                            ? AppTheme.accentTeal.withValues(alpha: 0.15)
+                            : (isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        style.icon,
+                        color: currentStyle == style ? AppTheme.accentTeal : null,
+                      ),
+                    ),
+                    title: Text(
+                      style.label,
+                      style: TextStyle(
+                        fontWeight: currentStyle == style ? FontWeight.bold : FontWeight.w600,
+                        color: currentStyle == style ? AppTheme.accentTeal : null,
+                      ),
+                    ),
+                    subtitle: Text(style.description, style: const TextStyle(fontSize: 12)),
+                    trailing: currentStyle == style
+                        ? const Icon(Icons.check_circle, color: AppTheme.accentTeal)
+                        : null,
+                    onTap: () {
+                      TileCacheService.instance.setLayerStyle(style);
+                      Navigator.pop(ctx);
+                      setState(() {});
+                    },
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -2184,6 +2266,20 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                       );
                     }
                   },
+                  onLongPressStart: (details) {
+                    final m = _transformationController.value;
+                    final currentScale = m.getMaxScaleOnAxis();
+                    final effectiveScale = currentScale > 0.01 ? currentScale : 1.0;
+                    final dx = m.storage[12];
+                    final dy = m.storage[13];
+                    final touchCanvasX = (details.localPosition.dx - dx) / effectiveScale;
+                    final touchCanvasY = (details.localPosition.dy - dy) / effectiveScale;
+                    final touchWorldPx = originPx + touchCanvasX;
+                    final touchWorldPy = originPy + touchCanvasY;
+                    final touchLng = _pixelX2lon(touchWorldPx, _zoom);
+                    final touchLat = _pixelY2lat(touchWorldPy, _zoom);
+                    _showAddLandmarkModal(context, initialLat: touchLat, initialLng: touchLng);
+                  },
                   onScaleUpdate: (details) {
                     if (details.pointerCount >= 2 && details.rotation.abs() > 0.005) {
                       setState(() {
@@ -2468,38 +2564,48 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
               child: Column(
                 children: [
                   // Bússola Interativa (Norte Magnético estilo Organic Maps)
-                  if (_rotation.abs() > 0.01) ...[
-                    FloatingActionButton.small(
-                      heroTag: 'map_compass',
-                      backgroundColor: Colors.white,
-                      foregroundColor: Colors.red.shade700,
-                      tooltip: 'Norte Magnético (Toque para redefinir para 0°)',
-                      onPressed: () {
-                        setState(() {
-                          _rotation = 0.0;
-                        });
-                      },
-                      child: Transform.rotate(
-                        angle: -_rotation,
-                        child: const Icon(
-                          Icons.navigation_rounded,
-                          size: 20,
-                          color: Colors.red,
-                        ),
+                  FloatingActionButton.small(
+                    heroTag: 'map_compass',
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.red.shade700,
+                    tooltip: 'Norte Magnético (${(_rotation * 180 / math.pi).round()}°)\nToque para redefinir para 0° • Segure para girar 90°',
+                    onPressed: () {
+                      setState(() {
+                        _rotation = 0.0;
+                      });
+                    },
+                    child: Transform.rotate(
+                      angle: -_rotation,
+                      child: const Icon(
+                        Icons.navigation_rounded,
+                        size: 20,
+                        color: Colors.red,
                       ),
                     ),
-                    const SizedBox(height: 6),
-                  ],
+                  ),
+                  const SizedBox(height: 6),
 
-                  // Botão Tela Cheia (Fullscreen toggle para iPads/tablets)
+                  // Botão Camadas do Mapa (Estilos Organic Maps: Padrão, Satélite, Relevo, Noite)
+                  FloatingActionButton.small(
+                    heroTag: 'map_layer_styles',
+                    backgroundColor: Colors.white,
+                    foregroundColor: AppTheme.accentTeal,
+                    tooltip: 'Camadas e Estilos de Mapa',
+                    onPressed: () => _showMapLayerStylesModal(context),
+                    child: const Icon(Icons.layers_rounded, size: 20),
+                  ),
+                  const SizedBox(height: 6),
+
+                  // Botão Tela Cheia (Fullscreen toggle para iPads/tablets e mobile)
                   FloatingActionButton.small(
                     heroTag: 'map_fullscreen',
                     backgroundColor: Colors.white,
                     foregroundColor: Colors.black87,
                     tooltip: _isFullscreen ? 'Sair da Tela Cheia' : 'Modo Tela Cheia',
                     onPressed: () {
+                      ref.read(isMapFullscreenProvider.notifier).toggle();
                       setState(() {
-                        _isFullscreen = !_isFullscreen;
+                        _isFullscreen = ref.read(isMapFullscreenProvider);
                       });
                     },
                     child: Icon(_isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen),

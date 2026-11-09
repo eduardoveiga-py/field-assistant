@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -7,6 +8,8 @@ import '../../projects/project_manager.dart';
 import '../../tasks/task_manager.dart';
 import '../providers.dart';
 import '../widgets/adaptive_ministry_sheet.dart';
+import '../widgets/rich_markdown_toolbar.dart';
+import '../widgets/universal_attachment_viewer.dart';
 import 'person_detail_screen.dart';
 import 'project_detail_screen.dart';
 
@@ -21,17 +24,318 @@ class TasksScreen extends ConsumerStatefulWidget {
 
 class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProviderStateMixin {
   late final TabController _tabController;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  String _selectedCategory = 'todas';
+  String _selectedPriority = 'todas';
+  String? _selectedTag;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 5, vsync: this);
+    _tabController.addListener(() {
+      if (mounted) setState(() {});
+    });
+    _searchController.addListener(() {
+      final text = _searchController.text.trim();
+      if (_searchQuery != text && mounted) {
+        setState(() => _searchQuery = text);
+      }
+    });
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _searchController.dispose();
     super.dispose();
+  }
+
+  List<String> _extractTags(String metadataJson) {
+    try {
+      if (metadataJson.isNotEmpty) {
+        final decoded = jsonDecode(metadataJson);
+        if (decoded is Map && decoded['tags'] is List) {
+          return List<String>.from(decoded['tags'].map((e) => e.toString()));
+        }
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  List<Map<String, dynamic>> _extractAttachments(String attachmentsJson) {
+    try {
+      if (attachmentsJson.isNotEmpty) {
+        final decoded = jsonDecode(attachmentsJson);
+        if (decoded is List) {
+          return List<Map<String, dynamic>>.from(decoded.whereType<Map>());
+        }
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  List<TaskEntry> _filterTasks(List<TaskEntry> raw) {
+    return raw.where((t) {
+      if (_searchQuery.isNotEmpty) {
+        final q = _searchQuery.toLowerCase();
+        final titleMatch = t.title.toLowerCase().contains(q);
+        final descMatch = (t.description ?? '').toLowerCase().contains(q);
+        final catMatch = t.category.toLowerCase().contains(q);
+        final tags = _extractTags(t.metadata);
+        final tagMatch = tags.any((tag) => tag.toLowerCase().contains(q));
+        if (!titleMatch && !descMatch && !catMatch && !tagMatch) return false;
+      }
+      if (_selectedCategory != 'todas' && t.category != _selectedCategory) {
+        return false;
+      }
+      if (_selectedPriority != 'todas' && t.priority != _selectedPriority) {
+        return false;
+      }
+      if (_selectedTag != null && _selectedTag!.isNotEmpty) {
+        final tags = _extractTags(t.metadata);
+        if (!tags.contains(_selectedTag)) return false;
+      }
+      return true;
+    }).toList();
+  }
+
+  List<ProjectEntry> _filterProjects(List<ProjectEntry> raw) {
+    return raw.where((p) {
+      if (_searchQuery.isNotEmpty) {
+        final q = _searchQuery.toLowerCase();
+        final nameMatch = p.name.toLowerCase().contains(q);
+        final objMatch = (p.objective ?? '').toLowerCase().contains(q);
+        final descMatch = (p.description ?? '').toLowerCase().contains(q);
+        final catMatch = p.category.toLowerCase().contains(q);
+        final tags = _extractTags(p.metadata);
+        final tagMatch = tags.any((tag) => tag.toLowerCase().contains(q));
+        if (!nameMatch && !objMatch && !descMatch && !catMatch && !tagMatch) return false;
+      }
+      if (_selectedCategory != 'todas' && p.category != _selectedCategory) {
+        return false;
+      }
+      if (_selectedTag != null && _selectedTag!.isNotEmpty) {
+        final tags = _extractTags(p.metadata);
+        if (!tags.contains(_selectedTag)) return false;
+      }
+      return true;
+    }).toList();
+  }
+
+  Widget _buildSearchAndFilterBar(bool isDark) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+        border: Border(
+          bottom: BorderSide(
+            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+          ),
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              isDense: true,
+              hintText: 'Pesquisar tarefas, projetos, tags...',
+              prefixIcon: const Icon(Icons.search, size: 20, color: AppTheme.primaryBlue),
+              suffixIcon: _searchQuery.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, size: 18),
+                      onPressed: () => _searchController.clear(),
+                    )
+                  : null,
+              filled: true,
+              fillColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(
+                  color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                ),
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                // Filtro Categoria
+                FilterChip(
+                  label: Text(_selectedCategory == 'todas' ? 'Todas Categorias' : _categoryLabel(_selectedCategory)),
+                  selected: _selectedCategory != 'todas',
+                  onSelected: (_) {
+                    _showCategoryFilterMenu();
+                  },
+                ),
+                const SizedBox(width: 8),
+                // Filtro Prioridade
+                FilterChip(
+                  label: Text(_selectedPriority == 'todas' ? 'Todas Prioridades' : _priorityLabel(_selectedPriority)),
+                  selected: _selectedPriority != 'todas',
+                  onSelected: (_) {
+                    _showPriorityFilterMenu();
+                  },
+                ),
+                if (_selectedTag != null) ...[
+                  const SizedBox(width: 8),
+                  Chip(
+                    label: Text('#$_selectedTag'),
+                    deleteIcon: const Icon(Icons.close, size: 14),
+                    onDeleted: () => setState(() => _selectedTag = null),
+                  ),
+                ],
+                if (_selectedCategory != 'todas' || _selectedPriority != 'todas' || _selectedTag != null) ...[
+                  const SizedBox(width: 8),
+                  TextButton.icon(
+                    style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                    icon: const Icon(Icons.filter_alt_off, size: 16),
+                    label: const Text('Limpar', style: TextStyle(fontSize: 12)),
+                    onPressed: () {
+                      setState(() {
+                        _selectedCategory = 'todas';
+                        _selectedPriority = 'todas';
+                        _selectedTag = null;
+                      });
+                    },
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showCategoryFilterMenu() {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ListTile(title: Text('Filtrar por Categoria', style: TextStyle(fontWeight: FontWeight.bold))),
+            const Divider(height: 1),
+            ListTile(
+              title: const Text('Todas as categorias'),
+              trailing: _selectedCategory == 'todas' ? const Icon(Icons.check, color: AppTheme.primaryBlue) : null,
+              onTap: () {
+                setState(() => _selectedCategory = 'todas');
+                Navigator.pop(ctx);
+              },
+            ),
+            ListTile(
+              title: const Text('Ministério'),
+              trailing: _selectedCategory == 'ministry' ? const Icon(Icons.check, color: AppTheme.primaryBlue) : null,
+              onTap: () {
+                setState(() => _selectedCategory = 'ministry');
+                Navigator.pop(ctx);
+              },
+            ),
+            ListTile(
+              title: const Text('Pessoal'),
+              trailing: _selectedCategory == 'personal' ? const Icon(Icons.check, color: AppTheme.primaryBlue) : null,
+              onTap: () {
+                setState(() => _selectedCategory = 'personal');
+                Navigator.pop(ctx);
+              },
+            ),
+            ListTile(
+              title: const Text('Estudo'),
+              trailing: _selectedCategory == 'study' ? const Icon(Icons.check, color: AppTheme.primaryBlue) : null,
+              onTap: () {
+                setState(() => _selectedCategory = 'study');
+                Navigator.pop(ctx);
+              },
+            ),
+            ListTile(
+              title: const Text('Tecnologia'),
+              trailing: _selectedCategory == 'tech' ? const Icon(Icons.check, color: AppTheme.primaryBlue) : null,
+              onTap: () {
+                setState(() => _selectedCategory = 'tech');
+                Navigator.pop(ctx);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showPriorityFilterMenu() {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ListTile(title: Text('Filtrar por Prioridade', style: TextStyle(fontWeight: FontWeight.bold))),
+            const Divider(height: 1),
+            ListTile(
+              title: const Text('Todas as prioridades'),
+              trailing: _selectedPriority == 'todas' ? const Icon(Icons.check, color: AppTheme.primaryBlue) : null,
+              onTap: () {
+                setState(() => _selectedPriority = 'todas');
+                Navigator.pop(ctx);
+              },
+            ),
+            ListTile(
+              title: const Text('Urgente'),
+              leading: const Icon(Icons.error_outline, color: Colors.redAccent),
+              trailing: _selectedPriority == 'urgent' ? const Icon(Icons.check, color: AppTheme.primaryBlue) : null,
+              onTap: () {
+                setState(() => _selectedPriority = 'urgent');
+                Navigator.pop(ctx);
+              },
+            ),
+            ListTile(
+              title: const Text('Alta'),
+              leading: const Icon(Icons.arrow_upward, color: Colors.orange),
+              trailing: _selectedPriority == 'high' ? const Icon(Icons.check, color: AppTheme.primaryBlue) : null,
+              onTap: () {
+                setState(() => _selectedPriority = 'high');
+                Navigator.pop(ctx);
+              },
+            ),
+            ListTile(
+              title: const Text('Normal'),
+              leading: const Icon(Icons.remove, color: AppTheme.primaryBlue),
+              trailing: _selectedPriority == 'normal' ? const Icon(Icons.check, color: AppTheme.primaryBlue) : null,
+              onTap: () {
+                setState(() => _selectedPriority = 'normal');
+                Navigator.pop(ctx);
+              },
+            ),
+            ListTile(
+              title: const Text('Baixa'),
+              leading: const Icon(Icons.arrow_downward, color: Colors.grey),
+              trailing: _selectedPriority == 'low' ? const Icon(Icons.check, color: AppTheme.primaryBlue) : null,
+              onTap: () {
+                setState(() => _selectedPriority = 'low');
+                Navigator.pop(ctx);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _priorityLabel(String prio) {
+    switch (prio) {
+      case 'urgent': return 'Urgente';
+      case 'high': return 'Alta';
+      case 'normal': return 'Normal';
+      case 'low': return 'Baixa';
+      default: return prio;
+    }
   }
 
   @override
@@ -63,21 +367,22 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showCreateTaskOrProjectMenu,
-        backgroundColor: AppTheme.primaryBlue,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add),
-        label: const Text('Adicionar', style: TextStyle(fontWeight: FontWeight.bold)),
-      ),
-      body: TabBarView(
-        controller: _tabController,
+      floatingActionButton: _buildTabAwareFab(),
+      body: Column(
         children: [
-          _buildTodayAndOverdueTab(isDark),
-          _buildAllTasksTab(isDark),
-          _buildProjectsTab(isDark),
-          _buildContactActionsTab(isDark),
-          _buildCompletedTasksTab(isDark),
+          _buildSearchAndFilterBar(isDark),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildTodayAndOverdueTab(isDark),
+                _buildAllTasksTab(isDark),
+                _buildProjectsTab(isDark),
+                _buildContactActionsTab(isDark),
+                _buildCompletedTasksTab(isDark),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -97,12 +402,15 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
           return const Center(child: CircularProgressIndicator());
         }
 
-        final tasks = snapshot.data ?? [];
+        final rawTasks = snapshot.data ?? [];
+        final tasks = _filterTasks(rawTasks);
         if (tasks.isEmpty) {
           return _buildEmptyState(
             icon: Icons.done_all_rounded,
-            title: 'Tudo em dia para hoje!',
-            subtitle: 'Nenhuma tarefa pendente ou atrasada no momento.',
+            title: rawTasks.isEmpty ? 'Tudo em dia para hoje!' : 'Nenhuma tarefa corresponde aos filtros',
+            subtitle: rawTasks.isEmpty
+                ? 'Nenhuma tarefa pendente ou atrasada no momento.'
+                : 'Ajuste os filtros ou a pesquisa para ver mais itens.',
             isDark: isDark,
           );
         }
@@ -131,12 +439,15 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
           return const Center(child: CircularProgressIndicator());
         }
 
-        final tasks = snapshot.data ?? [];
+        final rawTasks = snapshot.data ?? [];
+        final tasks = _filterTasks(rawTasks);
         if (tasks.isEmpty) {
           return _buildEmptyState(
             icon: Icons.checklist_rounded,
-            title: 'Nenhuma tarefa pendente',
-            subtitle: 'Toque no botão Adicionar para criar uma nova tarefa ou converta a partir da Inbox.',
+            title: rawTasks.isEmpty ? 'Nenhuma tarefa pendente' : 'Nenhuma tarefa corresponde aos filtros',
+            subtitle: rawTasks.isEmpty
+                ? 'Toque no botão Adicionar para criar uma nova tarefa ou converta a partir da Inbox.'
+                : 'Ajuste os filtros ou a pesquisa para ver mais itens.',
             isDark: isDark,
           );
         }
@@ -165,12 +476,15 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
           return const Center(child: CircularProgressIndicator());
         }
 
-        final projects = snapshot.data ?? [];
+        final rawProjects = snapshot.data ?? [];
+        final projects = _filterProjects(rawProjects);
         if (projects.isEmpty) {
           return _buildEmptyState(
             icon: Icons.folder_open_rounded,
-            title: 'Nenhum projeto ativo',
-            subtitle: 'Crie projetos para agrupar tarefas maiores, metas pessoais ou alvos teocráticos.',
+            title: rawProjects.isEmpty ? 'Nenhum projeto ativo' : 'Nenhum projeto corresponde aos filtros',
+            subtitle: rawProjects.isEmpty
+                ? 'Crie projetos para agrupar tarefas maiores, metas pessoais ou alvos teocráticos.'
+                : 'Ajuste os filtros ou a pesquisa para ver mais itens.',
             isDark: isDark,
           );
         }
@@ -234,8 +548,32 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
                     style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primaryBlue),
                   ),
                 ),
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert, size: 20),
+                  onSelected: (val) {
+                    if (val == 'edit') _showEditProjectModal(project);
+                    if (val == 'delete') _confirmDeleteProject(project);
+                  },
+                  itemBuilder: (ctx) => [
+                    const PopupMenuItem(value: 'edit', child: Text('Editar Projeto')),
+                    const PopupMenuItem(value: 'delete', child: Text('Excluir Projeto', style: TextStyle(color: Colors.redAccent))),
+                  ],
+                ),
               ],
             ),
+            if (project.targetDate != null) ...[
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  const Icon(Icons.flag_outlined, size: 13, color: AppTheme.primaryBlue),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Prazo / Meta: ${_formatDate(project.targetDate!)}',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primaryBlue),
+                  ),
+                ],
+              ),
+            ],
             if (project.objective != null && project.objective!.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text(
@@ -248,6 +586,34 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
                 overflow: TextOverflow.ellipsis,
               ),
             ],
+            // Tags do Projeto
+            Builder(
+              builder: (ctx) {
+                final pTags = _extractTags(project.metadata);
+                if (pTags.isEmpty) return const SizedBox.shrink();
+                return Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: pTags.map((t) => InkWell(
+                      onTap: () => setState(() => _selectedTag = t),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryBlue.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          '#$t',
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primaryBlue),
+                        ),
+                      ),
+                    )).toList(),
+                  ),
+                );
+              },
+            ),
             const SizedBox(height: 14),
 
             // Progresso em tempo real
@@ -369,12 +735,15 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
           return const Center(child: CircularProgressIndicator());
         }
 
-        final tasks = snapshot.data ?? [];
+        final rawTasks = snapshot.data ?? [];
+        final tasks = _filterTasks(rawTasks);
         if (tasks.isEmpty) {
           return _buildEmptyState(
             icon: Icons.check_circle_outline,
-            title: 'Nenhuma tarefa concluída recentemente',
-            subtitle: 'Conclua tarefas ativas para visualizar o histórico aqui.',
+            title: rawTasks.isEmpty ? 'Nenhuma tarefa concluída recentemente' : 'Nenhuma tarefa corresponde aos filtros',
+            subtitle: rawTasks.isEmpty
+                ? 'Conclua tarefas ativas para visualizar o histórico aqui.'
+                : 'Ajuste os filtros ou a pesquisa para ver mais itens.',
             isDark: isDark,
           );
         }
@@ -397,6 +766,8 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
     final isOverdue = task.dueDate != null &&
         task.dueDate!.isBefore(DateTime.now().subtract(const Duration(hours: 1))) &&
         !task.isCompleted;
+    final tags = _extractTags(task.metadata);
+    final attachments = _extractAttachments(task.attachments);
 
     return Container(
       decoration: BoxDecoration(
@@ -408,10 +779,13 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
               : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
         ),
       ),
-      child: CheckboxListTile(
-        value: task.isCompleted,
-        activeColor: AppTheme.primaryBlue,
-        onChanged: (val) => taskMgr.toggleTaskComplete(task.id, completed: val),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        leading: Checkbox(
+          value: task.isCompleted,
+          activeColor: AppTheme.primaryBlue,
+          onChanged: (val) => taskMgr.toggleTaskComplete(task.id, completed: val),
+        ),
         title: Text(
           task.title,
           style: TextStyle(
@@ -420,36 +794,123 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
             color: task.isCompleted ? Colors.grey : null,
           ),
         ),
-        subtitle: Row(
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (task.dueDate != null) ...[
-              Icon(
-                Icons.calendar_today,
-                size: 12,
-                color: isOverdue ? Colors.redAccent : Colors.grey,
-              ),
-              const SizedBox(width: 4),
+            // Descrição da Tarefa — corrigido para exibir na listagem
+            if (task.description != null && task.description!.isNotEmpty) ...[
+              const SizedBox(height: 3),
               Text(
-                _formatDate(task.dueDate!),
+                task.description!,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 11,
-                  color: isOverdue ? Colors.redAccent : Colors.grey,
-                  fontWeight: isOverdue ? FontWeight.bold : FontWeight.normal,
+                  fontSize: 13,
+                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                  decoration: task.isCompleted ? TextDecoration.lineThrough : null,
                 ),
               ),
-              const SizedBox(width: 8),
             ],
-            if (task.recurrenceRule != null && task.recurrenceRule != 'none' && task.recurrenceRule!.isNotEmpty) ...[
-              const Icon(Icons.repeat, size: 12, color: AppTheme.primaryBlue),
-              const SizedBox(width: 2),
-              Text(
-                task.recurrenceRule!,
-                style: const TextStyle(fontSize: 11, color: AppTheme.primaryBlue),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                _priorityIcon(task.priority),
+                const SizedBox(width: 6),
+                if (task.dueDate != null) ...[
+                  Icon(
+                    Icons.calendar_today,
+                    size: 12,
+                    color: isOverdue ? Colors.redAccent : Colors.grey,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    _formatDate(task.dueDate!),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isOverdue ? Colors.redAccent : Colors.grey,
+                      fontWeight: isOverdue ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                if (task.recurrenceRule != null &&
+                    task.recurrenceRule != 'none' &&
+                    task.recurrenceRule!.isNotEmpty) ...[
+                  const Icon(Icons.repeat, size: 12, color: AppTheme.primaryBlue),
+                  const SizedBox(width: 2),
+                  Text(
+                    task.recurrenceRule!,
+                    style: const TextStyle(fontSize: 11, color: AppTheme.primaryBlue),
+                  ),
+                ],
+              ],
+            ),
+            if (tags.isNotEmpty || attachments.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: [
+                  for (final t in tags)
+                    InkWell(
+                      onTap: () => setState(() => _selectedTag = t),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryBlue.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          '#$t',
+                          style: const TextStyle(fontSize: 11, color: AppTheme.primaryBlue, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ),
+                  for (final att in attachments)
+                    InkWell(
+                      onTap: () {
+                        final path = att['path'] as String? ?? '';
+                        final name = att['name'] as String? ?? 'Anexo';
+                        final type = att['type'] as String? ?? 'file';
+                        showUniversalAttachmentViewer(context, filePath: path, title: name, fileType: type);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.purple.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: Colors.purple.withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.attach_file, size: 12, color: Colors.purple),
+                            const SizedBox(width: 2),
+                            Text(
+                              att['name'] ?? 'Anexo',
+                              style: const TextStyle(fontSize: 11, color: Colors.purple),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ],
           ],
         ),
-        secondary: _priorityIcon(task.priority),
+        trailing: PopupMenuButton<String>(
+          icon: const Icon(Icons.more_vert, size: 20),
+          onSelected: (val) {
+            if (val == 'edit') _showEditTaskModal(task);
+            if (val == 'delete') _confirmDeleteTask(task);
+          },
+          itemBuilder: (ctx) => [
+            const PopupMenuItem(value: 'edit', child: Text('Editar Tarefa')),
+            const PopupMenuItem(value: 'delete', child: Text('Excluir Tarefa', style: TextStyle(color: Colors.redAccent))),
+          ],
+        ),
       ),
     );
   }
@@ -489,50 +950,12 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
     );
   }
 
-  void _showCreateTaskOrProjectMenu() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const CircleAvatar(
-                  backgroundColor: Color(0xFF10B981),
-                  child: Icon(Icons.check, color: Colors.white),
-                ),
-                title: const Text('Nova Tarefa', style: TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: const Text('Criar uma tarefa avulsa ou ministerial'),
-                onTap: () {
-                  Navigator.of(ctx).pop();
-                  _showCreateTaskModal();
-                },
-              ),
-              ListTile(
-                leading: const CircleAvatar(
-                  backgroundColor: Color(0xFF3B82F6),
-                  child: Icon(Icons.folder, color: Colors.white),
-                ),
-                title: const Text('Novo Projeto', style: TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: const Text('Criar um projeto para agrupar tarefas e notas'),
-                onTap: () {
-                  Navigator.of(ctx).pop();
-                  _showCreateProjectModal();
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+
 
   void _showCreateTaskModal() {
     final titleCtrl = TextEditingController();
     final descCtrl = TextEditingController();
+    final tagsCtrl = TextEditingController();
     String priority = 'normal';
     String category = 'ministry';
     String recurrence = 'none';
@@ -545,7 +968,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
       builder: (ctx, scroll) {
         return StatefulBuilder(
           builder: (ctx, setModalState) {
-            return Padding(
+            return SingleChildScrollView(
+              controller: scroll,
+              physics: const ClampingScrollPhysics(),
               padding: const EdgeInsets.all(20),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -557,10 +982,25 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
                     decoration: const InputDecoration(labelText: 'O que precisa ser feito?', border: OutlineInputBorder()),
                   ),
                   const SizedBox(height: 12),
+                  RichMarkdownToolbar(controller: descCtrl),
+                  const SizedBox(height: 6),
                   TextField(
                     controller: descCtrl,
-                    maxLines: 2,
-                    decoration: const InputDecoration(labelText: 'Descrição ou detalhes (opcional)', border: OutlineInputBorder()),
+                    maxLines: 3,
+                    decoration: const InputDecoration(
+                      labelText: 'Descrição ou detalhes (Markdown e imagens)',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: tagsCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Tags (separadas por vírgula)',
+                      hintText: 'ex: ministério, revisita, prioridade',
+                      prefixIcon: Icon(Icons.tag, size: 18),
+                      border: OutlineInputBorder(),
+                    ),
                   ),
                   const SizedBox(height: 12),
                   Row(
@@ -596,12 +1036,17 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
                   ),
                   const SizedBox(height: 12),
                   ListTile(
-                    title: Text(dueDate == null ? 'Definir Data de Vencimento' : 'Vencimento: ${_formatDate(dueDate!)}'),
-                    trailing: const Icon(Icons.calendar_today),
+                    title: Text(dueDate == null ? 'Definir Prazo / Vencimento (Opcional)' : 'Vencimento: ${_formatDate(dueDate!)}'),
+                    trailing: dueDate != null
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, size: 18),
+                            onPressed: () => setModalState(() => dueDate = null),
+                          )
+                        : const Icon(Icons.calendar_today),
                     onTap: () async {
                       final picked = await showDatePicker(
                         context: context,
-                        initialDate: DateTime.now(),
+                        initialDate: dueDate ?? DateTime.now(),
                         firstDate: DateTime.now().subtract(const Duration(days: 30)),
                         lastDate: DateTime.now().add(const Duration(days: 365)),
                       );
@@ -619,6 +1064,11 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
                       final title = titleCtrl.text.trim();
                       if (title.isEmpty) return;
                       final taskMgr = ref.read(taskManagerProvider);
+                      final tags = tagsCtrl.text
+                          .split(',')
+                          .map((e) => e.trim())
+                          .where((e) => e.isNotEmpty)
+                          .toList();
                       await taskMgr.createTask(
                         title: title,
                         description: descCtrl.text.trim().isNotEmpty ? descCtrl.text.trim() : null,
@@ -626,6 +1076,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
                         category: category,
                         recurrenceRule: recurrence,
                         dueDate: dueDate,
+                        tags: tags,
                       );
                       if (ctx.mounted) Navigator.of(ctx).pop();
                     },
@@ -640,9 +1091,174 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
     );
   }
 
+  void _showEditTaskModal(TaskEntry task) {
+    final titleCtrl = TextEditingController(text: task.title);
+    final descCtrl = TextEditingController(text: task.description ?? '');
+    final initialTags = _extractTags(task.metadata);
+    final tagsCtrl = TextEditingController(text: initialTags.join(', '));
+    String priority = task.priority;
+    String category = task.category;
+    String recurrence = task.recurrenceRule ?? 'none';
+    DateTime? dueDate = task.dueDate;
+
+    showAdaptiveMinistrySheet(
+      context: context,
+      title: 'Editar Tarefa',
+      titleLeading: const Icon(Icons.edit_note, color: AppTheme.primaryBlue),
+      builder: (ctx, scroll) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            return SingleChildScrollView(
+              controller: scroll,
+              physics: const ClampingScrollPhysics(),
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    controller: titleCtrl,
+                    decoration: const InputDecoration(labelText: 'O que precisa ser feito?', border: OutlineInputBorder()),
+                  ),
+                  const SizedBox(height: 12),
+                  RichMarkdownToolbar(controller: descCtrl),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: descCtrl,
+                    maxLines: 3,
+                    decoration: const InputDecoration(
+                      labelText: 'Descrição ou detalhes (Markdown e imagens)',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: tagsCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Tags (separadas por vírgula)',
+                      prefixIcon: Icon(Icons.tag, size: 18),
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          initialValue: priority,
+                          decoration: const InputDecoration(labelText: 'Prioridade', border: OutlineInputBorder()),
+                          items: const [
+                            DropdownMenuItem(value: 'low', child: Text('Baixa')),
+                            DropdownMenuItem(value: 'normal', child: Text('Normal')),
+                            DropdownMenuItem(value: 'high', child: Text('Alta')),
+                            DropdownMenuItem(value: 'urgent', child: Text('Urgente')),
+                          ],
+                          onChanged: (v) => setModalState(() => priority = v ?? 'normal'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          initialValue: ['none', 'daily', 'weekly', 'monthly'].contains(recurrence) ? recurrence : 'none',
+                          decoration: const InputDecoration(labelText: 'Recorrência', border: OutlineInputBorder()),
+                          items: const [
+                            DropdownMenuItem(value: 'none', child: Text('Nenhuma')),
+                            DropdownMenuItem(value: 'daily', child: Text('Diária')),
+                            DropdownMenuItem(value: 'weekly', child: Text('Semanal')),
+                            DropdownMenuItem(value: 'monthly', child: Text('Mensal')),
+                          ],
+                          onChanged: (v) => setModalState(() => recurrence = v ?? 'none'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  ListTile(
+                    title: Text(dueDate == null ? 'Definir Prazo / Vencimento (Opcional)' : 'Vencimento: ${_formatDate(dueDate!)}'),
+                    trailing: dueDate != null
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, size: 18),
+                            onPressed: () => setModalState(() => dueDate = null),
+                          )
+                        : const Icon(Icons.calendar_today),
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: dueDate ?? DateTime.now(),
+                        firstDate: DateTime.now().subtract(const Duration(days: 30)),
+                        lastDate: DateTime.now().add(const Duration(days: 365)),
+                      );
+                      if (picked != null) setModalState(() => dueDate = picked);
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryBlue,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    onPressed: () async {
+                      final title = titleCtrl.text.trim();
+                      if (title.isEmpty) return;
+                      final taskMgr = ref.read(taskManagerProvider);
+                      final tags = tagsCtrl.text
+                          .split(',')
+                          .map((e) => e.trim())
+                          .where((e) => e.isNotEmpty)
+                          .toList();
+                      await taskMgr.updateTask(
+                        task.id,
+                        title: title,
+                        description: descCtrl.text.trim().isNotEmpty ? descCtrl.text.trim() : null,
+                        priority: priority,
+                        category: category,
+                        recurrenceRule: recurrence,
+                        dueDate: dueDate,
+                        tags: tags,
+                      );
+                      if (ctx.mounted) Navigator.of(ctx).pop();
+                    },
+                    child: const Text('Salvar Alterações', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _confirmDeleteTask(TaskEntry task) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Excluir Tarefa'),
+        content: Text('Tem certeza que deseja excluir "${task.title}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+            onPressed: () async {
+              final taskMgr = ref.read(taskManagerProvider);
+              await taskMgr.softDeleteTask(task.id);
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('Excluir'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showCreateProjectModal() {
     final nameCtrl = TextEditingController();
     final objCtrl = TextEditingController();
+    final tagsCtrl = TextEditingController();
     String category = 'ministry';
     DateTime? targetDate;
 
@@ -653,7 +1269,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
       builder: (ctx, scroll) {
         return StatefulBuilder(
           builder: (ctx, setModalState) {
-            return Padding(
+            return SingleChildScrollView(
+              controller: scroll,
+              physics: const ClampingScrollPhysics(),
               padding: const EdgeInsets.all(20),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -665,9 +1283,22 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
                     decoration: const InputDecoration(labelText: 'Nome do Projeto', border: OutlineInputBorder()),
                   ),
                   const SizedBox(height: 12),
+                  RichMarkdownToolbar(controller: objCtrl),
+                  const SizedBox(height: 6),
                   TextField(
                     controller: objCtrl,
-                    decoration: const InputDecoration(labelText: 'Objetivo Principal', border: OutlineInputBorder()),
+                    maxLines: 3,
+                    decoration: const InputDecoration(labelText: 'Objetivo Principal (Markdown e imagens)', border: OutlineInputBorder()),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: tagsCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Tags (separadas por vírgula)',
+                      hintText: 'ex: pioneiro, alvo, congregação',
+                      prefixIcon: Icon(Icons.tag, size: 18),
+                      border: OutlineInputBorder(),
+                    ),
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
@@ -682,12 +1313,17 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
                   ),
                   const SizedBox(height: 12),
                   ListTile(
-                    title: Text(targetDate == null ? 'Definir Data Alvo / Meta' : 'Meta: ${_formatDate(targetDate!)}'),
-                    trailing: const Icon(Icons.flag_outlined),
+                    title: Text(targetDate == null ? 'Definir Prazo / Meta (Opcional)' : 'Meta: ${_formatDate(targetDate!)}'),
+                    trailing: targetDate != null
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, size: 18),
+                            onPressed: () => setModalState(() => targetDate = null),
+                          )
+                        : const Icon(Icons.flag_outlined),
                     onTap: () async {
                       final picked = await showDatePicker(
                         context: context,
-                        initialDate: DateTime.now().add(const Duration(days: 30)),
+                        initialDate: targetDate ?? DateTime.now().add(const Duration(days: 30)),
                         firstDate: DateTime.now(),
                         lastDate: DateTime.now().add(const Duration(days: 730)),
                       );
@@ -705,11 +1341,17 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
                       final name = nameCtrl.text.trim();
                       if (name.isEmpty) return;
                       final projMgr = ref.read(projectManagerProvider);
+                      final tags = tagsCtrl.text
+                          .split(',')
+                          .map((e) => e.trim())
+                          .where((e) => e.isNotEmpty)
+                          .toList();
                       await projMgr.createProject(
                         name: name,
                         objective: objCtrl.text.trim().isNotEmpty ? objCtrl.text.trim() : null,
                         category: category,
                         targetDate: targetDate,
+                        tags: tags,
                       );
                       if (ctx.mounted) Navigator.of(ctx).pop();
                     },
@@ -721,6 +1363,163 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
           },
         );
       },
+    );
+  }
+
+  void _showEditProjectModal(ProjectEntry project) {
+    final nameCtrl = TextEditingController(text: project.name);
+    final objCtrl = TextEditingController(text: project.objective ?? '');
+    final initialTags = _extractTags(project.metadata);
+    final tagsCtrl = TextEditingController(text: initialTags.join(', '));
+    String category = project.category;
+    DateTime? targetDate = project.targetDate;
+
+    showAdaptiveMinistrySheet(
+      context: context,
+      title: 'Editar Projeto',
+      titleLeading: const Icon(Icons.edit_note, color: Color(0xFF3B82F6)),
+      builder: (ctx, scroll) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            return SingleChildScrollView(
+              controller: scroll,
+              physics: const ClampingScrollPhysics(),
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    controller: nameCtrl,
+                    decoration: const InputDecoration(labelText: 'Nome do Projeto', border: OutlineInputBorder()),
+                  ),
+                  const SizedBox(height: 12),
+                  RichMarkdownToolbar(controller: objCtrl),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: objCtrl,
+                    maxLines: 3,
+                    decoration: const InputDecoration(labelText: 'Objetivo Principal (Markdown e imagens)', border: OutlineInputBorder()),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: tagsCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Tags (separadas por vírgula)',
+                      prefixIcon: Icon(Icons.tag, size: 18),
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    initialValue: ['ministry', 'personal', 'study'].contains(category) ? category : 'ministry',
+                    decoration: const InputDecoration(labelText: 'Categoria', border: OutlineInputBorder()),
+                    items: const [
+                      DropdownMenuItem(value: 'ministry', child: Text('Ministério')),
+                      DropdownMenuItem(value: 'personal', child: Text('Pessoal')),
+                      DropdownMenuItem(value: 'study', child: Text('Estudo')),
+                    ],
+                    onChanged: (v) => setModalState(() => category = v ?? 'ministry'),
+                  ),
+                  const SizedBox(height: 12),
+                  ListTile(
+                    title: Text(targetDate == null ? 'Definir Prazo / Meta (Opcional)' : 'Meta: ${_formatDate(targetDate!)}'),
+                    trailing: targetDate != null
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, size: 18),
+                            onPressed: () => setModalState(() => targetDate = null),
+                          )
+                        : const Icon(Icons.flag_outlined),
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: targetDate ?? DateTime.now().add(const Duration(days: 30)),
+                        firstDate: DateTime.now(),
+                        lastDate: DateTime.now().add(const Duration(days: 730)),
+                      );
+                      if (picked != null) setModalState(() => targetDate = picked);
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF3B82F6),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    onPressed: () async {
+                      final name = nameCtrl.text.trim();
+                      if (name.isEmpty) return;
+                      final projMgr = ref.read(projectManagerProvider);
+                      final tags = tagsCtrl.text
+                          .split(',')
+                          .map((e) => e.trim())
+                          .where((e) => e.isNotEmpty)
+                          .toList();
+                      await projMgr.updateProject(
+                        project.id,
+                        name: name,
+                        objective: objCtrl.text.trim().isNotEmpty ? objCtrl.text.trim() : null,
+                        category: category,
+                        targetDate: targetDate,
+                        tags: tags,
+                      );
+                      if (ctx.mounted) Navigator.of(ctx).pop();
+                    },
+                    child: const Text('Salvar Alterações', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _confirmDeleteProject(ProjectEntry project) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Excluir Projeto'),
+        content: Text('Tem certeza que deseja excluir "${project.name}"? As tarefas vinculadas serão preservadas.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+            onPressed: () async {
+              final projMgr = ref.read(projectManagerProvider);
+              await projMgr.softDeleteProject(project.id);
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('Excluir'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabAwareFab() {
+    if (_tabController.index == 2) {
+      return FloatingActionButton.extended(
+        heroTag: 'fab_tasks_proj',
+        onPressed: _showCreateProjectModal,
+        backgroundColor: const Color(0xFF3B82F6),
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.create_new_folder),
+        label: const Text('Novo Projeto', style: TextStyle(fontWeight: FontWeight.bold)),
+      );
+    }
+    return FloatingActionButton.extended(
+      heroTag: 'fab_tasks_task',
+      onPressed: _showCreateTaskModal,
+      backgroundColor: AppTheme.primaryBlue,
+      foregroundColor: Colors.white,
+      icon: const Icon(Icons.add_task),
+      label: const Text('Nova Tarefa', style: TextStyle(fontWeight: FontWeight.bold)),
     );
   }
 

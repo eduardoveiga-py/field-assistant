@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../database/app_database.dart';
@@ -41,7 +42,41 @@ final languagesStreamProvider = StreamProvider<List<AppLanguageEntry>>((ref) {
 
 class ActiveLanguageNotifier extends Notifier<AppLanguageEntry?> {
   @override
-  AppLanguageEntry? build() => null;
+  AppLanguageEntry? build() {
+    _loadPersisted();
+    return null;
+  }
+
+  Future<void> _loadPersisted() async {
+    try {
+      final db = ref.read(databaseProvider);
+      final row = await (db.select(db.appKvStore)
+            ..where((t) => t.key.equals('active_language_code')))
+          .getSingleOrNull();
+      if (row != null && row.value.isNotEmpty) {
+        final lang = await (db.select(db.appLanguages)
+              ..where((t) => t.id.equals(row.value) | t.code.equals(row.value)))
+            .getSingleOrNull();
+        if (lang != null) {
+          state = lang;
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> selectLanguage(AppLanguageEntry lang) async {
+    state = lang;
+    try {
+      final db = ref.read(databaseProvider);
+      await db.into(db.appKvStore).insertOnConflictUpdate(
+            AppKvStoreCompanion.insert(
+              key: 'active_language_code',
+              value: lang.id,
+              updatedAt: Value(DateTime.now()),
+            ),
+          );
+    } catch (_) {}
+  }
 
   @override
   set state(AppLanguageEntry? value) => super.state = value;

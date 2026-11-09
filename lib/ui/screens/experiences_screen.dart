@@ -9,6 +9,9 @@ import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../../experiences/experience_manager.dart';
 import '../../media/media_picker_helper.dart';
+import '../widgets/knowledge_item_reader_dialog.dart';
+import '../widgets/rich_markdown_toolbar.dart';
+import '../widgets/universal_attachment_viewer.dart';
 
 class ExperiencesScreen extends ConsumerStatefulWidget {
   const ExperiencesScreen({super.key});
@@ -310,10 +313,12 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
                               },
                             ),
                             const SizedBox(height: 12),
+                            RichMarkdownToolbar(controller: contentController),
+                            const SizedBox(height: 6),
                             TextField(
                               controller: contentController,
                               decoration: const InputDecoration(
-                                labelText: 'Relato da Experiência *',
+                                labelText: 'Relato da Experiência * (Markdown e imagens)',
                                 hintText: 'Escreva como foi o contato, reações, textos bíblicos usados e lições aprendidas...',
                               ),
                               maxLines: 5,
@@ -713,8 +718,26 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
 
                       return Card(
                         margin: const EdgeInsets.only(bottom: 12),
-                        child: Padding(
-                          padding: const EdgeInsets.all(14),
+                        clipBehavior: Clip.antiAlias,
+                        child: InkWell(
+                          onTap: () {
+                            showKnowledgeItemReader(
+                              context,
+                              title: exp.title,
+                              content: exp.content,
+                              category: exp.locationOrModality ?? 'Ministério',
+                              itemType: 'Experiência',
+                              tags: exp.tags,
+                              updatedAt: exp.dateTime,
+                              onEdit: () => _showAddEditExperienceModal(context, existing: exp),
+                              onDelete: () async {
+                                final mgr = ref.read(experienceManagerProvider);
+                                await mgr.deleteExperience(exp.id);
+                              },
+                            );
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.all(14),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -825,6 +848,8 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
                               const SizedBox(height: 10),
                               Text(
                                 exp.content,
+                                maxLines: 4,
+                                overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   fontSize: 13,
                                   height: 1.4,
@@ -846,10 +871,11 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
                                       final img = exp.mediaUrls[i];
                                       return GestureDetector(
                                         onTap: () =>
-                                            MediaPickerHelper.showFullScreenImage(
+                                            showUniversalAttachmentViewer(
                                               context,
-                                              imageSource: img,
+                                              filePath: img,
                                               title: exp.title,
+                                              fileType: 'image',
                                             ),
                                         child: Container(
                                           margin: const EdgeInsets.only(
@@ -946,6 +972,7 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
                               ),
                             ],
                           ),
+                        ),
                         ),
                       );
                     },

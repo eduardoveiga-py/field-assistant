@@ -1295,193 +1295,25 @@ class TodayScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 16),
 
-            // Atalhos rápidos com transparência (Glassmorphism) e imagens temáticas no topo
-            Row(
-              children: [
-                Expanded(
-                  child: _QuickActionButton(
-                    icon: Icons.person_add_alt_1,
-                    label: 'Nova Pessoa',
-                    themeType: _CardArtworkTheme.newPerson,
-                    color: isDark
-                        ? const Color(0xFF60A5FA)
-                        : AppTheme.primaryBlue,
-                    onTap: () => showAddPersonDialog(context, ref),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _QuickActionButton(
-                    icon: Icons.repeat,
-                    label: 'Revisitas',
-                    themeType: _CardArtworkTheme.returnVisits,
-                    color: AppTheme.accentTeal,
-                    onTap: () {
-                      ref.read(peopleFilterProvider.notifier).state = 'Revisitas';
-                      _navigateTo(AppFeature.people);
-                    },
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _QuickActionButton(
-                    icon: Icons.menu_book,
-                    label: 'Estudos',
-                    themeType: _CardArtworkTheme.bibleStudies,
-                    color: const Color(0xFFA78BFA),
-                    onTap: () => _navigateTo(AppFeature.studies),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _QuickActionButton(
-                    icon: Icons.timer,
-                    label: 'Atividade',
-                    themeType: _CardArtworkTheme.activityTimer,
-                    color: const Color(0xFF34D399),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const ActivitiesScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
+            // Atalhos rápidos organizados e compactos (Categorias: Principais, Ministério, Produtividade, Todos)
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildShortcutPill(context, ref, 'principais', '⭐ Principais', Icons.star_rounded, isDark),
+                  const SizedBox(width: 8),
+                  _buildShortcutPill(context, ref, 'ministerio', '🏛️ Ministério', Icons.menu_book_rounded, isDark),
+                  const SizedBox(width: 8),
+                  _buildShortcutPill(context, ref, 'produtividade', '⚡ Produtividade', Icons.bolt_rounded, isDark),
+                  const SizedBox(width: 8),
+                  _buildShortcutPill(context, ref, 'todos', '📋 Todos (13)', Icons.grid_view_rounded, isDark),
+                ],
+              ),
             ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: _QuickActionButton(
-                    icon: Icons.phone_forwarded,
-                    label: 'Telefones',
-                    themeType: _CardArtworkTheme.phones,
-                    color: const Color(0xFF38BDF8),
-                    onTap: () => _navigateTo(AppFeature.phones),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _QuickActionButton(
-                    icon: Icons.auto_stories,
-                    label: 'Experiências',
-                    themeType: _CardArtworkTheme.experiences,
-                    color: const Color(0xFFFBBF24),
-                    onTap: () => _navigateTo(AppFeature.experiences),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _QuickActionButton(
-                    icon: Icons.note_alt_outlined,
-                    label: 'Anotações',
-                    themeType: _CardArtworkTheme.notes,
-                    color: const Color(0xFF94A3B8),
-                    onTap: () => _navigateTo(AppFeature.notesResearch),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _QuickActionButton(
-                    icon: Icons.analytics,
-                    label: 'Estatísticas',
-                    themeType: _CardArtworkTheme.statistics,
-                    color: const Color(0xFF818CF8),
-                    onTap: () => _navigateTo(AppFeature.dashboard),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: _QuickActionButton(
-                    icon: Icons.map_outlined,
-                    label: '🗺️ Mapa / Pinar',
-                    themeType: _CardArtworkTheme.territoryMap,
-                    color: const Color(0xFF2DD4BF),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const ContactsMapScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _QuickActionButton(
-                    icon: Icons.public,
-                    label: '🌍 Estrangeiro',
-                    themeType: _CardArtworkTheme.foreignContact,
-                    color: const Color(0xFF60A5FA),
-                    onTap: () => _showAddForeignContactDialog(context, ref),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: _QuickActionButton(
-                    icon: Icons.all_inbox_rounded,
-                    label: 'Inbox',
-                    themeType: _CardArtworkTheme.notes,
-                    color: const Color(0xFF3B82F6),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const InboxScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _QuickActionButton(
-                    icon: Icons.task_alt_rounded,
-                    label: 'Tarefas',
-                    themeType: _CardArtworkTheme.activityTimer,
-                    color: const Color(0xFF10B981),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const TasksScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _QuickActionButton(
-                    icon: Icons.menu_book_rounded,
-                    label: 'Conhecimento',
-                    themeType: _CardArtworkTheme.bibleStudies,
-                    color: const Color(0xFF8B5CF6),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const KnowledgeBaseScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 12),
+
+            _buildCompactShortcutsGrid(context, ref, isDark),
+            const SizedBox(height: 20),
 
             // SEÇÃO: Bairros / Setores do Território
             Row(
@@ -1850,6 +1682,283 @@ class TodayScreen extends ConsumerWidget {
       ),
     );
   }
+
+  Widget _buildShortcutPill(
+    BuildContext context,
+    WidgetRef ref,
+    String key,
+    String label,
+    IconData icon,
+    bool isDark,
+  ) {
+    final current = ref.watch(todayShortcutsCategoryProvider);
+    final isSelected = current == key;
+
+    return ChoiceChip(
+      avatar: Icon(
+        icon,
+        size: 14,
+        color: isSelected ? Colors.white : AppTheme.primaryBlue,
+      ),
+      label: Text(label),
+      selected: isSelected,
+      selectedColor: AppTheme.primaryBlue,
+      labelStyle: TextStyle(
+        color: isSelected ? Colors.white : (isDark ? const Color(0xFFCBD5E1) : AppTheme.textDark),
+        fontSize: 12,
+        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+      ),
+      onSelected: (_) {
+        ref.read(todayShortcutsCategoryProvider.notifier).state = key;
+      },
+    );
+  }
+
+  Widget _buildCompactShortcutsGrid(BuildContext context, WidgetRef ref, bool isDark) {
+    final category = ref.watch(todayShortcutsCategoryProvider);
+
+    final btnNovaPessoa = _QuickActionButton(
+      icon: Icons.person_add_alt_1,
+      label: 'Nova Pessoa',
+      themeType: _CardArtworkTheme.newPerson,
+      color: isDark ? const Color(0xFF60A5FA) : AppTheme.primaryBlue,
+      onTap: () => showAddPersonDialog(context, ref),
+    );
+    final btnRevisitas = _QuickActionButton(
+      icon: Icons.repeat,
+      label: 'Revisitas',
+      themeType: _CardArtworkTheme.returnVisits,
+      color: AppTheme.accentTeal,
+      onTap: () {
+        ref.read(peopleFilterProvider.notifier).state = 'Revisitas';
+        _navigateTo(AppFeature.people);
+      },
+    );
+    final btnEstudos = _QuickActionButton(
+      icon: Icons.menu_book,
+      label: 'Estudos',
+      themeType: _CardArtworkTheme.bibleStudies,
+      color: const Color(0xFFA78BFA),
+      onTap: () => _navigateTo(AppFeature.studies),
+    );
+    final btnAtividade = _QuickActionButton(
+      icon: Icons.timer,
+      label: 'Atividade',
+      themeType: _CardArtworkTheme.activityTimer,
+      color: const Color(0xFF34D399),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ActivitiesScreen()),
+        );
+      },
+    );
+    final btnMapa = _QuickActionButton(
+      icon: Icons.map_outlined,
+      label: '🗺️ Mapa / Pinar',
+      themeType: _CardArtworkTheme.territoryMap,
+      color: const Color(0xFF2DD4BF),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ContactsMapScreen()),
+        );
+      },
+    );
+    final btnInbox = _QuickActionButton(
+      icon: Icons.all_inbox_rounded,
+      label: 'Inbox',
+      themeType: _CardArtworkTheme.notes,
+      color: const Color(0xFF3B82F6),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const InboxScreen()),
+        );
+      },
+    );
+    final btnTarefas = _QuickActionButton(
+      icon: Icons.task_alt_rounded,
+      label: 'Tarefas',
+      themeType: _CardArtworkTheme.activityTimer,
+      color: const Color(0xFF10B981),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const TasksScreen()),
+        );
+      },
+    );
+    final btnConhecimento = _QuickActionButton(
+      icon: Icons.menu_book_rounded,
+      label: 'Conhecimento',
+      themeType: _CardArtworkTheme.bibleStudies,
+      color: const Color(0xFF8B5CF6),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const KnowledgeBaseScreen()),
+        );
+      },
+    );
+    final btnTelefones = _QuickActionButton(
+      icon: Icons.phone_forwarded,
+      label: 'Telefones',
+      themeType: _CardArtworkTheme.phones,
+      color: const Color(0xFF38BDF8),
+      onTap: () => _navigateTo(AppFeature.phones),
+    );
+    final btnExperiencias = _QuickActionButton(
+      icon: Icons.auto_stories,
+      label: 'Experiências',
+      themeType: _CardArtworkTheme.experiences,
+      color: const Color(0xFFFBBF24),
+      onTap: () => _navigateTo(AppFeature.experiences),
+    );
+    final btnAnotacoes = _QuickActionButton(
+      icon: Icons.note_alt_outlined,
+      label: 'Anotações',
+      themeType: _CardArtworkTheme.notes,
+      color: const Color(0xFF94A3B8),
+      onTap: () => _navigateTo(AppFeature.notesResearch),
+    );
+    final btnEstatisticas = _QuickActionButton(
+      icon: Icons.analytics,
+      label: 'Estatísticas',
+      themeType: _CardArtworkTheme.statistics,
+      color: const Color(0xFF818CF8),
+      onTap: () => _navigateTo(AppFeature.dashboard),
+    );
+    final btnEstrangeiro = _QuickActionButton(
+      icon: Icons.public,
+      label: '🌍 Estrangeiro',
+      themeType: _CardArtworkTheme.foreignContact,
+      color: const Color(0xFF60A5FA),
+      onTap: () => _showAddForeignContactDialog(context, ref),
+    );
+
+    if (category == 'ministerio') {
+      return Column(
+        children: [
+          Row(
+            children: [
+              Expanded(child: btnNovaPessoa),
+              const SizedBox(width: 8),
+              Expanded(child: btnRevisitas),
+              const SizedBox(width: 8),
+              Expanded(child: btnEstudos),
+              const SizedBox(width: 8),
+              Expanded(child: btnAtividade),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(child: btnMapa),
+              const SizedBox(width: 8),
+              Expanded(child: btnEstrangeiro),
+              const SizedBox(width: 8),
+              Expanded(child: btnTelefones),
+              const SizedBox(width: 8),
+              Expanded(child: btnExperiencias),
+            ],
+          ),
+        ],
+      );
+    }
+
+    if (category == 'produtividade') {
+      return Row(
+        children: [
+          Expanded(child: btnInbox),
+          const SizedBox(width: 8),
+          Expanded(child: btnTarefas),
+          const SizedBox(width: 8),
+          Expanded(child: btnConhecimento),
+          const SizedBox(width: 8),
+          Expanded(child: btnAnotacoes),
+        ],
+      );
+    }
+
+    if (category == 'todos') {
+      return Column(
+        children: [
+          Row(
+            children: [
+              Expanded(child: btnNovaPessoa),
+              const SizedBox(width: 8),
+              Expanded(child: btnRevisitas),
+              const SizedBox(width: 8),
+              Expanded(child: btnEstudos),
+              const SizedBox(width: 8),
+              Expanded(child: btnAtividade),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(child: btnMapa),
+              const SizedBox(width: 8),
+              Expanded(child: btnInbox),
+              const SizedBox(width: 8),
+              Expanded(child: btnTarefas),
+              const SizedBox(width: 8),
+              Expanded(child: btnConhecimento),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(child: btnTelefones),
+              const SizedBox(width: 8),
+              Expanded(child: btnExperiencias),
+              const SizedBox(width: 8),
+              Expanded(child: btnAnotacoes),
+              const SizedBox(width: 8),
+              Expanded(child: btnEstatisticas),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(child: btnEstrangeiro),
+              const Spacer(flex: 3),
+            ],
+          ),
+        ],
+      );
+    }
+
+    // Padrão: 'principais' (2 linhas compactas que economizam 60% da tela vertical)
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(child: btnNovaPessoa),
+            const SizedBox(width: 8),
+            Expanded(child: btnRevisitas),
+            const SizedBox(width: 8),
+            Expanded(child: btnEstudos),
+            const SizedBox(width: 8),
+            Expanded(child: btnMapa),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(child: btnInbox),
+            const SizedBox(width: 8),
+            Expanded(child: btnTarefas),
+            const SizedBox(width: 8),
+            Expanded(child: btnConhecimento),
+            const SizedBox(width: 8),
+            Expanded(child: btnAtividade),
+          ],
+        ),
+      ],
+    );
+  }
 }
 
 enum _CardArtworkTheme {
@@ -1885,47 +1994,48 @@ class _QuickActionButton extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(14),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
         child: Material(
           color: Colors.transparent,
           child: InkWell(
             onTap: onTap,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(14),
             splashColor: color.withValues(alpha: 0.2),
             highlightColor: color.withValues(alpha: 0.1),
             child: Container(
+              constraints: const BoxConstraints(minHeight: 52),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    color.withValues(alpha: isDark ? 0.18 : 0.14),
+                    color.withValues(alpha: isDark ? 0.16 : 0.12),
                     isDark
                         ? const Color(0xFF0F172A).withValues(alpha: 0.72)
-                        : Colors.white.withValues(alpha: 0.88),
+                        : Colors.white.withValues(alpha: 0.90),
                   ],
                 ),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: color.withValues(alpha: isDark ? 0.38 : 0.32),
+                  color: color.withValues(alpha: isDark ? 0.38 : 0.30),
                   width: 1.1,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: color.withValues(alpha: isDark ? 0.12 : 0.08),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6),
+                    color: color.withValues(alpha: isDark ? 0.08 : 0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
                   ),
                 ],
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Imagem / Ilustração transparente no topo de cada card baseada na função
+                  // Ilustração transparente compacta
                   SizedBox(
-                    height: 54,
+                    height: 32,
                     width: double.infinity,
                     child: Stack(
                       fit: StackFit.expand,
@@ -1936,48 +2046,25 @@ class _QuickActionButton extends StatelessWidget {
                             themeType: themeType,
                           ),
                         ),
-                        // Gradiente translúcido suavizando a base da imagem do topo
-                        DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                color.withValues(alpha: 0.06),
-                                (isDark
-                                        ? const Color(0xFF0F172A)
-                                        : Colors.white)
-                                    .withValues(alpha: 0.55),
-                              ],
-                            ),
-                          ),
-                        ),
-                        // Ícone principal centralizado com halo translúcido
                         Center(
                           child: Container(
-                            padding: const EdgeInsets.all(8),
+                            padding: const EdgeInsets.all(5),
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               color: color.withValues(alpha: 0.18),
                               border: Border.all(
-                                color: color.withValues(alpha: 0.45),
+                                color: color.withValues(alpha: 0.40),
                                 width: 1,
                               ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: color.withValues(alpha: 0.28),
-                                  blurRadius: 12,
-                                ),
-                              ],
                             ),
-                            child: Icon(icon, color: color, size: 22),
+                            child: Icon(icon, color: color, size: 17),
                           ),
                         ),
                       ],
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(6, 6, 6, 12),
+                    padding: const EdgeInsets.fromLTRB(4, 2, 4, 6),
                     child: Text(
                       label,
                       textAlign: TextAlign.center,
@@ -1985,8 +2072,8 @@ class _QuickActionButton extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: 12.5,
-                        letterSpacing: 0.2,
+                        fontSize: 11.5,
+                        letterSpacing: 0.1,
                         color: color,
                       ),
                     ),
