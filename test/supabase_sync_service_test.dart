@@ -968,5 +968,113 @@ void main() {
       expect(deleted, isTrue);
       expect(deleteCalled, isTrue);
     });
+
+    test('TC-SYNC-KNOWLEDGE-DOC-01: Sincronização de knowledge_documents realiza upload e download no bucket knowledge_vault', () async {
+      final tempDir = Directory.systemTemp.createTempSync('sync_kdoc_test_');
+      addTearDown(() => tempDir.deleteSync(recursive: true));
+
+      bool uploadCalled = false;
+      bool downloadCalled = false;
+
+      final mockClient = MockHttpClient((request) async {
+        final uri = request.url.toString();
+
+        if (uri.contains('/storage/v1/object/knowledge_vault')) {
+          if (request.method == 'POST') {
+            uploadCalled = true;
+            return http.Response(jsonEncode({'Key': 'knowledge_vault/test_doc.pdf'}), 200, headers: {'content-type': 'application/json'});
+          }
+          if (request.method == 'GET') {
+            downloadCalled = true;
+            return http.Response.bytes(utf8.encode('%PDF-1.4 Mock Content'), 200, headers: {'content-type': 'application/pdf'});
+          }
+        }
+
+        if (request.method == 'POST' && uri.contains('/rest/v1/knowledge_documents')) {
+          return mockJsonResponse(request, []);
+        }
+
+        if (request.method == 'GET' && uri.contains('/rest/v1/knowledge_documents')) {
+          return mockJsonResponse(request, [
+            {
+              'id': 'remote_doc_1',
+              'title': 'Manual Teocrático',
+              'file_name': 'manual.pdf',
+              'file_type': 'pdf',
+              'file_size': 1024,
+              'file_path': 'manual.pdf',
+              'category': 'manual',
+              'tags': '[]',
+              'created_at': DateTime.now().toIso8601String(),
+              'updated_at': DateTime.now().toIso8601String(),
+            }
+          ], contentRange: '0-0/1');
+        }
+        return mockJsonResponse(request, []);
+      });
+
+      final customSync = SupabaseSyncService(
+        db: db,
+        repository: repo,
+        clientOverride: SupabaseClient(
+          'https://mock.supabase.co',
+          'dummy-key-xyz',
+          httpClient: mockClient,
+        ),
+        documentsDirectoryProvider: () async => tempDir.path,
+      );
+
+      // 1. Testa upload no pushSync criando um documento local com arquivo físico
+      final localFile = File('${tempDir.path}/local_test.pdf');
+      localFile.writeAsStringSync('Local PDF bytes');
+
+      await db.into(db.knowledgeDocuments).insert(
+        KnowledgeDocumentsCompanion.insert(
+          id: 'local_doc_1',
+          title: 'Meu Estudo',
+          fileName: 'local_test.pdf',
+          fileType: 'pdf',
+          fileSize: 100,
+          filePath: localFile.path,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+      );
+
+      await db.into(db.syncQueue).insert(
+        SyncQueueCompanion.insert(
+          id: 'op_doc_1',
+          entityType: 'knowledge_documents',
+          entityId: 'local_doc_1',
+          operation: 'INSERT',
+          payload: jsonEncode({
+            'id': 'local_doc_1',
+            'title': 'Meu Estudo',
+            'file_name': 'local_test.pdf',
+            'file_type': 'pdf',
+            'file_size': 100,
+            'file_path': localFile.path,
+            'category': 'general',
+            'tags': '[]',
+            'created_at': DateTime.now().toIso8601String(),
+            'updated_at': DateTime.now().toIso8601String(),
+          }),
+          createdAt: DateTime.now(),
+        ),
+      );
+
+      final pushRes = await customSync.processSyncQueue();
+      expect(pushRes.successCount, equals(1));
+      expect(uploadCalled, isTrue);
+
+      // 2. Testa download no fetchRemoteChanges (pullSync)
+      final pullRes = await customSync.fetchRemoteChanges();
+      expect(pullRes.successCount, greaterThanOrEqualTo(1));
+      expect(downloadCalled, isTrue);
+
+      // Verifica que o arquivo baixado foi gravado no diretório de documentos local
+      final downloadedDoc = await (db.select(db.knowledgeDocuments)..where((t) => t.id.equals('remote_doc_1'))).getSingle();
+      expect(File(downloadedDoc.filePath).existsSync(), isTrue);
+    });
   });
 }

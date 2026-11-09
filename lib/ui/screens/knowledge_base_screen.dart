@@ -1934,7 +1934,7 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
         }
 
         final km = ref.read(knowledgeManagerProvider);
-        await km.registerDocument(
+        final registeredDoc = await km.registerDocument(
           title: f.name.split('.').first,
           fileName: f.name,
           filePath: finalPath,
@@ -1942,6 +1942,19 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
           fileType: f.extension ?? 'other',
           category: 'manual',
         );
+
+        if (fileBytes != null && fileBytes.isNotEmpty) {
+          try {
+            final appDb = ref.read(databaseProvider);
+            await appDb.into(appDb.appKvStore).insertOnConflictUpdate(
+                  AppKvStoreCompanion.insert(
+                    key: 'doc_bytes_${registeredDoc.id}',
+                    value: base64Encode(fileBytes),
+                    updatedAt: drift.Value(DateTime.now()),
+                  ),
+                );
+          } catch (_) {}
+        }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Documento registrado na Base de Conhecimento!')),
@@ -2074,6 +2087,18 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
               break;
             }
           }
+        }
+      } catch (_) {}
+    }
+
+    if (resolvedBytes == null || resolvedBytes.isEmpty) {
+      try {
+        final appDb = ref.read(databaseProvider);
+        final kv = await (appDb.select(appDb.appKvStore)
+              ..where((t) => t.key.equals('doc_bytes_${doc.id}')))
+            .getSingleOrNull();
+        if (kv != null && kv.value.isNotEmpty) {
+          resolvedBytes = base64Decode(kv.value);
         }
       } catch (_) {}
     }

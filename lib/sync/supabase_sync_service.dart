@@ -5,6 +5,7 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:drift/drift.dart' as drift;
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -1394,6 +1395,173 @@ class SupabaseSyncService {
     }
   }
 
+  /// Realiza o upload do arquivo binário de um documento para o bucket privado knowledge_vault
+  Future<bool> _uploadKnowledgeDocument(
+    String id,
+    SupabaseClient client,
+    List<String> errors,
+  ) async {
+    try {
+      final doc = await (db.select(
+        db.knowledgeDocuments,
+      )..where((t) => t.id.equals(id))).getSingleOrNull();
+      if (doc == null) return true;
+
+      Uint8List? bytes;
+
+      // 1. Tenta carregar do disco físico (iOS, Android, Windows)
+      if (!kIsWeb && doc.filePath.isNotEmpty) {
+        final direct = File(doc.filePath);
+        if (await direct.exists()) {
+          try {
+            bytes = await direct.readAsBytes();
+          } catch (_) {}
+        } else {
+          final docsDir = documentsDirectoryProvider != null
+              ? await documentsDirectoryProvider!()
+              : (await getApplicationDocumentsDirectory()).path;
+          final candidates = [
+            File(p.join(docsDir, 'documents', doc.fileName)),
+            File(p.join(docsDir, doc.fileName)),
+          ];
+          for (final c in candidates) {
+            if (await c.exists()) {
+              try {
+                bytes = await c.readAsBytes();
+                break;
+              } catch (_) {}
+            }
+          }
+        }
+      }
+
+      // 2. Se for Web ou não achou no disco, busca no AppKvStore (cache de bytes)
+      if (bytes == null || bytes.isEmpty) {
+        final kv = await (db.select(db.appKvStore)
+              ..where((t) => t.key.equals('doc_bytes_$id')))
+            .getSingleOrNull();
+        if (kv != null && kv.value.isNotEmpty) {
+          try {
+            bytes = base64Decode(kv.value);
+          } catch (_) {}
+        }
+      }
+
+      if (bytes != null && bytes.isNotEmpty) {
+        final userFolder = _resolveStorageFolder(client);
+        final extension = doc.fileType.isNotEmpty ? doc.fileType.replaceAll('.', '') : 'pdf';
+        final storageFileName = '$id.$extension';
+        final storagePath = '$userFolder/$storageFileName';
+
+        await client.storage.from('knowledge_vault').uploadBinary(
+              storagePath,
+              bytes,
+              fileOptions: const FileOptions(upsert: true),
+            );
+        return true;
+      }
+      return true;
+    } catch (e) {
+      errors.add('Erro no upload de documento para knowledge_vault ($id): $e');
+      return false;
+    }
+  }
+
+  /// Realiza o download do arquivo binário do knowledge_vault e salva no armazenamento local
+  Future<bool> _downloadKnowledgeDocument(
+    String id,
+    SupabaseClient client,
+  ) async {
+    try {
+      final doc = await (db.select(
+        db.knowledgeDocuments,
+      )..where((t) => t.id.equals(id))).getSingleOrNull();
+      if (doc == null) return false;
+
+      final userFolder = _resolveStorageFolder(client);
+      final extension = doc.fileType.isNotEmpty ? doc.fileType.replaceAll('.', '') : 'pdf';
+      final storageFileName = '$id.$extension';
+      final storagePath = '$userFolder/$storageFileName';
+
+      Uint8List? bytes;
+      try {
+        bytes = await client.storage.from('knowledge_vault').download(storagePath);
+      } catch (_) {
+        try {
+          bytes = await client.storage.from('knowledge_vault').download(storageFileName);
+        } catch (_) {}
+      }
+
+      if (bytes != null && bytes.isNotEmpty) {
+        if (!kIsWeb) {
+          final docsDir = documentsDirectoryProvider != null
+              ? await documentsDirectoryProvider!()
+              : (await getApplicationDocumentsDirectory()).path;
+          final targetFolder = Directory(p.join(docsDir, 'documents'));
+          if (!await targetFolder.exists()) {
+            await targetFolder.create(recursive: true);
+          }
+          final safeName = doc.fileName.isNotEmpty ? doc.fileName : storageFileName;
+          final localFilePath = p.join(targetFolder.path, safeName);
+          final file = File(localFilePath);
+          await file.writeAsBytes(bytes, flush: true);
+
+          await (db.update(db.knowledgeDocuments)..where((t) => t.id.equals(id))).write(
+            KnowledgeDocumentsCompanion(filePath: drift.Value(localFilePath)),
+          );
+        } else {
+          // Em ambiente Web, armazena os bytes no AppKvStore para acesso offline imediato
+          await db.into(db.appKvStore).insertOnConflictUpdate(
+                AppKvStoreCompanion.insert(
+                  key: 'doc_bytes_$id',
+                  value: base64Encode(bytes),
+                  updatedAt: drift.Value(DateTime.now()),
+                ),
+              );
+        }
+
+        // Remove pendência de download se estava registrada
+        await (db.delete(
+          db.appKvStore,
+        )..where((t) => t.key.equals('pending_doc_download_$id'))).go();
+        return true;
+      }
+      throw Exception('Arquivo do documento não disponível para download no storage: $id');
+    } catch (e) {
+      try {
+        await db.into(db.appKvStore).insertOnConflictUpdate(
+              AppKvStoreCompanion.insert(
+                key: 'pending_doc_download_$id',
+                value: DateTime.now().toUtc().toIso8601String(),
+                updatedAt: drift.Value(DateTime.now()),
+              ),
+            );
+      } catch (_) {}
+      return false;
+    }
+  }
+
+  /// Exclui o arquivo físico no Supabase Storage quando o documento é removido
+  Future<void> _deleteKnowledgeDocumentStorage(
+    String id,
+    SupabaseClient client,
+  ) async {
+    try {
+      final userFolder = _resolveStorageFolder(client);
+      await client.storage.from('knowledge_vault').remove([
+        '$userFolder/$id.pdf',
+        '$userFolder/$id.epub',
+        '$userFolder/$id.doc',
+        '$userFolder/$id.docx',
+        '$userFolder/$id.txt',
+        '$userFolder/$id',
+        '$id.pdf',
+        '$id',
+      ]);
+      await (db.delete(db.appKvStore)..where((t) => t.key.equals('doc_bytes_$id'))).go();
+    } catch (_) {}
+  }
+
   /// Retenta o download de áudios que falharam durante a recepção de metadados
   Future<int> retryPendingMediaDownloads() async {
     if (!isConfigured) return 0;
@@ -1431,6 +1599,16 @@ class SupabaseSyncService {
       }
     }
 
+    final pendingDocs = await (db.select(
+      db.appKvStore,
+    )..where((t) => t.key.like('pending_doc_download_%'))).get();
+
+    for (final row in pendingDocs) {
+      final id = row.key.replaceFirst('pending_doc_download_', '');
+      final ok = await _downloadKnowledgeDocument(id, client);
+      if (ok) recovered++;
+    }
+
     return recovered;
   }
 
@@ -1461,6 +1639,8 @@ class SupabaseSyncService {
           await _downloadVoiceNoteAudio(id, client);
         } else if ((table == 'ticuna_words' || table == 'ticuna_phrases') && client != null) {
           await _downloadTicunaAudio(id, table, client);
+        } else if (table == 'knowledge_documents' && client != null) {
+          await _downloadKnowledgeDocument(id, client);
         }
         return true;
       }
@@ -1551,6 +1731,8 @@ class SupabaseSyncService {
               await _downloadVoiceNoteAudio(id, client);
             } else if ((table == 'ticuna_words' || table == 'ticuna_phrases') && client != null) {
               await _downloadTicunaAudio(id, table, client);
+            } else if (table == 'knowledge_documents' && client != null) {
+              await _downloadKnowledgeDocument(id, client);
             }
           }
           return true;
@@ -1883,11 +2065,34 @@ class SupabaseSyncService {
               );
               continue;
             }
+          } else if (tableName == 'knowledge_documents') {
+            final docOk = await _uploadKnowledgeDocument(
+              op.entityId,
+              client,
+              errors,
+            );
+            if (!docOk) {
+              failure++;
+              await repository.markSyncOperationFailed(
+                op.id,
+                'Falha no upload do arquivo binário do documento para o Storage (knowledge_vault)',
+              );
+              continue;
+            }
           }
 
           await repository.markSyncOperationSuccess(op.id);
           success++;
         } else if (operation == 'DELETE') {
+          // Exclui arquivos binários associados no Storage
+          if (tableName == 'voice_notes') {
+            await _deleteVoiceNoteAudio(op.entityId, client);
+          } else if (tableName == 'ticuna_words' || tableName == 'ticuna_phrases') {
+            await _deleteTicunaAudio(op.entityId, client);
+          } else if (tableName == 'knowledge_documents') {
+            await _deleteKnowledgeDocumentStorage(op.entityId, client);
+          }
+
           // C2: Substitui DELETE cego por soft-delete (deleted_at)
           final nowIso = DateTime.now().toUtc().toIso8601String();
           await client

@@ -290,6 +290,20 @@ class _UniversalAttachmentViewerDialogState
 
   Future<void> _openExternal() async {
     try {
+      if (kIsWeb) {
+        if (_isPdf) {
+          final pdfBytes = await _resolvePdfBytes();
+          await Printing.layoutPdf(
+            onLayout: (format) async => pdfBytes,
+            name: widget.title != null ? '${widget.title}.pdf' : 'documento.pdf',
+          );
+          return;
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No navegador, utilize o botão de visualização ou impressão para acessar o arquivo.')),
+        );
+        return;
+      }
       if (widget.filePath.startsWith('http://') || widget.filePath.startsWith('https://')) {
         await launchUrl(Uri.parse(widget.filePath), mode: LaunchMode.externalApplication);
         return;
