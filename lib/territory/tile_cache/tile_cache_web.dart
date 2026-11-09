@@ -11,9 +11,21 @@ class TileCacheWeb implements TileCacheBackend {
   static const int _blockedTileByteLength = 6725;
   static const String _userAgent = AppVersion.userAgent;
 
+  /// Limite máximo de azulejos na memória para prevenir estouro de RAM no navegador
+  static const int maxCacheEntries = 500;
+
   final http.Client? httpClient;
 
   TileCacheWeb({this.httpClient});
+
+  static void _put(String key, Uint8List bytes) {
+    if (_cache.containsKey(key)) {
+      _cache.remove(key);
+    } else if (_cache.length >= maxCacheEntries) {
+      _cache.remove(_cache.keys.first);
+    }
+    _cache[key] = bytes;
+  }
 
   bool _isBlockedTile(Uint8List bytes) {
     if (bytes.isEmpty) return true;
@@ -41,17 +53,17 @@ class TileCacheWeb implements TileCacheBackend {
     final legacyKey = '$z/$x/$y';
 
     if (_cache.containsKey(key)) {
-      final cachedBytes = _cache[key]!;
+      final cachedBytes = _cache.remove(key)!;
       if (!_isBlockedTile(cachedBytes)) {
+        _cache[key] = cachedBytes;
         return cachedBytes;
       }
-      _cache.remove(key);
     } else if (s == MapLayerStyle.standard && _cache.containsKey(legacyKey)) {
-      final cachedBytes = _cache[legacyKey]!;
+      final cachedBytes = _cache.remove(legacyKey)!;
       if (!_isBlockedTile(cachedBytes)) {
+        _cache[key] = cachedBytes;
         return cachedBytes;
       }
-      _cache.remove(legacyKey);
     }
 
     final client = httpClient ?? http.Client();
@@ -80,7 +92,7 @@ class TileCacheWeb implements TileCacheBackend {
             _isBlockedTile(res.bodyBytes);
 
         if (res.statusCode == 200 && !isOsmBlocked) {
-          _cache[key] = res.bodyBytes;
+          _put(key, res.bodyBytes);
           return res.bodyBytes;
         }
       } catch (_) {}
@@ -109,7 +121,7 @@ class TileCacheWeb implements TileCacheBackend {
             _isBlockedTile(resFallback.bodyBytes);
 
         if (resFallback.statusCode == 200 && !isFallbackBlocked) {
-          _cache[key] = resFallback.bodyBytes;
+          _put(key, resFallback.bodyBytes);
           return resFallback.bodyBytes;
         }
       } catch (_) {}
@@ -129,7 +141,7 @@ class TileCacheWeb implements TileCacheBackend {
       _cache.remove(key);
       return;
     }
-    _cache[key] = bytes;
+    _put(key, bytes);
   }
 
   @override

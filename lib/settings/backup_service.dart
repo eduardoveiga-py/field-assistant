@@ -287,6 +287,28 @@ class BackupService {
       }
     }
 
+    // Saneamento e portabilidade de fotos: se a imagem estiver apontando para um arquivo local em disco,
+    // converte os bytes para data URI base64 garantindo restauração perfeita em qualquer dispositivo
+    final List<Map<String, dynamic>> exportedPhotos = [];
+    for (final p in photos) {
+      final photoMap = p.toJson();
+      if (!kIsWeb &&
+          p.imageData.isNotEmpty &&
+          !p.imageData.startsWith('data:image') &&
+          !p.imageData.startsWith('data:video') &&
+          !p.imageData.startsWith('http://') &&
+          !p.imageData.startsWith('https://')) {
+        try {
+          final f = File(p.imageData);
+          if (await f.exists()) {
+            final bytes = await f.readAsBytes();
+            photoMap['imageData'] = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+          }
+        } catch (_) {}
+      }
+      exportedPhotos.add(photoMap);
+    }
+
     final payload = {
       'exported_tables_count': 29,
       'exported_tables': [
@@ -335,7 +357,7 @@ class BackupService {
       'territoryLandmarks': landmarks.map((l) => l.toJson()).toList(),
       'familyTies': familyTies.map((f) => f.toJson()).toList(),
       'ministryExperiences': experiences.map((e) => e.toJson()).toList(),
-      'personPhotos': photos.map((p) => p.toJson()).toList(),
+      'personPhotos': exportedPhotos,
       'personPublications': publications.map((p) => p.toJson()).toList(),
       'researchArticles': articles.map((a) => a.toJson()).toList(),
       'researchTags': tags.map((t) => t.toJson()).toList(),
@@ -1243,7 +1265,26 @@ class BackupService {
         // 13. Fotos de Pessoas e Residências
         final photos = (data['personPhotos'] as List<dynamic>?) ?? [];
         for (final item in photos) {
-          final entry = PersonPhotoEntry.fromJson(item as Map<String, dynamic>);
+          final map = Map<String, dynamic>.from(item as Map);
+          if (map.containsKey('image_data') && !map.containsKey('imageData')) {
+            map['imageData'] = map['image_data'];
+          }
+          if (map.containsKey('person_id') && !map.containsKey('personId')) {
+            map['personId'] = map['person_id'];
+          }
+          if (map.containsKey('photo_type') && !map.containsKey('photoType')) {
+            map['photoType'] = map['photo_type'];
+          }
+          if (map.containsKey('created_at') && !map.containsKey('createdAt')) {
+            map['createdAt'] = map['created_at'];
+          }
+          if (map.containsKey('updated_at') && !map.containsKey('updatedAt')) {
+            map['updatedAt'] = map['updated_at'];
+          }
+          if (map.containsKey('deleted_at') && !map.containsKey('deletedAt')) {
+            map['deletedAt'] = map['deleted_at'];
+          }
+          final entry = PersonPhotoEntry.fromJson(map);
           final existing = await (db.select(
             db.personPhotos,
           )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/app_theme.dart';
@@ -79,14 +80,18 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
     try {
       final db = ref.read(repositoryProvider).db;
       final emailEntry = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_imap_email'))).getSingleOrNull();
-      final passEntry = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_imap_password'))).getSingleOrNull();
+      const secureStorage = FlutterSecureStorage();
+      String? password = await secureStorage.read(key: 'jw_imap_password');
+      if (password == null || password.isEmpty) {
+        final legacyPass = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_imap_password'))).getSingleOrNull();
+        password = legacyPass?.value;
+      }
       final hostEntry = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_imap_host'))).getSingleOrNull();
       final portEntry = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_imap_port'))).getSingleOrNull();
 
       final host = (hostEntry?.value.trim().isNotEmpty == true) ? hostEntry!.value.trim() : 'mail.jw.org';
       final port = int.tryParse(portEntry?.value ?? '') ?? 993;
       final username = emailEntry?.value.trim();
-      final password = passEntry?.value;
 
       final emailService = ref.read(jwEmailServiceProvider);
       final count = await emailService.syncEmails(

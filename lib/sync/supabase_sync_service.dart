@@ -2133,6 +2133,11 @@ class SupabaseSyncService {
       _setStatus(SyncStatus.synced);
     }
 
+    // Expulga operações sincronizadas antigas (> 30 dias) para manter o SQLite leve e veloz
+    try {
+      await repository.pruneOldSyncedOperations();
+    } catch (_) {}
+
     return SyncProcessResult(
       totalProcessed: pendingOps.length,
       successCount: success,

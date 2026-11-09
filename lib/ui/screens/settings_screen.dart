@@ -2,6 +2,7 @@ import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../appointments/calendar_sync_coordinator.dart';
 import '../../database/app_database.dart';
@@ -76,14 +77,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     try {
       final db = ref.read(repositoryProvider).db;
       final email = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_imap_email'))).getSingleOrNull();
-      final pass = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_imap_password'))).getSingleOrNull();
+      const secureStorage = FlutterSecureStorage();
+      String? pass = await secureStorage.read(key: 'jw_imap_password');
+
+      // Migração automática retroativa: se a senha ainda estava em texto puro no SQLite,
+      // migra com segurança para o Keychain/KeyStore e elimina do banco relacional
+      if (pass == null || pass.isEmpty) {
+        final legacyPass = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_imap_password'))).getSingleOrNull();
+        if (legacyPass != null && legacyPass.value.isNotEmpty) {
+          pass = legacyPass.value;
+          await secureStorage.write(key: 'jw_imap_password', value: pass);
+          await (db.delete(db.appKvStore)..where((t) => t.key.equals('jw_imap_password'))).go();
+        }
+      }
+
       final host = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_imap_host'))).getSingleOrNull();
       final port = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_imap_port'))).getSingleOrNull();
 
       if (mounted) {
         setState(() {
           if (email != null) _jwEmailCtrl.text = email.value;
-          if (pass != null) _jwPasswordCtrl.text = pass.value;
+          if (pass != null) _jwPasswordCtrl.text = pass;
           if (host != null && host.value.isNotEmpty) _jwHostCtrl.text = host.value;
           if (port != null && port.value.isNotEmpty) _jwPortCtrl.text = port.value;
         });
@@ -2021,13 +2035,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                   updatedAt: Value(DateTime.now()),
                                 ),
                               );
-                              await db.into(db.appKvStore).insertOnConflictUpdate(
-                                AppKvStoreCompanion.insert(
-                                  key: 'jw_imap_password',
-                                  value: pass,
-                                  updatedAt: Value(DateTime.now()),
-                                ),
+
+                              // Salva senha com criptografia forte de hardware no Keychain/KeyStore
+                              await const FlutterSecureStorage().write(
+                                key: 'jw_imap_password',
+                                value: pass,
                               );
+                              // Garante que o SQLite não retenha a senha em texto puro
+                              await (db.delete(db.appKvStore)..where((t) => t.key.equals('jw_imap_password'))).go();
+
                               await db.into(db.appKvStore).insertOnConflictUpdate(
                                 AppKvStoreCompanion.insert(
                                   key: 'jw_imap_host',
@@ -2066,6 +2082,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   label: const Text('Limpar'),
                   onPressed: () async {
                     final db = ref.read(repositoryProvider).db;
+                    await const FlutterSecureStorage().delete(key: 'jw_imap_password');
                     await (db.delete(db.appKvStore)..where((t) => t.key.equals('jw_imap_email'))).go();
                     await (db.delete(db.appKvStore)..where((t) => t.key.equals('jw_imap_password'))).go();
                     await (db.delete(db.appKvStore)..where((t) => t.key.equals('jw_imap_host'))).go();

@@ -1432,23 +1432,29 @@ class AppRepository {
   Future<void> permanentlyDeleteItem(String entityType, String id) async {
     await db.transaction(() async {
       if (entityType == 'people') {
+        // Exclui em cascata todas as entidades filhas para respeitar integridade de chaves estrangeiras
+        await (db.delete(db.visits)..where((t) => t.personId.equals(id))).go();
+        await (db.delete(db.studyParticipants)..where((t) => t.personId.equals(id))).go();
+        await (db.delete(db.appointments)..where((t) => t.personId.equals(id))).go();
+        await (db.delete(db.familyTies)..where((t) => t.personId.equals(id) | t.relatedPersonId.equals(id))).go();
+        await (db.delete(db.personPhotos)..where((t) => t.personId.equals(id))).go();
+        await (db.delete(db.personPublications)..where((t) => t.personId.equals(id))).go();
+        await (db.delete(db.voiceNotes)..where((t) => t.personId.equals(id))).go();
         await (db.delete(db.people)..where((t) => t.id.equals(id))).go();
       } else if (entityType == 'visits') {
+        await (db.delete(db.voiceNotes)..where((t) => t.visitId.equals(id))).go();
         await (db.delete(db.visits)..where((t) => t.id.equals(id))).go();
       } else if (entityType == 'bible_studies') {
-        await (db.delete(
-          db.studyParticipants,
-        )..where((t) => t.studyId.equals(id))).go();
-        await (db.delete(
-          db.studySessions,
-        )..where((t) => t.studyId.equals(id))).go();
+        await (db.delete(db.studyParticipants)..where((t) => t.studyId.equals(id))).go();
+        await (db.delete(db.studySessions)..where((t) => t.studyId.equals(id))).go();
+        await (db.delete(db.voiceNotes)..where((t) => t.studyId.equals(id))).go();
+        await (db.delete(db.appointments)..where((t) => t.studyId.equals(id))).go();
         await (db.delete(db.bibleStudies)..where((t) => t.id.equals(id))).go();
       } else if (entityType == 'appointments') {
+        await (db.delete(db.calendarEventLinks)..where((t) => t.appointmentId.equals(id))).go();
         await (db.delete(db.appointments)..where((t) => t.id.equals(id))).go();
       } else if (entityType == 'activity_records') {
-        await (db.delete(
-          db.activityRecords,
-        )..where((t) => t.id.equals(id))).go();
+        await (db.delete(db.activityRecords)..where((t) => t.id.equals(id))).go();
       }
       await _recordSyncOperation(
         entityType: entityType,
@@ -1473,6 +1479,17 @@ class AppRepository {
                 OrderingTerm(expression: t.createdAt, mode: OrderingMode.asc),
           ]))
         .get();
+  }
+
+  /// Expulga operações antigas já sincronizadas para prevenir inchaço do SQLite e backup
+  Future<int> pruneOldSyncedOperations({
+    Duration maxAge = const Duration(days: 30),
+  }) async {
+    final cutoff = DateTime.now().subtract(maxAge);
+    return (db.delete(db.syncQueue)
+          ..where((tbl) =>
+              tbl.status.equals('synced') & tbl.createdAt.isSmallerThanValue(cutoff)))
+        .go();
   }
 
   Future<void> markSyncOperationSuccess(String id) async {
