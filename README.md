@@ -3,11 +3,11 @@
 # 📖 Ministério Pessoal
 ### *Gestão Eficiente, Discreta e Offline-First do Ministério de Campo*
 
-[![Versão](https://img.shields.io/badge/Versão-1.2.1%20(Build%206)-blue?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/eduardoveiga-py/field-assistant/releases/latest)
+[![Versão](https://img.shields.io/badge/Versão-1.3.0%20(Build%207)-blue?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/eduardoveiga-py/field-assistant/releases/latest)
 [![Flutter](https://img.shields.io/badge/Flutter-3.27+-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-3.5+-0175C2?style=for-the-badge&logo=dart&logoColor=white)](https://dart.dev)
 [![Offline First](https://img.shields.io/badge/Arquitetura-Offline--First-success?style=for-the-badge&logo=sqlite&logoColor=white)](https://drift.simonbinder.eu/)
-[![Testes](https://img.shields.io/badge/Testes-630%2B%20Passando%20(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](https://github.com/eduardoveiga-py/field-assistant/actions)
+[![Testes](https://img.shields.io/badge/Testes-670%2B%20Passando%20(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](https://github.com/eduardoveiga-py/field-assistant/actions)
 [![Plataformas](https://img.shields.io/badge/Plataformas-Android%20%7C%20iOS%20%7C%20Web-orange?style=for-the-badge)](https://github.com/eduardoveiga-py/field-assistant/releases)
 
 <p align="center">
@@ -260,6 +260,43 @@ flowchart LR
 ---
 
 ## 📋 Histórico de Lançamentos e Changelog
+
+### 🚀 Versão 1.3.0 (Build 7) — 09/11/2026: A Grande Evolução Estratégica Integrada
+- **MÓDULO A — Inbox Universal**:
+  - Ponto central e de atrito zero para capturar qualquer informação sem interromper o foco ministerial ou pessoal.
+  - Modal adaptativo de captura rápida (`QuickCaptureSheet`) acessível via FAB flutuante e atalho na AppBar da tela Início.
+  - 3 modos de captura:
+    - ✍️ *Ideia / Texto*: Campo rápido com salvamento instantâneo e chips de categoria (Ministério, Pessoal, Estudo, Dúvida, Ideia).
+    - 🎤 *Voz / Ditado*: Gravação de áudio de até 5 minutos (300 segundos) com contador em tempo real, visualizador de onda e player de pré-visualização.
+    - 📎 *Documento / Foto*: Anexação de arquivos locais (PDF, DOC, TXT, EPUB) ou fotos da galeria com cálculo automático de tamanho e hash.
+  - Tela `InboxScreen` com filtros por status (*Pendentes*, *Em Análise*, *Processadas*, *Todas*), badges por tipo de mídia, player de áudio embutido e menu de triagem.
+  - Pipeline de conversão não-destrutiva: transforma itens capturados em **Tarefas**, **Projetos**, **Notas** ou **Dúvidas Teocráticas**, preservando o registro original com `status = 'converted'`, `converted_entity_type` e `converted_entity_id`.
+
+- **MÓDULO B — Tarefas e Projetos**:
+  - `TaskManager`: Gerenciador de responsabilidades com suporte a prioridades (*baixa, normal, alta, urgente*), prazos, vínculos a contatos ou estudos e **recorrência automática contínua** (*diária, semanal, mensal*): ao concluir uma tarefa recorrente, a próxima ocorrência é gerada automaticamente com data futura.
+  - `ProjectManager`: Estruturação de iniciativas de médio e longo prazo com metas, alvos e cálculo reativo de progresso percentual (`ProjectProgress`: tarefas concluídas / total de tarefas).
+  - Tela `TasksScreen` com 5 abas otimizadas:
+    - ⚡ *Hoje & Urgentes*: Tarefas com vencimento para hoje ou em atraso.
+    - 📋 *Minhas Tarefas*: Lista completa com ordenação inteligente.
+    - 📁 *Projetos*: Visão geral dos projetos ativos com barras de progresso % em tempo real.
+    - 👥 *Ações de Contatos*: Histórico e pendências de revisitas dos contatos.
+    - ✅ *Concluídas*: Registro de tarefas finalizadas.
+  - Tela `ProjectDetailScreen` com objetivos, descrição, barra de progresso visual, lista de tarefas vinculadas e modal de adição rápida.
+
+- **MÓDULO C — Base de Conhecimento**:
+  - `KnowledgeManager`: Repositório central de conhecimento, estudos e pesquisa teocrática.
+  - 4 pilares estruturados na tela `KnowledgeBaseScreen`:
+    - 📝 *Notas de Conhecimento*: Anotações ricas em Markdown, marcação de favoritos, fixação de notas importantes no topo e categorização.
+    - ❓ *Perguntas & Dúvidas Teocráticas*: Registro de objeções ou dúvidas de moradores para pesquisa posterior, com status *Em Aberto* ou *Respondida*, textos bíblicos de apoio e respostas detalhadas.
+    - 📁 *Documentos*: Gerenciador de arquivos locais (apostilas, PDFs, manuais) com tamanho em KB e hash criptográfico SHA-256 para auditoria de integridade.
+    - 🔗 *Recursos & JW.org*: Catálogo de links diretos de artigos, vídeos do Ministério e ferramentas do site oficial com abertura rápida externa.
+
+- **Integração Global dos Três Módulos**:
+  - `GlobalSearchDelegate`: Barra de busca unificada de `Hoje no Ministério` agora indexa e pesquisa em tempo real Pessoas, Telefones, Agenda, Estudos, **Tarefas**, **Projetos**, **Notas de Conhecimento** e **Itens da Inbox**.
+  - `PersonDetailScreen`: Aba *Alvos & Tarefas* sincronizada diretamente com a tabela `tasks` (`watchTasksForPerson`), permitindo gerenciar tarefas formais da pessoa sem perder o histórico legado.
+  - `StudiesScreen`: Atalho na AppBar para consulta imediata de recursos e notas de conhecimento durante o curso bíblico.
+  - Banco de Dados Drift (Schema v6): 7 novas tabelas (`inbox_entries`, `projects`, `tasks`, `knowledge_notes`, `knowledge_questions`, `knowledge_documents`, `knowledge_resources`), coluna `appointments.task_id` e colunas contextuais em `research_articles`.
+  - Migração Supabase DDL com RLS (`auth.uid() = owner_id`), 26 tabelas no `SupabaseSyncService` e 29 tabelas no `BackupService` criptografado (PBKDF2-HMAC-SHA256).
 
 ### 🚀 Versão 1.2.1 (Build 6) — 09/11/2026
 - **Componentes Adaptativos (Regra 10)**:

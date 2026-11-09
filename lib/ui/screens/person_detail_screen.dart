@@ -6457,6 +6457,36 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
           ),
           const SizedBox(height: 16),
 
+          // Tarefas Formais Integradas (Módulo B)
+          StreamBuilder<List<TaskEntry>>(
+            stream: ref.watch(taskManagerProvider).watchTasksForPerson(person.id),
+            builder: (ctx, snap) {
+              final tasks = snap.data ?? [];
+              if (tasks.isEmpty) return const SizedBox.shrink();
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Tarefas Vinculadas a este Contato', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  const SizedBox(height: 8),
+                  ...tasks.map((task) => Card(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    child: CheckboxListTile(
+                      value: task.status == 'completed',
+                      activeColor: AppTheme.primaryBlue,
+                      onChanged: (val) => ref.read(taskManagerProvider).toggleTaskComplete(task.id, completed: val),
+                      title: Text(task.title, style: TextStyle(decoration: task.status == 'completed' ? TextDecoration.lineThrough : null, fontWeight: FontWeight.w600)),
+                      subtitle: task.dueDate != null ? Text('Vencimento: //') : null,
+                    ),
+                  )),
+                  const SizedBox(height: 14),
+                  const Divider(),
+                  const SizedBox(height: 10),
+                ],
+              );
+            },
+          ),
+
           if (targets.isEmpty)
             Card(
               child: Padding(

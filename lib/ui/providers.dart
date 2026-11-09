@@ -3,6 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../database/app_database.dart';
 import '../database/repository.dart';
 import '../settings/backup_service.dart';
+import '../inbox/inbox_manager.dart';
+import '../tasks/task_manager.dart';
+import '../projects/project_manager.dart';
+import '../knowledge/knowledge_manager.dart';
 
 // Provider do Banco Drift
 final databaseProvider = Provider<AppDatabase>((ref) {
@@ -23,7 +27,77 @@ final backupServiceProvider = Provider<BackupService>((ref) {
   return BackupService(repo);
 });
 
-// Stream Providers reativos
+// ==========================================
+// MÓDULO A — INBOX UNIVERSAL
+// ==========================================
+
+final inboxManagerProvider = Provider<InboxManager>((ref) {
+  final db = ref.watch(databaseProvider);
+  return InboxManager(db: db);
+});
+
+final unprocessedInboxStreamProvider = StreamProvider<List<InboxEntry>>((ref) {
+  final inboxManager = ref.watch(inboxManagerProvider);
+  return inboxManager.watchUnprocessedEntries();
+});
+
+final unprocessedInboxCountProvider = StreamProvider<int>((ref) {
+  final inboxManager = ref.watch(inboxManagerProvider);
+  return inboxManager.watchUnprocessedCount();
+});
+
+// ==========================================
+// MÓDULO B — TAREFAS E PROJETOS
+// ==========================================
+
+final taskManagerProvider = Provider<TaskManager>((ref) {
+  final db = ref.watch(databaseProvider);
+  return TaskManager(db: db);
+});
+
+final pendingTasksStreamProvider = StreamProvider<List<TaskEntry>>((ref) {
+  final taskManager = ref.watch(taskManagerProvider);
+  return taskManager.watchPendingTasks();
+});
+
+final todayTasksStreamProvider = StreamProvider<List<TaskEntry>>((ref) {
+  final taskManager = ref.watch(taskManagerProvider);
+  return taskManager.watchTasksForToday();
+});
+
+final pendingTaskCountProvider = StreamProvider<int>((ref) {
+  final taskManager = ref.watch(taskManagerProvider);
+  return taskManager.watchPendingTaskCount();
+});
+
+final projectManagerProvider = Provider<ProjectManager>((ref) {
+  final db = ref.watch(databaseProvider);
+  return ProjectManager(db: db);
+});
+
+final activeProjectsStreamProvider = StreamProvider<List<ProjectEntry>>((ref) {
+  final projectManager = ref.watch(projectManagerProvider);
+  return projectManager.watchActiveProjects();
+});
+
+// ==========================================
+// MÓDULO C — BASE DE CONHECIMENTO
+// ==========================================
+
+final knowledgeManagerProvider = Provider<KnowledgeManager>((ref) {
+  final db = ref.watch(databaseProvider);
+  return KnowledgeManager(db: db);
+});
+
+final recentNotesStreamProvider = StreamProvider<List<KnowledgeNoteEntry>>((ref) {
+  final km = ref.watch(knowledgeManagerProvider);
+  return km.watchNotes();
+});
+
+// ==========================================
+// STREAM PROVIDERS REATIVOS EXISTENTES
+// ==========================================
+
 final peopleStreamProvider = StreamProvider<List<PersonEntry>>((ref) {
   final repo = ref.watch(repositoryProvider);
   return repo.watchAllPeople();
@@ -115,5 +189,3 @@ class PeopleFilterNotifier extends Notifier<String> {
 final peopleFilterProvider = NotifierProvider<PeopleFilterNotifier, String>(
   PeopleFilterNotifier.new,
 );
-
-

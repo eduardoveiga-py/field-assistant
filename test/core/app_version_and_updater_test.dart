@@ -11,36 +11,37 @@ import 'package:ministerio_pessoal/core/i18n/app_locale_strings.dart';
 void main() {
   group('AppVersion Contract & Semver Parser', () {
     test('1. Metadados e versão centralizada estão consistentes', () {
-      expect(AppVersion.version, equals('1.2.1'));
-      expect(AppVersion.buildNumber, equals(6));
-      expect(AppVersion.displayVersion, equals('v1.2.1'));
-      expect(AppVersion.userAgent, contains('MinisterioPessoal/1.2.1'));
+      expect(AppVersion.version, equals('1.3.0'));
+      expect(AppVersion.buildNumber, equals(7));
+      expect(AppVersion.displayVersion, equals('v1.3.0'));
+      expect(AppVersion.userAgent, contains('MinisterioPessoal/1.3.0'));
       expect(AppVersion.liveContainerSourceUrl, startsWith('livecontainer://sources?url='));
       expect(AppVersion.releaseDate, isNotEmpty);
     });
 
     test('2. Comparador semântico de versões (Semver)', () {
       // Versões iguais
-      expect(AppVersion.compare('1.2.1', '1.2.1'), equals(0));
-      expect(AppVersion.compare('v1.2.1', '1.2.1'), equals(0));
+      expect(AppVersion.compare('1.3.0', '1.3.0'), equals(0));
+      expect(AppVersion.compare('v1.3.0', '1.3.0'), equals(0));
 
       // Versão local mais recente que remota
-      expect(AppVersion.compare('1.2.1', '1.2.0'), greaterThan(0));
-      expect(AppVersion.compare('1.2.1', '1.1.2'), greaterThan(0));
-      expect(AppVersion.compare('1.2.1', '1.0.0'), greaterThan(0));
+      expect(AppVersion.compare('1.3.0', '1.2.1'), greaterThan(0));
+      expect(AppVersion.compare('1.3.0', '1.2.0'), greaterThan(0));
+      expect(AppVersion.compare('1.3.0', '1.1.2'), greaterThan(0));
+      expect(AppVersion.compare('1.3.0', '1.0.0'), greaterThan(0));
       expect(AppVersion.compare('2.0.0', '1.9.9'), greaterThan(0));
       expect(AppVersion.compare('1.10.0', '1.9.0'), greaterThan(0));
 
       // Versão remota mais recente que local
-      expect(AppVersion.compare('1.2.1', '1.2.2'), lessThan(0));
-      expect(AppVersion.compare('1.2.1', '1.3.0'), lessThan(0));
-      expect(AppVersion.compare('1.2.1', '2.0.0'), lessThan(0));
+      expect(AppVersion.compare('1.3.0', '1.3.1'), lessThan(0));
+      expect(AppVersion.compare('1.3.0', '1.4.0'), lessThan(0));
+      expect(AppVersion.compare('1.3.0', '2.0.0'), lessThan(0));
 
       // isNewerThanCurrent
-      expect(AppVersion.isNewerThanCurrent('1.2.2'), isTrue);
+      expect(AppVersion.isNewerThanCurrent('1.3.1'), isTrue);
       expect(AppVersion.isNewerThanCurrent('2.0.0'), isTrue);
+      expect(AppVersion.isNewerThanCurrent('1.3.0'), isFalse);
       expect(AppVersion.isNewerThanCurrent('1.2.1'), isFalse);
-      expect(AppVersion.isNewerThanCurrent('1.2.0'), isFalse);
       expect(AppVersion.isNewerThanCurrent('1.1.0'), isFalse);
     });
   });

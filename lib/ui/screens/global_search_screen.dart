@@ -9,6 +9,10 @@ import 'phone_contacts_screen.dart';
 import 'research_screen.dart';
 import 'appointments_screen.dart';
 import 'studies_screen.dart';
+import 'tasks_screen.dart';
+import 'project_detail_screen.dart';
+import 'knowledge_base_screen.dart';
+import 'inbox_screen.dart';
 
 enum GlobalSearchResultType {
   person('Pessoa', Icons.person, AppTheme.primaryBlue),
@@ -16,7 +20,11 @@ enum GlobalSearchResultType {
   voiceNote('Nota de Voz', Icons.mic, Color(0xFF10B981)),
   research('Pesquisa Bíblica', Icons.menu_book, Color(0xFFD97706)),
   appointment('Compromisso', Icons.event, Color(0xFF2563EB)),
-  study('Estudo Bíblico', Icons.school, Color(0xFF7C3AED));
+  study('Estudo Bíblico', Icons.school, Color(0xFF7C3AED)),
+  task('Tarefa', Icons.check_circle_outline, Color(0xFF10B981)),
+  project('Projeto', Icons.folder_special, Color(0xFF3B82F6)),
+  knowledge('Conhecimento', Icons.menu_book, Color(0xFF8B5CF6)),
+  inbox('Inbox', Icons.all_inbox, Color(0xFF0284C7));
 
   final String label;
   final IconData icon;
@@ -450,6 +458,81 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
         }
       } catch (_) {}
     }
+
+    // 7. Tarefas
+    try {
+      final tasks = await (db.select(db.tasks)..where((t) => (t.title.like('%$query%') | t.description.like('%$query%')) & t.deletedAt.isNull())).get();
+      for (final t in tasks) {
+        results.add(
+          GlobalSearchResultItem(
+            id: t.id,
+            title: t.title,
+            subtitle: 'Prioridade: ${t.priority} • Categoria: ${t.category}',
+            snippet: t.description,
+            type: GlobalSearchResultType.task,
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const TasksScreen()));
+            },
+          ),
+        );
+      }
+    } catch (_) {}
+
+    // 8. Projetos
+    try {
+      final projs = await (db.select(db.projects)..where((t) => (t.name.like('%$query%') | t.objective.like('%$query%')) & t.deletedAt.isNull())).get();
+      for (final pr in projs) {
+        results.add(
+          GlobalSearchResultItem(
+            id: pr.id,
+            title: pr.name,
+            subtitle: 'Status: ${pr.status} • Categoria: ${pr.category}',
+            snippet: pr.objective,
+            type: GlobalSearchResultType.project,
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(builder: (_) => ProjectDetailScreen(projectId: pr.id)));
+            },
+          ),
+        );
+      }
+    } catch (_) {}
+
+    // 9. Base de Conhecimento (Notas)
+    try {
+      final notes = await (db.select(db.knowledgeNotes)..where((t) => (t.title.like('%$query%') | t.content.like('%$query%')) & t.deletedAt.isNull())).get();
+      for (final n in notes) {
+        results.add(
+          GlobalSearchResultItem(
+            id: n.id,
+            title: n.title,
+            subtitle: 'Nota • Categoria: ${n.category}',
+            snippet: n.content,
+            type: GlobalSearchResultType.knowledge,
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const KnowledgeBaseScreen()));
+            },
+          ),
+        );
+      }
+    } catch (_) {}
+
+    // 10. Inbox Universal
+    try {
+      final inboxEntries = await (db.select(db.inboxEntries)..where((t) => t.content.like('%$query%') & t.deletedAt.isNull())).get();
+      for (final inb in inboxEntries) {
+        results.add(
+          GlobalSearchResultItem(
+            id: inb.id,
+            title: inb.content.length > 50 ? '${inb.content.substring(0, 50)}...' : inb.content,
+            subtitle: 'Inbox • Status: ${inb.status}',
+            type: GlobalSearchResultType.inbox,
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const InboxScreen()));
+            },
+          ),
+        );
+      }
+    } catch (_) {}
 
     return results;
   }

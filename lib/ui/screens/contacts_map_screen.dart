@@ -1454,7 +1454,7 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                 ),
                 PopupMenuButton<String>(
                   tooltip: 'Mais Opções do Mapa',
-                  constraints: const BoxConstraints(minWidth: 260, maxWidth: 360),
+                  constraints: const BoxConstraints(minWidth: 280, maxWidth: 380),
                   onSelected: (val) {
                     final people = peopleAsync.value ?? [];
                     if (val == 'pdf') {

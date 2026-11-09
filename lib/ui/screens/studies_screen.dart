@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'knowledge_base_screen.dart';
 
 import '../../appointments/availability_engine.dart';
 import '../../core/app_theme.dart';
@@ -2181,6 +2182,18 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
       appBar: AppBar(
         title: const Text('Estudos Bíblicos'),
         bottom: ScreenHeroAccentBand.studies(),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.menu_book_rounded),
+            tooltip: 'Base de Conhecimento & Recursos',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const KnowledgeBaseScreen()),
+              );
+            },
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: AppTheme.primaryBlue,

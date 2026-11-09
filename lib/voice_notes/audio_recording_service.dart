@@ -35,7 +35,7 @@ abstract class AudioRecordingService {
 
   Future<bool> hasPermission();
   Future<bool> requestPermission();
-  Future<String> startRecording({String? customPath});
+  Future<String> startRecording({String? customPath, int maxDurationSeconds = 30});
   Future<RecordingResult?> stopRecording();
   Future<void> cancelRecording();
   void dispose();
@@ -44,6 +44,7 @@ abstract class AudioRecordingService {
 /// Implementação real de gravação de áudio usando package:record.
 class RealAudioRecordingService implements AudioRecordingService {
   final AudioRecorder _audioRecorder = AudioRecorder();
+  int _maxDurationSeconds = 30;
   final Uuid _uuid = const Uuid();
   bool _isRecording = false;
   Timer? _timer;
@@ -81,7 +82,8 @@ class RealAudioRecordingService implements AudioRecordingService {
   }
 
   @override
-  Future<String> startRecording({String? customPath}) async {
+  Future<String> startRecording({String? customPath, int maxDurationSeconds = 30}) async {
+    _maxDurationSeconds = maxDurationSeconds;
     if (_isRecording) {
       await cancelRecording();
     }
@@ -135,7 +137,7 @@ class RealAudioRecordingService implements AudioRecordingService {
       if (!_durationController.isClosed) {
         _durationController.add(_elapsedSeconds);
       }
-      if (_elapsedSeconds >= 30) {
+      if (_elapsedSeconds >= _maxDurationSeconds) {
         timer.cancel();
         // Interrompe o gravador de verdade ao atingir 30 segundos
         await stopRecording();
@@ -222,6 +224,7 @@ class RealAudioRecordingService implements AudioRecordingService {
 /// (Mobile, Web, Windows) e totalmente testável sem dependência de hardware real.
 class LocalAudioRecordingService implements AudioRecordingService {
   final Uuid _uuid = const Uuid();
+  int _maxDurationSeconds = 30;
   bool _isRecording = false;
   Timer? _timer;
   int _elapsedSeconds = 0;
@@ -264,7 +267,8 @@ class LocalAudioRecordingService implements AudioRecordingService {
   }
 
   @override
-  Future<String> startRecording({String? customPath}) async {
+  Future<String> startRecording({String? customPath, int maxDurationSeconds = 30}) async {
+    _maxDurationSeconds = maxDurationSeconds;
     if (_isRecording) {
       await cancelRecording();
     }
@@ -314,7 +318,7 @@ class LocalAudioRecordingService implements AudioRecordingService {
         _durationController.add(_elapsedSeconds);
       }
       // Limite máximo de segurança para nota rápida: 30 segundos
-      if (_elapsedSeconds >= 30) {
+      if (_elapsedSeconds >= _maxDurationSeconds) {
         timer.cancel();
         await stopRecording();
       }
@@ -384,7 +388,7 @@ class LocalAudioRecordingService implements AudioRecordingService {
     if (!_durationController.isClosed) {
       _durationController.add(_elapsedSeconds);
     }
-    if (_elapsedSeconds >= 30) {
+    if (_elapsedSeconds >= _maxDurationSeconds) {
       _timer?.cancel();
       _timer = null;
       await stopRecording();

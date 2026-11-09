@@ -22,6 +22,10 @@ import '../../core/update_checker_service.dart';
 import 'settings_screen.dart';
 import 'global_search_screen.dart';
 import 'next_actions_screen.dart';
+import 'inbox_screen.dart';
+import 'tasks_screen.dart';
+import 'knowledge_base_screen.dart';
+import '../widgets/quick_capture_sheet.dart';
 
 class TodayScreen extends ConsumerWidget {
   final Function(int)? onTabChange;
@@ -791,6 +795,27 @@ class TodayScreen extends ConsumerWidget {
               ),
             ),
           ),
+          Consumer(
+            builder: (ctx, ref, _) {
+              final countAsync = ref.watch(unprocessedInboxCountProvider);
+              final count = countAsync.value ?? 0;
+              return IconButton(
+                visualDensity: VisualDensity.compact,
+                icon: Badge(
+                  isLabelVisible: count > 0,
+                  label: Text('$count'),
+                  child: const Icon(Icons.all_inbox_rounded),
+                ),
+                tooltip: 'Inbox Universal ($count pendentes)',
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const InboxScreen()),
+                  );
+                },
+              );
+            },
+          ),
           IconButton(
             visualDensity: VisualDensity.compact,
             icon: const Icon(Icons.timer_outlined),
@@ -814,6 +839,13 @@ class TodayScreen extends ConsumerWidget {
             },
           ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        tooltip: 'Captura Rápida (Inbox)',
+        backgroundColor: AppTheme.primaryBlue,
+        foregroundColor: Colors.white,
+        onPressed: () => QuickCaptureSheet.show(context),
+        child: const Icon(Icons.add, size: 28),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -1390,6 +1422,61 @@ class TodayScreen extends ConsumerWidget {
                     themeType: _CardArtworkTheme.foreignContact,
                     color: const Color(0xFF60A5FA),
                     onTap: () => _showAddForeignContactDialog(context, ref),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: _QuickActionButton(
+                    icon: Icons.all_inbox_rounded,
+                    label: 'Inbox',
+                    themeType: _CardArtworkTheme.notes,
+                    color: const Color(0xFF3B82F6),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const InboxScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _QuickActionButton(
+                    icon: Icons.task_alt_rounded,
+                    label: 'Tarefas',
+                    themeType: _CardArtworkTheme.activityTimer,
+                    color: const Color(0xFF10B981),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const TasksScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _QuickActionButton(
+                    icon: Icons.menu_book_rounded,
+                    label: 'Conhecimento',
+                    themeType: _CardArtworkTheme.bibleStudies,
+                    color: const Color(0xFF8B5CF6),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const KnowledgeBaseScreen(),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ],
