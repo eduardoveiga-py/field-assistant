@@ -4814,6 +4814,15 @@ class $AppointmentsTable extends Appointments
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _taskIdMeta = const VerificationMeta('taskId');
+  @override
+  late final GeneratedColumn<String> taskId = GeneratedColumn<String>(
+    'task_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -4874,6 +4883,7 @@ class $AppointmentsTable extends Appointments
     reminderMinutesBefore,
     secondReminderMinutesBefore,
     isProvisional,
+    taskId,
     createdAt,
     updatedAt,
     deletedAt,
@@ -4992,6 +5002,12 @@ class $AppointmentsTable extends Appointments
         ),
       );
     }
+    if (data.containsKey('task_id')) {
+      context.handle(
+        _taskIdMeta,
+        taskId.isAcceptableOrUnknown(data['task_id']!, _taskIdMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -5081,6 +5097,10 @@ class $AppointmentsTable extends Appointments
         DriftSqlType.bool,
         data['${effectivePrefix}is_provisional'],
       )!,
+      taskId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}task_id'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -5121,6 +5141,7 @@ class AppointmentEntry extends DataClass
   final int? reminderMinutesBefore;
   final int? secondReminderMinutesBefore;
   final bool isProvisional;
+  final String? taskId;
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? deletedAt;
@@ -5139,6 +5160,7 @@ class AppointmentEntry extends DataClass
     this.reminderMinutesBefore,
     this.secondReminderMinutesBefore,
     required this.isProvisional,
+    this.taskId,
     required this.createdAt,
     required this.updatedAt,
     this.deletedAt,
@@ -5174,6 +5196,9 @@ class AppointmentEntry extends DataClass
       );
     }
     map['is_provisional'] = Variable<bool>(isProvisional);
+    if (!nullToAbsent || taskId != null) {
+      map['task_id'] = Variable<String>(taskId);
+    }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     if (!nullToAbsent || deletedAt != null) {
@@ -5211,6 +5236,9 @@ class AppointmentEntry extends DataClass
           ? const Value.absent()
           : Value(secondReminderMinutesBefore),
       isProvisional: Value(isProvisional),
+      taskId: taskId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(taskId),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
       deletedAt: deletedAt == null && nullToAbsent
@@ -5245,6 +5273,7 @@ class AppointmentEntry extends DataClass
         json['secondReminderMinutesBefore'],
       ),
       isProvisional: serializer.fromJson<bool>(json['isProvisional']),
+      taskId: serializer.fromJson<String?>(json['taskId']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
@@ -5272,6 +5301,7 @@ class AppointmentEntry extends DataClass
         secondReminderMinutesBefore,
       ),
       'isProvisional': serializer.toJson<bool>(isProvisional),
+      'taskId': serializer.toJson<String?>(taskId),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
@@ -5293,6 +5323,7 @@ class AppointmentEntry extends DataClass
     Value<int?> reminderMinutesBefore = const Value.absent(),
     Value<int?> secondReminderMinutesBefore = const Value.absent(),
     bool? isProvisional,
+    Value<String?> taskId = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
     Value<DateTime?> deletedAt = const Value.absent(),
@@ -5319,6 +5350,7 @@ class AppointmentEntry extends DataClass
         ? secondReminderMinutesBefore.value
         : this.secondReminderMinutesBefore,
     isProvisional: isProvisional ?? this.isProvisional,
+    taskId: taskId.present ? taskId.value : this.taskId,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
@@ -5351,6 +5383,7 @@ class AppointmentEntry extends DataClass
       isProvisional: data.isProvisional.present
           ? data.isProvisional.value
           : this.isProvisional,
+      taskId: data.taskId.present ? data.taskId.value : this.taskId,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
@@ -5374,6 +5407,7 @@ class AppointmentEntry extends DataClass
           ..write('reminderMinutesBefore: $reminderMinutesBefore, ')
           ..write('secondReminderMinutesBefore: $secondReminderMinutesBefore, ')
           ..write('isProvisional: $isProvisional, ')
+          ..write('taskId: $taskId, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
@@ -5397,6 +5431,7 @@ class AppointmentEntry extends DataClass
     reminderMinutesBefore,
     secondReminderMinutesBefore,
     isProvisional,
+    taskId,
     createdAt,
     updatedAt,
     deletedAt,
@@ -5420,6 +5455,7 @@ class AppointmentEntry extends DataClass
           other.secondReminderMinutesBefore ==
               this.secondReminderMinutesBefore &&
           other.isProvisional == this.isProvisional &&
+          other.taskId == this.taskId &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
           other.deletedAt == this.deletedAt &&
@@ -5440,6 +5476,7 @@ class AppointmentsCompanion extends UpdateCompanion<AppointmentEntry> {
   final Value<int?> reminderMinutesBefore;
   final Value<int?> secondReminderMinutesBefore;
   final Value<bool> isProvisional;
+  final Value<String?> taskId;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<DateTime?> deletedAt;
@@ -5459,6 +5496,7 @@ class AppointmentsCompanion extends UpdateCompanion<AppointmentEntry> {
     this.reminderMinutesBefore = const Value.absent(),
     this.secondReminderMinutesBefore = const Value.absent(),
     this.isProvisional = const Value.absent(),
+    this.taskId = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
@@ -5479,6 +5517,7 @@ class AppointmentsCompanion extends UpdateCompanion<AppointmentEntry> {
     this.reminderMinutesBefore = const Value.absent(),
     this.secondReminderMinutesBefore = const Value.absent(),
     this.isProvisional = const Value.absent(),
+    this.taskId = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
     this.deletedAt = const Value.absent(),
@@ -5504,6 +5543,7 @@ class AppointmentsCompanion extends UpdateCompanion<AppointmentEntry> {
     Expression<int>? reminderMinutesBefore,
     Expression<int>? secondReminderMinutesBefore,
     Expression<bool>? isProvisional,
+    Expression<String>? taskId,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? deletedAt,
@@ -5527,6 +5567,7 @@ class AppointmentsCompanion extends UpdateCompanion<AppointmentEntry> {
       if (secondReminderMinutesBefore != null)
         'second_reminder_minutes_before': secondReminderMinutesBefore,
       if (isProvisional != null) 'is_provisional': isProvisional,
+      if (taskId != null) 'task_id': taskId,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (deletedAt != null) 'deleted_at': deletedAt,
@@ -5549,6 +5590,7 @@ class AppointmentsCompanion extends UpdateCompanion<AppointmentEntry> {
     Value<int?>? reminderMinutesBefore,
     Value<int?>? secondReminderMinutesBefore,
     Value<bool>? isProvisional,
+    Value<String?>? taskId,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<DateTime?>? deletedAt,
@@ -5572,6 +5614,7 @@ class AppointmentsCompanion extends UpdateCompanion<AppointmentEntry> {
       secondReminderMinutesBefore:
           secondReminderMinutesBefore ?? this.secondReminderMinutesBefore,
       isProvisional: isProvisional ?? this.isProvisional,
+      taskId: taskId ?? this.taskId,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
@@ -5628,6 +5671,9 @@ class AppointmentsCompanion extends UpdateCompanion<AppointmentEntry> {
     if (isProvisional.present) {
       map['is_provisional'] = Variable<bool>(isProvisional.value);
     }
+    if (taskId.present) {
+      map['task_id'] = Variable<String>(taskId.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -5662,6 +5708,7 @@ class AppointmentsCompanion extends UpdateCompanion<AppointmentEntry> {
           ..write('reminderMinutesBefore: $reminderMinutesBefore, ')
           ..write('secondReminderMinutesBefore: $secondReminderMinutesBefore, ')
           ..write('isProvisional: $isProvisional, ')
+          ..write('taskId: $taskId, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
@@ -12155,6 +12202,60 @@ class $ResearchArticlesTable extends ResearchArticles
     requiredDuringInsert: false,
     defaultValue: const Constant('[]'),
   );
+  static const VerificationMeta _objectiveMeta = const VerificationMeta(
+    'objective',
+  );
+  @override
+  late final GeneratedColumn<String> objective = GeneratedColumn<String>(
+    'objective',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('active'),
+  );
+  static const VerificationMeta _conclusionMeta = const VerificationMeta(
+    'conclusion',
+  );
+  @override
+  late final GeneratedColumn<String> conclusion = GeneratedColumn<String>(
+    'conclusion',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _projectIdMeta = const VerificationMeta(
+    'projectId',
+  );
+  @override
+  late final GeneratedColumn<String> projectId = GeneratedColumn<String>(
+    'project_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _mainQuestionIdMeta = const VerificationMeta(
+    'mainQuestionId',
+  );
+  @override
+  late final GeneratedColumn<String> mainQuestionId = GeneratedColumn<String>(
+    'main_question_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -12208,6 +12309,11 @@ class $ResearchArticlesTable extends ResearchArticles
     content,
     tags,
     attachments,
+    objective,
+    status,
+    conclusion,
+    projectId,
+    mainQuestionId,
     createdAt,
     updatedAt,
     deletedAt,
@@ -12266,6 +12372,39 @@ class $ResearchArticlesTable extends ResearchArticles
         attachments.isAcceptableOrUnknown(
           data['attachments']!,
           _attachmentsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('objective')) {
+      context.handle(
+        _objectiveMeta,
+        objective.isAcceptableOrUnknown(data['objective']!, _objectiveMeta),
+      );
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    }
+    if (data.containsKey('conclusion')) {
+      context.handle(
+        _conclusionMeta,
+        conclusion.isAcceptableOrUnknown(data['conclusion']!, _conclusionMeta),
+      );
+    }
+    if (data.containsKey('project_id')) {
+      context.handle(
+        _projectIdMeta,
+        projectId.isAcceptableOrUnknown(data['project_id']!, _projectIdMeta),
+      );
+    }
+    if (data.containsKey('main_question_id')) {
+      context.handle(
+        _mainQuestionIdMeta,
+        mainQuestionId.isAcceptableOrUnknown(
+          data['main_question_id']!,
+          _mainQuestionIdMeta,
         ),
       );
     }
@@ -12330,6 +12469,26 @@ class $ResearchArticlesTable extends ResearchArticles
         DriftSqlType.string,
         data['${effectivePrefix}attachments'],
       )!,
+      objective: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}objective'],
+      ),
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      conclusion: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}conclusion'],
+      ),
+      projectId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}project_id'],
+      ),
+      mainQuestionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}main_question_id'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -12363,6 +12522,11 @@ class ResearchArticleEntry extends DataClass
   final String content;
   final String tags;
   final String attachments;
+  final String? objective;
+  final String status;
+  final String? conclusion;
+  final String? projectId;
+  final String? mainQuestionId;
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? deletedAt;
@@ -12374,6 +12538,11 @@ class ResearchArticleEntry extends DataClass
     required this.content,
     required this.tags,
     required this.attachments,
+    this.objective,
+    required this.status,
+    this.conclusion,
+    this.projectId,
+    this.mainQuestionId,
     required this.createdAt,
     required this.updatedAt,
     this.deletedAt,
@@ -12388,6 +12557,19 @@ class ResearchArticleEntry extends DataClass
     map['content'] = Variable<String>(content);
     map['tags'] = Variable<String>(tags);
     map['attachments'] = Variable<String>(attachments);
+    if (!nullToAbsent || objective != null) {
+      map['objective'] = Variable<String>(objective);
+    }
+    map['status'] = Variable<String>(status);
+    if (!nullToAbsent || conclusion != null) {
+      map['conclusion'] = Variable<String>(conclusion);
+    }
+    if (!nullToAbsent || projectId != null) {
+      map['project_id'] = Variable<String>(projectId);
+    }
+    if (!nullToAbsent || mainQuestionId != null) {
+      map['main_question_id'] = Variable<String>(mainQuestionId);
+    }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     if (!nullToAbsent || deletedAt != null) {
@@ -12405,6 +12587,19 @@ class ResearchArticleEntry extends DataClass
       content: Value(content),
       tags: Value(tags),
       attachments: Value(attachments),
+      objective: objective == null && nullToAbsent
+          ? const Value.absent()
+          : Value(objective),
+      status: Value(status),
+      conclusion: conclusion == null && nullToAbsent
+          ? const Value.absent()
+          : Value(conclusion),
+      projectId: projectId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(projectId),
+      mainQuestionId: mainQuestionId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(mainQuestionId),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
       deletedAt: deletedAt == null && nullToAbsent
@@ -12426,6 +12621,11 @@ class ResearchArticleEntry extends DataClass
       content: serializer.fromJson<String>(json['content']),
       tags: serializer.fromJson<String>(json['tags']),
       attachments: serializer.fromJson<String>(json['attachments']),
+      objective: serializer.fromJson<String?>(json['objective']),
+      status: serializer.fromJson<String>(json['status']),
+      conclusion: serializer.fromJson<String?>(json['conclusion']),
+      projectId: serializer.fromJson<String?>(json['projectId']),
+      mainQuestionId: serializer.fromJson<String?>(json['mainQuestionId']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
@@ -12442,6 +12642,11 @@ class ResearchArticleEntry extends DataClass
       'content': serializer.toJson<String>(content),
       'tags': serializer.toJson<String>(tags),
       'attachments': serializer.toJson<String>(attachments),
+      'objective': serializer.toJson<String?>(objective),
+      'status': serializer.toJson<String>(status),
+      'conclusion': serializer.toJson<String?>(conclusion),
+      'projectId': serializer.toJson<String?>(projectId),
+      'mainQuestionId': serializer.toJson<String?>(mainQuestionId),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
@@ -12456,6 +12661,11 @@ class ResearchArticleEntry extends DataClass
     String? content,
     String? tags,
     String? attachments,
+    Value<String?> objective = const Value.absent(),
+    String? status,
+    Value<String?> conclusion = const Value.absent(),
+    Value<String?> projectId = const Value.absent(),
+    Value<String?> mainQuestionId = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
     Value<DateTime?> deletedAt = const Value.absent(),
@@ -12467,6 +12677,13 @@ class ResearchArticleEntry extends DataClass
     content: content ?? this.content,
     tags: tags ?? this.tags,
     attachments: attachments ?? this.attachments,
+    objective: objective.present ? objective.value : this.objective,
+    status: status ?? this.status,
+    conclusion: conclusion.present ? conclusion.value : this.conclusion,
+    projectId: projectId.present ? projectId.value : this.projectId,
+    mainQuestionId: mainQuestionId.present
+        ? mainQuestionId.value
+        : this.mainQuestionId,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
@@ -12482,6 +12699,15 @@ class ResearchArticleEntry extends DataClass
       attachments: data.attachments.present
           ? data.attachments.value
           : this.attachments,
+      objective: data.objective.present ? data.objective.value : this.objective,
+      status: data.status.present ? data.status.value : this.status,
+      conclusion: data.conclusion.present
+          ? data.conclusion.value
+          : this.conclusion,
+      projectId: data.projectId.present ? data.projectId.value : this.projectId,
+      mainQuestionId: data.mainQuestionId.present
+          ? data.mainQuestionId.value
+          : this.mainQuestionId,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
@@ -12498,6 +12724,11 @@ class ResearchArticleEntry extends DataClass
           ..write('content: $content, ')
           ..write('tags: $tags, ')
           ..write('attachments: $attachments, ')
+          ..write('objective: $objective, ')
+          ..write('status: $status, ')
+          ..write('conclusion: $conclusion, ')
+          ..write('projectId: $projectId, ')
+          ..write('mainQuestionId: $mainQuestionId, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
@@ -12514,6 +12745,11 @@ class ResearchArticleEntry extends DataClass
     content,
     tags,
     attachments,
+    objective,
+    status,
+    conclusion,
+    projectId,
+    mainQuestionId,
     createdAt,
     updatedAt,
     deletedAt,
@@ -12529,6 +12765,11 @@ class ResearchArticleEntry extends DataClass
           other.content == this.content &&
           other.tags == this.tags &&
           other.attachments == this.attachments &&
+          other.objective == this.objective &&
+          other.status == this.status &&
+          other.conclusion == this.conclusion &&
+          other.projectId == this.projectId &&
+          other.mainQuestionId == this.mainQuestionId &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
           other.deletedAt == this.deletedAt &&
@@ -12542,6 +12783,11 @@ class ResearchArticlesCompanion extends UpdateCompanion<ResearchArticleEntry> {
   final Value<String> content;
   final Value<String> tags;
   final Value<String> attachments;
+  final Value<String?> objective;
+  final Value<String> status;
+  final Value<String?> conclusion;
+  final Value<String?> projectId;
+  final Value<String?> mainQuestionId;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<DateTime?> deletedAt;
@@ -12554,6 +12800,11 @@ class ResearchArticlesCompanion extends UpdateCompanion<ResearchArticleEntry> {
     this.content = const Value.absent(),
     this.tags = const Value.absent(),
     this.attachments = const Value.absent(),
+    this.objective = const Value.absent(),
+    this.status = const Value.absent(),
+    this.conclusion = const Value.absent(),
+    this.projectId = const Value.absent(),
+    this.mainQuestionId = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
@@ -12567,6 +12818,11 @@ class ResearchArticlesCompanion extends UpdateCompanion<ResearchArticleEntry> {
     required String content,
     this.tags = const Value.absent(),
     this.attachments = const Value.absent(),
+    this.objective = const Value.absent(),
+    this.status = const Value.absent(),
+    this.conclusion = const Value.absent(),
+    this.projectId = const Value.absent(),
+    this.mainQuestionId = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
     this.deletedAt = const Value.absent(),
@@ -12585,6 +12841,11 @@ class ResearchArticlesCompanion extends UpdateCompanion<ResearchArticleEntry> {
     Expression<String>? content,
     Expression<String>? tags,
     Expression<String>? attachments,
+    Expression<String>? objective,
+    Expression<String>? status,
+    Expression<String>? conclusion,
+    Expression<String>? projectId,
+    Expression<String>? mainQuestionId,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? deletedAt,
@@ -12598,6 +12859,11 @@ class ResearchArticlesCompanion extends UpdateCompanion<ResearchArticleEntry> {
       if (content != null) 'content': content,
       if (tags != null) 'tags': tags,
       if (attachments != null) 'attachments': attachments,
+      if (objective != null) 'objective': objective,
+      if (status != null) 'status': status,
+      if (conclusion != null) 'conclusion': conclusion,
+      if (projectId != null) 'project_id': projectId,
+      if (mainQuestionId != null) 'main_question_id': mainQuestionId,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (deletedAt != null) 'deleted_at': deletedAt,
@@ -12613,6 +12879,11 @@ class ResearchArticlesCompanion extends UpdateCompanion<ResearchArticleEntry> {
     Value<String>? content,
     Value<String>? tags,
     Value<String>? attachments,
+    Value<String?>? objective,
+    Value<String>? status,
+    Value<String?>? conclusion,
+    Value<String?>? projectId,
+    Value<String?>? mainQuestionId,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<DateTime?>? deletedAt,
@@ -12626,6 +12897,11 @@ class ResearchArticlesCompanion extends UpdateCompanion<ResearchArticleEntry> {
       content: content ?? this.content,
       tags: tags ?? this.tags,
       attachments: attachments ?? this.attachments,
+      objective: objective ?? this.objective,
+      status: status ?? this.status,
+      conclusion: conclusion ?? this.conclusion,
+      projectId: projectId ?? this.projectId,
+      mainQuestionId: mainQuestionId ?? this.mainQuestionId,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
@@ -12655,6 +12931,21 @@ class ResearchArticlesCompanion extends UpdateCompanion<ResearchArticleEntry> {
     if (attachments.present) {
       map['attachments'] = Variable<String>(attachments.value);
     }
+    if (objective.present) {
+      map['objective'] = Variable<String>(objective.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (conclusion.present) {
+      map['conclusion'] = Variable<String>(conclusion.value);
+    }
+    if (projectId.present) {
+      map['project_id'] = Variable<String>(projectId.value);
+    }
+    if (mainQuestionId.present) {
+      map['main_question_id'] = Variable<String>(mainQuestionId.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -12682,6 +12973,11 @@ class ResearchArticlesCompanion extends UpdateCompanion<ResearchArticleEntry> {
           ..write('content: $content, ')
           ..write('tags: $tags, ')
           ..write('attachments: $attachments, ')
+          ..write('objective: $objective, ')
+          ..write('status: $status, ')
+          ..write('conclusion: $conclusion, ')
+          ..write('projectId: $projectId, ')
+          ..write('mainQuestionId: $mainQuestionId, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
@@ -16541,6 +16837,7265 @@ class AppLanguagesCompanion extends UpdateCompanion<AppLanguageEntry> {
   }
 }
 
+class $InboxEntriesTable extends InboxEntries
+    with TableInfo<$InboxEntriesTable, InboxEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $InboxEntriesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _contentMeta = const VerificationMeta(
+    'content',
+  );
+  @override
+  late final GeneratedColumn<String> content = GeneratedColumn<String>(
+    'content',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sourceTypeMeta = const VerificationMeta(
+    'sourceType',
+  );
+  @override
+  late final GeneratedColumn<String> sourceType = GeneratedColumn<String>(
+    'source_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('text'),
+  );
+  static const VerificationMeta _mediaPathMeta = const VerificationMeta(
+    'mediaPath',
+  );
+  @override
+  late final GeneratedColumn<String> mediaPath = GeneratedColumn<String>(
+    'media_path',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _mediaDurationSecondsMeta =
+      const VerificationMeta('mediaDurationSeconds');
+  @override
+  late final GeneratedColumn<int> mediaDurationSeconds = GeneratedColumn<int>(
+    'media_duration_seconds',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _attachmentsMeta = const VerificationMeta(
+    'attachments',
+  );
+  @override
+  late final GeneratedColumn<String> attachments = GeneratedColumn<String>(
+    'attachments',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('unprocessed'),
+  );
+  static const VerificationMeta _suggestedCategoryMeta = const VerificationMeta(
+    'suggestedCategory',
+  );
+  @override
+  late final GeneratedColumn<String> suggestedCategory =
+      GeneratedColumn<String>(
+        'suggested_category',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _convertedEntityTypeMeta =
+      const VerificationMeta('convertedEntityType');
+  @override
+  late final GeneratedColumn<String> convertedEntityType =
+      GeneratedColumn<String>(
+        'converted_entity_type',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _convertedEntityIdMeta = const VerificationMeta(
+    'convertedEntityId',
+  );
+  @override
+  late final GeneratedColumn<String> convertedEntityId =
+      GeneratedColumn<String>(
+        'converted_entity_id',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _capturedAtMeta = const VerificationMeta(
+    'capturedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> capturedAt = GeneratedColumn<DateTime>(
+    'captured_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _processedAtMeta = const VerificationMeta(
+    'processedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> processedAt = GeneratedColumn<DateTime>(
+    'processed_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _metadataMeta = const VerificationMeta(
+    'metadata',
+  );
+  @override
+  late final GeneratedColumn<String> metadata = GeneratedColumn<String>(
+    'metadata',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('{}'),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _revisionMeta = const VerificationMeta(
+    'revision',
+  );
+  @override
+  late final GeneratedColumn<int> revision = GeneratedColumn<int>(
+    'revision',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    content,
+    sourceType,
+    mediaPath,
+    mediaDurationSeconds,
+    attachments,
+    status,
+    suggestedCategory,
+    convertedEntityType,
+    convertedEntityId,
+    capturedAt,
+    processedAt,
+    metadata,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'inbox_entries';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<InboxEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('content')) {
+      context.handle(
+        _contentMeta,
+        content.isAcceptableOrUnknown(data['content']!, _contentMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_contentMeta);
+    }
+    if (data.containsKey('source_type')) {
+      context.handle(
+        _sourceTypeMeta,
+        sourceType.isAcceptableOrUnknown(data['source_type']!, _sourceTypeMeta),
+      );
+    }
+    if (data.containsKey('media_path')) {
+      context.handle(
+        _mediaPathMeta,
+        mediaPath.isAcceptableOrUnknown(data['media_path']!, _mediaPathMeta),
+      );
+    }
+    if (data.containsKey('media_duration_seconds')) {
+      context.handle(
+        _mediaDurationSecondsMeta,
+        mediaDurationSeconds.isAcceptableOrUnknown(
+          data['media_duration_seconds']!,
+          _mediaDurationSecondsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('attachments')) {
+      context.handle(
+        _attachmentsMeta,
+        attachments.isAcceptableOrUnknown(
+          data['attachments']!,
+          _attachmentsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    }
+    if (data.containsKey('suggested_category')) {
+      context.handle(
+        _suggestedCategoryMeta,
+        suggestedCategory.isAcceptableOrUnknown(
+          data['suggested_category']!,
+          _suggestedCategoryMeta,
+        ),
+      );
+    }
+    if (data.containsKey('converted_entity_type')) {
+      context.handle(
+        _convertedEntityTypeMeta,
+        convertedEntityType.isAcceptableOrUnknown(
+          data['converted_entity_type']!,
+          _convertedEntityTypeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('converted_entity_id')) {
+      context.handle(
+        _convertedEntityIdMeta,
+        convertedEntityId.isAcceptableOrUnknown(
+          data['converted_entity_id']!,
+          _convertedEntityIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('captured_at')) {
+      context.handle(
+        _capturedAtMeta,
+        capturedAt.isAcceptableOrUnknown(data['captured_at']!, _capturedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_capturedAtMeta);
+    }
+    if (data.containsKey('processed_at')) {
+      context.handle(
+        _processedAtMeta,
+        processedAt.isAcceptableOrUnknown(
+          data['processed_at']!,
+          _processedAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('metadata')) {
+      context.handle(
+        _metadataMeta,
+        metadata.isAcceptableOrUnknown(data['metadata']!, _metadataMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    if (data.containsKey('revision')) {
+      context.handle(
+        _revisionMeta,
+        revision.isAcceptableOrUnknown(data['revision']!, _revisionMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  InboxEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return InboxEntry(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      content: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}content'],
+      )!,
+      sourceType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_type'],
+      )!,
+      mediaPath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}media_path'],
+      ),
+      mediaDurationSeconds: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}media_duration_seconds'],
+      ),
+      attachments: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}attachments'],
+      )!,
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      suggestedCategory: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}suggested_category'],
+      ),
+      convertedEntityType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}converted_entity_type'],
+      ),
+      convertedEntityId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}converted_entity_id'],
+      ),
+      capturedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}captured_at'],
+      )!,
+      processedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}processed_at'],
+      ),
+      metadata: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}metadata'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+      revision: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}revision'],
+      )!,
+    );
+  }
+
+  @override
+  $InboxEntriesTable createAlias(String alias) {
+    return $InboxEntriesTable(attachedDatabase, alias);
+  }
+}
+
+class InboxEntry extends DataClass implements Insertable<InboxEntry> {
+  final String id;
+  final String content;
+  final String sourceType;
+  final String? mediaPath;
+  final int? mediaDurationSeconds;
+  final String attachments;
+  final String status;
+  final String? suggestedCategory;
+  final String? convertedEntityType;
+  final String? convertedEntityId;
+  final DateTime capturedAt;
+  final DateTime? processedAt;
+  final String metadata;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime? deletedAt;
+  final int revision;
+  const InboxEntry({
+    required this.id,
+    required this.content,
+    required this.sourceType,
+    this.mediaPath,
+    this.mediaDurationSeconds,
+    required this.attachments,
+    required this.status,
+    this.suggestedCategory,
+    this.convertedEntityType,
+    this.convertedEntityId,
+    required this.capturedAt,
+    this.processedAt,
+    required this.metadata,
+    required this.createdAt,
+    required this.updatedAt,
+    this.deletedAt,
+    required this.revision,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['content'] = Variable<String>(content);
+    map['source_type'] = Variable<String>(sourceType);
+    if (!nullToAbsent || mediaPath != null) {
+      map['media_path'] = Variable<String>(mediaPath);
+    }
+    if (!nullToAbsent || mediaDurationSeconds != null) {
+      map['media_duration_seconds'] = Variable<int>(mediaDurationSeconds);
+    }
+    map['attachments'] = Variable<String>(attachments);
+    map['status'] = Variable<String>(status);
+    if (!nullToAbsent || suggestedCategory != null) {
+      map['suggested_category'] = Variable<String>(suggestedCategory);
+    }
+    if (!nullToAbsent || convertedEntityType != null) {
+      map['converted_entity_type'] = Variable<String>(convertedEntityType);
+    }
+    if (!nullToAbsent || convertedEntityId != null) {
+      map['converted_entity_id'] = Variable<String>(convertedEntityId);
+    }
+    map['captured_at'] = Variable<DateTime>(capturedAt);
+    if (!nullToAbsent || processedAt != null) {
+      map['processed_at'] = Variable<DateTime>(processedAt);
+    }
+    map['metadata'] = Variable<String>(metadata);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    map['revision'] = Variable<int>(revision);
+    return map;
+  }
+
+  InboxEntriesCompanion toCompanion(bool nullToAbsent) {
+    return InboxEntriesCompanion(
+      id: Value(id),
+      content: Value(content),
+      sourceType: Value(sourceType),
+      mediaPath: mediaPath == null && nullToAbsent
+          ? const Value.absent()
+          : Value(mediaPath),
+      mediaDurationSeconds: mediaDurationSeconds == null && nullToAbsent
+          ? const Value.absent()
+          : Value(mediaDurationSeconds),
+      attachments: Value(attachments),
+      status: Value(status),
+      suggestedCategory: suggestedCategory == null && nullToAbsent
+          ? const Value.absent()
+          : Value(suggestedCategory),
+      convertedEntityType: convertedEntityType == null && nullToAbsent
+          ? const Value.absent()
+          : Value(convertedEntityType),
+      convertedEntityId: convertedEntityId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(convertedEntityId),
+      capturedAt: Value(capturedAt),
+      processedAt: processedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(processedAt),
+      metadata: Value(metadata),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      revision: Value(revision),
+    );
+  }
+
+  factory InboxEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return InboxEntry(
+      id: serializer.fromJson<String>(json['id']),
+      content: serializer.fromJson<String>(json['content']),
+      sourceType: serializer.fromJson<String>(json['sourceType']),
+      mediaPath: serializer.fromJson<String?>(json['mediaPath']),
+      mediaDurationSeconds: serializer.fromJson<int?>(
+        json['mediaDurationSeconds'],
+      ),
+      attachments: serializer.fromJson<String>(json['attachments']),
+      status: serializer.fromJson<String>(json['status']),
+      suggestedCategory: serializer.fromJson<String?>(
+        json['suggestedCategory'],
+      ),
+      convertedEntityType: serializer.fromJson<String?>(
+        json['convertedEntityType'],
+      ),
+      convertedEntityId: serializer.fromJson<String?>(
+        json['convertedEntityId'],
+      ),
+      capturedAt: serializer.fromJson<DateTime>(json['capturedAt']),
+      processedAt: serializer.fromJson<DateTime?>(json['processedAt']),
+      metadata: serializer.fromJson<String>(json['metadata']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      revision: serializer.fromJson<int>(json['revision']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'content': serializer.toJson<String>(content),
+      'sourceType': serializer.toJson<String>(sourceType),
+      'mediaPath': serializer.toJson<String?>(mediaPath),
+      'mediaDurationSeconds': serializer.toJson<int?>(mediaDurationSeconds),
+      'attachments': serializer.toJson<String>(attachments),
+      'status': serializer.toJson<String>(status),
+      'suggestedCategory': serializer.toJson<String?>(suggestedCategory),
+      'convertedEntityType': serializer.toJson<String?>(convertedEntityType),
+      'convertedEntityId': serializer.toJson<String?>(convertedEntityId),
+      'capturedAt': serializer.toJson<DateTime>(capturedAt),
+      'processedAt': serializer.toJson<DateTime?>(processedAt),
+      'metadata': serializer.toJson<String>(metadata),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'revision': serializer.toJson<int>(revision),
+    };
+  }
+
+  InboxEntry copyWith({
+    String? id,
+    String? content,
+    String? sourceType,
+    Value<String?> mediaPath = const Value.absent(),
+    Value<int?> mediaDurationSeconds = const Value.absent(),
+    String? attachments,
+    String? status,
+    Value<String?> suggestedCategory = const Value.absent(),
+    Value<String?> convertedEntityType = const Value.absent(),
+    Value<String?> convertedEntityId = const Value.absent(),
+    DateTime? capturedAt,
+    Value<DateTime?> processedAt = const Value.absent(),
+    String? metadata,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    Value<DateTime?> deletedAt = const Value.absent(),
+    int? revision,
+  }) => InboxEntry(
+    id: id ?? this.id,
+    content: content ?? this.content,
+    sourceType: sourceType ?? this.sourceType,
+    mediaPath: mediaPath.present ? mediaPath.value : this.mediaPath,
+    mediaDurationSeconds: mediaDurationSeconds.present
+        ? mediaDurationSeconds.value
+        : this.mediaDurationSeconds,
+    attachments: attachments ?? this.attachments,
+    status: status ?? this.status,
+    suggestedCategory: suggestedCategory.present
+        ? suggestedCategory.value
+        : this.suggestedCategory,
+    convertedEntityType: convertedEntityType.present
+        ? convertedEntityType.value
+        : this.convertedEntityType,
+    convertedEntityId: convertedEntityId.present
+        ? convertedEntityId.value
+        : this.convertedEntityId,
+    capturedAt: capturedAt ?? this.capturedAt,
+    processedAt: processedAt.present ? processedAt.value : this.processedAt,
+    metadata: metadata ?? this.metadata,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    revision: revision ?? this.revision,
+  );
+  InboxEntry copyWithCompanion(InboxEntriesCompanion data) {
+    return InboxEntry(
+      id: data.id.present ? data.id.value : this.id,
+      content: data.content.present ? data.content.value : this.content,
+      sourceType: data.sourceType.present
+          ? data.sourceType.value
+          : this.sourceType,
+      mediaPath: data.mediaPath.present ? data.mediaPath.value : this.mediaPath,
+      mediaDurationSeconds: data.mediaDurationSeconds.present
+          ? data.mediaDurationSeconds.value
+          : this.mediaDurationSeconds,
+      attachments: data.attachments.present
+          ? data.attachments.value
+          : this.attachments,
+      status: data.status.present ? data.status.value : this.status,
+      suggestedCategory: data.suggestedCategory.present
+          ? data.suggestedCategory.value
+          : this.suggestedCategory,
+      convertedEntityType: data.convertedEntityType.present
+          ? data.convertedEntityType.value
+          : this.convertedEntityType,
+      convertedEntityId: data.convertedEntityId.present
+          ? data.convertedEntityId.value
+          : this.convertedEntityId,
+      capturedAt: data.capturedAt.present
+          ? data.capturedAt.value
+          : this.capturedAt,
+      processedAt: data.processedAt.present
+          ? data.processedAt.value
+          : this.processedAt,
+      metadata: data.metadata.present ? data.metadata.value : this.metadata,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      revision: data.revision.present ? data.revision.value : this.revision,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('InboxEntry(')
+          ..write('id: $id, ')
+          ..write('content: $content, ')
+          ..write('sourceType: $sourceType, ')
+          ..write('mediaPath: $mediaPath, ')
+          ..write('mediaDurationSeconds: $mediaDurationSeconds, ')
+          ..write('attachments: $attachments, ')
+          ..write('status: $status, ')
+          ..write('suggestedCategory: $suggestedCategory, ')
+          ..write('convertedEntityType: $convertedEntityType, ')
+          ..write('convertedEntityId: $convertedEntityId, ')
+          ..write('capturedAt: $capturedAt, ')
+          ..write('processedAt: $processedAt, ')
+          ..write('metadata: $metadata, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    content,
+    sourceType,
+    mediaPath,
+    mediaDurationSeconds,
+    attachments,
+    status,
+    suggestedCategory,
+    convertedEntityType,
+    convertedEntityId,
+    capturedAt,
+    processedAt,
+    metadata,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is InboxEntry &&
+          other.id == this.id &&
+          other.content == this.content &&
+          other.sourceType == this.sourceType &&
+          other.mediaPath == this.mediaPath &&
+          other.mediaDurationSeconds == this.mediaDurationSeconds &&
+          other.attachments == this.attachments &&
+          other.status == this.status &&
+          other.suggestedCategory == this.suggestedCategory &&
+          other.convertedEntityType == this.convertedEntityType &&
+          other.convertedEntityId == this.convertedEntityId &&
+          other.capturedAt == this.capturedAt &&
+          other.processedAt == this.processedAt &&
+          other.metadata == this.metadata &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt &&
+          other.revision == this.revision);
+}
+
+class InboxEntriesCompanion extends UpdateCompanion<InboxEntry> {
+  final Value<String> id;
+  final Value<String> content;
+  final Value<String> sourceType;
+  final Value<String?> mediaPath;
+  final Value<int?> mediaDurationSeconds;
+  final Value<String> attachments;
+  final Value<String> status;
+  final Value<String?> suggestedCategory;
+  final Value<String?> convertedEntityType;
+  final Value<String?> convertedEntityId;
+  final Value<DateTime> capturedAt;
+  final Value<DateTime?> processedAt;
+  final Value<String> metadata;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> revision;
+  final Value<int> rowid;
+  const InboxEntriesCompanion({
+    this.id = const Value.absent(),
+    this.content = const Value.absent(),
+    this.sourceType = const Value.absent(),
+    this.mediaPath = const Value.absent(),
+    this.mediaDurationSeconds = const Value.absent(),
+    this.attachments = const Value.absent(),
+    this.status = const Value.absent(),
+    this.suggestedCategory = const Value.absent(),
+    this.convertedEntityType = const Value.absent(),
+    this.convertedEntityId = const Value.absent(),
+    this.capturedAt = const Value.absent(),
+    this.processedAt = const Value.absent(),
+    this.metadata = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  InboxEntriesCompanion.insert({
+    required String id,
+    required String content,
+    this.sourceType = const Value.absent(),
+    this.mediaPath = const Value.absent(),
+    this.mediaDurationSeconds = const Value.absent(),
+    this.attachments = const Value.absent(),
+    this.status = const Value.absent(),
+    this.suggestedCategory = const Value.absent(),
+    this.convertedEntityType = const Value.absent(),
+    this.convertedEntityId = const Value.absent(),
+    required DateTime capturedAt,
+    this.processedAt = const Value.absent(),
+    this.metadata = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       content = Value(content),
+       capturedAt = Value(capturedAt),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<InboxEntry> custom({
+    Expression<String>? id,
+    Expression<String>? content,
+    Expression<String>? sourceType,
+    Expression<String>? mediaPath,
+    Expression<int>? mediaDurationSeconds,
+    Expression<String>? attachments,
+    Expression<String>? status,
+    Expression<String>? suggestedCategory,
+    Expression<String>? convertedEntityType,
+    Expression<String>? convertedEntityId,
+    Expression<DateTime>? capturedAt,
+    Expression<DateTime>? processedAt,
+    Expression<String>? metadata,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? revision,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (content != null) 'content': content,
+      if (sourceType != null) 'source_type': sourceType,
+      if (mediaPath != null) 'media_path': mediaPath,
+      if (mediaDurationSeconds != null)
+        'media_duration_seconds': mediaDurationSeconds,
+      if (attachments != null) 'attachments': attachments,
+      if (status != null) 'status': status,
+      if (suggestedCategory != null) 'suggested_category': suggestedCategory,
+      if (convertedEntityType != null)
+        'converted_entity_type': convertedEntityType,
+      if (convertedEntityId != null) 'converted_entity_id': convertedEntityId,
+      if (capturedAt != null) 'captured_at': capturedAt,
+      if (processedAt != null) 'processed_at': processedAt,
+      if (metadata != null) 'metadata': metadata,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (revision != null) 'revision': revision,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  InboxEntriesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? content,
+    Value<String>? sourceType,
+    Value<String?>? mediaPath,
+    Value<int?>? mediaDurationSeconds,
+    Value<String>? attachments,
+    Value<String>? status,
+    Value<String?>? suggestedCategory,
+    Value<String?>? convertedEntityType,
+    Value<String?>? convertedEntityId,
+    Value<DateTime>? capturedAt,
+    Value<DateTime?>? processedAt,
+    Value<String>? metadata,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? revision,
+    Value<int>? rowid,
+  }) {
+    return InboxEntriesCompanion(
+      id: id ?? this.id,
+      content: content ?? this.content,
+      sourceType: sourceType ?? this.sourceType,
+      mediaPath: mediaPath ?? this.mediaPath,
+      mediaDurationSeconds: mediaDurationSeconds ?? this.mediaDurationSeconds,
+      attachments: attachments ?? this.attachments,
+      status: status ?? this.status,
+      suggestedCategory: suggestedCategory ?? this.suggestedCategory,
+      convertedEntityType: convertedEntityType ?? this.convertedEntityType,
+      convertedEntityId: convertedEntityId ?? this.convertedEntityId,
+      capturedAt: capturedAt ?? this.capturedAt,
+      processedAt: processedAt ?? this.processedAt,
+      metadata: metadata ?? this.metadata,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      revision: revision ?? this.revision,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (content.present) {
+      map['content'] = Variable<String>(content.value);
+    }
+    if (sourceType.present) {
+      map['source_type'] = Variable<String>(sourceType.value);
+    }
+    if (mediaPath.present) {
+      map['media_path'] = Variable<String>(mediaPath.value);
+    }
+    if (mediaDurationSeconds.present) {
+      map['media_duration_seconds'] = Variable<int>(mediaDurationSeconds.value);
+    }
+    if (attachments.present) {
+      map['attachments'] = Variable<String>(attachments.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (suggestedCategory.present) {
+      map['suggested_category'] = Variable<String>(suggestedCategory.value);
+    }
+    if (convertedEntityType.present) {
+      map['converted_entity_type'] = Variable<String>(
+        convertedEntityType.value,
+      );
+    }
+    if (convertedEntityId.present) {
+      map['converted_entity_id'] = Variable<String>(convertedEntityId.value);
+    }
+    if (capturedAt.present) {
+      map['captured_at'] = Variable<DateTime>(capturedAt.value);
+    }
+    if (processedAt.present) {
+      map['processed_at'] = Variable<DateTime>(processedAt.value);
+    }
+    if (metadata.present) {
+      map['metadata'] = Variable<String>(metadata.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (revision.present) {
+      map['revision'] = Variable<int>(revision.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('InboxEntriesCompanion(')
+          ..write('id: $id, ')
+          ..write('content: $content, ')
+          ..write('sourceType: $sourceType, ')
+          ..write('mediaPath: $mediaPath, ')
+          ..write('mediaDurationSeconds: $mediaDurationSeconds, ')
+          ..write('attachments: $attachments, ')
+          ..write('status: $status, ')
+          ..write('suggestedCategory: $suggestedCategory, ')
+          ..write('convertedEntityType: $convertedEntityType, ')
+          ..write('convertedEntityId: $convertedEntityId, ')
+          ..write('capturedAt: $capturedAt, ')
+          ..write('processedAt: $processedAt, ')
+          ..write('metadata: $metadata, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $ProjectsTable extends Projects
+    with TableInfo<$ProjectsTable, ProjectEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ProjectsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _objectiveMeta = const VerificationMeta(
+    'objective',
+  );
+  @override
+  late final GeneratedColumn<String> objective = GeneratedColumn<String>(
+    'objective',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _descriptionMeta = const VerificationMeta(
+    'description',
+  );
+  @override
+  late final GeneratedColumn<String> description = GeneratedColumn<String>(
+    'description',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _categoryMeta = const VerificationMeta(
+    'category',
+  );
+  @override
+  late final GeneratedColumn<String> category = GeneratedColumn<String>(
+    'category',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('ministry'),
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('active'),
+  );
+  static const VerificationMeta _colorHexMeta = const VerificationMeta(
+    'colorHex',
+  );
+  @override
+  late final GeneratedColumn<String> colorHex = GeneratedColumn<String>(
+    'color_hex',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _iconNameMeta = const VerificationMeta(
+    'iconName',
+  );
+  @override
+  late final GeneratedColumn<String> iconName = GeneratedColumn<String>(
+    'icon_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _startDateMeta = const VerificationMeta(
+    'startDate',
+  );
+  @override
+  late final GeneratedColumn<DateTime> startDate = GeneratedColumn<DateTime>(
+    'start_date',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _targetDateMeta = const VerificationMeta(
+    'targetDate',
+  );
+  @override
+  late final GeneratedColumn<DateTime> targetDate = GeneratedColumn<DateTime>(
+    'target_date',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _completedAtMeta = const VerificationMeta(
+    'completedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> completedAt = GeneratedColumn<DateTime>(
+    'completed_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _originInboxIdMeta = const VerificationMeta(
+    'originInboxId',
+  );
+  @override
+  late final GeneratedColumn<String> originInboxId = GeneratedColumn<String>(
+    'origin_inbox_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _metadataMeta = const VerificationMeta(
+    'metadata',
+  );
+  @override
+  late final GeneratedColumn<String> metadata = GeneratedColumn<String>(
+    'metadata',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('{}'),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _revisionMeta = const VerificationMeta(
+    'revision',
+  );
+  @override
+  late final GeneratedColumn<int> revision = GeneratedColumn<int>(
+    'revision',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    name,
+    objective,
+    description,
+    category,
+    status,
+    colorHex,
+    iconName,
+    startDate,
+    targetDate,
+    completedAt,
+    originInboxId,
+    metadata,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'projects';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ProjectEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('objective')) {
+      context.handle(
+        _objectiveMeta,
+        objective.isAcceptableOrUnknown(data['objective']!, _objectiveMeta),
+      );
+    }
+    if (data.containsKey('description')) {
+      context.handle(
+        _descriptionMeta,
+        description.isAcceptableOrUnknown(
+          data['description']!,
+          _descriptionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('category')) {
+      context.handle(
+        _categoryMeta,
+        category.isAcceptableOrUnknown(data['category']!, _categoryMeta),
+      );
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    }
+    if (data.containsKey('color_hex')) {
+      context.handle(
+        _colorHexMeta,
+        colorHex.isAcceptableOrUnknown(data['color_hex']!, _colorHexMeta),
+      );
+    }
+    if (data.containsKey('icon_name')) {
+      context.handle(
+        _iconNameMeta,
+        iconName.isAcceptableOrUnknown(data['icon_name']!, _iconNameMeta),
+      );
+    }
+    if (data.containsKey('start_date')) {
+      context.handle(
+        _startDateMeta,
+        startDate.isAcceptableOrUnknown(data['start_date']!, _startDateMeta),
+      );
+    }
+    if (data.containsKey('target_date')) {
+      context.handle(
+        _targetDateMeta,
+        targetDate.isAcceptableOrUnknown(data['target_date']!, _targetDateMeta),
+      );
+    }
+    if (data.containsKey('completed_at')) {
+      context.handle(
+        _completedAtMeta,
+        completedAt.isAcceptableOrUnknown(
+          data['completed_at']!,
+          _completedAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('origin_inbox_id')) {
+      context.handle(
+        _originInboxIdMeta,
+        originInboxId.isAcceptableOrUnknown(
+          data['origin_inbox_id']!,
+          _originInboxIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('metadata')) {
+      context.handle(
+        _metadataMeta,
+        metadata.isAcceptableOrUnknown(data['metadata']!, _metadataMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    if (data.containsKey('revision')) {
+      context.handle(
+        _revisionMeta,
+        revision.isAcceptableOrUnknown(data['revision']!, _revisionMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ProjectEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ProjectEntry(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      objective: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}objective'],
+      ),
+      description: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}description'],
+      ),
+      category: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}category'],
+      )!,
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      colorHex: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}color_hex'],
+      ),
+      iconName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}icon_name'],
+      ),
+      startDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}start_date'],
+      ),
+      targetDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}target_date'],
+      ),
+      completedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}completed_at'],
+      ),
+      originInboxId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}origin_inbox_id'],
+      ),
+      metadata: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}metadata'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+      revision: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}revision'],
+      )!,
+    );
+  }
+
+  @override
+  $ProjectsTable createAlias(String alias) {
+    return $ProjectsTable(attachedDatabase, alias);
+  }
+}
+
+class ProjectEntry extends DataClass implements Insertable<ProjectEntry> {
+  final String id;
+  final String name;
+  final String? objective;
+  final String? description;
+  final String category;
+  final String status;
+  final String? colorHex;
+  final String? iconName;
+  final DateTime? startDate;
+  final DateTime? targetDate;
+  final DateTime? completedAt;
+  final String? originInboxId;
+  final String metadata;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime? deletedAt;
+  final int revision;
+  const ProjectEntry({
+    required this.id,
+    required this.name,
+    this.objective,
+    this.description,
+    required this.category,
+    required this.status,
+    this.colorHex,
+    this.iconName,
+    this.startDate,
+    this.targetDate,
+    this.completedAt,
+    this.originInboxId,
+    required this.metadata,
+    required this.createdAt,
+    required this.updatedAt,
+    this.deletedAt,
+    required this.revision,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    if (!nullToAbsent || objective != null) {
+      map['objective'] = Variable<String>(objective);
+    }
+    if (!nullToAbsent || description != null) {
+      map['description'] = Variable<String>(description);
+    }
+    map['category'] = Variable<String>(category);
+    map['status'] = Variable<String>(status);
+    if (!nullToAbsent || colorHex != null) {
+      map['color_hex'] = Variable<String>(colorHex);
+    }
+    if (!nullToAbsent || iconName != null) {
+      map['icon_name'] = Variable<String>(iconName);
+    }
+    if (!nullToAbsent || startDate != null) {
+      map['start_date'] = Variable<DateTime>(startDate);
+    }
+    if (!nullToAbsent || targetDate != null) {
+      map['target_date'] = Variable<DateTime>(targetDate);
+    }
+    if (!nullToAbsent || completedAt != null) {
+      map['completed_at'] = Variable<DateTime>(completedAt);
+    }
+    if (!nullToAbsent || originInboxId != null) {
+      map['origin_inbox_id'] = Variable<String>(originInboxId);
+    }
+    map['metadata'] = Variable<String>(metadata);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    map['revision'] = Variable<int>(revision);
+    return map;
+  }
+
+  ProjectsCompanion toCompanion(bool nullToAbsent) {
+    return ProjectsCompanion(
+      id: Value(id),
+      name: Value(name),
+      objective: objective == null && nullToAbsent
+          ? const Value.absent()
+          : Value(objective),
+      description: description == null && nullToAbsent
+          ? const Value.absent()
+          : Value(description),
+      category: Value(category),
+      status: Value(status),
+      colorHex: colorHex == null && nullToAbsent
+          ? const Value.absent()
+          : Value(colorHex),
+      iconName: iconName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(iconName),
+      startDate: startDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(startDate),
+      targetDate: targetDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(targetDate),
+      completedAt: completedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(completedAt),
+      originInboxId: originInboxId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(originInboxId),
+      metadata: Value(metadata),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      revision: Value(revision),
+    );
+  }
+
+  factory ProjectEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ProjectEntry(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      objective: serializer.fromJson<String?>(json['objective']),
+      description: serializer.fromJson<String?>(json['description']),
+      category: serializer.fromJson<String>(json['category']),
+      status: serializer.fromJson<String>(json['status']),
+      colorHex: serializer.fromJson<String?>(json['colorHex']),
+      iconName: serializer.fromJson<String?>(json['iconName']),
+      startDate: serializer.fromJson<DateTime?>(json['startDate']),
+      targetDate: serializer.fromJson<DateTime?>(json['targetDate']),
+      completedAt: serializer.fromJson<DateTime?>(json['completedAt']),
+      originInboxId: serializer.fromJson<String?>(json['originInboxId']),
+      metadata: serializer.fromJson<String>(json['metadata']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      revision: serializer.fromJson<int>(json['revision']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'objective': serializer.toJson<String?>(objective),
+      'description': serializer.toJson<String?>(description),
+      'category': serializer.toJson<String>(category),
+      'status': serializer.toJson<String>(status),
+      'colorHex': serializer.toJson<String?>(colorHex),
+      'iconName': serializer.toJson<String?>(iconName),
+      'startDate': serializer.toJson<DateTime?>(startDate),
+      'targetDate': serializer.toJson<DateTime?>(targetDate),
+      'completedAt': serializer.toJson<DateTime?>(completedAt),
+      'originInboxId': serializer.toJson<String?>(originInboxId),
+      'metadata': serializer.toJson<String>(metadata),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'revision': serializer.toJson<int>(revision),
+    };
+  }
+
+  ProjectEntry copyWith({
+    String? id,
+    String? name,
+    Value<String?> objective = const Value.absent(),
+    Value<String?> description = const Value.absent(),
+    String? category,
+    String? status,
+    Value<String?> colorHex = const Value.absent(),
+    Value<String?> iconName = const Value.absent(),
+    Value<DateTime?> startDate = const Value.absent(),
+    Value<DateTime?> targetDate = const Value.absent(),
+    Value<DateTime?> completedAt = const Value.absent(),
+    Value<String?> originInboxId = const Value.absent(),
+    String? metadata,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    Value<DateTime?> deletedAt = const Value.absent(),
+    int? revision,
+  }) => ProjectEntry(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    objective: objective.present ? objective.value : this.objective,
+    description: description.present ? description.value : this.description,
+    category: category ?? this.category,
+    status: status ?? this.status,
+    colorHex: colorHex.present ? colorHex.value : this.colorHex,
+    iconName: iconName.present ? iconName.value : this.iconName,
+    startDate: startDate.present ? startDate.value : this.startDate,
+    targetDate: targetDate.present ? targetDate.value : this.targetDate,
+    completedAt: completedAt.present ? completedAt.value : this.completedAt,
+    originInboxId: originInboxId.present
+        ? originInboxId.value
+        : this.originInboxId,
+    metadata: metadata ?? this.metadata,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    revision: revision ?? this.revision,
+  );
+  ProjectEntry copyWithCompanion(ProjectsCompanion data) {
+    return ProjectEntry(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      objective: data.objective.present ? data.objective.value : this.objective,
+      description: data.description.present
+          ? data.description.value
+          : this.description,
+      category: data.category.present ? data.category.value : this.category,
+      status: data.status.present ? data.status.value : this.status,
+      colorHex: data.colorHex.present ? data.colorHex.value : this.colorHex,
+      iconName: data.iconName.present ? data.iconName.value : this.iconName,
+      startDate: data.startDate.present ? data.startDate.value : this.startDate,
+      targetDate: data.targetDate.present
+          ? data.targetDate.value
+          : this.targetDate,
+      completedAt: data.completedAt.present
+          ? data.completedAt.value
+          : this.completedAt,
+      originInboxId: data.originInboxId.present
+          ? data.originInboxId.value
+          : this.originInboxId,
+      metadata: data.metadata.present ? data.metadata.value : this.metadata,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      revision: data.revision.present ? data.revision.value : this.revision,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ProjectEntry(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('objective: $objective, ')
+          ..write('description: $description, ')
+          ..write('category: $category, ')
+          ..write('status: $status, ')
+          ..write('colorHex: $colorHex, ')
+          ..write('iconName: $iconName, ')
+          ..write('startDate: $startDate, ')
+          ..write('targetDate: $targetDate, ')
+          ..write('completedAt: $completedAt, ')
+          ..write('originInboxId: $originInboxId, ')
+          ..write('metadata: $metadata, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    name,
+    objective,
+    description,
+    category,
+    status,
+    colorHex,
+    iconName,
+    startDate,
+    targetDate,
+    completedAt,
+    originInboxId,
+    metadata,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ProjectEntry &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.objective == this.objective &&
+          other.description == this.description &&
+          other.category == this.category &&
+          other.status == this.status &&
+          other.colorHex == this.colorHex &&
+          other.iconName == this.iconName &&
+          other.startDate == this.startDate &&
+          other.targetDate == this.targetDate &&
+          other.completedAt == this.completedAt &&
+          other.originInboxId == this.originInboxId &&
+          other.metadata == this.metadata &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt &&
+          other.revision == this.revision);
+}
+
+class ProjectsCompanion extends UpdateCompanion<ProjectEntry> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<String?> objective;
+  final Value<String?> description;
+  final Value<String> category;
+  final Value<String> status;
+  final Value<String?> colorHex;
+  final Value<String?> iconName;
+  final Value<DateTime?> startDate;
+  final Value<DateTime?> targetDate;
+  final Value<DateTime?> completedAt;
+  final Value<String?> originInboxId;
+  final Value<String> metadata;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> revision;
+  final Value<int> rowid;
+  const ProjectsCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.objective = const Value.absent(),
+    this.description = const Value.absent(),
+    this.category = const Value.absent(),
+    this.status = const Value.absent(),
+    this.colorHex = const Value.absent(),
+    this.iconName = const Value.absent(),
+    this.startDate = const Value.absent(),
+    this.targetDate = const Value.absent(),
+    this.completedAt = const Value.absent(),
+    this.originInboxId = const Value.absent(),
+    this.metadata = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ProjectsCompanion.insert({
+    required String id,
+    required String name,
+    this.objective = const Value.absent(),
+    this.description = const Value.absent(),
+    this.category = const Value.absent(),
+    this.status = const Value.absent(),
+    this.colorHex = const Value.absent(),
+    this.iconName = const Value.absent(),
+    this.startDate = const Value.absent(),
+    this.targetDate = const Value.absent(),
+    this.completedAt = const Value.absent(),
+    this.originInboxId = const Value.absent(),
+    this.metadata = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<ProjectEntry> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<String>? objective,
+    Expression<String>? description,
+    Expression<String>? category,
+    Expression<String>? status,
+    Expression<String>? colorHex,
+    Expression<String>? iconName,
+    Expression<DateTime>? startDate,
+    Expression<DateTime>? targetDate,
+    Expression<DateTime>? completedAt,
+    Expression<String>? originInboxId,
+    Expression<String>? metadata,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? revision,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (objective != null) 'objective': objective,
+      if (description != null) 'description': description,
+      if (category != null) 'category': category,
+      if (status != null) 'status': status,
+      if (colorHex != null) 'color_hex': colorHex,
+      if (iconName != null) 'icon_name': iconName,
+      if (startDate != null) 'start_date': startDate,
+      if (targetDate != null) 'target_date': targetDate,
+      if (completedAt != null) 'completed_at': completedAt,
+      if (originInboxId != null) 'origin_inbox_id': originInboxId,
+      if (metadata != null) 'metadata': metadata,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (revision != null) 'revision': revision,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ProjectsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<String?>? objective,
+    Value<String?>? description,
+    Value<String>? category,
+    Value<String>? status,
+    Value<String?>? colorHex,
+    Value<String?>? iconName,
+    Value<DateTime?>? startDate,
+    Value<DateTime?>? targetDate,
+    Value<DateTime?>? completedAt,
+    Value<String?>? originInboxId,
+    Value<String>? metadata,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? revision,
+    Value<int>? rowid,
+  }) {
+    return ProjectsCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      objective: objective ?? this.objective,
+      description: description ?? this.description,
+      category: category ?? this.category,
+      status: status ?? this.status,
+      colorHex: colorHex ?? this.colorHex,
+      iconName: iconName ?? this.iconName,
+      startDate: startDate ?? this.startDate,
+      targetDate: targetDate ?? this.targetDate,
+      completedAt: completedAt ?? this.completedAt,
+      originInboxId: originInboxId ?? this.originInboxId,
+      metadata: metadata ?? this.metadata,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      revision: revision ?? this.revision,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (objective.present) {
+      map['objective'] = Variable<String>(objective.value);
+    }
+    if (description.present) {
+      map['description'] = Variable<String>(description.value);
+    }
+    if (category.present) {
+      map['category'] = Variable<String>(category.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (colorHex.present) {
+      map['color_hex'] = Variable<String>(colorHex.value);
+    }
+    if (iconName.present) {
+      map['icon_name'] = Variable<String>(iconName.value);
+    }
+    if (startDate.present) {
+      map['start_date'] = Variable<DateTime>(startDate.value);
+    }
+    if (targetDate.present) {
+      map['target_date'] = Variable<DateTime>(targetDate.value);
+    }
+    if (completedAt.present) {
+      map['completed_at'] = Variable<DateTime>(completedAt.value);
+    }
+    if (originInboxId.present) {
+      map['origin_inbox_id'] = Variable<String>(originInboxId.value);
+    }
+    if (metadata.present) {
+      map['metadata'] = Variable<String>(metadata.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (revision.present) {
+      map['revision'] = Variable<int>(revision.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ProjectsCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('objective: $objective, ')
+          ..write('description: $description, ')
+          ..write('category: $category, ')
+          ..write('status: $status, ')
+          ..write('colorHex: $colorHex, ')
+          ..write('iconName: $iconName, ')
+          ..write('startDate: $startDate, ')
+          ..write('targetDate: $targetDate, ')
+          ..write('completedAt: $completedAt, ')
+          ..write('originInboxId: $originInboxId, ')
+          ..write('metadata: $metadata, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $TasksTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _projectIdMeta = const VerificationMeta(
+    'projectId',
+  );
+  @override
+  late final GeneratedColumn<String> projectId = GeneratedColumn<String>(
+    'project_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _personIdMeta = const VerificationMeta(
+    'personId',
+  );
+  @override
+  late final GeneratedColumn<String> personId = GeneratedColumn<String>(
+    'person_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _studyIdMeta = const VerificationMeta(
+    'studyId',
+  );
+  @override
+  late final GeneratedColumn<String> studyId = GeneratedColumn<String>(
+    'study_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sectorIdMeta = const VerificationMeta(
+    'sectorId',
+  );
+  @override
+  late final GeneratedColumn<String> sectorId = GeneratedColumn<String>(
+    'sector_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _originInboxIdMeta = const VerificationMeta(
+    'originInboxId',
+  );
+  @override
+  late final GeneratedColumn<String> originInboxId = GeneratedColumn<String>(
+    'origin_inbox_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _parentTaskIdMeta = const VerificationMeta(
+    'parentTaskId',
+  );
+  @override
+  late final GeneratedColumn<String> parentTaskId = GeneratedColumn<String>(
+    'parent_task_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _descriptionMeta = const VerificationMeta(
+    'description',
+  );
+  @override
+  late final GeneratedColumn<String> description = GeneratedColumn<String>(
+    'description',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('todo'),
+  );
+  static const VerificationMeta _priorityMeta = const VerificationMeta(
+    'priority',
+  );
+  @override
+  late final GeneratedColumn<String> priority = GeneratedColumn<String>(
+    'priority',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('normal'),
+  );
+  static const VerificationMeta _categoryMeta = const VerificationMeta(
+    'category',
+  );
+  @override
+  late final GeneratedColumn<String> category = GeneratedColumn<String>(
+    'category',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('ministry'),
+  );
+  static const VerificationMeta _startDateMeta = const VerificationMeta(
+    'startDate',
+  );
+  @override
+  late final GeneratedColumn<DateTime> startDate = GeneratedColumn<DateTime>(
+    'start_date',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _dueDateMeta = const VerificationMeta(
+    'dueDate',
+  );
+  @override
+  late final GeneratedColumn<DateTime> dueDate = GeneratedColumn<DateTime>(
+    'due_date',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _scheduledAtMeta = const VerificationMeta(
+    'scheduledAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> scheduledAt = GeneratedColumn<DateTime>(
+    'scheduled_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _durationMinutesMeta = const VerificationMeta(
+    'durationMinutes',
+  );
+  @override
+  late final GeneratedColumn<int> durationMinutes = GeneratedColumn<int>(
+    'duration_minutes',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(30),
+  );
+  static const VerificationMeta _completedAtMeta = const VerificationMeta(
+    'completedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> completedAt = GeneratedColumn<DateTime>(
+    'completed_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _isRecurringMeta = const VerificationMeta(
+    'isRecurring',
+  );
+  @override
+  late final GeneratedColumn<bool> isRecurring = GeneratedColumn<bool>(
+    'is_recurring',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_recurring" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _recurrenceRuleMeta = const VerificationMeta(
+    'recurrenceRule',
+  );
+  @override
+  late final GeneratedColumn<String> recurrenceRule = GeneratedColumn<String>(
+    'recurrence_rule',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _appointmentIdMeta = const VerificationMeta(
+    'appointmentId',
+  );
+  @override
+  late final GeneratedColumn<String> appointmentId = GeneratedColumn<String>(
+    'appointment_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _attachmentsMeta = const VerificationMeta(
+    'attachments',
+  );
+  @override
+  late final GeneratedColumn<String> attachments = GeneratedColumn<String>(
+    'attachments',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  );
+  static const VerificationMeta _metadataMeta = const VerificationMeta(
+    'metadata',
+  );
+  @override
+  late final GeneratedColumn<String> metadata = GeneratedColumn<String>(
+    'metadata',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('{}'),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _revisionMeta = const VerificationMeta(
+    'revision',
+  );
+  @override
+  late final GeneratedColumn<int> revision = GeneratedColumn<int>(
+    'revision',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    projectId,
+    personId,
+    studyId,
+    sectorId,
+    originInboxId,
+    parentTaskId,
+    title,
+    description,
+    status,
+    priority,
+    category,
+    startDate,
+    dueDate,
+    scheduledAt,
+    durationMinutes,
+    completedAt,
+    isRecurring,
+    recurrenceRule,
+    appointmentId,
+    attachments,
+    metadata,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'tasks';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<TaskEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('project_id')) {
+      context.handle(
+        _projectIdMeta,
+        projectId.isAcceptableOrUnknown(data['project_id']!, _projectIdMeta),
+      );
+    }
+    if (data.containsKey('person_id')) {
+      context.handle(
+        _personIdMeta,
+        personId.isAcceptableOrUnknown(data['person_id']!, _personIdMeta),
+      );
+    }
+    if (data.containsKey('study_id')) {
+      context.handle(
+        _studyIdMeta,
+        studyId.isAcceptableOrUnknown(data['study_id']!, _studyIdMeta),
+      );
+    }
+    if (data.containsKey('sector_id')) {
+      context.handle(
+        _sectorIdMeta,
+        sectorId.isAcceptableOrUnknown(data['sector_id']!, _sectorIdMeta),
+      );
+    }
+    if (data.containsKey('origin_inbox_id')) {
+      context.handle(
+        _originInboxIdMeta,
+        originInboxId.isAcceptableOrUnknown(
+          data['origin_inbox_id']!,
+          _originInboxIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('parent_task_id')) {
+      context.handle(
+        _parentTaskIdMeta,
+        parentTaskId.isAcceptableOrUnknown(
+          data['parent_task_id']!,
+          _parentTaskIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('description')) {
+      context.handle(
+        _descriptionMeta,
+        description.isAcceptableOrUnknown(
+          data['description']!,
+          _descriptionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    }
+    if (data.containsKey('priority')) {
+      context.handle(
+        _priorityMeta,
+        priority.isAcceptableOrUnknown(data['priority']!, _priorityMeta),
+      );
+    }
+    if (data.containsKey('category')) {
+      context.handle(
+        _categoryMeta,
+        category.isAcceptableOrUnknown(data['category']!, _categoryMeta),
+      );
+    }
+    if (data.containsKey('start_date')) {
+      context.handle(
+        _startDateMeta,
+        startDate.isAcceptableOrUnknown(data['start_date']!, _startDateMeta),
+      );
+    }
+    if (data.containsKey('due_date')) {
+      context.handle(
+        _dueDateMeta,
+        dueDate.isAcceptableOrUnknown(data['due_date']!, _dueDateMeta),
+      );
+    }
+    if (data.containsKey('scheduled_at')) {
+      context.handle(
+        _scheduledAtMeta,
+        scheduledAt.isAcceptableOrUnknown(
+          data['scheduled_at']!,
+          _scheduledAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('duration_minutes')) {
+      context.handle(
+        _durationMinutesMeta,
+        durationMinutes.isAcceptableOrUnknown(
+          data['duration_minutes']!,
+          _durationMinutesMeta,
+        ),
+      );
+    }
+    if (data.containsKey('completed_at')) {
+      context.handle(
+        _completedAtMeta,
+        completedAt.isAcceptableOrUnknown(
+          data['completed_at']!,
+          _completedAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('is_recurring')) {
+      context.handle(
+        _isRecurringMeta,
+        isRecurring.isAcceptableOrUnknown(
+          data['is_recurring']!,
+          _isRecurringMeta,
+        ),
+      );
+    }
+    if (data.containsKey('recurrence_rule')) {
+      context.handle(
+        _recurrenceRuleMeta,
+        recurrenceRule.isAcceptableOrUnknown(
+          data['recurrence_rule']!,
+          _recurrenceRuleMeta,
+        ),
+      );
+    }
+    if (data.containsKey('appointment_id')) {
+      context.handle(
+        _appointmentIdMeta,
+        appointmentId.isAcceptableOrUnknown(
+          data['appointment_id']!,
+          _appointmentIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('attachments')) {
+      context.handle(
+        _attachmentsMeta,
+        attachments.isAcceptableOrUnknown(
+          data['attachments']!,
+          _attachmentsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('metadata')) {
+      context.handle(
+        _metadataMeta,
+        metadata.isAcceptableOrUnknown(data['metadata']!, _metadataMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    if (data.containsKey('revision')) {
+      context.handle(
+        _revisionMeta,
+        revision.isAcceptableOrUnknown(data['revision']!, _revisionMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  TaskEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return TaskEntry(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      projectId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}project_id'],
+      ),
+      personId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}person_id'],
+      ),
+      studyId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}study_id'],
+      ),
+      sectorId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sector_id'],
+      ),
+      originInboxId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}origin_inbox_id'],
+      ),
+      parentTaskId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}parent_task_id'],
+      ),
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      )!,
+      description: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}description'],
+      ),
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      priority: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}priority'],
+      )!,
+      category: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}category'],
+      )!,
+      startDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}start_date'],
+      ),
+      dueDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}due_date'],
+      ),
+      scheduledAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}scheduled_at'],
+      ),
+      durationMinutes: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}duration_minutes'],
+      ),
+      completedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}completed_at'],
+      ),
+      isRecurring: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_recurring'],
+      )!,
+      recurrenceRule: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}recurrence_rule'],
+      ),
+      appointmentId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}appointment_id'],
+      ),
+      attachments: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}attachments'],
+      )!,
+      metadata: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}metadata'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+      revision: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}revision'],
+      )!,
+    );
+  }
+
+  @override
+  $TasksTable createAlias(String alias) {
+    return $TasksTable(attachedDatabase, alias);
+  }
+}
+
+class TaskEntry extends DataClass implements Insertable<TaskEntry> {
+  final String id;
+  final String? projectId;
+  final String? personId;
+  final String? studyId;
+  final String? sectorId;
+  final String? originInboxId;
+  final String? parentTaskId;
+  final String title;
+  final String? description;
+  final String status;
+  final String priority;
+  final String category;
+  final DateTime? startDate;
+  final DateTime? dueDate;
+  final DateTime? scheduledAt;
+  final int? durationMinutes;
+  final DateTime? completedAt;
+  final bool isRecurring;
+  final String? recurrenceRule;
+  final String? appointmentId;
+  final String attachments;
+  final String metadata;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime? deletedAt;
+  final int revision;
+  const TaskEntry({
+    required this.id,
+    this.projectId,
+    this.personId,
+    this.studyId,
+    this.sectorId,
+    this.originInboxId,
+    this.parentTaskId,
+    required this.title,
+    this.description,
+    required this.status,
+    required this.priority,
+    required this.category,
+    this.startDate,
+    this.dueDate,
+    this.scheduledAt,
+    this.durationMinutes,
+    this.completedAt,
+    required this.isRecurring,
+    this.recurrenceRule,
+    this.appointmentId,
+    required this.attachments,
+    required this.metadata,
+    required this.createdAt,
+    required this.updatedAt,
+    this.deletedAt,
+    required this.revision,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    if (!nullToAbsent || projectId != null) {
+      map['project_id'] = Variable<String>(projectId);
+    }
+    if (!nullToAbsent || personId != null) {
+      map['person_id'] = Variable<String>(personId);
+    }
+    if (!nullToAbsent || studyId != null) {
+      map['study_id'] = Variable<String>(studyId);
+    }
+    if (!nullToAbsent || sectorId != null) {
+      map['sector_id'] = Variable<String>(sectorId);
+    }
+    if (!nullToAbsent || originInboxId != null) {
+      map['origin_inbox_id'] = Variable<String>(originInboxId);
+    }
+    if (!nullToAbsent || parentTaskId != null) {
+      map['parent_task_id'] = Variable<String>(parentTaskId);
+    }
+    map['title'] = Variable<String>(title);
+    if (!nullToAbsent || description != null) {
+      map['description'] = Variable<String>(description);
+    }
+    map['status'] = Variable<String>(status);
+    map['priority'] = Variable<String>(priority);
+    map['category'] = Variable<String>(category);
+    if (!nullToAbsent || startDate != null) {
+      map['start_date'] = Variable<DateTime>(startDate);
+    }
+    if (!nullToAbsent || dueDate != null) {
+      map['due_date'] = Variable<DateTime>(dueDate);
+    }
+    if (!nullToAbsent || scheduledAt != null) {
+      map['scheduled_at'] = Variable<DateTime>(scheduledAt);
+    }
+    if (!nullToAbsent || durationMinutes != null) {
+      map['duration_minutes'] = Variable<int>(durationMinutes);
+    }
+    if (!nullToAbsent || completedAt != null) {
+      map['completed_at'] = Variable<DateTime>(completedAt);
+    }
+    map['is_recurring'] = Variable<bool>(isRecurring);
+    if (!nullToAbsent || recurrenceRule != null) {
+      map['recurrence_rule'] = Variable<String>(recurrenceRule);
+    }
+    if (!nullToAbsent || appointmentId != null) {
+      map['appointment_id'] = Variable<String>(appointmentId);
+    }
+    map['attachments'] = Variable<String>(attachments);
+    map['metadata'] = Variable<String>(metadata);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    map['revision'] = Variable<int>(revision);
+    return map;
+  }
+
+  TasksCompanion toCompanion(bool nullToAbsent) {
+    return TasksCompanion(
+      id: Value(id),
+      projectId: projectId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(projectId),
+      personId: personId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(personId),
+      studyId: studyId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(studyId),
+      sectorId: sectorId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sectorId),
+      originInboxId: originInboxId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(originInboxId),
+      parentTaskId: parentTaskId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(parentTaskId),
+      title: Value(title),
+      description: description == null && nullToAbsent
+          ? const Value.absent()
+          : Value(description),
+      status: Value(status),
+      priority: Value(priority),
+      category: Value(category),
+      startDate: startDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(startDate),
+      dueDate: dueDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(dueDate),
+      scheduledAt: scheduledAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(scheduledAt),
+      durationMinutes: durationMinutes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(durationMinutes),
+      completedAt: completedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(completedAt),
+      isRecurring: Value(isRecurring),
+      recurrenceRule: recurrenceRule == null && nullToAbsent
+          ? const Value.absent()
+          : Value(recurrenceRule),
+      appointmentId: appointmentId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(appointmentId),
+      attachments: Value(attachments),
+      metadata: Value(metadata),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      revision: Value(revision),
+    );
+  }
+
+  factory TaskEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return TaskEntry(
+      id: serializer.fromJson<String>(json['id']),
+      projectId: serializer.fromJson<String?>(json['projectId']),
+      personId: serializer.fromJson<String?>(json['personId']),
+      studyId: serializer.fromJson<String?>(json['studyId']),
+      sectorId: serializer.fromJson<String?>(json['sectorId']),
+      originInboxId: serializer.fromJson<String?>(json['originInboxId']),
+      parentTaskId: serializer.fromJson<String?>(json['parentTaskId']),
+      title: serializer.fromJson<String>(json['title']),
+      description: serializer.fromJson<String?>(json['description']),
+      status: serializer.fromJson<String>(json['status']),
+      priority: serializer.fromJson<String>(json['priority']),
+      category: serializer.fromJson<String>(json['category']),
+      startDate: serializer.fromJson<DateTime?>(json['startDate']),
+      dueDate: serializer.fromJson<DateTime?>(json['dueDate']),
+      scheduledAt: serializer.fromJson<DateTime?>(json['scheduledAt']),
+      durationMinutes: serializer.fromJson<int?>(json['durationMinutes']),
+      completedAt: serializer.fromJson<DateTime?>(json['completedAt']),
+      isRecurring: serializer.fromJson<bool>(json['isRecurring']),
+      recurrenceRule: serializer.fromJson<String?>(json['recurrenceRule']),
+      appointmentId: serializer.fromJson<String?>(json['appointmentId']),
+      attachments: serializer.fromJson<String>(json['attachments']),
+      metadata: serializer.fromJson<String>(json['metadata']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      revision: serializer.fromJson<int>(json['revision']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'projectId': serializer.toJson<String?>(projectId),
+      'personId': serializer.toJson<String?>(personId),
+      'studyId': serializer.toJson<String?>(studyId),
+      'sectorId': serializer.toJson<String?>(sectorId),
+      'originInboxId': serializer.toJson<String?>(originInboxId),
+      'parentTaskId': serializer.toJson<String?>(parentTaskId),
+      'title': serializer.toJson<String>(title),
+      'description': serializer.toJson<String?>(description),
+      'status': serializer.toJson<String>(status),
+      'priority': serializer.toJson<String>(priority),
+      'category': serializer.toJson<String>(category),
+      'startDate': serializer.toJson<DateTime?>(startDate),
+      'dueDate': serializer.toJson<DateTime?>(dueDate),
+      'scheduledAt': serializer.toJson<DateTime?>(scheduledAt),
+      'durationMinutes': serializer.toJson<int?>(durationMinutes),
+      'completedAt': serializer.toJson<DateTime?>(completedAt),
+      'isRecurring': serializer.toJson<bool>(isRecurring),
+      'recurrenceRule': serializer.toJson<String?>(recurrenceRule),
+      'appointmentId': serializer.toJson<String?>(appointmentId),
+      'attachments': serializer.toJson<String>(attachments),
+      'metadata': serializer.toJson<String>(metadata),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'revision': serializer.toJson<int>(revision),
+    };
+  }
+
+  TaskEntry copyWith({
+    String? id,
+    Value<String?> projectId = const Value.absent(),
+    Value<String?> personId = const Value.absent(),
+    Value<String?> studyId = const Value.absent(),
+    Value<String?> sectorId = const Value.absent(),
+    Value<String?> originInboxId = const Value.absent(),
+    Value<String?> parentTaskId = const Value.absent(),
+    String? title,
+    Value<String?> description = const Value.absent(),
+    String? status,
+    String? priority,
+    String? category,
+    Value<DateTime?> startDate = const Value.absent(),
+    Value<DateTime?> dueDate = const Value.absent(),
+    Value<DateTime?> scheduledAt = const Value.absent(),
+    Value<int?> durationMinutes = const Value.absent(),
+    Value<DateTime?> completedAt = const Value.absent(),
+    bool? isRecurring,
+    Value<String?> recurrenceRule = const Value.absent(),
+    Value<String?> appointmentId = const Value.absent(),
+    String? attachments,
+    String? metadata,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    Value<DateTime?> deletedAt = const Value.absent(),
+    int? revision,
+  }) => TaskEntry(
+    id: id ?? this.id,
+    projectId: projectId.present ? projectId.value : this.projectId,
+    personId: personId.present ? personId.value : this.personId,
+    studyId: studyId.present ? studyId.value : this.studyId,
+    sectorId: sectorId.present ? sectorId.value : this.sectorId,
+    originInboxId: originInboxId.present
+        ? originInboxId.value
+        : this.originInboxId,
+    parentTaskId: parentTaskId.present ? parentTaskId.value : this.parentTaskId,
+    title: title ?? this.title,
+    description: description.present ? description.value : this.description,
+    status: status ?? this.status,
+    priority: priority ?? this.priority,
+    category: category ?? this.category,
+    startDate: startDate.present ? startDate.value : this.startDate,
+    dueDate: dueDate.present ? dueDate.value : this.dueDate,
+    scheduledAt: scheduledAt.present ? scheduledAt.value : this.scheduledAt,
+    durationMinutes: durationMinutes.present
+        ? durationMinutes.value
+        : this.durationMinutes,
+    completedAt: completedAt.present ? completedAt.value : this.completedAt,
+    isRecurring: isRecurring ?? this.isRecurring,
+    recurrenceRule: recurrenceRule.present
+        ? recurrenceRule.value
+        : this.recurrenceRule,
+    appointmentId: appointmentId.present
+        ? appointmentId.value
+        : this.appointmentId,
+    attachments: attachments ?? this.attachments,
+    metadata: metadata ?? this.metadata,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    revision: revision ?? this.revision,
+  );
+  TaskEntry copyWithCompanion(TasksCompanion data) {
+    return TaskEntry(
+      id: data.id.present ? data.id.value : this.id,
+      projectId: data.projectId.present ? data.projectId.value : this.projectId,
+      personId: data.personId.present ? data.personId.value : this.personId,
+      studyId: data.studyId.present ? data.studyId.value : this.studyId,
+      sectorId: data.sectorId.present ? data.sectorId.value : this.sectorId,
+      originInboxId: data.originInboxId.present
+          ? data.originInboxId.value
+          : this.originInboxId,
+      parentTaskId: data.parentTaskId.present
+          ? data.parentTaskId.value
+          : this.parentTaskId,
+      title: data.title.present ? data.title.value : this.title,
+      description: data.description.present
+          ? data.description.value
+          : this.description,
+      status: data.status.present ? data.status.value : this.status,
+      priority: data.priority.present ? data.priority.value : this.priority,
+      category: data.category.present ? data.category.value : this.category,
+      startDate: data.startDate.present ? data.startDate.value : this.startDate,
+      dueDate: data.dueDate.present ? data.dueDate.value : this.dueDate,
+      scheduledAt: data.scheduledAt.present
+          ? data.scheduledAt.value
+          : this.scheduledAt,
+      durationMinutes: data.durationMinutes.present
+          ? data.durationMinutes.value
+          : this.durationMinutes,
+      completedAt: data.completedAt.present
+          ? data.completedAt.value
+          : this.completedAt,
+      isRecurring: data.isRecurring.present
+          ? data.isRecurring.value
+          : this.isRecurring,
+      recurrenceRule: data.recurrenceRule.present
+          ? data.recurrenceRule.value
+          : this.recurrenceRule,
+      appointmentId: data.appointmentId.present
+          ? data.appointmentId.value
+          : this.appointmentId,
+      attachments: data.attachments.present
+          ? data.attachments.value
+          : this.attachments,
+      metadata: data.metadata.present ? data.metadata.value : this.metadata,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      revision: data.revision.present ? data.revision.value : this.revision,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TaskEntry(')
+          ..write('id: $id, ')
+          ..write('projectId: $projectId, ')
+          ..write('personId: $personId, ')
+          ..write('studyId: $studyId, ')
+          ..write('sectorId: $sectorId, ')
+          ..write('originInboxId: $originInboxId, ')
+          ..write('parentTaskId: $parentTaskId, ')
+          ..write('title: $title, ')
+          ..write('description: $description, ')
+          ..write('status: $status, ')
+          ..write('priority: $priority, ')
+          ..write('category: $category, ')
+          ..write('startDate: $startDate, ')
+          ..write('dueDate: $dueDate, ')
+          ..write('scheduledAt: $scheduledAt, ')
+          ..write('durationMinutes: $durationMinutes, ')
+          ..write('completedAt: $completedAt, ')
+          ..write('isRecurring: $isRecurring, ')
+          ..write('recurrenceRule: $recurrenceRule, ')
+          ..write('appointmentId: $appointmentId, ')
+          ..write('attachments: $attachments, ')
+          ..write('metadata: $metadata, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hashAll([
+    id,
+    projectId,
+    personId,
+    studyId,
+    sectorId,
+    originInboxId,
+    parentTaskId,
+    title,
+    description,
+    status,
+    priority,
+    category,
+    startDate,
+    dueDate,
+    scheduledAt,
+    durationMinutes,
+    completedAt,
+    isRecurring,
+    recurrenceRule,
+    appointmentId,
+    attachments,
+    metadata,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  ]);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is TaskEntry &&
+          other.id == this.id &&
+          other.projectId == this.projectId &&
+          other.personId == this.personId &&
+          other.studyId == this.studyId &&
+          other.sectorId == this.sectorId &&
+          other.originInboxId == this.originInboxId &&
+          other.parentTaskId == this.parentTaskId &&
+          other.title == this.title &&
+          other.description == this.description &&
+          other.status == this.status &&
+          other.priority == this.priority &&
+          other.category == this.category &&
+          other.startDate == this.startDate &&
+          other.dueDate == this.dueDate &&
+          other.scheduledAt == this.scheduledAt &&
+          other.durationMinutes == this.durationMinutes &&
+          other.completedAt == this.completedAt &&
+          other.isRecurring == this.isRecurring &&
+          other.recurrenceRule == this.recurrenceRule &&
+          other.appointmentId == this.appointmentId &&
+          other.attachments == this.attachments &&
+          other.metadata == this.metadata &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt &&
+          other.revision == this.revision);
+}
+
+class TasksCompanion extends UpdateCompanion<TaskEntry> {
+  final Value<String> id;
+  final Value<String?> projectId;
+  final Value<String?> personId;
+  final Value<String?> studyId;
+  final Value<String?> sectorId;
+  final Value<String?> originInboxId;
+  final Value<String?> parentTaskId;
+  final Value<String> title;
+  final Value<String?> description;
+  final Value<String> status;
+  final Value<String> priority;
+  final Value<String> category;
+  final Value<DateTime?> startDate;
+  final Value<DateTime?> dueDate;
+  final Value<DateTime?> scheduledAt;
+  final Value<int?> durationMinutes;
+  final Value<DateTime?> completedAt;
+  final Value<bool> isRecurring;
+  final Value<String?> recurrenceRule;
+  final Value<String?> appointmentId;
+  final Value<String> attachments;
+  final Value<String> metadata;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> revision;
+  final Value<int> rowid;
+  const TasksCompanion({
+    this.id = const Value.absent(),
+    this.projectId = const Value.absent(),
+    this.personId = const Value.absent(),
+    this.studyId = const Value.absent(),
+    this.sectorId = const Value.absent(),
+    this.originInboxId = const Value.absent(),
+    this.parentTaskId = const Value.absent(),
+    this.title = const Value.absent(),
+    this.description = const Value.absent(),
+    this.status = const Value.absent(),
+    this.priority = const Value.absent(),
+    this.category = const Value.absent(),
+    this.startDate = const Value.absent(),
+    this.dueDate = const Value.absent(),
+    this.scheduledAt = const Value.absent(),
+    this.durationMinutes = const Value.absent(),
+    this.completedAt = const Value.absent(),
+    this.isRecurring = const Value.absent(),
+    this.recurrenceRule = const Value.absent(),
+    this.appointmentId = const Value.absent(),
+    this.attachments = const Value.absent(),
+    this.metadata = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  TasksCompanion.insert({
+    required String id,
+    this.projectId = const Value.absent(),
+    this.personId = const Value.absent(),
+    this.studyId = const Value.absent(),
+    this.sectorId = const Value.absent(),
+    this.originInboxId = const Value.absent(),
+    this.parentTaskId = const Value.absent(),
+    required String title,
+    this.description = const Value.absent(),
+    this.status = const Value.absent(),
+    this.priority = const Value.absent(),
+    this.category = const Value.absent(),
+    this.startDate = const Value.absent(),
+    this.dueDate = const Value.absent(),
+    this.scheduledAt = const Value.absent(),
+    this.durationMinutes = const Value.absent(),
+    this.completedAt = const Value.absent(),
+    this.isRecurring = const Value.absent(),
+    this.recurrenceRule = const Value.absent(),
+    this.appointmentId = const Value.absent(),
+    this.attachments = const Value.absent(),
+    this.metadata = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       title = Value(title),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<TaskEntry> custom({
+    Expression<String>? id,
+    Expression<String>? projectId,
+    Expression<String>? personId,
+    Expression<String>? studyId,
+    Expression<String>? sectorId,
+    Expression<String>? originInboxId,
+    Expression<String>? parentTaskId,
+    Expression<String>? title,
+    Expression<String>? description,
+    Expression<String>? status,
+    Expression<String>? priority,
+    Expression<String>? category,
+    Expression<DateTime>? startDate,
+    Expression<DateTime>? dueDate,
+    Expression<DateTime>? scheduledAt,
+    Expression<int>? durationMinutes,
+    Expression<DateTime>? completedAt,
+    Expression<bool>? isRecurring,
+    Expression<String>? recurrenceRule,
+    Expression<String>? appointmentId,
+    Expression<String>? attachments,
+    Expression<String>? metadata,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? revision,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (projectId != null) 'project_id': projectId,
+      if (personId != null) 'person_id': personId,
+      if (studyId != null) 'study_id': studyId,
+      if (sectorId != null) 'sector_id': sectorId,
+      if (originInboxId != null) 'origin_inbox_id': originInboxId,
+      if (parentTaskId != null) 'parent_task_id': parentTaskId,
+      if (title != null) 'title': title,
+      if (description != null) 'description': description,
+      if (status != null) 'status': status,
+      if (priority != null) 'priority': priority,
+      if (category != null) 'category': category,
+      if (startDate != null) 'start_date': startDate,
+      if (dueDate != null) 'due_date': dueDate,
+      if (scheduledAt != null) 'scheduled_at': scheduledAt,
+      if (durationMinutes != null) 'duration_minutes': durationMinutes,
+      if (completedAt != null) 'completed_at': completedAt,
+      if (isRecurring != null) 'is_recurring': isRecurring,
+      if (recurrenceRule != null) 'recurrence_rule': recurrenceRule,
+      if (appointmentId != null) 'appointment_id': appointmentId,
+      if (attachments != null) 'attachments': attachments,
+      if (metadata != null) 'metadata': metadata,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (revision != null) 'revision': revision,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  TasksCompanion copyWith({
+    Value<String>? id,
+    Value<String?>? projectId,
+    Value<String?>? personId,
+    Value<String?>? studyId,
+    Value<String?>? sectorId,
+    Value<String?>? originInboxId,
+    Value<String?>? parentTaskId,
+    Value<String>? title,
+    Value<String?>? description,
+    Value<String>? status,
+    Value<String>? priority,
+    Value<String>? category,
+    Value<DateTime?>? startDate,
+    Value<DateTime?>? dueDate,
+    Value<DateTime?>? scheduledAt,
+    Value<int?>? durationMinutes,
+    Value<DateTime?>? completedAt,
+    Value<bool>? isRecurring,
+    Value<String?>? recurrenceRule,
+    Value<String?>? appointmentId,
+    Value<String>? attachments,
+    Value<String>? metadata,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? revision,
+    Value<int>? rowid,
+  }) {
+    return TasksCompanion(
+      id: id ?? this.id,
+      projectId: projectId ?? this.projectId,
+      personId: personId ?? this.personId,
+      studyId: studyId ?? this.studyId,
+      sectorId: sectorId ?? this.sectorId,
+      originInboxId: originInboxId ?? this.originInboxId,
+      parentTaskId: parentTaskId ?? this.parentTaskId,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      status: status ?? this.status,
+      priority: priority ?? this.priority,
+      category: category ?? this.category,
+      startDate: startDate ?? this.startDate,
+      dueDate: dueDate ?? this.dueDate,
+      scheduledAt: scheduledAt ?? this.scheduledAt,
+      durationMinutes: durationMinutes ?? this.durationMinutes,
+      completedAt: completedAt ?? this.completedAt,
+      isRecurring: isRecurring ?? this.isRecurring,
+      recurrenceRule: recurrenceRule ?? this.recurrenceRule,
+      appointmentId: appointmentId ?? this.appointmentId,
+      attachments: attachments ?? this.attachments,
+      metadata: metadata ?? this.metadata,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      revision: revision ?? this.revision,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (projectId.present) {
+      map['project_id'] = Variable<String>(projectId.value);
+    }
+    if (personId.present) {
+      map['person_id'] = Variable<String>(personId.value);
+    }
+    if (studyId.present) {
+      map['study_id'] = Variable<String>(studyId.value);
+    }
+    if (sectorId.present) {
+      map['sector_id'] = Variable<String>(sectorId.value);
+    }
+    if (originInboxId.present) {
+      map['origin_inbox_id'] = Variable<String>(originInboxId.value);
+    }
+    if (parentTaskId.present) {
+      map['parent_task_id'] = Variable<String>(parentTaskId.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (description.present) {
+      map['description'] = Variable<String>(description.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (priority.present) {
+      map['priority'] = Variable<String>(priority.value);
+    }
+    if (category.present) {
+      map['category'] = Variable<String>(category.value);
+    }
+    if (startDate.present) {
+      map['start_date'] = Variable<DateTime>(startDate.value);
+    }
+    if (dueDate.present) {
+      map['due_date'] = Variable<DateTime>(dueDate.value);
+    }
+    if (scheduledAt.present) {
+      map['scheduled_at'] = Variable<DateTime>(scheduledAt.value);
+    }
+    if (durationMinutes.present) {
+      map['duration_minutes'] = Variable<int>(durationMinutes.value);
+    }
+    if (completedAt.present) {
+      map['completed_at'] = Variable<DateTime>(completedAt.value);
+    }
+    if (isRecurring.present) {
+      map['is_recurring'] = Variable<bool>(isRecurring.value);
+    }
+    if (recurrenceRule.present) {
+      map['recurrence_rule'] = Variable<String>(recurrenceRule.value);
+    }
+    if (appointmentId.present) {
+      map['appointment_id'] = Variable<String>(appointmentId.value);
+    }
+    if (attachments.present) {
+      map['attachments'] = Variable<String>(attachments.value);
+    }
+    if (metadata.present) {
+      map['metadata'] = Variable<String>(metadata.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (revision.present) {
+      map['revision'] = Variable<int>(revision.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TasksCompanion(')
+          ..write('id: $id, ')
+          ..write('projectId: $projectId, ')
+          ..write('personId: $personId, ')
+          ..write('studyId: $studyId, ')
+          ..write('sectorId: $sectorId, ')
+          ..write('originInboxId: $originInboxId, ')
+          ..write('parentTaskId: $parentTaskId, ')
+          ..write('title: $title, ')
+          ..write('description: $description, ')
+          ..write('status: $status, ')
+          ..write('priority: $priority, ')
+          ..write('category: $category, ')
+          ..write('startDate: $startDate, ')
+          ..write('dueDate: $dueDate, ')
+          ..write('scheduledAt: $scheduledAt, ')
+          ..write('durationMinutes: $durationMinutes, ')
+          ..write('completedAt: $completedAt, ')
+          ..write('isRecurring: $isRecurring, ')
+          ..write('recurrenceRule: $recurrenceRule, ')
+          ..write('appointmentId: $appointmentId, ')
+          ..write('attachments: $attachments, ')
+          ..write('metadata: $metadata, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $KnowledgeNotesTable extends KnowledgeNotes
+    with TableInfo<$KnowledgeNotesTable, KnowledgeNoteEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $KnowledgeNotesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _projectIdMeta = const VerificationMeta(
+    'projectId',
+  );
+  @override
+  late final GeneratedColumn<String> projectId = GeneratedColumn<String>(
+    'project_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _personIdMeta = const VerificationMeta(
+    'personId',
+  );
+  @override
+  late final GeneratedColumn<String> personId = GeneratedColumn<String>(
+    'person_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _studyIdMeta = const VerificationMeta(
+    'studyId',
+  );
+  @override
+  late final GeneratedColumn<String> studyId = GeneratedColumn<String>(
+    'study_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _originInboxIdMeta = const VerificationMeta(
+    'originInboxId',
+  );
+  @override
+  late final GeneratedColumn<String> originInboxId = GeneratedColumn<String>(
+    'origin_inbox_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _contentMeta = const VerificationMeta(
+    'content',
+  );
+  @override
+  late final GeneratedColumn<String> content = GeneratedColumn<String>(
+    'content',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _categoryMeta = const VerificationMeta(
+    'category',
+  );
+  @override
+  late final GeneratedColumn<String> category = GeneratedColumn<String>(
+    'category',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('general'),
+  );
+  static const VerificationMeta _tagsMeta = const VerificationMeta('tags');
+  @override
+  late final GeneratedColumn<String> tags = GeneratedColumn<String>(
+    'tags',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  );
+  static const VerificationMeta _attachmentsMeta = const VerificationMeta(
+    'attachments',
+  );
+  @override
+  late final GeneratedColumn<String> attachments = GeneratedColumn<String>(
+    'attachments',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  );
+  static const VerificationMeta _sourcesMeta = const VerificationMeta(
+    'sources',
+  );
+  @override
+  late final GeneratedColumn<String> sources = GeneratedColumn<String>(
+    'sources',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  );
+  static const VerificationMeta _isPinnedMeta = const VerificationMeta(
+    'isPinned',
+  );
+  @override
+  late final GeneratedColumn<bool> isPinned = GeneratedColumn<bool>(
+    'is_pinned',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_pinned" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _revisionMeta = const VerificationMeta(
+    'revision',
+  );
+  @override
+  late final GeneratedColumn<int> revision = GeneratedColumn<int>(
+    'revision',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    projectId,
+    personId,
+    studyId,
+    originInboxId,
+    title,
+    content,
+    category,
+    tags,
+    attachments,
+    sources,
+    isPinned,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'knowledge_notes';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<KnowledgeNoteEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('project_id')) {
+      context.handle(
+        _projectIdMeta,
+        projectId.isAcceptableOrUnknown(data['project_id']!, _projectIdMeta),
+      );
+    }
+    if (data.containsKey('person_id')) {
+      context.handle(
+        _personIdMeta,
+        personId.isAcceptableOrUnknown(data['person_id']!, _personIdMeta),
+      );
+    }
+    if (data.containsKey('study_id')) {
+      context.handle(
+        _studyIdMeta,
+        studyId.isAcceptableOrUnknown(data['study_id']!, _studyIdMeta),
+      );
+    }
+    if (data.containsKey('origin_inbox_id')) {
+      context.handle(
+        _originInboxIdMeta,
+        originInboxId.isAcceptableOrUnknown(
+          data['origin_inbox_id']!,
+          _originInboxIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('content')) {
+      context.handle(
+        _contentMeta,
+        content.isAcceptableOrUnknown(data['content']!, _contentMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_contentMeta);
+    }
+    if (data.containsKey('category')) {
+      context.handle(
+        _categoryMeta,
+        category.isAcceptableOrUnknown(data['category']!, _categoryMeta),
+      );
+    }
+    if (data.containsKey('tags')) {
+      context.handle(
+        _tagsMeta,
+        tags.isAcceptableOrUnknown(data['tags']!, _tagsMeta),
+      );
+    }
+    if (data.containsKey('attachments')) {
+      context.handle(
+        _attachmentsMeta,
+        attachments.isAcceptableOrUnknown(
+          data['attachments']!,
+          _attachmentsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('sources')) {
+      context.handle(
+        _sourcesMeta,
+        sources.isAcceptableOrUnknown(data['sources']!, _sourcesMeta),
+      );
+    }
+    if (data.containsKey('is_pinned')) {
+      context.handle(
+        _isPinnedMeta,
+        isPinned.isAcceptableOrUnknown(data['is_pinned']!, _isPinnedMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    if (data.containsKey('revision')) {
+      context.handle(
+        _revisionMeta,
+        revision.isAcceptableOrUnknown(data['revision']!, _revisionMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  KnowledgeNoteEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return KnowledgeNoteEntry(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      projectId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}project_id'],
+      ),
+      personId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}person_id'],
+      ),
+      studyId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}study_id'],
+      ),
+      originInboxId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}origin_inbox_id'],
+      ),
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      )!,
+      content: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}content'],
+      )!,
+      category: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}category'],
+      )!,
+      tags: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}tags'],
+      )!,
+      attachments: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}attachments'],
+      )!,
+      sources: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sources'],
+      )!,
+      isPinned: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_pinned'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+      revision: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}revision'],
+      )!,
+    );
+  }
+
+  @override
+  $KnowledgeNotesTable createAlias(String alias) {
+    return $KnowledgeNotesTable(attachedDatabase, alias);
+  }
+}
+
+class KnowledgeNoteEntry extends DataClass
+    implements Insertable<KnowledgeNoteEntry> {
+  final String id;
+  final String? projectId;
+  final String? personId;
+  final String? studyId;
+  final String? originInboxId;
+  final String title;
+  final String content;
+  final String category;
+  final String tags;
+  final String attachments;
+  final String sources;
+  final bool isPinned;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime? deletedAt;
+  final int revision;
+  const KnowledgeNoteEntry({
+    required this.id,
+    this.projectId,
+    this.personId,
+    this.studyId,
+    this.originInboxId,
+    required this.title,
+    required this.content,
+    required this.category,
+    required this.tags,
+    required this.attachments,
+    required this.sources,
+    required this.isPinned,
+    required this.createdAt,
+    required this.updatedAt,
+    this.deletedAt,
+    required this.revision,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    if (!nullToAbsent || projectId != null) {
+      map['project_id'] = Variable<String>(projectId);
+    }
+    if (!nullToAbsent || personId != null) {
+      map['person_id'] = Variable<String>(personId);
+    }
+    if (!nullToAbsent || studyId != null) {
+      map['study_id'] = Variable<String>(studyId);
+    }
+    if (!nullToAbsent || originInboxId != null) {
+      map['origin_inbox_id'] = Variable<String>(originInboxId);
+    }
+    map['title'] = Variable<String>(title);
+    map['content'] = Variable<String>(content);
+    map['category'] = Variable<String>(category);
+    map['tags'] = Variable<String>(tags);
+    map['attachments'] = Variable<String>(attachments);
+    map['sources'] = Variable<String>(sources);
+    map['is_pinned'] = Variable<bool>(isPinned);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    map['revision'] = Variable<int>(revision);
+    return map;
+  }
+
+  KnowledgeNotesCompanion toCompanion(bool nullToAbsent) {
+    return KnowledgeNotesCompanion(
+      id: Value(id),
+      projectId: projectId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(projectId),
+      personId: personId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(personId),
+      studyId: studyId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(studyId),
+      originInboxId: originInboxId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(originInboxId),
+      title: Value(title),
+      content: Value(content),
+      category: Value(category),
+      tags: Value(tags),
+      attachments: Value(attachments),
+      sources: Value(sources),
+      isPinned: Value(isPinned),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      revision: Value(revision),
+    );
+  }
+
+  factory KnowledgeNoteEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return KnowledgeNoteEntry(
+      id: serializer.fromJson<String>(json['id']),
+      projectId: serializer.fromJson<String?>(json['projectId']),
+      personId: serializer.fromJson<String?>(json['personId']),
+      studyId: serializer.fromJson<String?>(json['studyId']),
+      originInboxId: serializer.fromJson<String?>(json['originInboxId']),
+      title: serializer.fromJson<String>(json['title']),
+      content: serializer.fromJson<String>(json['content']),
+      category: serializer.fromJson<String>(json['category']),
+      tags: serializer.fromJson<String>(json['tags']),
+      attachments: serializer.fromJson<String>(json['attachments']),
+      sources: serializer.fromJson<String>(json['sources']),
+      isPinned: serializer.fromJson<bool>(json['isPinned']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      revision: serializer.fromJson<int>(json['revision']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'projectId': serializer.toJson<String?>(projectId),
+      'personId': serializer.toJson<String?>(personId),
+      'studyId': serializer.toJson<String?>(studyId),
+      'originInboxId': serializer.toJson<String?>(originInboxId),
+      'title': serializer.toJson<String>(title),
+      'content': serializer.toJson<String>(content),
+      'category': serializer.toJson<String>(category),
+      'tags': serializer.toJson<String>(tags),
+      'attachments': serializer.toJson<String>(attachments),
+      'sources': serializer.toJson<String>(sources),
+      'isPinned': serializer.toJson<bool>(isPinned),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'revision': serializer.toJson<int>(revision),
+    };
+  }
+
+  KnowledgeNoteEntry copyWith({
+    String? id,
+    Value<String?> projectId = const Value.absent(),
+    Value<String?> personId = const Value.absent(),
+    Value<String?> studyId = const Value.absent(),
+    Value<String?> originInboxId = const Value.absent(),
+    String? title,
+    String? content,
+    String? category,
+    String? tags,
+    String? attachments,
+    String? sources,
+    bool? isPinned,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    Value<DateTime?> deletedAt = const Value.absent(),
+    int? revision,
+  }) => KnowledgeNoteEntry(
+    id: id ?? this.id,
+    projectId: projectId.present ? projectId.value : this.projectId,
+    personId: personId.present ? personId.value : this.personId,
+    studyId: studyId.present ? studyId.value : this.studyId,
+    originInboxId: originInboxId.present
+        ? originInboxId.value
+        : this.originInboxId,
+    title: title ?? this.title,
+    content: content ?? this.content,
+    category: category ?? this.category,
+    tags: tags ?? this.tags,
+    attachments: attachments ?? this.attachments,
+    sources: sources ?? this.sources,
+    isPinned: isPinned ?? this.isPinned,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    revision: revision ?? this.revision,
+  );
+  KnowledgeNoteEntry copyWithCompanion(KnowledgeNotesCompanion data) {
+    return KnowledgeNoteEntry(
+      id: data.id.present ? data.id.value : this.id,
+      projectId: data.projectId.present ? data.projectId.value : this.projectId,
+      personId: data.personId.present ? data.personId.value : this.personId,
+      studyId: data.studyId.present ? data.studyId.value : this.studyId,
+      originInboxId: data.originInboxId.present
+          ? data.originInboxId.value
+          : this.originInboxId,
+      title: data.title.present ? data.title.value : this.title,
+      content: data.content.present ? data.content.value : this.content,
+      category: data.category.present ? data.category.value : this.category,
+      tags: data.tags.present ? data.tags.value : this.tags,
+      attachments: data.attachments.present
+          ? data.attachments.value
+          : this.attachments,
+      sources: data.sources.present ? data.sources.value : this.sources,
+      isPinned: data.isPinned.present ? data.isPinned.value : this.isPinned,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      revision: data.revision.present ? data.revision.value : this.revision,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('KnowledgeNoteEntry(')
+          ..write('id: $id, ')
+          ..write('projectId: $projectId, ')
+          ..write('personId: $personId, ')
+          ..write('studyId: $studyId, ')
+          ..write('originInboxId: $originInboxId, ')
+          ..write('title: $title, ')
+          ..write('content: $content, ')
+          ..write('category: $category, ')
+          ..write('tags: $tags, ')
+          ..write('attachments: $attachments, ')
+          ..write('sources: $sources, ')
+          ..write('isPinned: $isPinned, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    projectId,
+    personId,
+    studyId,
+    originInboxId,
+    title,
+    content,
+    category,
+    tags,
+    attachments,
+    sources,
+    isPinned,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is KnowledgeNoteEntry &&
+          other.id == this.id &&
+          other.projectId == this.projectId &&
+          other.personId == this.personId &&
+          other.studyId == this.studyId &&
+          other.originInboxId == this.originInboxId &&
+          other.title == this.title &&
+          other.content == this.content &&
+          other.category == this.category &&
+          other.tags == this.tags &&
+          other.attachments == this.attachments &&
+          other.sources == this.sources &&
+          other.isPinned == this.isPinned &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt &&
+          other.revision == this.revision);
+}
+
+class KnowledgeNotesCompanion extends UpdateCompanion<KnowledgeNoteEntry> {
+  final Value<String> id;
+  final Value<String?> projectId;
+  final Value<String?> personId;
+  final Value<String?> studyId;
+  final Value<String?> originInboxId;
+  final Value<String> title;
+  final Value<String> content;
+  final Value<String> category;
+  final Value<String> tags;
+  final Value<String> attachments;
+  final Value<String> sources;
+  final Value<bool> isPinned;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> revision;
+  final Value<int> rowid;
+  const KnowledgeNotesCompanion({
+    this.id = const Value.absent(),
+    this.projectId = const Value.absent(),
+    this.personId = const Value.absent(),
+    this.studyId = const Value.absent(),
+    this.originInboxId = const Value.absent(),
+    this.title = const Value.absent(),
+    this.content = const Value.absent(),
+    this.category = const Value.absent(),
+    this.tags = const Value.absent(),
+    this.attachments = const Value.absent(),
+    this.sources = const Value.absent(),
+    this.isPinned = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  KnowledgeNotesCompanion.insert({
+    required String id,
+    this.projectId = const Value.absent(),
+    this.personId = const Value.absent(),
+    this.studyId = const Value.absent(),
+    this.originInboxId = const Value.absent(),
+    required String title,
+    required String content,
+    this.category = const Value.absent(),
+    this.tags = const Value.absent(),
+    this.attachments = const Value.absent(),
+    this.sources = const Value.absent(),
+    this.isPinned = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       title = Value(title),
+       content = Value(content),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<KnowledgeNoteEntry> custom({
+    Expression<String>? id,
+    Expression<String>? projectId,
+    Expression<String>? personId,
+    Expression<String>? studyId,
+    Expression<String>? originInboxId,
+    Expression<String>? title,
+    Expression<String>? content,
+    Expression<String>? category,
+    Expression<String>? tags,
+    Expression<String>? attachments,
+    Expression<String>? sources,
+    Expression<bool>? isPinned,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? revision,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (projectId != null) 'project_id': projectId,
+      if (personId != null) 'person_id': personId,
+      if (studyId != null) 'study_id': studyId,
+      if (originInboxId != null) 'origin_inbox_id': originInboxId,
+      if (title != null) 'title': title,
+      if (content != null) 'content': content,
+      if (category != null) 'category': category,
+      if (tags != null) 'tags': tags,
+      if (attachments != null) 'attachments': attachments,
+      if (sources != null) 'sources': sources,
+      if (isPinned != null) 'is_pinned': isPinned,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (revision != null) 'revision': revision,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  KnowledgeNotesCompanion copyWith({
+    Value<String>? id,
+    Value<String?>? projectId,
+    Value<String?>? personId,
+    Value<String?>? studyId,
+    Value<String?>? originInboxId,
+    Value<String>? title,
+    Value<String>? content,
+    Value<String>? category,
+    Value<String>? tags,
+    Value<String>? attachments,
+    Value<String>? sources,
+    Value<bool>? isPinned,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? revision,
+    Value<int>? rowid,
+  }) {
+    return KnowledgeNotesCompanion(
+      id: id ?? this.id,
+      projectId: projectId ?? this.projectId,
+      personId: personId ?? this.personId,
+      studyId: studyId ?? this.studyId,
+      originInboxId: originInboxId ?? this.originInboxId,
+      title: title ?? this.title,
+      content: content ?? this.content,
+      category: category ?? this.category,
+      tags: tags ?? this.tags,
+      attachments: attachments ?? this.attachments,
+      sources: sources ?? this.sources,
+      isPinned: isPinned ?? this.isPinned,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      revision: revision ?? this.revision,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (projectId.present) {
+      map['project_id'] = Variable<String>(projectId.value);
+    }
+    if (personId.present) {
+      map['person_id'] = Variable<String>(personId.value);
+    }
+    if (studyId.present) {
+      map['study_id'] = Variable<String>(studyId.value);
+    }
+    if (originInboxId.present) {
+      map['origin_inbox_id'] = Variable<String>(originInboxId.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (content.present) {
+      map['content'] = Variable<String>(content.value);
+    }
+    if (category.present) {
+      map['category'] = Variable<String>(category.value);
+    }
+    if (tags.present) {
+      map['tags'] = Variable<String>(tags.value);
+    }
+    if (attachments.present) {
+      map['attachments'] = Variable<String>(attachments.value);
+    }
+    if (sources.present) {
+      map['sources'] = Variable<String>(sources.value);
+    }
+    if (isPinned.present) {
+      map['is_pinned'] = Variable<bool>(isPinned.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (revision.present) {
+      map['revision'] = Variable<int>(revision.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('KnowledgeNotesCompanion(')
+          ..write('id: $id, ')
+          ..write('projectId: $projectId, ')
+          ..write('personId: $personId, ')
+          ..write('studyId: $studyId, ')
+          ..write('originInboxId: $originInboxId, ')
+          ..write('title: $title, ')
+          ..write('content: $content, ')
+          ..write('category: $category, ')
+          ..write('tags: $tags, ')
+          ..write('attachments: $attachments, ')
+          ..write('sources: $sources, ')
+          ..write('isPinned: $isPinned, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $KnowledgeQuestionsTable extends KnowledgeQuestions
+    with TableInfo<$KnowledgeQuestionsTable, KnowledgeQuestionEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $KnowledgeQuestionsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _projectIdMeta = const VerificationMeta(
+    'projectId',
+  );
+  @override
+  late final GeneratedColumn<String> projectId = GeneratedColumn<String>(
+    'project_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _personIdMeta = const VerificationMeta(
+    'personId',
+  );
+  @override
+  late final GeneratedColumn<String> personId = GeneratedColumn<String>(
+    'person_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _studyIdMeta = const VerificationMeta(
+    'studyId',
+  );
+  @override
+  late final GeneratedColumn<String> studyId = GeneratedColumn<String>(
+    'study_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _originInboxIdMeta = const VerificationMeta(
+    'originInboxId',
+  );
+  @override
+  late final GeneratedColumn<String> originInboxId = GeneratedColumn<String>(
+    'origin_inbox_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _researchArticleIdMeta = const VerificationMeta(
+    'researchArticleId',
+  );
+  @override
+  late final GeneratedColumn<String> researchArticleId =
+      GeneratedColumn<String>(
+        'research_article_id',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _questionMeta = const VerificationMeta(
+    'question',
+  );
+  @override
+  late final GeneratedColumn<String> question = GeneratedColumn<String>(
+    'question',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _contextMeta = const VerificationMeta(
+    'context',
+  );
+  @override
+  late final GeneratedColumn<String> context = GeneratedColumn<String>(
+    'context',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _categoryMeta = const VerificationMeta(
+    'category',
+  );
+  @override
+  late final GeneratedColumn<String> category = GeneratedColumn<String>(
+    'category',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('biblical'),
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('unanswered'),
+  );
+  static const VerificationMeta _answerMeta = const VerificationMeta('answer');
+  @override
+  late final GeneratedColumn<String> answer = GeneratedColumn<String>(
+    'answer',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _answeredAtMeta = const VerificationMeta(
+    'answeredAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> answeredAt = GeneratedColumn<DateTime>(
+    'answered_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _revisionMeta = const VerificationMeta(
+    'revision',
+  );
+  @override
+  late final GeneratedColumn<int> revision = GeneratedColumn<int>(
+    'revision',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    projectId,
+    personId,
+    studyId,
+    originInboxId,
+    researchArticleId,
+    question,
+    context,
+    category,
+    status,
+    answer,
+    answeredAt,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'knowledge_questions';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<KnowledgeQuestionEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('project_id')) {
+      context.handle(
+        _projectIdMeta,
+        projectId.isAcceptableOrUnknown(data['project_id']!, _projectIdMeta),
+      );
+    }
+    if (data.containsKey('person_id')) {
+      context.handle(
+        _personIdMeta,
+        personId.isAcceptableOrUnknown(data['person_id']!, _personIdMeta),
+      );
+    }
+    if (data.containsKey('study_id')) {
+      context.handle(
+        _studyIdMeta,
+        studyId.isAcceptableOrUnknown(data['study_id']!, _studyIdMeta),
+      );
+    }
+    if (data.containsKey('origin_inbox_id')) {
+      context.handle(
+        _originInboxIdMeta,
+        originInboxId.isAcceptableOrUnknown(
+          data['origin_inbox_id']!,
+          _originInboxIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('research_article_id')) {
+      context.handle(
+        _researchArticleIdMeta,
+        researchArticleId.isAcceptableOrUnknown(
+          data['research_article_id']!,
+          _researchArticleIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('question')) {
+      context.handle(
+        _questionMeta,
+        question.isAcceptableOrUnknown(data['question']!, _questionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_questionMeta);
+    }
+    if (data.containsKey('context')) {
+      context.handle(
+        _contextMeta,
+        this.context.isAcceptableOrUnknown(data['context']!, _contextMeta),
+      );
+    }
+    if (data.containsKey('category')) {
+      context.handle(
+        _categoryMeta,
+        category.isAcceptableOrUnknown(data['category']!, _categoryMeta),
+      );
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    }
+    if (data.containsKey('answer')) {
+      context.handle(
+        _answerMeta,
+        answer.isAcceptableOrUnknown(data['answer']!, _answerMeta),
+      );
+    }
+    if (data.containsKey('answered_at')) {
+      context.handle(
+        _answeredAtMeta,
+        answeredAt.isAcceptableOrUnknown(data['answered_at']!, _answeredAtMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    if (data.containsKey('revision')) {
+      context.handle(
+        _revisionMeta,
+        revision.isAcceptableOrUnknown(data['revision']!, _revisionMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  KnowledgeQuestionEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return KnowledgeQuestionEntry(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      projectId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}project_id'],
+      ),
+      personId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}person_id'],
+      ),
+      studyId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}study_id'],
+      ),
+      originInboxId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}origin_inbox_id'],
+      ),
+      researchArticleId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}research_article_id'],
+      ),
+      question: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}question'],
+      )!,
+      context: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}context'],
+      ),
+      category: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}category'],
+      )!,
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      answer: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}answer'],
+      ),
+      answeredAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}answered_at'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+      revision: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}revision'],
+      )!,
+    );
+  }
+
+  @override
+  $KnowledgeQuestionsTable createAlias(String alias) {
+    return $KnowledgeQuestionsTable(attachedDatabase, alias);
+  }
+}
+
+class KnowledgeQuestionEntry extends DataClass
+    implements Insertable<KnowledgeQuestionEntry> {
+  final String id;
+  final String? projectId;
+  final String? personId;
+  final String? studyId;
+  final String? originInboxId;
+  final String? researchArticleId;
+  final String question;
+  final String? context;
+  final String category;
+  final String status;
+  final String? answer;
+  final DateTime? answeredAt;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime? deletedAt;
+  final int revision;
+  const KnowledgeQuestionEntry({
+    required this.id,
+    this.projectId,
+    this.personId,
+    this.studyId,
+    this.originInboxId,
+    this.researchArticleId,
+    required this.question,
+    this.context,
+    required this.category,
+    required this.status,
+    this.answer,
+    this.answeredAt,
+    required this.createdAt,
+    required this.updatedAt,
+    this.deletedAt,
+    required this.revision,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    if (!nullToAbsent || projectId != null) {
+      map['project_id'] = Variable<String>(projectId);
+    }
+    if (!nullToAbsent || personId != null) {
+      map['person_id'] = Variable<String>(personId);
+    }
+    if (!nullToAbsent || studyId != null) {
+      map['study_id'] = Variable<String>(studyId);
+    }
+    if (!nullToAbsent || originInboxId != null) {
+      map['origin_inbox_id'] = Variable<String>(originInboxId);
+    }
+    if (!nullToAbsent || researchArticleId != null) {
+      map['research_article_id'] = Variable<String>(researchArticleId);
+    }
+    map['question'] = Variable<String>(question);
+    if (!nullToAbsent || context != null) {
+      map['context'] = Variable<String>(context);
+    }
+    map['category'] = Variable<String>(category);
+    map['status'] = Variable<String>(status);
+    if (!nullToAbsent || answer != null) {
+      map['answer'] = Variable<String>(answer);
+    }
+    if (!nullToAbsent || answeredAt != null) {
+      map['answered_at'] = Variable<DateTime>(answeredAt);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    map['revision'] = Variable<int>(revision);
+    return map;
+  }
+
+  KnowledgeQuestionsCompanion toCompanion(bool nullToAbsent) {
+    return KnowledgeQuestionsCompanion(
+      id: Value(id),
+      projectId: projectId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(projectId),
+      personId: personId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(personId),
+      studyId: studyId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(studyId),
+      originInboxId: originInboxId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(originInboxId),
+      researchArticleId: researchArticleId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(researchArticleId),
+      question: Value(question),
+      context: context == null && nullToAbsent
+          ? const Value.absent()
+          : Value(context),
+      category: Value(category),
+      status: Value(status),
+      answer: answer == null && nullToAbsent
+          ? const Value.absent()
+          : Value(answer),
+      answeredAt: answeredAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(answeredAt),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      revision: Value(revision),
+    );
+  }
+
+  factory KnowledgeQuestionEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return KnowledgeQuestionEntry(
+      id: serializer.fromJson<String>(json['id']),
+      projectId: serializer.fromJson<String?>(json['projectId']),
+      personId: serializer.fromJson<String?>(json['personId']),
+      studyId: serializer.fromJson<String?>(json['studyId']),
+      originInboxId: serializer.fromJson<String?>(json['originInboxId']),
+      researchArticleId: serializer.fromJson<String?>(
+        json['researchArticleId'],
+      ),
+      question: serializer.fromJson<String>(json['question']),
+      context: serializer.fromJson<String?>(json['context']),
+      category: serializer.fromJson<String>(json['category']),
+      status: serializer.fromJson<String>(json['status']),
+      answer: serializer.fromJson<String?>(json['answer']),
+      answeredAt: serializer.fromJson<DateTime?>(json['answeredAt']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      revision: serializer.fromJson<int>(json['revision']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'projectId': serializer.toJson<String?>(projectId),
+      'personId': serializer.toJson<String?>(personId),
+      'studyId': serializer.toJson<String?>(studyId),
+      'originInboxId': serializer.toJson<String?>(originInboxId),
+      'researchArticleId': serializer.toJson<String?>(researchArticleId),
+      'question': serializer.toJson<String>(question),
+      'context': serializer.toJson<String?>(context),
+      'category': serializer.toJson<String>(category),
+      'status': serializer.toJson<String>(status),
+      'answer': serializer.toJson<String?>(answer),
+      'answeredAt': serializer.toJson<DateTime?>(answeredAt),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'revision': serializer.toJson<int>(revision),
+    };
+  }
+
+  KnowledgeQuestionEntry copyWith({
+    String? id,
+    Value<String?> projectId = const Value.absent(),
+    Value<String?> personId = const Value.absent(),
+    Value<String?> studyId = const Value.absent(),
+    Value<String?> originInboxId = const Value.absent(),
+    Value<String?> researchArticleId = const Value.absent(),
+    String? question,
+    Value<String?> context = const Value.absent(),
+    String? category,
+    String? status,
+    Value<String?> answer = const Value.absent(),
+    Value<DateTime?> answeredAt = const Value.absent(),
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    Value<DateTime?> deletedAt = const Value.absent(),
+    int? revision,
+  }) => KnowledgeQuestionEntry(
+    id: id ?? this.id,
+    projectId: projectId.present ? projectId.value : this.projectId,
+    personId: personId.present ? personId.value : this.personId,
+    studyId: studyId.present ? studyId.value : this.studyId,
+    originInboxId: originInboxId.present
+        ? originInboxId.value
+        : this.originInboxId,
+    researchArticleId: researchArticleId.present
+        ? researchArticleId.value
+        : this.researchArticleId,
+    question: question ?? this.question,
+    context: context.present ? context.value : this.context,
+    category: category ?? this.category,
+    status: status ?? this.status,
+    answer: answer.present ? answer.value : this.answer,
+    answeredAt: answeredAt.present ? answeredAt.value : this.answeredAt,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    revision: revision ?? this.revision,
+  );
+  KnowledgeQuestionEntry copyWithCompanion(KnowledgeQuestionsCompanion data) {
+    return KnowledgeQuestionEntry(
+      id: data.id.present ? data.id.value : this.id,
+      projectId: data.projectId.present ? data.projectId.value : this.projectId,
+      personId: data.personId.present ? data.personId.value : this.personId,
+      studyId: data.studyId.present ? data.studyId.value : this.studyId,
+      originInboxId: data.originInboxId.present
+          ? data.originInboxId.value
+          : this.originInboxId,
+      researchArticleId: data.researchArticleId.present
+          ? data.researchArticleId.value
+          : this.researchArticleId,
+      question: data.question.present ? data.question.value : this.question,
+      context: data.context.present ? data.context.value : this.context,
+      category: data.category.present ? data.category.value : this.category,
+      status: data.status.present ? data.status.value : this.status,
+      answer: data.answer.present ? data.answer.value : this.answer,
+      answeredAt: data.answeredAt.present
+          ? data.answeredAt.value
+          : this.answeredAt,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      revision: data.revision.present ? data.revision.value : this.revision,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('KnowledgeQuestionEntry(')
+          ..write('id: $id, ')
+          ..write('projectId: $projectId, ')
+          ..write('personId: $personId, ')
+          ..write('studyId: $studyId, ')
+          ..write('originInboxId: $originInboxId, ')
+          ..write('researchArticleId: $researchArticleId, ')
+          ..write('question: $question, ')
+          ..write('context: $context, ')
+          ..write('category: $category, ')
+          ..write('status: $status, ')
+          ..write('answer: $answer, ')
+          ..write('answeredAt: $answeredAt, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    projectId,
+    personId,
+    studyId,
+    originInboxId,
+    researchArticleId,
+    question,
+    context,
+    category,
+    status,
+    answer,
+    answeredAt,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is KnowledgeQuestionEntry &&
+          other.id == this.id &&
+          other.projectId == this.projectId &&
+          other.personId == this.personId &&
+          other.studyId == this.studyId &&
+          other.originInboxId == this.originInboxId &&
+          other.researchArticleId == this.researchArticleId &&
+          other.question == this.question &&
+          other.context == this.context &&
+          other.category == this.category &&
+          other.status == this.status &&
+          other.answer == this.answer &&
+          other.answeredAt == this.answeredAt &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt &&
+          other.revision == this.revision);
+}
+
+class KnowledgeQuestionsCompanion
+    extends UpdateCompanion<KnowledgeQuestionEntry> {
+  final Value<String> id;
+  final Value<String?> projectId;
+  final Value<String?> personId;
+  final Value<String?> studyId;
+  final Value<String?> originInboxId;
+  final Value<String?> researchArticleId;
+  final Value<String> question;
+  final Value<String?> context;
+  final Value<String> category;
+  final Value<String> status;
+  final Value<String?> answer;
+  final Value<DateTime?> answeredAt;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> revision;
+  final Value<int> rowid;
+  const KnowledgeQuestionsCompanion({
+    this.id = const Value.absent(),
+    this.projectId = const Value.absent(),
+    this.personId = const Value.absent(),
+    this.studyId = const Value.absent(),
+    this.originInboxId = const Value.absent(),
+    this.researchArticleId = const Value.absent(),
+    this.question = const Value.absent(),
+    this.context = const Value.absent(),
+    this.category = const Value.absent(),
+    this.status = const Value.absent(),
+    this.answer = const Value.absent(),
+    this.answeredAt = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  KnowledgeQuestionsCompanion.insert({
+    required String id,
+    this.projectId = const Value.absent(),
+    this.personId = const Value.absent(),
+    this.studyId = const Value.absent(),
+    this.originInboxId = const Value.absent(),
+    this.researchArticleId = const Value.absent(),
+    required String question,
+    this.context = const Value.absent(),
+    this.category = const Value.absent(),
+    this.status = const Value.absent(),
+    this.answer = const Value.absent(),
+    this.answeredAt = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       question = Value(question),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<KnowledgeQuestionEntry> custom({
+    Expression<String>? id,
+    Expression<String>? projectId,
+    Expression<String>? personId,
+    Expression<String>? studyId,
+    Expression<String>? originInboxId,
+    Expression<String>? researchArticleId,
+    Expression<String>? question,
+    Expression<String>? context,
+    Expression<String>? category,
+    Expression<String>? status,
+    Expression<String>? answer,
+    Expression<DateTime>? answeredAt,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? revision,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (projectId != null) 'project_id': projectId,
+      if (personId != null) 'person_id': personId,
+      if (studyId != null) 'study_id': studyId,
+      if (originInboxId != null) 'origin_inbox_id': originInboxId,
+      if (researchArticleId != null) 'research_article_id': researchArticleId,
+      if (question != null) 'question': question,
+      if (context != null) 'context': context,
+      if (category != null) 'category': category,
+      if (status != null) 'status': status,
+      if (answer != null) 'answer': answer,
+      if (answeredAt != null) 'answered_at': answeredAt,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (revision != null) 'revision': revision,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  KnowledgeQuestionsCompanion copyWith({
+    Value<String>? id,
+    Value<String?>? projectId,
+    Value<String?>? personId,
+    Value<String?>? studyId,
+    Value<String?>? originInboxId,
+    Value<String?>? researchArticleId,
+    Value<String>? question,
+    Value<String?>? context,
+    Value<String>? category,
+    Value<String>? status,
+    Value<String?>? answer,
+    Value<DateTime?>? answeredAt,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? revision,
+    Value<int>? rowid,
+  }) {
+    return KnowledgeQuestionsCompanion(
+      id: id ?? this.id,
+      projectId: projectId ?? this.projectId,
+      personId: personId ?? this.personId,
+      studyId: studyId ?? this.studyId,
+      originInboxId: originInboxId ?? this.originInboxId,
+      researchArticleId: researchArticleId ?? this.researchArticleId,
+      question: question ?? this.question,
+      context: context ?? this.context,
+      category: category ?? this.category,
+      status: status ?? this.status,
+      answer: answer ?? this.answer,
+      answeredAt: answeredAt ?? this.answeredAt,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      revision: revision ?? this.revision,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (projectId.present) {
+      map['project_id'] = Variable<String>(projectId.value);
+    }
+    if (personId.present) {
+      map['person_id'] = Variable<String>(personId.value);
+    }
+    if (studyId.present) {
+      map['study_id'] = Variable<String>(studyId.value);
+    }
+    if (originInboxId.present) {
+      map['origin_inbox_id'] = Variable<String>(originInboxId.value);
+    }
+    if (researchArticleId.present) {
+      map['research_article_id'] = Variable<String>(researchArticleId.value);
+    }
+    if (question.present) {
+      map['question'] = Variable<String>(question.value);
+    }
+    if (context.present) {
+      map['context'] = Variable<String>(context.value);
+    }
+    if (category.present) {
+      map['category'] = Variable<String>(category.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (answer.present) {
+      map['answer'] = Variable<String>(answer.value);
+    }
+    if (answeredAt.present) {
+      map['answered_at'] = Variable<DateTime>(answeredAt.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (revision.present) {
+      map['revision'] = Variable<int>(revision.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('KnowledgeQuestionsCompanion(')
+          ..write('id: $id, ')
+          ..write('projectId: $projectId, ')
+          ..write('personId: $personId, ')
+          ..write('studyId: $studyId, ')
+          ..write('originInboxId: $originInboxId, ')
+          ..write('researchArticleId: $researchArticleId, ')
+          ..write('question: $question, ')
+          ..write('context: $context, ')
+          ..write('category: $category, ')
+          ..write('status: $status, ')
+          ..write('answer: $answer, ')
+          ..write('answeredAt: $answeredAt, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $KnowledgeDocumentsTable extends KnowledgeDocuments
+    with TableInfo<$KnowledgeDocumentsTable, KnowledgeDocumentEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $KnowledgeDocumentsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _projectIdMeta = const VerificationMeta(
+    'projectId',
+  );
+  @override
+  late final GeneratedColumn<String> projectId = GeneratedColumn<String>(
+    'project_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _researchArticleIdMeta = const VerificationMeta(
+    'researchArticleId',
+  );
+  @override
+  late final GeneratedColumn<String> researchArticleId =
+      GeneratedColumn<String>(
+        'research_article_id',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _personIdMeta = const VerificationMeta(
+    'personId',
+  );
+  @override
+  late final GeneratedColumn<String> personId = GeneratedColumn<String>(
+    'person_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sectorIdMeta = const VerificationMeta(
+    'sectorId',
+  );
+  @override
+  late final GeneratedColumn<String> sectorId = GeneratedColumn<String>(
+    'sector_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _originInboxIdMeta = const VerificationMeta(
+    'originInboxId',
+  );
+  @override
+  late final GeneratedColumn<String> originInboxId = GeneratedColumn<String>(
+    'origin_inbox_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _fileNameMeta = const VerificationMeta(
+    'fileName',
+  );
+  @override
+  late final GeneratedColumn<String> fileName = GeneratedColumn<String>(
+    'file_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _fileTypeMeta = const VerificationMeta(
+    'fileType',
+  );
+  @override
+  late final GeneratedColumn<String> fileType = GeneratedColumn<String>(
+    'file_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _fileSizeMeta = const VerificationMeta(
+    'fileSize',
+  );
+  @override
+  late final GeneratedColumn<int> fileSize = GeneratedColumn<int>(
+    'file_size',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _filePathMeta = const VerificationMeta(
+    'filePath',
+  );
+  @override
+  late final GeneratedColumn<String> filePath = GeneratedColumn<String>(
+    'file_path',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _remoteStoragePathMeta = const VerificationMeta(
+    'remoteStoragePath',
+  );
+  @override
+  late final GeneratedColumn<String> remoteStoragePath =
+      GeneratedColumn<String>(
+        'remote_storage_path',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _sha256ChecksumMeta = const VerificationMeta(
+    'sha256Checksum',
+  );
+  @override
+  late final GeneratedColumn<String> sha256Checksum = GeneratedColumn<String>(
+    'sha256_checksum',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _descriptionMeta = const VerificationMeta(
+    'description',
+  );
+  @override
+  late final GeneratedColumn<String> description = GeneratedColumn<String>(
+    'description',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _tagsMeta = const VerificationMeta('tags');
+  @override
+  late final GeneratedColumn<String> tags = GeneratedColumn<String>(
+    'tags',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  );
+  static const VerificationMeta _categoryMeta = const VerificationMeta(
+    'category',
+  );
+  @override
+  late final GeneratedColumn<String> category = GeneratedColumn<String>(
+    'category',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('general'),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _revisionMeta = const VerificationMeta(
+    'revision',
+  );
+  @override
+  late final GeneratedColumn<int> revision = GeneratedColumn<int>(
+    'revision',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    projectId,
+    researchArticleId,
+    personId,
+    sectorId,
+    originInboxId,
+    title,
+    fileName,
+    fileType,
+    fileSize,
+    filePath,
+    remoteStoragePath,
+    sha256Checksum,
+    description,
+    tags,
+    category,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'knowledge_documents';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<KnowledgeDocumentEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('project_id')) {
+      context.handle(
+        _projectIdMeta,
+        projectId.isAcceptableOrUnknown(data['project_id']!, _projectIdMeta),
+      );
+    }
+    if (data.containsKey('research_article_id')) {
+      context.handle(
+        _researchArticleIdMeta,
+        researchArticleId.isAcceptableOrUnknown(
+          data['research_article_id']!,
+          _researchArticleIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('person_id')) {
+      context.handle(
+        _personIdMeta,
+        personId.isAcceptableOrUnknown(data['person_id']!, _personIdMeta),
+      );
+    }
+    if (data.containsKey('sector_id')) {
+      context.handle(
+        _sectorIdMeta,
+        sectorId.isAcceptableOrUnknown(data['sector_id']!, _sectorIdMeta),
+      );
+    }
+    if (data.containsKey('origin_inbox_id')) {
+      context.handle(
+        _originInboxIdMeta,
+        originInboxId.isAcceptableOrUnknown(
+          data['origin_inbox_id']!,
+          _originInboxIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('file_name')) {
+      context.handle(
+        _fileNameMeta,
+        fileName.isAcceptableOrUnknown(data['file_name']!, _fileNameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_fileNameMeta);
+    }
+    if (data.containsKey('file_type')) {
+      context.handle(
+        _fileTypeMeta,
+        fileType.isAcceptableOrUnknown(data['file_type']!, _fileTypeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_fileTypeMeta);
+    }
+    if (data.containsKey('file_size')) {
+      context.handle(
+        _fileSizeMeta,
+        fileSize.isAcceptableOrUnknown(data['file_size']!, _fileSizeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_fileSizeMeta);
+    }
+    if (data.containsKey('file_path')) {
+      context.handle(
+        _filePathMeta,
+        filePath.isAcceptableOrUnknown(data['file_path']!, _filePathMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_filePathMeta);
+    }
+    if (data.containsKey('remote_storage_path')) {
+      context.handle(
+        _remoteStoragePathMeta,
+        remoteStoragePath.isAcceptableOrUnknown(
+          data['remote_storage_path']!,
+          _remoteStoragePathMeta,
+        ),
+      );
+    }
+    if (data.containsKey('sha256_checksum')) {
+      context.handle(
+        _sha256ChecksumMeta,
+        sha256Checksum.isAcceptableOrUnknown(
+          data['sha256_checksum']!,
+          _sha256ChecksumMeta,
+        ),
+      );
+    }
+    if (data.containsKey('description')) {
+      context.handle(
+        _descriptionMeta,
+        description.isAcceptableOrUnknown(
+          data['description']!,
+          _descriptionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('tags')) {
+      context.handle(
+        _tagsMeta,
+        tags.isAcceptableOrUnknown(data['tags']!, _tagsMeta),
+      );
+    }
+    if (data.containsKey('category')) {
+      context.handle(
+        _categoryMeta,
+        category.isAcceptableOrUnknown(data['category']!, _categoryMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    if (data.containsKey('revision')) {
+      context.handle(
+        _revisionMeta,
+        revision.isAcceptableOrUnknown(data['revision']!, _revisionMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  KnowledgeDocumentEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return KnowledgeDocumentEntry(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      projectId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}project_id'],
+      ),
+      researchArticleId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}research_article_id'],
+      ),
+      personId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}person_id'],
+      ),
+      sectorId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sector_id'],
+      ),
+      originInboxId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}origin_inbox_id'],
+      ),
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      )!,
+      fileName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}file_name'],
+      )!,
+      fileType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}file_type'],
+      )!,
+      fileSize: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}file_size'],
+      )!,
+      filePath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}file_path'],
+      )!,
+      remoteStoragePath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}remote_storage_path'],
+      ),
+      sha256Checksum: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sha256_checksum'],
+      ),
+      description: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}description'],
+      ),
+      tags: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}tags'],
+      )!,
+      category: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}category'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+      revision: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}revision'],
+      )!,
+    );
+  }
+
+  @override
+  $KnowledgeDocumentsTable createAlias(String alias) {
+    return $KnowledgeDocumentsTable(attachedDatabase, alias);
+  }
+}
+
+class KnowledgeDocumentEntry extends DataClass
+    implements Insertable<KnowledgeDocumentEntry> {
+  final String id;
+  final String? projectId;
+  final String? researchArticleId;
+  final String? personId;
+  final String? sectorId;
+  final String? originInboxId;
+  final String title;
+  final String fileName;
+  final String fileType;
+  final int fileSize;
+  final String filePath;
+  final String? remoteStoragePath;
+  final String? sha256Checksum;
+  final String? description;
+  final String tags;
+  final String category;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime? deletedAt;
+  final int revision;
+  const KnowledgeDocumentEntry({
+    required this.id,
+    this.projectId,
+    this.researchArticleId,
+    this.personId,
+    this.sectorId,
+    this.originInboxId,
+    required this.title,
+    required this.fileName,
+    required this.fileType,
+    required this.fileSize,
+    required this.filePath,
+    this.remoteStoragePath,
+    this.sha256Checksum,
+    this.description,
+    required this.tags,
+    required this.category,
+    required this.createdAt,
+    required this.updatedAt,
+    this.deletedAt,
+    required this.revision,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    if (!nullToAbsent || projectId != null) {
+      map['project_id'] = Variable<String>(projectId);
+    }
+    if (!nullToAbsent || researchArticleId != null) {
+      map['research_article_id'] = Variable<String>(researchArticleId);
+    }
+    if (!nullToAbsent || personId != null) {
+      map['person_id'] = Variable<String>(personId);
+    }
+    if (!nullToAbsent || sectorId != null) {
+      map['sector_id'] = Variable<String>(sectorId);
+    }
+    if (!nullToAbsent || originInboxId != null) {
+      map['origin_inbox_id'] = Variable<String>(originInboxId);
+    }
+    map['title'] = Variable<String>(title);
+    map['file_name'] = Variable<String>(fileName);
+    map['file_type'] = Variable<String>(fileType);
+    map['file_size'] = Variable<int>(fileSize);
+    map['file_path'] = Variable<String>(filePath);
+    if (!nullToAbsent || remoteStoragePath != null) {
+      map['remote_storage_path'] = Variable<String>(remoteStoragePath);
+    }
+    if (!nullToAbsent || sha256Checksum != null) {
+      map['sha256_checksum'] = Variable<String>(sha256Checksum);
+    }
+    if (!nullToAbsent || description != null) {
+      map['description'] = Variable<String>(description);
+    }
+    map['tags'] = Variable<String>(tags);
+    map['category'] = Variable<String>(category);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    map['revision'] = Variable<int>(revision);
+    return map;
+  }
+
+  KnowledgeDocumentsCompanion toCompanion(bool nullToAbsent) {
+    return KnowledgeDocumentsCompanion(
+      id: Value(id),
+      projectId: projectId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(projectId),
+      researchArticleId: researchArticleId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(researchArticleId),
+      personId: personId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(personId),
+      sectorId: sectorId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sectorId),
+      originInboxId: originInboxId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(originInboxId),
+      title: Value(title),
+      fileName: Value(fileName),
+      fileType: Value(fileType),
+      fileSize: Value(fileSize),
+      filePath: Value(filePath),
+      remoteStoragePath: remoteStoragePath == null && nullToAbsent
+          ? const Value.absent()
+          : Value(remoteStoragePath),
+      sha256Checksum: sha256Checksum == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sha256Checksum),
+      description: description == null && nullToAbsent
+          ? const Value.absent()
+          : Value(description),
+      tags: Value(tags),
+      category: Value(category),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      revision: Value(revision),
+    );
+  }
+
+  factory KnowledgeDocumentEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return KnowledgeDocumentEntry(
+      id: serializer.fromJson<String>(json['id']),
+      projectId: serializer.fromJson<String?>(json['projectId']),
+      researchArticleId: serializer.fromJson<String?>(
+        json['researchArticleId'],
+      ),
+      personId: serializer.fromJson<String?>(json['personId']),
+      sectorId: serializer.fromJson<String?>(json['sectorId']),
+      originInboxId: serializer.fromJson<String?>(json['originInboxId']),
+      title: serializer.fromJson<String>(json['title']),
+      fileName: serializer.fromJson<String>(json['fileName']),
+      fileType: serializer.fromJson<String>(json['fileType']),
+      fileSize: serializer.fromJson<int>(json['fileSize']),
+      filePath: serializer.fromJson<String>(json['filePath']),
+      remoteStoragePath: serializer.fromJson<String?>(
+        json['remoteStoragePath'],
+      ),
+      sha256Checksum: serializer.fromJson<String?>(json['sha256Checksum']),
+      description: serializer.fromJson<String?>(json['description']),
+      tags: serializer.fromJson<String>(json['tags']),
+      category: serializer.fromJson<String>(json['category']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      revision: serializer.fromJson<int>(json['revision']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'projectId': serializer.toJson<String?>(projectId),
+      'researchArticleId': serializer.toJson<String?>(researchArticleId),
+      'personId': serializer.toJson<String?>(personId),
+      'sectorId': serializer.toJson<String?>(sectorId),
+      'originInboxId': serializer.toJson<String?>(originInboxId),
+      'title': serializer.toJson<String>(title),
+      'fileName': serializer.toJson<String>(fileName),
+      'fileType': serializer.toJson<String>(fileType),
+      'fileSize': serializer.toJson<int>(fileSize),
+      'filePath': serializer.toJson<String>(filePath),
+      'remoteStoragePath': serializer.toJson<String?>(remoteStoragePath),
+      'sha256Checksum': serializer.toJson<String?>(sha256Checksum),
+      'description': serializer.toJson<String?>(description),
+      'tags': serializer.toJson<String>(tags),
+      'category': serializer.toJson<String>(category),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'revision': serializer.toJson<int>(revision),
+    };
+  }
+
+  KnowledgeDocumentEntry copyWith({
+    String? id,
+    Value<String?> projectId = const Value.absent(),
+    Value<String?> researchArticleId = const Value.absent(),
+    Value<String?> personId = const Value.absent(),
+    Value<String?> sectorId = const Value.absent(),
+    Value<String?> originInboxId = const Value.absent(),
+    String? title,
+    String? fileName,
+    String? fileType,
+    int? fileSize,
+    String? filePath,
+    Value<String?> remoteStoragePath = const Value.absent(),
+    Value<String?> sha256Checksum = const Value.absent(),
+    Value<String?> description = const Value.absent(),
+    String? tags,
+    String? category,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    Value<DateTime?> deletedAt = const Value.absent(),
+    int? revision,
+  }) => KnowledgeDocumentEntry(
+    id: id ?? this.id,
+    projectId: projectId.present ? projectId.value : this.projectId,
+    researchArticleId: researchArticleId.present
+        ? researchArticleId.value
+        : this.researchArticleId,
+    personId: personId.present ? personId.value : this.personId,
+    sectorId: sectorId.present ? sectorId.value : this.sectorId,
+    originInboxId: originInboxId.present
+        ? originInboxId.value
+        : this.originInboxId,
+    title: title ?? this.title,
+    fileName: fileName ?? this.fileName,
+    fileType: fileType ?? this.fileType,
+    fileSize: fileSize ?? this.fileSize,
+    filePath: filePath ?? this.filePath,
+    remoteStoragePath: remoteStoragePath.present
+        ? remoteStoragePath.value
+        : this.remoteStoragePath,
+    sha256Checksum: sha256Checksum.present
+        ? sha256Checksum.value
+        : this.sha256Checksum,
+    description: description.present ? description.value : this.description,
+    tags: tags ?? this.tags,
+    category: category ?? this.category,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    revision: revision ?? this.revision,
+  );
+  KnowledgeDocumentEntry copyWithCompanion(KnowledgeDocumentsCompanion data) {
+    return KnowledgeDocumentEntry(
+      id: data.id.present ? data.id.value : this.id,
+      projectId: data.projectId.present ? data.projectId.value : this.projectId,
+      researchArticleId: data.researchArticleId.present
+          ? data.researchArticleId.value
+          : this.researchArticleId,
+      personId: data.personId.present ? data.personId.value : this.personId,
+      sectorId: data.sectorId.present ? data.sectorId.value : this.sectorId,
+      originInboxId: data.originInboxId.present
+          ? data.originInboxId.value
+          : this.originInboxId,
+      title: data.title.present ? data.title.value : this.title,
+      fileName: data.fileName.present ? data.fileName.value : this.fileName,
+      fileType: data.fileType.present ? data.fileType.value : this.fileType,
+      fileSize: data.fileSize.present ? data.fileSize.value : this.fileSize,
+      filePath: data.filePath.present ? data.filePath.value : this.filePath,
+      remoteStoragePath: data.remoteStoragePath.present
+          ? data.remoteStoragePath.value
+          : this.remoteStoragePath,
+      sha256Checksum: data.sha256Checksum.present
+          ? data.sha256Checksum.value
+          : this.sha256Checksum,
+      description: data.description.present
+          ? data.description.value
+          : this.description,
+      tags: data.tags.present ? data.tags.value : this.tags,
+      category: data.category.present ? data.category.value : this.category,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      revision: data.revision.present ? data.revision.value : this.revision,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('KnowledgeDocumentEntry(')
+          ..write('id: $id, ')
+          ..write('projectId: $projectId, ')
+          ..write('researchArticleId: $researchArticleId, ')
+          ..write('personId: $personId, ')
+          ..write('sectorId: $sectorId, ')
+          ..write('originInboxId: $originInboxId, ')
+          ..write('title: $title, ')
+          ..write('fileName: $fileName, ')
+          ..write('fileType: $fileType, ')
+          ..write('fileSize: $fileSize, ')
+          ..write('filePath: $filePath, ')
+          ..write('remoteStoragePath: $remoteStoragePath, ')
+          ..write('sha256Checksum: $sha256Checksum, ')
+          ..write('description: $description, ')
+          ..write('tags: $tags, ')
+          ..write('category: $category, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    projectId,
+    researchArticleId,
+    personId,
+    sectorId,
+    originInboxId,
+    title,
+    fileName,
+    fileType,
+    fileSize,
+    filePath,
+    remoteStoragePath,
+    sha256Checksum,
+    description,
+    tags,
+    category,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is KnowledgeDocumentEntry &&
+          other.id == this.id &&
+          other.projectId == this.projectId &&
+          other.researchArticleId == this.researchArticleId &&
+          other.personId == this.personId &&
+          other.sectorId == this.sectorId &&
+          other.originInboxId == this.originInboxId &&
+          other.title == this.title &&
+          other.fileName == this.fileName &&
+          other.fileType == this.fileType &&
+          other.fileSize == this.fileSize &&
+          other.filePath == this.filePath &&
+          other.remoteStoragePath == this.remoteStoragePath &&
+          other.sha256Checksum == this.sha256Checksum &&
+          other.description == this.description &&
+          other.tags == this.tags &&
+          other.category == this.category &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt &&
+          other.revision == this.revision);
+}
+
+class KnowledgeDocumentsCompanion
+    extends UpdateCompanion<KnowledgeDocumentEntry> {
+  final Value<String> id;
+  final Value<String?> projectId;
+  final Value<String?> researchArticleId;
+  final Value<String?> personId;
+  final Value<String?> sectorId;
+  final Value<String?> originInboxId;
+  final Value<String> title;
+  final Value<String> fileName;
+  final Value<String> fileType;
+  final Value<int> fileSize;
+  final Value<String> filePath;
+  final Value<String?> remoteStoragePath;
+  final Value<String?> sha256Checksum;
+  final Value<String?> description;
+  final Value<String> tags;
+  final Value<String> category;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> revision;
+  final Value<int> rowid;
+  const KnowledgeDocumentsCompanion({
+    this.id = const Value.absent(),
+    this.projectId = const Value.absent(),
+    this.researchArticleId = const Value.absent(),
+    this.personId = const Value.absent(),
+    this.sectorId = const Value.absent(),
+    this.originInboxId = const Value.absent(),
+    this.title = const Value.absent(),
+    this.fileName = const Value.absent(),
+    this.fileType = const Value.absent(),
+    this.fileSize = const Value.absent(),
+    this.filePath = const Value.absent(),
+    this.remoteStoragePath = const Value.absent(),
+    this.sha256Checksum = const Value.absent(),
+    this.description = const Value.absent(),
+    this.tags = const Value.absent(),
+    this.category = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  KnowledgeDocumentsCompanion.insert({
+    required String id,
+    this.projectId = const Value.absent(),
+    this.researchArticleId = const Value.absent(),
+    this.personId = const Value.absent(),
+    this.sectorId = const Value.absent(),
+    this.originInboxId = const Value.absent(),
+    required String title,
+    required String fileName,
+    required String fileType,
+    required int fileSize,
+    required String filePath,
+    this.remoteStoragePath = const Value.absent(),
+    this.sha256Checksum = const Value.absent(),
+    this.description = const Value.absent(),
+    this.tags = const Value.absent(),
+    this.category = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       title = Value(title),
+       fileName = Value(fileName),
+       fileType = Value(fileType),
+       fileSize = Value(fileSize),
+       filePath = Value(filePath),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<KnowledgeDocumentEntry> custom({
+    Expression<String>? id,
+    Expression<String>? projectId,
+    Expression<String>? researchArticleId,
+    Expression<String>? personId,
+    Expression<String>? sectorId,
+    Expression<String>? originInboxId,
+    Expression<String>? title,
+    Expression<String>? fileName,
+    Expression<String>? fileType,
+    Expression<int>? fileSize,
+    Expression<String>? filePath,
+    Expression<String>? remoteStoragePath,
+    Expression<String>? sha256Checksum,
+    Expression<String>? description,
+    Expression<String>? tags,
+    Expression<String>? category,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? revision,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (projectId != null) 'project_id': projectId,
+      if (researchArticleId != null) 'research_article_id': researchArticleId,
+      if (personId != null) 'person_id': personId,
+      if (sectorId != null) 'sector_id': sectorId,
+      if (originInboxId != null) 'origin_inbox_id': originInboxId,
+      if (title != null) 'title': title,
+      if (fileName != null) 'file_name': fileName,
+      if (fileType != null) 'file_type': fileType,
+      if (fileSize != null) 'file_size': fileSize,
+      if (filePath != null) 'file_path': filePath,
+      if (remoteStoragePath != null) 'remote_storage_path': remoteStoragePath,
+      if (sha256Checksum != null) 'sha256_checksum': sha256Checksum,
+      if (description != null) 'description': description,
+      if (tags != null) 'tags': tags,
+      if (category != null) 'category': category,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (revision != null) 'revision': revision,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  KnowledgeDocumentsCompanion copyWith({
+    Value<String>? id,
+    Value<String?>? projectId,
+    Value<String?>? researchArticleId,
+    Value<String?>? personId,
+    Value<String?>? sectorId,
+    Value<String?>? originInboxId,
+    Value<String>? title,
+    Value<String>? fileName,
+    Value<String>? fileType,
+    Value<int>? fileSize,
+    Value<String>? filePath,
+    Value<String?>? remoteStoragePath,
+    Value<String?>? sha256Checksum,
+    Value<String?>? description,
+    Value<String>? tags,
+    Value<String>? category,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? revision,
+    Value<int>? rowid,
+  }) {
+    return KnowledgeDocumentsCompanion(
+      id: id ?? this.id,
+      projectId: projectId ?? this.projectId,
+      researchArticleId: researchArticleId ?? this.researchArticleId,
+      personId: personId ?? this.personId,
+      sectorId: sectorId ?? this.sectorId,
+      originInboxId: originInboxId ?? this.originInboxId,
+      title: title ?? this.title,
+      fileName: fileName ?? this.fileName,
+      fileType: fileType ?? this.fileType,
+      fileSize: fileSize ?? this.fileSize,
+      filePath: filePath ?? this.filePath,
+      remoteStoragePath: remoteStoragePath ?? this.remoteStoragePath,
+      sha256Checksum: sha256Checksum ?? this.sha256Checksum,
+      description: description ?? this.description,
+      tags: tags ?? this.tags,
+      category: category ?? this.category,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      revision: revision ?? this.revision,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (projectId.present) {
+      map['project_id'] = Variable<String>(projectId.value);
+    }
+    if (researchArticleId.present) {
+      map['research_article_id'] = Variable<String>(researchArticleId.value);
+    }
+    if (personId.present) {
+      map['person_id'] = Variable<String>(personId.value);
+    }
+    if (sectorId.present) {
+      map['sector_id'] = Variable<String>(sectorId.value);
+    }
+    if (originInboxId.present) {
+      map['origin_inbox_id'] = Variable<String>(originInboxId.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (fileName.present) {
+      map['file_name'] = Variable<String>(fileName.value);
+    }
+    if (fileType.present) {
+      map['file_type'] = Variable<String>(fileType.value);
+    }
+    if (fileSize.present) {
+      map['file_size'] = Variable<int>(fileSize.value);
+    }
+    if (filePath.present) {
+      map['file_path'] = Variable<String>(filePath.value);
+    }
+    if (remoteStoragePath.present) {
+      map['remote_storage_path'] = Variable<String>(remoteStoragePath.value);
+    }
+    if (sha256Checksum.present) {
+      map['sha256_checksum'] = Variable<String>(sha256Checksum.value);
+    }
+    if (description.present) {
+      map['description'] = Variable<String>(description.value);
+    }
+    if (tags.present) {
+      map['tags'] = Variable<String>(tags.value);
+    }
+    if (category.present) {
+      map['category'] = Variable<String>(category.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (revision.present) {
+      map['revision'] = Variable<int>(revision.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('KnowledgeDocumentsCompanion(')
+          ..write('id: $id, ')
+          ..write('projectId: $projectId, ')
+          ..write('researchArticleId: $researchArticleId, ')
+          ..write('personId: $personId, ')
+          ..write('sectorId: $sectorId, ')
+          ..write('originInboxId: $originInboxId, ')
+          ..write('title: $title, ')
+          ..write('fileName: $fileName, ')
+          ..write('fileType: $fileType, ')
+          ..write('fileSize: $fileSize, ')
+          ..write('filePath: $filePath, ')
+          ..write('remoteStoragePath: $remoteStoragePath, ')
+          ..write('sha256Checksum: $sha256Checksum, ')
+          ..write('description: $description, ')
+          ..write('tags: $tags, ')
+          ..write('category: $category, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $KnowledgeResourcesTable extends KnowledgeResources
+    with TableInfo<$KnowledgeResourcesTable, KnowledgeResourceEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $KnowledgeResourcesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _projectIdMeta = const VerificationMeta(
+    'projectId',
+  );
+  @override
+  late final GeneratedColumn<String> projectId = GeneratedColumn<String>(
+    'project_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _researchArticleIdMeta = const VerificationMeta(
+    'researchArticleId',
+  );
+  @override
+  late final GeneratedColumn<String> researchArticleId =
+      GeneratedColumn<String>(
+        'research_article_id',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _personIdMeta = const VerificationMeta(
+    'personId',
+  );
+  @override
+  late final GeneratedColumn<String> personId = GeneratedColumn<String>(
+    'person_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _originInboxIdMeta = const VerificationMeta(
+    'originInboxId',
+  );
+  @override
+  late final GeneratedColumn<String> originInboxId = GeneratedColumn<String>(
+    'origin_inbox_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _resourceTypeMeta = const VerificationMeta(
+    'resourceType',
+  );
+  @override
+  late final GeneratedColumn<String> resourceType = GeneratedColumn<String>(
+    'resource_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _descriptionMeta = const VerificationMeta(
+    'description',
+  );
+  @override
+  late final GeneratedColumn<String> description = GeneratedColumn<String>(
+    'description',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _urlMeta = const VerificationMeta('url');
+  @override
+  late final GeneratedColumn<String> url = GeneratedColumn<String>(
+    'url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _localAssetPathMeta = const VerificationMeta(
+    'localAssetPath',
+  );
+  @override
+  late final GeneratedColumn<String> localAssetPath = GeneratedColumn<String>(
+    'local_asset_path',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _tagsMeta = const VerificationMeta('tags');
+  @override
+  late final GeneratedColumn<String> tags = GeneratedColumn<String>(
+    'tags',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  );
+  static const VerificationMeta _categoryMeta = const VerificationMeta(
+    'category',
+  );
+  @override
+  late final GeneratedColumn<String> category = GeneratedColumn<String>(
+    'category',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('general'),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _revisionMeta = const VerificationMeta(
+    'revision',
+  );
+  @override
+  late final GeneratedColumn<int> revision = GeneratedColumn<int>(
+    'revision',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    projectId,
+    researchArticleId,
+    personId,
+    originInboxId,
+    title,
+    resourceType,
+    description,
+    url,
+    localAssetPath,
+    tags,
+    category,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'knowledge_resources';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<KnowledgeResourceEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('project_id')) {
+      context.handle(
+        _projectIdMeta,
+        projectId.isAcceptableOrUnknown(data['project_id']!, _projectIdMeta),
+      );
+    }
+    if (data.containsKey('research_article_id')) {
+      context.handle(
+        _researchArticleIdMeta,
+        researchArticleId.isAcceptableOrUnknown(
+          data['research_article_id']!,
+          _researchArticleIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('person_id')) {
+      context.handle(
+        _personIdMeta,
+        personId.isAcceptableOrUnknown(data['person_id']!, _personIdMeta),
+      );
+    }
+    if (data.containsKey('origin_inbox_id')) {
+      context.handle(
+        _originInboxIdMeta,
+        originInboxId.isAcceptableOrUnknown(
+          data['origin_inbox_id']!,
+          _originInboxIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('resource_type')) {
+      context.handle(
+        _resourceTypeMeta,
+        resourceType.isAcceptableOrUnknown(
+          data['resource_type']!,
+          _resourceTypeMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_resourceTypeMeta);
+    }
+    if (data.containsKey('description')) {
+      context.handle(
+        _descriptionMeta,
+        description.isAcceptableOrUnknown(
+          data['description']!,
+          _descriptionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('url')) {
+      context.handle(
+        _urlMeta,
+        url.isAcceptableOrUnknown(data['url']!, _urlMeta),
+      );
+    }
+    if (data.containsKey('local_asset_path')) {
+      context.handle(
+        _localAssetPathMeta,
+        localAssetPath.isAcceptableOrUnknown(
+          data['local_asset_path']!,
+          _localAssetPathMeta,
+        ),
+      );
+    }
+    if (data.containsKey('tags')) {
+      context.handle(
+        _tagsMeta,
+        tags.isAcceptableOrUnknown(data['tags']!, _tagsMeta),
+      );
+    }
+    if (data.containsKey('category')) {
+      context.handle(
+        _categoryMeta,
+        category.isAcceptableOrUnknown(data['category']!, _categoryMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    if (data.containsKey('revision')) {
+      context.handle(
+        _revisionMeta,
+        revision.isAcceptableOrUnknown(data['revision']!, _revisionMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  KnowledgeResourceEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return KnowledgeResourceEntry(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      projectId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}project_id'],
+      ),
+      researchArticleId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}research_article_id'],
+      ),
+      personId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}person_id'],
+      ),
+      originInboxId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}origin_inbox_id'],
+      ),
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      )!,
+      resourceType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}resource_type'],
+      )!,
+      description: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}description'],
+      ),
+      url: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}url'],
+      ),
+      localAssetPath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}local_asset_path'],
+      ),
+      tags: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}tags'],
+      )!,
+      category: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}category'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+      revision: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}revision'],
+      )!,
+    );
+  }
+
+  @override
+  $KnowledgeResourcesTable createAlias(String alias) {
+    return $KnowledgeResourcesTable(attachedDatabase, alias);
+  }
+}
+
+class KnowledgeResourceEntry extends DataClass
+    implements Insertable<KnowledgeResourceEntry> {
+  final String id;
+  final String? projectId;
+  final String? researchArticleId;
+  final String? personId;
+  final String? originInboxId;
+  final String title;
+  final String resourceType;
+  final String? description;
+  final String? url;
+  final String? localAssetPath;
+  final String tags;
+  final String category;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime? deletedAt;
+  final int revision;
+  const KnowledgeResourceEntry({
+    required this.id,
+    this.projectId,
+    this.researchArticleId,
+    this.personId,
+    this.originInboxId,
+    required this.title,
+    required this.resourceType,
+    this.description,
+    this.url,
+    this.localAssetPath,
+    required this.tags,
+    required this.category,
+    required this.createdAt,
+    required this.updatedAt,
+    this.deletedAt,
+    required this.revision,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    if (!nullToAbsent || projectId != null) {
+      map['project_id'] = Variable<String>(projectId);
+    }
+    if (!nullToAbsent || researchArticleId != null) {
+      map['research_article_id'] = Variable<String>(researchArticleId);
+    }
+    if (!nullToAbsent || personId != null) {
+      map['person_id'] = Variable<String>(personId);
+    }
+    if (!nullToAbsent || originInboxId != null) {
+      map['origin_inbox_id'] = Variable<String>(originInboxId);
+    }
+    map['title'] = Variable<String>(title);
+    map['resource_type'] = Variable<String>(resourceType);
+    if (!nullToAbsent || description != null) {
+      map['description'] = Variable<String>(description);
+    }
+    if (!nullToAbsent || url != null) {
+      map['url'] = Variable<String>(url);
+    }
+    if (!nullToAbsent || localAssetPath != null) {
+      map['local_asset_path'] = Variable<String>(localAssetPath);
+    }
+    map['tags'] = Variable<String>(tags);
+    map['category'] = Variable<String>(category);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    map['revision'] = Variable<int>(revision);
+    return map;
+  }
+
+  KnowledgeResourcesCompanion toCompanion(bool nullToAbsent) {
+    return KnowledgeResourcesCompanion(
+      id: Value(id),
+      projectId: projectId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(projectId),
+      researchArticleId: researchArticleId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(researchArticleId),
+      personId: personId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(personId),
+      originInboxId: originInboxId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(originInboxId),
+      title: Value(title),
+      resourceType: Value(resourceType),
+      description: description == null && nullToAbsent
+          ? const Value.absent()
+          : Value(description),
+      url: url == null && nullToAbsent ? const Value.absent() : Value(url),
+      localAssetPath: localAssetPath == null && nullToAbsent
+          ? const Value.absent()
+          : Value(localAssetPath),
+      tags: Value(tags),
+      category: Value(category),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      revision: Value(revision),
+    );
+  }
+
+  factory KnowledgeResourceEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return KnowledgeResourceEntry(
+      id: serializer.fromJson<String>(json['id']),
+      projectId: serializer.fromJson<String?>(json['projectId']),
+      researchArticleId: serializer.fromJson<String?>(
+        json['researchArticleId'],
+      ),
+      personId: serializer.fromJson<String?>(json['personId']),
+      originInboxId: serializer.fromJson<String?>(json['originInboxId']),
+      title: serializer.fromJson<String>(json['title']),
+      resourceType: serializer.fromJson<String>(json['resourceType']),
+      description: serializer.fromJson<String?>(json['description']),
+      url: serializer.fromJson<String?>(json['url']),
+      localAssetPath: serializer.fromJson<String?>(json['localAssetPath']),
+      tags: serializer.fromJson<String>(json['tags']),
+      category: serializer.fromJson<String>(json['category']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      revision: serializer.fromJson<int>(json['revision']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'projectId': serializer.toJson<String?>(projectId),
+      'researchArticleId': serializer.toJson<String?>(researchArticleId),
+      'personId': serializer.toJson<String?>(personId),
+      'originInboxId': serializer.toJson<String?>(originInboxId),
+      'title': serializer.toJson<String>(title),
+      'resourceType': serializer.toJson<String>(resourceType),
+      'description': serializer.toJson<String?>(description),
+      'url': serializer.toJson<String?>(url),
+      'localAssetPath': serializer.toJson<String?>(localAssetPath),
+      'tags': serializer.toJson<String>(tags),
+      'category': serializer.toJson<String>(category),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'revision': serializer.toJson<int>(revision),
+    };
+  }
+
+  KnowledgeResourceEntry copyWith({
+    String? id,
+    Value<String?> projectId = const Value.absent(),
+    Value<String?> researchArticleId = const Value.absent(),
+    Value<String?> personId = const Value.absent(),
+    Value<String?> originInboxId = const Value.absent(),
+    String? title,
+    String? resourceType,
+    Value<String?> description = const Value.absent(),
+    Value<String?> url = const Value.absent(),
+    Value<String?> localAssetPath = const Value.absent(),
+    String? tags,
+    String? category,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    Value<DateTime?> deletedAt = const Value.absent(),
+    int? revision,
+  }) => KnowledgeResourceEntry(
+    id: id ?? this.id,
+    projectId: projectId.present ? projectId.value : this.projectId,
+    researchArticleId: researchArticleId.present
+        ? researchArticleId.value
+        : this.researchArticleId,
+    personId: personId.present ? personId.value : this.personId,
+    originInboxId: originInboxId.present
+        ? originInboxId.value
+        : this.originInboxId,
+    title: title ?? this.title,
+    resourceType: resourceType ?? this.resourceType,
+    description: description.present ? description.value : this.description,
+    url: url.present ? url.value : this.url,
+    localAssetPath: localAssetPath.present
+        ? localAssetPath.value
+        : this.localAssetPath,
+    tags: tags ?? this.tags,
+    category: category ?? this.category,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    revision: revision ?? this.revision,
+  );
+  KnowledgeResourceEntry copyWithCompanion(KnowledgeResourcesCompanion data) {
+    return KnowledgeResourceEntry(
+      id: data.id.present ? data.id.value : this.id,
+      projectId: data.projectId.present ? data.projectId.value : this.projectId,
+      researchArticleId: data.researchArticleId.present
+          ? data.researchArticleId.value
+          : this.researchArticleId,
+      personId: data.personId.present ? data.personId.value : this.personId,
+      originInboxId: data.originInboxId.present
+          ? data.originInboxId.value
+          : this.originInboxId,
+      title: data.title.present ? data.title.value : this.title,
+      resourceType: data.resourceType.present
+          ? data.resourceType.value
+          : this.resourceType,
+      description: data.description.present
+          ? data.description.value
+          : this.description,
+      url: data.url.present ? data.url.value : this.url,
+      localAssetPath: data.localAssetPath.present
+          ? data.localAssetPath.value
+          : this.localAssetPath,
+      tags: data.tags.present ? data.tags.value : this.tags,
+      category: data.category.present ? data.category.value : this.category,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      revision: data.revision.present ? data.revision.value : this.revision,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('KnowledgeResourceEntry(')
+          ..write('id: $id, ')
+          ..write('projectId: $projectId, ')
+          ..write('researchArticleId: $researchArticleId, ')
+          ..write('personId: $personId, ')
+          ..write('originInboxId: $originInboxId, ')
+          ..write('title: $title, ')
+          ..write('resourceType: $resourceType, ')
+          ..write('description: $description, ')
+          ..write('url: $url, ')
+          ..write('localAssetPath: $localAssetPath, ')
+          ..write('tags: $tags, ')
+          ..write('category: $category, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    projectId,
+    researchArticleId,
+    personId,
+    originInboxId,
+    title,
+    resourceType,
+    description,
+    url,
+    localAssetPath,
+    tags,
+    category,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    revision,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is KnowledgeResourceEntry &&
+          other.id == this.id &&
+          other.projectId == this.projectId &&
+          other.researchArticleId == this.researchArticleId &&
+          other.personId == this.personId &&
+          other.originInboxId == this.originInboxId &&
+          other.title == this.title &&
+          other.resourceType == this.resourceType &&
+          other.description == this.description &&
+          other.url == this.url &&
+          other.localAssetPath == this.localAssetPath &&
+          other.tags == this.tags &&
+          other.category == this.category &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt &&
+          other.revision == this.revision);
+}
+
+class KnowledgeResourcesCompanion
+    extends UpdateCompanion<KnowledgeResourceEntry> {
+  final Value<String> id;
+  final Value<String?> projectId;
+  final Value<String?> researchArticleId;
+  final Value<String?> personId;
+  final Value<String?> originInboxId;
+  final Value<String> title;
+  final Value<String> resourceType;
+  final Value<String?> description;
+  final Value<String?> url;
+  final Value<String?> localAssetPath;
+  final Value<String> tags;
+  final Value<String> category;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> revision;
+  final Value<int> rowid;
+  const KnowledgeResourcesCompanion({
+    this.id = const Value.absent(),
+    this.projectId = const Value.absent(),
+    this.researchArticleId = const Value.absent(),
+    this.personId = const Value.absent(),
+    this.originInboxId = const Value.absent(),
+    this.title = const Value.absent(),
+    this.resourceType = const Value.absent(),
+    this.description = const Value.absent(),
+    this.url = const Value.absent(),
+    this.localAssetPath = const Value.absent(),
+    this.tags = const Value.absent(),
+    this.category = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  KnowledgeResourcesCompanion.insert({
+    required String id,
+    this.projectId = const Value.absent(),
+    this.researchArticleId = const Value.absent(),
+    this.personId = const Value.absent(),
+    this.originInboxId = const Value.absent(),
+    required String title,
+    required String resourceType,
+    this.description = const Value.absent(),
+    this.url = const Value.absent(),
+    this.localAssetPath = const Value.absent(),
+    this.tags = const Value.absent(),
+    this.category = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.deletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       title = Value(title),
+       resourceType = Value(resourceType),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<KnowledgeResourceEntry> custom({
+    Expression<String>? id,
+    Expression<String>? projectId,
+    Expression<String>? researchArticleId,
+    Expression<String>? personId,
+    Expression<String>? originInboxId,
+    Expression<String>? title,
+    Expression<String>? resourceType,
+    Expression<String>? description,
+    Expression<String>? url,
+    Expression<String>? localAssetPath,
+    Expression<String>? tags,
+    Expression<String>? category,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? revision,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (projectId != null) 'project_id': projectId,
+      if (researchArticleId != null) 'research_article_id': researchArticleId,
+      if (personId != null) 'person_id': personId,
+      if (originInboxId != null) 'origin_inbox_id': originInboxId,
+      if (title != null) 'title': title,
+      if (resourceType != null) 'resource_type': resourceType,
+      if (description != null) 'description': description,
+      if (url != null) 'url': url,
+      if (localAssetPath != null) 'local_asset_path': localAssetPath,
+      if (tags != null) 'tags': tags,
+      if (category != null) 'category': category,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (revision != null) 'revision': revision,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  KnowledgeResourcesCompanion copyWith({
+    Value<String>? id,
+    Value<String?>? projectId,
+    Value<String?>? researchArticleId,
+    Value<String?>? personId,
+    Value<String?>? originInboxId,
+    Value<String>? title,
+    Value<String>? resourceType,
+    Value<String?>? description,
+    Value<String?>? url,
+    Value<String?>? localAssetPath,
+    Value<String>? tags,
+    Value<String>? category,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? revision,
+    Value<int>? rowid,
+  }) {
+    return KnowledgeResourcesCompanion(
+      id: id ?? this.id,
+      projectId: projectId ?? this.projectId,
+      researchArticleId: researchArticleId ?? this.researchArticleId,
+      personId: personId ?? this.personId,
+      originInboxId: originInboxId ?? this.originInboxId,
+      title: title ?? this.title,
+      resourceType: resourceType ?? this.resourceType,
+      description: description ?? this.description,
+      url: url ?? this.url,
+      localAssetPath: localAssetPath ?? this.localAssetPath,
+      tags: tags ?? this.tags,
+      category: category ?? this.category,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      revision: revision ?? this.revision,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (projectId.present) {
+      map['project_id'] = Variable<String>(projectId.value);
+    }
+    if (researchArticleId.present) {
+      map['research_article_id'] = Variable<String>(researchArticleId.value);
+    }
+    if (personId.present) {
+      map['person_id'] = Variable<String>(personId.value);
+    }
+    if (originInboxId.present) {
+      map['origin_inbox_id'] = Variable<String>(originInboxId.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (resourceType.present) {
+      map['resource_type'] = Variable<String>(resourceType.value);
+    }
+    if (description.present) {
+      map['description'] = Variable<String>(description.value);
+    }
+    if (url.present) {
+      map['url'] = Variable<String>(url.value);
+    }
+    if (localAssetPath.present) {
+      map['local_asset_path'] = Variable<String>(localAssetPath.value);
+    }
+    if (tags.present) {
+      map['tags'] = Variable<String>(tags.value);
+    }
+    if (category.present) {
+      map['category'] = Variable<String>(category.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (revision.present) {
+      map['revision'] = Variable<int>(revision.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('KnowledgeResourcesCompanion(')
+          ..write('id: $id, ')
+          ..write('projectId: $projectId, ')
+          ..write('researchArticleId: $researchArticleId, ')
+          ..write('personId: $personId, ')
+          ..write('originInboxId: $originInboxId, ')
+          ..write('title: $title, ')
+          ..write('resourceType: $resourceType, ')
+          ..write('description: $description, ')
+          ..write('url: $url, ')
+          ..write('localAssetPath: $localAssetPath, ')
+          ..write('tags: $tags, ')
+          ..write('category: $category, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('revision: $revision, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -16580,6 +24135,16 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $CalendarEventLinksTable calendarEventLinks =
       $CalendarEventLinksTable(this);
   late final $AppLanguagesTable appLanguages = $AppLanguagesTable(this);
+  late final $InboxEntriesTable inboxEntries = $InboxEntriesTable(this);
+  late final $ProjectsTable projects = $ProjectsTable(this);
+  late final $TasksTable tasks = $TasksTable(this);
+  late final $KnowledgeNotesTable knowledgeNotes = $KnowledgeNotesTable(this);
+  late final $KnowledgeQuestionsTable knowledgeQuestions =
+      $KnowledgeQuestionsTable(this);
+  late final $KnowledgeDocumentsTable knowledgeDocuments =
+      $KnowledgeDocumentsTable(this);
+  late final $KnowledgeResourcesTable knowledgeResources =
+      $KnowledgeResourcesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -16608,6 +24173,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     externalCalendarEvents,
     calendarEventLinks,
     appLanguages,
+    inboxEntries,
+    projects,
+    tasks,
+    knowledgeNotes,
+    knowledgeQuestions,
+    knowledgeDocuments,
+    knowledgeResources,
   ];
 }
 
@@ -20121,6 +27693,7 @@ typedef $$AppointmentsTableCreateCompanionBuilder =
       Value<int?> reminderMinutesBefore,
       Value<int?> secondReminderMinutesBefore,
       Value<bool> isProvisional,
+      Value<String?> taskId,
       required DateTime createdAt,
       required DateTime updatedAt,
       Value<DateTime?> deletedAt,
@@ -20142,6 +27715,7 @@ typedef $$AppointmentsTableUpdateCompanionBuilder =
       Value<int?> reminderMinutesBefore,
       Value<int?> secondReminderMinutesBefore,
       Value<bool> isProvisional,
+      Value<String?> taskId,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<DateTime?> deletedAt,
@@ -20250,6 +27824,11 @@ class $$AppointmentsTableFilterComposer
 
   ColumnFilters<bool> get isProvisional => $composableBuilder(
     column: $table.isProvisional,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get taskId => $composableBuilder(
+    column: $table.taskId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -20384,6 +27963,11 @@ class $$AppointmentsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get taskId => $composableBuilder(
+    column: $table.taskId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -20505,6 +28089,9 @@ class $$AppointmentsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get taskId =>
+      $composableBuilder(column: $table.taskId, builder: (column) => column);
+
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
@@ -20605,6 +28192,7 @@ class $$AppointmentsTableTableManager
                 Value<int?> reminderMinutesBefore = const Value.absent(),
                 Value<int?> secondReminderMinutesBefore = const Value.absent(),
                 Value<bool> isProvisional = const Value.absent(),
+                Value<String?> taskId = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
@@ -20624,6 +28212,7 @@ class $$AppointmentsTableTableManager
                 reminderMinutesBefore: reminderMinutesBefore,
                 secondReminderMinutesBefore: secondReminderMinutesBefore,
                 isProvisional: isProvisional,
+                taskId: taskId,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
@@ -20645,6 +28234,7 @@ class $$AppointmentsTableTableManager
                 Value<int?> reminderMinutesBefore = const Value.absent(),
                 Value<int?> secondReminderMinutesBefore = const Value.absent(),
                 Value<bool> isProvisional = const Value.absent(),
+                Value<String?> taskId = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
                 Value<DateTime?> deletedAt = const Value.absent(),
@@ -20664,6 +28254,7 @@ class $$AppointmentsTableTableManager
                 reminderMinutesBefore: reminderMinutesBefore,
                 secondReminderMinutesBefore: secondReminderMinutesBefore,
                 isProvisional: isProvisional,
+                taskId: taskId,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
@@ -24348,6 +31939,11 @@ typedef $$ResearchArticlesTableCreateCompanionBuilder =
       required String content,
       Value<String> tags,
       Value<String> attachments,
+      Value<String?> objective,
+      Value<String> status,
+      Value<String?> conclusion,
+      Value<String?> projectId,
+      Value<String?> mainQuestionId,
       required DateTime createdAt,
       required DateTime updatedAt,
       Value<DateTime?> deletedAt,
@@ -24362,6 +31958,11 @@ typedef $$ResearchArticlesTableUpdateCompanionBuilder =
       Value<String> content,
       Value<String> tags,
       Value<String> attachments,
+      Value<String?> objective,
+      Value<String> status,
+      Value<String?> conclusion,
+      Value<String?> projectId,
+      Value<String?> mainQuestionId,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<DateTime?> deletedAt,
@@ -24405,6 +32006,31 @@ class $$ResearchArticlesTableFilterComposer
 
   ColumnFilters<String> get attachments => $composableBuilder(
     column: $table.attachments,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get objective => $composableBuilder(
+    column: $table.objective,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get conclusion => $composableBuilder(
+    column: $table.conclusion,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get projectId => $composableBuilder(
+    column: $table.projectId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get mainQuestionId => $composableBuilder(
+    column: $table.mainQuestionId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -24468,6 +32094,31 @@ class $$ResearchArticlesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get objective => $composableBuilder(
+    column: $table.objective,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get conclusion => $composableBuilder(
+    column: $table.conclusion,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get projectId => $composableBuilder(
+    column: $table.projectId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get mainQuestionId => $composableBuilder(
+    column: $table.mainQuestionId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -24515,6 +32166,25 @@ class $$ResearchArticlesTableAnnotationComposer
 
   GeneratedColumn<String> get attachments => $composableBuilder(
     column: $table.attachments,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get objective =>
+      $composableBuilder(column: $table.objective, builder: (column) => column);
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<String> get conclusion => $composableBuilder(
+    column: $table.conclusion,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get projectId =>
+      $composableBuilder(column: $table.projectId, builder: (column) => column);
+
+  GeneratedColumn<String> get mainQuestionId => $composableBuilder(
+    column: $table.mainQuestionId,
     builder: (column) => column,
   );
 
@@ -24574,6 +32244,11 @@ class $$ResearchArticlesTableTableManager
                 Value<String> content = const Value.absent(),
                 Value<String> tags = const Value.absent(),
                 Value<String> attachments = const Value.absent(),
+                Value<String?> objective = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String?> conclusion = const Value.absent(),
+                Value<String?> projectId = const Value.absent(),
+                Value<String?> mainQuestionId = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
@@ -24586,6 +32261,11 @@ class $$ResearchArticlesTableTableManager
                 content: content,
                 tags: tags,
                 attachments: attachments,
+                objective: objective,
+                status: status,
+                conclusion: conclusion,
+                projectId: projectId,
+                mainQuestionId: mainQuestionId,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
@@ -24600,6 +32280,11 @@ class $$ResearchArticlesTableTableManager
                 required String content,
                 Value<String> tags = const Value.absent(),
                 Value<String> attachments = const Value.absent(),
+                Value<String?> objective = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String?> conclusion = const Value.absent(),
+                Value<String?> projectId = const Value.absent(),
+                Value<String?> mainQuestionId = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
                 Value<DateTime?> deletedAt = const Value.absent(),
@@ -24612,6 +32297,11 @@ class $$ResearchArticlesTableTableManager
                 content: content,
                 tags: tags,
                 attachments: attachments,
+                objective: objective,
+                status: status,
+                conclusion: conclusion,
+                projectId: projectId,
+                mainQuestionId: mainQuestionId,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
@@ -26619,6 +34309,3350 @@ typedef $$AppLanguagesTableProcessedTableManager =
       AppLanguageEntry,
       PrefetchHooks Function()
     >;
+typedef $$InboxEntriesTableCreateCompanionBuilder =
+    InboxEntriesCompanion Function({
+      required String id,
+      required String content,
+      Value<String> sourceType,
+      Value<String?> mediaPath,
+      Value<int?> mediaDurationSeconds,
+      Value<String> attachments,
+      Value<String> status,
+      Value<String?> suggestedCategory,
+      Value<String?> convertedEntityType,
+      Value<String?> convertedEntityId,
+      required DateTime capturedAt,
+      Value<DateTime?> processedAt,
+      Value<String> metadata,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> revision,
+      Value<int> rowid,
+    });
+typedef $$InboxEntriesTableUpdateCompanionBuilder =
+    InboxEntriesCompanion Function({
+      Value<String> id,
+      Value<String> content,
+      Value<String> sourceType,
+      Value<String?> mediaPath,
+      Value<int?> mediaDurationSeconds,
+      Value<String> attachments,
+      Value<String> status,
+      Value<String?> suggestedCategory,
+      Value<String?> convertedEntityType,
+      Value<String?> convertedEntityId,
+      Value<DateTime> capturedAt,
+      Value<DateTime?> processedAt,
+      Value<String> metadata,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> revision,
+      Value<int> rowid,
+    });
+
+class $$InboxEntriesTableFilterComposer
+    extends Composer<_$AppDatabase, $InboxEntriesTable> {
+  $$InboxEntriesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get content => $composableBuilder(
+    column: $table.content,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceType => $composableBuilder(
+    column: $table.sourceType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get mediaPath => $composableBuilder(
+    column: $table.mediaPath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get mediaDurationSeconds => $composableBuilder(
+    column: $table.mediaDurationSeconds,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get attachments => $composableBuilder(
+    column: $table.attachments,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get suggestedCategory => $composableBuilder(
+    column: $table.suggestedCategory,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get convertedEntityType => $composableBuilder(
+    column: $table.convertedEntityType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get convertedEntityId => $composableBuilder(
+    column: $table.convertedEntityId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get capturedAt => $composableBuilder(
+    column: $table.capturedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get processedAt => $composableBuilder(
+    column: $table.processedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get metadata => $composableBuilder(
+    column: $table.metadata,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$InboxEntriesTableOrderingComposer
+    extends Composer<_$AppDatabase, $InboxEntriesTable> {
+  $$InboxEntriesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get content => $composableBuilder(
+    column: $table.content,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourceType => $composableBuilder(
+    column: $table.sourceType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get mediaPath => $composableBuilder(
+    column: $table.mediaPath,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get mediaDurationSeconds => $composableBuilder(
+    column: $table.mediaDurationSeconds,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get attachments => $composableBuilder(
+    column: $table.attachments,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get suggestedCategory => $composableBuilder(
+    column: $table.suggestedCategory,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get convertedEntityType => $composableBuilder(
+    column: $table.convertedEntityType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get convertedEntityId => $composableBuilder(
+    column: $table.convertedEntityId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get capturedAt => $composableBuilder(
+    column: $table.capturedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get processedAt => $composableBuilder(
+    column: $table.processedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get metadata => $composableBuilder(
+    column: $table.metadata,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$InboxEntriesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $InboxEntriesTable> {
+  $$InboxEntriesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get content =>
+      $composableBuilder(column: $table.content, builder: (column) => column);
+
+  GeneratedColumn<String> get sourceType => $composableBuilder(
+    column: $table.sourceType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get mediaPath =>
+      $composableBuilder(column: $table.mediaPath, builder: (column) => column);
+
+  GeneratedColumn<int> get mediaDurationSeconds => $composableBuilder(
+    column: $table.mediaDurationSeconds,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get attachments => $composableBuilder(
+    column: $table.attachments,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<String> get suggestedCategory => $composableBuilder(
+    column: $table.suggestedCategory,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get convertedEntityType => $composableBuilder(
+    column: $table.convertedEntityType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get convertedEntityId => $composableBuilder(
+    column: $table.convertedEntityId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get capturedAt => $composableBuilder(
+    column: $table.capturedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get processedAt => $composableBuilder(
+    column: $table.processedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get metadata =>
+      $composableBuilder(column: $table.metadata, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get revision =>
+      $composableBuilder(column: $table.revision, builder: (column) => column);
+}
+
+class $$InboxEntriesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $InboxEntriesTable,
+          InboxEntry,
+          $$InboxEntriesTableFilterComposer,
+          $$InboxEntriesTableOrderingComposer,
+          $$InboxEntriesTableAnnotationComposer,
+          $$InboxEntriesTableCreateCompanionBuilder,
+          $$InboxEntriesTableUpdateCompanionBuilder,
+          (
+            InboxEntry,
+            BaseReferences<_$AppDatabase, $InboxEntriesTable, InboxEntry>,
+          ),
+          InboxEntry,
+          PrefetchHooks Function()
+        > {
+  $$InboxEntriesTableTableManager(_$AppDatabase db, $InboxEntriesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$InboxEntriesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$InboxEntriesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$InboxEntriesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> content = const Value.absent(),
+                Value<String> sourceType = const Value.absent(),
+                Value<String?> mediaPath = const Value.absent(),
+                Value<int?> mediaDurationSeconds = const Value.absent(),
+                Value<String> attachments = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String?> suggestedCategory = const Value.absent(),
+                Value<String?> convertedEntityType = const Value.absent(),
+                Value<String?> convertedEntityId = const Value.absent(),
+                Value<DateTime> capturedAt = const Value.absent(),
+                Value<DateTime?> processedAt = const Value.absent(),
+                Value<String> metadata = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => InboxEntriesCompanion(
+                id: id,
+                content: content,
+                sourceType: sourceType,
+                mediaPath: mediaPath,
+                mediaDurationSeconds: mediaDurationSeconds,
+                attachments: attachments,
+                status: status,
+                suggestedCategory: suggestedCategory,
+                convertedEntityType: convertedEntityType,
+                convertedEntityId: convertedEntityId,
+                capturedAt: capturedAt,
+                processedAt: processedAt,
+                metadata: metadata,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String content,
+                Value<String> sourceType = const Value.absent(),
+                Value<String?> mediaPath = const Value.absent(),
+                Value<int?> mediaDurationSeconds = const Value.absent(),
+                Value<String> attachments = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String?> suggestedCategory = const Value.absent(),
+                Value<String?> convertedEntityType = const Value.absent(),
+                Value<String?> convertedEntityId = const Value.absent(),
+                required DateTime capturedAt,
+                Value<DateTime?> processedAt = const Value.absent(),
+                Value<String> metadata = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => InboxEntriesCompanion.insert(
+                id: id,
+                content: content,
+                sourceType: sourceType,
+                mediaPath: mediaPath,
+                mediaDurationSeconds: mediaDurationSeconds,
+                attachments: attachments,
+                status: status,
+                suggestedCategory: suggestedCategory,
+                convertedEntityType: convertedEntityType,
+                convertedEntityId: convertedEntityId,
+                capturedAt: capturedAt,
+                processedAt: processedAt,
+                metadata: metadata,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$InboxEntriesTable, InboxEntry>(table),
+                  BaseReferences<_$AppDatabase, $InboxEntriesTable, InboxEntry>(
+                    db,
+                    table,
+                    e,
+                  ),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$InboxEntriesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $InboxEntriesTable,
+      InboxEntry,
+      $$InboxEntriesTableFilterComposer,
+      $$InboxEntriesTableOrderingComposer,
+      $$InboxEntriesTableAnnotationComposer,
+      $$InboxEntriesTableCreateCompanionBuilder,
+      $$InboxEntriesTableUpdateCompanionBuilder,
+      (
+        InboxEntry,
+        BaseReferences<_$AppDatabase, $InboxEntriesTable, InboxEntry>,
+      ),
+      InboxEntry,
+      PrefetchHooks Function()
+    >;
+typedef $$ProjectsTableCreateCompanionBuilder = ProjectsCompanion Function({
+  required String id,
+  required String name,
+  Value<String?> objective,
+  Value<String?> description,
+  Value<String> category,
+  Value<String> status,
+  Value<String?> colorHex,
+  Value<String?> iconName,
+  Value<DateTime?> startDate,
+  Value<DateTime?> targetDate,
+  Value<DateTime?> completedAt,
+  Value<String?> originInboxId,
+  Value<String> metadata,
+  required DateTime createdAt,
+  required DateTime updatedAt,
+  Value<DateTime?> deletedAt,
+  Value<int> revision,
+  Value<int> rowid,
+});
+typedef $$ProjectsTableUpdateCompanionBuilder = ProjectsCompanion Function({
+  Value<String> id,
+  Value<String> name,
+  Value<String?> objective,
+  Value<String?> description,
+  Value<String> category,
+  Value<String> status,
+  Value<String?> colorHex,
+  Value<String?> iconName,
+  Value<DateTime?> startDate,
+  Value<DateTime?> targetDate,
+  Value<DateTime?> completedAt,
+  Value<String?> originInboxId,
+  Value<String> metadata,
+  Value<DateTime> createdAt,
+  Value<DateTime> updatedAt,
+  Value<DateTime?> deletedAt,
+  Value<int> revision,
+  Value<int> rowid,
+});
+
+class $$ProjectsTableFilterComposer
+    extends Composer<_$AppDatabase, $ProjectsTable> {
+  $$ProjectsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get objective => $composableBuilder(
+    column: $table.objective,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get colorHex => $composableBuilder(
+    column: $table.colorHex,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get iconName => $composableBuilder(
+    column: $table.iconName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get startDate => $composableBuilder(
+    column: $table.startDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get targetDate => $composableBuilder(
+    column: $table.targetDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get completedAt => $composableBuilder(
+    column: $table.completedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get originInboxId => $composableBuilder(
+    column: $table.originInboxId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get metadata => $composableBuilder(
+    column: $table.metadata,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$ProjectsTableOrderingComposer
+    extends Composer<_$AppDatabase, $ProjectsTable> {
+  $$ProjectsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get objective => $composableBuilder(
+    column: $table.objective,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get colorHex => $composableBuilder(
+    column: $table.colorHex,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get iconName => $composableBuilder(
+    column: $table.iconName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get startDate => $composableBuilder(
+    column: $table.startDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get targetDate => $composableBuilder(
+    column: $table.targetDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get completedAt => $composableBuilder(
+    column: $table.completedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get originInboxId => $composableBuilder(
+    column: $table.originInboxId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get metadata => $composableBuilder(
+    column: $table.metadata,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$ProjectsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ProjectsTable> {
+  $$ProjectsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get objective =>
+      $composableBuilder(column: $table.objective, builder: (column) => column);
+
+  GeneratedColumn<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get category =>
+      $composableBuilder(column: $table.category, builder: (column) => column);
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<String> get colorHex =>
+      $composableBuilder(column: $table.colorHex, builder: (column) => column);
+
+  GeneratedColumn<String> get iconName =>
+      $composableBuilder(column: $table.iconName, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get startDate =>
+      $composableBuilder(column: $table.startDate, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get targetDate => $composableBuilder(
+    column: $table.targetDate,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get completedAt => $composableBuilder(
+    column: $table.completedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get originInboxId => $composableBuilder(
+    column: $table.originInboxId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get metadata =>
+      $composableBuilder(column: $table.metadata, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get revision =>
+      $composableBuilder(column: $table.revision, builder: (column) => column);
+}
+
+class $$ProjectsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ProjectsTable,
+          ProjectEntry,
+          $$ProjectsTableFilterComposer,
+          $$ProjectsTableOrderingComposer,
+          $$ProjectsTableAnnotationComposer,
+          $$ProjectsTableCreateCompanionBuilder,
+          $$ProjectsTableUpdateCompanionBuilder,
+          (
+            ProjectEntry,
+            BaseReferences<_$AppDatabase, $ProjectsTable, ProjectEntry>,
+          ),
+          ProjectEntry,
+          PrefetchHooks Function()
+        > {
+  $$ProjectsTableTableManager(_$AppDatabase db, $ProjectsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ProjectsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ProjectsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ProjectsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String?> objective = const Value.absent(),
+                Value<String?> description = const Value.absent(),
+                Value<String> category = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String?> colorHex = const Value.absent(),
+                Value<String?> iconName = const Value.absent(),
+                Value<DateTime?> startDate = const Value.absent(),
+                Value<DateTime?> targetDate = const Value.absent(),
+                Value<DateTime?> completedAt = const Value.absent(),
+                Value<String?> originInboxId = const Value.absent(),
+                Value<String> metadata = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ProjectsCompanion(
+                id: id,
+                name: name,
+                objective: objective,
+                description: description,
+                category: category,
+                status: status,
+                colorHex: colorHex,
+                iconName: iconName,
+                startDate: startDate,
+                targetDate: targetDate,
+                completedAt: completedAt,
+                originInboxId: originInboxId,
+                metadata: metadata,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String name,
+                Value<String?> objective = const Value.absent(),
+                Value<String?> description = const Value.absent(),
+                Value<String> category = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String?> colorHex = const Value.absent(),
+                Value<String?> iconName = const Value.absent(),
+                Value<DateTime?> startDate = const Value.absent(),
+                Value<DateTime?> targetDate = const Value.absent(),
+                Value<DateTime?> completedAt = const Value.absent(),
+                Value<String?> originInboxId = const Value.absent(),
+                Value<String> metadata = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ProjectsCompanion.insert(
+                id: id,
+                name: name,
+                objective: objective,
+                description: description,
+                category: category,
+                status: status,
+                colorHex: colorHex,
+                iconName: iconName,
+                startDate: startDate,
+                targetDate: targetDate,
+                completedAt: completedAt,
+                originInboxId: originInboxId,
+                metadata: metadata,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$ProjectsTable, ProjectEntry>(table),
+                  BaseReferences<_$AppDatabase, $ProjectsTable, ProjectEntry>(
+                    db,
+                    table,
+                    e,
+                  ),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$ProjectsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ProjectsTable,
+      ProjectEntry,
+      $$ProjectsTableFilterComposer,
+      $$ProjectsTableOrderingComposer,
+      $$ProjectsTableAnnotationComposer,
+      $$ProjectsTableCreateCompanionBuilder,
+      $$ProjectsTableUpdateCompanionBuilder,
+      (
+        ProjectEntry,
+        BaseReferences<_$AppDatabase, $ProjectsTable, ProjectEntry>,
+      ),
+      ProjectEntry,
+      PrefetchHooks Function()
+    >;
+typedef $$TasksTableCreateCompanionBuilder = TasksCompanion Function({
+  required String id,
+  Value<String?> projectId,
+  Value<String?> personId,
+  Value<String?> studyId,
+  Value<String?> sectorId,
+  Value<String?> originInboxId,
+  Value<String?> parentTaskId,
+  required String title,
+  Value<String?> description,
+  Value<String> status,
+  Value<String> priority,
+  Value<String> category,
+  Value<DateTime?> startDate,
+  Value<DateTime?> dueDate,
+  Value<DateTime?> scheduledAt,
+  Value<int?> durationMinutes,
+  Value<DateTime?> completedAt,
+  Value<bool> isRecurring,
+  Value<String?> recurrenceRule,
+  Value<String?> appointmentId,
+  Value<String> attachments,
+  Value<String> metadata,
+  required DateTime createdAt,
+  required DateTime updatedAt,
+  Value<DateTime?> deletedAt,
+  Value<int> revision,
+  Value<int> rowid,
+});
+typedef $$TasksTableUpdateCompanionBuilder = TasksCompanion Function({
+  Value<String> id,
+  Value<String?> projectId,
+  Value<String?> personId,
+  Value<String?> studyId,
+  Value<String?> sectorId,
+  Value<String?> originInboxId,
+  Value<String?> parentTaskId,
+  Value<String> title,
+  Value<String?> description,
+  Value<String> status,
+  Value<String> priority,
+  Value<String> category,
+  Value<DateTime?> startDate,
+  Value<DateTime?> dueDate,
+  Value<DateTime?> scheduledAt,
+  Value<int?> durationMinutes,
+  Value<DateTime?> completedAt,
+  Value<bool> isRecurring,
+  Value<String?> recurrenceRule,
+  Value<String?> appointmentId,
+  Value<String> attachments,
+  Value<String> metadata,
+  Value<DateTime> createdAt,
+  Value<DateTime> updatedAt,
+  Value<DateTime?> deletedAt,
+  Value<int> revision,
+  Value<int> rowid,
+});
+
+class $$TasksTableFilterComposer extends Composer<_$AppDatabase, $TasksTable> {
+  $$TasksTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get projectId => $composableBuilder(
+    column: $table.projectId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get personId => $composableBuilder(
+    column: $table.personId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get studyId => $composableBuilder(
+    column: $table.studyId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sectorId => $composableBuilder(
+    column: $table.sectorId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get originInboxId => $composableBuilder(
+    column: $table.originInboxId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get parentTaskId => $composableBuilder(
+    column: $table.parentTaskId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get priority => $composableBuilder(
+    column: $table.priority,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get startDate => $composableBuilder(
+    column: $table.startDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get dueDate => $composableBuilder(
+    column: $table.dueDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get scheduledAt => $composableBuilder(
+    column: $table.scheduledAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get durationMinutes => $composableBuilder(
+    column: $table.durationMinutes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get completedAt => $composableBuilder(
+    column: $table.completedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isRecurring => $composableBuilder(
+    column: $table.isRecurring,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get recurrenceRule => $composableBuilder(
+    column: $table.recurrenceRule,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get appointmentId => $composableBuilder(
+    column: $table.appointmentId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get attachments => $composableBuilder(
+    column: $table.attachments,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get metadata => $composableBuilder(
+    column: $table.metadata,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$TasksTableOrderingComposer
+    extends Composer<_$AppDatabase, $TasksTable> {
+  $$TasksTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get projectId => $composableBuilder(
+    column: $table.projectId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get personId => $composableBuilder(
+    column: $table.personId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get studyId => $composableBuilder(
+    column: $table.studyId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sectorId => $composableBuilder(
+    column: $table.sectorId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get originInboxId => $composableBuilder(
+    column: $table.originInboxId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get parentTaskId => $composableBuilder(
+    column: $table.parentTaskId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get priority => $composableBuilder(
+    column: $table.priority,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get startDate => $composableBuilder(
+    column: $table.startDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get dueDate => $composableBuilder(
+    column: $table.dueDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get scheduledAt => $composableBuilder(
+    column: $table.scheduledAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get durationMinutes => $composableBuilder(
+    column: $table.durationMinutes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get completedAt => $composableBuilder(
+    column: $table.completedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isRecurring => $composableBuilder(
+    column: $table.isRecurring,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get recurrenceRule => $composableBuilder(
+    column: $table.recurrenceRule,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get appointmentId => $composableBuilder(
+    column: $table.appointmentId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get attachments => $composableBuilder(
+    column: $table.attachments,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get metadata => $composableBuilder(
+    column: $table.metadata,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$TasksTableAnnotationComposer
+    extends Composer<_$AppDatabase, $TasksTable> {
+  $$TasksTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get projectId =>
+      $composableBuilder(column: $table.projectId, builder: (column) => column);
+
+  GeneratedColumn<String> get personId =>
+      $composableBuilder(column: $table.personId, builder: (column) => column);
+
+  GeneratedColumn<String> get studyId =>
+      $composableBuilder(column: $table.studyId, builder: (column) => column);
+
+  GeneratedColumn<String> get sectorId =>
+      $composableBuilder(column: $table.sectorId, builder: (column) => column);
+
+  GeneratedColumn<String> get originInboxId => $composableBuilder(
+    column: $table.originInboxId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get parentTaskId => $composableBuilder(
+    column: $table.parentTaskId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<String> get priority =>
+      $composableBuilder(column: $table.priority, builder: (column) => column);
+
+  GeneratedColumn<String> get category =>
+      $composableBuilder(column: $table.category, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get startDate =>
+      $composableBuilder(column: $table.startDate, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get dueDate =>
+      $composableBuilder(column: $table.dueDate, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get scheduledAt => $composableBuilder(
+    column: $table.scheduledAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get durationMinutes => $composableBuilder(
+    column: $table.durationMinutes,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get completedAt => $composableBuilder(
+    column: $table.completedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isRecurring => $composableBuilder(
+    column: $table.isRecurring,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get recurrenceRule => $composableBuilder(
+    column: $table.recurrenceRule,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get appointmentId => $composableBuilder(
+    column: $table.appointmentId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get attachments => $composableBuilder(
+    column: $table.attachments,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get metadata =>
+      $composableBuilder(column: $table.metadata, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get revision =>
+      $composableBuilder(column: $table.revision, builder: (column) => column);
+}
+
+class $$TasksTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $TasksTable,
+          TaskEntry,
+          $$TasksTableFilterComposer,
+          $$TasksTableOrderingComposer,
+          $$TasksTableAnnotationComposer,
+          $$TasksTableCreateCompanionBuilder,
+          $$TasksTableUpdateCompanionBuilder,
+          (TaskEntry, BaseReferences<_$AppDatabase, $TasksTable, TaskEntry>),
+          TaskEntry,
+          PrefetchHooks Function()
+        > {
+  $$TasksTableTableManager(_$AppDatabase db, $TasksTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$TasksTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$TasksTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$TasksTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String?> projectId = const Value.absent(),
+                Value<String?> personId = const Value.absent(),
+                Value<String?> studyId = const Value.absent(),
+                Value<String?> sectorId = const Value.absent(),
+                Value<String?> originInboxId = const Value.absent(),
+                Value<String?> parentTaskId = const Value.absent(),
+                Value<String> title = const Value.absent(),
+                Value<String?> description = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String> priority = const Value.absent(),
+                Value<String> category = const Value.absent(),
+                Value<DateTime?> startDate = const Value.absent(),
+                Value<DateTime?> dueDate = const Value.absent(),
+                Value<DateTime?> scheduledAt = const Value.absent(),
+                Value<int?> durationMinutes = const Value.absent(),
+                Value<DateTime?> completedAt = const Value.absent(),
+                Value<bool> isRecurring = const Value.absent(),
+                Value<String?> recurrenceRule = const Value.absent(),
+                Value<String?> appointmentId = const Value.absent(),
+                Value<String> attachments = const Value.absent(),
+                Value<String> metadata = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TasksCompanion(
+                id: id,
+                projectId: projectId,
+                personId: personId,
+                studyId: studyId,
+                sectorId: sectorId,
+                originInboxId: originInboxId,
+                parentTaskId: parentTaskId,
+                title: title,
+                description: description,
+                status: status,
+                priority: priority,
+                category: category,
+                startDate: startDate,
+                dueDate: dueDate,
+                scheduledAt: scheduledAt,
+                durationMinutes: durationMinutes,
+                completedAt: completedAt,
+                isRecurring: isRecurring,
+                recurrenceRule: recurrenceRule,
+                appointmentId: appointmentId,
+                attachments: attachments,
+                metadata: metadata,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                Value<String?> projectId = const Value.absent(),
+                Value<String?> personId = const Value.absent(),
+                Value<String?> studyId = const Value.absent(),
+                Value<String?> sectorId = const Value.absent(),
+                Value<String?> originInboxId = const Value.absent(),
+                Value<String?> parentTaskId = const Value.absent(),
+                required String title,
+                Value<String?> description = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String> priority = const Value.absent(),
+                Value<String> category = const Value.absent(),
+                Value<DateTime?> startDate = const Value.absent(),
+                Value<DateTime?> dueDate = const Value.absent(),
+                Value<DateTime?> scheduledAt = const Value.absent(),
+                Value<int?> durationMinutes = const Value.absent(),
+                Value<DateTime?> completedAt = const Value.absent(),
+                Value<bool> isRecurring = const Value.absent(),
+                Value<String?> recurrenceRule = const Value.absent(),
+                Value<String?> appointmentId = const Value.absent(),
+                Value<String> attachments = const Value.absent(),
+                Value<String> metadata = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TasksCompanion.insert(
+                id: id,
+                projectId: projectId,
+                personId: personId,
+                studyId: studyId,
+                sectorId: sectorId,
+                originInboxId: originInboxId,
+                parentTaskId: parentTaskId,
+                title: title,
+                description: description,
+                status: status,
+                priority: priority,
+                category: category,
+                startDate: startDate,
+                dueDate: dueDate,
+                scheduledAt: scheduledAt,
+                durationMinutes: durationMinutes,
+                completedAt: completedAt,
+                isRecurring: isRecurring,
+                recurrenceRule: recurrenceRule,
+                appointmentId: appointmentId,
+                attachments: attachments,
+                metadata: metadata,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$TasksTable, TaskEntry>(table),
+                  BaseReferences<_$AppDatabase, $TasksTable, TaskEntry>(
+                    db,
+                    table,
+                    e,
+                  ),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$TasksTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $TasksTable,
+      TaskEntry,
+      $$TasksTableFilterComposer,
+      $$TasksTableOrderingComposer,
+      $$TasksTableAnnotationComposer,
+      $$TasksTableCreateCompanionBuilder,
+      $$TasksTableUpdateCompanionBuilder,
+      (TaskEntry, BaseReferences<_$AppDatabase, $TasksTable, TaskEntry>),
+      TaskEntry,
+      PrefetchHooks Function()
+    >;
+typedef $$KnowledgeNotesTableCreateCompanionBuilder =
+    KnowledgeNotesCompanion Function({
+      required String id,
+      Value<String?> projectId,
+      Value<String?> personId,
+      Value<String?> studyId,
+      Value<String?> originInboxId,
+      required String title,
+      required String content,
+      Value<String> category,
+      Value<String> tags,
+      Value<String> attachments,
+      Value<String> sources,
+      Value<bool> isPinned,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> revision,
+      Value<int> rowid,
+    });
+typedef $$KnowledgeNotesTableUpdateCompanionBuilder =
+    KnowledgeNotesCompanion Function({
+      Value<String> id,
+      Value<String?> projectId,
+      Value<String?> personId,
+      Value<String?> studyId,
+      Value<String?> originInboxId,
+      Value<String> title,
+      Value<String> content,
+      Value<String> category,
+      Value<String> tags,
+      Value<String> attachments,
+      Value<String> sources,
+      Value<bool> isPinned,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> revision,
+      Value<int> rowid,
+    });
+
+class $$KnowledgeNotesTableFilterComposer
+    extends Composer<_$AppDatabase, $KnowledgeNotesTable> {
+  $$KnowledgeNotesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get projectId => $composableBuilder(
+    column: $table.projectId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get personId => $composableBuilder(
+    column: $table.personId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get studyId => $composableBuilder(
+    column: $table.studyId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get originInboxId => $composableBuilder(
+    column: $table.originInboxId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get content => $composableBuilder(
+    column: $table.content,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get tags => $composableBuilder(
+    column: $table.tags,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get attachments => $composableBuilder(
+    column: $table.attachments,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sources => $composableBuilder(
+    column: $table.sources,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isPinned => $composableBuilder(
+    column: $table.isPinned,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$KnowledgeNotesTableOrderingComposer
+    extends Composer<_$AppDatabase, $KnowledgeNotesTable> {
+  $$KnowledgeNotesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get projectId => $composableBuilder(
+    column: $table.projectId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get personId => $composableBuilder(
+    column: $table.personId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get studyId => $composableBuilder(
+    column: $table.studyId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get originInboxId => $composableBuilder(
+    column: $table.originInboxId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get content => $composableBuilder(
+    column: $table.content,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get tags => $composableBuilder(
+    column: $table.tags,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get attachments => $composableBuilder(
+    column: $table.attachments,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sources => $composableBuilder(
+    column: $table.sources,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isPinned => $composableBuilder(
+    column: $table.isPinned,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$KnowledgeNotesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $KnowledgeNotesTable> {
+  $$KnowledgeNotesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get projectId =>
+      $composableBuilder(column: $table.projectId, builder: (column) => column);
+
+  GeneratedColumn<String> get personId =>
+      $composableBuilder(column: $table.personId, builder: (column) => column);
+
+  GeneratedColumn<String> get studyId =>
+      $composableBuilder(column: $table.studyId, builder: (column) => column);
+
+  GeneratedColumn<String> get originInboxId => $composableBuilder(
+    column: $table.originInboxId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get content =>
+      $composableBuilder(column: $table.content, builder: (column) => column);
+
+  GeneratedColumn<String> get category =>
+      $composableBuilder(column: $table.category, builder: (column) => column);
+
+  GeneratedColumn<String> get tags =>
+      $composableBuilder(column: $table.tags, builder: (column) => column);
+
+  GeneratedColumn<String> get attachments => $composableBuilder(
+    column: $table.attachments,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get sources =>
+      $composableBuilder(column: $table.sources, builder: (column) => column);
+
+  GeneratedColumn<bool> get isPinned =>
+      $composableBuilder(column: $table.isPinned, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get revision =>
+      $composableBuilder(column: $table.revision, builder: (column) => column);
+}
+
+class $$KnowledgeNotesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $KnowledgeNotesTable,
+          KnowledgeNoteEntry,
+          $$KnowledgeNotesTableFilterComposer,
+          $$KnowledgeNotesTableOrderingComposer,
+          $$KnowledgeNotesTableAnnotationComposer,
+          $$KnowledgeNotesTableCreateCompanionBuilder,
+          $$KnowledgeNotesTableUpdateCompanionBuilder,
+          (
+            KnowledgeNoteEntry,
+            BaseReferences<
+              _$AppDatabase,
+              $KnowledgeNotesTable,
+              KnowledgeNoteEntry
+            >,
+          ),
+          KnowledgeNoteEntry,
+          PrefetchHooks Function()
+        > {
+  $$KnowledgeNotesTableTableManager(
+    _$AppDatabase db,
+    $KnowledgeNotesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$KnowledgeNotesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$KnowledgeNotesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$KnowledgeNotesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String?> projectId = const Value.absent(),
+                Value<String?> personId = const Value.absent(),
+                Value<String?> studyId = const Value.absent(),
+                Value<String?> originInboxId = const Value.absent(),
+                Value<String> title = const Value.absent(),
+                Value<String> content = const Value.absent(),
+                Value<String> category = const Value.absent(),
+                Value<String> tags = const Value.absent(),
+                Value<String> attachments = const Value.absent(),
+                Value<String> sources = const Value.absent(),
+                Value<bool> isPinned = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => KnowledgeNotesCompanion(
+                id: id,
+                projectId: projectId,
+                personId: personId,
+                studyId: studyId,
+                originInboxId: originInboxId,
+                title: title,
+                content: content,
+                category: category,
+                tags: tags,
+                attachments: attachments,
+                sources: sources,
+                isPinned: isPinned,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                Value<String?> projectId = const Value.absent(),
+                Value<String?> personId = const Value.absent(),
+                Value<String?> studyId = const Value.absent(),
+                Value<String?> originInboxId = const Value.absent(),
+                required String title,
+                required String content,
+                Value<String> category = const Value.absent(),
+                Value<String> tags = const Value.absent(),
+                Value<String> attachments = const Value.absent(),
+                Value<String> sources = const Value.absent(),
+                Value<bool> isPinned = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => KnowledgeNotesCompanion.insert(
+                id: id,
+                projectId: projectId,
+                personId: personId,
+                studyId: studyId,
+                originInboxId: originInboxId,
+                title: title,
+                content: content,
+                category: category,
+                tags: tags,
+                attachments: attachments,
+                sources: sources,
+                isPinned: isPinned,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$KnowledgeNotesTable, KnowledgeNoteEntry>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $KnowledgeNotesTable,
+                    KnowledgeNoteEntry
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$KnowledgeNotesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $KnowledgeNotesTable,
+      KnowledgeNoteEntry,
+      $$KnowledgeNotesTableFilterComposer,
+      $$KnowledgeNotesTableOrderingComposer,
+      $$KnowledgeNotesTableAnnotationComposer,
+      $$KnowledgeNotesTableCreateCompanionBuilder,
+      $$KnowledgeNotesTableUpdateCompanionBuilder,
+      (
+        KnowledgeNoteEntry,
+        BaseReferences<_$AppDatabase, $KnowledgeNotesTable, KnowledgeNoteEntry>,
+      ),
+      KnowledgeNoteEntry,
+      PrefetchHooks Function()
+    >;
+typedef $$KnowledgeQuestionsTableCreateCompanionBuilder =
+    KnowledgeQuestionsCompanion Function({
+      required String id,
+      Value<String?> projectId,
+      Value<String?> personId,
+      Value<String?> studyId,
+      Value<String?> originInboxId,
+      Value<String?> researchArticleId,
+      required String question,
+      Value<String?> context,
+      Value<String> category,
+      Value<String> status,
+      Value<String?> answer,
+      Value<DateTime?> answeredAt,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> revision,
+      Value<int> rowid,
+    });
+typedef $$KnowledgeQuestionsTableUpdateCompanionBuilder =
+    KnowledgeQuestionsCompanion Function({
+      Value<String> id,
+      Value<String?> projectId,
+      Value<String?> personId,
+      Value<String?> studyId,
+      Value<String?> originInboxId,
+      Value<String?> researchArticleId,
+      Value<String> question,
+      Value<String?> context,
+      Value<String> category,
+      Value<String> status,
+      Value<String?> answer,
+      Value<DateTime?> answeredAt,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> revision,
+      Value<int> rowid,
+    });
+
+class $$KnowledgeQuestionsTableFilterComposer
+    extends Composer<_$AppDatabase, $KnowledgeQuestionsTable> {
+  $$KnowledgeQuestionsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get projectId => $composableBuilder(
+    column: $table.projectId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get personId => $composableBuilder(
+    column: $table.personId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get studyId => $composableBuilder(
+    column: $table.studyId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get originInboxId => $composableBuilder(
+    column: $table.originInboxId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get researchArticleId => $composableBuilder(
+    column: $table.researchArticleId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get question => $composableBuilder(
+    column: $table.question,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get context => $composableBuilder(
+    column: $table.context,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get answer => $composableBuilder(
+    column: $table.answer,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get answeredAt => $composableBuilder(
+    column: $table.answeredAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$KnowledgeQuestionsTableOrderingComposer
+    extends Composer<_$AppDatabase, $KnowledgeQuestionsTable> {
+  $$KnowledgeQuestionsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get projectId => $composableBuilder(
+    column: $table.projectId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get personId => $composableBuilder(
+    column: $table.personId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get studyId => $composableBuilder(
+    column: $table.studyId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get originInboxId => $composableBuilder(
+    column: $table.originInboxId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get researchArticleId => $composableBuilder(
+    column: $table.researchArticleId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get question => $composableBuilder(
+    column: $table.question,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get context => $composableBuilder(
+    column: $table.context,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get answer => $composableBuilder(
+    column: $table.answer,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get answeredAt => $composableBuilder(
+    column: $table.answeredAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$KnowledgeQuestionsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $KnowledgeQuestionsTable> {
+  $$KnowledgeQuestionsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get projectId =>
+      $composableBuilder(column: $table.projectId, builder: (column) => column);
+
+  GeneratedColumn<String> get personId =>
+      $composableBuilder(column: $table.personId, builder: (column) => column);
+
+  GeneratedColumn<String> get studyId =>
+      $composableBuilder(column: $table.studyId, builder: (column) => column);
+
+  GeneratedColumn<String> get originInboxId => $composableBuilder(
+    column: $table.originInboxId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get researchArticleId => $composableBuilder(
+    column: $table.researchArticleId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get question =>
+      $composableBuilder(column: $table.question, builder: (column) => column);
+
+  GeneratedColumn<String> get context =>
+      $composableBuilder(column: $table.context, builder: (column) => column);
+
+  GeneratedColumn<String> get category =>
+      $composableBuilder(column: $table.category, builder: (column) => column);
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<String> get answer =>
+      $composableBuilder(column: $table.answer, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get answeredAt => $composableBuilder(
+    column: $table.answeredAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get revision =>
+      $composableBuilder(column: $table.revision, builder: (column) => column);
+}
+
+class $$KnowledgeQuestionsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $KnowledgeQuestionsTable,
+          KnowledgeQuestionEntry,
+          $$KnowledgeQuestionsTableFilterComposer,
+          $$KnowledgeQuestionsTableOrderingComposer,
+          $$KnowledgeQuestionsTableAnnotationComposer,
+          $$KnowledgeQuestionsTableCreateCompanionBuilder,
+          $$KnowledgeQuestionsTableUpdateCompanionBuilder,
+          (
+            KnowledgeQuestionEntry,
+            BaseReferences<
+              _$AppDatabase,
+              $KnowledgeQuestionsTable,
+              KnowledgeQuestionEntry
+            >,
+          ),
+          KnowledgeQuestionEntry,
+          PrefetchHooks Function()
+        > {
+  $$KnowledgeQuestionsTableTableManager(
+    _$AppDatabase db,
+    $KnowledgeQuestionsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$KnowledgeQuestionsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$KnowledgeQuestionsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$KnowledgeQuestionsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String?> projectId = const Value.absent(),
+                Value<String?> personId = const Value.absent(),
+                Value<String?> studyId = const Value.absent(),
+                Value<String?> originInboxId = const Value.absent(),
+                Value<String?> researchArticleId = const Value.absent(),
+                Value<String> question = const Value.absent(),
+                Value<String?> context = const Value.absent(),
+                Value<String> category = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String?> answer = const Value.absent(),
+                Value<DateTime?> answeredAt = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => KnowledgeQuestionsCompanion(
+                id: id,
+                projectId: projectId,
+                personId: personId,
+                studyId: studyId,
+                originInboxId: originInboxId,
+                researchArticleId: researchArticleId,
+                question: question,
+                context: context,
+                category: category,
+                status: status,
+                answer: answer,
+                answeredAt: answeredAt,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                Value<String?> projectId = const Value.absent(),
+                Value<String?> personId = const Value.absent(),
+                Value<String?> studyId = const Value.absent(),
+                Value<String?> originInboxId = const Value.absent(),
+                Value<String?> researchArticleId = const Value.absent(),
+                required String question,
+                Value<String?> context = const Value.absent(),
+                Value<String> category = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String?> answer = const Value.absent(),
+                Value<DateTime?> answeredAt = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => KnowledgeQuestionsCompanion.insert(
+                id: id,
+                projectId: projectId,
+                personId: personId,
+                studyId: studyId,
+                originInboxId: originInboxId,
+                researchArticleId: researchArticleId,
+                question: question,
+                context: context,
+                category: category,
+                status: status,
+                answer: answer,
+                answeredAt: answeredAt,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$KnowledgeQuestionsTable, KnowledgeQuestionEntry>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $KnowledgeQuestionsTable,
+                    KnowledgeQuestionEntry
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$KnowledgeQuestionsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $KnowledgeQuestionsTable,
+      KnowledgeQuestionEntry,
+      $$KnowledgeQuestionsTableFilterComposer,
+      $$KnowledgeQuestionsTableOrderingComposer,
+      $$KnowledgeQuestionsTableAnnotationComposer,
+      $$KnowledgeQuestionsTableCreateCompanionBuilder,
+      $$KnowledgeQuestionsTableUpdateCompanionBuilder,
+      (
+        KnowledgeQuestionEntry,
+        BaseReferences<
+          _$AppDatabase,
+          $KnowledgeQuestionsTable,
+          KnowledgeQuestionEntry
+        >,
+      ),
+      KnowledgeQuestionEntry,
+      PrefetchHooks Function()
+    >;
+typedef $$KnowledgeDocumentsTableCreateCompanionBuilder =
+    KnowledgeDocumentsCompanion Function({
+      required String id,
+      Value<String?> projectId,
+      Value<String?> researchArticleId,
+      Value<String?> personId,
+      Value<String?> sectorId,
+      Value<String?> originInboxId,
+      required String title,
+      required String fileName,
+      required String fileType,
+      required int fileSize,
+      required String filePath,
+      Value<String?> remoteStoragePath,
+      Value<String?> sha256Checksum,
+      Value<String?> description,
+      Value<String> tags,
+      Value<String> category,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> revision,
+      Value<int> rowid,
+    });
+typedef $$KnowledgeDocumentsTableUpdateCompanionBuilder =
+    KnowledgeDocumentsCompanion Function({
+      Value<String> id,
+      Value<String?> projectId,
+      Value<String?> researchArticleId,
+      Value<String?> personId,
+      Value<String?> sectorId,
+      Value<String?> originInboxId,
+      Value<String> title,
+      Value<String> fileName,
+      Value<String> fileType,
+      Value<int> fileSize,
+      Value<String> filePath,
+      Value<String?> remoteStoragePath,
+      Value<String?> sha256Checksum,
+      Value<String?> description,
+      Value<String> tags,
+      Value<String> category,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> revision,
+      Value<int> rowid,
+    });
+
+class $$KnowledgeDocumentsTableFilterComposer
+    extends Composer<_$AppDatabase, $KnowledgeDocumentsTable> {
+  $$KnowledgeDocumentsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get projectId => $composableBuilder(
+    column: $table.projectId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get researchArticleId => $composableBuilder(
+    column: $table.researchArticleId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get personId => $composableBuilder(
+    column: $table.personId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sectorId => $composableBuilder(
+    column: $table.sectorId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get originInboxId => $composableBuilder(
+    column: $table.originInboxId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get fileName => $composableBuilder(
+    column: $table.fileName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get fileType => $composableBuilder(
+    column: $table.fileType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get fileSize => $composableBuilder(
+    column: $table.fileSize,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get filePath => $composableBuilder(
+    column: $table.filePath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get remoteStoragePath => $composableBuilder(
+    column: $table.remoteStoragePath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sha256Checksum => $composableBuilder(
+    column: $table.sha256Checksum,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get tags => $composableBuilder(
+    column: $table.tags,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$KnowledgeDocumentsTableOrderingComposer
+    extends Composer<_$AppDatabase, $KnowledgeDocumentsTable> {
+  $$KnowledgeDocumentsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get projectId => $composableBuilder(
+    column: $table.projectId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get researchArticleId => $composableBuilder(
+    column: $table.researchArticleId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get personId => $composableBuilder(
+    column: $table.personId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sectorId => $composableBuilder(
+    column: $table.sectorId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get originInboxId => $composableBuilder(
+    column: $table.originInboxId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get fileName => $composableBuilder(
+    column: $table.fileName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get fileType => $composableBuilder(
+    column: $table.fileType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get fileSize => $composableBuilder(
+    column: $table.fileSize,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get filePath => $composableBuilder(
+    column: $table.filePath,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get remoteStoragePath => $composableBuilder(
+    column: $table.remoteStoragePath,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sha256Checksum => $composableBuilder(
+    column: $table.sha256Checksum,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get tags => $composableBuilder(
+    column: $table.tags,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$KnowledgeDocumentsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $KnowledgeDocumentsTable> {
+  $$KnowledgeDocumentsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get projectId =>
+      $composableBuilder(column: $table.projectId, builder: (column) => column);
+
+  GeneratedColumn<String> get researchArticleId => $composableBuilder(
+    column: $table.researchArticleId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get personId =>
+      $composableBuilder(column: $table.personId, builder: (column) => column);
+
+  GeneratedColumn<String> get sectorId =>
+      $composableBuilder(column: $table.sectorId, builder: (column) => column);
+
+  GeneratedColumn<String> get originInboxId => $composableBuilder(
+    column: $table.originInboxId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get fileName =>
+      $composableBuilder(column: $table.fileName, builder: (column) => column);
+
+  GeneratedColumn<String> get fileType =>
+      $composableBuilder(column: $table.fileType, builder: (column) => column);
+
+  GeneratedColumn<int> get fileSize =>
+      $composableBuilder(column: $table.fileSize, builder: (column) => column);
+
+  GeneratedColumn<String> get filePath =>
+      $composableBuilder(column: $table.filePath, builder: (column) => column);
+
+  GeneratedColumn<String> get remoteStoragePath => $composableBuilder(
+    column: $table.remoteStoragePath,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get sha256Checksum => $composableBuilder(
+    column: $table.sha256Checksum,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get tags =>
+      $composableBuilder(column: $table.tags, builder: (column) => column);
+
+  GeneratedColumn<String> get category =>
+      $composableBuilder(column: $table.category, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get revision =>
+      $composableBuilder(column: $table.revision, builder: (column) => column);
+}
+
+class $$KnowledgeDocumentsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $KnowledgeDocumentsTable,
+          KnowledgeDocumentEntry,
+          $$KnowledgeDocumentsTableFilterComposer,
+          $$KnowledgeDocumentsTableOrderingComposer,
+          $$KnowledgeDocumentsTableAnnotationComposer,
+          $$KnowledgeDocumentsTableCreateCompanionBuilder,
+          $$KnowledgeDocumentsTableUpdateCompanionBuilder,
+          (
+            KnowledgeDocumentEntry,
+            BaseReferences<
+              _$AppDatabase,
+              $KnowledgeDocumentsTable,
+              KnowledgeDocumentEntry
+            >,
+          ),
+          KnowledgeDocumentEntry,
+          PrefetchHooks Function()
+        > {
+  $$KnowledgeDocumentsTableTableManager(
+    _$AppDatabase db,
+    $KnowledgeDocumentsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$KnowledgeDocumentsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$KnowledgeDocumentsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$KnowledgeDocumentsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String?> projectId = const Value.absent(),
+                Value<String?> researchArticleId = const Value.absent(),
+                Value<String?> personId = const Value.absent(),
+                Value<String?> sectorId = const Value.absent(),
+                Value<String?> originInboxId = const Value.absent(),
+                Value<String> title = const Value.absent(),
+                Value<String> fileName = const Value.absent(),
+                Value<String> fileType = const Value.absent(),
+                Value<int> fileSize = const Value.absent(),
+                Value<String> filePath = const Value.absent(),
+                Value<String?> remoteStoragePath = const Value.absent(),
+                Value<String?> sha256Checksum = const Value.absent(),
+                Value<String?> description = const Value.absent(),
+                Value<String> tags = const Value.absent(),
+                Value<String> category = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => KnowledgeDocumentsCompanion(
+                id: id,
+                projectId: projectId,
+                researchArticleId: researchArticleId,
+                personId: personId,
+                sectorId: sectorId,
+                originInboxId: originInboxId,
+                title: title,
+                fileName: fileName,
+                fileType: fileType,
+                fileSize: fileSize,
+                filePath: filePath,
+                remoteStoragePath: remoteStoragePath,
+                sha256Checksum: sha256Checksum,
+                description: description,
+                tags: tags,
+                category: category,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                Value<String?> projectId = const Value.absent(),
+                Value<String?> researchArticleId = const Value.absent(),
+                Value<String?> personId = const Value.absent(),
+                Value<String?> sectorId = const Value.absent(),
+                Value<String?> originInboxId = const Value.absent(),
+                required String title,
+                required String fileName,
+                required String fileType,
+                required int fileSize,
+                required String filePath,
+                Value<String?> remoteStoragePath = const Value.absent(),
+                Value<String?> sha256Checksum = const Value.absent(),
+                Value<String?> description = const Value.absent(),
+                Value<String> tags = const Value.absent(),
+                Value<String> category = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => KnowledgeDocumentsCompanion.insert(
+                id: id,
+                projectId: projectId,
+                researchArticleId: researchArticleId,
+                personId: personId,
+                sectorId: sectorId,
+                originInboxId: originInboxId,
+                title: title,
+                fileName: fileName,
+                fileType: fileType,
+                fileSize: fileSize,
+                filePath: filePath,
+                remoteStoragePath: remoteStoragePath,
+                sha256Checksum: sha256Checksum,
+                description: description,
+                tags: tags,
+                category: category,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$KnowledgeDocumentsTable, KnowledgeDocumentEntry>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $KnowledgeDocumentsTable,
+                    KnowledgeDocumentEntry
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$KnowledgeDocumentsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $KnowledgeDocumentsTable,
+      KnowledgeDocumentEntry,
+      $$KnowledgeDocumentsTableFilterComposer,
+      $$KnowledgeDocumentsTableOrderingComposer,
+      $$KnowledgeDocumentsTableAnnotationComposer,
+      $$KnowledgeDocumentsTableCreateCompanionBuilder,
+      $$KnowledgeDocumentsTableUpdateCompanionBuilder,
+      (
+        KnowledgeDocumentEntry,
+        BaseReferences<
+          _$AppDatabase,
+          $KnowledgeDocumentsTable,
+          KnowledgeDocumentEntry
+        >,
+      ),
+      KnowledgeDocumentEntry,
+      PrefetchHooks Function()
+    >;
+typedef $$KnowledgeResourcesTableCreateCompanionBuilder =
+    KnowledgeResourcesCompanion Function({
+      required String id,
+      Value<String?> projectId,
+      Value<String?> researchArticleId,
+      Value<String?> personId,
+      Value<String?> originInboxId,
+      required String title,
+      required String resourceType,
+      Value<String?> description,
+      Value<String?> url,
+      Value<String?> localAssetPath,
+      Value<String> tags,
+      Value<String> category,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> revision,
+      Value<int> rowid,
+    });
+typedef $$KnowledgeResourcesTableUpdateCompanionBuilder =
+    KnowledgeResourcesCompanion Function({
+      Value<String> id,
+      Value<String?> projectId,
+      Value<String?> researchArticleId,
+      Value<String?> personId,
+      Value<String?> originInboxId,
+      Value<String> title,
+      Value<String> resourceType,
+      Value<String?> description,
+      Value<String?> url,
+      Value<String?> localAssetPath,
+      Value<String> tags,
+      Value<String> category,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> revision,
+      Value<int> rowid,
+    });
+
+class $$KnowledgeResourcesTableFilterComposer
+    extends Composer<_$AppDatabase, $KnowledgeResourcesTable> {
+  $$KnowledgeResourcesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get projectId => $composableBuilder(
+    column: $table.projectId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get researchArticleId => $composableBuilder(
+    column: $table.researchArticleId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get personId => $composableBuilder(
+    column: $table.personId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get originInboxId => $composableBuilder(
+    column: $table.originInboxId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get resourceType => $composableBuilder(
+    column: $table.resourceType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get url => $composableBuilder(
+    column: $table.url,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get localAssetPath => $composableBuilder(
+    column: $table.localAssetPath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get tags => $composableBuilder(
+    column: $table.tags,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$KnowledgeResourcesTableOrderingComposer
+    extends Composer<_$AppDatabase, $KnowledgeResourcesTable> {
+  $$KnowledgeResourcesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get projectId => $composableBuilder(
+    column: $table.projectId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get researchArticleId => $composableBuilder(
+    column: $table.researchArticleId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get personId => $composableBuilder(
+    column: $table.personId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get originInboxId => $composableBuilder(
+    column: $table.originInboxId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get resourceType => $composableBuilder(
+    column: $table.resourceType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get url => $composableBuilder(
+    column: $table.url,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get localAssetPath => $composableBuilder(
+    column: $table.localAssetPath,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get tags => $composableBuilder(
+    column: $table.tags,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$KnowledgeResourcesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $KnowledgeResourcesTable> {
+  $$KnowledgeResourcesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get projectId =>
+      $composableBuilder(column: $table.projectId, builder: (column) => column);
+
+  GeneratedColumn<String> get researchArticleId => $composableBuilder(
+    column: $table.researchArticleId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get personId =>
+      $composableBuilder(column: $table.personId, builder: (column) => column);
+
+  GeneratedColumn<String> get originInboxId => $composableBuilder(
+    column: $table.originInboxId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get resourceType => $composableBuilder(
+    column: $table.resourceType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get url =>
+      $composableBuilder(column: $table.url, builder: (column) => column);
+
+  GeneratedColumn<String> get localAssetPath => $composableBuilder(
+    column: $table.localAssetPath,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get tags =>
+      $composableBuilder(column: $table.tags, builder: (column) => column);
+
+  GeneratedColumn<String> get category =>
+      $composableBuilder(column: $table.category, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get revision =>
+      $composableBuilder(column: $table.revision, builder: (column) => column);
+}
+
+class $$KnowledgeResourcesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $KnowledgeResourcesTable,
+          KnowledgeResourceEntry,
+          $$KnowledgeResourcesTableFilterComposer,
+          $$KnowledgeResourcesTableOrderingComposer,
+          $$KnowledgeResourcesTableAnnotationComposer,
+          $$KnowledgeResourcesTableCreateCompanionBuilder,
+          $$KnowledgeResourcesTableUpdateCompanionBuilder,
+          (
+            KnowledgeResourceEntry,
+            BaseReferences<
+              _$AppDatabase,
+              $KnowledgeResourcesTable,
+              KnowledgeResourceEntry
+            >,
+          ),
+          KnowledgeResourceEntry,
+          PrefetchHooks Function()
+        > {
+  $$KnowledgeResourcesTableTableManager(
+    _$AppDatabase db,
+    $KnowledgeResourcesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$KnowledgeResourcesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$KnowledgeResourcesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$KnowledgeResourcesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String?> projectId = const Value.absent(),
+                Value<String?> researchArticleId = const Value.absent(),
+                Value<String?> personId = const Value.absent(),
+                Value<String?> originInboxId = const Value.absent(),
+                Value<String> title = const Value.absent(),
+                Value<String> resourceType = const Value.absent(),
+                Value<String?> description = const Value.absent(),
+                Value<String?> url = const Value.absent(),
+                Value<String?> localAssetPath = const Value.absent(),
+                Value<String> tags = const Value.absent(),
+                Value<String> category = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => KnowledgeResourcesCompanion(
+                id: id,
+                projectId: projectId,
+                researchArticleId: researchArticleId,
+                personId: personId,
+                originInboxId: originInboxId,
+                title: title,
+                resourceType: resourceType,
+                description: description,
+                url: url,
+                localAssetPath: localAssetPath,
+                tags: tags,
+                category: category,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                Value<String?> projectId = const Value.absent(),
+                Value<String?> researchArticleId = const Value.absent(),
+                Value<String?> personId = const Value.absent(),
+                Value<String?> originInboxId = const Value.absent(),
+                required String title,
+                required String resourceType,
+                Value<String?> description = const Value.absent(),
+                Value<String?> url = const Value.absent(),
+                Value<String?> localAssetPath = const Value.absent(),
+                Value<String> tags = const Value.absent(),
+                Value<String> category = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => KnowledgeResourcesCompanion.insert(
+                id: id,
+                projectId: projectId,
+                researchArticleId: researchArticleId,
+                personId: personId,
+                originInboxId: originInboxId,
+                title: title,
+                resourceType: resourceType,
+                description: description,
+                url: url,
+                localAssetPath: localAssetPath,
+                tags: tags,
+                category: category,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                revision: revision,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$KnowledgeResourcesTable, KnowledgeResourceEntry>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $KnowledgeResourcesTable,
+                    KnowledgeResourceEntry
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$KnowledgeResourcesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $KnowledgeResourcesTable,
+      KnowledgeResourceEntry,
+      $$KnowledgeResourcesTableFilterComposer,
+      $$KnowledgeResourcesTableOrderingComposer,
+      $$KnowledgeResourcesTableAnnotationComposer,
+      $$KnowledgeResourcesTableCreateCompanionBuilder,
+      $$KnowledgeResourcesTableUpdateCompanionBuilder,
+      (
+        KnowledgeResourceEntry,
+        BaseReferences<
+          _$AppDatabase,
+          $KnowledgeResourcesTable,
+          KnowledgeResourceEntry
+        >,
+      ),
+      KnowledgeResourceEntry,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -26672,4 +37706,18 @@ class $AppDatabaseManager {
       $$CalendarEventLinksTableTableManager(_db, _db.calendarEventLinks);
   $$AppLanguagesTableTableManager get appLanguages =>
       $$AppLanguagesTableTableManager(_db, _db.appLanguages);
+  $$InboxEntriesTableTableManager get inboxEntries =>
+      $$InboxEntriesTableTableManager(_db, _db.inboxEntries);
+  $$ProjectsTableTableManager get projects =>
+      $$ProjectsTableTableManager(_db, _db.projects);
+  $$TasksTableTableManager get tasks =>
+      $$TasksTableTableManager(_db, _db.tasks);
+  $$KnowledgeNotesTableTableManager get knowledgeNotes =>
+      $$KnowledgeNotesTableTableManager(_db, _db.knowledgeNotes);
+  $$KnowledgeQuestionsTableTableManager get knowledgeQuestions =>
+      $$KnowledgeQuestionsTableTableManager(_db, _db.knowledgeQuestions);
+  $$KnowledgeDocumentsTableTableManager get knowledgeDocuments =>
+      $$KnowledgeDocumentsTableTableManager(_db, _db.knowledgeDocuments);
+  $$KnowledgeResourcesTableTableManager get knowledgeResources =>
+      $$KnowledgeResourcesTableTableManager(_db, _db.knowledgeResources);
 }

@@ -504,6 +504,40 @@ class SupabaseSyncService {
         }
         map['tags'] ??= '[]';
         break;
+      case 'inbox_entries':
+        if (map['attachments'] is List) map['attachments'] = jsonEncode(map['attachments']);
+        map['attachments'] ??= '[]';
+        if (map['metadata'] is Map) map['metadata'] = jsonEncode(map['metadata']);
+        map['metadata'] ??= '{}';
+        break;
+      case 'projects':
+        if (map['metadata'] is Map) map['metadata'] = jsonEncode(map['metadata']);
+        map['metadata'] ??= '{}';
+        break;
+      case 'tasks':
+        if (map['attachments'] is List) map['attachments'] = jsonEncode(map['attachments']);
+        map['attachments'] ??= '[]';
+        if (map['metadata'] is Map) map['metadata'] = jsonEncode(map['metadata']);
+        map['metadata'] ??= '{}';
+        break;
+      case 'knowledge_notes':
+        if (map['tags'] is List) map['tags'] = jsonEncode(map['tags']);
+        map['tags'] ??= '[]';
+        if (map['attachments'] is List) map['attachments'] = jsonEncode(map['attachments']);
+        map['attachments'] ??= '[]';
+        if (map['sources'] is List) map['sources'] = jsonEncode(map['sources']);
+        map['sources'] ??= '[]';
+        break;
+      case 'knowledge_questions':
+        break;
+      case 'knowledge_documents':
+        if (map['tags'] is List) map['tags'] = jsonEncode(map['tags']);
+        map['tags'] ??= '[]';
+        break;
+      case 'knowledge_resources':
+        if (map['tags'] is List) map['tags'] = jsonEncode(map['tags']);
+        map['tags'] ??= '[]';
+        break;
     }
     return map;
   }
@@ -575,6 +609,27 @@ class SupabaseSyncService {
         await db
             .into(db.territorySectors)
             .insert(TerritorySectorEntry.fromJson(map));
+        break;
+      case 'inbox_entries':
+        await db.into(db.inboxEntries).insert(InboxEntry.fromJson(map));
+        break;
+      case 'projects':
+        await db.into(db.projects).insert(ProjectEntry.fromJson(map));
+        break;
+      case 'tasks':
+        await db.into(db.tasks).insert(TaskEntry.fromJson(map));
+        break;
+      case 'knowledge_notes':
+        await db.into(db.knowledgeNotes).insert(KnowledgeNoteEntry.fromJson(map));
+        break;
+      case 'knowledge_questions':
+        await db.into(db.knowledgeQuestions).insert(KnowledgeQuestionEntry.fromJson(map));
+        break;
+      case 'knowledge_documents':
+        await db.into(db.knowledgeDocuments).insert(KnowledgeDocumentEntry.fromJson(map));
+        break;
+      case 'knowledge_resources':
+        await db.into(db.knowledgeResources).insert(KnowledgeResourceEntry.fromJson(map));
         break;
       case 'ticuna_words':
         await db.customInsert(
@@ -695,6 +750,27 @@ class SupabaseSyncService {
         await db
             .update(db.territorySectors)
             .replace(TerritorySectorEntry.fromJson(map));
+        break;
+      case 'inbox_entries':
+        await db.update(db.inboxEntries).replace(InboxEntry.fromJson(map));
+        break;
+      case 'projects':
+        await db.update(db.projects).replace(ProjectEntry.fromJson(map));
+        break;
+      case 'tasks':
+        await db.update(db.tasks).replace(TaskEntry.fromJson(map));
+        break;
+      case 'knowledge_notes':
+        await db.update(db.knowledgeNotes).replace(KnowledgeNoteEntry.fromJson(map));
+        break;
+      case 'knowledge_questions':
+        await db.update(db.knowledgeQuestions).replace(KnowledgeQuestionEntry.fromJson(map));
+        break;
+      case 'knowledge_documents':
+        await db.update(db.knowledgeDocuments).replace(KnowledgeDocumentEntry.fromJson(map));
+        break;
+      case 'knowledge_resources':
+        await db.update(db.knowledgeResources).replace(KnowledgeResourceEntry.fromJson(map));
         break;
       case 'ticuna_words':
         await db.customInsert(
@@ -839,6 +915,41 @@ class SupabaseSyncService {
           TerritorySectorsCompanion(deletedAt: drift.Value(deletedAt)),
         );
         break;
+      case 'inbox_entries':
+        await (db.update(db.inboxEntries)..where((t) => t.id.equals(id))).write(
+          InboxEntriesCompanion(deletedAt: drift.Value(deletedAt)),
+        );
+        break;
+      case 'projects':
+        await (db.update(db.projects)..where((t) => t.id.equals(id))).write(
+          ProjectsCompanion(deletedAt: drift.Value(deletedAt)),
+        );
+        break;
+      case 'tasks':
+        await (db.update(db.tasks)..where((t) => t.id.equals(id))).write(
+          TasksCompanion(deletedAt: drift.Value(deletedAt)),
+        );
+        break;
+      case 'knowledge_notes':
+        await (db.update(db.knowledgeNotes)..where((t) => t.id.equals(id))).write(
+          KnowledgeNotesCompanion(deletedAt: drift.Value(deletedAt)),
+        );
+        break;
+      case 'knowledge_questions':
+        await (db.update(db.knowledgeQuestions)..where((t) => t.id.equals(id))).write(
+          KnowledgeQuestionsCompanion(deletedAt: drift.Value(deletedAt)),
+        );
+        break;
+      case 'knowledge_documents':
+        await (db.update(db.knowledgeDocuments)..where((t) => t.id.equals(id))).write(
+          KnowledgeDocumentsCompanion(deletedAt: drift.Value(deletedAt)),
+        );
+        break;
+      case 'knowledge_resources':
+        await (db.update(db.knowledgeResources)..where((t) => t.id.equals(id))).write(
+          KnowledgeResourcesCompanion(deletedAt: drift.Value(deletedAt)),
+        );
+        break;
       case 'ticuna_words':
         await db.customStatement('DELETE FROM ticuna_words WHERE id = ?', [id]);
         break;
@@ -933,6 +1044,41 @@ class SupabaseSyncService {
       case 'territory_sectors':
         final row = await (db.select(
           db.territorySectors,
+        )..where((t) => t.id.equals(id))).getSingleOrNull();
+        return row?.toJson();
+      case 'inbox_entries':
+        final row = await (db.select(
+          db.inboxEntries,
+        )..where((t) => t.id.equals(id))).getSingleOrNull();
+        return row?.toJson();
+      case 'projects':
+        final row = await (db.select(
+          db.projects,
+        )..where((t) => t.id.equals(id))).getSingleOrNull();
+        return row?.toJson();
+      case 'tasks':
+        final row = await (db.select(
+          db.tasks,
+        )..where((t) => t.id.equals(id))).getSingleOrNull();
+        return row?.toJson();
+      case 'knowledge_notes':
+        final row = await (db.select(
+          db.knowledgeNotes,
+        )..where((t) => t.id.equals(id))).getSingleOrNull();
+        return row?.toJson();
+      case 'knowledge_questions':
+        final row = await (db.select(
+          db.knowledgeQuestions,
+        )..where((t) => t.id.equals(id))).getSingleOrNull();
+        return row?.toJson();
+      case 'knowledge_documents':
+        final row = await (db.select(
+          db.knowledgeDocuments,
+        )..where((t) => t.id.equals(id))).getSingleOrNull();
+        return row?.toJson();
+      case 'knowledge_resources':
+        final row = await (db.select(
+          db.knowledgeResources,
         )..where((t) => t.id.equals(id))).getSingleOrNull();
         return row?.toJson();
       case 'ticuna_words':

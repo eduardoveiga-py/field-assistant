@@ -528,7 +528,7 @@ void main() {
       final appDb = AppDatabase.forTesting(NativeDatabase.opened(sqliteDb));
 
       final ver = await appDb.customSelect('PRAGMA user_version;').getSingle();
-      expect(ver.read<int>('user_version'), equals(5));
+      expect(ver.read<int>('user_version'), equals(6));
 
       // 1. Verifica coluna last_attempt_at em sync_queue
       final qRow = await (appDb.select(appDb.syncQueue)..where((t) => t.id.equals('q_v4'))).getSingle();
@@ -541,6 +541,81 @@ void main() {
       expect(languages.first.id, equals('tca'));
       expect(languages.first.name, equals('Ticuna (Magüta)'));
       expect(languages.first.isDefault, isTrue);
+
+      await appDb.close();
+    });
+
+    test('TC-MIG-06: Migração incremental v5 para v6 com Inbox, Tarefas, Projetos e Conhecimento', () async {
+      final sqliteDb = sql.sqlite3.openInMemory();
+
+      sqliteDb.execute('PRAGMA user_version = 5;');
+      sqliteDb.execute('''
+        CREATE TABLE appointments (
+          id TEXT NOT NULL PRIMARY KEY,
+          title TEXT NOT NULL,
+          start_time INTEGER NOT NULL,
+          end_time INTEGER NOT NULL,
+          duration_minutes INTEGER NOT NULL DEFAULT 30,
+          status TEXT NOT NULL DEFAULT 'planejado',
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          revision INTEGER NOT NULL DEFAULT 1
+        );
+      ''');
+      sqliteDb.execute('''
+        CREATE TABLE research_articles (
+          id TEXT NOT NULL PRIMARY KEY,
+          title TEXT NOT NULL,
+          summary TEXT NOT NULL,
+          content TEXT NOT NULL,
+          tags TEXT NOT NULL DEFAULT '[]',
+          attachments TEXT NOT NULL DEFAULT '[]',
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          revision INTEGER NOT NULL DEFAULT 1
+        );
+      ''');
+
+      final appDb = AppDatabase.forTesting(NativeDatabase.opened(sqliteDb));
+
+      final ver = await appDb.customSelect('PRAGMA user_version;').getSingle();
+      expect(ver.read<int>('user_version'), equals(6));
+
+      // 1. Verifica se as 7 novas tabelas foram criadas
+      final inboxCount = await appDb.select(appDb.inboxEntries).get();
+      expect(inboxCount, isEmpty);
+
+      final tasksCount = await appDb.select(appDb.tasks).get();
+      expect(tasksCount, isEmpty);
+
+      final projectsCount = await appDb.select(appDb.projects).get();
+      expect(projectsCount, isEmpty);
+
+      final notesCount = await appDb.select(appDb.knowledgeNotes).get();
+      expect(notesCount, isEmpty);
+
+      final questionsCount = await appDb.select(appDb.knowledgeQuestions).get();
+      expect(questionsCount, isEmpty);
+
+      final docsCount = await appDb.select(appDb.knowledgeDocuments).get();
+      expect(docsCount, isEmpty);
+
+      final resCount = await appDb.select(appDb.knowledgeResources).get();
+      expect(resCount, isEmpty);
+
+      // 2. Insere e valida registros tipados nas novas tabelas
+      await appDb.into(appDb.inboxEntries).insert(
+        InboxEntriesCompanion.insert(
+          id: 'inbox_1',
+          content: 'Ideia para revisita sobre profecias',
+          capturedAt: DateTime.now(),
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+      );
+      final savedInbox = await (appDb.select(appDb.inboxEntries)..where((t) => t.id.equals('inbox_1'))).getSingle();
+      expect(savedInbox.content, equals('Ideia para revisita sobre profecias'));
+      expect(savedInbox.status, equals('unprocessed'));
 
       await appDb.close();
     });

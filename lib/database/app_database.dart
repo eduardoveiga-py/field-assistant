@@ -30,6 +30,13 @@ part 'app_database.g.dart';
     ExternalCalendarEvents,
     CalendarEventLinks,
     AppLanguages,
+    InboxEntries,
+    Projects,
+    Tasks,
+    KnowledgeNotes,
+    KnowledgeQuestions,
+    KnowledgeDocuments,
+    KnowledgeResources,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -38,7 +45,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -88,8 +95,56 @@ class AppDatabase extends _$AppDatabase {
         await _migrateSyncQueueLastAttemptAt(m);
         await _seedDefaultLanguage();
       }
+      if (from < 6) {
+        // Migração incremental da versão 5 para a versão 6:
+        // Módulos Integrados: Inbox Universal, Tarefas & Projetos, Base de Conhecimento
+        await _createTableIfNotExists(m, inboxEntries);
+        await _createTableIfNotExists(m, projects);
+        await _createTableIfNotExists(m, tasks);
+        await _createTableIfNotExists(m, knowledgeNotes);
+        await _createTableIfNotExists(m, knowledgeQuestions);
+        await _createTableIfNotExists(m, knowledgeDocuments);
+        await _createTableIfNotExists(m, knowledgeResources);
+
+        await _migrateAppointmentsTaskId(m);
+        await _migrateResearchArticlesContextColumns(m);
+      }
     },
   );
+
+  Future<void> _migrateAppointmentsTaskId(Migrator m) async {
+    final columns = await customSelect(
+      "PRAGMA table_info(appointments)",
+    ).get();
+    final colNames = columns.map((c) => c.read<String>('name')).toSet();
+    if (colNames.isNotEmpty && !colNames.contains('task_id')) {
+      await m.addColumn(appointments, appointments.taskId);
+    }
+  }
+
+  Future<void> _migrateResearchArticlesContextColumns(Migrator m) async {
+    final columns = await customSelect(
+      "PRAGMA table_info(research_articles)",
+    ).get();
+    final colNames = columns.map((c) => c.read<String>('name')).toSet();
+    if (colNames.isNotEmpty) {
+      if (!colNames.contains('objective')) {
+        await m.addColumn(researchArticles, researchArticles.objective);
+      }
+      if (!colNames.contains('status')) {
+        await m.addColumn(researchArticles, researchArticles.status);
+      }
+      if (!colNames.contains('conclusion')) {
+        await m.addColumn(researchArticles, researchArticles.conclusion);
+      }
+      if (!colNames.contains('project_id')) {
+        await m.addColumn(researchArticles, researchArticles.projectId);
+      }
+      if (!colNames.contains('main_question_id')) {
+        await m.addColumn(researchArticles, researchArticles.mainQuestionId);
+      }
+    }
+  }
 
   Future<void> _migrateCalendarEventLinksPendingResolution(Migrator m) async {
     // Verifica se a coluna já existe para suportar bancos criados parcialmente.

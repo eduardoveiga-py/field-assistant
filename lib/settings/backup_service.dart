@@ -258,6 +258,13 @@ class BackupService {
     final manualOrders = await db.select(db.studentManualOrder).get();
     final calendarEvents = await db.select(db.externalCalendarEvents).get();
     final calendarLinks = await db.select(db.calendarEventLinks).get();
+    final inboxes = await db.select(db.inboxEntries).get();
+    final projects = await db.select(db.projects).get();
+    final tasks = await db.select(db.tasks).get();
+    final knowledgeNotes = await db.select(db.knowledgeNotes).get();
+    final knowledgeQuestions = await db.select(db.knowledgeQuestions).get();
+    final knowledgeDocuments = await db.select(db.knowledgeDocuments).get();
+    final knowledgeResources = await db.select(db.knowledgeResources).get();
     final kvStore = await (db.select(
       db.appKvStore,
     )..where((t) => t.key.isNotValue(_silentBackupKeySecret))).get();
@@ -281,7 +288,7 @@ class BackupService {
     }
 
     final payload = {
-      'exported_tables_count': 22,
+      'exported_tables_count': 29,
       'exported_tables': [
         'people',
         'visits',
@@ -304,6 +311,13 @@ class BackupService {
         'studentManualOrder',
         'externalCalendarEvents',
         'calendarEventLinks',
+        'inboxEntries',
+        'projects',
+        'tasks',
+        'knowledgeNotes',
+        'knowledgeQuestions',
+        'knowledgeDocuments',
+        'knowledgeResources',
         'appKvStore',
       ],
       'people': people.map((p) => p.toJson()).toList(),
@@ -329,6 +343,13 @@ class BackupService {
       'studentManualOrder': manualOrders.map((m) => m.toJson()).toList(),
       'externalCalendarEvents': calendarEvents.map((c) => c.toJson()).toList(),
       'calendarEventLinks': calendarLinks.map((l) => l.toJson()).toList(),
+      'inboxEntries': inboxes.map((i) => i.toJson()).toList(),
+      'projects': projects.map((p) => p.toJson()).toList(),
+      'tasks': tasks.map((t) => t.toJson()).toList(),
+      'knowledgeNotes': knowledgeNotes.map((n) => n.toJson()).toList(),
+      'knowledgeQuestions': knowledgeQuestions.map((q) => q.toJson()).toList(),
+      'knowledgeDocuments': knowledgeDocuments.map((d) => d.toJson()).toList(),
+      'knowledgeResources': knowledgeResources.map((r) => r.toJson()).toList(),
       'appKvStore': kvStore.map((k) => k.toJson()).toList(),
     };
 
@@ -1376,7 +1397,126 @@ class BackupService {
           }
         }
 
-        // 21. Configurações da App (Key-Value Store)
+        // 21. Inbox Universal
+        final inboxRows = (data['inboxEntries'] as List<dynamic>?) ?? [];
+        for (final item in inboxRows) {
+          final entry = InboxEntry.fromJson(item as Map<String, dynamic>);
+          final existing = await (db.select(
+            db.inboxEntries,
+          )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+          if (existing == null) {
+            await db.into(db.inboxEntries).insert(entry);
+            totalRestoredCount++;
+          } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
+              entry.revision > existing.revision) {
+            await db.update(db.inboxEntries).replace(entry);
+            totalRestoredCount++;
+          }
+        }
+
+        // 22. Projetos
+        final projectRows = (data['projects'] as List<dynamic>?) ?? [];
+        for (final item in projectRows) {
+          final entry = ProjectEntry.fromJson(item as Map<String, dynamic>);
+          final existing = await (db.select(
+            db.projects,
+          )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+          if (existing == null) {
+            await db.into(db.projects).insert(entry);
+            totalRestoredCount++;
+          } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
+              entry.revision > existing.revision) {
+            await db.update(db.projects).replace(entry);
+            totalRestoredCount++;
+          }
+        }
+
+        // 23. Tarefas
+        final taskRows = (data['tasks'] as List<dynamic>?) ?? [];
+        for (final item in taskRows) {
+          final entry = TaskEntry.fromJson(item as Map<String, dynamic>);
+          final existing = await (db.select(
+            db.tasks,
+          )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+          if (existing == null) {
+            await db.into(db.tasks).insert(entry);
+            totalRestoredCount++;
+          } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
+              entry.revision > existing.revision) {
+            await db.update(db.tasks).replace(entry);
+            totalRestoredCount++;
+          }
+        }
+
+        // 24. Notas de Conhecimento
+        final noteRows = (data['knowledgeNotes'] as List<dynamic>?) ?? [];
+        for (final item in noteRows) {
+          final entry = KnowledgeNoteEntry.fromJson(item as Map<String, dynamic>);
+          final existing = await (db.select(
+            db.knowledgeNotes,
+          )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+          if (existing == null) {
+            await db.into(db.knowledgeNotes).insert(entry);
+            totalRestoredCount++;
+          } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
+              entry.revision > existing.revision) {
+            await db.update(db.knowledgeNotes).replace(entry);
+            totalRestoredCount++;
+          }
+        }
+
+        // 25. Perguntas de Conhecimento
+        final questionRows = (data['knowledgeQuestions'] as List<dynamic>?) ?? [];
+        for (final item in questionRows) {
+          final entry = KnowledgeQuestionEntry.fromJson(item as Map<String, dynamic>);
+          final existing = await (db.select(
+            db.knowledgeQuestions,
+          )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+          if (existing == null) {
+            await db.into(db.knowledgeQuestions).insert(entry);
+            totalRestoredCount++;
+          } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
+              entry.revision > existing.revision) {
+            await db.update(db.knowledgeQuestions).replace(entry);
+            totalRestoredCount++;
+          }
+        }
+
+        // 26. Documentos de Conhecimento
+        final docRows = (data['knowledgeDocuments'] as List<dynamic>?) ?? [];
+        for (final item in docRows) {
+          final entry = KnowledgeDocumentEntry.fromJson(item as Map<String, dynamic>);
+          final existing = await (db.select(
+            db.knowledgeDocuments,
+          )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+          if (existing == null) {
+            await db.into(db.knowledgeDocuments).insert(entry);
+            totalRestoredCount++;
+          } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
+              entry.revision > existing.revision) {
+            await db.update(db.knowledgeDocuments).replace(entry);
+            totalRestoredCount++;
+          }
+        }
+
+        // 27. Recursos de Conhecimento
+        final resRows = (data['knowledgeResources'] as List<dynamic>?) ?? [];
+        for (final item in resRows) {
+          final entry = KnowledgeResourceEntry.fromJson(item as Map<String, dynamic>);
+          final existing = await (db.select(
+            db.knowledgeResources,
+          )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+          if (existing == null) {
+            await db.into(db.knowledgeResources).insert(entry);
+            totalRestoredCount++;
+          } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
+              entry.revision > existing.revision) {
+            await db.update(db.knowledgeResources).replace(entry);
+            totalRestoredCount++;
+          }
+        }
+
+        // 28. Configurações da App (Key-Value Store)
         final kvRows = (data['appKvStore'] as List<dynamic>?) ?? [];
         for (final item in kvRows) {
           final entry = AppKvEntry.fromJson(item as Map<String, dynamic>);

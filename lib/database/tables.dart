@@ -153,6 +153,7 @@ class Appointments extends Table {
   IntColumn get secondReminderMinutesBefore => integer().nullable()();
   BoolColumn get isProvisional =>
       boolean().withDefault(const Constant(false))();
+  TextColumn get taskId => text().nullable().named('task_id')();
 
   // Auditoria e sincronização
   DateTimeColumn get createdAt => dateTime()();
@@ -371,6 +372,11 @@ class ResearchArticles extends Table {
   TextColumn get content => text()();
   TextColumn get tags => text().withDefault(const Constant('[]'))();
   TextColumn get attachments => text().withDefault(const Constant('[]'))();
+  TextColumn get objective => text().nullable()();
+  TextColumn get status => text().withDefault(const Constant('active'))();
+  TextColumn get conclusion => text().nullable()();
+  TextColumn get projectId => text().nullable().named('project_id')();
+  TextColumn get mainQuestionId => text().nullable().named('main_question_id')();
 
   // Auditoria e sincronização
   DateTimeColumn get createdAt => dateTime().named('created_at')();
@@ -507,6 +513,244 @@ class AppLanguages extends Table {
       boolean().withDefault(const Constant(false)).named('is_default')();
   DateTimeColumn get createdAt => dateTime().named('created_at')();
   DateTimeColumn get updatedAt => dateTime().named('updated_at')();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+// ==========================================
+// MÓDULO A — INBOX UNIVERSAL
+// ==========================================
+@DataClassName('InboxEntry')
+class InboxEntries extends Table {
+  TextColumn get id => text()(); // UUID v4
+  TextColumn get content => text()();
+  TextColumn get sourceType =>
+      text().withDefault(const Constant('text')).named('source_type')(); // text, audio, image, file, link, share
+  TextColumn get mediaPath => text().nullable().named('media_path')();
+  IntColumn get mediaDurationSeconds =>
+      integer().nullable().named('media_duration_seconds')();
+  TextColumn get attachments =>
+      text().withDefault(const Constant('[]'))(); // JSON array
+  TextColumn get status =>
+      text().withDefault(const Constant('unprocessed'))(); // unprocessed, in_review, converted, archived
+  TextColumn get suggestedCategory =>
+      text().nullable().named('suggested_category')();
+  TextColumn get convertedEntityType =>
+      text().nullable().named('converted_entity_type')(); // task, project, note, question, research, document, resource, person
+  TextColumn get convertedEntityId =>
+      text().nullable().named('converted_entity_id')();
+  DateTimeColumn get capturedAt => dateTime().named('captured_at')();
+  DateTimeColumn get processedAt =>
+      dateTime().nullable().named('processed_at')();
+  TextColumn get metadata =>
+      text().withDefault(const Constant('{}'))(); // JSON
+
+  // Auditoria e sincronização
+  DateTimeColumn get createdAt => dateTime().named('created_at')();
+  DateTimeColumn get updatedAt => dateTime().named('updated_at')();
+  DateTimeColumn get deletedAt => dateTime().nullable().named('deleted_at')();
+  IntColumn get revision => integer().withDefault(const Constant(1))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+// ==========================================
+// MÓDULO B — TAREFAS E PROJETOS
+// ==========================================
+@DataClassName('ProjectEntry')
+class Projects extends Table {
+  TextColumn get id => text()(); // UUID v4
+  TextColumn get name => text()();
+  TextColumn get objective => text().nullable()();
+  TextColumn get description => text().nullable()();
+  TextColumn get category =>
+      text().withDefault(const Constant('ministry'))(); // ministry, tech, personal, research, linguistic
+  TextColumn get status =>
+      text().withDefault(const Constant('active'))(); // planning, active, paused, completed, archived
+  TextColumn get colorHex => text().nullable().named('color_hex')();
+  TextColumn get iconName => text().nullable().named('icon_name')();
+  DateTimeColumn get startDate => dateTime().nullable().named('start_date')();
+  DateTimeColumn get targetDate => dateTime().nullable().named('target_date')();
+  DateTimeColumn get completedAt => dateTime().nullable().named('completed_at')();
+  TextColumn get originInboxId => text().nullable().named('origin_inbox_id')();
+  TextColumn get metadata =>
+      text().withDefault(const Constant('{}'))(); // JSON
+
+  DateTimeColumn get createdAt => dateTime().named('created_at')();
+  DateTimeColumn get updatedAt => dateTime().named('updated_at')();
+  DateTimeColumn get deletedAt => dateTime().nullable().named('deleted_at')();
+  IntColumn get revision => integer().withDefault(const Constant(1))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DataClassName('TaskEntry')
+class Tasks extends Table {
+  TextColumn get id => text()(); // UUID v4
+  TextColumn get projectId => text().nullable().named('project_id')();
+  TextColumn get personId => text().nullable().named('person_id')();
+  TextColumn get studyId => text().nullable().named('study_id')();
+  TextColumn get sectorId => text().nullable().named('sector_id')();
+  TextColumn get originInboxId => text().nullable().named('origin_inbox_id')();
+  TextColumn get parentTaskId =>
+      text().nullable().named('parent_task_id')(); // Subtarefa hierárquica
+
+  TextColumn get title => text()();
+  TextColumn get description => text().nullable()();
+  TextColumn get status =>
+      text().withDefault(const Constant('todo'))(); // todo, in_progress, waiting, completed, cancelled, archived
+  TextColumn get priority =>
+      text().withDefault(const Constant('normal'))(); // low, normal, high, urgent
+  TextColumn get category =>
+      text().withDefault(const Constant('ministry'))(); // ministry, tech, personal, research, linguistic
+
+  DateTimeColumn get startDate => dateTime().nullable().named('start_date')();
+  DateTimeColumn get dueDate => dateTime().nullable().named('due_date')();
+  DateTimeColumn get scheduledAt => dateTime().nullable().named('scheduled_at')();
+  IntColumn get durationMinutes =>
+      integer().nullable().named('duration_minutes').withDefault(const Constant(30))();
+  DateTimeColumn get completedAt => dateTime().nullable().named('completed_at')();
+
+  BoolColumn get isRecurring =>
+      boolean().named('is_recurring').withDefault(const Constant(false))();
+  TextColumn get recurrenceRule =>
+      text().nullable().named('recurrence_rule')(); // daily, weekly, monthly, custom RRULE
+  TextColumn get appointmentId =>
+      text().nullable().named('appointment_id')();
+  TextColumn get attachments =>
+      text().withDefault(const Constant('[]'))(); // JSON array
+  TextColumn get metadata =>
+      text().withDefault(const Constant('{}'))(); // JSON
+
+  DateTimeColumn get createdAt => dateTime().named('created_at')();
+  DateTimeColumn get updatedAt => dateTime().named('updated_at')();
+  DateTimeColumn get deletedAt => dateTime().nullable().named('deleted_at')();
+  IntColumn get revision => integer().withDefault(const Constant(1))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+// ==========================================
+// MÓDULO C — BASE DE CONHECIMENTO
+// ==========================================
+@DataClassName('KnowledgeNoteEntry')
+class KnowledgeNotes extends Table {
+  TextColumn get id => text()(); // UUID v4
+  TextColumn get projectId => text().nullable().named('project_id')();
+  TextColumn get personId => text().nullable().named('person_id')();
+  TextColumn get studyId => text().nullable().named('study_id')();
+  TextColumn get originInboxId => text().nullable().named('origin_inbox_id')();
+
+  TextColumn get title => text()();
+  TextColumn get content => text()(); // Markdown format
+  TextColumn get category =>
+      text().withDefault(const Constant('general'))(); // biblical, ministry, ticuna, tech, personal, general
+  TextColumn get tags => text().withDefault(const Constant('[]'))(); // JSON array
+  TextColumn get attachments =>
+      text().withDefault(const Constant('[]'))(); // JSON array
+  TextColumn get sources =>
+      text().withDefault(const Constant('[]'))(); // JSON array
+  BoolColumn get isPinned =>
+      boolean().named('is_pinned').withDefault(const Constant(false))();
+
+  DateTimeColumn get createdAt => dateTime().named('created_at')();
+  DateTimeColumn get updatedAt => dateTime().named('updated_at')();
+  DateTimeColumn get deletedAt => dateTime().nullable().named('deleted_at')();
+  IntColumn get revision => integer().withDefault(const Constant(1))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DataClassName('KnowledgeQuestionEntry')
+class KnowledgeQuestions extends Table {
+  TextColumn get id => text()(); // UUID v4
+  TextColumn get projectId => text().nullable().named('project_id')();
+  TextColumn get personId => text().nullable().named('person_id')();
+  TextColumn get studyId => text().nullable().named('study_id')();
+  TextColumn get originInboxId => text().nullable().named('origin_inbox_id')();
+  TextColumn get researchArticleId =>
+      text().nullable().named('research_article_id')();
+
+  TextColumn get question => text()();
+  TextColumn get context => text().nullable()();
+  TextColumn get category =>
+      text().withDefault(const Constant('biblical'))(); // biblical, ministry, ticuna, tech, personal
+  TextColumn get status =>
+      text().withDefault(const Constant('unanswered'))(); // unanswered, researching, answered, archived
+  TextColumn get answer => text().nullable()();
+  DateTimeColumn get answeredAt => dateTime().nullable().named('answered_at')();
+
+  DateTimeColumn get createdAt => dateTime().named('created_at')();
+  DateTimeColumn get updatedAt => dateTime().named('updated_at')();
+  DateTimeColumn get deletedAt => dateTime().nullable().named('deleted_at')();
+  IntColumn get revision => integer().withDefault(const Constant(1))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DataClassName('KnowledgeDocumentEntry')
+class KnowledgeDocuments extends Table {
+  TextColumn get id => text()(); // UUID v4
+  TextColumn get projectId => text().nullable().named('project_id')();
+  TextColumn get researchArticleId =>
+      text().nullable().named('research_article_id')();
+  TextColumn get personId => text().nullable().named('person_id')();
+  TextColumn get sectorId => text().nullable().named('sector_id')();
+  TextColumn get originInboxId => text().nullable().named('origin_inbox_id')();
+
+  TextColumn get title => text()();
+  TextColumn get fileName => text().named('file_name')();
+  TextColumn get fileType =>
+      text().named('file_type')(); // pdf, docx, xlsx, image, audio, other
+  IntColumn get fileSize => integer().named('file_size')();
+  TextColumn get filePath =>
+      text().named('file_path')(); // Caminho local relativo seguro
+  TextColumn get remoteStoragePath =>
+      text().nullable().named('remote_storage_path')(); // Supabase storage
+  TextColumn get sha256Checksum =>
+      text().nullable().named('sha256_checksum')();
+  TextColumn get description => text().nullable()();
+  TextColumn get tags => text().withDefault(const Constant('[]'))();
+  TextColumn get category => text().withDefault(const Constant('general'))();
+
+  DateTimeColumn get createdAt => dateTime().named('created_at')();
+  DateTimeColumn get updatedAt => dateTime().named('updated_at')();
+  DateTimeColumn get deletedAt => dateTime().nullable().named('deleted_at')();
+  IntColumn get revision => integer().withDefault(const Constant(1))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DataClassName('KnowledgeResourceEntry')
+class KnowledgeResources extends Table {
+  TextColumn get id => text()(); // UUID v4
+  TextColumn get projectId => text().nullable().named('project_id')();
+  TextColumn get researchArticleId =>
+      text().nullable().named('research_article_id')();
+  TextColumn get personId => text().nullable().named('person_id')();
+  TextColumn get originInboxId => text().nullable().named('origin_inbox_id')();
+
+  TextColumn get title => text()();
+  TextColumn get resourceType =>
+      text().named('resource_type')(); // link, video, jw_publication, tool, reference, template, tutorial, other
+  TextColumn get description => text().nullable()();
+  TextColumn get url => text().nullable()();
+  TextColumn get localAssetPath =>
+      text().nullable().named('local_asset_path')();
+  TextColumn get tags => text().withDefault(const Constant('[]'))();
+  TextColumn get category => text().withDefault(const Constant('general'))();
+
+  DateTimeColumn get createdAt => dateTime().named('created_at')();
+  DateTimeColumn get updatedAt => dateTime().named('updated_at')();
+  DateTimeColumn get deletedAt => dateTime().nullable().named('deleted_at')();
+  IntColumn get revision => integer().withDefault(const Constant(1))();
 
   @override
   Set<Column> get primaryKey => {id};

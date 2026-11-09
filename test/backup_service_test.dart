@@ -233,13 +233,20 @@ void main() {
           'studentManualOrder',
           'externalCalendarEvents',
           'calendarEventLinks',
+          'inboxEntries',
+          'projects',
+          'tasks',
+          'knowledgeNotes',
+          'knowledgeQuestions',
+          'knowledgeDocuments',
+          'knowledgeResources',
           'appKvStore',
         ];
 
         expect(
           preview.inventoryTables.length,
-          equals(22),
-          reason: 'O backup deve exportar exatamente 22 tabelas',
+          equals(29),
+          reason: 'O backup deve exportar exatamente 29 tabelas',
         );
         for (final tbl in expected22Tables) {
           expect(
