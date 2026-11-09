@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../../core/app_version.dart';
-import 'tile_cache_interface.dart';
 import 'tile_cache_service.dart';
 
 TileCacheBackend getTileBackend() => TileCacheWeb();
@@ -36,14 +35,23 @@ class TileCacheWeb implements TileCacheBackend {
   bool isBlockedTile(Uint8List bytes) => _isBlockedTile(bytes);
 
   @override
-  Future<Uint8List?> getTile(int z, int x, int y) async {
-    final key = '$z/$x/$y';
+  Future<Uint8List?> getTile(int z, int x, int y, [MapLayerStyle? style]) async {
+    final s = style ?? TileCacheService.instance.activeStyle;
+    final key = '${s.id}/$z/$x/$y';
+    final legacyKey = '$z/$x/$y';
+
     if (_cache.containsKey(key)) {
       final cachedBytes = _cache[key]!;
       if (!_isBlockedTile(cachedBytes)) {
         return cachedBytes;
       }
       _cache.remove(key);
+    } else if (s == MapLayerStyle.standard && _cache.containsKey(legacyKey)) {
+      final cachedBytes = _cache[legacyKey]!;
+      if (!_isBlockedTile(cachedBytes)) {
+        return cachedBytes;
+      }
+      _cache.remove(legacyKey);
     }
 
     final client = httpClient ?? http.Client();
@@ -51,7 +59,7 @@ class TileCacheWeb implements TileCacheBackend {
 
     try {
       // 1ª Tentativa: Provedor de azulejos oficial com estilo selecionado
-      final uri = Uri.parse(TileCacheService.instance.getTileUrl(z, x, y));
+      final uri = Uri.parse(TileCacheService.instance.getTileUrl(z, x, y, s));
       try {
         final res = await client.get(
           uri,
@@ -114,8 +122,9 @@ class TileCacheWeb implements TileCacheBackend {
   }
 
   @override
-  Future<void> saveTile(int z, int x, int y, Uint8List bytes) async {
-    final key = '$z/$x/$y';
+  Future<void> saveTile(int z, int x, int y, Uint8List bytes, [MapLayerStyle? style]) async {
+    final s = style ?? TileCacheService.instance.activeStyle;
+    final key = '${s.id}/$z/$x/$y';
     if (_isBlockedTile(bytes)) {
       _cache.remove(key);
       return;
@@ -124,19 +133,25 @@ class TileCacheWeb implements TileCacheBackend {
   }
 
   @override
-  Future<bool> isTileCached(int z, int x, int y) async {
-    final key = '$z/$x/$y';
-    final bytes = _cache[key];
+  Future<bool> isTileCached(int z, int x, int y, [MapLayerStyle? style]) async {
+    final s = style ?? TileCacheService.instance.activeStyle;
+    final key = '${s.id}/$z/$x/$y';
+    final legacyKey = '$z/$x/$y';
+    final bytes = _cache[key] ?? (s == MapLayerStyle.standard ? _cache[legacyKey] : null);
     if (bytes == null || _isBlockedTile(bytes)) {
       _cache.remove(key);
+      if (s == MapLayerStyle.standard) _cache.remove(legacyKey);
       return false;
     }
     return true;
   }
 
   @override
-  Future<int> getCachedTileCount() async {
+  Future<int> getCachedTileCount([MapLayerStyle? style]) async {
     _cache.removeWhere((_, bytes) => _isBlockedTile(bytes));
+    if (style != null) {
+      return _cache.keys.where((k) => k.startsWith('${style.id}/')).length;
+    }
     return _cache.length;
   }
 

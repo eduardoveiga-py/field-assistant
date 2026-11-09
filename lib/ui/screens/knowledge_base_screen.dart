@@ -16,6 +16,7 @@ import '../../research/research_manager.dart';
 import '../providers.dart';
 import '../widgets/adaptive_ministry_sheet.dart';
 import '../widgets/knowledge_item_reader_dialog.dart';
+import '../widgets/markdown_preview_text.dart';
 import '../widgets/rich_markdown_toolbar.dart';
 import '../widgets/universal_attachment_viewer.dart';
 import 'research_screen.dart';
@@ -322,8 +323,8 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                               ),
                               const SizedBox(height: 6),
                               Expanded(
-                                child: Text(
-                                  note.content,
+                                child: MarkdownPreviewText(
+                                  text: note.content,
                                   maxLines: 3,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
@@ -548,8 +549,8 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                                 ),
                                 const SizedBox(height: 6),
                                 Expanded(
-                                  child: Text(
-                                    q.answer != null && q.answer!.isNotEmpty
+                                  child: MarkdownPreviewText(
+                                    text: q.answer != null && q.answer!.isNotEmpty
                                         ? 'Resposta: ${q.answer!}'
                                         : (q.context ?? 'Toque para abrir a janela de leitura e detalhes.'),
                                     maxLines: 3,
@@ -976,8 +977,8 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                     const SizedBox(height: 4),
-                                    Text(
-                                      r.description ?? r.url ?? r.resourceType,
+                                    MarkdownPreviewText(
+                                      text: r.description ?? r.url ?? r.resourceType,
                                       style: TextStyle(
                                         fontSize: 12,
                                         color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
@@ -1893,8 +1894,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
       if (res.isNotEmpty) {
         final f = res.first;
         String finalPath = f.path ?? f.name;
+        int fileSize = f.lengthSync() ?? (await f.length()) ?? 0;
 
-        if (!kIsWeb && f.path != null && f.path!.isNotEmpty) {
+        if (!kIsWeb) {
           try {
             final appDir = await getApplicationDocumentsDirectory();
             final docsFolder = Directory('${appDir.path}/documents');
@@ -1902,12 +1904,33 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
               await docsFolder.create(recursive: true);
             }
             final targetFile = File('${docsFolder.path}/${f.name}');
-            final sourceFile = File(f.path!);
-            if (await sourceFile.exists()) {
-              await sourceFile.copy(targetFile.path);
-              finalPath = targetFile.path;
+            Uint8List? fileBytes;
+            try {
+              fileBytes = await f.readAsBytes();
+            } catch (_) {}
+            if ((fileBytes == null || fileBytes.isEmpty) && f.path != null && f.path!.isNotEmpty) {
+              final sourceFile = File(f.path!);
+              if (await sourceFile.exists()) {
+                try {
+                  fileBytes = await sourceFile.readAsBytes();
+                } catch (_) {}
+              }
             }
-          } catch (_) {}
+            if (fileBytes != null && fileBytes.isNotEmpty) {
+              await targetFile.writeAsBytes(fileBytes, flush: true);
+              finalPath = targetFile.path;
+              fileSize = fileBytes.length;
+            } else if (f.path != null && f.path!.isNotEmpty) {
+              final sourceFile = File(f.path!);
+              if (await sourceFile.exists()) {
+                await sourceFile.copy(targetFile.path);
+                finalPath = targetFile.path;
+                fileSize = await targetFile.length();
+              }
+            }
+          } catch (err) {
+            debugPrint('Erro ao copiar documento permanente: $err');
+          }
         }
 
         final km = ref.read(knowledgeManagerProvider);
@@ -1915,7 +1938,7 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
           title: f.name.split('.').first,
           fileName: f.name,
           filePath: finalPath,
-          fileSize: (await f.length()) ?? 0,
+          fileSize: fileSize,
           fileType: f.extension ?? 'other',
           category: 'manual',
         );
@@ -2012,32 +2035,130 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
   }
 
   Future<void> _openDocument(KnowledgeDocumentEntry doc) async {
-    await showUniversalAttachmentViewer(
-      context,
-      filePath: doc.filePath,
-      title: doc.title,
-      fileType: doc.fileType,
-    );
+    String resolvedPath = doc.filePath;
+    Uint8List? resolvedBytes;
+    if (!kIsWeb) {
+      try {
+        final direct = File(doc.filePath);
+        if (await direct.exists()) {
+          resolvedPath = direct.path;
+          try {
+            resolvedBytes = await direct.readAsBytes();
+          } catch (_) {}
+        } else {
+          final docDir = await getApplicationDocumentsDirectory();
+          final fileName = doc.fileName.isNotEmpty
+              ? doc.fileName
+              : doc.filePath.split(RegExp(r'[\\/]')).last;
+          final candidates = [
+            File('${docDir.path}/documents/$fileName'),
+            File('${docDir.path}/$fileName'),
+          ];
+          try {
+            final supportDir = await getApplicationSupportDirectory();
+            candidates.add(File('${supportDir.path}/documents/$fileName'));
+            candidates.add(File('${supportDir.path}/$fileName'));
+          } catch (_) {}
+          try {
+            final tempDir = await getTemporaryDirectory();
+            candidates.add(File('${tempDir.path}/$fileName'));
+            candidates.add(File('${tempDir.path}/file_picker/$fileName'));
+          } catch (_) {}
+
+          for (final c in candidates) {
+            if (await c.exists()) {
+              resolvedPath = c.path;
+              try {
+                resolvedBytes = await c.readAsBytes();
+              } catch (_) {}
+              break;
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (mounted) {
+      await showUniversalAttachmentViewer(
+        context,
+        filePath: resolvedPath,
+        title: doc.title,
+        fileType: doc.fileType,
+        bytes: resolvedBytes,
+      );
+    }
   }
 
   Future<void> _openDocumentExternal(KnowledgeDocumentEntry doc) async {
+    String pathToOpen = doc.filePath;
+    Uint8List? fileBytes;
+    if (!kIsWeb) {
+      try {
+        final direct = File(doc.filePath);
+        if (await direct.exists()) {
+          pathToOpen = direct.path;
+          try {
+            fileBytes = await direct.readAsBytes();
+          } catch (_) {}
+        } else {
+          final docDir = await getApplicationDocumentsDirectory();
+          final fileName = doc.fileName.isNotEmpty
+              ? doc.fileName
+              : doc.filePath.split(RegExp(r'[\\/]')).last;
+          final candidates = [
+            File('${docDir.path}/documents/$fileName'),
+            File('${docDir.path}/$fileName'),
+          ];
+          try {
+            final supportDir = await getApplicationSupportDirectory();
+            candidates.add(File('${supportDir.path}/documents/$fileName'));
+            candidates.add(File('${supportDir.path}/$fileName'));
+          } catch (_) {}
+          try {
+            final tempDir = await getTemporaryDirectory();
+            candidates.add(File('${tempDir.path}/$fileName'));
+            candidates.add(File('${tempDir.path}/file_picker/$fileName'));
+          } catch (_) {}
+
+          for (final c in candidates) {
+            if (await c.exists()) {
+              pathToOpen = c.path;
+              try {
+                fileBytes = await c.readAsBytes();
+              } catch (_) {}
+              break;
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
     try {
-      final res = await OpenFilex.open(doc.filePath);
-      if (res.type != ResultType.done && mounted) {
-        await showUniversalAttachmentViewer(
-          context,
-          filePath: doc.filePath,
-          title: doc.title,
-          fileType: doc.fileType,
-        );
+      final res = await OpenFilex.open(pathToOpen);
+      if (res.type != ResultType.done) {
+        final uri = Uri.file(pathToOpen);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+          return;
+        }
+        if (mounted) {
+          await showUniversalAttachmentViewer(
+            context,
+            filePath: pathToOpen,
+            title: doc.title,
+            fileType: doc.fileType,
+            bytes: fileBytes,
+          );
+        }
       }
     } catch (_) {
       if (mounted) {
         await showUniversalAttachmentViewer(
           context,
-          filePath: doc.filePath,
+          filePath: pathToOpen,
           title: doc.title,
           fileType: doc.fileType,
+          bytes: fileBytes,
         );
       }
     }

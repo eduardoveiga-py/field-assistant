@@ -127,10 +127,13 @@ class _UniversalAttachmentViewerDialogState
       } else if (_isText) {
         if (widget.bytes != null) {
           _textContent = String.fromCharCodes(widget.bytes!);
-        } else if (!kIsWeb && File(widget.filePath).existsSync()) {
-          _textContent = await File(widget.filePath).readAsString();
         } else {
-          _textContent = 'Conteúdo do arquivo não disponível para leitura de texto puro.';
+          final existingFile = await _findExistingLocalFile(widget.filePath);
+          if (existingFile != null) {
+            _textContent = await existingFile.readAsString();
+          } else {
+            _textContent = 'Conteúdo do arquivo não disponível para leitura de texto puro.';
+          }
         }
       }
     } catch (e) {
@@ -140,24 +143,87 @@ class _UniversalAttachmentViewerDialogState
     }
   }
 
+  Future<File?> _findExistingLocalFile(String rawPath) async {
+    if (kIsWeb || rawPath.trim().isEmpty) return null;
+
+    try {
+      final direct = File(rawPath);
+      if (await direct.exists()) return direct;
+    } catch (_) {}
+
+    String decoded = rawPath;
+    try {
+      decoded = Uri.decodeFull(rawPath);
+      final directDecoded = File(decoded);
+      if (await directDecoded.exists()) return directDecoded;
+    } catch (_) {}
+
+    final rawName = rawPath.split(RegExp(r'[\\/]')).last;
+    final decodedName = decoded.split(RegExp(r'[\\/]')).last;
+    final fileNames = {rawName, decodedName}.where((n) => n.trim().isNotEmpty).toList();
+    if (fileNames.isEmpty) return null;
+
+    try {
+      final docDir = await getApplicationDocumentsDirectory();
+      final candidates = <File>[];
+      for (final n in fileNames) {
+        candidates.add(File('${docDir.path}/documents/$n'));
+        candidates.add(File('${docDir.path}/$n'));
+      }
+      try {
+        final supportDir = await getApplicationSupportDirectory();
+        for (final n in fileNames) {
+          candidates.add(File('${supportDir.path}/documents/$n'));
+          candidates.add(File('${supportDir.path}/$n'));
+        }
+      } catch (_) {}
+      try {
+        final tempDir = await getTemporaryDirectory();
+        for (final n in fileNames) {
+          candidates.add(File('${tempDir.path}/$n'));
+          candidates.add(File('${tempDir.path}/file_picker/$n'));
+        }
+      } catch (_) {}
+      try {
+        final extDir = await getExternalStorageDirectory();
+        if (extDir != null) {
+          for (final n in fileNames) {
+            candidates.add(File('${extDir.path}/$n'));
+            candidates.add(File('${extDir.path}/Download/$n'));
+            candidates.add(File('${extDir.path}/documents/$n'));
+          }
+        }
+      } catch (_) {}
+      try {
+        final dlDir = await getDownloadsDirectory();
+        if (dlDir != null) {
+          for (final n in fileNames) {
+            candidates.add(File('${dlDir.path}/$n'));
+          }
+        }
+      } catch (_) {}
+
+      for (final f in candidates) {
+        if (await f.exists()) {
+          return f;
+        }
+      }
+    } catch (_) {}
+
+    return null;
+  }
+
   Future<Uint8List> _resolvePdfBytes() async {
     if (widget.bytes != null && widget.bytes!.isNotEmpty) {
       return widget.bytes!;
     }
-    if (!kIsWeb && File(widget.filePath).existsSync()) {
-      return await File(widget.filePath).readAsBytes();
-    }
-    // Procura em diretórios padrão do app caso seja caminho relativo ou apenas nome do arquivo
-    if (!kIsWeb) {
+    final existing = await _findExistingLocalFile(widget.filePath);
+    if (existing != null) {
       try {
-        final docDir = await getApplicationDocumentsDirectory();
-        final fileName = widget.filePath.split(RegExp(r'[\\/]')).last;
-        final candidate = File('${docDir.path}/$fileName');
-        if (candidate.existsSync()) {
-          return await candidate.readAsBytes();
-        }
+        return await existing.readAsBytes();
       } catch (_) {}
     }
+
     // Fallback caso caminho comece com http
     if (widget.filePath.startsWith('http://') || widget.filePath.startsWith('https://')) {
       final resp = await http.get(Uri.parse(widget.filePath));
@@ -228,11 +294,52 @@ class _UniversalAttachmentViewerDialogState
         await launchUrl(Uri.parse(widget.filePath), mode: LaunchMode.externalApplication);
         return;
       }
-      final res = await OpenFilex.open(widget.filePath);
-      if (res.type != ResultType.done && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Aplicativo externo: ${res.message}')),
-        );
+      String targetPath = widget.filePath;
+      final existing = await _findExistingLocalFile(widget.filePath);
+      if (existing != null) {
+        targetPath = existing.path;
+      } else {
+        // Se o arquivo físico original não foi localizado no caminho gravado,
+        // mas possuímos os bytes (em memória ou gerados pelo resolvedor),
+        // gravamos temporariamente no cache para o visualizador do sistema conseguir abrir
+        Uint8List? availableBytes = widget.bytes;
+        if (availableBytes == null || availableBytes.isEmpty) {
+          try {
+            if (_isPdf) {
+              availableBytes = await _resolvePdfBytes();
+            }
+          } catch (_) {}
+        }
+
+        if (availableBytes != null && availableBytes.isNotEmpty) {
+          try {
+            final tempDir = await getTemporaryDirectory();
+            final rawName = widget.filePath.split(RegExp(r'[\\/]')).last;
+            final safeName = rawName.isNotEmpty
+                ? rawName
+                : '${widget.title ?? "document"}.${_isPdf ? "pdf" : "bin"}';
+            final tempFile = File('${tempDir.path}/$safeName');
+            await tempFile.writeAsBytes(availableBytes, flush: true);
+            targetPath = tempFile.path;
+          } catch (_) {}
+        }
+      }
+
+      final res = await OpenFilex.open(targetPath);
+      if (res.type != ResultType.done) {
+        final uri = Uri.file(targetPath);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+          return;
+        }
+        if (mounted) {
+          final msg = res.message.isNotEmpty
+              ? res.message
+              : 'Nenhum leitor compatível encontrado para este formato.';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Aplicativo externo: $msg')),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -421,16 +528,22 @@ class _UniversalAttachmentViewerDialogState
                 ? Image.memory(widget.bytes!, fit: BoxFit.contain)
                 : widget.filePath.startsWith('http')
                     ? Image.network(widget.filePath, fit: BoxFit.contain)
-                    : !kIsWeb && File(widget.filePath).existsSync()
-                        ? Image.file(File(widget.filePath), fit: BoxFit.contain)
-                        : Column(
+                    : FutureBuilder<File?>(
+                        future: _findExistingLocalFile(widget.filePath),
+                        builder: (ctx, snap) {
+                          if (snap.data != null) {
+                            return Image.file(snap.data!, fit: BoxFit.contain);
+                          }
+                          return Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               const Icon(Icons.broken_image, size: 64, color: Colors.grey),
                               const SizedBox(height: 8),
                               Text('Arquivo de imagem não encontrado: ${widget.filePath}'),
                             ],
-                          ),
+                          );
+                        },
+                      ),
           ),
         ),
       );

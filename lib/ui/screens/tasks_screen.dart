@@ -8,6 +8,7 @@ import '../../projects/project_manager.dart';
 import '../../tasks/task_manager.dart';
 import '../providers.dart';
 import '../widgets/adaptive_ministry_sheet.dart';
+import '../widgets/markdown_preview_text.dart';
 import '../widgets/rich_markdown_toolbar.dart';
 import '../widgets/universal_attachment_viewer.dart';
 import 'person_detail_screen.dart';
@@ -800,8 +801,8 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
             // Descrição da Tarefa — corrigido para exibir na listagem
             if (task.description != null && task.description!.isNotEmpty) ...[
               const SizedBox(height: 3),
-              Text(
-                task.description!,
+              MarkdownPreviewText(
+                text: task.description!,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(

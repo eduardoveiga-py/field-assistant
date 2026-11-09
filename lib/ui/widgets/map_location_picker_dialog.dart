@@ -457,13 +457,14 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
                                           top: (ty - minTileY) * _tileSize,
                                           child: CachedTileWidget(
                                             key: ValueKey(
-                                              'picker_tile_${_zoom}_${tx}_$ty',
+                                              'picker_tile_${TileCacheService.instance.activeStyle.id}_${_zoom}_${tx}_$ty',
                                             ),
                                             z: _zoom,
                                             x: tx,
                                             y: ty,
                                             size: _tileSize,
                                             isDark: isDark,
+                                            layerStyle: TileCacheService.instance.activeStyle,
                                           ),
                                         ),
 

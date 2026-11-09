@@ -7,6 +7,7 @@ import '../../core/app_theme.dart';
 import '../../media/media_picker_helper.dart';
 import '../../reports/web_downloader.dart';
 import '../../research/research_manager.dart';
+import '../widgets/markdown_preview_text.dart';
 import '../widgets/rich_markdown_toolbar.dart';
 
 class ResearchScreen extends ConsumerStatefulWidget {
@@ -1083,8 +1084,8 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                                           ),
                                         ),
                                         const SizedBox(height: 4),
-                                        Text(
-                                          item.summary,
+                                        MarkdownPreviewText(
+                                          text: item.summary,
                                           style: TextStyle(
                                             fontSize: 13,
                                             color: isDark

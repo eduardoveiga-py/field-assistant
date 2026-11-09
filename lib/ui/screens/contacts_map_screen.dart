@@ -807,13 +807,15 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) {
         final currentStyle = TileCacheService.instance.activeStyle;
         return SafeArea(
-          child: Padding(
+          child: SingleChildScrollView(
+            physics: const ClampingScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -2356,12 +2358,13 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                                 left: (tx - minTileX) * _tileSize,
                                 top: (ty - minTileY) * _tileSize,
                                 child: CachedTileWidget(
-                                  key: ValueKey('tile_${_zoom}_${tx}_$ty'),
+                                  key: ValueKey('tile_${TileCacheService.instance.activeStyle.id}_${_zoom}_${tx}_$ty'),
                                   z: _zoom,
                                   x: tx,
                                   y: ty,
                                   size: _tileSize,
                                   isDark: isDark,
+                                  layerStyle: TileCacheService.instance.activeStyle,
                                 ),
                               ),
 

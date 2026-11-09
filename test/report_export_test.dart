@@ -7,7 +7,6 @@ import 'package:ministerio_pessoal/core/date_utils.dart';
 import 'package:ministerio_pessoal/database/app_database.dart';
 import 'package:ministerio_pessoal/reports/report_export_service.dart';
 import 'package:ministerio_pessoal/territory/geocoding_service.dart';
-import 'package:ministerio_pessoal/territory/tile_cache/tile_cache_interface.dart';
 import 'package:ministerio_pessoal/territory/tile_cache/tile_cache_native.dart';
 import 'package:ministerio_pessoal/territory/tile_cache/tile_cache_service.dart';
 import 'package:pdf/pdf.dart';
@@ -599,8 +598,9 @@ class _FakeTileCacheBackend implements TileCacheBackend {
   final Map<String, Uint8List> _store = {};
 
   @override
-  Future<Uint8List?> getTile(int z, int x, int y) async {
-    final key = '$z/$x/$y';
+  Future<Uint8List?> getTile(int z, int x, int y, [MapLayerStyle? style]) async {
+    final s = style?.id ?? 'standard';
+    final key = '$s/$z/$x/$y';
     if (!_store.containsKey(key)) {
       _store[key] = Uint8List.fromList([z, x, y]);
     }
@@ -608,17 +608,22 @@ class _FakeTileCacheBackend implements TileCacheBackend {
   }
 
   @override
-  Future<void> saveTile(int z, int x, int y, Uint8List bytes) async {
-    _store['$z/$x/$y'] = bytes;
+  Future<void> saveTile(int z, int x, int y, Uint8List bytes, [MapLayerStyle? style]) async {
+    final s = style?.id ?? 'standard';
+    _store['$s/$z/$x/$y'] = bytes;
   }
 
   @override
-  Future<bool> isTileCached(int z, int x, int y) async {
-    return _store.containsKey('$z/$x/$y');
+  Future<bool> isTileCached(int z, int x, int y, [MapLayerStyle? style]) async {
+    final s = style?.id ?? 'standard';
+    return _store.containsKey('$s/$z/$x/$y');
   }
 
   @override
-  Future<int> getCachedTileCount() async {
+  Future<int> getCachedTileCount([MapLayerStyle? style]) async {
+    if (style != null) {
+      return _store.keys.where((k) => k.startsWith('${style.id}/')).length;
+    }
     return _store.length;
   }
 }

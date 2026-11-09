@@ -9,6 +9,7 @@ import '../../core/app_theme.dart';
 import '../../contacts/phone_contacts_manager.dart';
 import '../../database/app_database.dart';
 import '../providers.dart';
+import '../widgets/markdown_preview_text.dart';
 import 'person_detail_screen.dart';
 
 class PhoneContactsScreen extends ConsumerStatefulWidget {
@@ -1081,8 +1082,8 @@ class _PhoneContactsScreenState extends ConsumerState<PhoneContactsScreen> {
                                 if (item.notes != null &&
                                     item.notes!.isNotEmpty) ...[
                                   const SizedBox(height: 8),
-                                  Text(
-                                    item.notes!,
+                                  MarkdownPreviewText(
+                                    text: item.notes!,
                                     style: TextStyle(
                                       fontSize: 12,
                                       color: isDark

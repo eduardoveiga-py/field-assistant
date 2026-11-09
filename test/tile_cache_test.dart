@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:ministerio_pessoal/territory/tile_cache/tile_cache_interface.dart';
 import 'package:ministerio_pessoal/territory/tile_cache/tile_cache_native.dart';
 import 'package:ministerio_pessoal/territory/tile_cache/tile_cache_web.dart';
 
@@ -405,6 +406,44 @@ void main() {
       // Múltiplos releases sem acquire prévio não devem negativar o contador
       TileCacheNative.resetQueue();
       expect(TileCacheNative.activeDownloads, 0);
+    });
+
+    test('TileCacheNative and TileCacheWeb isolate cache entries by MapLayerStyle', () async {
+      final tempDir = await Directory.systemTemp.createTemp('tile_test_style_iso_');
+      try {
+        final native = TileCacheNative(customDir: tempDir);
+        final osmBytes = Uint8List.fromList([1, 1, 1]);
+        final satBytes = Uint8List.fromList([2, 2, 2]);
+
+        await native.saveTile(10, 5, 5, osmBytes, MapLayerStyle.standard);
+        await native.saveTile(10, 5, 5, satBytes, MapLayerStyle.satellite);
+
+        final readOsm = await native.getTile(10, 5, 5, MapLayerStyle.standard);
+        final readSat = await native.getTile(10, 5, 5, MapLayerStyle.satellite);
+
+        expect(readOsm, equals(osmBytes));
+        expect(readSat, equals(satBytes));
+        expect(await native.getCachedTileCount(MapLayerStyle.standard), equals(1));
+        expect(await native.getCachedTileCount(MapLayerStyle.satellite), equals(1));
+        expect(await native.getCachedTileCount(), equals(2));
+
+        // Web isolation
+        TileCacheWeb.clearCache();
+        final web = TileCacheWeb();
+        await web.saveTile(10, 5, 5, osmBytes, MapLayerStyle.standard);
+        await web.saveTile(10, 5, 5, satBytes, MapLayerStyle.satellite);
+
+        final webOsm = await web.getTile(10, 5, 5, MapLayerStyle.standard);
+        final webSat = await web.getTile(10, 5, 5, MapLayerStyle.satellite);
+
+        expect(webOsm, equals(osmBytes));
+        expect(webSat, equals(satBytes));
+        expect(await web.getCachedTileCount(MapLayerStyle.standard), equals(1));
+        expect(await web.getCachedTileCount(MapLayerStyle.satellite), equals(1));
+        expect(await web.getCachedTileCount(), equals(2));
+      } finally {
+        await tempDir.delete(recursive: true);
+      }
     });
   });
 }

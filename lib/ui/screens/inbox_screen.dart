@@ -12,6 +12,7 @@ import '../../research/research_manager.dart';
 import '../../voice_notes/audio_recording_service.dart';
 import '../providers.dart';
 import '../widgets/adaptive_ministry_sheet.dart';
+import '../widgets/markdown_preview_text.dart';
 import '../widgets/quick_capture_sheet.dart';
 import '../widgets/rich_markdown_toolbar.dart';
 import '../widgets/universal_attachment_viewer.dart';
@@ -472,8 +473,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
             const SizedBox(height: 10),
 
             // Conteúdo textual
-            Text(
-              entry.content,
+            MarkdownPreviewText(
+              text: entry.content,
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,

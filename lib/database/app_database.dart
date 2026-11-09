@@ -45,7 +45,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -109,11 +109,47 @@ class AppDatabase extends _$AppDatabase {
         await _migrateAppointmentsTaskId(m);
         await _migrateResearchArticlesContextColumns(m);
       }
+      if (from < 7) {
+        // Migração incremental da versão 6 para a versão 7:
+        // Garante que a coluna updated_at exista na tabela app_kv_store
+        await _createTableIfNotExists(m, appKvStore);
+        await _migrateAppKvStoreUpdatedAt(m);
+      }
     },
     beforeOpen: (details) async {
+      await _ensureAppKvStoreUpdatedAt();
       await _seedDefaultLanguage();
     },
   );
+
+  Future<void> _migrateAppKvStoreUpdatedAt(Migrator m) async {
+    final columns = await customSelect(
+      "PRAGMA table_info(app_kv_store)",
+    ).get();
+    final colNames = columns.map((c) => c.read<String>('name')).toSet();
+    if (colNames.isNotEmpty && !colNames.contains('updated_at')) {
+      await m.addColumn(appKvStore, appKvStore.updatedAt);
+    }
+  }
+
+  Future<void> _ensureAppKvStoreUpdatedAt() async {
+    try {
+      final tableCheck = await customSelect(
+        "SELECT count(*) as count FROM sqlite_master WHERE type='table' AND name='app_kv_store'",
+      ).getSingle();
+      if (tableCheck.read<int>('count') > 0) {
+        final columns = await customSelect(
+          "PRAGMA table_info(app_kv_store)",
+        ).get();
+        final colNames = columns.map((c) => c.read<String>('name')).toSet();
+        if (!colNames.contains('updated_at')) {
+          await customStatement(
+            "ALTER TABLE app_kv_store ADD COLUMN updated_at INTEGER;",
+          );
+        }
+      }
+    } catch (_) {}
+  }
 
   Future<void> _migrateAppointmentsTaskId(Migrator m) async {
     final columns = await customSelect(

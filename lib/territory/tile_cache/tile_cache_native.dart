@@ -6,7 +6,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 
 import '../../core/app_version.dart';
-import 'tile_cache_interface.dart';
 import 'tile_cache_service.dart';
 
 TileCacheBackend getTileBackend() => TileCacheNative();
@@ -64,8 +63,19 @@ class TileCacheNative implements TileCacheBackend {
     return dir;
   }
 
-  File _getTileFile(Directory dir, int z, int x, int y) {
-    return File('${dir.path}/$z/$x/$y.png');
+  File _getTileFile(Directory dir, int z, int x, int y, [MapLayerStyle? style]) {
+    final s = style ?? TileCacheService.instance.activeStyle;
+    final primary = File('${dir.path}/${s.id}_${z}_${x}_$y.png');
+    if (primary.existsSync()) return primary;
+
+    // Fallback para arquivos legados gravados em versões anteriores sem o identificador de estilo
+    if (s == MapLayerStyle.standard) {
+      final legacy = File('${dir.path}/$z/$x/$y.png');
+      if (legacy.existsSync()) return legacy;
+      final legacyFlat = File('${dir.path}/tile_${z}_${x}_$y.png');
+      if (legacyFlat.existsSync()) return legacyFlat;
+    }
+    return primary;
   }
 
   bool _isBlockedTile(Uint8List bytes) {
@@ -100,10 +110,11 @@ class TileCacheNative implements TileCacheBackend {
   bool isBlockedTile(Uint8List bytes) => _isBlockedTile(bytes);
 
   @override
-  Future<Uint8List?> getTile(int z, int x, int y) async {
+  Future<Uint8List?> getTile(int z, int x, int y, [MapLayerStyle? style]) async {
+    final s = style ?? TileCacheService.instance.activeStyle;
     try {
       final dir = await _getDir();
-      final file = _getTileFile(dir, z, x, y);
+      final file = _getTileFile(dir, z, x, y, s);
       if (await file.exists()) {
         final bytes = await file.readAsBytes();
         // Se o arquivo em cache for o bloco de erro/bloqueio 403 ou marca d'água CARTO,
@@ -126,7 +137,7 @@ class TileCacheNative implements TileCacheBackend {
       final shouldCloseClient = httpClient == null;
       try {
         // 1ª Tentativa: Provedor de azulejos oficial com estilo selecionado e User-Agent plenamente identificado
-        final osmUri = Uri.parse(TileCacheService.instance.getTileUrl(z, x, y));
+        final osmUri = Uri.parse(TileCacheService.instance.getTileUrl(z, x, y, s));
         try {
           final res = await client
               .get(
@@ -149,45 +160,46 @@ class TileCacheNative implements TileCacheBackend {
               _isBlockedTile(res.bodyBytes);
 
           if (res.statusCode == 200 && !isOsmBlocked) {
-            await saveTile(z, x, y, res.bodyBytes);
+            await saveTile(z, x, y, res.bodyBytes, s);
             return res.bodyBytes;
           }
         } catch (_) {
           // Falha transitória de rede; prossegue para fallback
         }
 
-        // 2ª Tentativa (Fallback transparente de alta disponibilidade): OSM France
-        // Garante que o mapa nunca fique com blocos vazios ou indisponíveis
-        final fallbackUri = Uri.parse(
-          'https://a.tile.openstreetmap.fr/osmfr/$z/$x/$y.png',
-        );
-        try {
-          final resFallback = await client
-              .get(
-                fallbackUri,
-                headers: {
-                  'User-Agent': _userAgent,
-                  'Accept': 'image/png,image/*',
-                },
-              )
-              .timeout(const Duration(seconds: 6));
+        // 2ª Tentativa (Fallback transparente de alta disponibilidade): OSM France apenas se for standard
+        if (s == MapLayerStyle.standard) {
+          final fallbackUri = Uri.parse(
+            'https://a.tile.openstreetmap.fr/osmfr/$z/$x/$y.png',
+          );
+          try {
+            final resFallback = await client
+                .get(
+                  fallbackUri,
+                  headers: {
+                    'User-Agent': _userAgent,
+                    'Accept': 'image/png,image/*',
+                  },
+                )
+                .timeout(const Duration(seconds: 6));
 
-          final fallbackEtag = resFallback.headers['etag']?.toLowerCase() ?? '';
-          final isFallbackWatermarked = fallbackEtag.contains('wm-') ||
-              resFallback.bodyBytes.length == 2049 ||
-              resFallback.bodyBytes.length == 2513;
+            final fallbackEtag = resFallback.headers['etag']?.toLowerCase() ?? '';
+            final isFallbackWatermarked = fallbackEtag.contains('wm-') ||
+                resFallback.bodyBytes.length == 2049 ||
+                resFallback.bodyBytes.length == 2513;
 
-          final isFallbackBlocked = resFallback.headers.containsKey('x-blocked') ||
-              isFallbackWatermarked ||
-              resFallback.bodyBytes.length == _blockedTileByteLength ||
-              _isBlockedTile(resFallback.bodyBytes);
+            final isFallbackBlocked = resFallback.headers.containsKey('x-blocked') ||
+                isFallbackWatermarked ||
+                resFallback.bodyBytes.length == _blockedTileByteLength ||
+                _isBlockedTile(resFallback.bodyBytes);
 
-          if (resFallback.statusCode == 200 && !isFallbackBlocked) {
-            await saveTile(z, x, y, resFallback.bodyBytes);
-            return resFallback.bodyBytes;
+            if (resFallback.statusCode == 200 && !isFallbackBlocked) {
+              await saveTile(z, x, y, resFallback.bodyBytes, s);
+              return resFallback.bodyBytes;
+            }
+          } catch (_) {
+            // Falha de rede no fallback
           }
-        } catch (_) {
-          // Falha de rede no fallback
         }
       } finally {
         if (shouldCloseClient) {
@@ -202,12 +214,13 @@ class TileCacheNative implements TileCacheBackend {
   }
 
   @override
-  Future<void> saveTile(int z, int x, int y, Uint8List bytes) async {
+  Future<void> saveTile(int z, int x, int y, Uint8List bytes, [MapLayerStyle? style]) async {
+    final s = style ?? TileCacheService.instance.activeStyle;
     // Rejeita salvar arquivos vazios, com bloqueio ou com marca d'água de erro (2049 / 2513 bytes)
     if (_isBlockedTile(bytes)) {
       try {
         final dir = await _getDir();
-        final file = _getTileFile(dir, z, x, y);
+        final file = _getTileFile(dir, z, x, y, s);
         if (await file.exists()) {
           await file.delete();
         }
@@ -216,7 +229,7 @@ class TileCacheNative implements TileCacheBackend {
     }
     try {
       final dir = await _getDir();
-      final file = _getTileFile(dir, z, x, y);
+      final file = File('${dir.path}/${s.id}_${z}_${x}_$y.png');
       if (!await file.parent.exists()) {
         await file.parent.create(recursive: true);
       }
@@ -225,10 +238,11 @@ class TileCacheNative implements TileCacheBackend {
   }
 
   @override
-  Future<bool> isTileCached(int z, int x, int y) async {
+  Future<bool> isTileCached(int z, int x, int y, [MapLayerStyle? style]) async {
+    final s = style ?? TileCacheService.instance.activeStyle;
     try {
       final dir = await _getDir();
-      final file = _getTileFile(dir, z, x, y);
+      final file = _getTileFile(dir, z, x, y, s);
       if (await file.exists()) {
         final len = await file.length();
         if (len == 0 ||
@@ -249,7 +263,7 @@ class TileCacheNative implements TileCacheBackend {
   }
 
   @override
-  Future<int> getCachedTileCount() async {
+  Future<int> getCachedTileCount([MapLayerStyle? style]) async {
     try {
       final dir = await _getDir();
       if (!await dir.exists()) return 0;
@@ -259,6 +273,9 @@ class TileCacheNative implements TileCacheBackend {
         followLinks: false,
       )) {
         if (entity is File && entity.path.endsWith('.png')) {
+          if (style != null && !entity.path.contains('${style.id}_')) {
+            continue;
+          }
           final len = await entity.length();
           if (len == 0 ||
               len == 2049 ||

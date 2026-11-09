@@ -528,7 +528,7 @@ void main() {
       final appDb = AppDatabase.forTesting(NativeDatabase.opened(sqliteDb));
 
       final ver = await appDb.customSelect('PRAGMA user_version;').getSingle();
-      expect(ver.read<int>('user_version'), equals(6));
+      expect(ver.read<int>('user_version'), equals(appDb.schemaVersion));
 
       // 1. Verifica coluna last_attempt_at em sync_queue
       final qRow = await (appDb.select(appDb.syncQueue)..where((t) => t.id.equals('q_v4'))).getSingle();
@@ -537,7 +537,7 @@ void main() {
 
       // 2. Verifica se a tabela app_languages foi criada e Ticuna foi semeada como padrão
       final languages = await appDb.select(appDb.appLanguages).get();
-      expect(languages.length, equals(1));
+      expect(languages.length, equals(5));
       expect(languages.first.id, equals('tca'));
       expect(languages.first.name, equals('Ticuna (Magüta)'));
       expect(languages.first.isDefault, isTrue);
@@ -579,7 +579,7 @@ void main() {
       final appDb = AppDatabase.forTesting(NativeDatabase.opened(sqliteDb));
 
       final ver = await appDb.customSelect('PRAGMA user_version;').getSingle();
-      expect(ver.read<int>('user_version'), equals(6));
+      expect(ver.read<int>('user_version'), equals(appDb.schemaVersion));
 
       // 1. Verifica se as 7 novas tabelas foram criadas
       final inboxCount = await appDb.select(appDb.inboxEntries).get();
@@ -616,6 +616,59 @@ void main() {
       final savedInbox = await (appDb.select(appDb.inboxEntries)..where((t) => t.id.equals('inbox_1'))).getSingle();
       expect(savedInbox.content, equals('Ideia para revisita sobre profecias'));
       expect(savedInbox.status, equals('unprocessed'));
+
+      await appDb.close();
+    });
+
+    test('TC-MIG-07: Migração incremental v6 para v7 garantindo updated_at em app_kv_store', () async {
+      final sqliteDb = sql.sqlite3.openInMemory();
+
+      sqliteDb.execute('PRAGMA user_version = 6;');
+      sqliteDb.execute('''
+        CREATE TABLE app_kv_store (
+          key TEXT NOT NULL PRIMARY KEY,
+          value TEXT NOT NULL
+        );
+      ''');
+      sqliteDb.execute('''
+        INSERT INTO app_kv_store (key, value)
+        VALUES ('jw_imap_host', 'mail.jw.org');
+      ''');
+
+      final appDb = AppDatabase.forTesting(NativeDatabase.opened(sqliteDb));
+
+      final ver = await appDb.customSelect('PRAGMA user_version;').getSingle();
+      expect(ver.read<int>('user_version'), equals(appDb.schemaVersion));
+
+      // 1. Verifica se a coluna updated_at existe em app_kv_store
+      final columns = await appDb.customSelect("PRAGMA table_info(app_kv_store)").get();
+      final colNames = columns.map((c) => c.read<String>('name')).toSet();
+      expect(colNames.contains('updated_at'), isTrue);
+
+      // 2. Insere e atualiza dados com updated_at usando insertOnConflictUpdate
+      final now = DateTime.now();
+      await appDb.into(appDb.appKvStore).insertOnConflictUpdate(
+        AppKvStoreCompanion.insert(
+          key: 'jw_imap_email',
+          value: 'usuario@jw.org',
+          updatedAt: Value(now),
+        ),
+      );
+      await appDb.into(appDb.appKvStore).insertOnConflictUpdate(
+        AppKvStoreCompanion.insert(
+          key: 'jw_imap_host',
+          value: 'mail.jw.org',
+          updatedAt: Value(now),
+        ),
+      );
+
+      final emailRow = await (appDb.select(appDb.appKvStore)..where((t) => t.key.equals('jw_imap_email'))).getSingle();
+      expect(emailRow.value, equals('usuario@jw.org'));
+      expect(emailRow.updatedAt, isNotNull);
+
+      final hostRow = await (appDb.select(appDb.appKvStore)..where((t) => t.key.equals('jw_imap_host'))).getSingle();
+      expect(hostRow.value, equals('mail.jw.org'));
+      expect(hostRow.updatedAt, isNotNull);
 
       await appDb.close();
     });

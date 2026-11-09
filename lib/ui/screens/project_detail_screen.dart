@@ -8,6 +8,7 @@ import '../../projects/project_manager.dart';
 import '../../tasks/task_manager.dart';
 import '../providers.dart';
 import '../widgets/adaptive_ministry_sheet.dart';
+import '../widgets/markdown_preview_text.dart';
 import '../widgets/rich_markdown_toolbar.dart';
 
 /// Tela de Detalhes de um Projeto do Módulo B.
@@ -260,8 +261,8 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                               children: [
                                 if (task.description != null && task.description!.isNotEmpty) ...[
                                   const SizedBox(height: 2),
-                                  Text(
-                                    task.description!,
+                                  MarkdownPreviewText(
+                                    text: task.description!,
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(

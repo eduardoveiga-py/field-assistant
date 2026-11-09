@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../core/app_theme.dart';
 import '../../voice_notes/audio_recording_service.dart';
@@ -149,9 +151,48 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> with Sing
       );
       if (result.isNotEmpty) {
         final f = result.first;
-        final fileSize = (await f.length()) ?? 0;
+        String finalPath = f.path ?? f.name;
+        int fileSize = f.lengthSync() ?? (await f.length()) ?? 0;
+
+        if (!kIsWeb) {
+          try {
+            final appDir = await getApplicationDocumentsDirectory();
+            final docsFolder = Directory('${appDir.path}/documents');
+            if (!docsFolder.existsSync()) {
+              await docsFolder.create(recursive: true);
+            }
+            final targetFile = File('${docsFolder.path}/${f.name}');
+            Uint8List? bytes;
+            try {
+              bytes = await f.readAsBytes();
+            } catch (_) {}
+            if ((bytes == null || bytes.isEmpty) && f.path != null && f.path!.isNotEmpty) {
+              final sf = File(f.path!);
+              if (await sf.exists()) {
+                try {
+                  bytes = await sf.readAsBytes();
+                } catch (_) {}
+              }
+            }
+            if (bytes != null && bytes.isNotEmpty) {
+              await targetFile.writeAsBytes(bytes, flush: true);
+              finalPath = targetFile.path;
+              fileSize = bytes.length;
+            } else if (f.path != null && f.path!.isNotEmpty) {
+              final sf = File(f.path!);
+              if (await sf.exists()) {
+                await sf.copy(targetFile.path);
+                finalPath = targetFile.path;
+                fileSize = await targetFile.length();
+              }
+            }
+          } catch (e) {
+            debugPrint('Erro ao persistir documento no quick capture: $e');
+          }
+        }
+
         setState(() {
-          _attachedFilePath = f.path;
+          _attachedFilePath = finalPath;
           _attachedFileName = f.name;
           _attachedFileSize = fileSize;
           _attachedFileType = 'file';
@@ -172,8 +213,23 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> with Sing
       final picked = await picker.pickImage(source: source, imageQuality: 85);
       if (picked != null) {
         final bytes = await picked.readAsBytes();
+        String finalPath = picked.path;
+
+        if (!kIsWeb) {
+          try {
+            final appDir = await getApplicationDocumentsDirectory();
+            final imgFolder = Directory('${appDir.path}/documents');
+            if (!imgFolder.existsSync()) {
+              await imgFolder.create(recursive: true);
+            }
+            final targetFile = File('${imgFolder.path}/${picked.name}');
+            await targetFile.writeAsBytes(bytes, flush: true);
+            finalPath = targetFile.path;
+          } catch (_) {}
+        }
+
         setState(() {
-          _attachedFilePath = picked.path;
+          _attachedFilePath = finalPath;
           _attachedFileName = picked.name;
           _attachedFileSize = bytes.length;
           _attachedFileType = 'image';

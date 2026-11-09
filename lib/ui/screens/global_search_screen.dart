@@ -13,6 +13,7 @@ import 'tasks_screen.dart';
 import 'project_detail_screen.dart';
 import 'knowledge_base_screen.dart';
 import 'inbox_screen.dart';
+import '../widgets/markdown_preview_text.dart';
 
 enum GlobalSearchResultType {
   person('Pessoa', Icons.person, AppTheme.primaryBlue),
@@ -213,8 +214,8 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
                   ),
                   if (item.snippet != null && item.snippet!.isNotEmpty) ...[
                     const SizedBox(height: 2),
-                    Text(
-                      item.snippet!,
+                    MarkdownPreviewText(
+                      text: item.snippet!,
                       style: const TextStyle(
                         fontSize: 11,
                         fontStyle: FontStyle.italic,

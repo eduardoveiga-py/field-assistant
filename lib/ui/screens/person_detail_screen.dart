@@ -36,6 +36,7 @@ import '../../voice_notes/voice_notes_manager.dart';
 import '../../voice_notes/voice_note_models.dart';
 import '../widgets/quick_voice_note_dialog.dart';
 import '../widgets/doorstep_return_booking_dialog.dart';
+import '../widgets/markdown_preview_text.dart';
 import '../../core/feature_registry.dart';
 
 class PersonDetailScreen extends ConsumerStatefulWidget {
@@ -7548,8 +7549,8 @@ class PersonUnifiedTimelineSection extends ConsumerWidget {
                             if (item.notes != null &&
                                 item.notes!.isNotEmpty) ...[
                               const SizedBox(height: 6),
-                              Text(
-                                item.notes!,
+                              MarkdownPreviewText(
+                                text: item.notes!,
                                 style: const TextStyle(fontSize: 13),
                               ),
                             ],

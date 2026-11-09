@@ -10,6 +10,7 @@ import '../../core/date_utils.dart';
 import '../../experiences/experience_manager.dart';
 import '../../media/media_picker_helper.dart';
 import '../widgets/knowledge_item_reader_dialog.dart';
+import '../widgets/markdown_preview_text.dart';
 import '../widgets/rich_markdown_toolbar.dart';
 import '../widgets/universal_attachment_viewer.dart';
 
@@ -846,8 +847,8 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
                                 ],
                               ),
                               const SizedBox(height: 10),
-                              Text(
-                                exp.content,
+                              MarkdownPreviewText(
+                                text: exp.content,
                                 maxLines: 4,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
