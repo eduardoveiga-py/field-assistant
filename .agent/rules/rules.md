@@ -58,3 +58,17 @@ Este arquivo contém restrições estritas e instruções persistentes para todo
 - O cache de tiles nativo e web deve implementar auto-cura: rejeitar e expurgar do disco arquivos de 2049, 2513 ou 6725 bytes, arquivos vazios (0 bytes) e respostas com ETag de marca d'água (`wm-`).
 - A concorrência máxima de download para o OpenStreetMap deve respeitar estritamente o limite de 2 conexões simultâneas da Tile Usage Policy do OSM.
 
+## 10. Modais e Diálogos Adaptativos (Responsividade iPad / Tablet / Web)
+- NUNCA utilize `DraggableScrollableSheet` ou `showModalBottomSheet(isScrollControlled: true)` sem definir limites estritos de altura (`maxHeight: 0.85 * viewportHeight`) em telas grandes.
+- Em dispositivos com largura superior a 600pt (iPads, tablets e desktop), modais informativos e de seleção DEVEM ser renderizados como `Dialog` centralizado com `maxWidth: 720`, cantos totalmente arredondados (`BorderRadius.circular(24)`) e botão explícito de fechamento.
+
+## 11. Arquitetura Extensível de Múltiplos Idiomas no Drift
+- NUNCA engesse tabelas ou interfaces linguísticas a um único idioma através de SQL cru ou constantes fixas.
+- O catálogo de idiomas deve ser persistido na tabela Drift `AppLanguages`, com o Ticuna (`tca`) configurado como padrão (`is_default = true`).
+- A inclusão de novas línguas indígenas pelo publicador deve ser 100% dinâmica em tempo de execução, associando vocabulário, frases e áudios ao respectivo `language_id`.
+
+## 12. Motor de Mapas de Alta Performance e Conformidade Offline
+- NUNCA implemente download de cidades ou estados inteiros via scraping direto de imagens individuais do servidor OpenStreetMap oficial, pois isso viola a Tile Usage Policy e resulta em banimento por IP (HTTP 403).
+- O download regional deve ser estruturado em pacotes consolidados `.mbtiles` (SQLite) servidos por CDN/Releases.
+- O motor de renderização cartográfica deve manter interpolação contínua de resolução (eliminando flickering de tela no zoom), rotação tridimensional livre com 2 dedos, agulha de bússola com retorno ao Norte magnético e barra de escala métrica dinâmica.
+
