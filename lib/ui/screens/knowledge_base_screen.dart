@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:drift/drift.dart' as drift;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -1895,19 +1896,15 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
         final f = res.first;
         String finalPath = f.path ?? f.name;
         int fileSize = f.lengthSync() ?? (await f.length()) ?? 0;
+        Uint8List? fileBytes = f.bytes;
 
         if (!kIsWeb) {
           try {
-            final appDir = await getApplicationDocumentsDirectory();
-            final docsFolder = Directory('${appDir.path}/documents');
-            if (!docsFolder.existsSync()) {
-              await docsFolder.create(recursive: true);
+            if (fileBytes == null) {
+              try {
+                fileBytes = await f.readAsBytes();
+              } catch (_) {}
             }
-            final targetFile = File('${docsFolder.path}/${f.name}');
-            Uint8List? fileBytes;
-            try {
-              fileBytes = await f.readAsBytes();
-            } catch (_) {}
             if ((fileBytes == null || fileBytes.isEmpty) && f.path != null && f.path!.isNotEmpty) {
               final sourceFile = File(f.path!);
               if (await sourceFile.exists()) {
@@ -1916,6 +1913,14 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                 } catch (_) {}
               }
             }
+
+            final appDir = await getApplicationDocumentsDirectory();
+            final docsFolder = Directory('${appDir.path}/documents');
+            if (!docsFolder.existsSync()) {
+              await docsFolder.create(recursive: true);
+            }
+            final targetFile = File('${docsFolder.path}/${f.name}');
+
             if (fileBytes != null && fileBytes.isNotEmpty) {
               await targetFile.writeAsBytes(fileBytes, flush: true);
               finalPath = targetFile.path;

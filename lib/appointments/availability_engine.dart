@@ -322,9 +322,9 @@ class AvailabilityEngine {
         final b = active[j];
 
         // Se são em dias diferentes, não colidem
-        if (a.date.year != b.date.year ||
-            a.date.month != b.date.month ||
-            a.date.day != b.date.day) {
+        if (a.startTime.year != b.startTime.year ||
+            a.startTime.month != b.startTime.month ||
+            a.startTime.day != b.startTime.day) {
           continue;
         }
 
@@ -338,7 +338,7 @@ class AvailabilityEngine {
           final pair = AppointmentConflictPair(
             appointmentA: a,
             appointmentB: b,
-            collisionDate: a.date,
+            collisionDate: a.startTime,
           );
           if (!seen.contains(pair.conflictKey)) {
             seen.add(pair.conflictKey);
