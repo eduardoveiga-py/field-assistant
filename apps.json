@@ -24,7 +24,7 @@
       "iconURL": "https://cdn.jsdelivr.net/gh/eduardoveiga-py/field-assistant@master/web/icons/Icon-512.png",
       "tintColor": "#1E3A8A",
       "category": "utilities",
-      "size": 14105434,
+      "size": 14105609,
       "minOSVersion": "14.0",
       "versions": [
         {
@@ -32,7 +32,7 @@
           "date": "2026-11-10",
           "localizedDescription": "Lançamento Oficial 1.3.2: Compilação nativa multiplataforma completa (Android, iOS/iPadOS, Web, Windows 10/11 x64, Linux GTK x64 e macOS Universal) com manifesto SHA256SUMS.txt, abstrações seguras para ditado por voz (VoiceDictationService) e calendário nativo (CalendarProvider / AppleEventKitProvider) em desktop, e compatibilidade com MSVC 14.51 e GStreamer.",
           "downloadURL": "https://github.com/eduardoveiga-py/field-assistant/releases/latest/download/app-release-unsigned.ipa",
-          "size": 14105434,
+          "size": 14105609,
           "minOSVersion": "14.0"
         },
         {
