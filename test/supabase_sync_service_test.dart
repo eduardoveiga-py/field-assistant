@@ -979,8 +979,8 @@ void main() {
       final mockClient = MockClient((request) async {
         final uri = request.url.toString();
 
-        if (uri.contains('/storage/v1/object/knowledge_vault')) {
-          if (request.method == 'POST') {
+        if (uri.contains('/storage/v1/object/knowledge_vault') || uri.contains('knowledge_vault')) {
+          if (request.method == 'POST' || request.method == 'PUT') {
             uploadCalled = true;
             return http.Response(jsonEncode({'Key': 'knowledge_vault/test_doc.pdf'}), 200, headers: {'content-type': 'application/json'});
           }
@@ -995,6 +995,9 @@ void main() {
         }
 
         if (request.method == 'GET' && uri.contains('/rest/v1/knowledge_documents')) {
+          if (uri.contains('id=eq.')) {
+            return mockJsonResponse(request, []);
+          }
           return mockJsonResponse(request, [
             {
               'id': 'remote_doc_1',
