@@ -124,6 +124,9 @@ class GoogleCalendarProvider implements CalendarProvider {
   CalendarProviderType get providerType => CalendarProviderType.google;
 
   @override
+  bool get isSupportedOnCurrentPlatform => true;
+
+  @override
   Future<bool> isAuthorized() async {
     try {
       final explicitlyConnected = await _secureStorage.read(key: _keyUserExplicitlyConnected);

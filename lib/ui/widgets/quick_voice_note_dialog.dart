@@ -98,7 +98,7 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
         (kIsWeb ? LocalAudioRecordingService() : RealAudioRecordingService());
     _dictationService =
         widget.dictationService ??
-        (kIsWeb ? LocalVoiceDictationService() : RealVoiceDictationService());
+        VoiceDictationService.platform();
     _playerService =
         widget.playerService ??
         (kIsWeb ? LocalAudioPlayerService() : RealAudioPlayerService());
@@ -366,11 +366,18 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
                 _buildRecordingPanel(isSunMode, isDark),
                 const SizedBox(height: 16),
 
+                if (!VoiceDictationService.isPlatformSupported) ...[
+                  _buildUnsupportedPlatformNotice(isSunMode, isDark),
+                  const SizedBox(height: 16),
+                ],
+
                 // Pré-visualização Estruturada Teocrática
                 _buildStructuredPreview(isSunMode, isDark),
                 const SizedBox(height: 16),
 
-                if (_dictationError != null) ...[
+                if (_dictationError != null &&
+                    (VoiceDictationService.isPlatformSupported ||
+                        !_dictationError!.contains('indisponível'))) ...[
                   _buildDictationError(isSunMode, isDark),
                   const SizedBox(height: 16),
                 ],
@@ -389,6 +396,46 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildUnsupportedPlatformNotice(bool isSunMode, bool isDark) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isSunMode
+            ? Colors.white
+            : (isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF)),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isSunMode ? Colors.black : const Color(0xFF3B82F6),
+          width: isSunMode ? 2.0 : 1.2,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.info_outline,
+            color: isSunMode ? Colors.black : const Color(0xFF2563EB),
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Ditado de voz indisponível nesta plataforma (Linux/Desktop). O áudio será gravado e salvo normalmente, e os dados da visita podem ser digitados manualmente.',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSunMode ? FontWeight.bold : FontWeight.w500,
+                color: isSunMode
+                    ? Colors.black
+                    : (isDark ? const Color(0xFF93C5FD) : const Color(0xFF1E40AF)),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

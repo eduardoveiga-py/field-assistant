@@ -68,20 +68,22 @@ class _ConnectedCalendarsScreenState
 
     // Apple state
     bool aAuth = false;
-    try {
-      aAuth = await coordinator.appleProvider.isAuthorized();
-    } catch (_) {}
     String? aAcc;
     List<ExternalCalendarItem> aCals = [];
     String? aSelectedId;
-    if (aAuth) {
+    if (coordinator.appleProvider.isSupportedOnCurrentPlatform) {
       try {
-        aAcc = await coordinator.appleProvider.getConnectedAccountName();
-        aCals = uniqueCalendarItems(
-          await coordinator.appleProvider.getAvailableCalendars(),
-        );
-        aSelectedId = await coordinator.appleProvider.getSelectedCalendarId();
+        aAuth = await coordinator.appleProvider.isAuthorized();
       } catch (_) {}
+      if (aAuth) {
+        try {
+          aAcc = await coordinator.appleProvider.getConnectedAccountName();
+          aCals = uniqueCalendarItems(
+            await coordinator.appleProvider.getAvailableCalendars(),
+          );
+          aSelectedId = await coordinator.appleProvider.getSelectedCalendarId();
+        } catch (_) {}
+      }
     }
 
     List<CalendarConflictItem> pendingConflicts = [];
@@ -233,12 +235,21 @@ class _ConnectedCalendarsScreenState
   }
 
   Future<void> _connectApple() async {
+    final coordinator = ref.read(calendarSyncCoordinatorProvider);
+    if (!coordinator.appleProvider.isSupportedOnCurrentPlatform) {
+      if (mounted) {
+        setState(() {
+          _syncMessage =
+              'Aviso: A sincronização com o Apple Calendar está disponível exclusivamente no iOS.';
+        });
+      }
+      return;
+    }
     setState(() {
       _isSyncing = true;
       _syncMessage = null;
     });
     try {
-      final coordinator = ref.read(calendarSyncCoordinatorProvider);
       final authorized = await coordinator.appleProvider.requestAuthorization();
       if (authorized) {
         await _syncNow();
@@ -368,6 +379,9 @@ class _ConnectedCalendarsScreenState
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final coordinator = ref.watch(calendarSyncCoordinatorProvider);
+    final isAppleSupported =
+        coordinator.appleProvider.isSupportedOnCurrentPlatform;
 
     return Scaffold(
       appBar: AppBar(
@@ -710,14 +724,20 @@ class _ConnectedCalendarsScreenState
                               ),
                             ),
                             Text(
-                              _isAppleAuthorized
-                                  ? (_appleAccount ?? 'Acesso Autorizado')
-                                  : 'Não autorizado',
+                              !isAppleSupported
+                                  ? 'Disponível exclusivamente no iOS'
+                                  : (_isAppleAuthorized
+                                      ? (_appleAccount ?? 'Acesso Autorizado')
+                                      : 'Não autorizado'),
                               style: TextStyle(
                                 fontSize: 13,
-                                color: _isAppleAuthorized
-                                    ? Colors.green[700]
-                                    : Colors.grey,
+                                color: !isAppleSupported
+                                    ? (isDark
+                                        ? const Color(0xFFFBBF24)
+                                        : const Color(0xFFB45309))
+                                    : (_isAppleAuthorized
+                                        ? Colors.green[700]
+                                        : Colors.grey),
                                 fontWeight: _isAppleAuthorized
                                     ? FontWeight.w600
                                     : FontWeight.normal,
@@ -726,7 +746,13 @@ class _ConnectedCalendarsScreenState
                           ],
                         ),
                       ),
-                      if (_isAppleAuthorized)
+                      if (!isAppleSupported)
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.block, size: 18),
+                          label: const Text('Autorizar'),
+                          onPressed: null,
+                        )
+                      else if (_isAppleAuthorized)
                         OutlinedButton(
                           onPressed: _disconnectApple,
                           child: const Text('Desvincular'),
@@ -739,6 +765,46 @@ class _ConnectedCalendarsScreenState
                         ),
                     ],
                   ),
+                  if (!isAppleSupported) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? const Color(0xFF1E293B)
+                            : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isDark
+                              ? const Color(0xFF334155)
+                              : const Color(0xFFE2E8F0),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.info_outline,
+                            size: 16,
+                            color: isDark
+                                ? const Color(0xFF94A3B8)
+                                : const Color(0xFF64748B),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'A sincronização com o Apple Calendar nativo está disponível apenas no aplicativo para iPhone e iPad. No desktop, utilize a integração com o Google Calendar.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDark
+                                    ? const Color(0xFF94A3B8)
+                                    : const Color(0xFF64748B),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   if (_isAppleAuthorized && _appleCalendars.isNotEmpty) ...[
                     const Divider(height: 24),
                     const Text(

@@ -1,6 +1,9 @@
 import 'dart:collection';
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/native.dart';
 import 'package:drift/drift.dart' as drift;
 import 'package:device_calendar/device_calendar.dart' as dev_cal;
@@ -13,6 +16,8 @@ import 'package:ministerio_pessoal/appointments/calendar_sync_coordinator.dart';
 import 'package:ministerio_pessoal/appointments/google_calendar_provider.dart';
 import 'package:ministerio_pessoal/appointments/apple_eventkit_provider.dart';
 import 'package:ministerio_pessoal/appointments/calendar_provider.dart';
+import 'package:ministerio_pessoal/ui/providers.dart';
+import 'package:ministerio_pessoal/ui/screens/connected_calendars_screen.dart';
 
 class FakeDeviceCalendarPlugin implements dev_cal.DeviceCalendarPlugin {
   bool hasPermissionsResult = true;
@@ -231,11 +236,15 @@ class MockGoogleCalendarProvider extends GoogleCalendarProvider {
 
 class MockAppleCalendarProvider extends AppleEventKitProvider {
   bool authorized = true;
+  bool supported = true;
   final Map<String, Map<String, dynamic>> appleEvents = {};
   int pushCount = 0;
   int deleteCount = 0;
 
-  MockAppleCalendarProvider({this.authorized = false});
+  MockAppleCalendarProvider({this.authorized = false, this.supported = true});
+
+  @override
+  bool get isSupportedOnCurrentPlatform => supported;
 
   @override
   Future<bool> isAuthorized() async => authorized;
@@ -1028,6 +1037,7 @@ void main() {
     late AppleEventKitProvider appleProvider;
 
     setUp(() {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
       db = AppDatabase.forTesting(NativeDatabase.memory());
       FlutterSecureStorage.setMockInitialValues({
         'apple_eventkit_selected_id': 'cal_apple_test',
@@ -1037,6 +1047,7 @@ void main() {
     });
 
     tearDown(() async {
+      debugDefaultTargetPlatformOverride = null;
       await db.close();
     });
 
@@ -1426,6 +1437,129 @@ void main() {
 
       // O fingerprint com frequência diária DEVE ser diferente do semanal
       expect(fpDaily, isNot(equals(fpWeekly)));
+    });
+  });
+
+  group('Desktop & Platform Isolation for AppleEventKitProvider & Coordinator', () {
+    late AppDatabase db;
+    late AppRepository repo;
+    late FakeDeviceCalendarPlugin fakePlugin;
+    late AppleEventKitProvider appleProvider;
+
+    setUp(() {
+      db = AppDatabase.forTesting(NativeDatabase.memory());
+      repo = AppRepository(db);
+      FlutterSecureStorage.setMockInitialValues({
+        'apple_eventkit_selected_id': 'cal_desktop_test',
+      });
+      fakePlugin = FakeDeviceCalendarPlugin();
+      appleProvider = AppleEventKitProvider(deviceCalendarPlugin: fakePlugin);
+    });
+
+    tearDown(() async {
+      debugDefaultTargetPlatformOverride = null;
+      await db.close();
+    });
+
+    test('isSupportedOnCurrentPlatform is true only on iOS and false on Windows/Linux/macOS', () {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      expect(appleProvider.isSupportedOnCurrentPlatform, isTrue);
+
+      debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+      expect(appleProvider.isSupportedOnCurrentPlatform, isFalse);
+
+      debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+      expect(appleProvider.isSupportedOnCurrentPlatform, isFalse);
+
+      debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+      expect(appleProvider.isSupportedOnCurrentPlatform, isFalse);
+
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      expect(appleProvider.isSupportedOnCurrentPlatform, isFalse);
+    });
+
+    test('AppleEventKitProvider guards on unsupported platform return safe defaults without calling plugin', () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+
+      expect(await appleProvider.isAuthorized(), isFalse);
+      expect(await appleProvider.requestAuthorization(), isFalse);
+      expect(await appleProvider.getConnectedAccountName(), isNull);
+      expect(await appleProvider.getAvailableCalendars(), isEmpty);
+      expect(await appleProvider.getSelectedCalendarId(), isNull);
+
+      final syncRes = await appleProvider.syncEvents(db: db);
+      expect(syncRes.success, isFalse);
+      expect(syncRes.errorMessage, contains('não suportado'));
+
+      final appt = await repo.createAppointment(
+        title: 'Teste Guard',
+        startTime: DateTime(2026, 11, 10, 10),
+        endTime: DateTime(2026, 11, 10, 11),
+      );
+      final pushRes = await appleProvider.pushAppointmentToExternal(db, appt);
+      expect(pushRes, isNull);
+
+      final deleteRes = await appleProvider.deleteExternalEvent(db, 'ext_ev_1');
+      expect(deleteRes, isFalse);
+    });
+
+    test('CalendarSyncCoordinator skips Apple provider on unsupported desktop platform', () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+      final mockGoogle = MockGoogleCalendarProvider(authorized: true);
+      final unsupportedApple = MockAppleCalendarProvider(authorized: true, supported: false);
+
+      final coordinator = CalendarSyncCoordinator(
+        db,
+        google: mockGoogle,
+        apple: unsupportedApple,
+      );
+
+      final result = await coordinator.syncAll();
+      expect(result.success, isTrue);
+      // Apple provider was skipped during sync because isSupportedOnCurrentPlatform is false
+      expect(unsupportedApple.pushCount, equals(0));
+    });
+
+    testWidgets('ConnectedCalendarsScreen on desktop disables Apple authorize and shows iOS exclusivity notice', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+      try {
+        final mockGoogle = MockGoogleCalendarProvider(authorized: false);
+        final realAppleProvider = AppleEventKitProvider(deviceCalendarPlugin: fakePlugin);
+        final coordinator = CalendarSyncCoordinator(
+          db,
+          google: mockGoogle,
+          apple: realAppleProvider,
+        );
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              databaseProvider.overrideWithValue(db),
+              calendarSyncCoordinatorProvider.overrideWithValue(coordinator),
+            ],
+            child: const MaterialApp(
+              home: ConnectedCalendarsScreen(),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Check iOS exclusivity subtitle
+        expect(find.text('Disponível exclusivamente no iOS'), findsOneWidget);
+        expect(
+          find.textContaining('A sincronização com o Apple Calendar nativo está disponível apenas no aplicativo para iPhone e iPad'),
+          findsOneWidget,
+        );
+
+        // Verify Authorize button for Apple Calendar is disabled (onPressed is null)
+        final authorizeButtons = find.widgetWithText(ElevatedButton, 'Autorizar');
+        expect(authorizeButtons, findsWidgets);
+
+        final disabledButton = tester.widget<ElevatedButton>(authorizeButtons.last);
+        expect(disabledButton.onPressed, isNull);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
     });
   });
 }

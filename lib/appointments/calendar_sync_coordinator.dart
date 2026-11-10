@@ -88,6 +88,7 @@ class CalendarSyncCoordinator {
 
     // 1. Download de alterações externas
     for (final provider in allProviders) {
+      if (!provider.isSupportedOnCurrentPlatform) continue;
       if (providers != null && !providers.contains(provider.providerType)) continue;
       try {
         final authorized = await provider.isAuthorized();
@@ -376,6 +377,7 @@ class CalendarSyncCoordinator {
   /// Propaga criação ou alteração de um compromisso local para os calendários externos conectados
   Future<void> pushLocalAppointment(AppointmentEntry appointment) async {
     for (final provider in allProviders) {
+      if (!provider.isSupportedOnCurrentPlatform) continue;
       try {
         if (await provider.isAuthorized()) {
           await provider.pushAppointmentToExternal(db, appointment);
@@ -395,7 +397,7 @@ class CalendarSyncCoordinator {
 
     for (final link in links) {
       final provider = getProviderByName(link.provider);
-      if (provider != null) {
+      if (provider != null && provider.isSupportedOnCurrentPlatform) {
         try {
           if (await provider.isAuthorized()) {
             await provider.deleteExternalEvent(db, link.externalEventId);
@@ -455,7 +457,9 @@ class CalendarSyncCoordinator {
   Future<void> resolveConflictKeepLocal(CalendarConflictItem conflict) async {
     final provider = getProviderByName(conflict.link.provider);
     String? resId;
-    if (provider != null && await provider.isAuthorized()) {
+    if (provider != null &&
+        provider.isSupportedOnCurrentPlatform &&
+        await provider.isAuthorized()) {
       resId = await provider.pushAppointmentToExternal(
         db,
         conflict.localAppointment,

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:device_calendar/device_calendar.dart' as dev_cal;
 import 'package:drift/drift.dart' as drift;
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:uuid/uuid.dart';
@@ -57,7 +58,12 @@ class AppleEventKitProvider implements CalendarProvider {
   CalendarProviderType get providerType => CalendarProviderType.appleEventKit;
 
   @override
+  bool get isSupportedOnCurrentPlatform =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
+
+  @override
   Future<bool> isAuthorized() async {
+    if (!isSupportedOnCurrentPlatform) return false;
     try {
       final permissions = await _deviceCalendarPlugin.hasPermissions();
       return permissions.isSuccess && (permissions.data ?? false);
@@ -68,6 +74,7 @@ class AppleEventKitProvider implements CalendarProvider {
 
   @override
   Future<bool> requestAuthorization() async {
+    if (!isSupportedOnCurrentPlatform) return false;
     try {
       final res = await _deviceCalendarPlugin.requestPermissions();
       return res.isSuccess && (res.data ?? false);
@@ -78,6 +85,7 @@ class AppleEventKitProvider implements CalendarProvider {
 
   @override
   Future<String?> getConnectedAccountName() async {
+    if (!isSupportedOnCurrentPlatform) return null;
     final calendars = await getAvailableCalendars();
     final selectedId = await getSelectedCalendarId();
     if (selectedId != null) {
@@ -91,6 +99,7 @@ class AppleEventKitProvider implements CalendarProvider {
 
   @override
   Future<List<ExternalCalendarItem>> getAvailableCalendars() async {
+    if (!isSupportedOnCurrentPlatform) return [];
     try {
       final authorized = await isAuthorized();
       if (!authorized) return [];
@@ -113,16 +122,19 @@ class AppleEventKitProvider implements CalendarProvider {
 
   @override
   Future<String?> getSelectedCalendarId() async {
+    if (!isSupportedOnCurrentPlatform) return null;
     return await _secureStorage.read(key: _keySelectedCalendarId);
   }
 
   @override
   Future<void> setSelectedCalendarId(String calendarId) async {
+    if (!isSupportedOnCurrentPlatform) return;
     await _secureStorage.write(key: _keySelectedCalendarId, value: calendarId);
   }
 
   @override
   Future<void> disconnect() async {
+    if (!isSupportedOnCurrentPlatform) return;
     await _secureStorage.delete(key: _keySelectedCalendarId);
   }
 
@@ -131,6 +143,12 @@ class AppleEventKitProvider implements CalendarProvider {
     required AppDatabase db,
     bool fullSync = false,
   }) async {
+    if (!isSupportedOnCurrentPlatform) {
+      return CalendarSyncResult(
+        success: false,
+        errorMessage: 'Apple Calendar / EventKit não suportado nesta plataforma.',
+      );
+    }
     try {
       final authorized = await isAuthorized();
       if (!authorized) {
@@ -307,6 +325,7 @@ class AppleEventKitProvider implements CalendarProvider {
     AppDatabase db,
     AppointmentEntry appointment,
   ) async {
+    if (!isSupportedOnCurrentPlatform) return null;
     try {
       if (!await isAuthorized()) return null;
       final calendarId = await getSelectedCalendarId();
@@ -443,6 +462,7 @@ class AppleEventKitProvider implements CalendarProvider {
     AppDatabase db,
     String externalEventId,
   ) async {
+    if (!isSupportedOnCurrentPlatform) return false;
     try {
       final calendarId = await getSelectedCalendarId();
       if (calendarId == null) return false;

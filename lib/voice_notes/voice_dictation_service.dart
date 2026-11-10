@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 /// Contrato desacoplado para serviço de reconhecimento e ditado de voz.
@@ -13,6 +14,59 @@ abstract class VoiceDictationService {
   });
   Future<void> stopListening();
   void dispose();
+
+  /// Retorna true se a plataforma atual suporta nativamente o engine de reconhecimento de fala.
+  static bool get isPlatformSupported {
+    if (kIsWeb) return true;
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+      case TargetPlatform.iOS:
+      case TargetPlatform.windows:
+      case TargetPlatform.macOS:
+        return true;
+      case TargetPlatform.linux:
+      case TargetPlatform.fuchsia:
+        return false;
+    }
+  }
+
+  /// Cria a instância apropriada para a plataforma em execução:
+  /// - Em plataformas não suportadas (ex: Linux): retorna UnsupportedVoiceDictationService.
+  /// - Em plataformas suportadas: retorna RealVoiceDictationService com proteção a exceções.
+  static VoiceDictationService platform({
+    VoiceDictationService? overrideService,
+  }) {
+    if (overrideService != null) return overrideService;
+    if (!isPlatformSupported) {
+      return UnsupportedVoiceDictationService();
+    }
+    return RealVoiceDictationService();
+  }
+}
+
+/// Serviço no-op para plataformas sem suporte nativo a reconhecimento de voz (ex: Linux).
+class UnsupportedVoiceDictationService implements VoiceDictationService {
+  @override
+  bool get isListening => false;
+
+  @override
+  Future<bool> isAvailable() async => false;
+
+  @override
+  Future<void> startListening({
+    required ValueChanged<String> onResult,
+    ValueChanged<String>? onError,
+  }) async {
+    onError?.call(
+      'Ditado por voz indisponível nesta plataforma. Digite o resumo manualmente.',
+    );
+  }
+
+  @override
+  Future<void> stopListening() async {}
+
+  @override
+  void dispose() {}
 }
 
 /// Implementação real de reconhecimento e ditado de voz usando speech_to_text (pt-BR, offline-first).
@@ -26,6 +80,9 @@ class RealVoiceDictationService implements VoiceDictationService {
 
   @override
   Future<bool> isAvailable() async {
+    if (!VoiceDictationService.isPlatformSupported) {
+      return false;
+    }
     try {
       if (!_isInitialized) {
         _isInitialized = await _speech.initialize(
@@ -38,6 +95,10 @@ class RealVoiceDictationService implements VoiceDictationService {
         );
       }
       return _isInitialized && _speech.isAvailable;
+    } on MissingPluginException {
+      return false;
+    } on PlatformException {
+      return false;
     } catch (_) {
       return false;
     }
@@ -68,6 +129,12 @@ class RealVoiceDictationService implements VoiceDictationService {
           localeId: 'pt_BR',
         ),
       );
+    } on MissingPluginException catch (e) {
+      _isListening = false;
+      onError?.call('Plugin de reconhecimento de voz não disponível na plataforma: ${e.message}');
+    } on PlatformException catch (e) {
+      _isListening = false;
+      onError?.call('Erro de plataforma no reconhecimento de voz: ${e.message}');
     } catch (e) {
       _isListening = false;
       onError?.call('Erro ao iniciar reconhecimento de voz: $e');

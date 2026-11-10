@@ -97,6 +97,9 @@ class CalendarSyncResult {
 abstract class CalendarProvider {
   CalendarProviderType get providerType;
 
+  /// Retorna se o provedor é suportado na plataforma atual de execução.
+  bool get isSupportedOnCurrentPlatform => true;
+
   /// Retorna se o provedor está atualmente conectado e autorizado
   Future<bool> isAuthorized();
 

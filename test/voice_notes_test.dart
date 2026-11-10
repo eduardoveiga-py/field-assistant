@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -843,6 +844,128 @@ void main() {
       final granted = await recorder.requestPermission();
       expect(granted, isTrue);
       expect(await recorder.hasPermission(), isTrue);
+    });
+  });
+
+  group('VoiceDictationService Desktop & Platform Isolation', () {
+    tearDown(() {
+      debugDefaultTargetPlatformOverride = null;
+    });
+
+    test('isPlatformSupported returns false on Linux and true on Windows/macOS/iOS/Android', () {
+      debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+      expect(VoiceDictationService.isPlatformSupported, isFalse);
+
+      debugDefaultTargetPlatformOverride = TargetPlatform.fuchsia;
+      expect(VoiceDictationService.isPlatformSupported, isFalse);
+
+      debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+      expect(VoiceDictationService.isPlatformSupported, isTrue);
+
+      debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+      expect(VoiceDictationService.isPlatformSupported, isTrue);
+
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      expect(VoiceDictationService.isPlatformSupported, isTrue);
+
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      expect(VoiceDictationService.isPlatformSupported, isTrue);
+    });
+
+    test('platform() factory returns UnsupportedVoiceDictationService on Linux', () {
+      debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+      final service = VoiceDictationService.platform();
+      expect(service, isA<UnsupportedVoiceDictationService>());
+    });
+
+    test('platform() factory returns RealVoiceDictationService on Windows', () {
+      debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+      final service = VoiceDictationService.platform();
+      expect(service, isA<RealVoiceDictationService>());
+    });
+
+    test('platform() factory respects overrideService when provided', () {
+      final overrideMock = LocalVoiceDictationService();
+      debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+      final service = VoiceDictationService.platform(overrideService: overrideMock);
+      expect(service, same(overrideMock));
+    });
+
+    test('UnsupportedVoiceDictationService returns false for isAvailable and isListening', () async {
+      final service = UnsupportedVoiceDictationService();
+      expect(service.isListening, isFalse);
+      expect(await service.isAvailable(), isFalse);
+    });
+
+    test('UnsupportedVoiceDictationService startListening invokes onError with friendly message', () async {
+      final service = UnsupportedVoiceDictationService();
+      String? errorMessage;
+      await service.startListening(
+        onResult: (_) {},
+        onError: (err) => errorMessage = err,
+      );
+      expect(errorMessage, isNotNull);
+      expect(errorMessage, contains('Ditado por voz indisponível nesta plataforma'));
+      expect(errorMessage, contains('Digite o resumo manualmente'));
+    });
+
+    testWidgets('QuickVoiceNoteDialog on Linux displays informative fallback notice and preserves audio recording', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+      try {
+        final db = AppDatabase.forTesting(NativeDatabase.memory());
+        final repo = AppRepository(db);
+        final mockRecordService = LocalAudioRecordingService();
+        final person = await repo.createPerson(
+          name: 'Carlos Oliveira',
+          status: 'revisita',
+        );
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              databaseProvider.overrideWithValue(db),
+              repositoryProvider.overrideWithValue(repo),
+            ],
+            child: MaterialApp(
+              home: Scaffold(
+                body: Builder(
+                  builder: (context) => ElevatedButton(
+                    onPressed: () {
+                      QuickVoiceNoteDialog.show(
+                        context: context,
+                        person: person,
+                        recordingService: mockRecordService,
+                      );
+                    },
+                    child: const Text('Abrir Modal'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        await tester.tap(find.text('Abrir Modal'));
+        await tester.pumpAndSettle();
+
+        // Verify the unsupported platform notice is visible
+        expect(find.textContaining('Ditado de voz indisponível nesta plataforma (Linux/Desktop)'), findsOneWidget);
+        expect(find.text('Carlos Oliveira'), findsOneWidget);
+
+        // Verify audio recording still works
+        expect(find.text('Iniciar Gravação'), findsOneWidget);
+        await tester.tap(find.text('Iniciar Gravação'));
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(mockRecordService.isRecording, isTrue);
+
+        await tester.tap(find.text('Concluir Gravação'));
+        await tester.pumpAndSettle();
+        expect(mockRecordService.isRecording, isFalse);
+
+        await db.close();
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
     });
   });
 }
