@@ -76,6 +76,12 @@ if(TARGET local_auth_windows_plugin)
   if(EXISTS "${CMAKE_BINARY_DIR}/packages/Microsoft.Windows.ImplementationLibrary/build/native/include")
     target_include_directories(local_auth_windows_plugin PRIVATE "${CMAKE_BINARY_DIR}/packages/Microsoft.Windows.ImplementationLibrary/build/native/include")
   endif()
+  # MSVC 14.51 (VS 2026 on windows-latest) raises STL1011 for <experimental/coroutine>
+  # included via <pplawait.h> in local_auth_windows-2.0.2.
+  target_compile_definitions(local_auth_windows_plugin PRIVATE _SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)
+  if(MSVC)
+    target_compile_options(local_auth_windows_plugin PRIVATE /wd4996)
+  endif()
 endif()
 
 
