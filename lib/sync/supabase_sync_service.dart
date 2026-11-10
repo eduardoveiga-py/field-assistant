@@ -88,6 +88,13 @@ class SupabaseSyncService {
     'research_articles',
     'research_tags',
     'territory_sectors',
+    'inbox_entries',
+    'projects',
+    'tasks',
+    'knowledge_notes',
+    'knowledge_questions',
+    'knowledge_documents',
+    'knowledge_resources',
     'ticuna_words',
     'ticuna_phrases',
   ];
