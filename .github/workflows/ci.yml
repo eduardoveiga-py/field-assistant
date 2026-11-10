@@ -177,7 +177,20 @@ jobs:
         run: flutter pub get
 
       - name: Build Windows Executable
-        run: flutter build windows --release
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          flutter build windows --release 2>&1 | Tee-Object -FilePath build-windows.log
+          $exitCode = $LASTEXITCODE
+          if ($exitCode -ne 0) {
+            $errors = Get-Content build-windows.log | Select-String -Pattern "error |CMake Error|fatal error|FAILED" | Select-Object -First 25
+            foreach ($e in $errors) {
+              Write-Host "::error::$($e.Line)"
+            }
+            $tail = (Get-Content build-windows.log -Tail 25) -join "%0A"
+            Write-Host "::error::$tail"
+            exit $exitCode
+          }
 
       - name: Package Windows Artifact
         shell: pwsh

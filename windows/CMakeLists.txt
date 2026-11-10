@@ -65,6 +65,11 @@ include(flutter/generated_plugins.cmake)
 # Microsoft.Windows.ImplementationLibrary with -ExcludeVersion, while the
 # plugin's target_link_libraries references the versioned directory name.
 if(TARGET local_auth_windows_plugin)
+  get_target_property(_la_libs local_auth_windows_plugin LINK_LIBRARIES)
+  if(_la_libs)
+    list(FILTER _la_libs EXCLUDE REGEX "Microsoft\\.Windows\\.ImplementationLibrary\\.[0-9]+")
+    set_target_properties(local_auth_windows_plugin PROPERTIES LINK_LIBRARIES "${_la_libs}")
+  endif()
   if(EXISTS "${CMAKE_BINARY_DIR}/packages/Microsoft.Windows.ImplementationLibrary/build/native/Microsoft.Windows.ImplementationLibrary.targets")
     target_link_libraries(local_auth_windows_plugin PRIVATE "${CMAKE_BINARY_DIR}/packages/Microsoft.Windows.ImplementationLibrary/build/native/Microsoft.Windows.ImplementationLibrary.targets")
   endif()
