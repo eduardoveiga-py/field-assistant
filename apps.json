@@ -24,7 +24,7 @@
       "iconURL": "https://cdn.jsdelivr.net/gh/eduardoveiga-py/field-assistant@master/web/icons/Icon-512.png",
       "tintColor": "#1E3A8A",
       "category": "utilities",
-      "size": 14800000,
+      "size": 14105434,
       "minOSVersion": "14.0",
       "versions": [
         {
@@ -32,7 +32,7 @@
           "date": "2026-11-09",
           "localizedDescription": "Lançamento Oficial 1.3.1: Pacote integral de estabilidade, segurança e compilação multiplataforma (Android, iOS/iPadOS e Web). Resolução inteligente de conflitos de agenda em 1 toque, sincronização binária multi-dispositivo de documentos na Base de Conhecimento, exclusão em cascata na lixeira definitiva, proteção teocrática de senhas de e-mail no FlutterSecureStorage com migração retroativa, portabilidade de fotos em base64 no backup cifrado e descarte LRU no mapa web.",
           "downloadURL": "https://github.com/eduardoveiga-py/field-assistant/releases/latest/download/app-release-unsigned.ipa",
-          "size": 14800000,
+          "size": 14105434,
           "minOSVersion": "14.0"
         },
         {
