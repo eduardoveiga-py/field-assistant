@@ -4,10 +4,10 @@ class AppVersion {
   AppVersion._();
 
   /// Versão Semântica Oficial (Major.Minor.Patch)
-  static const String version = '1.3.1';
+  static const String version = '1.3.2';
 
   /// Número sequencial da compilação (build number)
-  static const int buildNumber = 8;
+  static const int buildNumber = 9;
 
   /// Prefixo canônico para exibição em interfaces
   static const String displayVersion = 'v$version';
@@ -16,7 +16,7 @@ class AppVersion {
   static const String fullDisplayVersion = 'v$version+$buildNumber';
 
   /// Data oficial do lançamento (AAAA-MM-DD)
-  static const String releaseDate = '2026-11-09';
+  static const String releaseDate = '2026-11-10';
 
   /// Nome amigável do aplicativo
   static const String appName = 'Ministério Pessoal';

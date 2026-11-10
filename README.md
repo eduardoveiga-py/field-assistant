@@ -3,12 +3,12 @@
 # 📖 Ministério Pessoal
 ### *Gestão Eficiente, Discreta e Offline-First do Ministério de Campo*
 
-[![Versão](https://img.shields.io/badge/Versão-1.3.1%20(Build%208)-blue?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/eduardoveiga-py/field-assistant/releases/latest)
+[![Versão](https://img.shields.io/badge/Versão-1.3.2%20(Build%209)-blue?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/eduardoveiga-py/field-assistant/releases/latest)
 [![Flutter](https://img.shields.io/badge/Flutter-3.27+-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-3.5+-0175C2?style=for-the-badge&logo=dart&logoColor=white)](https://dart.dev)
 [![Offline First](https://img.shields.io/badge/Arquitetura-Offline--First-success?style=for-the-badge&logo=sqlite&logoColor=white)](https://drift.simonbinder.eu/)
-[![Testes](https://img.shields.io/badge/Testes-708%20Passando%20(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](https://github.com/eduardoveiga-py/field-assistant/actions)
-[![Plataformas](https://img.shields.io/badge/Plataformas-Android%20%7C%20iOS%20%7C%20Web-orange?style=for-the-badge)](https://github.com/eduardoveiga-py/field-assistant/releases)
+[![Testes](https://img.shields.io/badge/Testes-744%20Passando%20(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](https://github.com/eduardoveiga-py/field-assistant/actions)
+[![Plataformas](https://img.shields.io/badge/Plataformas-Android%20%7C%20iOS%20%7C%20Web%20%7C%20Windows%20%7C%20Linux%20%7C%20macOS-orange?style=for-the-badge)](https://github.com/eduardoveiga-py/field-assistant/releases)
 
 <p align="center">
   <b>Um aplicativo completo, ágil e focado na rotina ministerial para organizar contatos, revisitas, cursos bíblicos, compromissos, territórios e relatórios mensais.</b><br>
@@ -30,6 +30,9 @@ Acesse a página de **[Releases Oficiais](https://github.com/eduardoveiga-py/fie
 | **Android** | [`app-arm64-v8a-release.apk`](https://github.com/eduardoveiga-py/field-assistant/releases/latest/download/app-arm64-v8a-release.apk) | Baixe diretamente no aparelho Android, abra o arquivo e confirme a instalação (autorizando fontes desconhecidas se solicitado). |
 | **iPhone / iPad** | [`app-release-unsigned.ipa`](https://github.com/eduardoveiga-py/field-assistant/releases/latest/download/app-release-unsigned.ipa) | Instale via **LiveContainer**, **AltStore**, **SideStore**, **TrollStore** ou **Sideloadly** com suporte a atualizações contínuas via catálogo interno ou link direto. |
 | **Navegador (Web)** | `web-release.zip` / Acesso Online | Acesse diretamente pelo Chrome, Safari ou Edge e toque em **"Adicionar à Tela de Início"** para instalar como PWA nativo com SQLite Wasm local. |
+| **Windows 10/11 (x64)** | [`field-assistant-windows-x64.zip`](https://github.com/eduardoveiga-py/field-assistant/releases/latest/download/field-assistant-windows-x64.zip) | Extraia o `.zip` para uma pasta local e execute `ministerio_pessoal.exe`. |
+| **Linux (GTK x64)** | [`field-assistant-linux-x64.tar.gz`](https://github.com/eduardoveiga-py/field-assistant/releases/latest/download/field-assistant-linux-x64.tar.gz) | Extraia o arquivo (`tar -xzf field-assistant-linux-x64.tar.gz`) e execute `./ministerio_pessoal`. |
+| **macOS** | [`field-assistant-macos.zip`](https://github.com/eduardoveiga-py/field-assistant/releases/latest/download/field-assistant-macos.zip) | Descompacte o `.zip`, mova o `.app` para a pasta **Aplicativos** e abra o aplicativo. |
 
 ### 📱 Fonte Oficial para LiveContainer & AltStore (iOS)
 
@@ -327,6 +330,16 @@ flowchart LR
 ---
 
 ## 📋 Histórico de Lançamentos e Changelog
+
+### 🚀 Versão 1.3.2 (Build 9) — 10/11/2026: Suporte Nativo Completo para Desktop (Windows, Linux e macOS)
+- **Compilação Nativa Desktop e Distribuição Universal**:
+  - Geração automatizada no GitHub Actions de binários nativos para **Windows 10/11 x64** (`field-assistant-windows-x64.zip`), **Linux GTK x64** (`field-assistant-linux-x64.tar.gz`) e **macOS Universal** (`field-assistant-macos.zip`), somados aos binários oficiais de **Android**, **iOS/iPadOS** e **Web**, acompanhados de manifesto de integridade `SHA256SUMS.txt`.
+- **Abstrações e Isolamento Seguro de Plugins Móveis**:
+  - **`VoiceDictationService`**: Factory condicional com fallback gracioso para plataformas desktop sem reconhecimento de voz nativo contínuo, preservando gravação de áudio e entrada manual no `QuickVoiceNoteDialog`.
+  - **`CalendarProvider` / `AppleEventKitProvider`**: Isolamento condicional de plataforma impedindo chamadas nativas ao `device_calendar` em Windows, Linux e macOS, desabilitando o calendário Apple graciosamente na UI enquanto mantém o Google Calendar ativo.
+- **Scaffolding e Compatibilidade CMake / MSVC / GStreamer**:
+  - Estruturas nativas configuradas para `linux/` (GTK+ 3.0) e `macos/` (entitlements Sandbox de rede, áudio/microfone e arquivos + `Info.plist`).
+  - Correções no build desktop para compatibilidade com **MSVC 14.51 (Visual Studio 2026)**, `local_auth_windows` e isolamento do `jni` transitivo.
 
 ### 🚀 Versão 1.3.1 (Build 8) — 09/11/2026: Paridade Cartográfica Organic Maps, Extensibilidade Multilíngue e Hardening de Módulos
 - **Paridade Cartográfica Avançada com Organic Maps (Anti-Flicker, Camadas, Bússola e 23 Regiões)**:
