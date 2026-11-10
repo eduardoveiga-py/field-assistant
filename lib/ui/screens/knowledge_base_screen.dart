@@ -1895,16 +1895,14 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
       if (res.isNotEmpty) {
         final f = res.first;
         String finalPath = f.path ?? f.name;
-        int fileSize = f.lengthSync() ?? (await f.length()) ?? 0;
-        Uint8List? fileBytes = f.bytes;
+        Uint8List? fileBytes;
+        try {
+          fileBytes = await f.readAsBytes();
+        } catch (_) {}
+        int fileSize = fileBytes?.length ?? f.lengthSync() ?? (await f.length()) ?? 0;
 
         if (!kIsWeb) {
           try {
-            if (fileBytes == null) {
-              try {
-                fileBytes = await f.readAsBytes();
-              } catch (_) {}
-            }
             if ((fileBytes == null || fileBytes.isEmpty) && f.path != null && f.path!.isNotEmpty) {
               final sourceFile = File(f.path!);
               if (await sourceFile.exists()) {
@@ -1938,13 +1936,14 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
           }
         }
 
+        final fileExt = f.name.contains('.') ? f.name.split('.').last.toLowerCase() : 'other';
         final km = ref.read(knowledgeManagerProvider);
         final registeredDoc = await km.registerDocument(
           title: f.name.split('.').first,
           fileName: f.name,
           filePath: finalPath,
           fileSize: fileSize,
-          fileType: f.extension ?? 'other',
+          fileType: fileExt,
           category: 'manual',
         );
 
