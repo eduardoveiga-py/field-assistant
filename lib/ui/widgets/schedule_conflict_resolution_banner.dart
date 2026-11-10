@@ -4,7 +4,6 @@ import 'package:intl/intl.dart';
 
 import '../../appointments/availability_engine.dart';
 import '../../core/app_theme.dart';
-import '../../database/app_database.dart';
 import '../providers.dart';
 import 'adaptive_ministry_sheet.dart';
 
@@ -222,7 +221,7 @@ class _ConflictResolutionSheetContentState
       physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16),
       itemCount: activeConflicts.length,
-      separatorBuilder: (_, __) => const Divider(height: 24),
+      separatorBuilder: (_, _) => const Divider(height: 24),
       itemBuilder: (context, index) {
         final pair = activeConflicts[index];
         final a = pair.appointmentA;

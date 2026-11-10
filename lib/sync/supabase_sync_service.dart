@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
-import 'dart:typed_data';
 
 import 'package:drift/drift.dart' as drift;
 import 'package:flutter/foundation.dart';
@@ -1556,7 +1555,7 @@ class SupabaseSyncService {
         '$userFolder/$id.txt',
         '$userFolder/$id',
         '$id.pdf',
-        '$id',
+        id,
       ]);
       await (db.delete(db.appKvStore)..where((t) => t.key.equals('doc_bytes_$id'))).go();
     } catch (_) {}

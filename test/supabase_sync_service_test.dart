@@ -976,7 +976,7 @@ void main() {
       bool uploadCalled = false;
       bool downloadCalled = false;
 
-      final mockClient = MockHttpClient((request) async {
+      final mockClient = MockClient((request) async {
         final uri = request.url.toString();
 
         if (uri.contains('/storage/v1/object/knowledge_vault')) {
@@ -1063,7 +1063,7 @@ void main() {
         ),
       );
 
-      final pushRes = await customSync.processSyncQueue();
+      final pushRes = await customSync.processQueue();
       expect(pushRes.successCount, equals(1));
       expect(uploadCalled, isTrue);
 
