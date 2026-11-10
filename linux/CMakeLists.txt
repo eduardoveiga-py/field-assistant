@@ -72,6 +72,9 @@ set_target_properties(${BINARY_NAME}
 
 # Generated plugin build rules, which manage building the plugins and adding
 # them to the application.
+# Disable desktop JNI lookup so transitive Android plugin jni-1.1.2 does not
+# attempt to link libjvm.so on Linux desktop when a host JDK is installed.
+set(CMAKE_DISABLE_FIND_PACKAGE_JNI TRUE)
 include(flutter/generated_plugins.cmake)
 
 

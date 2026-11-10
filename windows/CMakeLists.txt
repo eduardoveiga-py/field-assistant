@@ -55,7 +55,23 @@ add_subdirectory("runner")
 
 # Generated plugin build rules, which manage building the plugins and adding
 # them to the application.
+# Disable desktop JNI lookup so transitive Android plugin jni-1.1.2 does not
+# trigger its broken WIN32 set_target_properties(${TARGET_NAME} ...) bug when
+# a host JDK (JAVA_HOME) is installed on the machine or CI runner.
+set(CMAKE_DISABLE_FIND_PACKAGE_JNI TRUE)
 include(flutter/generated_plugins.cmake)
+
+# Fix upstream local_auth_windows-2.0.2 CMake mismatch where NuGet installs
+# Microsoft.Windows.ImplementationLibrary with -ExcludeVersion, while the
+# plugin's target_link_libraries references the versioned directory name.
+if(TARGET local_auth_windows_plugin)
+  if(EXISTS "${CMAKE_BINARY_DIR}/packages/Microsoft.Windows.ImplementationLibrary/build/native/Microsoft.Windows.ImplementationLibrary.targets")
+    target_link_libraries(local_auth_windows_plugin PRIVATE "${CMAKE_BINARY_DIR}/packages/Microsoft.Windows.ImplementationLibrary/build/native/Microsoft.Windows.ImplementationLibrary.targets")
+  endif()
+  if(EXISTS "${CMAKE_BINARY_DIR}/packages/Microsoft.Windows.ImplementationLibrary/build/native/include")
+    target_include_directories(local_auth_windows_plugin PRIVATE "${CMAKE_BINARY_DIR}/packages/Microsoft.Windows.ImplementationLibrary/build/native/include")
+  endif()
+endif()
 
 
 # === Installation ===
