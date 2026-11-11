@@ -110,8 +110,8 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
   @override
   void initState() {
     super.initState();
-    _selectedLat = widget.initialLat ?? -23.550520;
-    _selectedLng = widget.initialLng ?? -46.633308;
+    _selectedLat = widget.initialLat ?? GeolocationHelper.defaultLat;
+    _selectedLng = widget.initialLng ?? GeolocationHelper.defaultLng;
     _viewCenterLat = _selectedLat;
     _viewCenterLng = _selectedLng;
 
@@ -193,10 +193,11 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
 
   Future<void> _useCurrentGps() async {
     setState(() => _statusText = 'Obtendo GPS do dispositivo...');
-    final pos = await GeolocationHelper.getCurrentLocation();
+    final result = await GeolocationHelper.getCurrentLocationWithStatus();
     if (!mounted) return;
 
-    if (pos != null) {
+    final pos = result.coordinates;
+    if (result.isSuccess && pos != null) {
       setState(() {
         _selectedLat = pos.latitude;
         _selectedLng = pos.longitude;
@@ -205,10 +206,21 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
         _hasCenteredInitialView = false;
       });
       await _fetchAddressForCoords(pos.latitude, pos.longitude);
+    } else if (widget.initialLat == null && widget.initialLng == null) {
+      setState(() {
+        _selectedLat = GeolocationHelper.defaultLat;
+        _selectedLng = GeolocationHelper.defaultLng;
+        _viewCenterLat = GeolocationHelper.defaultLat;
+        _viewCenterLng = GeolocationHelper.defaultLng;
+        _hasCenteredInitialView = false;
+        _statusText =
+            '${result.userMessage} Fallback: Santo Antônio do Içá. Toque no mapa para marcar.';
+      });
     } else {
-      setState(
-        () => _statusText = 'GPS indisponível. Toque no mapa para marcar.',
-      );
+      setState(() {
+        _statusText =
+            '${result.userMessage} Mantendo ponto atual; toque no mapa para ajustar.';
+      });
     }
   }
 

@@ -247,3 +247,10 @@ final isMapFullscreenProvider = NotifierProvider<MapFullscreenNotifier, bool>(
   MapFullscreenNotifier.new,
 );
 
+/// Contadores reativos da fila de sincronização (pendentes, falhas e conflitos)
+final syncQueueCountsProvider =
+    StreamProvider<({int pending, int failed, int conflict})>((ref) {
+  final repo = ref.watch(repositoryProvider);
+  return repo.watchSyncQueueCounts();
+});
+

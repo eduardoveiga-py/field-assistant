@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
-import 'package:drift/drift.dart';
 
+import '../core/sync_timestamp.dart';
 import '../database/app_database.dart';
 import '../ui/providers.dart';
 
@@ -31,91 +32,58 @@ class FamilyTieItem {
     'related_person_id': relatedPersonId,
     'related_person_name': relatedPersonName,
     'relationship_type': relationshipType,
-    'created_at': createdAt.toIso8601String(),
+    'created_at': createdAt.toUtc().toIso8601String(),
   };
+
+  factory FamilyTieItem.fromEntry(FamilyTieEntry e) => FamilyTieItem(
+    id: e.id,
+    personId: e.personId,
+    relatedPersonId: e.relatedPersonId,
+    relatedPersonName: e.relatedPersonName,
+    relationshipType: e.relationshipType,
+    createdAt: e.createdAt,
+  );
 
   factory FamilyTieItem.fromMap(Map<String, dynamic> map) => FamilyTieItem(
     id: map['id'] as String,
-    personId: map['person_id'] as String,
-    relatedPersonId: map['related_person_id'] as String?,
-    relatedPersonName: map['related_person_name'] as String,
-    relationshipType: map['relationship_type'] as String,
-    createdAt: DateTime.parse(map['created_at'] as String),
+    personId: (map['person_id'] ?? map['personId']) as String,
+    relatedPersonId: (map['related_person_id'] ?? map['relatedPersonId']) as String?,
+    relatedPersonName:
+        (map['related_person_name'] ?? map['relatedPersonName']) as String,
+    relationshipType:
+        (map['relationship_type'] ?? map['relationshipType']) as String,
+    createdAt:
+        SyncTimestamp.parse(map['created_at'] ?? map['createdAt']) ??
+        DateTime.now(),
   );
 }
 
 class FamilyTiesManager {
   final AppDatabase db;
   final Uuid _uuid = const Uuid();
-  final StreamController<List<FamilyTieItem>> _tiesController =
-      StreamController<List<FamilyTieItem>>.broadcast();
-  Future<void>? _initFuture;
-  bool _initialized = false;
 
-  FamilyTiesManager(this.db) {
-    _initTable();
-  }
-
-  Future<void> _initTable() async {
-    if (_initialized) return;
-    _initFuture ??= _doInitTable();
-    await _initFuture;
-  }
-
-  Future<void> _doInitTable() async {
-    try {
-      await db.customStatement('''
-        CREATE TABLE IF NOT EXISTS family_ties (
-          id TEXT PRIMARY KEY,
-          person_id TEXT NOT NULL,
-          related_person_id TEXT,
-          related_person_name TEXT NOT NULL,
-          relationship_type TEXT NOT NULL,
-          created_at TEXT NOT NULL
-        );
-      ''');
-    } catch (_) {}
-    _initialized = true;
-    _refresh();
-  }
-
-  Future<void> _refresh() async {
-    try {
-      final list = await getAllTies();
-      if (!_tiesController.isClosed) {
-        _tiesController.add(list);
-      }
-    } catch (_) {}
-  }
+  FamilyTiesManager(this.db);
 
   Future<List<FamilyTieItem>> getAllTies() async {
-    await _initTable();
-    try {
-      final rows = await db.customSelect('SELECT * FROM family_ties').get();
-      return rows.map((r) => FamilyTieItem.fromMap(r.data)).toList();
-    } catch (_) {
-      return [];
-    }
+    final rows = await (db.select(db.familyTies)
+          ..where((t) => t.deletedAt.isNull()))
+        .get();
+    return rows.map(FamilyTieItem.fromEntry).toList();
   }
 
-  Stream<List<FamilyTieItem>> watchAllTies() async* {
-    yield await getAllTies();
-    yield* _tiesController.stream;
+  Stream<List<FamilyTieItem>> watchAllTies() {
+    return (db.select(db.familyTies)..where((t) => t.deletedAt.isNull()))
+        .watch()
+        .map((rows) => rows.map(FamilyTieItem.fromEntry).toList());
   }
 
   Future<List<FamilyTieItem>> getTiesForPerson(String personId) async {
-    await _initTable();
-    try {
-      final list = await db
-          .customSelect(
-            'SELECT * FROM family_ties WHERE person_id = ? ORDER BY relationship_type ASC',
-            variables: [Variable.withString(personId)],
-          )
-          .get();
-      return list.map((r) => FamilyTieItem.fromMap(r.data)).toList();
-    } catch (_) {
-      return [];
-    }
+    final rows =
+        await (db.select(db.familyTies)
+              ..where((t) => t.personId.equals(personId) & t.deletedAt.isNull())
+              ..orderBy([(t) => OrderingTerm.asc(t.relationshipType)]))
+            .get();
+    return rows.map(FamilyTieItem.fromEntry).toList();
   }
 
   static String getReciprocalRelationship(String relationship) {
@@ -179,87 +147,106 @@ class FamilyTiesManager {
     required String relatedPersonName,
     required String relationshipType,
   }) async {
-    await _initTable();
     final now = DateTime.now();
     final tieId = _uuid.v4();
+    final cleanRelatedId =
+        relatedPersonId != null && relatedPersonId.isNotEmpty
+            ? relatedPersonId
+            : null;
 
-    await db.customInsert(
-      'INSERT INTO family_ties (id, person_id, related_person_id, related_person_name, relationship_type, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-      variables: [
-        Variable.withString(tieId),
-        Variable.withString(personId),
-        Variable.withString(relatedPersonId ?? ''),
-        Variable.withString(relatedPersonName.trim()),
-        Variable.withString(relationshipType.trim()),
-        Variable.withString(now.toIso8601String()),
-      ],
-    );
-
-    // VÍNCULO RECÍPROCO AUTOMÁTICO
-    // Se a outra pessoa for cadastrada no app, cria ou atualiza automaticamente o vínculo nela também!
-    if (relatedPersonId != null &&
-        relatedPersonId.isNotEmpty &&
-        relatedPersonId != personId) {
-      final reciprocalType = getReciprocalRelationship(relationshipType);
-      final existingReciprocal = await db
-          .customSelect(
-            'SELECT id FROM family_ties WHERE person_id = ? AND related_person_id = ?',
-            variables: [
-              Variable.withString(relatedPersonId),
-              Variable.withString(personId),
-            ],
-          )
-          .getSingleOrNull();
-
-      if (existingReciprocal != null) {
-        await db.customUpdate(
-          'UPDATE family_ties SET relationship_type = ?, related_person_name = ? WHERE id = ?',
-          variables: [
-            Variable.withString(reciprocalType),
-            Variable.withString(personName.trim()),
-            Variable.withString(existingReciprocal.read<String>('id')),
-          ],
-        );
-      } else {
-        await db.customInsert(
-          'INSERT INTO family_ties (id, person_id, related_person_id, related_person_name, relationship_type, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-          variables: [
-            Variable.withString(_uuid.v4()),
-            Variable.withString(relatedPersonId),
-            Variable.withString(personId),
-            Variable.withString(personName.trim()),
-            Variable.withString(reciprocalType),
-            Variable.withString(now.toIso8601String()),
-          ],
-        );
-      }
-    }
-
-    final item = FamilyTieItem(
+    final entry = FamilyTieEntry(
       id: tieId,
       personId: personId,
-      relatedPersonId: relatedPersonId,
+      relatedPersonId: cleanRelatedId,
       relatedPersonName: relatedPersonName.trim(),
       relationshipType: relationshipType.trim(),
       createdAt: now,
+      updatedAt: now,
+      deletedAt: null,
+      revision: 1,
     );
 
-    try {
+    await db.transaction(() async {
+      await db.into(db.familyTies).insert(entry);
       await db.into(db.syncQueue).insert(
         SyncQueueCompanion.insert(
           id: _uuid.v4(),
           entityType: 'family_ties',
           entityId: tieId,
           operation: 'INSERT',
-          payload: jsonEncode(item.toMap()),
+          payload: jsonEncode(SyncTimestamp.normalizeMapDates(entry.toJson())),
           createdAt: now,
           status: const Value('pending'),
         ),
       );
-    } catch (_) {}
 
-    await _refresh();
-    return item;
+      // VÍNCULO RECÍPROCO AUTOMÁTICO
+      if (cleanRelatedId != null && cleanRelatedId != personId) {
+        final reciprocalType = getReciprocalRelationship(relationshipType);
+        final existingReciprocal =
+            await (db.select(db.familyTies)..where(
+                  (t) =>
+                      t.personId.equals(cleanRelatedId) &
+                      t.relatedPersonId.equals(personId) &
+                      t.deletedAt.isNull(),
+                ))
+                .getSingleOrNull();
+
+        if (existingReciprocal != null) {
+          final updatedRec = existingReciprocal.copyWith(
+            relationshipType: reciprocalType,
+            relatedPersonName: personName.trim(),
+            updatedAt: Value(now),
+            revision: existingReciprocal.revision + 1,
+          );
+          await db.update(db.familyTies).replace(updatedRec);
+          final payload = SyncTimestamp.normalizeMapDates(updatedRec.toJson());
+          payload['_base'] = SyncTimestamp.normalizeMapDates(
+            existingReciprocal.toJson(),
+          );
+          await db.into(db.syncQueue).insert(
+            SyncQueueCompanion.insert(
+              id: _uuid.v4(),
+              entityType: 'family_ties',
+              entityId: updatedRec.id,
+              operation: 'UPDATE',
+              payload: jsonEncode(payload),
+              createdAt: now,
+              status: const Value('pending'),
+            ),
+          );
+        } else {
+          final recId = _uuid.v4();
+          final recEntry = FamilyTieEntry(
+            id: recId,
+            personId: cleanRelatedId,
+            relatedPersonId: personId,
+            relatedPersonName: personName.trim(),
+            relationshipType: reciprocalType,
+            createdAt: now,
+            updatedAt: now,
+            deletedAt: null,
+            revision: 1,
+          );
+          await db.into(db.familyTies).insert(recEntry);
+          await db.into(db.syncQueue).insert(
+            SyncQueueCompanion.insert(
+              id: _uuid.v4(),
+              entityType: 'family_ties',
+              entityId: recId,
+              operation: 'INSERT',
+              payload: jsonEncode(
+                SyncTimestamp.normalizeMapDates(recEntry.toJson()),
+              ),
+              createdAt: now,
+              status: const Value('pending'),
+            ),
+          );
+        }
+      }
+    });
+
+    return FamilyTieItem.fromEntry(entry);
   }
 
   Future<void> updateFamilyTie({
@@ -267,116 +254,146 @@ class FamilyTiesManager {
     required String newRelationshipType,
     String? newRelatedPersonName,
   }) async {
-    await _initTable();
     final now = DateTime.now();
-    final existing = await db
-        .customSelect(
-          'SELECT * FROM family_ties WHERE id = ?',
-          variables: [Variable.withString(id)],
-        )
+    final existing = await (db.select(db.familyTies)
+          ..where((t) => t.id.equals(id)))
         .getSingleOrNull();
-
     if (existing == null) return;
-    final item = FamilyTieItem.fromMap(existing.data);
 
-    await db.customUpdate(
-      'UPDATE family_ties SET relationship_type = ?, related_person_name = ? WHERE id = ?',
-      variables: [
-        Variable.withString(newRelationshipType.trim()),
-        Variable.withString(
-          newRelatedPersonName?.trim() ?? item.relatedPersonName,
-        ),
-        Variable.withString(id),
-      ],
+    final updated = existing.copyWith(
+      relationshipType: newRelationshipType.trim(),
+      relatedPersonName:
+          newRelatedPersonName?.trim() ?? existing.relatedPersonName,
+      updatedAt: Value(now),
+      revision: existing.revision + 1,
     );
 
-    try {
+    await db.transaction(() async {
+      await db.update(db.familyTies).replace(updated);
+      final payload = SyncTimestamp.normalizeMapDates(updated.toJson());
+      payload['_base'] = SyncTimestamp.normalizeMapDates(existing.toJson());
       await db.into(db.syncQueue).insert(
         SyncQueueCompanion.insert(
           id: _uuid.v4(),
           entityType: 'family_ties',
           entityId: id,
           operation: 'UPDATE',
-          payload: jsonEncode({
-            'id': id,
-            'relationship_type': newRelationshipType.trim(),
-            'related_person_name':
-                newRelatedPersonName?.trim() ?? item.relatedPersonName,
-            'updated_at': now.toIso8601String(),
-          }),
+          payload: jsonEncode(payload),
           createdAt: now,
           status: const Value('pending'),
         ),
       );
-    } catch (_) {}
 
-    // Atualiza recíproco se vinculado a pessoa cadastrada
-    if (item.relatedPersonId != null && item.relatedPersonId!.isNotEmpty) {
-      final reciprocalType = getReciprocalRelationship(newRelationshipType);
-      await db.customUpdate(
-        'UPDATE family_ties SET relationship_type = ? WHERE person_id = ? AND related_person_id = ?',
-        variables: [
-          Variable.withString(reciprocalType),
-          Variable.withString(item.relatedPersonId!),
-          Variable.withString(item.personId),
-        ],
-      );
-    }
-
-    await _refresh();
+      if (existing.relatedPersonId != null &&
+          existing.relatedPersonId!.isNotEmpty) {
+        final reciprocalType = getReciprocalRelationship(newRelationshipType);
+        final rec = await (db.select(db.familyTies)..where(
+              (t) =>
+                  t.personId.equals(existing.relatedPersonId!) &
+                  t.relatedPersonId.equals(existing.personId) &
+                  t.deletedAt.isNull(),
+            ))
+            .getSingleOrNull();
+        if (rec != null) {
+          final updatedRec = rec.copyWith(
+            relationshipType: reciprocalType,
+            updatedAt: Value(now),
+            revision: rec.revision + 1,
+          );
+          await db.update(db.familyTies).replace(updatedRec);
+          final recPayload = SyncTimestamp.normalizeMapDates(updatedRec.toJson());
+          recPayload['_base'] = SyncTimestamp.normalizeMapDates(rec.toJson());
+          await db.into(db.syncQueue).insert(
+            SyncQueueCompanion.insert(
+              id: _uuid.v4(),
+              entityType: 'family_ties',
+              entityId: rec.id,
+              operation: 'UPDATE',
+              payload: jsonEncode(recPayload),
+              createdAt: now,
+              status: const Value('pending'),
+            ),
+          );
+        }
+      }
+    });
   }
 
   Future<void> deleteFamilyTie(
     String id, {
     bool deleteReciprocal = true,
   }) async {
-    await _initTable();
     final now = DateTime.now();
-    final existing = await db
-        .customSelect(
-          'SELECT * FROM family_ties WHERE id = ?',
-          variables: [Variable.withString(id)],
-        )
+    final existing = await (db.select(db.familyTies)
+          ..where((t) => t.id.equals(id)))
         .getSingleOrNull();
+    if (existing == null) return;
 
-    if (existing != null) {
-      final item = FamilyTieItem.fromMap(existing.data);
-      await db.customUpdate(
-        'DELETE FROM family_ties WHERE id = ?',
-        variables: [Variable.withString(id)],
+    await db.transaction(() async {
+      final nextRev = existing.revision + 1;
+      await (db.update(db.familyTies)..where((t) => t.id.equals(id))).write(
+        FamilyTiesCompanion(
+          deletedAt: Value(now),
+          updatedAt: Value(now),
+          revision: Value(nextRev),
+        ),
+      );
+      await db.into(db.syncQueue).insert(
+        SyncQueueCompanion.insert(
+          id: _uuid.v4(),
+          entityType: 'family_ties',
+          entityId: id,
+          operation: 'DELETE',
+          payload: jsonEncode({
+            'id': id,
+            'deleted_at': now.toUtc().toIso8601String(),
+            'updated_at': now.toUtc().toIso8601String(),
+            'revision': nextRev,
+          }),
+          createdAt: now,
+          status: const Value('pending'),
+        ),
       );
 
-      try {
-        await db.into(db.syncQueue).insert(
-          SyncQueueCompanion.insert(
-            id: _uuid.v4(),
-            entityType: 'family_ties',
-            entityId: id,
-            operation: 'DELETE',
-            payload: jsonEncode({
-              'id': id,
-              'deleted_at': now.toIso8601String(),
-            }),
-            createdAt: now,
-            status: const Value('pending'),
-          ),
-        );
-      } catch (_) {}
-
       if (deleteReciprocal &&
-          item.relatedPersonId != null &&
-          item.relatedPersonId!.isNotEmpty) {
-        await db.customUpdate(
-          'DELETE FROM family_ties WHERE person_id = ? AND related_person_id = ?',
-          variables: [
-            Variable.withString(item.relatedPersonId!),
-            Variable.withString(item.personId),
-          ],
-        );
+          existing.relatedPersonId != null &&
+          existing.relatedPersonId!.isNotEmpty) {
+        final rec = await (db.select(db.familyTies)..where(
+              (t) =>
+                  t.personId.equals(existing.relatedPersonId!) &
+                  t.relatedPersonId.equals(existing.personId) &
+                  t.deletedAt.isNull(),
+            ))
+            .getSingleOrNull();
+        if (rec != null) {
+          final recNextRev = rec.revision + 1;
+          await (db.update(db.familyTies)..where((t) => t.id.equals(rec.id)))
+              .write(
+            FamilyTiesCompanion(
+              deletedAt: Value(now),
+              updatedAt: Value(now),
+              revision: Value(recNextRev),
+            ),
+          );
+          await db.into(db.syncQueue).insert(
+            SyncQueueCompanion.insert(
+              id: _uuid.v4(),
+              entityType: 'family_ties',
+              entityId: rec.id,
+              operation: 'DELETE',
+              payload: jsonEncode({
+                'id': rec.id,
+                'deleted_at': now.toUtc().toIso8601String(),
+                'updated_at': now.toUtc().toIso8601String(),
+                'revision': recNextRev,
+              }),
+              createdAt: now,
+              status: const Value('pending'),
+            ),
+          );
+        }
       }
-    }
-
-    await _refresh();
+    });
   }
 }
 

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/app_logger.dart';
 import '../database/app_database.dart';
 import '../ui/providers.dart';
 
@@ -42,7 +43,9 @@ class AppSettingsManager {
     for (final listener in List.of(_listeners)) {
       try {
         listener(snapshot);
-      } catch (_) {}
+      } catch (e, st) {
+        AppLogger.warning('Falha em listener de AppSettingsManager', e, st);
+      }
     }
   }
 
@@ -116,7 +119,9 @@ class AppSettingsManager {
     }
 
     final task = _writeQueue.then((_) => writeOp(), onError: (_) => writeOp());
-    _writeQueue = task.catchError((_) {});
+    _writeQueue = task.catchError((Object e, StackTrace st) {
+      AppLogger.debug('Erro na fila de escrita de configuração ($key): $e', st);
+    });
     return task;
   }
 
@@ -145,7 +150,9 @@ class AppSettingsManager {
       (_) => deleteOp(),
       onError: (_) => deleteOp(),
     );
-    _writeQueue = task.catchError((_) {});
+    _writeQueue = task.catchError((Object e, StackTrace st) {
+      AppLogger.debug('Erro na fila de remoção de configuração ($key): $e', st);
+    });
     return task;
   }
 
@@ -193,7 +200,9 @@ class AppSettingsNotifier extends Notifier<Map<String, String>> {
           .then((_) {
             state = Map<String, String>.from(manager._memoryCache);
           })
-          .catchError((_) {});
+          .catchError((Object e, StackTrace st) {
+            AppLogger.warning('Falha ao inicializar AppSettingsNotifier', e, st);
+          });
     }
 
     return Map<String, String>.from(manager._memoryCache);

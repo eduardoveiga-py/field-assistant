@@ -6,6 +6,7 @@ import '../../core/date_utils.dart';
 import '../../database/app_database.dart';
 import '../../publications/periodicals_catalog.dart';
 import '../../publications/person_publications_manager.dart';
+import 'managed_text_controllers.dart';
 
 class PersonPublicationsTab extends ConsumerStatefulWidget {
   final PersonEntry person;
@@ -33,62 +34,68 @@ class _PersonPublicationsTabState extends ConsumerState<PersonPublicationsTab> {
   }
 
   void _showAddCustomPlacedDialog() {
-    final titleController = TextEditingController();
-    final notesController = TextEditingController();
-
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.auto_stories, color: AppTheme.primaryBlue),
-            SizedBox(width: 8),
-            Text('Publicação Deixada'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: titleController,
-              decoration: const InputDecoration(
-                labelText: 'Nome da Publicação *',
-                hintText: 'Ex: Brochura Quem Está Fazendo a Vontade de Jeová?',
-              ),
-              autofocus: true,
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: const ['', ''],
+        builder: (ctx, ctrls) {
+          final titleController = ctrls[0];
+          final notesController = ctrls[1];
+
+          return AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.auto_stories, color: AppTheme.primaryBlue),
+                SizedBox(width: 8),
+                Text('Publicação Deixada'),
+              ],
             ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: notesController,
-              decoration: const InputDecoration(
-                labelText: 'Observações (opcional)',
-                hintText: 'Ex: Deixada com o filho mais velho',
-              ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: titleController,
+                  decoration: const InputDecoration(
+                    labelText: 'Nome da Publicação *',
+                    hintText: 'Ex: Brochura Quem Está Fazendo a Vontade de Jeová?',
+                  ),
+                  autofocus: true,
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: notesController,
+                  decoration: const InputDecoration(
+                    labelText: 'Observações (opcional)',
+                    hintText: 'Ex: Deixada com o filho mais velho',
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final text = titleController.text.trim();
-              if (text.isEmpty) return;
-              final mgr = ref.read(personPublicationsManagerProvider);
-              await mgr.addPlacedPublication(
-                personId: widget.person.id,
-                title: text,
-                notes: notesController.text.trim().isEmpty
-                    ? null
-                    : notesController.text.trim(),
-              );
-              if (ctx.mounted) Navigator.pop(ctx);
-            },
-            child: const Text('Salvar'),
-          ),
-        ],
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancelar'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  final text = titleController.text.trim();
+                  if (text.isEmpty) return;
+                  final notes = notesController.text.trim().isEmpty
+                      ? null
+                      : notesController.text.trim();
+                  final mgr = ref.read(personPublicationsManagerProvider);
+                  await mgr.addPlacedPublication(
+                    personId: widget.person.id,
+                    title: text,
+                    notes: notes,
+                  );
+                  if (ctx.mounted) Navigator.pop(ctx);
+                },
+                child: const Text('Salvar'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -393,15 +400,17 @@ class _PersonPublicationsTabState extends ConsumerState<PersonPublicationsTab> {
   }
 
   void _showAddRequestDialog() {
-    final titleController = TextEditingController();
-    final reminderNotesController = TextEditingController(
-      text: 'Pedir no balcão de publicações no Salão do Reino',
-    );
     DateTime chosenDate = DateTime.now().add(const Duration(days: 7));
 
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: const ['', 'Pedir no balcão de publicações no Salão do Reino'],
+        builder: (ctx, ctrls) {
+          final titleController = ctrls[0];
+          final reminderNotesController = ctrls[1];
+
+          return StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
           title: const Row(
             children: [
@@ -498,6 +507,8 @@ class _PersonPublicationsTabState extends ConsumerState<PersonPublicationsTab> {
             ),
           ],
         ),
+      );
+        },
       ),
     );
   }

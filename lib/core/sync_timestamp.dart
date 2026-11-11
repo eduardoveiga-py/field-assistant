@@ -53,4 +53,51 @@ class SyncTimestamp {
     final dt = parse(value);
     return dt?.toIso8601String();
   }
+
+  /// Conjunto canônico de nomes de colunas/propriedades de data/hora do aplicativo.
+  static const Set<String> dateFieldKeys = {
+    'createdAt', 'created_at',
+    'updatedAt', 'updated_at',
+    'deletedAt', 'deleted_at',
+    'date', 'dateTime', 'dateTimeField', 'date_time', 'date_time_field',
+    'firstContactAt', 'first_contact_at',
+    'lastContactAt', 'last_contact_at',
+    'nextActionAt', 'next_action_at',
+    'suggestedReturnDate', 'suggested_return_date',
+    'startedAt', 'started_at',
+    'lastSessionAt', 'last_session_at',
+    'nextPlannedAt', 'next_planned_at',
+    'startTime', 'start_time',
+    'endTime', 'end_time',
+    'lastAttemptAt', 'last_attempt_at',
+    'lastModifiedExternal', 'last_modified_external',
+    'lastSyncedAt', 'last_synced_at',
+    'capturedAt', 'captured_at',
+    'processedAt', 'processed_at',
+    'startDate', 'start_date',
+    'targetDate', 'target_date',
+    'completedAt', 'completed_at',
+    'dueDate', 'due_date',
+    'scheduledAt', 'scheduled_at',
+    'answeredAt', 'answered_at',
+    'lastReviewedAt', 'last_reviewed_at',
+  };
+
+  /// Normaliza todos os campos de data conhecidos de um mapa (ex: `entry.toJson()`)
+  /// para strings ISO-8601 UTC, evitando inteiros epoch em JSONs enviados ao Supabase.
+  static Map<String, dynamic> normalizeMapDates(Map<String, dynamic> input) {
+    final result = Map<String, dynamic>.from(input);
+    for (final key in result.keys.toList()) {
+      final val = result[key];
+      if (val == null || !dateFieldKeys.contains(key)) continue;
+      if (val is String && RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(val.trim())) {
+        continue;
+      }
+      final iso = toIso8601String(val);
+      if (iso != null) {
+        result[key] = iso;
+      }
+    }
+    return result;
+  }
 }

@@ -1,19 +1,19 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'dart:math';
 
 import 'package:drift/drift.dart' as drift;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/app_logger.dart';
 import '../core/sync_timestamp.dart';
 import '../database/app_database.dart';
 import '../database/repository.dart';
 import '../ui/providers.dart';
+import 'media_bytes.dart';
 import 'sync_engine.dart';
 import 'supabase_config.dart';
 
@@ -41,21 +41,133 @@ typedef SyncResult = SyncProcessResult;
 
 /// Serviço de sincronização offline-first integrado com Supabase e fila persistente SQLite (Drift).
 class SupabaseSyncService {
+  static const String runtimeUrlStorageKey = 'runtime_supabase_url';
+  static const String runtimeAnonKeyStorageKey = 'runtime_supabase_anon_key';
+
   static bool get isInitialized {
     try {
       Supabase.instance.client;
       return true;
-    } catch (_) {
+    } catch (e) {
+      AppLogger.debug('Supabase ainda não inicializado: $e');
       return false;
     }
   }
 
-  static Future<void> initialize() async {
+  /// Valida URL e Anon Key do projeto Supabase antes de inicializar ou salvar.
+  static String? validateSupabaseCredentials(String url, String anonKey) {
+    final cleanUrl = url.trim();
+    final cleanKey = anonKey.trim();
+    if (cleanUrl.isEmpty) {
+      return 'Informe a URL do projeto Supabase (ex: https://xyz.supabase.co).';
+    }
+    final uri = Uri.tryParse(cleanUrl);
+    final isLocalHost =
+        uri != null &&
+        uri.scheme == 'http' &&
+        (uri.host == 'localhost' || uri.host == '127.0.0.1');
+    final isHttps = uri != null && uri.scheme == 'https' && uri.host.isNotEmpty;
+    if ((!isHttps && !isLocalHost) || cleanUrl.contains('your-supabase-url')) {
+      return 'URL Supabase inválida. Utilize https://seu-projeto.supabase.co.';
+    }
+    if (cleanKey.isEmpty ||
+        cleanKey.length < 20 ||
+        cleanKey.contains('your-anon-key')) {
+      return 'Chave Anon/Publishable inválida ou muito curta.';
+    }
+    return null;
+  }
+
+  /// Carrega credenciais Supabase configuradas em runtime no armazenamento seguro.
+  static Future<({String url, String anonKey})?> loadRuntimeConfig({
+    FlutterSecureStorage? storage,
+  }) async {
+    try {
+      final secure = storage ?? const FlutterSecureStorage();
+      final url = (await secure.read(key: runtimeUrlStorageKey))?.trim() ?? '';
+      final key = (await secure.read(key: runtimeAnonKeyStorageKey))?.trim() ?? '';
+      if (url.isEmpty || key.isEmpty) return null;
+      if (validateSupabaseCredentials(url, key) != null) return null;
+      return (url: url, anonKey: key);
+    } catch (e, st) {
+      AppLogger.warning('Falha ao ler configuração runtime do Supabase', e, st);
+      return null;
+    }
+  }
+
+  static Future<String?> getRuntimeUrl({FlutterSecureStorage? storage}) async {
+    final cfg = await loadRuntimeConfig(storage: storage);
+    return cfg?.url;
+  }
+
+  static Future<bool> hasRuntimeConfig({FlutterSecureStorage? storage}) async {
+    return (await loadRuntimeConfig(storage: storage)) != null;
+  }
+
+  static Future<void> initialize({FlutterSecureStorage? storage}) async {
+    String url = SupabaseConfig.url.trim();
+    String anonKey = SupabaseConfig.publishableKey.trim();
+
+    if (!SupabaseConfig.isConfigured) {
+      final runtimeCfg = await loadRuntimeConfig(storage: storage);
+      if (runtimeCfg == null) {
+        AppLogger.info(
+          'Supabase não configurado via --dart-define nem em runtime; operando exclusivamente offline-first.',
+        );
+        return;
+      }
+      url = runtimeCfg.url;
+      anonKey = runtimeCfg.anonKey;
+    }
+
     if (!isInitialized) {
       await Supabase.initialize(
-        url: SupabaseConfig.url,
-        publishableKey: SupabaseConfig.publishableKey,
+        url: url,
+        publishableKey: anonKey,
       );
+    }
+  }
+
+  /// Salva credenciais Supabase em runtime no armazenamento seguro e (re)inicializa o cliente.
+  static Future<void> configureAndInitialize({
+    required String url,
+    required String anonKey,
+    FlutterSecureStorage? storage,
+    bool initializeClient = true,
+  }) async {
+    final cleanUrl = url.trim();
+    final cleanKey = anonKey.trim();
+    final validationError = validateSupabaseCredentials(cleanUrl, cleanKey);
+    if (validationError != null) {
+      throw FormatException(validationError);
+    }
+
+    final secure = storage ?? const FlutterSecureStorage();
+    if (initializeClient) {
+      if (isInitialized) {
+        await Supabase.instance.dispose();
+      }
+      await Supabase.initialize(
+        url: cleanUrl,
+        publishableKey: cleanKey,
+      );
+    }
+
+    await secure.write(key: runtimeUrlStorageKey, value: cleanUrl);
+    await secure.write(key: runtimeAnonKeyStorageKey, value: cleanKey);
+  }
+
+  /// Remove a configuração runtime do Supabase do armazenamento seguro.
+  static Future<void> clearRuntimeConfig({
+    FlutterSecureStorage? storage,
+    bool disposeClientIfNoCompileTime = true,
+  }) async {
+    final secure = storage ?? const FlutterSecureStorage();
+    await secure.delete(key: runtimeUrlStorageKey);
+    await secure.delete(key: runtimeAnonKeyStorageKey);
+    if (isInitialized &&
+        (disposeClientIfNoCompileTime || SupabaseConfig.isConfigured)) {
+      await Supabase.instance.dispose();
     }
   }
 
@@ -65,6 +177,7 @@ class SupabaseSyncService {
   final String supabaseAnonKey;
   final SupabaseClient? clientOverride;
   final Future<String> Function()? documentsDirectoryProvider;
+  final bool strictStorageAuth;
 
   final StreamController<SyncStatus> _statusController =
       StreamController<SyncStatus>.broadcast();
@@ -112,6 +225,7 @@ class SupabaseSyncService {
     ),
     this.clientOverride,
     this.documentsDirectoryProvider,
+    this.strictStorageAuth = false,
   });
 
   SyncStatus get currentStatus => _currentStatus;
@@ -159,6 +273,8 @@ class SupabaseSyncService {
     final sanitized = Map<String, dynamic>.from(payload);
     sanitized.remove('_base');
     sanitized.remove('baseData');
+    sanitized.remove('_remote');
+    sanitized.remove('_conflicts');
     if (entityType == 'voice_notes' || entityType == 'voiceNotes') {
       sanitized.remove('audio_file_path');
       sanitized.remove('audioFilePath');
@@ -166,19 +282,38 @@ class SupabaseSyncService {
     return sanitized;
   }
 
+  static const Set<String> _jsonbColumns = {
+    'tags',
+    'attachments',
+    'metadata',
+    'sources',
+    'media_urls',
+    'participant_ids',
+  };
+
   /// Converte payload com chaves camelCase para snake_case para envio PostgREST
   static Map<String, dynamic> toRemotePayload(
     String entityType,
     Map<String, dynamic> localPayload,
   ) {
-    final sanitized = sanitizePayload(entityType, localPayload);
+    final normalizedDates = SyncTimestamp.normalizeMapDates(
+      sanitizePayload(entityType, localPayload),
+    );
     final Map<String, dynamic> remote = {};
-    sanitized.forEach((key, value) {
-      if (key == 'dateTimeField') {
-        remote['date_time_field'] = value;
-      } else {
-        remote[camelToSnake(key)] = value;
+    normalizedDates.forEach((key, value) {
+      final snakeKey = key == 'dateTimeField' ? 'date_time_field' : camelToSnake(key);
+      if (_jsonbColumns.contains(snakeKey) && value is String) {
+        final trimmed = value.trim();
+        if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+          try {
+            remote[snakeKey] = jsonDecode(trimmed);
+            return;
+          } catch (e, st) {
+            AppLogger.debug('Campo JSONB ($snakeKey) inválido mantido como string: $e', st);
+          }
+        }
       }
+      remote[snakeKey] = value;
     });
     if (entityType == 'ticuna_words' ||
         entityType == 'ticuna_phrases' ||
@@ -188,6 +323,9 @@ class SupabaseSyncService {
       if (audioPath != null && audioPath.isNotEmpty && !audioPath.startsWith('http')) {
         final id = remote['id']?.toString() ?? '';
         remote['audio_path'] = '${id}_pronunciation.m4a';
+      }
+      if (remote.containsKey('is_favorite') && remote['is_favorite'] is bool) {
+        remote['is_favorite'] = (remote['is_favorite'] as bool) ? 1 : 0;
       }
     }
     return remote;
@@ -203,7 +341,7 @@ class SupabaseSyncService {
       if (camelKey == 'dateTime') {
         camelKey = 'dateTimeField';
       }
-      if (value is List) {
+      if (value is List || value is Map) {
         result[camelKey] = jsonEncode(value);
       } else if (value is int &&
           (camelKey == 'latitude' || camelKey == 'longitude')) {
@@ -293,9 +431,7 @@ class SupabaseSyncService {
   }
 
   static String? _isoString(dynamic val) {
-    if (val == null) return null;
-    if (val is DateTime) return val.toUtc().toIso8601String();
-    return val.toString();
+    return SyncTimestamp.toIso8601String(val);
   }
 
   Map<String, dynamic> _prepareEntryMap(
@@ -464,6 +600,7 @@ class SupabaseSyncService {
       case 'person_photos':
         map['personId'] = map['personId'] ?? map['person_id'] ?? '';
         map['photoType'] = map['photoType'] ?? map['photo_type'] ?? 'person';
+        map['filePath'] = map['filePath'] ?? map['file_path'];
         map['imageData'] = map['imageData'] ?? map['image_data'] ?? '';
         break;
       case 'person_publications':
@@ -640,7 +777,7 @@ class SupabaseSyncService {
         break;
       case 'ticuna_words':
         await db.customInsert(
-          'INSERT OR REPLACE INTO ticuna_words (id, word, translation, phonetics, grammatical_class, example_sentence, example_translation, notes, tags, is_favorite, review_level, review_count, last_reviewed_at, audio_path, audio_duration_seconds, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          'INSERT OR REPLACE INTO ticuna_words (id, word, translation, phonetics, grammatical_class, example_sentence, example_translation, notes, tags, is_favorite, review_level, review_count, last_reviewed_at, audio_path, audio_duration_seconds, language_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
           variables: [
             drift.Variable.withString(map['id']?.toString() ?? ''),
             drift.Variable.withString(map['word']?.toString() ?? ''),
@@ -657,6 +794,7 @@ class SupabaseSyncService {
             drift.Variable.withString(map['last_reviewed_at']?.toString() ?? map['lastReviewedAt']?.toString() ?? ''),
             drift.Variable.withString(map['audio_path']?.toString() ?? map['audioPath']?.toString() ?? ''),
             drift.Variable.withInt((map['audio_duration_seconds'] as num?)?.toInt() ?? (map['audioDurationSeconds'] as num?)?.toInt() ?? 0),
+            drift.Variable.withString(map['language_id']?.toString() ?? map['languageId']?.toString() ?? 'tca'),
             drift.Variable.withString(_isoString(map['created_at'] ?? map['createdAt']) ?? DateTime.now().toIso8601String()),
             drift.Variable.withString(_isoString(map['updated_at'] ?? map['updatedAt']) ?? DateTime.now().toIso8601String()),
           ],
@@ -664,7 +802,7 @@ class SupabaseSyncService {
         break;
       case 'ticuna_phrases':
         await db.customInsert(
-          'INSERT OR REPLACE INTO ticuna_phrases (id, phrase, translation, category, phonetics, notes, tags, is_favorite, audio_path, audio_duration_seconds, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          'INSERT OR REPLACE INTO ticuna_phrases (id, phrase, translation, category, phonetics, notes, tags, is_favorite, audio_path, audio_duration_seconds, language_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
           variables: [
             drift.Variable.withString(map['id']?.toString() ?? ''),
             drift.Variable.withString(map['phrase']?.toString() ?? ''),
@@ -676,6 +814,7 @@ class SupabaseSyncService {
             drift.Variable.withInt((map['is_favorite'] == 1 || map['is_favorite'] == true || map['isFavorite'] == 1 || map['isFavorite'] == true) ? 1 : 0),
             drift.Variable.withString(map['audio_path']?.toString() ?? map['audioPath']?.toString() ?? ''),
             drift.Variable.withInt((map['audio_duration_seconds'] as num?)?.toInt() ?? (map['audioDurationSeconds'] as num?)?.toInt() ?? 0),
+            drift.Variable.withString(map['language_id']?.toString() ?? map['languageId']?.toString() ?? 'tca'),
             drift.Variable.withString(_isoString(map['created_at'] ?? map['createdAt']) ?? DateTime.now().toIso8601String()),
             drift.Variable.withString(_isoString(map['updated_at'] ?? map['updatedAt']) ?? DateTime.now().toIso8601String()),
           ],
@@ -781,7 +920,7 @@ class SupabaseSyncService {
         break;
       case 'ticuna_words':
         await db.customInsert(
-          'INSERT OR REPLACE INTO ticuna_words (id, word, translation, phonetics, grammatical_class, example_sentence, example_translation, notes, tags, is_favorite, review_level, review_count, last_reviewed_at, audio_path, audio_duration_seconds, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          'INSERT OR REPLACE INTO ticuna_words (id, word, translation, phonetics, grammatical_class, example_sentence, example_translation, notes, tags, is_favorite, review_level, review_count, last_reviewed_at, audio_path, audio_duration_seconds, language_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
           variables: [
             drift.Variable.withString(map['id']?.toString() ?? ''),
             drift.Variable.withString(map['word']?.toString() ?? ''),
@@ -798,6 +937,7 @@ class SupabaseSyncService {
             drift.Variable.withString(map['last_reviewed_at']?.toString() ?? map['lastReviewedAt']?.toString() ?? ''),
             drift.Variable.withString(map['audio_path']?.toString() ?? map['audioPath']?.toString() ?? ''),
             drift.Variable.withInt((map['audio_duration_seconds'] as num?)?.toInt() ?? (map['audioDurationSeconds'] as num?)?.toInt() ?? 0),
+            drift.Variable.withString(map['language_id']?.toString() ?? map['languageId']?.toString() ?? 'tca'),
             drift.Variable.withString(_isoString(map['created_at'] ?? map['createdAt']) ?? DateTime.now().toIso8601String()),
             drift.Variable.withString(_isoString(map['updated_at'] ?? map['updatedAt']) ?? DateTime.now().toIso8601String()),
           ],
@@ -805,7 +945,7 @@ class SupabaseSyncService {
         break;
       case 'ticuna_phrases':
         await db.customInsert(
-          'INSERT OR REPLACE INTO ticuna_phrases (id, phrase, translation, category, phonetics, notes, tags, is_favorite, audio_path, audio_duration_seconds, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          'INSERT OR REPLACE INTO ticuna_phrases (id, phrase, translation, category, phonetics, notes, tags, is_favorite, audio_path, audio_duration_seconds, language_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
           variables: [
             drift.Variable.withString(map['id']?.toString() ?? ''),
             drift.Variable.withString(map['phrase']?.toString() ?? ''),
@@ -817,6 +957,7 @@ class SupabaseSyncService {
             drift.Variable.withInt((map['is_favorite'] == 1 || map['is_favorite'] == true || map['isFavorite'] == 1 || map['isFavorite'] == true) ? 1 : 0),
             drift.Variable.withString(map['audio_path']?.toString() ?? map['audioPath']?.toString() ?? ''),
             drift.Variable.withInt((map['audio_duration_seconds'] as num?)?.toInt() ?? (map['audioDurationSeconds'] as num?)?.toInt() ?? 0),
+            drift.Variable.withString(map['language_id']?.toString() ?? map['languageId']?.toString() ?? 'tca'),
             drift.Variable.withString(_isoString(map['created_at'] ?? map['createdAt']) ?? DateTime.now().toIso8601String()),
             drift.Variable.withString(_isoString(map['updated_at'] ?? map['updatedAt']) ?? DateTime.now().toIso8601String()),
           ],
@@ -967,6 +1108,13 @@ class SupabaseSyncService {
   }
 
   Future<Map<String, dynamic>?> _getLocalMap(String table, String id) async {
+    final raw = await _getRawLocalMap(table, id);
+    if (raw == null) return null;
+    final normalized = normalizeRemotePayload(raw);
+    return SyncTimestamp.normalizeMapDates(sanitizePayload(table, normalized));
+  }
+
+  Future<Map<String, dynamic>?> _getRawLocalMap(String table, String id) async {
     switch (table) {
       case 'people':
         final row = await (db.select(
@@ -1096,7 +1244,8 @@ class SupabaseSyncService {
           ).get();
           if (rows.isEmpty) return null;
           return rows.first.data;
-        } catch (_) {
+        } catch (e, st) {
+          AppLogger.debug('Falha ao ler ticuna_words ($id) em _getRawLocalMap: $e', st);
           return null;
         }
       case 'ticuna_phrases':
@@ -1107,7 +1256,8 @@ class SupabaseSyncService {
           ).get();
           if (rows.isEmpty) return null;
           return rows.first.data;
-        } catch (_) {
+        } catch (e, st) {
+          AppLogger.debug('Falha ao ler ticuna_phrases ($id) em _getRawLocalMap: $e', st);
           return null;
         }
       default:
@@ -1115,13 +1265,24 @@ class SupabaseSyncService {
     }
   }
 
-  /// Resolve a pasta correspondente ao UUID do usuário autenticado para armazenamento seguro
-  String _resolveStorageFolder(SupabaseClient client) {
+  /// Resolve a pasta correspondente ao UUID do usuário autenticado para armazenamento seguro.
+  /// Retorna `null` quando não há sessão ativa em produção (evita pasta compartilhada 00000000-...).
+  String? _resolveStorageFolder(SupabaseClient client) {
     final uid = client.auth.currentUser?.id ?? client.auth.currentSession?.user.id;
     if (uid != null && uid.isNotEmpty) {
       return uid;
     }
-    return '00000000-0000-0000-0000-000000000000';
+    if (clientOverride != null && !strictStorageAuth) {
+      return 'test_mock_uid';
+    }
+    return null;
+  }
+
+  Future<String> _resolveBaseDocsDir() async {
+    if (documentsDirectoryProvider != null) {
+      return await documentsDirectoryProvider!();
+    }
+    return await resolveDefaultDocumentsDir();
   }
 
   Future<bool> _uploadVoiceNoteAudio(
@@ -1134,15 +1295,18 @@ class SupabaseSyncService {
         db.voiceNotes,
       )..where((t) => t.id.equals(id))).getSingleOrNull();
       if (vn?.audioFilePath != null && vn!.audioFilePath!.isNotEmpty) {
-        final file = File(vn.audioFilePath!);
-        if (await file.exists()) {
-          final bytes = await file.readAsBytes();
+        final bytes = await readMediaBytes(vn.audioFilePath!);
+        if (bytes != null && bytes.isNotEmpty) {
           final userFolder = _resolveStorageFolder(client);
+          if (userFolder == null) {
+            errors.add(
+              'Upload de áudio ($id) bloqueado: usuário não autenticado (sessão ausente).',
+            );
+            return false;
+          }
           final rawFileName = id.endsWith('.m4a') ? id : '$id.m4a';
           final storagePath = '$userFolder/$rawFileName';
-          await client.storage
-              .from('voice_notes')
-              .uploadBinary(
+          await client.storage.from('voice_notes').uploadBinary(
                 storagePath,
                 bytes,
                 fileOptions: const FileOptions(upsert: true),
@@ -1165,31 +1329,34 @@ class SupabaseSyncService {
     List<String> errors,
   ) async {
     try {
-      final audioPath = cleanPayload['audio_path']?.toString();
-      if (audioPath != null && audioPath.isNotEmpty && !audioPath.startsWith('http')) {
-        final file = File(audioPath);
-        if (await file.exists()) {
-          final bytes = await file.readAsBytes();
+      final audioPath = cleanPayload['audio_path']?.toString() ??
+          cleanPayload['audioPath']?.toString();
+      if (audioPath != null &&
+          audioPath.isNotEmpty &&
+          !audioPath.startsWith('http')) {
+        final bytes = await readMediaBytes(audioPath);
+        if (bytes != null && bytes.isNotEmpty) {
           final userFolder = _resolveStorageFolder(client);
+          if (userFolder == null) {
+            errors.add(
+              'Upload de áudio Ticuna ($id) bloqueado: usuário não autenticado.',
+            );
+            return false;
+          }
           final rawFileName = '${id}_pronunciation.m4a';
           final storagePath = '$userFolder/$rawFileName';
           try {
             await client.storage.from('ticuna_audio').uploadBinary(
-              storagePath,
-              bytes,
-              fileOptions: const FileOptions(upsert: true),
+                  storagePath,
+                  bytes,
+                  fileOptions: const FileOptions(upsert: true),
+                );
+          } catch (e1, st1) {
+            AppLogger.error('Erro no upload de áudio Ticuna ($id) para ticuna_audio ($storagePath)', e1, st1);
+            errors.add(
+              'Erro no upload de áudio Ticuna ($id) no bucket ticuna_audio: $e1',
             );
-          } catch (e1) {
-            try {
-              await client.storage.from('voice_notes').uploadBinary(
-                '$userFolder/ticuna_$rawFileName',
-                bytes,
-                fileOptions: const FileOptions(upsert: true),
-              );
-            } catch (e2) {
-              errors.add('Erro no upload de áudio Ticuna ($id) em ambos os buckets (ticuna_audio: $e1; voice_notes: $e2)');
-              return false;
-            }
+            return false;
           }
         }
       }
@@ -1207,44 +1374,36 @@ class SupabaseSyncService {
   ) async {
     try {
       final userFolder = _resolveStorageFolder(client);
+      if (userFolder == null) {
+        AppLogger.warning('Download de áudio Ticuna ($id) adiado: usuário não autenticado.');
+        return false;
+      }
       final rawFileName = '${id}_pronunciation.m4a';
       final storagePath = '$userFolder/$rawFileName';
       Uint8List? bytes;
       try {
-        bytes = await client.storage
-            .from('ticuna_audio')
-            .download(storagePath);
-      } catch (_) {
+        bytes = await client.storage.from('ticuna_audio').download(storagePath);
+      } catch (e1) {
+        AppLogger.debug('Fallback raiz ticuna_audio ($id): $e1');
         try {
-          bytes = await client.storage
-              .from('ticuna_audio')
-              .download(rawFileName);
-        } catch (_) {
-          try {
-            bytes = await client.storage
-                .from('voice_notes')
-                .download('$userFolder/ticuna_$rawFileName');
-          } catch (_) {
-            try {
-              bytes = await client.storage
-                  .from('voice_notes')
-                  .download('ticuna_$rawFileName');
-            } catch (_) {}
-          }
+          bytes = await client.storage.from('ticuna_audio').download(rawFileName);
+        } catch (e2, st2) {
+          AppLogger.debug('Falha no download de ticuna_audio ($id): $e2', st2);
         }
       }
 
       if (bytes != null && bytes.isNotEmpty) {
-        final docsDir = documentsDirectoryProvider != null
-            ? await documentsDirectoryProvider!()
-            : (await getApplicationDocumentsDirectory()).path;
-        final ticunaDir = Directory(p.join(docsDir, 'ticuna_audio'));
-        if (!await ticunaDir.exists()) {
-          await ticunaDir.create(recursive: true);
+        final baseDir = await _resolveBaseDocsDir();
+        final localFilePath = await saveMediaBytes(
+          baseDir: baseDir,
+          subDir: 'ticuna_audio',
+          fileName: rawFileName,
+          bytes: bytes,
+          mimeType: 'audio/m4a',
+        );
+        if (localFilePath == null || localFilePath.isEmpty) {
+          throw Exception('Falha ao salvar áudio Ticuna no dispositivo: $id');
         }
-        final localFilePath = p.join(ticunaDir.path, rawFileName);
-        final file = File(localFilePath);
-        await file.writeAsBytes(bytes, flush: true);
 
         if (table == 'ticuna_words') {
           await db.customUpdate(
@@ -1263,13 +1422,14 @@ class SupabaseSyncService {
             ],
           );
         }
-        // Remove chave pendente se existir
         await (db.delete(db.appKvStore)
-          ..where((t) => t.key.equals('pending_ticuna_audio_download_${table}_$id'))).go();
+              ..where((t) => t.key.equals('pending_ticuna_audio_download_${table}_$id')))
+            .go();
         return true;
       }
       throw Exception('Arquivo de áudio Ticuna não disponível no storage: $id');
-    } catch (e) {
+    } catch (e, st) {
+      AppLogger.warning('Falha no download de áudio Ticuna ($id)', e, st);
       try {
         await db.into(db.appKvStore).insertOnConflictUpdate(
               AppKvStoreCompanion.insert(
@@ -1278,7 +1438,9 @@ class SupabaseSyncService {
                 updatedAt: drift.Value(DateTime.now()),
               ),
             );
-      } catch (_) {}
+      } catch (kvErr, kvSt) {
+        AppLogger.warning('Falha ao registrar pending_ticuna_audio_download ($id)', kvErr, kvSt);
+      }
       return false;
     }
   }
@@ -1286,57 +1448,60 @@ class SupabaseSyncService {
   Future<bool> _downloadVoiceNoteAudio(String id, SupabaseClient client) async {
     try {
       final userFolder = _resolveStorageFolder(client);
+      if (userFolder == null) {
+        AppLogger.warning('Download de áudio voice_note ($id) adiado: usuário não autenticado.');
+        return false;
+      }
       final rawFileName = id.endsWith('.m4a') ? id : '$id.m4a';
       final storagePath = '$userFolder/$rawFileName';
       Uint8List? bytes;
       try {
-        bytes = await client.storage
-            .from('voice_notes')
-            .download(storagePath);
-      } catch (_) {
+        bytes = await client.storage.from('voice_notes').download(storagePath);
+      } catch (e1) {
+        AppLogger.debug('Fallback raiz voice_notes ($storagePath): $e1');
         try {
-          bytes = await client.storage
-              .from('voice_notes')
-              .download(rawFileName);
-        } catch (_) {}
+          bytes = await client.storage.from('voice_notes').download(rawFileName);
+        } catch (dlErr, dlSt) {
+          AppLogger.debug('Fallback raiz voice_notes falhou ($rawFileName): $dlErr', dlSt);
+        }
       }
 
       if (bytes != null && bytes.isNotEmpty) {
-        final docsDir = documentsDirectoryProvider != null
-            ? await documentsDirectoryProvider!()
-            : (await getApplicationDocumentsDirectory()).path;
-        final voiceNotesDir = Directory(p.join(docsDir, 'voice_notes'));
-        if (!await voiceNotesDir.exists()) {
-          await voiceNotesDir.create(recursive: true);
+        final baseDir = await _resolveBaseDocsDir();
+        final localFilePath = await saveMediaBytes(
+          baseDir: baseDir,
+          subDir: 'voice_notes',
+          fileName: rawFileName,
+          bytes: bytes,
+          mimeType: 'audio/m4a',
+        );
+        if (localFilePath == null || localFilePath.isEmpty) {
+          throw Exception('Falha ao salvar áudio de nota de voz: $id');
         }
-        final localFilePath = p.join(voiceNotesDir.path, rawFileName);
-        final file = File(localFilePath);
-        await file.writeAsBytes(bytes, flush: true);
 
         await (db.update(db.voiceNotes)..where((t) => t.id.equals(id))).write(
           VoiceNotesCompanion(audioFilePath: drift.Value(localFilePath)),
         );
 
-        // Remove pendência de download se estava registrada
         await (db.delete(
           db.appKvStore,
         )..where((t) => t.key.equals('pending_audio_download_$id'))).go();
         return true;
       }
       throw Exception('Arquivo de áudio não disponível para download no storage: $id');
-    } catch (e) {
-      // Registra a nota no AppKvStore para retentativa resiliente posterior
+    } catch (e, st) {
+      AppLogger.warning('Falha no download de áudio voice_notes ($id)', e, st);
       try {
-        await db
-            .into(db.appKvStore)
-            .insertOnConflictUpdate(
+        await db.into(db.appKvStore).insertOnConflictUpdate(
               AppKvStoreCompanion.insert(
                 key: 'pending_audio_download_$id',
                 value: DateTime.now().toUtc().toIso8601String(),
                 updatedAt: drift.Value(DateTime.now()),
               ),
             );
-      } catch (_) {}
+      } catch (kvErr, kvSt) {
+        AppLogger.warning('Falha ao registrar pending_audio_download ($id)', kvErr, kvSt);
+      }
       return false;
     }
   }
@@ -1347,7 +1512,8 @@ class SupabaseSyncService {
     SupabaseClient? client;
     try {
       client = clientOverride ?? Supabase.instance.client;
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.debug('Supabase client indisponível em deleteVoiceNoteAudio ($id): $e', st);
       return false;
     }
     return _deleteVoiceNoteAudio(id, client);
@@ -1356,13 +1522,15 @@ class SupabaseSyncService {
   Future<bool> _deleteVoiceNoteAudio(String id, SupabaseClient client) async {
     try {
       final userFolder = _resolveStorageFolder(client);
+      if (userFolder == null) return false;
       final rawFileName = id.endsWith('.m4a') ? id : '$id.m4a';
       await client.storage.from('voice_notes').remove([
         '$userFolder/$rawFileName',
         rawFileName,
       ]);
       return true;
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.debug('Falha ao excluir áudio voice_notes ($id): $e', st);
       return false;
     }
   }
@@ -1373,7 +1541,8 @@ class SupabaseSyncService {
     SupabaseClient? client;
     try {
       client = clientOverride ?? Supabase.instance.client;
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.debug('Supabase client indisponível em deleteTicunaAudio ($id): $e', st);
       return false;
     }
     return _deleteTicunaAudio(id, client);
@@ -1382,21 +1551,19 @@ class SupabaseSyncService {
   Future<bool> _deleteTicunaAudio(String id, SupabaseClient client) async {
     try {
       final userFolder = _resolveStorageFolder(client);
+      if (userFolder == null) return false;
       final rawFileName = '${id}_pronunciation.m4a';
       try {
         await client.storage.from('ticuna_audio').remove([
           '$userFolder/$rawFileName',
           rawFileName,
         ]);
-      } catch (_) {}
-      try {
-        await client.storage.from('voice_notes').remove([
-          '$userFolder/ticuna_$rawFileName',
-          'ticuna_$rawFileName',
-        ]);
-      } catch (_) {}
+      } on TypeError catch (e, st) {
+        AppLogger.debug('Resposta não-lista ao remover ticuna_audio ($rawFileName): $e', st);
+      }
       return true;
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.debug('Falha ao remover áudio Ticuna ($id): $e', st);
       return false;
     }
   }
@@ -1415,33 +1582,33 @@ class SupabaseSyncService {
 
       Uint8List? bytes;
 
-      // 1. Tenta carregar do disco físico (iOS, Android, Windows)
-      if (!kIsWeb && doc.filePath.isNotEmpty) {
-        final direct = File(doc.filePath);
-        if (await direct.exists()) {
-          try {
-            bytes = await direct.readAsBytes();
-          } catch (_) {}
-        } else {
-          final docsDir = documentsDirectoryProvider != null
-              ? await documentsDirectoryProvider!()
-              : (await getApplicationDocumentsDirectory()).path;
-          final candidates = [
-            File(p.join(docsDir, 'documents', doc.fileName)),
-            File(p.join(docsDir, doc.fileName)),
-          ];
-          for (final c in candidates) {
-            if (await c.exists()) {
-              try {
-                bytes = await c.readAsBytes();
-                break;
-              } catch (_) {}
+      // 1. Tenta carregar via camada multiplataforma (arquivo físico no IO ou URI na Web)
+      if (doc.filePath.isNotEmpty) {
+        try {
+          bytes = await readMediaBytes(doc.filePath);
+        } catch (e, st) {
+          AppLogger.debug('Falha ao ler documento via filePath (${doc.filePath}): $e', st);
+        }
+      }
+
+      if ((bytes == null || bytes.isEmpty) && !kIsWeb && doc.fileName.isNotEmpty) {
+        final baseDir = await _resolveBaseDocsDir();
+        if (baseDir.isNotEmpty) {
+          for (final candidate in [
+            '$baseDir/documents/${doc.fileName}',
+            '$baseDir/${doc.fileName}',
+          ]) {
+            try {
+              bytes = await readMediaBytes(candidate);
+              if (bytes != null && bytes.isNotEmpty) break;
+            } catch (e, st) {
+              AppLogger.debug('Falha ao ler candidato knowledge_doc ($candidate): $e', st);
             }
           }
         }
       }
 
-      // 2. Se for Web ou não achou no disco, busca no AppKvStore (cache de bytes)
+      // 2. Busca no AppKvStore (cache de bytes Web/portátil)
       if (bytes == null || bytes.isEmpty) {
         final kv = await (db.select(db.appKvStore)
               ..where((t) => t.key.equals('doc_bytes_$id')))
@@ -1449,12 +1616,20 @@ class SupabaseSyncService {
         if (kv != null && kv.value.isNotEmpty) {
           try {
             bytes = base64Decode(kv.value);
-          } catch (_) {}
+          } catch (e, st) {
+            AppLogger.warning('Cache Base64 doc_bytes_$id corrompido', e, st);
+          }
         }
       }
 
       if (bytes != null && bytes.isNotEmpty) {
         final userFolder = _resolveStorageFolder(client);
+        if (userFolder == null) {
+          errors.add(
+            'Upload de documento ($id) bloqueado: usuário não autenticado.',
+          );
+          return false;
+        }
         final extension = doc.fileType.isNotEmpty ? doc.fileType.replaceAll('.', '') : 'pdf';
         final storageFileName = '$id.$extension';
         final storagePath = '$userFolder/$storageFileName';
@@ -1485,6 +1660,10 @@ class SupabaseSyncService {
       if (doc == null) return false;
 
       final userFolder = _resolveStorageFolder(client);
+      if (userFolder == null) {
+        AppLogger.warning('Download de documento ($id) adiado: usuário não autenticado.');
+        return false;
+      }
       final extension = doc.fileType.isNotEmpty ? doc.fileType.replaceAll('.', '') : 'pdf';
       final storageFileName = '$id.$extension';
       final storagePath = '$userFolder/$storageFileName';
@@ -1492,31 +1671,34 @@ class SupabaseSyncService {
       Uint8List? bytes;
       try {
         bytes = await client.storage.from('knowledge_vault').download(storagePath);
-      } catch (_) {
+      } catch (e, st) {
+        AppLogger.debug(
+          'Download em $storagePath falhou; tentando caminho legado $storageFileName: $e',
+          st,
+        );
         try {
           bytes = await client.storage.from('knowledge_vault').download(storageFileName);
-        } catch (_) {}
+        } catch (dlErr, dlSt) {
+          AppLogger.debug('Fallback raiz knowledge_vault falhou ($storageFileName): $dlErr', dlSt);
+        }
       }
 
       if (bytes != null && bytes.isNotEmpty) {
-        if (!kIsWeb) {
-          final docsDir = documentsDirectoryProvider != null
-              ? await documentsDirectoryProvider!()
-              : (await getApplicationDocumentsDirectory()).path;
-          final targetFolder = Directory(p.join(docsDir, 'documents'));
-          if (!await targetFolder.exists()) {
-            await targetFolder.create(recursive: true);
-          }
-          final safeName = doc.fileName.isNotEmpty ? doc.fileName : storageFileName;
-          final localFilePath = p.join(targetFolder.path, safeName);
-          final file = File(localFilePath);
-          await file.writeAsBytes(bytes, flush: true);
-
-          await (db.update(db.knowledgeDocuments)..where((t) => t.id.equals(id))).write(
-            KnowledgeDocumentsCompanion(filePath: drift.Value(localFilePath)),
+        final baseDir = await _resolveBaseDocsDir();
+        final safeName = doc.fileName.isNotEmpty ? doc.fileName : storageFileName;
+        if (!kIsWeb && baseDir.isNotEmpty) {
+          final localFilePath = await saveMediaBytes(
+            baseDir: baseDir,
+            subDir: 'documents',
+            fileName: safeName,
+            bytes: bytes,
           );
+          if (localFilePath != null) {
+            await (db.update(db.knowledgeDocuments)..where((t) => t.id.equals(id))).write(
+              KnowledgeDocumentsCompanion(filePath: drift.Value(localFilePath)),
+            );
+          }
         } else {
-          // Em ambiente Web, armazena os bytes no AppKvStore para acesso offline imediato
           await db.into(db.appKvStore).insertOnConflictUpdate(
                 AppKvStoreCompanion.insert(
                   key: 'doc_bytes_$id',
@@ -1526,14 +1708,14 @@ class SupabaseSyncService {
               );
         }
 
-        // Remove pendência de download se estava registrada
         await (db.delete(
           db.appKvStore,
         )..where((t) => t.key.equals('pending_doc_download_$id'))).go();
         return true;
       }
       throw Exception('Arquivo do documento não disponível para download no storage: $id');
-    } catch (e) {
+    } catch (e, st) {
+      AppLogger.warning('Falha no download de documento knowledge_vault ($id)', e, st);
       try {
         await db.into(db.appKvStore).insertOnConflictUpdate(
               AppKvStoreCompanion.insert(
@@ -1542,7 +1724,9 @@ class SupabaseSyncService {
                 updatedAt: drift.Value(DateTime.now()),
               ),
             );
-      } catch (_) {}
+      } catch (kvErr, kvSt) {
+        AppLogger.warning('Falha ao registrar pending_doc_download ($id)', kvErr, kvSt);
+      }
       return false;
     }
   }
@@ -1554,6 +1738,7 @@ class SupabaseSyncService {
   ) async {
     try {
       final userFolder = _resolveStorageFolder(client);
+      if (userFolder == null) return;
       await client.storage.from('knowledge_vault').remove([
         '$userFolder/$id.pdf',
         '$userFolder/$id.epub',
@@ -1565,7 +1750,185 @@ class SupabaseSyncService {
         id,
       ]);
       await (db.delete(db.appKvStore)..where((t) => t.key.equals('doc_bytes_$id'))).go();
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.warning('Falha ao excluir documento $id do storage', e, st);
+    }
+  }
+
+  Future<bool> _uploadPersonPhoto(
+    String id,
+    Map<String, dynamic> remotePayload,
+    SupabaseClient client,
+    List<String> errors,
+  ) async {
+    try {
+      final photo = await (db.select(db.personPhotos)
+            ..where((t) => t.id.equals(id)))
+          .getSingleOrNull();
+      final localPath = photo?.filePath;
+      final inlineData = photo?.imageData ?? '';
+
+      Uint8List? bytes;
+      if (localPath != null &&
+          localPath.isNotEmpty &&
+          !localPath.startsWith('http')) {
+        try {
+          bytes = await readMediaBytes(localPath);
+        } catch (e, st) {
+          AppLogger.warning('Falha ao ler arquivo local da foto $id', e, st);
+        }
+      }
+
+      if ((bytes == null || bytes.isEmpty) &&
+          inlineData.startsWith('data:image/')) {
+        final commaIdx = inlineData.indexOf(',');
+        if (commaIdx != -1) {
+          try {
+            bytes = Uint8List.fromList(
+              base64Decode(inlineData.substring(commaIdx + 1)),
+            );
+          } catch (e, st) {
+            AppLogger.warning('Falha ao decodificar base64 da foto $id', e, st);
+          }
+        }
+      }
+
+      // Remove caminhos locais do dispositivo antes de enviar ao PostgREST
+      final rawFp = remotePayload['file_path']?.toString() ?? '';
+      if (rawFp.startsWith('/') ||
+          RegExp(r'^[a-zA-Z]:[\\/]').hasMatch(rawFp)) {
+        remotePayload['file_path'] = null;
+      }
+
+      if (bytes == null || bytes.isEmpty) {
+        return true;
+      }
+
+      final userFolder = _resolveStorageFolder(client);
+      if (userFolder == null) {
+        errors.add('Usuário não autenticado para upload da foto $id.');
+        return false;
+      }
+      final storagePath = '$userFolder/$id.jpg';
+      await client.storage.from('person_photos').uploadBinary(
+            storagePath,
+            bytes,
+            fileOptions: const FileOptions(
+              contentType: 'image/jpeg',
+              upsert: true,
+            ),
+          );
+      remotePayload['file_path'] = storagePath;
+      remotePayload['image_data'] = '';
+      return true;
+    } catch (e, st) {
+      AppLogger.warning('Falha no upload de person_photos ($id)', e, st);
+      errors.add('Falha no upload da foto $id: $e');
+      return false;
+    }
+  }
+
+  Future<bool> _downloadPersonPhoto(String id, SupabaseClient client) async {
+    try {
+      final photo = await (db.select(db.personPhotos)
+            ..where((t) => t.id.equals(id)))
+          .getSingleOrNull();
+      final fp = photo?.filePath;
+      if (fp == null || fp.isEmpty || fp.startsWith('http')) {
+        return false;
+      }
+      if (fp.startsWith('/') || RegExp(r'^[a-zA-Z]:[\\/]').hasMatch(fp)) {
+        return true;
+      }
+
+      final userFolder = _resolveStorageFolder(client);
+      final candidates = <String>{
+        fp,
+        if (userFolder != null) '$userFolder/$id.jpg',
+        '$id.jpg',
+      }.toList();
+
+      Uint8List? bytes;
+      for (final path in candidates) {
+        try {
+          final dl = await client.storage.from('person_photos').download(path);
+          if (dl.isNotEmpty) {
+            bytes = dl;
+            break;
+          }
+        } catch (dlErr, dlSt) {
+          AppLogger.debug('Tentativa de download person_photos ($path) falhou: $dlErr', dlSt);
+        }
+      }
+
+      if (bytes != null && bytes.isNotEmpty) {
+        if (!kIsWeb) {
+          final baseDir = await _resolveBaseDocsDir();
+          if (baseDir.isNotEmpty) {
+            final localPath = await saveMediaBytes(
+              baseDir: baseDir,
+              subDir: 'person_photos',
+              fileName: '$id.jpg',
+              bytes: bytes,
+            );
+            if (localPath != null) {
+              await (db.update(db.personPhotos)..where((t) => t.id.equals(id)))
+                  .write(
+                PersonPhotosCompanion(
+                  filePath: drift.Value(localPath),
+                  imageData: const drift.Value(''),
+                ),
+              );
+            }
+          }
+        } else {
+          await (db.update(db.personPhotos)..where((t) => t.id.equals(id)))
+              .write(
+            PersonPhotosCompanion(
+              imageData: drift.Value(
+                'data:image/jpeg;base64,${base64Encode(bytes)}',
+              ),
+            ),
+          );
+        }
+
+        await (db.delete(db.appKvStore)
+              ..where((t) => t.key.equals('pending_photo_download_$id')))
+            .go();
+        return true;
+      }
+      throw Exception('Foto não disponível no storage person_photos: $id');
+    } catch (e, st) {
+      AppLogger.warning('Falha no download de foto person_photos ($id)', e, st);
+      try {
+        await db.into(db.appKvStore).insertOnConflictUpdate(
+              AppKvStoreCompanion.insert(
+                key: 'pending_photo_download_$id',
+                value: DateTime.now().toUtc().toIso8601String(),
+                updatedAt: drift.Value(DateTime.now()),
+              ),
+            );
+      } catch (e2, st2) {
+        AppLogger.warning('Falha ao registrar pendência de download de foto $id', e2, st2);
+      }
+      return false;
+    }
+  }
+
+  Future<void> _deletePersonPhotoStorage(
+    String id,
+    SupabaseClient client,
+  ) async {
+    try {
+      final userFolder = _resolveStorageFolder(client);
+      if (userFolder == null) return;
+      await client.storage.from('person_photos').remove([
+        '$userFolder/$id.jpg',
+        '$id.jpg',
+      ]);
+    } catch (e, st) {
+      AppLogger.warning('Falha ao excluir foto $id do storage', e, st);
+    }
   }
 
   /// Retenta o download de áudios que falharam durante a recepção de metadados
@@ -1574,7 +1937,8 @@ class SupabaseSyncService {
     SupabaseClient? client;
     try {
       client = clientOverride ?? Supabase.instance.client;
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.debug('Cliente Supabase indisponível para retry de mídias: $e', st);
       return 0;
     }
 
@@ -1615,6 +1979,16 @@ class SupabaseSyncService {
       if (ok) recovered++;
     }
 
+    final pendingPhotos = await (db.select(
+      db.appKvStore,
+    )..where((t) => t.key.like('pending_photo_download_%'))).get();
+
+    for (final row in pendingPhotos) {
+      final id = row.key.replaceFirst('pending_photo_download_', '');
+      final ok = await _downloadPersonPhoto(id, client);
+      if (ok) recovered++;
+    }
+
     return recovered;
   }
 
@@ -1647,6 +2021,8 @@ class SupabaseSyncService {
           await _downloadTicunaAudio(id, table, client);
         } else if (table == 'knowledge_documents' && client != null) {
           await _downloadKnowledgeDocument(id, client);
+        } else if (table == 'person_photos' && client != null) {
+          await _downloadPersonPhoto(id, client);
         }
         return true;
       }
@@ -1688,10 +2064,18 @@ class SupabaseSyncService {
           final errMsg =
               'Conflito detectado em $table ($id) nos campos: $conflictFields';
           errors.add(errMsg);
-          await repository.markSyncOperationFailed(pendingOp.id, errMsg);
-          await (db.update(db.syncQueue)
-                ..where((t) => t.id.equals(pendingOp.id)))
-              .write(const SyncQueueCompanion(status: drift.Value('conflict')));
+          await repository.markSyncOperationConflict(
+            pendingOp.id,
+            errMsg,
+            remoteData: normalized,
+            conflicts: mergeResult.conflicts
+                .map((c) => {
+                      'field': c.fieldName,
+                      'local': c.localValue,
+                      'remote': c.remoteValue,
+                    })
+                .toList(),
+          );
           _setStatus(SyncStatus.conflict);
           return false;
         } else {
@@ -1739,6 +2123,8 @@ class SupabaseSyncService {
               await _downloadTicunaAudio(id, table, client);
             } else if (table == 'knowledge_documents' && client != null) {
               await _downloadKnowledgeDocument(id, client);
+            } else if (table == 'person_photos' && client != null) {
+              await _downloadPersonPhoto(id, client);
             }
           }
           return true;
@@ -1791,7 +2177,8 @@ class SupabaseSyncService {
     SupabaseClient? client;
     try {
       client = clientOverride ?? Supabase.instance.client;
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.warning('Cliente Supabase indisponível durante fetchRemoteChanges', e, st);
       return const SyncProcessResult(
         totalProcessed: 0,
         successCount: 0,
@@ -1906,6 +2293,54 @@ class SupabaseSyncService {
     );
   }
 
+  /// Resolve um conflito da sync_queue aceitando a versão remota armazenada (ou baixando do servidor).
+  Future<bool> resolveConflictAcceptRemote(String syncQueueId) async {
+    final op = await (db.select(db.syncQueue)
+          ..where((t) => t.id.equals(syncQueueId)))
+        .getSingleOrNull();
+    if (op == null) return false;
+
+    final tableName = mapEntityToRemoteTable(op.entityType);
+    Map<String, dynamic>? remoteMap;
+    try {
+      final decoded = jsonDecode(op.payload);
+      if (decoded is Map<String, dynamic> && decoded['_remote'] is Map) {
+        remoteMap = normalizeRemotePayload(
+          Map<String, dynamic>.from(decoded['_remote'] as Map),
+        );
+      }
+    } catch (e, st) {
+      AppLogger.debug('Payload sem _remote JSON no conflito (${op.id}): $e', st);
+    }
+
+    if (remoteMap == null && isConfigured) {
+      try {
+        final client = clientOverride ?? Supabase.instance.client;
+        final rows = await client
+            .from(tableName)
+            .select()
+            .eq('id', op.entityId)
+            .limit(1);
+        if (rows.isNotEmpty) {
+          remoteMap = normalizeRemotePayload(rows.first);
+        }
+      } catch (e, st) {
+        AppLogger.warning('Falha ao buscar registro remoto para resolução de conflito', e, st);
+      }
+    }
+
+    if (remoteMap == null) return false;
+
+    final localExisting = await _getLocalMap(tableName, op.entityId);
+    if (localExisting == null) {
+      await _insertLocalEntry(tableName, remoteMap);
+    } else {
+      await _updateLocalEntry(tableName, remoteMap);
+    }
+    await repository.markSyncOperationSuccess(op.id);
+    return true;
+  }
+
   /// Processa a fila persistente de sincronização com backoff exponencial e detecção de conflitos.
   Future<SyncProcessResult> processQueue() async {
     final pendingOps = await repository.getPendingSyncOperations();
@@ -1937,7 +2372,8 @@ class SupabaseSyncService {
     SupabaseClient? client;
     try {
       client = clientOverride ?? Supabase.instance.client;
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.warning('Cliente Supabase não inicializado no processQueue', e, st);
       _setStatus(SyncStatus.waitingConnection);
       return SyncProcessResult(
         totalProcessed: pendingOps.length,
@@ -1955,17 +2391,22 @@ class SupabaseSyncService {
     final List<String> errors = [];
 
     for (final op in pendingOps) {
-      if (op.attempts >= 5) {
+      if (op.attempts >= AppRepository.maxSyncAttempts) {
         failure++;
-        errors.add(
-          'Operação ${op.id} (${op.entityType}) excedeu o limite máximo de 5 tentativas.',
+        final maxErr =
+            'Operação ${op.id} (${op.entityType}) excedeu o limite máximo de ${AppRepository.maxSyncAttempts} tentativas.';
+        errors.add(maxErr);
+        await repository.markSyncOperationFailed(
+          op.id,
+          maxErr,
+          forceFailed: true,
         );
         continue;
       }
 
       final backoffSeconds = pow(2, op.attempts).clamp(1, 300).toInt();
       final now = DateTime.now();
-      final lastAttempt = (op as dynamic).lastAttemptAt as DateTime? ?? op.createdAt;
+      final lastAttempt = op.lastAttemptAt ?? op.createdAt;
       if (now.difference(lastAttempt).inSeconds < backoffSeconds &&
           op.attempts > 0) {
         continue;
@@ -1974,71 +2415,176 @@ class SupabaseSyncService {
       try {
         final Map<String, dynamic> rawPayload =
             jsonDecode(op.payload) as Map<String, dynamic>;
-        final cleanPayload = sanitizePayload(op.entityType, rawPayload);
         final tableName = mapEntityToRemoteTable(op.entityType);
         final operation = op.operation.toUpperCase();
 
-        if (operation == 'INSERT' || operation == 'UPDATE') {
-          // C2: Pré-verificação de revisão remota antes de qualquer upsert e merge 3-way
-          try {
-            final remoteRows = await client
-                .from(tableName)
-                .select()
-                .eq('id', op.entityId)
-                .limit(1);
-            if (remoteRows.isNotEmpty) {
-              final remoteRecord = remoteRows.first;
-              final normalizedRemote = normalizeRemotePayload(remoteRecord);
-              final remoteRev = normalizedRemote['revision'] as int? ?? 1;
-              final localRev = cleanPayload['revision'] as int? ?? 1;
-              final remoteUpdated = SyncTimestamp.parse(
-                normalizedRemote['updatedAt'] ?? normalizedRemote['updated_at'],
-              );
-              final localUpdated = SyncTimestamp.parse(
-                cleanPayload['updatedAt'] ?? cleanPayload['updated_at'],
-              );
+        // F7/M10: Hidratação completa a partir do SQLite local antes do envio
+        var cleanPayload = SyncTimestamp.normalizeMapDates(
+          normalizeRemotePayload(sanitizePayload(op.entityType, rawPayload)),
+        );
+        final localRowMap = await _getLocalMap(tableName, op.entityId);
+        if (localRowMap != null) {
+          final isMinimalStub =
+              cleanPayload.length <= 3 && cleanPayload.containsKey('id');
+          if (isMinimalStub) {
+            cleanPayload = Map<String, dynamic>.from(localRowMap);
+          } else {
+            for (final entry in localRowMap.entries) {
+              cleanPayload.putIfAbsent(entry.key, () => entry.value);
+            }
+          }
+          cleanPayload = sanitizePayload(op.entityType, cleanPayload);
+        }
 
-              if (remoteRev > localRev ||
-                  (remoteUpdated != null &&
-                      localUpdated != null &&
-                      remoteUpdated.isAfter(localUpdated))) {
-                final baseData = rawPayload.containsKey('_base') &&
-                        rawPayload['_base'] is Map
-                    ? normalizeRemotePayload(
-                        rawPayload['_base'] as Map<String, dynamic>,
-                      )
-                    : <String, dynamic>{};
-                final mergeResult = SyncEngine.mergeEntities(
-                  entityType: op.entityType,
-                  entityId: op.entityId,
-                  localData: cleanPayload,
+        if (operation == 'INSERT' || operation == 'UPDATE') {
+          // C2 Camada 1: Pré-verificação estrita de revisão remota e merge 3-way
+          final rawRemoteRows = await client
+              .from(tableName)
+              .select()
+              .eq('id', op.entityId)
+              .limit(1);
+          final remoteRows = (rawRemoteRows as List)
+              .whereType<Map<String, dynamic>>()
+              .where((r) => r['id']?.toString() == op.entityId)
+              .toList();
+          if (remoteRows.isNotEmpty) {
+            final remoteRecord = remoteRows.first;
+            final normalizedRemote = SyncTimestamp.normalizeMapDates(
+              normalizeRemotePayload(remoteRecord),
+            );
+            final remoteRev = normalizedRemote['revision'] as int? ?? 1;
+            final localRev = cleanPayload['revision'] as int? ?? 1;
+            final remoteUpdated = SyncTimestamp.parse(
+              normalizedRemote['updatedAt'] ?? normalizedRemote['updated_at'],
+            );
+            final localUpdated = SyncTimestamp.parse(
+              cleanPayload['updatedAt'] ?? cleanPayload['updated_at'],
+            );
+
+            final baseData = rawPayload.containsKey('_base') &&
+                    rawPayload['_base'] is Map
+                ? SyncTimestamp.normalizeMapDates(
+                    normalizeRemotePayload(
+                      rawPayload['_base'] as Map<String, dynamic>,
+                    ),
+                  )
+                : <String, dynamic>{};
+            final baseRev = (baseData['revision'] as num?)?.toInt();
+
+            if (_hasConcurrentRemoteDivergence(
+              remoteRev: remoteRev,
+              localRev: localRev,
+              baseRev: baseRev,
+              remoteUpdated: remoteUpdated,
+              localUpdated: localUpdated,
+              localData: cleanPayload,
+              remoteData: normalizedRemote,
+            )) {
+              final mergeResult = SyncEngine.mergeEntities(
+                entityType: op.entityType,
+                entityId: op.entityId,
+                localData: cleanPayload,
+                remoteData: normalizedRemote,
+                baseData: baseData,
+              );
+              if (mergeResult.hasConflict) {
+                conflicts++;
+                _setStatus(SyncStatus.conflict);
+                final err =
+                    'Conflito de mesclagem 3-way detectado em ${op.entityType} (${op.entityId})';
+                errors.add(err);
+                await repository.markSyncOperationConflict(
+                  op.id,
+                  err,
                   remoteData: normalizedRemote,
-                  baseData: baseData,
+                  conflicts: mergeResult.conflicts
+                      .map((c) => {
+                            'field': c.fieldName,
+                            'local': c.localValue,
+                            'remote': c.remoteValue,
+                          })
+                      .toList(),
                 );
-                if (mergeResult.hasConflict) {
-                  conflicts++;
-                  _setStatus(SyncStatus.conflict);
-                  final err =
-                      'Conflito de mesclagem 3-way detectado em ${op.entityType} (${op.entityId})';
-                  errors.add(err);
-                  await repository.markSyncOperationFailed(op.id, err);
-                  continue;
-                } else {
-                  cleanPayload.addAll(mergeResult.mergedData);
-                  await _updateLocalEntry(tableName, mergeResult.mergedData);
-                }
+                continue;
+              } else {
+                cleanPayload.addAll(mergeResult.mergedData);
+                cleanPayload['revision'] = remoteRev + 1;
+                cleanPayload['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+                await _updateLocalEntry(tableName, cleanPayload);
               }
             }
-          } catch (_) {
-            // Caso a verificação falhe por ausência de conectividade, prossegue
           }
 
           final remotePayload = toRemotePayload(op.entityType, cleanPayload);
-          final currentUserId = client.auth.currentUser?.id;
+          final currentUserId =
+              client.auth.currentUser?.id ?? client.auth.currentSession?.user.id;
           if (currentUserId != null && currentUserId.isNotEmpty) {
             remotePayload['owner_id'] = currentUserId;
           }
-          await client.from(tableName).upsert(remotePayload);
+
+          if (tableName == 'person_photos') {
+            final photoOk = await _uploadPersonPhoto(
+              op.entityId,
+              remotePayload,
+              client,
+              errors,
+            );
+            if (!photoOk) {
+              failure++;
+              await repository.markSyncOperationFailed(
+                op.id,
+                'Falha no upload binário da foto para o Storage (person_photos)',
+              );
+              continue;
+            }
+          }
+
+          // C2 Camada 2: RPC Server-Side `sync_upsert` com trava otimista
+          bool pushedViaRpc = false;
+          try {
+            final rpcRes = await client.rpc(
+              'sync_upsert',
+              params: {
+                'p_table': tableName,
+                'p_payload': remotePayload,
+              },
+            );
+            if (rpcRes is Map<String, dynamic>) {
+              if (rpcRes['conflict'] == true ||
+                  rpcRes['code']?.toString() == '23505') {
+                conflicts++;
+                _setStatus(SyncStatus.conflict);
+                final serverRec = rpcRes['server_record'] is Map<String, dynamic>
+                    ? normalizeRemotePayload(
+                        rpcRes['server_record'] as Map<String, dynamic>,
+                      )
+                    : null;
+                final err =
+                    'Conflito otimista detectado pelo servidor em ${op.entityType} (${op.entityId}): ${rpcRes['message'] ?? ''}';
+                errors.add(err);
+                await repository.markSyncOperationConflict(
+                  op.id,
+                  err,
+                  remoteData: serverRec,
+                );
+                continue;
+              }
+              if (rpcRes['success'] == true) {
+                pushedViaRpc = true;
+              }
+            }
+          } on PostgrestException catch (rpcErr) {
+            if (rpcErr.code == '23505' || rpcErr.code == '409') {
+              rethrow;
+            }
+            AppLogger.warning(
+              'RPC sync_upsert indisponível (${rpcErr.code}): fallback para upsert após pré-check.',
+            );
+          }
+
+          if (!pushedViaRpc) {
+            await client.from(tableName).upsert(remotePayload);
+          }
 
           if (tableName == 'voice_notes') {
             final audioOk = await _uploadVoiceNoteAudio(
@@ -2051,7 +2597,6 @@ class SupabaseSyncService {
               await repository.markSyncOperationFailed(
                 op.id,
                 'Falha no upload do arquivo binário de áudio para o Storage',
-                forceFailed: true,
               );
               continue;
             }
@@ -2090,6 +2635,35 @@ class SupabaseSyncService {
           await repository.markSyncOperationSuccess(op.id);
           success++;
         } else if (operation == 'DELETE') {
+          // M5: Verificação de revisão remota antes de aplicar tombstone
+          final localRev = cleanPayload['revision'] as int? ?? 1;
+          final rawRemoteRows = await client
+              .from(tableName)
+              .select()
+              .eq('id', op.entityId)
+              .limit(1);
+          final remoteRows = (rawRemoteRows as List)
+              .whereType<Map<String, dynamic>>()
+              .where((r) => r['id']?.toString() == op.entityId)
+              .toList();
+          if (remoteRows.isNotEmpty) {
+            final remoteRecord = normalizeRemotePayload(remoteRows.first);
+            final remoteRev = remoteRecord['revision'] as int? ?? 1;
+            if (remoteRev > localRev) {
+              conflicts++;
+              _setStatus(SyncStatus.conflict);
+              final err =
+                  'Conflito em DELETE de ${op.entityType} (${op.entityId}): registro remoto (rev $remoteRev) foi alterado após exclusão local (rev $localRev).';
+              errors.add(err);
+              await repository.markSyncOperationConflict(
+                op.id,
+                err,
+                remoteData: remoteRecord,
+              );
+              continue;
+            }
+          }
+
           // Exclui arquivos binários associados no Storage
           if (tableName == 'voice_notes') {
             await _deleteVoiceNoteAudio(op.entityId, client);
@@ -2097,14 +2671,34 @@ class SupabaseSyncService {
             await _deleteTicunaAudio(op.entityId, client);
           } else if (tableName == 'knowledge_documents') {
             await _deleteKnowledgeDocumentStorage(op.entityId, client);
+          } else if (tableName == 'person_photos') {
+            await _deletePersonPhotoStorage(op.entityId, client);
           }
 
-          // C2: Substitui DELETE cego por soft-delete (deleted_at)
           final nowIso = DateTime.now().toUtc().toIso8601String();
           await client
               .from(tableName)
-              .update({'deleted_at': nowIso})
-              .eq('id', op.entityId);
+              .update({
+                'deleted_at': nowIso,
+                'updated_at': nowIso,
+                'revision': localRev,
+              })
+              .eq('id', op.entityId)
+              .lte('revision', localRev);
+          await repository.markSyncOperationSuccess(op.id);
+          success++;
+        } else if (operation == 'HARD_DELETE') {
+          if (tableName == 'voice_notes') {
+            await _deleteVoiceNoteAudio(op.entityId, client);
+          } else if (tableName == 'ticuna_words' || tableName == 'ticuna_phrases') {
+            await _deleteTicunaAudio(op.entityId, client);
+          } else if (tableName == 'knowledge_documents') {
+            await _deleteKnowledgeDocumentStorage(op.entityId, client);
+          } else if (tableName == 'person_photos') {
+            await _deletePersonPhotoStorage(op.entityId, client);
+          }
+
+          await client.from(tableName).delete().eq('id', op.entityId);
           await repository.markSyncOperationSuccess(op.id);
           success++;
         }
@@ -2115,7 +2709,7 @@ class SupabaseSyncService {
           final err =
               'Conflito detectado na operação ${op.id} (${op.entityType}): ${e.message}';
           errors.add(err);
-          await repository.markSyncOperationFailed(op.id, err);
+          await repository.markSyncOperationConflict(op.id, err);
         } else {
           failure++;
           final err =
@@ -2142,7 +2736,9 @@ class SupabaseSyncService {
     // Expulga operações sincronizadas antigas (> 30 dias) para manter o SQLite leve e veloz
     try {
       await repository.pruneOldSyncedOperations();
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.debug('Falha ao limpar operações sincronizadas antigas: $e', st);
+    }
 
     return SyncProcessResult(
       totalProcessed: pendingOps.length,
@@ -2153,6 +2749,72 @@ class SupabaseSyncService {
       message:
           'Sincronização concluída: $success enviados, $failure falhas, $conflicts conflitos.',
     );
+  }
+
+  bool _hasConcurrentRemoteDivergence({
+    required int remoteRev,
+    required int localRev,
+    required int? baseRev,
+    required DateTime? remoteUpdated,
+    required DateTime? localUpdated,
+    required Map<String, dynamic> localData,
+    required Map<String, dynamic> remoteData,
+  }) {
+    if (remoteRev > localRev) return true;
+    if (baseRev != null && remoteRev > baseRev) return true;
+    if (remoteUpdated != null &&
+        localUpdated != null &&
+        remoteUpdated.isAfter(localUpdated)) {
+      return true;
+    }
+    if (remoteRev == localRev && _recordsDifferNonAudit(localData, remoteData)) {
+      return true;
+    }
+    return false;
+  }
+
+  bool _recordsDifferNonAudit(
+    Map<String, dynamic> localData,
+    Map<String, dynamic> remoteData,
+  ) {
+    const ignoredKeys = {
+      'ownerId',
+      'owner_id',
+      'revision',
+      'updatedAt',
+      'updated_at',
+      'createdAt',
+      'created_at',
+    };
+    final keys = {...localData.keys, ...remoteData.keys};
+    for (final k in keys) {
+      if (ignoredKeys.contains(k)) continue;
+      final a = localData[k];
+      final b = remoteData[k];
+      if (a == null && b == null) continue;
+      if (!_valuesEqualNormalized(a, b)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool _valuesEqualNormalized(dynamic a, dynamic b) {
+    if (a == b) return true;
+    if (a == null || b == null) return false;
+    if ((a is bool && b is int) || (a is int && b is bool)) {
+      final aInt = a is bool ? (a ? 1 : 0) : a as int;
+      final bInt = b is bool ? (b ? 1 : 0) : b as int;
+      return aInt == bInt;
+    }
+    if (a is String && b is String) {
+      final aDt = SyncTimestamp.parse(a);
+      final bDt = SyncTimestamp.parse(b);
+      if (aDt != null && bDt != null) {
+        return aDt.difference(bDt).abs() <= const Duration(milliseconds: 1);
+      }
+    }
+    return false;
   }
 
   void dispose() {

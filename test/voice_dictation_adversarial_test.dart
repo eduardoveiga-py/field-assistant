@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -218,8 +220,19 @@ void main() {
 
     testWidgets('CHALLENGE-11: Linux full end-to-end flow with audio recording and manual entry', (tester) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+      final tempDir = Directory.systemTemp.createTempSync('challenge11_audio_');
+      addTearDown(() {
+        if (tempDir.existsSync()) tempDir.deleteSync(recursive: true);
+      });
+      final audioFixture = File('${tempDir.path}/recorded_visit.m4a')
+        ..writeAsBytesSync([
+          0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x4D, 0x34, 0x41, 0x20,
+          ...List.filled(64, 0x41),
+        ]);
       try {
-        final mockRecordService = LocalAudioRecordingService();
+        final mockRecordService = LocalAudioRecordingService(
+          defaultFilePath: audioFixture.path,
+        );
 
         await tester.pumpWidget(
           ProviderScope(

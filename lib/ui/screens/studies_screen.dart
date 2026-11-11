@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'knowledge_base_screen.dart';
 
 import '../../appointments/availability_engine.dart';
+import '../../core/app_logger.dart';
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../../database/app_database.dart';
@@ -17,6 +18,7 @@ import '../../publications/publication_link_resolver.dart';
 import '../../dashboard/counting_rules.dart';
 import '../providers.dart';
 import '../widgets/global_appointment_scheduling_section.dart';
+import '../widgets/managed_text_controllers.dart';
 import '../../publications/lff_book_catalog.dart';
 import '../../dashboard/student_priority_engine.dart';
 import '../widgets/screen_hero_accent_band.dart';
@@ -70,125 +72,131 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
 
   void _showEndStudyDialog(BuildContext context, BibleStudyEntry study) {
     String selectedReason = 'Falta de interesse / tempo';
-    final notesController = TextEditingController();
 
     if (!context.mounted) return;
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: const Row(
-            children: [
-              Icon(Icons.stop_circle_outlined, color: AppTheme.alertAmber),
-              SizedBox(width: 8),
-              Expanded(child: Text('Encerrar Estudo Bíblico')),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Você está encerrando o estudo "${study.title}". O contato NÃO será excluído e continuará preservado no seu histórico.',
-                  style: const TextStyle(fontSize: 13),
-                ),
-                const SizedBox(height: 14),
-                DropdownButtonFormField<String>(
-                  initialValue: selectedReason,
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Motivo do Encerramento *',
-                  ),
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'Falta de interesse / tempo',
-                      child: Text('Falta de interesse / tempo'),
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: const [''],
+        builder: (ctx, ctrls) {
+          final notesController = ctrls[0];
+
+          return StatefulBuilder(
+            builder: (ctx, setDialogState) => AlertDialog(
+              title: const Row(
+                children: [
+                  Icon(Icons.stop_circle_outlined, color: AppTheme.alertAmber),
+                  SizedBox(width: 8),
+                  Expanded(child: Text('Encerrar Estudo Bíblico')),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Você está encerrando o estudo "${study.title}". O contato NÃO será excluído e continuará preservado no seu histórico.',
+                      style: const TextStyle(fontSize: 13),
                     ),
-                    DropdownMenuItem(
-                      value: 'Mudou-se de território',
-                      child: Text('Mudou-se de território'),
+                    const SizedBox(height: 14),
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedReason,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Motivo do Encerramento *',
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'Falta de interesse / tempo',
+                          child: Text('Falta de interesse / tempo'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Mudou-se de território',
+                          child: Text('Mudou-se de território'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Oposição familiar',
+                          child: Text('Oposição familiar'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Estudo concluído / Batizado',
+                          child: Text('Estudo concluído / Batizado'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Problemas de saúde',
+                          child: Text('Problemas de saúde'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Outro',
+                          child: Text('Outro motivo'),
+                        ),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) setDialogState(() => selectedReason = val);
+                      },
                     ),
-                    DropdownMenuItem(
-                      value: 'Oposição familiar',
-                      child: Text('Oposição familiar'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'Estudo concluído / Batizado',
-                      child: Text('Estudo concluído / Batizado'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'Problemas de saúde',
-                      child: Text('Problemas de saúde'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'Outro',
-                      child: Text('Outro motivo'),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: notesController,
+                      decoration: const InputDecoration(
+                        labelText: 'Observação complementar (opcional)',
+                        hintText: 'Ex: Contato mantido com a família...',
+                      ),
+                      maxLines: 2,
                     ),
                   ],
-                  onChanged: (val) {
-                    if (val != null) setDialogState(() => selectedReason = val);
-                  },
                 ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: notesController,
-                  decoration: const InputDecoration(
-                    labelText: 'Observação complementar (opcional)',
-                    hintText: 'Ex: Contato mantido com a família...',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.alertAmber,
+                    foregroundColor: Colors.black,
                   ),
-                  maxLines: 2,
+                  onPressed: () async {
+                    final repo = ref.read(repositoryProvider);
+                    final reasonPayload = jsonEncode({
+                      'endReason': selectedReason,
+                      'notes': notesController.text.trim(),
+                      'endedAt': DateTime.now().toIso8601String(),
+                    });
+                    await repo.updateStudy(
+                      study.copyWith(
+                        status: selectedReason == 'Estudo concluído / Batizado'
+                            ? 'concluido'
+                            : 'encerrado',
+                        pauseOrCloseReason: Value(reasonPayload),
+                      ),
+                    );
+                    final parts = await repo.getParticipantsForStudy(study.id);
+                    for (final part in parts) {
+                      final p = await repo.getPersonById(part.personId);
+                      if (p != null) {
+                        await repo.updatePerson(p.copyWith(status: 'revisita'));
+                      }
+                    }
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Estudo encerrado ($selectedReason). Contatos mantidos como revisita!',
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                  child: const Text('Confirmar Encerramento'),
                 ),
               ],
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.alertAmber,
-                foregroundColor: Colors.black,
-              ),
-              onPressed: () async {
-                final repo = ref.read(repositoryProvider);
-                final reasonPayload = jsonEncode({
-                  'endReason': selectedReason,
-                  'notes': notesController.text.trim(),
-                  'endedAt': DateTime.now().toIso8601String(),
-                });
-                await repo.updateStudy(
-                  study.copyWith(
-                    status: selectedReason == 'Estudo concluído / Batizado'
-                        ? 'concluido'
-                        : 'encerrado',
-                    pauseOrCloseReason: Value(reasonPayload),
-                  ),
-                );
-                final parts = await repo.getParticipantsForStudy(study.id);
-                for (final part in parts) {
-                  final p = await repo.getPersonById(part.personId);
-                  if (p != null) {
-                    await repo.updatePerson(p.copyWith(status: 'revisita'));
-                  }
-                }
-                if (ctx.mounted) Navigator.pop(ctx);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Estudo encerrado ($selectedReason). Contatos mantidos como revisita!',
-                      ),
-                    ),
-                  );
-                }
-              },
-              child: const Text('Confirmar Encerramento'),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -386,20 +394,13 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
           )
         : null;
 
-    final lessonController = TextEditingController(
-      text: selectedLesson.toString(),
-    );
-    final paragraphsController = TextEditingController(
-      text: isLff
-          ? (selectedStartPoint == selectedEndPoint
-                ? '$selectedStartPoint'
-                : '$selectedStartPoint-$selectedEndPoint')
-          : (study.currentParagraph?.toString() ?? ''),
-    );
-    final notesController = TextEditingController();
-    final nextStepController = TextEditingController(
-      text: study.nextTopic ?? (initialNext?.label ?? ''),
-    );
+    final initLesson = selectedLesson.toString();
+    final initParagraphs = isLff
+        ? (selectedStartPoint == selectedEndPoint
+              ? '$selectedStartPoint'
+              : '$selectedStartPoint-$selectedEndPoint')
+        : (study.currentParagraph?.toString() ?? '');
+    final initNextStep = study.nextTopic ?? (initialNext?.label ?? '');
     int attendanceCount = 1;
     bool scheduleNextStudy = true;
 
@@ -437,7 +438,15 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
     if (!context.mounted) return;
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: [initLesson, initParagraphs, '', initNextStep],
+        builder: (ctx, ctrls) {
+          final lessonController = ctrls[0];
+          final paragraphsController = ctrls[1];
+          final notesController = ctrls[2];
+          final nextStepController = ctrls[3];
+
+          return StatefulBuilder(
         builder: (ctx, setDialogState) {
           final dialogIsDark = Theme.of(ctx).brightness == Brightness.dark;
           final allAppts = ref.read(appointmentsStreamProvider).value ?? [];
@@ -1156,28 +1165,34 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
             ],
           );
         },
+      );
+        },
       ),
     );
   }
 
   // Modal para criar novo estudo bíblico (compatível com primeiro uso e estudos já em andamento)
   void _showNewStudyDialog(BuildContext context) {
-    final titleController = TextEditingController();
-    final tagsController = TextEditingController();
     String selectedPublicationId = 'lff-book';
     String selectedLanguage = 'pt';
     String selectedFrequency = 'semanal';
     String selectedStatus = 'ativo';
     DateTime selectedStartedAt = DateTime.now();
     DateTime? selectedLastSessionAt;
-    final lessonController = TextEditingController(text: '1');
-    final paragraphController = TextEditingController(text: '1');
     final List<String> selectedPeopleIds = [];
 
     if (!context.mounted) return;
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: const ['', '', '1', '1'],
+        builder: (ctx, ctrls) {
+          final titleController = ctrls[0];
+          final tagsController = ctrls[1];
+          final lessonController = ctrls[2];
+          final paragraphController = ctrls[3];
+
+          return StatefulBuilder(
         builder: (ctx, setDialogState) {
           final people = ref.read(peopleStreamProvider).value ?? [];
           final isDarkDialog = Theme.of(ctx).brightness == Brightness.dark;
@@ -1538,30 +1553,37 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
             ],
           );
         },
+      );
+        },
       ),
     );
   }
 
   // Modal para editar dados de um estudo bíblico existente
   void _showEditStudyDialog(BuildContext context, BibleStudyEntry study) {
-    final titleController = TextEditingController(text: study.title);
-    final tagsController = TextEditingController(text: study.learningGoals ?? '');
     String selectedPublicationId = study.publicationId;
     String selectedLanguage = study.language;
     String selectedFrequency = study.frequency;
     String selectedStatus = study.status;
     DateTime realStartDate = study.startedAt;
     DateTime? lastSessionDate = study.lastSessionAt;
-    final lessonController = TextEditingController(
-      text: (study.currentLesson ?? 1).toString(),
-    );
-    final paragraphController = TextEditingController(
-      text: (study.currentParagraph ?? 1).toString(),
-    );
 
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: [
+          study.title,
+          study.learningGoals ?? '',
+          (study.currentLesson ?? 1).toString(),
+          (study.currentParagraph ?? 1).toString(),
+        ],
+        builder: (ctx, ctrls) {
+          final titleController = ctrls[0];
+          final tagsController = ctrls[1];
+          final lessonController = ctrls[2];
+          final paragraphController = ctrls[3];
+
+          return StatefulBuilder(
         builder: (ctx, setDialogState) {
           return AlertDialog(
             title: const Row(
@@ -1827,6 +1849,8 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
               ),
             ],
           );
+        },
+      );
         },
       ),
     );
@@ -2362,7 +2386,9 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                 allAvailableTags.addAll(
                   tList.map((t) => t.trim()).where((t) => t.isNotEmpty && t.length <= 30),
                 );
-              } catch (_) {}
+              } catch (e, st) {
+                AppLogger.debug('Falha ao ler tags JSON (${p.id}) no filtro de estudos: $e', st);
+              }
             }
           }
 
@@ -2394,7 +2420,9 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                         matchesTag = true;
                         break;
                       }
-                    } catch (_) {}
+                    } catch (e, st) {
+                      AppLogger.debug('Falha ao filtrar tag JSON (${person.id}) em estudos: $e', st);
+                    }
                   }
                 }
               }
@@ -2670,7 +2698,11 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                               if (d is Map && d.containsKey('endReason')) {
                                 endReason = d['endReason'];
                               }
-                            } catch (_) {
+                            } catch (e, st) {
+                              AppLogger.debug(
+                                'Motivo do estudo em texto livre (não JSON): $e',
+                                st,
+                              );
                               endReason = study.pauseOrCloseReason;
                             }
                           }
@@ -2699,7 +2731,9 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                                   studyTags.add(clean);
                                 }
                               }
-                            } catch (_) {}
+                            } catch (e, st) {
+                              AppLogger.debug('Falha ao ler tags JSON do contato principal (${primaryPerson.id}): $e', st);
+                            }
                           }
 
                           return Card(
@@ -2912,81 +2946,71 @@ class _StudiesScreenState extends ConsumerState<StudiesScreen> {
                                     // Conteúdo Expandido (abre apenas com um clique/toque economizando espaço vertical)
                                     if (isExpanded) ...[
                                       const Divider(height: 20),
-                                      FutureBuilder<List<StudyParticipantEntry>>(
-                                        future: ref
-                                            .read(repositoryProvider)
-                                            .getParticipantsForStudy(study.id),
-                                        builder: (context, partSnap) {
-                                          final parts = partSnap.data ?? [];
-                                          if (parts.isEmpty) {
-                                            return const SizedBox.shrink();
-                                          }
-                                          final people =
-                                              ref.watch(peopleStreamProvider).value ?? [];
-                                          final peopleMap = {
-                                            for (var p in people) p.id: p.name,
-                                          };
-                                          final names = parts
-                                              .map(
-                                                (p) => peopleMap[p.personId] ?? 'Participante',
-                                              )
-                                              .join(', ');
-                                          return InkWell(
-                                            onTap: () {
-                                              if (parts.isNotEmpty) {
+                                      if (studyParts.isNotEmpty)
+                                        Builder(
+                                          builder: (context) {
+                                            final peopleMap = {
+                                              for (var p in people) p.id: p.name,
+                                            };
+                                            final names = studyParts
+                                                .map(
+                                                  (p) => peopleMap[p.personId] ?? 'Participante',
+                                                )
+                                                .join(', ');
+                                            return InkWell(
+                                              onTap: () {
                                                 Navigator.push(
                                                   context,
                                                   MaterialPageRoute(
                                                     builder: (_) => PersonDetailScreen(
-                                                      personId: parts.first.personId,
+                                                      personId: studyParts.first.personId,
                                                     ),
                                                   ),
                                                 );
-                                              }
-                                            },
-                                            borderRadius: BorderRadius.circular(6),
-                                            child: Container(
-                                              padding: const EdgeInsets.symmetric(
-                                                horizontal: 8,
-                                                vertical: 5,
-                                              ),
-                                              margin: const EdgeInsets.only(bottom: 8),
-                                              decoration: BoxDecoration(
-                                                color: AppTheme.primaryBlue.withValues(alpha: 0.08),
-                                                borderRadius: BorderRadius.circular(6),
-                                                border: Border.all(
-                                                  color: AppTheme.primaryBlue.withValues(alpha: 0.2),
+                                              },
+                                              borderRadius: BorderRadius.circular(6),
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(
+                                                  horizontal: 8,
+                                                  vertical: 5,
                                                 ),
-                                              ),
-                                              child: Row(
-                                                children: [
-                                                  const Icon(
-                                                    Icons.people_alt_outlined,
-                                                    size: 16,
-                                                    color: AppTheme.primaryBlue,
+                                                margin: const EdgeInsets.only(bottom: 8),
+                                                decoration: BoxDecoration(
+                                                  color: AppTheme.primaryBlue.withValues(alpha: 0.08),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                  border: Border.all(
+                                                    color: AppTheme.primaryBlue.withValues(alpha: 0.2),
                                                   ),
-                                                  const SizedBox(width: 6),
-                                                  Expanded(
-                                                    child: Text(
-                                                      'Participam: $names',
-                                                      style: const TextStyle(
-                                                        fontSize: 12,
-                                                        fontWeight: FontWeight.w600,
-                                                        color: AppTheme.primaryBlue,
+                                                ),
+                                                child: Row(
+                                                  children: [
+                                                    const Icon(
+                                                      Icons.people_alt_outlined,
+                                                      size: 16,
+                                                      color: AppTheme.primaryBlue,
+                                                    ),
+                                                    const SizedBox(width: 6),
+                                                    Expanded(
+                                                      child: Text(
+                                                        'Participam: $names',
+                                                        style: const TextStyle(
+                                                          fontSize: 12,
+                                                          fontWeight: FontWeight.w600,
+                                                          color: AppTheme.primaryBlue,
+                                                        ),
                                                       ),
                                                     ),
-                                                  ),
-                                                  const Icon(
-                                                    Icons.arrow_forward_ios,
-                                                    size: 11,
-                                                    color: AppTheme.primaryBlue,
-                                                  ),
-                                                ],
+                                                    const Icon(
+                                                      Icons.arrow_forward_ios,
+                                                      size: 11,
+                                                      color: AppTheme.primaryBlue,
+                                                    ),
+                                                  ],
+                                                ),
                                               ),
-                                            ),
-                                          );
-                                        },
-                                      ),
+                                            );
+                                          },
+                                        ),
                                       Container(
                                         padding: const EdgeInsets.all(10),
                                         decoration: BoxDecoration(

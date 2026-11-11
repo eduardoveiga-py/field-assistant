@@ -6,10 +6,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/app_logger.dart';
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../../database/app_database.dart';
 import '../../ui/providers.dart';
+import 'managed_text_controllers.dart';
 
 class PersonHandOffHelper {
   /// Gera texto completo estruturado para passar a revisita para outro publicador ou pioneiro
@@ -78,7 +80,8 @@ class PersonHandOffHelper {
         } else {
           buffer.writeln('📝 *Observações:* ${person.generalNotes}');
         }
-      } catch (_) {
+      } catch (e, st) {
+        AppLogger.debug('Observações da pessoa em texto simples (não JSON): $e', st);
         buffer.writeln('📝 *Observações:* ${person.generalNotes}');
       }
     }
@@ -110,13 +113,17 @@ class PersonHandOffHelper {
       lastVisit: lastVisit,
       linkedStudy: linkedStudy,
     );
-    final toPublisherController = TextEditingController();
-    final notesController = TextEditingController();
     DateTime chosenDate = DateTime.now();
 
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: const ['', ''],
+        builder: (ctx, ctrls) {
+          final toPublisherController = ctrls[0];
+          final notesController = ctrls[1];
+
+          return StatefulBuilder(
         builder: (ctx, setDialogState) {
           final isDark = Theme.of(ctx).brightness == Brightness.dark;
 
@@ -337,6 +344,8 @@ class PersonHandOffHelper {
               ),
             ],
           );
+        },
+      );
         },
       ),
     );

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/app_theme.dart';
+import 'managed_text_controllers.dart';
 
 /// Barra de ferramentas de formatação rica e Markdown ágil.
 /// Permite aplicar Negrito, Itálico, Títulos, Listas, Citações,
@@ -292,7 +293,12 @@ class RichMarkdownToolbar extends StatelessWidget {
                   Navigator.pop(ctx);
                   try {
                     final picker = ImagePicker();
-                    final photo = await picker.pickImage(source: ImageSource.gallery);
+                    final photo = await picker.pickImage(
+                      source: ImageSource.gallery,
+                      maxWidth: 1280,
+                      maxHeight: 1280,
+                      imageQuality: 80,
+                    );
                     if (photo != null) {
                       _wrapSelection(
                         prefix: '![foto](${photo.path})',
@@ -312,7 +318,12 @@ class RichMarkdownToolbar extends StatelessWidget {
                   Navigator.pop(ctx);
                   try {
                     final picker = ImagePicker();
-                    final photo = await picker.pickImage(source: ImageSource.camera);
+                    final photo = await picker.pickImage(
+                      source: ImageSource.camera,
+                      maxWidth: 1280,
+                      maxHeight: 1280,
+                      imageQuality: 80,
+                    );
                     if (photo != null) {
                       _wrapSelection(
                         prefix: '![foto](${photo.path})',
@@ -341,52 +352,57 @@ class RichMarkdownToolbar extends StatelessWidget {
   }
 
   void _showManualImageDialog(BuildContext context) {
-    final captionCtrl = TextEditingController();
-    final urlCtrl = TextEditingController();
-
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Inserir Imagem por URL'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: captionCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Legenda da foto',
-                hintText: 'Ex: Mapa do território',
-                border: OutlineInputBorder(),
-              ),
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: const ['', ''],
+        builder: (ctx, ctrls) {
+          final captionCtrl = ctrls[0];
+          final urlCtrl = ctrls[1];
+
+          return AlertDialog(
+            title: const Text('Inserir Imagem por URL'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: captionCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Legenda da foto',
+                    hintText: 'Ex: Mapa do território',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: urlCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'URL ou Caminho da Imagem',
+                    hintText: 'https://exemplo.com/foto.jpg',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: urlCtrl,
-              decoration: const InputDecoration(
-                labelText: 'URL ou Caminho da Imagem',
-                hintText: 'https://exemplo.com/foto.jpg',
-                border: OutlineInputBorder(),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancelar'),
               ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final path = urlCtrl.text.trim();
-              if (path.isNotEmpty) {
-                final caption = captionCtrl.text.trim().isEmpty ? 'imagem' : captionCtrl.text.trim();
-                _wrapSelection(prefix: '![$caption]($path)', suffix: '');
-              }
-              Navigator.pop(ctx);
-            },
-            child: const Text('Inserir'),
-          ),
-        ],
+              ElevatedButton(
+                onPressed: () {
+                  final path = urlCtrl.text.trim();
+                  if (path.isNotEmpty) {
+                    final caption = captionCtrl.text.trim().isEmpty ? 'imagem' : captionCtrl.text.trim();
+                    _wrapSelection(prefix: '![$caption]($path)', suffix: '');
+                  }
+                  Navigator.pop(ctx);
+                },
+                child: const Text('Inserir'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -481,53 +497,58 @@ class RichMarkdownToolbar extends StatelessWidget {
     required String titleHint,
     required String urlHint,
   }) {
-    final titleCtrl = TextEditingController();
-    final urlCtrl = TextEditingController();
-
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('${defaultPrefix.isNotEmpty ? defaultPrefix : "🔗 "}Inserir Link'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: titleCtrl,
-              autofocus: true,
-              decoration: InputDecoration(
-                labelText: 'Título do Link / Publicação',
-                hintText: titleHint,
-                border: const OutlineInputBorder(),
-              ),
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: const ['', ''],
+        builder: (ctx, ctrls) {
+          final titleCtrl = ctrls[0];
+          final urlCtrl = ctrls[1];
+
+          return AlertDialog(
+            title: Text('${defaultPrefix.isNotEmpty ? defaultPrefix : "🔗 "}Inserir Link'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: titleCtrl,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    labelText: 'Título do Link / Publicação',
+                    hintText: titleHint,
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: urlCtrl,
+                  decoration: InputDecoration(
+                    labelText: 'URL (JW.org ou endereço web)',
+                    hintText: urlHint,
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: urlCtrl,
-              decoration: InputDecoration(
-                labelText: 'URL (JW.org ou endereço web)',
-                hintText: urlHint,
-                border: const OutlineInputBorder(),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancelar'),
               ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final url = urlCtrl.text.trim();
-              if (url.isNotEmpty) {
-                final title = titleCtrl.text.trim().isEmpty ? 'Link' : titleCtrl.text.trim();
-                _wrapSelection(prefix: '[$defaultPrefix$title]($url)', suffix: '');
-              }
-              Navigator.pop(ctx);
-            },
-            child: const Text('Inserir Link'),
-          ),
-        ],
+              ElevatedButton(
+                onPressed: () {
+                  final url = urlCtrl.text.trim();
+                  if (url.isNotEmpty) {
+                    final title = titleCtrl.text.trim().isEmpty ? 'Link' : titleCtrl.text.trim();
+                    _wrapSelection(prefix: '[$defaultPrefix$title]($url)', suffix: '');
+                  }
+                  Navigator.pop(ctx);
+                },
+                child: const Text('Inserir Link'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

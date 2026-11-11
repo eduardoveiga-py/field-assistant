@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
+import '../../core/app_logger.dart';
 import '../mbtiles/mbtiles_service.dart';
 import 'tile_cache_interface.dart';
 import 'tile_cache_web.dart' if (dart.library.io) 'tile_cache_native.dart';
@@ -154,7 +155,9 @@ class TileCacheService {
           if (bytes != null && bytes.isNotEmpty) {
             savedCount++;
           }
-        } catch (_) {}
+        } catch (e, st) {
+          AppLogger.debug('Falha ao baixar tile ($z/$x/$y): $e', st);
+        }
         completed++;
         onProgress?.call(completed, total);
       }

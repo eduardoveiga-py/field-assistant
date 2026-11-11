@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
-import 'package:drift/drift.dart';
 
+import '../core/sync_timestamp.dart';
 import '../database/app_database.dart';
 import '../ui/providers.dart';
 
@@ -35,102 +36,73 @@ class PersonPublicationItem {
     'publication_title': publicationTitle,
     'item_type': itemType,
     'status': status,
-    'date': date.toIso8601String(),
+    'date': date.toIso8601String().substring(0, 10),
     'notes': notes,
-    'created_at': createdAt.toIso8601String(),
+    'created_at': createdAt.toUtc().toIso8601String(),
   };
+
+  factory PersonPublicationItem.fromEntry(PersonPublicationEntry e) =>
+      PersonPublicationItem(
+        id: e.id,
+        personId: e.personId,
+        publicationTitle: e.publicationTitle,
+        itemType: e.itemType,
+        status: e.status,
+        date: SyncTimestamp.parse(e.date) ?? e.createdAt,
+        notes: e.notes,
+        createdAt: e.createdAt,
+      );
 
   factory PersonPublicationItem.fromMap(Map<String, dynamic> map) =>
       PersonPublicationItem(
         id: map['id'] as String,
-        personId: map['person_id'] as String,
-        publicationTitle: map['publication_title'] as String,
-        itemType: map['item_type'] as String,
+        personId: (map['person_id'] ?? map['personId']) as String,
+        publicationTitle:
+            (map['publication_title'] ?? map['publicationTitle']) as String,
+        itemType: (map['item_type'] ?? map['itemType']) as String,
         status: map['status'] as String,
-        date: DateTime.parse(map['date'] as String),
+        date: SyncTimestamp.parse(map['date']) ?? DateTime.now(),
         notes: map['notes'] as String?,
-        createdAt: DateTime.parse(map['created_at'] as String),
+        createdAt:
+            SyncTimestamp.parse(map['created_at'] ?? map['createdAt']) ??
+            DateTime.now(),
       );
 }
 
 class PersonPublicationsManager {
   final AppDatabase db;
   final Uuid _uuid = const Uuid();
-  final StreamController<List<PersonPublicationItem>> _controller =
-      StreamController<List<PersonPublicationItem>>.broadcast();
-  Future<void>? _initFuture;
-  bool _initialized = false;
 
-  PersonPublicationsManager(this.db) {
-    _initTable();
-  }
-
-  Future<void> _initTable() async {
-    if (_initialized) return;
-    _initFuture ??= _doInitTable();
-    await _initFuture;
-  }
-
-  Future<void> _doInitTable() async {
-    try {
-      await db.customStatement('''
-        CREATE TABLE IF NOT EXISTS person_publications (
-          id TEXT PRIMARY KEY,
-          person_id TEXT NOT NULL,
-          publication_title TEXT NOT NULL,
-          item_type TEXT NOT NULL,
-          status TEXT NOT NULL,
-          date TEXT NOT NULL,
-          notes TEXT,
-          created_at TEXT NOT NULL
-        );
-      ''');
-    } catch (_) {}
-    _initialized = true;
-    _refresh();
-  }
-
-  Future<void> _refresh() async {
-    try {
-      final list = await getAllPublications();
-      if (!_controller.isClosed) {
-        _controller.add(list);
-      }
-    } catch (_) {}
-  }
+  PersonPublicationsManager(this.db);
 
   Future<List<PersonPublicationItem>> getAllPublications() async {
-    await _initTable();
-    try {
-      final rows = await db
-          .customSelect('SELECT * FROM person_publications ORDER BY date DESC')
-          .get();
-      return rows.map((r) => PersonPublicationItem.fromMap(r.data)).toList();
-    } catch (_) {
-      return [];
-    }
+    final rows =
+        await (db.select(db.personPublications)
+              ..where((t) => t.deletedAt.isNull())
+              ..orderBy([(t) => OrderingTerm.desc(t.date)]))
+            .get();
+    return rows.map(PersonPublicationItem.fromEntry).toList();
   }
 
   Future<List<PersonPublicationItem>> getPublicationsForPerson(
     String personId,
   ) async {
-    await _initTable();
-    try {
-      final rows = await db
-          .customSelect(
-            'SELECT * FROM person_publications WHERE person_id = ? ORDER BY date DESC',
-            variables: [Variable.withString(personId)],
-          )
-          .get();
-      return rows.map((r) => PersonPublicationItem.fromMap(r.data)).toList();
-    } catch (_) {
-      return [];
-    }
+    final rows =
+        await (db.select(db.personPublications)
+              ..where(
+                (t) => t.personId.equals(personId) & t.deletedAt.isNull(),
+              )
+              ..orderBy([(t) => OrderingTerm.desc(t.date)]))
+            .get();
+    return rows.map(PersonPublicationItem.fromEntry).toList();
   }
 
-  Stream<List<PersonPublicationItem>> watchAllPublications() async* {
-    yield await getAllPublications();
-    yield* _controller.stream;
+  Stream<List<PersonPublicationItem>> watchAllPublications() {
+    return (db.select(db.personPublications)
+          ..where((t) => t.deletedAt.isNull())
+          ..orderBy([(t) => OrderingTerm.desc(t.date)]))
+        .watch()
+        .map((rows) => rows.map(PersonPublicationItem.fromEntry).toList());
   }
 
   Future<PersonPublicationItem> addDeliveredPublication({
@@ -151,52 +123,42 @@ class PersonPublicationsManager {
     DateTime? date,
     String? notes,
   }) async {
-    await _initTable();
     final now = DateTime.now();
     final id = _uuid.v4();
     final d = date ?? now;
+    final cleanNotes =
+        notes != null && notes.trim().isNotEmpty ? notes.trim() : null;
 
-    await db.customInsert(
-      'INSERT INTO person_publications (id, person_id, publication_title, item_type, status, date, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      variables: [
-        Variable.withString(id),
-        Variable.withString(personId),
-        Variable.withString(title.trim()),
-        Variable.withString('entregue'),
-        Variable.withString('entregue'),
-        Variable.withString(d.toIso8601String()),
-        Variable.withString(notes ?? ''),
-        Variable.withString(now.toIso8601String()),
-      ],
-    );
-
-    final item = PersonPublicationItem(
+    final entry = PersonPublicationEntry(
       id: id,
       personId: personId,
       publicationTitle: title.trim(),
       itemType: 'entregue',
       status: 'entregue',
-      date: d,
-      notes: notes,
+      date: d.toIso8601String().substring(0, 10),
+      notes: cleanNotes,
       createdAt: now,
+      updatedAt: now,
+      deletedAt: null,
+      revision: 1,
     );
 
-    try {
+    await db.transaction(() async {
+      await db.into(db.personPublications).insert(entry);
       await db.into(db.syncQueue).insert(
         SyncQueueCompanion.insert(
           id: _uuid.v4(),
           entityType: 'person_publications',
           entityId: id,
           operation: 'INSERT',
-          payload: jsonEncode(item.toMap()),
+          payload: jsonEncode(SyncTimestamp.normalizeMapDates(entry.toJson())),
           createdAt: now,
           status: const Value('pending'),
         ),
       );
-    } catch (_) {}
+    });
 
-    await _refresh();
-    return item;
+    return PersonPublicationItem.fromEntry(entry);
   }
 
   Future<PersonPublicationItem> addStudentRequest({
@@ -205,52 +167,42 @@ class PersonPublicationsManager {
     String? notes,
     DateTime? targetDate,
   }) async {
-    await _initTable();
     final now = DateTime.now();
     final id = _uuid.v4();
     final d = targetDate ?? now;
+    final cleanNotes =
+        notes != null && notes.trim().isNotEmpty ? notes.trim() : null;
 
-    await db.customInsert(
-      'INSERT INTO person_publications (id, person_id, publication_title, item_type, status, date, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      variables: [
-        Variable.withString(id),
-        Variable.withString(personId),
-        Variable.withString(title.trim()),
-        Variable.withString('pedido'),
-        Variable.withString('a_pedir'),
-        Variable.withString(d.toIso8601String()),
-        Variable.withString(notes ?? ''),
-        Variable.withString(now.toIso8601String()),
-      ],
-    );
-
-    final item = PersonPublicationItem(
+    final entry = PersonPublicationEntry(
       id: id,
       personId: personId,
       publicationTitle: title.trim(),
       itemType: 'pedido',
       status: 'a_pedir',
-      date: d,
-      notes: notes,
+      date: d.toIso8601String().substring(0, 10),
+      notes: cleanNotes,
       createdAt: now,
+      updatedAt: now,
+      deletedAt: null,
+      revision: 1,
     );
 
-    try {
+    await db.transaction(() async {
+      await db.into(db.personPublications).insert(entry);
       await db.into(db.syncQueue).insert(
         SyncQueueCompanion.insert(
           id: _uuid.v4(),
           entityType: 'person_publications',
           entityId: id,
           operation: 'INSERT',
-          payload: jsonEncode(item.toMap()),
+          payload: jsonEncode(SyncTimestamp.normalizeMapDates(entry.toJson())),
           createdAt: now,
           status: const Value('pending'),
         ),
       );
-    } catch (_) {}
+    });
 
-    await _refresh();
-    return item;
+    return PersonPublicationItem.fromEntry(entry);
   }
 
   Future<void> updatePublicationStatus({
@@ -258,33 +210,23 @@ class PersonPublicationsManager {
     required String newStatus,
     String? notes,
   }) async {
-    await _initTable();
     final now = DateTime.now();
-    if (notes != null) {
-      await db.customUpdate(
-        'UPDATE person_publications SET status = ?, notes = ? WHERE id = ?',
-        variables: [
-          Variable.withString(newStatus),
-          Variable.withString(notes),
-          Variable.withString(id),
-        ],
-      );
-    } else {
-      await db.customUpdate(
-        'UPDATE person_publications SET status = ? WHERE id = ?',
-        variables: [Variable.withString(newStatus), Variable.withString(id)],
-      );
-    }
+    final existing = await (db.select(db.personPublications)
+          ..where((t) => t.id.equals(id)))
+        .getSingleOrNull();
+    if (existing == null) return;
 
-    try {
-      final payload = <String, dynamic>{
-        'id': id,
-        'status': newStatus,
-        'updated_at': now.toIso8601String(),
-      };
-      if (notes != null) {
-        payload['notes'] = notes;
-      }
+    final updated = existing.copyWith(
+      status: newStatus,
+      notes: notes != null ? Value(notes) : Value(existing.notes),
+      updatedAt: Value(now),
+      revision: existing.revision + 1,
+    );
+
+    await db.transaction(() async {
+      await db.update(db.personPublications).replace(updated);
+      final payload = SyncTimestamp.normalizeMapDates(updated.toJson());
+      payload['_base'] = SyncTimestamp.normalizeMapDates(existing.toJson());
       await db.into(db.syncQueue).insert(
         SyncQueueCompanion.insert(
           id: _uuid.v4(),
@@ -296,20 +238,26 @@ class PersonPublicationsManager {
           status: const Value('pending'),
         ),
       );
-    } catch (_) {}
-
-    await _refresh();
+    });
   }
 
   Future<void> deletePublication(String id) async {
-    await _initTable();
     final now = DateTime.now();
-    await db.customUpdate(
-      'DELETE FROM person_publications WHERE id = ?',
-      variables: [Variable.withString(id)],
-    );
+    final existing = await (db.select(db.personPublications)
+          ..where((t) => t.id.equals(id)))
+        .getSingleOrNull();
+    if (existing == null) return;
 
-    try {
+    final nextRev = existing.revision + 1;
+    await db.transaction(() async {
+      await (db.update(db.personPublications)..where((t) => t.id.equals(id)))
+          .write(
+        PersonPublicationsCompanion(
+          deletedAt: Value(now),
+          updatedAt: Value(now),
+          revision: Value(nextRev),
+        ),
+      );
       await db.into(db.syncQueue).insert(
         SyncQueueCompanion.insert(
           id: _uuid.v4(),
@@ -318,15 +266,15 @@ class PersonPublicationsManager {
           operation: 'DELETE',
           payload: jsonEncode({
             'id': id,
-            'deleted_at': now.toIso8601String(),
+            'deleted_at': now.toUtc().toIso8601String(),
+            'updated_at': now.toUtc().toIso8601String(),
+            'revision': nextRev,
           }),
           createdAt: now,
           status: const Value('pending'),
         ),
       );
-    } catch (_) {}
-
-    await _refresh();
+    });
   }
 }
 

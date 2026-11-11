@@ -1,8 +1,11 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import '../core/app_logger.dart';
+import '../core/sync_timestamp.dart';
 import 'app_database.dart';
 
 class AppRepository {
@@ -14,6 +17,10 @@ class AppRepository {
   // --------------------------------------------------------------------------
   // TRANSAÇÃO AUXILIAR: MUTAÇÃO + ENFILEIRAMENTO DE SINCRONIZAÇÃO
   // --------------------------------------------------------------------------
+  Map<String, dynamic> _fullSyncJson(Map<String, dynamic> raw) {
+    return SyncTimestamp.normalizeMapDates(raw);
+  }
+
   Future<void> _recordSyncOperation({
     required String entityType,
     required String entityId,
@@ -21,9 +28,9 @@ class AppRepository {
     required Map<String, dynamic> payload,
     Map<String, dynamic>? baseData,
   }) async {
-    final finalPayload = Map<String, dynamic>.from(payload);
+    final finalPayload = _fullSyncJson(payload);
     if (baseData != null) {
-      finalPayload['_base'] = baseData;
+      finalPayload['_base'] = _fullSyncJson(baseData);
     }
     await db
         .into(db.syncQueue)
@@ -71,16 +78,48 @@ class AppRepository {
     final lower = query.trim().toLowerCase();
     if (lower.isEmpty) return getAllPeople();
 
+    // Caminho SQL indexado (A7) para queries ASCII: evita carregar estudos e fazer O(P*S) em memória.
+    if (!RegExp(r'[^\x00-\x7F]').hasMatch(lower)) {
+      final like = '%$lower%';
+      return db.customSelect(
+        '''
+        SELECT p.* FROM people p
+        WHERE p.deleted_at IS NULL AND (
+          lower(p.name) LIKE ?1 OR
+          lower(coalesce(p.phone, '')) LIKE ?1 OR
+          lower(coalesce(p.address, '')) LIKE ?1 OR
+          lower(coalesce(p.general_notes, '')) LIKE ?1 OR
+          lower(coalesce(p.next_action_note, '')) LIKE ?1 OR
+          lower(coalesce(p.contact_restrictions, '')) LIKE ?1 OR
+          lower(p.tags) LIKE ?1 OR
+          lower(coalesce(p.preferred_schedule, '')) LIKE ?1 OR
+          EXISTS (
+            SELECT 1 FROM study_participants sp
+            JOIN bible_studies bs ON bs.id = sp.study_id AND bs.deleted_at IS NULL
+            WHERE sp.person_id = p.id AND sp.deleted_at IS NULL AND (
+              lower(bs.title) LIKE ?1 OR
+              lower(bs.publication_id) LIKE ?1
+            )
+          )
+        )
+        ORDER BY p.name COLLATE NOCASE ASC
+        ''',
+        variables: [Variable.withString(like)],
+        readsFrom: {db.people, db.studyParticipants, db.bibleStudies},
+      ).asyncMap(db.people.mapFromRow).get();
+    }
+
+    // Fallback com suporte completo a diacríticos/acentos em O(P + S)
     final all = await getAllPeople();
     final studies = await getAllStudies();
     final participants = await (db.select(
       db.studyParticipants,
     )..where((tbl) => tbl.deletedAt.isNull())).get();
 
-    // Cria mapa de personId -> estudos vinculados
+    final studiesById = {for (final s in studies) s.id: s};
     final Map<String, List<BibleStudyEntry>> personStudies = {};
     for (final p in participants) {
-      final study = studies.where((s) => s.id == p.studyId).firstOrNull;
+      final study = studiesById[p.studyId];
       if (study != null) {
         personStudies.putIfAbsent(p.personId, () => []).add(study);
       }
@@ -108,7 +147,6 @@ class AppRepository {
 
       if (matchesDirect) return true;
 
-      // Verifica estudos bíblicos vinculados (título, publicação, lição e parágrafo)
       final linked = personStudies[p.id] ?? [];
       for (final s in linked) {
         if (s.title.toLowerCase().contains(lower) ||
@@ -173,24 +211,7 @@ class AppRepository {
         entityType: 'people',
         entityId: personId,
         operation: 'INSERT',
-        payload: {
-          'id': entry.id,
-          'name': entry.name,
-          'phone': entry.phone,
-          'address': entry.address,
-          'latitude': entry.latitude,
-          'longitude': entry.longitude,
-          'firstContactAt': entry.firstContactAt.toIso8601String(),
-          'status': entry.status,
-          'preferredSchedule': entry.preferredSchedule,
-          'generalNotes': entry.generalNotes,
-          'contactRestrictions': entry.contactRestrictions,
-          'tags': entry.tags,
-          'lastContactAt': entry.lastContactAt?.toIso8601String(),
-          'nextActionAt': entry.nextActionAt?.toIso8601String(),
-          'nextActionNote': entry.nextActionNote,
-          'revision': entry.revision,
-        },
+        payload: entry.toJson(),
       );
     });
 
@@ -211,23 +232,7 @@ class AppRepository {
         entityType: 'people',
         entityId: updated.id,
         operation: 'UPDATE',
-        payload: {
-          'id': updated.id,
-          'name': updated.name,
-          'phone': updated.phone,
-          'address': updated.address,
-          'latitude': updated.latitude,
-          'longitude': updated.longitude,
-          'status': updated.status,
-          'preferredSchedule': updated.preferredSchedule,
-          'generalNotes': updated.generalNotes,
-          'contactRestrictions': updated.contactRestrictions,
-          'tags': updated.tags,
-          'lastContactAt': updated.lastContactAt?.toIso8601String(),
-          'nextActionAt': updated.nextActionAt?.toIso8601String(),
-          'nextActionNote': updated.nextActionNote,
-          'revision': updated.revision,
-        },
+        payload: updated.toJson(),
         baseData: existing?.toJson(),
       );
     });
@@ -249,7 +254,8 @@ class AppRepository {
         entityType: 'people',
         entityId: id,
         operation: 'DELETE',
-        payload: {'id': id, 'deletedAt': now.toIso8601String()},
+        payload: updated.toJson(),
+        baseData: person.toJson(),
       );
 
       final participants = await (db.select(
@@ -266,7 +272,8 @@ class AppRepository {
           entityType: 'study_participants',
           entityId: p.id,
           operation: 'DELETE',
-          payload: {'id': p.id, 'deletedAt': now.toIso8601String()},
+          payload: updatedP.toJson(),
+          baseData: p.toJson(),
         );
       }
     });
@@ -375,20 +382,7 @@ class AppRepository {
           entityType: 'people',
           entityId: person.id,
           operation: 'UPDATE',
-          payload: {
-            'id': updatePersonData.id,
-            'name': updatePersonData.name,
-            'phone': updatePersonData.phone,
-            'firstContactAt': updatePersonData.firstContactAt.toIso8601String(),
-            'lastContactAt': updatePersonData.lastContactAt?.toIso8601String(),
-            'nextActionAt': updatePersonData.nextActionAt?.toIso8601String(),
-            'nextActionNote': updatePersonData.nextActionNote,
-            'status': updatePersonData.status,
-            'tags': updatePersonData.tags,
-            'generalNotes': updatePersonData.generalNotes,
-            'revision': updatePersonData.revision,
-            'updatedAt': now.toIso8601String(),
-          },
+          payload: updatePersonData.toJson(),
           baseData: person.toJson(),
         );
       }
@@ -397,21 +391,7 @@ class AppRepository {
         entityType: 'visits',
         entityId: visitId,
         operation: 'INSERT',
-        payload: {
-          'id': entry.id,
-          'personId': entry.personId,
-          'dateTimeField': entry.dateTimeField.toIso8601String(),
-          'contactType': entry.contactType,
-          'result': entry.result,
-          'notes': entry.notes,
-          'topicsDiscussed': entry.topicsDiscussed,
-          'scriptureOrPub': entry.scriptureOrPub,
-          'expressedQuestion': entry.expressedQuestion,
-          'nextStep': entry.nextStep,
-          'suggestedReturnDate': entry.suggestedReturnDate?.toIso8601String(),
-          'appointmentId': entry.appointmentId,
-          'revision': entry.revision,
-        },
+        payload: entry.toJson(),
       );
     });
 
@@ -433,15 +413,7 @@ class AppRepository {
         entityType: 'visits',
         entityId: updated.id,
         operation: 'UPDATE',
-        payload: {
-          'id': updated.id,
-          'notes': updated.notes,
-          'topicsDiscussed': updated.topicsDiscussed,
-          'result': updated.result,
-          'nextStep': updated.nextStep,
-          'suggestedReturnDate': updated.suggestedReturnDate?.toIso8601String(),
-          'revision': updated.revision,
-        },
+        payload: updated.toJson(),
         baseData: existing?.toJson(),
       );
     });
@@ -464,7 +436,8 @@ class AppRepository {
         entityType: 'visits',
         entityId: id,
         operation: 'DELETE',
-        payload: {'id': id, 'deletedAt': now.toIso8601String()},
+        payload: updated.toJson(),
+        baseData: visit.toJson(),
       );
     });
   }
@@ -584,18 +557,7 @@ class AppRepository {
           entityType: 'study_participants',
           entityId: partId,
           operation: 'INSERT',
-          payload: {
-            'id': partEntry.id,
-            'study_id': partEntry.studyId,
-            'studyId': partEntry.studyId,
-            'person_id': partEntry.personId,
-            'personId': partEntry.personId,
-            'is_primary': partEntry.isPrimary,
-            'isPrimary': partEntry.isPrimary,
-            'revision': partEntry.revision,
-            'created_at': partEntry.createdAt.toIso8601String(),
-            'updated_at': partEntry.updatedAt.toIso8601String(),
-          },
+          payload: partEntry.toJson(),
         );
       }
 
@@ -603,19 +565,7 @@ class AppRepository {
         entityType: 'bible_studies',
         entityId: studyId,
         operation: 'INSERT',
-        payload: {
-          'id': entry.id,
-          'title': entry.title,
-          'status': entry.status,
-          'startedAt': entry.startedAt.toIso8601String(),
-          'lastSessionAt': entry.lastSessionAt?.toIso8601String(),
-          'publicationId': entry.publicationId,
-          'language': entry.language,
-          'currentLesson': entry.currentLesson,
-          'currentParagraph': entry.currentParagraph,
-          'frequency': entry.frequency,
-          'revision': entry.revision,
-        },
+        payload: entry.toJson(),
       );
     });
 
@@ -635,16 +585,7 @@ class AppRepository {
         entityType: 'bible_studies',
         entityId: updated.id,
         operation: 'UPDATE',
-        payload: {
-          'id': updated.id,
-          'title': updated.title,
-          'status': updated.status,
-          'currentLesson': updated.currentLesson,
-          'currentParagraph': updated.currentParagraph,
-          'nextTopic': updated.nextTopic,
-          'pauseOrCloseReason': updated.pauseOrCloseReason,
-          'revision': updated.revision,
-        },
+        payload: updated.toJson(),
         baseData: existing?.toJson(),
       );
     });
@@ -665,7 +606,8 @@ class AppRepository {
         entityType: 'bible_studies',
         entityId: id,
         operation: 'DELETE',
-        payload: {'id': id, 'deletedAt': now.toIso8601String()},
+        payload: updated.toJson(),
+        baseData: study.toJson(),
       );
 
       final participants = await (db.select(
@@ -682,7 +624,8 @@ class AppRepository {
           entityType: 'study_participants',
           entityId: p.id,
           operation: 'DELETE',
-          payload: {'id': p.id, 'deletedAt': now.toIso8601String()},
+          payload: updatedP.toJson(),
+          baseData: p.toJson(),
         );
       }
 
@@ -700,7 +643,8 @@ class AppRepository {
           entityType: 'study_sessions',
           entityId: s.id,
           operation: 'DELETE',
-          payload: {'id': s.id, 'deletedAt': now.toIso8601String()},
+          payload: updatedS.toJson(),
+          baseData: s.toJson(),
         );
       }
     });
@@ -785,15 +729,8 @@ class AppRepository {
             entityType: 'bible_studies',
             entityId: study.id,
             operation: 'UPDATE',
-            payload: {
-              'id': updatedStudy.id,
-              'currentLesson': updatedStudy.currentLesson,
-              'currentParagraph': updatedStudy.currentParagraph,
-              'lastSessionAt': updatedStudy.lastSessionAt?.toIso8601String(),
-              'nextTopic': updatedStudy.nextTopic,
-              'revision': updatedStudy.revision,
-              'updatedAt': now.toIso8601String(),
-            },
+            payload: updatedStudy.toJson(),
+            baseData: study.toJson(),
           );
         }
       }
@@ -802,22 +739,7 @@ class AppRepository {
         entityType: 'study_sessions',
         entityId: sessionId,
         operation: 'INSERT',
-        payload: {
-          'id': entry.id,
-          'studyId': entry.studyId,
-          'dateTimeField': entry.dateTimeField.toIso8601String(),
-          'publicationCode': entry.publicationCode,
-          'lessonCovered': entry.lessonCovered,
-          'paragraphsCovered': entry.paragraphsCovered,
-          'sessionNotes': entry.sessionNotes,
-          'pendingQuestions': entry.pendingQuestions,
-          'nextStep': entry.nextStep,
-          'status': entry.status,
-          'participantIds': entry.participantIds,
-          'revision': entry.revision,
-          'createdAt': now.toIso8601String(),
-          'updatedAt': now.toIso8601String(),
-        },
+        payload: entry.toJson(),
       );
     });
 
@@ -857,21 +779,7 @@ class AppRepository {
         entityType: 'study_sessions',
         entityId: updated.id,
         operation: 'UPDATE',
-        payload: {
-          'id': updated.id,
-          'studyId': updated.studyId,
-          'dateTimeField': updated.dateTimeField.toIso8601String(),
-          'publicationCode': updated.publicationCode,
-          'lessonCovered': updated.lessonCovered,
-          'paragraphsCovered': updated.paragraphsCovered,
-          'sessionNotes': updated.sessionNotes,
-          'pendingQuestions': updated.pendingQuestions,
-          'nextStep': updated.nextStep,
-          'status': updated.status,
-          'participantIds': updated.participantIds,
-          'revision': updated.revision,
-          'updatedAt': now.toIso8601String(),
-        },
+        payload: updated.toJson(),
         baseData: existing?.toJson(),
       );
     });
@@ -894,7 +802,8 @@ class AppRepository {
         entityType: 'study_sessions',
         entityId: id,
         operation: 'DELETE',
-        payload: {'id': id, 'deletedAt': now.toIso8601String()},
+        payload: updated.toJson(),
+        baseData: session.toJson(),
       );
     });
   }
@@ -972,18 +881,7 @@ class AppRepository {
         entityType: 'appointments',
         entityId: apptId,
         operation: 'INSERT',
-        payload: {
-          'id': entry.id,
-          'personId': entry.personId,
-          'studyId': entry.studyId,
-          'title': entry.title,
-          'startTime': entry.startTime.toIso8601String(),
-          'endTime': entry.endTime.toIso8601String(),
-          'durationMinutes': entry.durationMinutes,
-          'status': entry.status,
-          'isProvisional': entry.isProvisional,
-          'revision': entry.revision,
-        },
+        payload: entry.toJson(),
       );
     });
 
@@ -1019,14 +917,7 @@ class AppRepository {
         entityType: 'appointments',
         entityId: updated.id,
         operation: 'UPDATE',
-        payload: {
-          'id': updated.id,
-          'title': updated.title,
-          'startTime': updated.startTime.toIso8601String(),
-          'endTime': updated.endTime.toIso8601String(),
-          'status': updated.status,
-          'revision': updated.revision,
-        },
+        payload: updated.toJson(),
         baseData: existing?.toJson(),
       );
     });
@@ -1091,27 +982,15 @@ class AppRepository {
         entityType: 'appointments',
         entityId: oldAppointment.id,
         operation: 'UPDATE',
-        payload: {
-          'id': oldAppointment.id,
-          'status': 'reagendado',
-          'revision': updatedOld.revision,
-        },
+        payload: updatedOld.toJson(),
+        baseData: oldAppointment.toJson(),
       );
 
       await _recordSyncOperation(
         entityType: 'appointments',
         entityId: newId,
         operation: 'INSERT',
-        payload: {
-          'id': newAppt.id,
-          'personId': newAppt.personId,
-          'title': newAppt.title,
-          'startTime': newAppt.startTime.toIso8601String(),
-          'endTime': newAppt.endTime.toIso8601String(),
-          'previousAppointmentId': oldAppointment.id,
-          'status': 'confirmado',
-          'revision': newAppt.revision,
-        },
+        payload: newAppt.toJson(),
       );
     });
 
@@ -1148,7 +1027,8 @@ class AppRepository {
         entityType: 'appointments',
         entityId: id,
         operation: 'DELETE',
-        payload: {'id': id, 'deletedAt': now.toIso8601String()},
+        payload: updated.toJson(),
+        baseData: appt.toJson(),
       );
     });
   }
@@ -1202,14 +1082,7 @@ class AppRepository {
         entityType: 'activity_records',
         entityId: activityId,
         operation: 'INSERT',
-        payload: {
-          'id': entry.id,
-          'date': entry.date.toIso8601String(),
-          'durationSeconds': entry.durationSeconds,
-          'modality': entry.modality,
-          'notes': entry.notes,
-          'revision': entry.revision,
-        },
+        payload: entry.toJson(),
       );
     });
 
@@ -1231,13 +1104,7 @@ class AppRepository {
         entityType: 'activity_records',
         entityId: updated.id,
         operation: 'UPDATE',
-        payload: {
-          'id': updated.id,
-          'durationSeconds': updated.durationSeconds,
-          'modality': updated.modality,
-          'notes': updated.notes,
-          'revision': updated.revision,
-        },
+        payload: updated.toJson(),
         baseData: existing?.toJson(),
       );
     });
@@ -1260,7 +1127,8 @@ class AppRepository {
         entityType: 'activity_records',
         entityId: id,
         operation: 'DELETE',
-        payload: {'id': id, 'deletedAt': now.toIso8601String()},
+        payload: updated.toJson(),
+        baseData: act.toJson(),
       );
     });
   }
@@ -1340,91 +1208,90 @@ class AppRepository {
   Future<void> restoreDeletedItem(String entityType, String id) async {
     final now = DateTime.now();
     await db.transaction(() async {
+      Map<String, dynamic>? restoredJson;
+      Map<String, dynamic>? baseJson;
       if (entityType == 'people') {
         final item = await (db.select(
           db.people,
         )..where((t) => t.id.equals(id))).getSingleOrNull();
         if (item != null) {
-          await db
-              .update(db.people)
-              .replace(
-                item.copyWith(
-                  deletedAt: const Value(null),
-                  updatedAt: now,
-                  revision: item.revision + 1,
-                ),
-              );
+          baseJson = item.toJson();
+          final updated = item.copyWith(
+            deletedAt: const Value(null),
+            updatedAt: now,
+            revision: item.revision + 1,
+          );
+          await db.update(db.people).replace(updated);
+          restoredJson = updated.toJson();
         }
       } else if (entityType == 'visits') {
         final item = await (db.select(
           db.visits,
         )..where((t) => t.id.equals(id))).getSingleOrNull();
         if (item != null) {
-          await db
-              .update(db.visits)
-              .replace(
-                item.copyWith(
-                  deletedAt: const Value(null),
-                  updatedAt: now,
-                  revision: item.revision + 1,
-                ),
-              );
+          baseJson = item.toJson();
+          final updated = item.copyWith(
+            deletedAt: const Value(null),
+            updatedAt: now,
+            revision: item.revision + 1,
+          );
+          await db.update(db.visits).replace(updated);
+          restoredJson = updated.toJson();
         }
       } else if (entityType == 'bible_studies') {
         final item = await (db.select(
           db.bibleStudies,
         )..where((t) => t.id.equals(id))).getSingleOrNull();
         if (item != null) {
-          await db
-              .update(db.bibleStudies)
-              .replace(
-                item.copyWith(
-                  deletedAt: const Value(null),
-                  updatedAt: now,
-                  revision: item.revision + 1,
-                ),
-              );
+          baseJson = item.toJson();
+          final updated = item.copyWith(
+            deletedAt: const Value(null),
+            updatedAt: now,
+            revision: item.revision + 1,
+          );
+          await db.update(db.bibleStudies).replace(updated);
+          restoredJson = updated.toJson();
         }
       } else if (entityType == 'appointments') {
         final item = await (db.select(
           db.appointments,
         )..where((t) => t.id.equals(id))).getSingleOrNull();
         if (item != null) {
-          await db
-              .update(db.appointments)
-              .replace(
-                item.copyWith(
-                  deletedAt: const Value(null),
-                  updatedAt: now,
-                  revision: item.revision + 1,
-                ),
-              );
+          baseJson = item.toJson();
+          final updated = item.copyWith(
+            deletedAt: const Value(null),
+            updatedAt: now,
+            revision: item.revision + 1,
+          );
+          await db.update(db.appointments).replace(updated);
+          restoredJson = updated.toJson();
         }
       } else if (entityType == 'activity_records') {
         final item = await (db.select(
           db.activityRecords,
         )..where((t) => t.id.equals(id))).getSingleOrNull();
         if (item != null) {
-          await db
-              .update(db.activityRecords)
-              .replace(
-                item.copyWith(
-                  deletedAt: const Value(null),
-                  updatedAt: now,
-                  revision: item.revision + 1,
-                ),
-              );
+          baseJson = item.toJson();
+          final updated = item.copyWith(
+            deletedAt: const Value(null),
+            updatedAt: now,
+            revision: item.revision + 1,
+          );
+          await db.update(db.activityRecords).replace(updated);
+          restoredJson = updated.toJson();
         }
       }
       await _recordSyncOperation(
         entityType: entityType,
         entityId: id,
         operation: 'UPDATE',
-        payload: {
-          'id': id,
-          'restored': true,
-          'updatedAt': now.toIso8601String(),
-        },
+        payload: restoredJson ??
+            {
+              'id': id,
+              'deletedAt': null,
+              'updatedAt': now.toUtc().toIso8601String(),
+            },
+        baseData: baseJson,
       );
     });
   }
@@ -1468,8 +1335,17 @@ class AppRepository {
   // --------------------------------------------------------------------------
   // MÓDULO: FILA DE SINCRONIZAÇÃO
   // --------------------------------------------------------------------------
-  Future<List<SyncQueueEntry>> getPendingSyncOperations() {
-    return (db.select(db.syncQueue)
+  static const int maxSyncAttempts = 5;
+
+  static Duration backoffFor(int attempts) {
+    final seconds = pow(2, attempts).clamp(1, 300).toInt();
+    return Duration(seconds: seconds);
+  }
+
+  Future<List<SyncQueueEntry>> getPendingSyncOperations({
+    bool respectBackoff = false,
+  }) async {
+    final rows = await (db.select(db.syncQueue)
           ..where(
             (tbl) =>
                 tbl.status.equals('pending') | tbl.status.equals('in_progress'),
@@ -1479,6 +1355,64 @@ class AppRepository {
                 OrderingTerm(expression: t.createdAt, mode: OrderingMode.asc),
           ]))
         .get();
+    if (!respectBackoff) return rows;
+    final now = DateTime.now();
+    return rows.where((op) {
+      if (op.attempts <= 0) return true;
+      final lastAttempt = op.lastAttemptAt ?? op.createdAt;
+      return now.difference(lastAttempt) >= backoffFor(op.attempts);
+    }).toList();
+  }
+
+  Future<List<SyncQueueEntry>> getFailedSyncOperations() {
+    return (db.select(db.syncQueue)
+          ..where((tbl) => tbl.status.equals('failed'))
+          ..orderBy([
+            (t) =>
+                OrderingTerm(expression: t.createdAt, mode: OrderingMode.desc),
+          ]))
+        .get();
+  }
+
+  Future<List<SyncQueueEntry>> getConflictSyncOperations() {
+    return (db.select(db.syncQueue)
+          ..where((tbl) => tbl.status.equals('conflict'))
+          ..orderBy([
+            (t) =>
+                OrderingTerm(expression: t.createdAt, mode: OrderingMode.desc),
+          ]))
+        .get();
+  }
+
+  Future<List<SyncQueueEntry>> getUnresolvedSyncOperations() {
+    return (db.select(db.syncQueue)
+          ..where((tbl) => tbl.status.isIn(['pending', 'in_progress', 'failed', 'conflict']))
+          ..orderBy([
+            (t) =>
+                OrderingTerm(expression: t.createdAt, mode: OrderingMode.desc),
+          ]))
+        .get();
+  }
+
+  Stream<({int pending, int failed, int conflict})> watchSyncQueueCounts() {
+    return (db.select(db.syncQueue)
+          ..where((tbl) => tbl.status.isIn(['pending', 'in_progress', 'failed', 'conflict'])))
+        .watch()
+        .map((rows) {
+      int pending = 0;
+      int failed = 0;
+      int conflict = 0;
+      for (final row in rows) {
+        if (row.status == 'failed') {
+          failed++;
+        } else if (row.status == 'conflict') {
+          conflict++;
+        } else {
+          pending++;
+        }
+      }
+      return (pending: pending, failed: failed, conflict: conflict);
+    });
   }
 
   /// Expulga operações antigas já sincronizadas para prevenir inchaço do SQLite e backup
@@ -1510,7 +1444,9 @@ class AppRepository {
       final nextAttempts = op.attempts + 1;
       await (db.update(db.syncQueue)..where((tbl) => tbl.id.equals(id))).write(
         SyncQueueCompanion(
-          status: Value((forceFailed || nextAttempts >= 5) ? 'failed' : 'pending'),
+          status: Value(
+            (forceFailed || nextAttempts >= maxSyncAttempts) ? 'failed' : 'pending',
+          ),
           attempts: Value(nextAttempts),
           lastError: Value(error),
           lastAttemptAt: Value(DateTime.now()),
@@ -1519,14 +1455,184 @@ class AppRepository {
     }
   }
 
+  Future<void> markSyncOperationConflict(
+    String id,
+    String error, {
+    Map<String, dynamic>? remoteData,
+    List<Map<String, dynamic>>? conflicts,
+  }) async {
+    final op = await (db.select(
+      db.syncQueue,
+    )..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
+    if (op == null) return;
+
+    String updatedPayload = op.payload;
+    if (remoteData != null || conflicts != null) {
+      try {
+        final decoded = jsonDecode(op.payload);
+        if (decoded is Map<String, dynamic>) {
+          if (remoteData != null) decoded['_remote'] = remoteData;
+          if (conflicts != null) decoded['_conflicts'] = conflicts;
+          updatedPayload = jsonEncode(decoded);
+        }
+      } catch (e, st) {
+        AppLogger.warning(
+          'Falha ao anexar metadados de conflito no payload de $id',
+          e,
+          st,
+        );
+      }
+    }
+
+    await (db.update(db.syncQueue)..where((tbl) => tbl.id.equals(id))).write(
+      SyncQueueCompanion(
+        status: const Value('conflict'),
+        attempts: Value(op.attempts + 1),
+        lastError: Value(error),
+        lastAttemptAt: Value(DateTime.now()),
+        payload: Value(updatedPayload),
+      ),
+    );
+  }
+
+  Future<int> retrySyncOperation(String id) async {
+    return (db.update(db.syncQueue)..where((tbl) => tbl.id.equals(id))).write(
+      const SyncQueueCompanion(
+        status: Value('pending'),
+        attempts: Value(0),
+        lastError: Value(null),
+        lastAttemptAt: Value(null),
+      ),
+    );
+  }
+
+  Future<void> resolveSyncConflictKeepLocal(String id) async {
+    final op = await (db.select(db.syncQueue)..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
+    if (op == null) return;
+    Map<String, dynamic> decoded = {};
+    try {
+      final raw = jsonDecode(op.payload);
+      if (raw is Map<String, dynamic>) {
+        decoded = Map<String, dynamic>.from(raw);
+      }
+    } catch (e, st) {
+      AppLogger.warning(
+        'Falha ao decodificar payload ao manter versão local de $id',
+        e,
+        st,
+      );
+    }
+
+    final now = DateTime.now().toUtc();
+    final remoteRev = (decoded['_remote'] is Map)
+        ? ((decoded['_remote']['revision'] as num?)?.toInt() ?? 1)
+        : 1;
+    final currentRev = (decoded['revision'] as num?)?.toInt() ?? 1;
+    final nextRev = (remoteRev >= currentRev ? remoteRev : currentRev) + 1;
+    decoded['revision'] = nextRev;
+    decoded['updatedAt'] = now.toIso8601String();
+    if (decoded['_remote'] is Map) {
+      decoded['_base'] = Map<String, dynamic>.from(decoded['_remote'] as Map);
+    }
+    decoded.remove('_remote');
+    decoded.remove('_conflicts');
+
+    await db.transaction(() async {
+      await _updateLocalEntityRevisionOnResolve(
+        entityType: op.entityType,
+        entityId: op.entityId,
+        revision: nextRev,
+        updatedAt: now,
+      );
+      await (db.update(db.syncQueue)..where((tbl) => tbl.id.equals(id))).write(
+        SyncQueueCompanion(
+          status: const Value('pending'),
+          attempts: const Value(0),
+          lastError: const Value(null),
+          lastAttemptAt: const Value(null),
+          payload: Value(jsonEncode(decoded)),
+        ),
+      );
+    });
+  }
+
+  static const Set<String> _revisionedTables = {
+    'people',
+    'visits',
+    'bible_studies',
+    'study_participants',
+    'study_sessions',
+    'appointments',
+    'activity_records',
+    'voice_notes',
+    'phone_contacts',
+    'territory_landmarks',
+    'family_ties',
+    'ministry_experiences',
+    'person_photos',
+    'person_publications',
+    'research_articles',
+    'research_tags',
+    'territory_sectors',
+    'student_manual_order',
+    'external_calendar_events',
+    'calendar_event_links',
+    'inbox_entries',
+    'projects',
+    'tasks',
+    'knowledge_notes',
+    'knowledge_questions',
+    'knowledge_documents',
+    'knowledge_resources',
+  };
+
+  Future<void> _updateLocalEntityRevisionOnResolve({
+    required String entityType,
+    required String entityId,
+    required int revision,
+    required DateTime updatedAt,
+  }) async {
+    final normalized = entityType.toLowerCase();
+    final tableName = switch (normalized) {
+      'person' => 'people',
+      'visit' => 'visits',
+      'biblestudy' || 'biblestudies' => 'bible_studies',
+      'studyparticipant' || 'studyparticipants' || 'biblestudyparticipants' || 'bible_study_participants' => 'study_participants',
+      'studysession' || 'studysessions' || 'biblestudysessions' || 'bible_study_sessions' => 'study_sessions',
+      'appointment' => 'appointments',
+      'activityrecord' || 'activityrecords' => 'activity_records',
+      'voicenote' || 'voicenotes' => 'voice_notes',
+      'phonecontact' || 'phonecontacts' => 'phone_contacts',
+      'territorylandmark' || 'territorylandmarks' => 'territory_landmarks',
+      'familytie' || 'familyties' => 'family_ties',
+      'ministryexperience' || 'ministryexperiences' => 'ministry_experiences',
+      'personphoto' || 'personphotos' => 'person_photos',
+      'personpublication' || 'personpublications' => 'person_publications',
+      'researcharticle' || 'researcharticles' => 'research_articles',
+      'researchtag' || 'researchtags' => 'research_tags',
+      'territorysector' || 'territorysectors' => 'territory_sectors',
+      _ => normalized,
+    };
+    if (!_revisionedTables.contains(tableName)) return;
+    final unixSeconds = updatedAt.millisecondsSinceEpoch ~/ 1000;
+    await db.customUpdate(
+      'UPDATE $tableName SET revision = ?, updated_at = ? WHERE id = ?',
+      variables: [
+        Variable.withInt(revision),
+        Variable.withInt(unixSeconds),
+        Variable.withString(entityId),
+      ],
+    );
+  }
+
   /// Reinicia todas as operações com falha definitiva ('failed' - dead letter) para nova tentativa
   Future<int> retryAllFailedOperations() async {
     return (db.update(db.syncQueue)..where((tbl) => tbl.status.equals('failed'))).write(
-      SyncQueueCompanion(
-        status: const Value('pending'),
-        attempts: const Value(0),
-        lastError: const Value(null),
-        lastAttemptAt: Value(DateTime.now()),
+      const SyncQueueCompanion(
+        status: Value('pending'),
+        attempts: Value(0),
+        lastError: Value(null),
+        lastAttemptAt: Value(null),
       ),
     );
   }

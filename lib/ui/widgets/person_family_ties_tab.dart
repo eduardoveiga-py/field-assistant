@@ -6,6 +6,7 @@ import '../../database/app_database.dart';
 import '../../family/family_ties_manager.dart';
 import '../providers.dart';
 import '../screens/person_detail_screen.dart';
+import 'managed_text_controllers.dart';
 
 class PersonFamilyTiesTab extends ConsumerStatefulWidget {
   final PersonEntry person;
@@ -51,7 +52,6 @@ class _PersonFamilyTiesTabState extends ConsumerState<PersonFamilyTiesTab> {
   ) {
     String selectedMode = 'registered'; // 'registered' ou 'manual'
     PersonEntry? selectedPerson;
-    final manualNameController = TextEditingController();
     String selectedRelationship = 'Esposa';
 
     // Pessoas disponíveis para vínculo (excluindo a própria pessoa)
@@ -61,7 +61,12 @@ class _PersonFamilyTiesTabState extends ConsumerState<PersonFamilyTiesTab> {
 
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: const [''],
+        builder: (ctx, ctrls) {
+          final manualNameController = ctrls[0];
+
+          return StatefulBuilder(
         builder: (ctx, setDialogState) {
           final isDark = Theme.of(ctx).brightness == Brightness.dark;
 
@@ -267,6 +272,8 @@ class _PersonFamilyTiesTabState extends ConsumerState<PersonFamilyTiesTab> {
             ],
           );
         },
+      );
+        },
       ),
     );
   }
@@ -276,60 +283,67 @@ class _PersonFamilyTiesTabState extends ConsumerState<PersonFamilyTiesTab> {
         _relationshipOptions.contains(tie.relationshipType)
         ? tie.relationshipType
         : 'Parente';
-    final nameController = TextEditingController(text: tie.relatedPersonName);
 
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: Text('Ajustar Vínculo: ${tie.relatedPersonName}'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (tie.relatedPersonId == null) ...[
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(labelText: 'Nome'),
-                ),
-                const SizedBox(height: 10),
-              ],
-              DropdownButtonFormField<String>(
-                initialValue: selectedRelationship,
-                decoration: const InputDecoration(
-                  labelText: 'Parentesco / Relação',
-                ),
-                items: _relationshipOptions
-                    .map((r) => DropdownMenuItem(value: r, child: Text(r)))
-                    .toList(),
-                onChanged: (val) {
-                  if (val != null) {
-                    setDialogState(() => selectedRelationship = val);
-                  }
-                },
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: [tie.relatedPersonName],
+        builder: (ctx, ctrls) {
+          final nameController = ctrls[0];
+
+          return StatefulBuilder(
+            builder: (ctx, setDialogState) => AlertDialog(
+              title: Text('Ajustar Vínculo: ${tie.relatedPersonName}'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (tie.relatedPersonId == null) ...[
+                    TextField(
+                      controller: nameController,
+                      decoration: const InputDecoration(labelText: 'Nome'),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+                  DropdownButtonFormField<String>(
+                    initialValue: selectedRelationship,
+                    decoration: const InputDecoration(
+                      labelText: 'Parentesco / Relação',
+                    ),
+                    items: _relationshipOptions
+                        .map((r) => DropdownMenuItem(value: r, child: Text(r)))
+                        .toList(),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setDialogState(() => selectedRelationship = val);
+                      }
+                    },
+                  ),
+                ],
               ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancelar'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final newName = tie.relatedPersonId == null
+                        ? nameController.text.trim()
+                        : null;
+                    final mgr = ref.read(familyTiesManagerProvider);
+                    await mgr.updateFamilyTie(
+                      id: tie.id,
+                      newRelationshipType: selectedRelationship,
+                      newRelatedPersonName: newName,
+                    );
+                    if (ctx.mounted) Navigator.pop(ctx);
+                  },
+                  child: const Text('Salvar'),
+                ),
+              ],
             ),
-            ElevatedButton(
-              onPressed: () async {
-                final mgr = ref.read(familyTiesManagerProvider);
-                await mgr.updateFamilyTie(
-                  id: tie.id,
-                  newRelationshipType: selectedRelationship,
-                  newRelatedPersonName: tie.relatedPersonId == null
-                      ? nameController.text.trim()
-                      : null,
-                );
-                if (ctx.mounted) Navigator.pop(ctx);
-              },
-              child: const Text('Salvar'),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }

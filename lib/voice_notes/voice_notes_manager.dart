@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import 'package:drift/drift.dart';
 
+import '../core/app_logger.dart';
 import '../database/app_database.dart';
 import '../database/repository.dart';
 import '../ui/providers.dart';
@@ -48,7 +49,9 @@ class VoiceNotesManager {
       if (!_notesController.isClosed) {
         _notesController.add(list);
       }
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.warning('Falha ao atualizar stream de notas de voz', e, st);
+    }
   }
 
   Future<void> _recordSyncOperation({
@@ -70,7 +73,9 @@ class VoiceNotesManager {
               status: const Value('pending'),
             ),
           );
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.error('Falha ao enfileirar nota de voz $entityId na sync_queue', e, st);
+    }
   }
 
   Future<List<VoiceNoteItem>> getAllVoiceNotes() async {
@@ -81,7 +86,8 @@ class VoiceNotesManager {
                 ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
               .get();
       return rows.map(_entryToItem).toList();
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.warning('Falha ao carregar todas as notas de voz', e, st);
       return [];
     }
   }
@@ -97,7 +103,8 @@ class VoiceNotesManager {
                 ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
               .get();
       return rows.map(_entryToItem).toList();
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.warning('Falha ao carregar notas de voz para $personId', e, st);
       return [];
     }
   }
@@ -125,7 +132,8 @@ class VoiceNotesManager {
               .get();
       if (rows.isEmpty) return null;
       return _entryToItem(rows.first);
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.warning('Falha ao buscar última nota de voz de $personId', e, st);
       return null;
     }
   }
@@ -195,7 +203,8 @@ class VoiceNotesManager {
       )..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
       if (row == null) return null;
       return _entryToItem(row);
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.warning('Falha ao buscar nota de voz $id', e, st);
       return null;
     }
   }

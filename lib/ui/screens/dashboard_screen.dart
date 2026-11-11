@@ -10,6 +10,7 @@ import '../../database/app_database.dart';
 import '../../dashboard/counting_rules.dart';
 import '../../reports/report_export_service.dart';
 import '../providers.dart';
+import '../widgets/managed_text_controllers.dart';
 import 'person_detail_screen.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
@@ -57,17 +58,21 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   void _showAddActivityDialog(BuildContext context) {
-    final hoursController = TextEditingController(text: '1');
-    final minutesController = TextEditingController(text: '30');
-    final placementsController = TextEditingController(text: '0');
-    final videosController = TextEditingController(text: '0');
-    final notesController = TextEditingController();
     String selectedModality = 'campo';
     DateTime selectedDate = DateTime.now();
 
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: const ['1', '30', '0', '0', ''],
+        builder: (ctx, ctrls) {
+          final hoursController = ctrls[0];
+          final minutesController = ctrls[1];
+          final placementsController = ctrls[2];
+          final videosController = ctrls[3];
+          final notesController = ctrls[4];
+
+          return StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
           title: const Row(
             children: [
@@ -267,6 +272,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             ),
           ],
         ),
+        );
+        },
       ),
     );
   }
@@ -511,7 +518,9 @@ $header
     final people = ref.watch(peopleStreamProvider).value ?? [];
     final appointments = ref.watch(appointmentsStreamProvider).value ?? [];
     final activities = ref.watch(activitiesStreamProvider).value ?? [];
-    final repo = ref.watch(repositoryProvider);
+    final sessionsAsync = ref.watch(studySessionsStreamProvider);
+    final visitsAsync = ref.watch(visitsStreamProvider);
+    final participantsAsync = ref.watch(studyParticipantsStreamProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -524,20 +533,18 @@ $header
           ),
         ],
       ),
-      body: FutureBuilder<List<dynamic>>(
-        future: Future.wait([
-          repo.getAllSessions(),
-          repo.getAllVisits(),
-          repo.db.select(repo.db.studyParticipants).get(),
-        ]),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) {
+      body: Builder(
+        builder: (context) {
+          if (sessionsAsync.isLoading && !sessionsAsync.hasValue ||
+              visitsAsync.isLoading && !visitsAsync.hasValue ||
+              participantsAsync.isLoading && !participantsAsync.hasValue) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final sessions = snapshot.data![0] as List<StudySessionEntry>;
-          final visits = snapshot.data![1] as List<VisitEntry>;
-          final participants = snapshot.data![2] as List<StudyParticipantEntry>;
+          final sessions = sessionsAsync.value ?? const <StudySessionEntry>[];
+          final visits = visitsAsync.value ?? const <VisitEntry>[];
+          final participants =
+              participantsAsync.value ?? const <StudyParticipantEntry>[];
 
           final metrics = DashboardCalculator.calculate(
             studies: studies,

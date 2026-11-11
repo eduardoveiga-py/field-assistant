@@ -796,14 +796,34 @@ void main() {
         equals(1),
       ); // Person criada no setUp passou, nota de voz falhou
 
-      // VERIFICAÇÃO CRÍTICA:
-      // A operação da nota de voz NÃO PODE ter sido marcada como synced!
-      final opInDb = await (db.select(
+      // VERIFICAÇÃO CRÍTICA (C1):
+      // Após a 1ª falha transitória de Storage, NÃO pode ser marcada como synced nem dead-letterada imediatamente;
+      // deve permanecer pending para retry com backoff, só virando 'failed' após maxSyncAttempts (5).
+      final opAfterFirstTry = await (db.select(
         db.syncQueue,
       )..where((t) => t.id.equals('q_vn_fail_upload'))).getSingle();
-      expect(opInDb.status, equals('failed'));
-      expect(opInDb.attempts, equals(1));
-      expect(opInDb.lastError, contains('Falha no upload do arquivo binário'));
+      expect(opAfterFirstTry.status, equals('pending'));
+      expect(opAfterFirstTry.attempts, equals(1));
+      expect(opAfterFirstTry.lastError, contains('Falha no upload do arquivo binário'));
+
+      for (int i = 0; i < 4; i++) {
+        await (db.update(db.syncQueue)
+              ..where((t) => t.id.equals('q_vn_fail_upload')))
+            .write(
+              SyncQueueCompanion(
+                lastAttemptAt: drift.Value(
+                  DateTime.now().subtract(const Duration(minutes: 10)),
+                ),
+              ),
+            );
+        await customSync.processQueue();
+      }
+
+      final opDeadLetter = await (db.select(
+        db.syncQueue,
+      )..where((t) => t.id.equals('q_vn_fail_upload'))).getSingle();
+      expect(opDeadLetter.status, equals('failed'));
+      expect(opDeadLetter.attempts, equals(AppRepository.maxSyncAttempts));
     });
 
     test('TC-SYNC-ADV-03: Download de áudio pendente é registrado e recuperável via retryPendingMediaDownloads', () async {

@@ -1,10 +1,10 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/app_logger.dart';
 import '../../core/app_theme.dart';
 import '../../database/app_database.dart';
 import '../../inbox/inbox_manager.dart';
@@ -12,7 +12,9 @@ import '../../inbox/jw_email_service.dart';
 import '../../research/research_manager.dart';
 import '../../voice_notes/audio_recording_service.dart';
 import '../providers.dart';
+import 'settings_screen.dart';
 import '../widgets/adaptive_ministry_sheet.dart';
+import '../widgets/managed_text_controllers.dart';
 import '../widgets/markdown_preview_text.dart';
 import '../widgets/quick_capture_sheet.dart';
 import '../widgets/rich_markdown_toolbar.dart';
@@ -48,7 +50,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
     _tabController.addListener(() {
       if (mounted) setState(() {});
     });
-    _playerService = kIsWeb ? LocalAudioPlayerService() : RealAudioPlayerService();
+    _playerService = RealAudioPlayerService();
     _playerService.playingStateStream.listen((isPlaying) {
       if (mounted) {
         setState(() {
@@ -93,6 +95,27 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
       final port = int.tryParse(portEntry?.value ?? '') ?? 993;
       final username = emailEntry?.value.trim();
 
+      // Se a conta não estiver configurada, orienta o usuário com ação direta
+      if (username == null || username.isEmpty || password == null || password.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Configure sua conta de e-mail teocrático em Configurações para sincronizar.'),
+              action: SnackBarAction(
+                label: 'Configurar',
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                  );
+                },
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
       final emailService = ref.read(jwEmailServiceProvider);
       final count = await emailService.syncEmails(
         host: host,
@@ -105,8 +128,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
           SnackBar(
             content: Text(
               count > 0
-                  ? '$count correspondência(s) retida(s) permanentemente!'
-                  : 'Caixa atualizada. Todas as mensagens já estão protegidas.',
+                  ? '$count nova(s) correspondência(s) retida(s) permanentemente!'
+                  : 'Caixa de e-mail atualizada. Nenhuma mensagem nova.',
             ),
           ),
         );
@@ -114,7 +137,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Sincronização offline: dados retidos mantidos.')),
+          SnackBar(
+            content: Text('Erro na sincronização de e-mail: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
         );
       }
     } finally {
@@ -159,6 +185,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
               label: const Text('Autenticar com Biometria / PIN', style: TextStyle(fontWeight: FontWeight.bold)),
               onPressed: () async {
                 final authenticated = await biometric.authenticate(
+                  context: context,
                   localizedReason: 'Confirme sua identidade para acessar a Inbox, cartas e e-mails.',
                 );
                 if (authenticated && mounted) {
@@ -687,8 +714,6 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
   // ==========================================
 
   void _showConvertToTaskDialog(InboxEntry entry) {
-    final titleCtrl = TextEditingController(text: entry.content);
-    final descCtrl = TextEditingController();
     String priority = 'normal';
     String category = entry.suggestedCategory ?? 'ministry';
     DateTime? dueDate;
@@ -697,277 +722,302 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
       context: context,
       title: 'Converter em Tarefa',
       titleLeading: const Icon(Icons.check_circle_outline, color: Color(0xFF10B981)),
-      builder: (ctx, scroll) {
-        return StatefulBuilder(
-          builder: (ctx, setModalState) {
-            return SingleChildScrollView(
-              controller: scroll,
-              physics: const ClampingScrollPhysics(),
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    TextField(
-                      controller: titleCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Título da Tarefa',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            initialValue: priority,
-                            decoration: const InputDecoration(labelText: 'Prioridade', border: OutlineInputBorder()),
-                            items: const [
-                              DropdownMenuItem(value: 'low', child: Text('Baixa')),
-                              DropdownMenuItem(value: 'normal', child: Text('Normal')),
-                              DropdownMenuItem(value: 'high', child: Text('Alta')),
-                              DropdownMenuItem(value: 'urgent', child: Text('Urgente')),
-                            ],
-                            onChanged: (v) => setModalState(() => priority = v ?? 'normal'),
-                          ),
+      builder: (ctx, scroll) => ManagedTextControllers(
+        initialTexts: [entry.content, ''],
+        builder: (ctx, ctrls) {
+          final titleCtrl = ctrls[0];
+          final descCtrl = ctrls[1];
+
+          return StatefulBuilder(
+            builder: (ctx, setModalState) {
+              return SingleChildScrollView(
+                controller: scroll,
+                physics: const ClampingScrollPhysics(),
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      TextField(
+                        controller: titleCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Título da Tarefa',
+                          border: OutlineInputBorder(),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            initialValue: category,
-                            decoration: const InputDecoration(labelText: 'Categoria', border: OutlineInputBorder()),
-                            items: const [
-                              DropdownMenuItem(value: 'ministry', child: Text('Ministério')),
-                              DropdownMenuItem(value: 'personal', child: Text('Pessoal')),
-                              DropdownMenuItem(value: 'study', child: Text('Estudo')),
-                            ],
-                            onChanged: (v) => setModalState(() => category = v ?? 'ministry'),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    ListTile(
-                      title: Text(dueDate == null ? 'Definir Data de Vencimento' : 'Vencimento: ${_formatDate(dueDate!)}'),
-                      trailing: const Icon(Icons.calendar_today),
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: DateTime.now(),
-                          firstDate: DateTime.now().subtract(const Duration(days: 30)),
-                          lastDate: DateTime.now().add(const Duration(days: 365)),
-                        );
-                        if (picked != null) setModalState(() => dueDate = picked);
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF10B981),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
-                      onPressed: () async {
-                        final inboxMgr = ref.read(inboxManagerProvider);
-                        await inboxMgr.convertToTask(
-                          entry.id,
-                          title: titleCtrl.text.trim().isEmpty ? entry.content : titleCtrl.text.trim(),
-                          description: descCtrl.text.trim().isNotEmpty ? descCtrl.text.trim() : null,
-                          priority: priority,
-                          category: category,
-                          dueDate: dueDate,
-                        );
-                        if (ctx.mounted) {
-                          Navigator.of(ctx).pop();
-                          ScaffoldMessenger.of(ctx).showSnackBar(
-                            const SnackBar(content: Text('Tarefa criada com sucesso!')),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              initialValue: priority,
+                              decoration: const InputDecoration(labelText: 'Prioridade', border: OutlineInputBorder()),
+                              items: const [
+                                DropdownMenuItem(value: 'low', child: Text('Baixa')),
+                                DropdownMenuItem(value: 'normal', child: Text('Normal')),
+                                DropdownMenuItem(value: 'high', child: Text('Alta')),
+                                DropdownMenuItem(value: 'urgent', child: Text('Urgente')),
+                              ],
+                              onChanged: (v) => setModalState(() => priority = v ?? 'normal'),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              initialValue: category,
+                              decoration: const InputDecoration(labelText: 'Categoria', border: OutlineInputBorder()),
+                              items: const [
+                                DropdownMenuItem(value: 'ministry', child: Text('Ministério')),
+                                DropdownMenuItem(value: 'personal', child: Text('Pessoal')),
+                                DropdownMenuItem(value: 'study', child: Text('Estudo')),
+                              ],
+                              onChanged: (v) => setModalState(() => category = v ?? 'ministry'),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      ListTile(
+                        title: Text(dueDate == null ? 'Definir Data de Vencimento' : 'Vencimento: ${_formatDate(dueDate!)}'),
+                        trailing: const Icon(Icons.calendar_today),
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: DateTime.now(),
+                            firstDate: DateTime.now().subtract(const Duration(days: 30)),
+                            lastDate: DateTime.now().add(const Duration(days: 365)),
                           );
-                        }
-                      },
-                      child: const Text('Confirmar Conversão em Tarefa', style: TextStyle(fontWeight: FontWeight.bold)),
-                    ),
-                  ],
+                          if (picked != null) setModalState(() => dueDate = picked);
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF10B981),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        onPressed: () async {
+                          final title = titleCtrl.text.trim().isEmpty ? entry.content : titleCtrl.text.trim();
+                          final desc = descCtrl.text.trim();
+                          final inboxMgr = ref.read(inboxManagerProvider);
+                          await inboxMgr.convertToTask(
+                            entry.id,
+                            title: title,
+                            description: desc.isNotEmpty ? desc : null,
+                            priority: priority,
+                            category: category,
+                            dueDate: dueDate,
+                          );
+                          if (ctx.mounted) {
+                            Navigator.of(ctx).pop();
+                            ScaffoldMessenger.of(ctx).showSnackBar(
+                              const SnackBar(content: Text('Tarefa criada com sucesso!')),
+                            );
+                          }
+                        },
+                        child: const Text('Confirmar Conversão em Tarefa', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            );
-          },
-        );
-      },
+              );
+            },
+          );
+        },
+      ),
     );
   }
 
   void _showConvertToProjectDialog(InboxEntry entry) {
-    final nameCtrl = TextEditingController(text: entry.content);
-    final objCtrl = TextEditingController();
     String category = entry.suggestedCategory ?? 'ministry';
 
     showAdaptiveMinistrySheet(
       context: context,
       title: 'Converter em Projeto',
       titleLeading: const Icon(Icons.folder_special_outlined, color: Color(0xFF3B82F6)),
-      builder: (ctx, scroll) {
-        return SingleChildScrollView(
-          controller: scroll,
-          physics: const ClampingScrollPhysics(),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                TextField(
-                  controller: nameCtrl,
-                  decoration: const InputDecoration(labelText: 'Nome do Projeto', border: OutlineInputBorder()),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: objCtrl,
-                  decoration: const InputDecoration(labelText: 'Objetivo Principal', border: OutlineInputBorder()),
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF3B82F6),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+      builder: (ctx, scroll) => ManagedTextControllers(
+        initialTexts: [entry.content, ''],
+        builder: (ctx, ctrls) {
+          final nameCtrl = ctrls[0];
+          final objCtrl = ctrls[1];
+
+          return SingleChildScrollView(
+            controller: scroll,
+            physics: const ClampingScrollPhysics(),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    controller: nameCtrl,
+                    decoration: const InputDecoration(labelText: 'Nome do Projeto', border: OutlineInputBorder()),
                   ),
-                  onPressed: () async {
-                    final inboxMgr = ref.read(inboxManagerProvider);
-                    await inboxMgr.convertToProject(
-                      entry.id,
-                      name: nameCtrl.text.trim().isEmpty ? entry.content : nameCtrl.text.trim(),
-                      objective: objCtrl.text.trim().isNotEmpty ? objCtrl.text.trim() : null,
-                      category: category,
-                    );
-                    if (ctx.mounted) {
-                      Navigator.of(ctx).pop();
-                      ScaffoldMessenger.of(ctx).showSnackBar(
-                        const SnackBar(content: Text('Projeto criado com sucesso!')),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: objCtrl,
+                    decoration: const InputDecoration(labelText: 'Objetivo Principal', border: OutlineInputBorder()),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF3B82F6),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    onPressed: () async {
+                      final name = nameCtrl.text.trim().isEmpty ? entry.content : nameCtrl.text.trim();
+                      final obj = objCtrl.text.trim();
+                      final inboxMgr = ref.read(inboxManagerProvider);
+                      await inboxMgr.convertToProject(
+                        entry.id,
+                        name: name,
+                        objective: obj.isNotEmpty ? obj : null,
+                        category: category,
                       );
-                    }
-                  },
-                  child: const Text('Confirmar Conversão em Projeto', style: TextStyle(fontWeight: FontWeight.bold)),
-                ),
-              ],
+                      if (ctx.mounted) {
+                        Navigator.of(ctx).pop();
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          const SnackBar(content: Text('Projeto criado com sucesso!')),
+                        );
+                      }
+                    },
+                    child: const Text('Confirmar Conversão em Projeto', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
   void _showConvertToNoteDialog(InboxEntry entry) {
-    final titleCtrl = TextEditingController(text: entry.content.length > 40 ? '${entry.content.substring(0, 40)}...' : entry.content);
-    final contentCtrl = TextEditingController(text: entry.content);
+    final initTitle = entry.content.length > 40 ? '${entry.content.substring(0, 40)}...' : entry.content;
 
     showAdaptiveMinistrySheet(
       context: context,
       title: 'Converter em Nota de Conhecimento',
       titleLeading: const Icon(Icons.note_add_outlined, color: Color(0xFF8B5CF6)),
-      builder: (ctx, scroll) {
-        return SingleChildScrollView(
-          controller: scroll,
-          physics: const ClampingScrollPhysics(),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                TextField(
-                  controller: titleCtrl,
-                  decoration: const InputDecoration(labelText: 'Título da Nota', border: OutlineInputBorder()),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: contentCtrl,
-                  maxLines: 4,
-                  decoration: const InputDecoration(labelText: 'Conteúdo', border: OutlineInputBorder()),
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF8B5CF6),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+      builder: (ctx, scroll) => ManagedTextControllers(
+        initialTexts: [initTitle, entry.content],
+        builder: (ctx, ctrls) {
+          final titleCtrl = ctrls[0];
+          final contentCtrl = ctrls[1];
+
+          return SingleChildScrollView(
+            controller: scroll,
+            physics: const ClampingScrollPhysics(),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    controller: titleCtrl,
+                    decoration: const InputDecoration(labelText: 'Título da Nota', border: OutlineInputBorder()),
                   ),
-                  onPressed: () async {
-                    final inboxMgr = ref.read(inboxManagerProvider);
-                    await inboxMgr.convertToNote(
-                      entry.id,
-                      title: titleCtrl.text.trim().isEmpty ? 'Nova Nota' : titleCtrl.text.trim(),
-                      content: contentCtrl.text.trim(),
-                    );
-                    if (ctx.mounted) {
-                      Navigator.of(ctx).pop();
-                      ScaffoldMessenger.of(ctx).showSnackBar(
-                        const SnackBar(content: Text('Nota salva na Base de Conhecimento!')),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: contentCtrl,
+                    maxLines: 4,
+                    decoration: const InputDecoration(labelText: 'Conteúdo', border: OutlineInputBorder()),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF8B5CF6),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    onPressed: () async {
+                      final title = titleCtrl.text.trim().isEmpty ? 'Nova Nota' : titleCtrl.text.trim();
+                      final content = contentCtrl.text.trim();
+                      final inboxMgr = ref.read(inboxManagerProvider);
+                      await inboxMgr.convertToNote(
+                        entry.id,
+                        title: title,
+                        content: content,
                       );
-                    }
-                  },
-                  child: const Text('Confirmar Conversão em Nota', style: TextStyle(fontWeight: FontWeight.bold)),
-                ),
-              ],
+                      if (ctx.mounted) {
+                        Navigator.of(ctx).pop();
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          const SnackBar(content: Text('Nota salva na Base de Conhecimento!')),
+                        );
+                      }
+                    },
+                    child: const Text('Confirmar Conversão em Nota', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
   void _showConvertToQuestionDialog(InboxEntry entry) {
-    final qCtrl = TextEditingController(text: entry.content);
-
     showAdaptiveMinistrySheet(
       context: context,
       title: 'Converter em Dúvida Teocrática',
       titleLeading: const Icon(Icons.help_outline, color: Color(0xFFF59E0B)),
-      builder: (ctx, scroll) {
-        return SingleChildScrollView(
-          controller: scroll,
-          physics: const ClampingScrollPhysics(),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                TextField(
-                  controller: qCtrl,
-                  maxLines: 3,
-                  decoration: const InputDecoration(
-                    labelText: 'Pergunta ou Assunto Bíblico',
-                    border: OutlineInputBorder(),
+      builder: (ctx, scroll) => ManagedTextControllers(
+        initialTexts: [entry.content],
+        builder: (ctx, ctrls) {
+          final qCtrl = ctrls[0];
+
+          return SingleChildScrollView(
+            controller: scroll,
+            physics: const ClampingScrollPhysics(),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    controller: qCtrl,
+                    maxLines: 3,
+                    decoration: const InputDecoration(
+                      labelText: 'Pergunta ou Assunto Bíblico',
+                      border: OutlineInputBorder(),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFF59E0B),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
-                  onPressed: () async {
-                    final inboxMgr = ref.read(inboxManagerProvider);
-                    await inboxMgr.convertToQuestion(
-                      entry.id,
-                      question: qCtrl.text.trim().isEmpty ? entry.content : qCtrl.text.trim(),
-                    );
-                    if (ctx.mounted) {
-                      Navigator.of(ctx).pop();
-                      ScaffoldMessenger.of(ctx).showSnackBar(
-                        const SnackBar(content: Text('Dúvida registrada para pesquisa bíblica!')),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFF59E0B),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    onPressed: () async {
+                      final qText = qCtrl.text.trim().isEmpty ? entry.content : qCtrl.text.trim();
+                      final inboxMgr = ref.read(inboxManagerProvider);
+                      await inboxMgr.convertToQuestion(
+                        entry.id,
+                        question: qText,
                       );
-                    }
-                  },
-                  child: const Text('Confirmar Conversão em Dúvida', style: TextStyle(fontWeight: FontWeight.bold)),
-                ),
-              ],
+                      if (ctx.mounted) {
+                        Navigator.of(ctx).pop();
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          const SnackBar(content: Text('Dúvida registrada para pesquisa bíblica!')),
+                        );
+                      }
+                    },
+                    child: const Text('Confirmar Conversão em Dúvida', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
@@ -987,82 +1037,86 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
   }
 
   void _showEditInboxEntryModal(InboxEntry entry) {
-    final contentCtrl = TextEditingController(text: entry.content);
     String? category = entry.suggestedCategory;
 
     showAdaptiveMinistrySheet(
       context: context,
       title: 'Editar Captura',
       titleLeading: const Icon(Icons.edit_note, color: AppTheme.primaryBlue),
-      builder: (ctx, scroll) {
-        return StatefulBuilder(
-          builder: (ctx, setModalState) {
-            return SingleChildScrollView(
-              controller: scroll,
-              physics: const ClampingScrollPhysics(),
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  RichMarkdownToolbar(controller: contentCtrl),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: contentCtrl,
-                    maxLines: 5,
-                    decoration: const InputDecoration(
-                      labelText: 'Conteúdo da Captura (Markdown e Imagens)',
-                      border: OutlineInputBorder(),
+      builder: (ctx, scroll) => ManagedTextControllers(
+        initialTexts: [entry.content],
+        builder: (ctx, ctrls) {
+          final contentCtrl = ctrls[0];
+
+          return StatefulBuilder(
+            builder: (ctx, setModalState) {
+              return SingleChildScrollView(
+                controller: scroll,
+                physics: const ClampingScrollPhysics(),
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    RichMarkdownToolbar(controller: contentCtrl),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: contentCtrl,
+                      maxLines: 5,
+                      decoration: const InputDecoration(
+                        labelText: 'Conteúdo da Captura (Markdown e Imagens)',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 14),
-                  DropdownButtonFormField<String>(
-                    initialValue: category,
-                    decoration: const InputDecoration(
-                      labelText: 'Categoria Sugerida',
-                      border: OutlineInputBorder(),
+                    const SizedBox(height: 14),
+                    DropdownButtonFormField<String>(
+                      initialValue: category,
+                      decoration: const InputDecoration(
+                        labelText: 'Categoria Sugerida',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: null, child: Text('Sem categoria')),
+                        DropdownMenuItem(value: 'ministry', child: Text('Ministério')),
+                        DropdownMenuItem(value: 'personal', child: Text('Pessoal')),
+                        DropdownMenuItem(value: 'study', child: Text('Estudo')),
+                        DropdownMenuItem(value: 'question', child: Text('Dúvida')),
+                        DropdownMenuItem(value: 'idea', child: Text('Ideia')),
+                      ],
+                      onChanged: (v) => setModalState(() => category = v),
                     ),
-                    items: const [
-                      DropdownMenuItem(value: null, child: Text('Sem categoria')),
-                      DropdownMenuItem(value: 'ministry', child: Text('Ministério')),
-                      DropdownMenuItem(value: 'personal', child: Text('Pessoal')),
-                      DropdownMenuItem(value: 'study', child: Text('Estudo')),
-                      DropdownMenuItem(value: 'question', child: Text('Dúvida')),
-                      DropdownMenuItem(value: 'idea', child: Text('Ideia')),
-                    ],
-                    onChanged: (v) => setModalState(() => category = v),
-                  ),
-                  const SizedBox(height: 18),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryBlue,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
-                    onPressed: () async {
-                      final updated = contentCtrl.text.trim();
-                      if (updated.isEmpty) return;
-                      final inboxMgr = ref.read(inboxManagerProvider);
-                      await inboxMgr.updateEntry(
-                        entry.id,
-                        content: updated,
-                        suggestedCategory: category,
-                      );
-                      if (ctx.mounted) Navigator.pop(ctx);
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Captura atualizada com sucesso!')),
+                    const SizedBox(height: 18),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryBlue,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      onPressed: () async {
+                        final updated = contentCtrl.text.trim();
+                        if (updated.isEmpty) return;
+                        final inboxMgr = ref.read(inboxManagerProvider);
+                        await inboxMgr.updateEntry(
+                          entry.id,
+                          content: updated,
+                          suggestedCategory: category,
                         );
-                      }
-                    },
-                    child: const Text('Salvar Alterações', style: TextStyle(fontWeight: FontWeight.bold)),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Captura atualizada com sucesso!')),
+                          );
+                        }
+                      },
+                      child: const Text('Salvar Alterações', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 
@@ -1076,7 +1130,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
       if (decoded is List) {
         return decoded.whereType<Map<String, dynamic>>().toList();
       }
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.debug('Falha ao parsear lista JSON no Inbox: $e', st);
+    }
     return [];
   }
 
@@ -1409,28 +1465,45 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
               final emails = snapshot.data ?? [];
               if (emails.isEmpty) {
                 return Center(
-                  child: Padding(
+                  child: SingleChildScrollView(
                     padding: const EdgeInsets.all(24),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.mail_lock_outlined, size: 48, color: Colors.grey.shade400),
-                        const SizedBox(height: 12),
+                        Icon(Icons.mark_email_unread_outlined, size: 52, color: Colors.grey.shade400),
+                        const SizedBox(height: 14),
                         const Text(
-                          'Nenhuma mensagem retida nesta visualização.',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                          'Nenhuma correspondência teocrática retida',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                         ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 8),
                         const Text(
-                          'Toque em Sincronizar para buscar novas correspondências teocráticas.',
+                          'Conecte sua conta de e-mail teocrático (IMAP) em Configurações para sincronizar e manter suas correspondências salvas localmente com retenção permanente.',
                           textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                          style: TextStyle(fontSize: 13, color: Colors.grey, height: 1.4),
                         ),
-                        const SizedBox(height: 16),
-                        OutlinedButton.icon(
-                          onPressed: _syncEmails,
-                          icon: const Icon(Icons.sync),
-                          label: const Text('Sincronizar mail.jw.org'),
+                        const SizedBox(height: 20),
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 8,
+                          alignment: WrapAlignment.center,
+                          children: [
+                            OutlinedButton.icon(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                                );
+                              },
+                              icon: const Icon(Icons.settings_outlined, size: 18),
+                              label: const Text('Configurar E-mail'),
+                            ),
+                            FilledButton.icon(
+                              onPressed: _syncEmails,
+                              icon: const Icon(Icons.sync, size: 18),
+                              label: const Text('Sincronizar Agora'),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -1495,6 +1568,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                 label: const Text('Autenticar com Biometria / PIN', style: TextStyle(fontWeight: FontWeight.bold)),
                 onPressed: () async {
                   final authenticated = await biometric.authenticate(
+                    context: context,
                     localizedReason: 'Confirme sua identidade para acessar as cartas e formulários do Hub.',
                   );
                   if (authenticated && mounted) {
@@ -1562,10 +1636,26 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
               }
               final letters = snapshot.data ?? [];
               if (letters.isEmpty) {
-                return const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Text('Nenhuma correspondência do Hub encontrada.'),
+                return Center(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.lock_outline, size: 48, color: Colors.grey.shade400),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Nenhuma correspondência restrita do Hub',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Cartas do corpo de anciãos e formulários oficiais sincronizados pelo IMAP serão armazenados aqui sob proteção biométrica.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                      ],
+                    ),
                   ),
                 );
               }
@@ -1906,6 +1996,31 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                   spacing: 8,
                   runSpacing: 8,
                   children: [
+                    if (msg.isDraft)
+                      FilledButton.icon(
+                        icon: const Icon(Icons.send_rounded, size: 16),
+                        label: const Text('Enviar via SMTP'),
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _showNewDraftDialog(existingDraft: msg);
+                        },
+                      )
+                    else
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.reply_rounded, size: 16),
+                        label: const Text('Responder SMTP'),
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          final replyTo = JwSmtpClient.extractValidEmailAddress(msg.from) ?? msg.from;
+                          final replySubj = msg.subject.toLowerCase().startsWith('re:')
+                              ? msg.subject
+                              : 'Re: ${msg.subject}';
+                          _showNewDraftDialog(
+                            initialTo: replyTo,
+                            initialSubject: replySubj,
+                          );
+                        },
+                      ),
                     FilledButton.tonalIcon(
                       icon: const Icon(Icons.download_rounded, size: 16),
                       label: const Text('Exportar'),
@@ -1941,14 +2056,18 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
   }
 
   // ==========================================
-  // COMPOR NOVO RASCUNHO TEOCRÁTICO
+  // COMPOR / EDITAR / ENVIAR E-MAIL TEOCRÁTICO
   // ==========================================
 
-  void _showNewDraftDialog() {
-    final toCtrl = TextEditingController();
-    final subjectCtrl = TextEditingController();
-    final contentCtrl = TextEditingController();
-    final tagsCtrl = TextEditingController();
+  void _showNewDraftDialog({
+    JwEmailMessage? existingDraft,
+    String? initialTo,
+    String? initialSubject,
+  }) {
+    final initTo = existingDraft?.to ?? initialTo ?? '';
+    final initSubject = existingDraft?.subject ?? initialSubject ?? '';
+    final initBody = existingDraft?.bodyText ?? '';
+    final initTags = existingDraft?.tags.join(', ') ?? '';
 
     showModalBottomSheet(
       context: context,
@@ -1956,109 +2075,336 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: EdgeInsets.only(
-            top: 20,
-            left: 20,
-            right: 20,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Row(
-                  children: [
-                    Icon(Icons.edit_note, color: AppTheme.primaryBlue),
-                    SizedBox(width: 8),
-                    Text(
-                      'Novo Rascunho Teocrático (Retido)',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                    ),
-                  ],
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: [initTo, initSubject, initBody, initTags],
+        builder: (ctx, ctrls) {
+          final toCtrl = ctrls[0];
+          final subjectCtrl = ctrls[1];
+          final contentCtrl = ctrls[2];
+          final tagsCtrl = ctrls[3];
+          bool isSending = false;
+          String? inlineError;
+          bool needsConfig = false;
+
+          return StatefulBuilder(
+            builder: (ctx, setSheetState) => SafeArea(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  top: 20,
+                  left: 20,
+                  right: 20,
+                  bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
                 ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: toCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Para (ex: corpo.anciaos@jw.org)',
-                    isDense: true,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.edit_note, color: AppTheme.primaryBlue),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              existingDraft != null
+                                  ? 'Enviar ou Editar Rascunho'
+                                  : 'Compor / Rascunho Teocrático',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (inlineError != null) ...[
+                        const SizedBox(height: 10),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Theme.of(ctx).colorScheme.errorContainer,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                inlineError!,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Theme.of(ctx).colorScheme.onErrorContainer,
+                                ),
+                              ),
+                              if (needsConfig) ...[
+                                const SizedBox(height: 6),
+                                TextButton.icon(
+                                  onPressed: () {
+                                    Navigator.pop(ctx);
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const SettingsScreen(),
+                                      ),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.settings, size: 16),
+                                  label: const Text('Configurar E-mail/SMTP'),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: toCtrl,
+                        enabled: !isSending,
+                        decoration: const InputDecoration(
+                          labelText: 'Para (ex: corpo.anciaos@jw.org)',
+                          isDense: true,
+                        ),
+                        keyboardType: TextInputType.emailAddress,
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: subjectCtrl,
+                        enabled: !isSending,
+                        decoration: const InputDecoration(
+                          labelText: 'Assunto *',
+                          isDense: true,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: tagsCtrl,
+                        enabled: !isSending,
+                        decoration: const InputDecoration(
+                          labelText: 'Tags (separadas por vírgula)',
+                          hintText: 'cartas, assembleia, pioneiro',
+                          isDense: true,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      RichMarkdownToolbar(controller: contentCtrl),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: contentCtrl,
+                        enabled: !isSending,
+                        maxLines: 5,
+                        decoration: const InputDecoration(
+                          labelText: 'Conteúdo da Mensagem *',
+                          hintText: 'Escreva a mensagem ou nota que deseja enviar ou salvar permanentemente...',
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Wrap(
+                        alignment: WrapAlignment.end,
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          TextButton(
+                            onPressed: isSending ? null : () => Navigator.pop(ctx),
+                            child: const Text('Cancelar'),
+                          ),
+                          OutlinedButton.icon(
+                            icon: const Icon(Icons.save, size: 16),
+                            label: const Text('Salvar Rascunho'),
+                            onPressed: isSending
+                                ? null
+                                : () async {
+                                    final subject = subjectCtrl.text.trim();
+                                    if (subject.isEmpty) {
+                                      setSheetState(() {
+                                        inlineError = 'Informe o assunto para salvar o rascunho.';
+                                        needsConfig = false;
+                                      });
+                                      return;
+                                    }
+                                    final to = toCtrl.text.trim();
+                                    final bodyText = contentCtrl.text.trim();
+                                    final tags = tagsCtrl.text
+                                        .split(',')
+                                        .map((t) => t.trim().replaceAll('#', ''))
+                                        .where((t) => t.isNotEmpty)
+                                        .toList();
+
+                                    final db = ref.read(repositoryProvider).db;
+                                    final emailEntry = await (db.select(db.appKvStore)
+                                          ..where((t) => t.key.equals('jw_imap_email')))
+                                        .getSingleOrNull();
+                                    final userEmail = emailEntry?.value.trim() ?? '';
+
+                                    final draft = JwEmailMessage(
+                                      id: existingDraft?.id ?? const Uuid().v4(),
+                                      subject: subject,
+                                      from: userEmail.isNotEmpty ? userEmail : 'local@dispositivo',
+                                      to: to,
+                                      date: DateTime.now(),
+                                      bodyText: bodyText,
+                                      isDraft: true,
+                                      tags: tags,
+                                    );
+                                    await ref.read(jwEmailServiceProvider).saveDraft(draft);
+                                    if (ctx.mounted) Navigator.pop(ctx);
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Rascunho salvo na retenção permanente!'),
+                                        ),
+                                      );
+                                    }
+                                  },
+                          ),
+                          FilledButton.icon(
+                            icon: isSending
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Icon(Icons.send_rounded, size: 16),
+                            label: Text(isSending ? 'Enviando SMTP...' : 'Enviar Agora (SMTP)'),
+                            onPressed: isSending
+                                ? null
+                                : () async {
+                                    final to = toCtrl.text.trim();
+                                    final subject = subjectCtrl.text.trim();
+                                    final bodyText = contentCtrl.text.trim();
+                                    if (to.isEmpty ||
+                                        JwSmtpClient.parseRecipients(to).isEmpty) {
+                                      setSheetState(() {
+                                        inlineError =
+                                            'Informe pelo menos um destinatário de e-mail válido no campo "Para".';
+                                        needsConfig = false;
+                                      });
+                                      return;
+                                    }
+                                    if (subject.isEmpty) {
+                                      setSheetState(() {
+                                        inlineError = 'O assunto não pode ficar em branco.';
+                                        needsConfig = false;
+                                      });
+                                      return;
+                                    }
+
+                                    setSheetState(() {
+                                      isSending = true;
+                                      inlineError = null;
+                                      needsConfig = false;
+                                    });
+
+                                    try {
+                                      final db = ref.read(repositoryProvider).db;
+                                      final emailEntry = await (db.select(db.appKvStore)
+                                            ..where((t) => t.key.equals('jw_imap_email')))
+                                          .getSingleOrNull();
+                                      const secureStorage = FlutterSecureStorage();
+                                      String? password = await secureStorage.read(key: 'jw_imap_password');
+                                      if (password == null || password.isEmpty) {
+                                        final legacyPass = await (db.select(db.appKvStore)
+                                              ..where((t) => t.key.equals('jw_imap_password')))
+                                            .getSingleOrNull();
+                                        password = legacyPass?.value;
+                                      }
+                                      final username = emailEntry?.value.trim() ?? '';
+                                      if (username.isEmpty || password == null || password.isEmpty) {
+                                        if (ctx.mounted) {
+                                          setSheetState(() {
+                                            isSending = false;
+                                            needsConfig = true;
+                                            inlineError =
+                                                'Credenciais IMAP/SMTP não configuradas. Configure seu e-mail e senha teocráticos em Configurações antes de enviar.';
+                                          });
+                                        }
+                                        return;
+                                      }
+
+                                      final smtpHostEntry = await (db.select(db.appKvStore)
+                                            ..where((t) => t.key.equals('jw_smtp_host')))
+                                          .getSingleOrNull();
+                                      final imapHostEntry = await (db.select(db.appKvStore)
+                                            ..where((t) => t.key.equals('jw_imap_host')))
+                                          .getSingleOrNull();
+                                      final smtpPortEntry = await (db.select(db.appKvStore)
+                                            ..where((t) => t.key.equals('jw_smtp_port')))
+                                          .getSingleOrNull();
+                                      final smtpSecEntry = await (db.select(db.appKvStore)
+                                            ..where((t) => t.key.equals('jw_smtp_security')))
+                                          .getSingleOrNull();
+
+                                      final smtpHost =
+                                          (smtpHostEntry?.value.trim().isNotEmpty == true)
+                                              ? smtpHostEntry!.value.trim()
+                                              : ((imapHostEntry?.value.trim().isNotEmpty == true)
+                                                  ? imapHostEntry!.value.trim()
+                                                  : 'mail.jw.org');
+                                      final securityMode =
+                                          (smtpSecEntry?.value.trim().isNotEmpty == true)
+                                              ? smtpSecEntry!.value.trim()
+                                              : 'starttls';
+                                      final smtpPort = int.tryParse(smtpPortEntry?.value ?? '') ??
+                                          (securityMode == 'ssl' ? 465 : 587);
+
+                                      final tags = tagsCtrl.text
+                                          .split(',')
+                                          .map((t) => t.trim().replaceAll('#', ''))
+                                          .where((t) => t.isNotEmpty)
+                                          .toList();
+
+                                      final msgToSend = JwEmailMessage(
+                                        id: existingDraft?.id ?? const Uuid().v4(),
+                                        subject: subject,
+                                        from: username,
+                                        to: to,
+                                        date: DateTime.now(),
+                                        bodyText: bodyText,
+                                        isDraft: false,
+                                        tags: tags,
+                                      );
+
+                                      await ref.read(jwEmailServiceProvider).sendEmail(
+                                            host: smtpHost,
+                                            port: smtpPort,
+                                            username: username,
+                                            password: password,
+                                            message: msgToSend,
+                                            securityMode: securityMode,
+                                            draftId: existingDraft?.id,
+                                          );
+
+                                      if (ctx.mounted) Navigator.pop(ctx);
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              'E-mail enviado via SMTP ($smtpHost:$smtpPort) e salvo na retenção permanente!',
+                                            ),
+                                            backgroundColor: Colors.green,
+                                          ),
+                                        );
+                                      }
+                                    } catch (e, st) {
+                                      AppLogger.warning('Falha ao enviar e-mail SMTP', e, st);
+                                      if (ctx.mounted) {
+                                        setSheetState(() {
+                                          isSending = false;
+                                          needsConfig = e is JwEmailAuthException;
+                                          inlineError = 'Falha no envio SMTP: $e';
+                                        });
+                                      }
+                                    }
+                                  },
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: subjectCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Assunto *',
-                    isDense: true,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: tagsCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Tags (separadas por vírgula)',
-                    hintText: 'cartas, assembleia, pioneiro',
-                    isDense: true,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                RichMarkdownToolbar(controller: contentCtrl),
-                const SizedBox(height: 6),
-                TextField(
-                  controller: contentCtrl,
-                  maxLines: 5,
-                  decoration: const InputDecoration(
-                    labelText: 'Conteúdo da Mensagem *',
-                    hintText: 'Escreva a mensagem ou nota que deseja salvar permanentemente...',
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      child: const Text('Cancelar'),
-                    ),
-                    const SizedBox(width: 8),
-                    FilledButton.icon(
-                      icon: const Icon(Icons.save),
-                      label: const Text('Salvar Rascunho Retido'),
-                      onPressed: () async {
-                        if (subjectCtrl.text.trim().isEmpty) return;
-                        final tags = tagsCtrl.text
-                            .split(',')
-                            .map((t) => t.trim().replaceAll('#', ''))
-                            .where((t) => t.isNotEmpty)
-                            .toList();
-                        final draft = JwEmailMessage(
-                          id: const Uuid().v4(),
-                          subject: subjectCtrl.text.trim(),
-                          from: 'me@jw.org',
-                          to: toCtrl.text.trim().isEmpty ? 'destinatario@jw.org' : toCtrl.text.trim(),
-                          date: DateTime.now(),
-                          bodyText: contentCtrl.text.trim(),
-                          isDraft: true,
-                          tags: tags,
-                        );
-                        await ref.read(jwEmailServiceProvider).saveDraft(draft);
-                        if (ctx.mounted) Navigator.pop(ctx);
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Rascunho salvo na retenção permanente!')),
-                          );
-                        }
-                      },
-                    ),
-                  ],
-                ),
-              ],
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }

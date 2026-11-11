@@ -1,5 +1,7 @@
 import 'package:drift/drift.dart';
 
+import '../core/app_logger.dart';
+import '../core/sync_timestamp.dart';
 import 'tables.dart';
 import 'connection/connection.dart' as impl;
 
@@ -37,6 +39,9 @@ part 'app_database.g.dart';
     KnowledgeQuestions,
     KnowledgeDocuments,
     KnowledgeResources,
+    TicunaWords,
+    TicunaPhrases,
+    TicunaTags,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -45,12 +50,13 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (Migrator m) async {
       await m.createAll();
+      await _ensurePerformanceIndexes();
       await _seedDefaultLanguage();
     },
     onUpgrade: (Migrator m, int from, int to) async {
@@ -115,12 +121,137 @@ class AppDatabase extends _$AppDatabase {
         await _createTableIfNotExists(m, appKvStore);
         await _migrateAppKvStoreUpdatedAt(m);
       }
+      if (from < 8) {
+        // Migração incremental da versão 7 para a versão 8 (A3, A7, A9):
+        // - Registra tabelas Ticuna no schema Drift e garante colunas legadas
+        // - Adiciona file_path em person_photos
+        // - Converte timestamps ISO TEXT gravados por managers legados para unix-seconds (INTEGER Drift)
+        // - Cria índices de busca de contatos e fila de sync
+        await _createTableIfNotExists(m, ticunaWords);
+        await _createTableIfNotExists(m, ticunaPhrases);
+        await _createTableIfNotExists(m, ticunaTags);
+        await _migrateTicunaLegacyColumns();
+        await _migratePersonPhotosFilePath(m);
+        await _normalizeLegacyTextTimestamps();
+        await _ensurePerformanceIndexes();
+      }
     },
     beforeOpen: (details) async {
       await _ensureAppKvStoreUpdatedAt();
+      await _ensurePerformanceIndexes();
       await _seedDefaultLanguage();
     },
   );
+
+  Future<void> _ensurePerformanceIndexes() async {
+    final rows = await customSelect(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('people', 'sync_queue')",
+    ).get();
+    final existing = rows.map((r) => r.read<String>('name')).toSet();
+    if (existing.contains('people')) {
+      await customStatement(
+        'CREATE INDEX IF NOT EXISTS idx_people_name ON people(name COLLATE NOCASE);',
+      );
+      await customStatement(
+        'CREATE INDEX IF NOT EXISTS idx_people_deleted_at ON people(deleted_at);',
+      );
+    }
+    if (existing.contains('sync_queue')) {
+      await customStatement(
+        'CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON sync_queue(status, created_at);',
+      );
+    }
+  }
+
+  Future<void> _migratePersonPhotosFilePath(Migrator m) async {
+    final tableCheck = await customSelect(
+      "SELECT count(*) as count FROM sqlite_master WHERE type='table' AND name='person_photos'",
+    ).getSingle();
+    if (tableCheck.read<int>('count') == 0) return;
+    final columns = await customSelect(
+      "PRAGMA table_info(person_photos)",
+    ).get();
+    final colNames = columns.map((c) => c.read<String>('name')).toSet();
+    if (colNames.isNotEmpty && !colNames.contains('file_path')) {
+      await m.addColumn(personPhotos, personPhotos.filePath);
+    }
+  }
+
+  Future<void> _migrateTicunaLegacyColumns() async {
+    final ticunaColumnsByTable = <String, Map<String, String>>{
+      'ticuna_words': {
+        'audio_path': 'ALTER TABLE ticuna_words ADD COLUMN audio_path TEXT;',
+        'audio_duration_seconds':
+            'ALTER TABLE ticuna_words ADD COLUMN audio_duration_seconds INTEGER;',
+        'language_id':
+            "ALTER TABLE ticuna_words ADD COLUMN language_id TEXT DEFAULT 'tca';",
+      },
+      'ticuna_phrases': {
+        'audio_path': 'ALTER TABLE ticuna_phrases ADD COLUMN audio_path TEXT;',
+        'audio_duration_seconds':
+            'ALTER TABLE ticuna_phrases ADD COLUMN audio_duration_seconds INTEGER;',
+        'language_id':
+            "ALTER TABLE ticuna_phrases ADD COLUMN language_id TEXT DEFAULT 'tca';",
+      },
+    };
+    for (final entry in ticunaColumnsByTable.entries) {
+      final columns = await customSelect('PRAGMA table_info(${entry.key})').get();
+      final colNames = columns.map((c) => c.read<String>('name')).toSet();
+      if (colNames.isEmpty) continue;
+      for (final colEntry in entry.value.entries) {
+        if (!colNames.contains(colEntry.key)) {
+          await customStatement(colEntry.value);
+        }
+      }
+    }
+  }
+
+  Future<void> _normalizeLegacyTextTimestamps() async {
+    const tableColumns = <String, List<String>>{
+      'family_ties': ['created_at', 'updated_at', 'deleted_at'],
+      'ministry_experiences': ['date_time', 'created_at', 'updated_at', 'deleted_at'],
+      'person_photos': ['created_at', 'updated_at', 'deleted_at'],
+      'person_publications': ['created_at', 'updated_at', 'deleted_at'],
+      'research_articles': ['created_at', 'updated_at', 'deleted_at'],
+      'research_tags': ['created_at', 'updated_at', 'deleted_at'],
+      'territory_sectors': ['created_at', 'updated_at', 'deleted_at'],
+      'student_manual_order': ['updated_at', 'deleted_at'],
+    };
+    const requiredCols = {'created_at', 'updated_at', 'date_time'};
+
+    for (final entry in tableColumns.entries) {
+      final table = entry.key;
+      final exists = await customSelect(
+        "SELECT count(*) as count FROM sqlite_master WHERE type='table' AND name=?",
+        variables: [Variable.withString(table)],
+      ).getSingle();
+      if (exists.read<int>('count') == 0) continue;
+
+      final info = await customSelect('PRAGMA table_info($table)').get();
+      final existingCols = info.map((c) => c.read<String>('name')).toSet();
+
+      for (final col in entry.value) {
+        if (!existingCols.contains(col)) continue;
+        final textRows = await customSelect(
+          "SELECT rowid AS _rid, $col AS _val FROM $table WHERE typeof($col) = 'text'",
+        ).get();
+        for (final row in textRows) {
+          final rid = row.read<int>('_rid');
+          final rawVal = row.data['_val']?.toString() ?? '';
+          final parsed = SyncTimestamp.parse(rawVal);
+          final replacement =
+              parsed ?? (requiredCols.contains(col) ? DateTime.now() : null);
+          await customStatement(
+            'UPDATE $table SET $col = ? WHERE rowid = ?',
+            [
+              replacement == null ? null : replacement.millisecondsSinceEpoch ~/ 1000,
+              rid,
+            ],
+          );
+        }
+      }
+    }
+  }
 
   Future<void> _migrateAppKvStoreUpdatedAt(Migrator m) async {
     final columns = await customSelect(
@@ -148,7 +279,10 @@ class AppDatabase extends _$AppDatabase {
           );
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.error('Falha ao garantir updated_at em app_kv_store', e, st);
+      rethrow;
+    }
   }
 
   Future<void> _migrateAppointmentsTaskId(Migrator m) async {
@@ -212,6 +346,11 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> _seedDefaultLanguage() async {
     try {
+      final tableCheck = await customSelect(
+        "SELECT count(*) AS count FROM sqlite_master WHERE type='table' AND name='app_languages'",
+      ).getSingle();
+      if (tableCheck.read<int>('count') == 0) return;
+
       final now = DateTime.now();
       final catalog = [
         AppLanguagesCompanion.insert(
@@ -282,7 +421,9 @@ class AppDatabase extends _$AppDatabase {
           await into(appLanguages).insertOnConflictUpdate(item);
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.warning('Falha ao semear idiomas padrão em app_languages', e, st);
+    }
   }
 
   Future<void> _migrateLandmarksColumns() async {
@@ -291,6 +432,7 @@ class AppDatabase extends _$AppDatabase {
         "PRAGMA table_info(territory_landmarks)",
       ).get();
       final colNames = columns.map((c) => c.read<String>('name')).toSet();
+      if (colNames.isEmpty) return;
       if (!colNames.contains('updated_at')) {
         await customStatement(
           "ALTER TABLE territory_landmarks ADD COLUMN updated_at INTEGER;",
@@ -312,7 +454,10 @@ class AppDatabase extends _$AppDatabase {
           "UPDATE territory_landmarks SET revision = 1 WHERE revision IS NULL;",
         );
       }
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.error('Erro na migração de colunas territory_landmarks', e, st);
+      rethrow;
+    }
   }
 
   Future<void> _migrateCustomTablesColumns() async {
@@ -361,7 +506,10 @@ class AppDatabase extends _$AppDatabase {
             "UPDATE $tbl SET revision = 1 WHERE revision IS NULL;",
           );
         }
-      } catch (_) {}
+      } catch (e, st) {
+        AppLogger.error('Erro na migração de colunas da tabela $tbl', e, st);
+        rethrow;
+      }
     }
   }
 
@@ -387,7 +535,10 @@ class AppDatabase extends _$AppDatabase {
         }
         await customStatement("DROP TABLE IF EXISTS app_settings_kv");
       }
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.error('Erro na migração de app_settings_kv para app_kv_store', e, st);
+      rethrow;
+    }
   }
 
   Future<void> _createTableIfNotExists(Migrator m, TableInfo table) async {

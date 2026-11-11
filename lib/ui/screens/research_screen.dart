@@ -7,6 +7,7 @@ import '../../core/app_theme.dart';
 import '../../media/media_picker_helper.dart';
 import '../../reports/web_downloader.dart';
 import '../../research/research_manager.dart';
+import '../widgets/managed_text_controllers.dart';
 import '../widgets/markdown_preview_text.dart';
 import '../widgets/rich_markdown_toolbar.dart';
 
@@ -36,11 +37,14 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
   }
 
   void _showManageTagsDialog(BuildContext context, List<ResearchTagItem> tags) {
-    final newTagController = TextEditingController();
-
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: const [''],
+        builder: (ctx, ctrls) {
+          final newTagController = ctrls[0];
+
+          return StatefulBuilder(
         builder: (ctx, setDialogState) {
           return AlertDialog(
             title: const Row(
@@ -129,46 +133,50 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                                   icon: const Icon(Icons.edit, size: 18),
                                   tooltip: 'Renomear',
                                   onPressed: () {
-                                    final editController =
-                                        TextEditingController(text: t.name);
                                     showDialog(
                                       context: context,
-                                      builder: (editCtx) => AlertDialog(
-                                        title: const Text('Renomear Categoria'),
-                                        content: TextField(
-                                          controller: editController,
-                                          autofocus: true,
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () =>
-                                                Navigator.pop(editCtx),
-                                            child: const Text('Cancelar'),
-                                          ),
-                                          ElevatedButton(
-                                            onPressed: () async {
-                                              final newName = editController
-                                                  .text
-                                                  .trim();
-                                              if (newName.isNotEmpty) {
-                                                final mgr = ref.read(
-                                                  researchManagerProvider,
-                                                );
-                                                await mgr.updateTag(
-                                                  t.id,
-                                                  newName,
-                                                );
-                                                if (editCtx.mounted) {
-                                                  Navigator.pop(editCtx);
-                                                }
-                                                if (ctx.mounted) {
-                                                  Navigator.pop(ctx);
-                                                }
-                                              }
-                                            },
-                                            child: const Text('Salvar'),
-                                          ),
-                                        ],
+                                      builder: (editCtx) => ManagedTextControllers(
+                                        initialTexts: [t.name],
+                                        builder: (editCtx, editCtrls) {
+                                          final editController = editCtrls[0];
+                                          return AlertDialog(
+                                            title: const Text('Renomear Categoria'),
+                                            content: TextField(
+                                              controller: editController,
+                                              autofocus: true,
+                                            ),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () =>
+                                                    Navigator.pop(editCtx),
+                                                child: const Text('Cancelar'),
+                                              ),
+                                              ElevatedButton(
+                                                onPressed: () async {
+                                                  final newName = editController
+                                                      .text
+                                                      .trim();
+                                                  if (newName.isNotEmpty) {
+                                                    final mgr = ref.read(
+                                                      researchManagerProvider,
+                                                    );
+                                                    await mgr.updateTag(
+                                                      t.id,
+                                                      newName,
+                                                    );
+                                                    if (editCtx.mounted) {
+                                                      Navigator.pop(editCtx);
+                                                    }
+                                                    if (ctx.mounted) {
+                                                      Navigator.pop(ctx);
+                                                    }
+                                                  }
+                                                },
+                                                child: const Text('Salvar'),
+                                              ),
+                                            ],
+                                          );
+                                        },
                                       ),
                                     );
                                   },
@@ -215,6 +223,8 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
               ),
             ],
           );
+        },
+      );
         },
       ),
     );
@@ -522,22 +532,27 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
     BuildContext context, {
     ResearchArticleItem? existing,
   }) {
-    final titleController = TextEditingController(text: existing?.title ?? '');
-    final summaryController = TextEditingController(
-      text: existing?.summary ?? '',
-    );
-    final contentController = TextEditingController(
-      text: existing?.content ?? '',
-    );
     final tags = List<String>.from(existing?.tags ?? []);
     final attachments = List<String>.from(existing?.attachments ?? []);
-    final tagInputController = TextEditingController();
 
     final availableTags = ref.read(researchTagsStreamProvider).value ?? [];
 
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: [
+          existing?.title ?? '',
+          existing?.summary ?? '',
+          existing?.content ?? '',
+          '',
+        ],
+        builder: (ctx, ctrls) {
+          final titleController = ctrls[0];
+          final summaryController = ctrls[1];
+          final contentController = ctrls[2];
+          final tagInputController = ctrls[3];
+
+          return StatefulBuilder(
         builder: (ctx, setDialogState) {
           final isDark = Theme.of(ctx).brightness == Brightness.dark;
           return Dialog(
@@ -865,6 +880,8 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
               ),
             ),
           );
+        },
+      );
         },
       ),
     );
@@ -1496,95 +1513,106 @@ Olá! Gostaria de compartilhar uma breve reflexão:
   }
 
   void _showEditWeeklyPresentationModal(BuildContext context) {
-    final titleCtrl = TextEditingController(text: _sampleTitle);
-    final questionCtrl = TextEditingController(text: _sampleQuestion);
-    final scriptureCtrl = TextEditingController(text: _sampleScripture);
-    final pubCtrl = TextEditingController(text: _samplePublication);
-    final videoCtrl = TextEditingController(text: _sampleVideoUrl);
-
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.style, color: Color(0xFFD97706)),
-            SizedBox(width: 8),
-            Text('Editar Cartão da Semana'),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: titleCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Tema / Título da Apresentação',
-                ),
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: [
+          _sampleTitle,
+          _sampleQuestion,
+          _sampleScripture,
+          _samplePublication,
+          _sampleVideoUrl,
+        ],
+        builder: (ctx, ctrls) {
+          final titleCtrl = ctrls[0];
+          final questionCtrl = ctrls[1];
+          final scriptureCtrl = ctrls[2];
+          final pubCtrl = ctrls[3];
+          final videoCtrl = ctrls[4];
+
+          return AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.style, color: Color(0xFFD97706)),
+                SizedBox(width: 8),
+                Text('Editar Cartão da Semana'),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: titleCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Tema / Título da Apresentação',
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: questionCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Pergunta de Introdução',
+                    ),
+                    maxLines: 2,
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: scriptureCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Texto Bíblico Principal',
+                    ),
+                    maxLines: 2,
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: pubCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Publicação de Oferta',
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: videoCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Link do Vídeo / JW Library',
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: questionCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Pergunta de Introdução',
-                ),
-                maxLines: 2,
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancelar'),
               ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: scriptureCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Texto Bíblico Principal',
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD97706),
+                  foregroundColor: Colors.white,
                 ),
-                maxLines: 2,
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: pubCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Publicação de Oferta',
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: videoCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Link do Vídeo / JW Library',
-                ),
+                onPressed: () {
+                  setState(() {
+                    _sampleTitle = titleCtrl.text.trim();
+                    _sampleQuestion = questionCtrl.text.trim();
+                    _sampleScripture = scriptureCtrl.text.trim();
+                    _samplePublication = pubCtrl.text.trim();
+                    _sampleVideoUrl = videoCtrl.text.trim();
+                  });
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Cartão de Bolso da Semana atualizado com sucesso!',
+                      ),
+                    ),
+                  );
+                },
+                child: const Text('Salvar Cartão'),
               ),
             ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFD97706),
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () {
-              setState(() {
-                _sampleTitle = titleCtrl.text.trim();
-                _sampleQuestion = questionCtrl.text.trim();
-                _sampleScripture = scriptureCtrl.text.trim();
-                _samplePublication = pubCtrl.text.trim();
-                _sampleVideoUrl = videoCtrl.text.trim();
-              });
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Cartão de Bolso da Semana atualizado com sucesso!',
-                  ),
-                ),
-              );
-            },
-            child: const Text('Salvar Cartão'),
-          ),
-        ],
+          );
+        },
       ),
     );
   }

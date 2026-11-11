@@ -2,12 +2,14 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/app_logger.dart';
 import '../../core/app_theme.dart';
 import '../../database/app_database.dart';
 import '../../projects/project_manager.dart';
 import '../../tasks/task_manager.dart';
 import '../providers.dart';
 import '../widgets/adaptive_ministry_sheet.dart';
+import '../widgets/managed_text_controllers.dart';
 import '../widgets/markdown_preview_text.dart';
 import '../widgets/rich_markdown_toolbar.dart';
 
@@ -296,9 +298,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
   }
 
   void _showAddTaskModal(ProjectEntry project) {
-    final titleCtrl = TextEditingController();
-    final descCtrl = TextEditingController();
-    final tagsCtrl = TextEditingController();
     String priority = 'normal';
     DateTime? dueDate;
 
@@ -306,103 +305,111 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       context: context,
       title: 'Nova Tarefa no Projeto',
       titleLeading: const Icon(Icons.add_task, color: AppTheme.primaryBlue),
-      builder: (ctx, scroll) {
-        return StatefulBuilder(
-          builder: (ctx, setModalState) {
-            return SingleChildScrollView(
-              controller: scroll,
-              physics: const ClampingScrollPhysics(),
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  TextField(
-                    controller: titleCtrl,
-                    autofocus: true,
-                    decoration: const InputDecoration(
-                      labelText: 'O que precisa ser feito?',
-                      border: OutlineInputBorder(),
+      builder: (ctx, scroll) => ManagedTextControllers(
+        initialTexts: const ['', '', ''],
+        builder: (ctx, ctrls) {
+          final titleCtrl = ctrls[0];
+          final descCtrl = ctrls[1];
+          final tagsCtrl = ctrls[2];
+
+          return StatefulBuilder(
+            builder: (ctx, setModalState) {
+              return SingleChildScrollView(
+                controller: scroll,
+                physics: const ClampingScrollPhysics(),
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextField(
+                      controller: titleCtrl,
+                      autofocus: true,
+                      decoration: const InputDecoration(
+                        labelText: 'O que precisa ser feito?',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: tagsCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Tags (separadas por vírgula)',
-                      hintText: 'Ex: pregação, pioneiro, visita',
-                      prefixIcon: Icon(Icons.tag, size: 18),
-                      border: OutlineInputBorder(),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: tagsCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Tags (separadas por vírgula)',
+                        hintText: 'Ex: pregação, pioneiro, visita',
+                        prefixIcon: Icon(Icons.tag, size: 18),
+                        border: OutlineInputBorder(),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  RichMarkdownToolbar(controller: descCtrl),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: descCtrl,
-                    maxLines: 2,
-                    decoration: const InputDecoration(
-                      labelText: 'Descrição ou detalhes (Markdown)',
-                      border: OutlineInputBorder(),
+                    const SizedBox(height: 12),
+                    RichMarkdownToolbar(controller: descCtrl),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: descCtrl,
+                      maxLines: 2,
+                      decoration: const InputDecoration(
+                        labelText: 'Descrição ou detalhes (Markdown)',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    initialValue: priority,
-                    decoration: const InputDecoration(labelText: 'Prioridade', border: OutlineInputBorder()),
-                    items: const [
-                      DropdownMenuItem(value: 'low', child: Text('Baixa')),
-                      DropdownMenuItem(value: 'normal', child: Text('Normal')),
-                      DropdownMenuItem(value: 'high', child: Text('Alta')),
-                      DropdownMenuItem(value: 'urgent', child: Text('Urgente')),
-                    ],
-                    onChanged: (v) => setModalState(() => priority = v ?? 'normal'),
-                  ),
-                  const SizedBox(height: 12),
-                  ListTile(
-                    title: Text(dueDate == null ? 'Definir Data de Vencimento' : 'Vencimento: ${_formatDate(dueDate!)}'),
-                    trailing: const Icon(Icons.calendar_today),
-                    onTap: () async {
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: DateTime.now(),
-                        firstDate: DateTime.now().subtract(const Duration(days: 30)),
-                        lastDate: DateTime.now().add(const Duration(days: 365)),
-                      );
-                      if (picked != null) setModalState(() => dueDate = picked);
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryBlue,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      initialValue: priority,
+                      decoration: const InputDecoration(labelText: 'Prioridade', border: OutlineInputBorder()),
+                      items: const [
+                        DropdownMenuItem(value: 'low', child: Text('Baixa')),
+                        DropdownMenuItem(value: 'normal', child: Text('Normal')),
+                        DropdownMenuItem(value: 'high', child: Text('Alta')),
+                        DropdownMenuItem(value: 'urgent', child: Text('Urgente')),
+                      ],
+                      onChanged: (v) => setModalState(() => priority = v ?? 'normal'),
                     ),
-                    onPressed: () async {
-                      final title = titleCtrl.text.trim();
-                      if (title.isEmpty) return;
-                      final rawTags = tagsCtrl.text.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
-                      final taskMgr = ref.read(taskManagerProvider);
-                      await taskMgr.createTask(
-                        title: title,
-                        description: descCtrl.text.trim().isNotEmpty ? descCtrl.text.trim() : null,
-                        projectId: project.id,
-                        category: project.category,
-                        priority: priority,
-                        dueDate: dueDate,
-                        tags: rawTags,
-                      );
-                      if (ctx.mounted) Navigator.of(ctx).pop();
-                    },
-                    child: const Text('Adicionar Tarefa', style: TextStyle(fontWeight: FontWeight.bold)),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
+                    const SizedBox(height: 12),
+                    ListTile(
+                      title: Text(dueDate == null ? 'Definir Data de Vencimento' : 'Vencimento: ${_formatDate(dueDate!)}'),
+                      trailing: const Icon(Icons.calendar_today),
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: DateTime.now(),
+                          firstDate: DateTime.now().subtract(const Duration(days: 30)),
+                          lastDate: DateTime.now().add(const Duration(days: 365)),
+                        );
+                        if (picked != null) setModalState(() => dueDate = picked);
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryBlue,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      onPressed: () async {
+                        final title = titleCtrl.text.trim();
+                        if (title.isEmpty) return;
+                        final descText = descCtrl.text.trim();
+                        final rawTags = tagsCtrl.text.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+                        final taskMgr = ref.read(taskManagerProvider);
+                        await taskMgr.createTask(
+                          title: title,
+                          description: descText.isNotEmpty ? descText : null,
+                          projectId: project.id,
+                          category: project.category,
+                          priority: priority,
+                          dueDate: dueDate,
+                          tags: rawTags,
+                        );
+                        if (ctx.mounted) Navigator.of(ctx).pop();
+                      },
+                      child: const Text('Adicionar Tarefa', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 
@@ -419,16 +426,15 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
   }
 
   void _showEditProjectModal(ProjectEntry project) {
-    final nameCtrl = TextEditingController(text: project.name);
-    final objCtrl = TextEditingController(text: project.objective ?? '');
     List<String> existingTags = [];
     try {
       final meta = jsonDecode(project.metadata) as Map<String, dynamic>;
       if (meta['tags'] is List) {
         existingTags = (meta['tags'] as List).map((e) => e.toString()).toList();
       }
-    } catch (_) {}
-    final tagsCtrl = TextEditingController(text: existingTags.join(', '));
+    } catch (e, st) {
+      AppLogger.debug('Falha ao ler metadata de tags do projeto (${project.id}): $e', st);
+    }
     String category = project.category;
     DateTime? targetDate = project.targetDate;
 
@@ -436,99 +442,111 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       context: context,
       title: 'Editar Projeto',
       titleLeading: const Icon(Icons.edit_note, color: Color(0xFF3B82F6)),
-      builder: (ctx, scroll) {
-        return StatefulBuilder(
-          builder: (ctx, setModalState) {
-            return SingleChildScrollView(
-              controller: scroll,
-              physics: const ClampingScrollPhysics(),
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  TextField(
-                    controller: nameCtrl,
-                    decoration: const InputDecoration(labelText: 'Nome do Projeto', border: OutlineInputBorder()),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: tagsCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Tags (separadas por vírgula)',
-                      hintText: 'Ex: pregação, pioneiro, reforma',
-                      prefixIcon: Icon(Icons.tag, size: 18),
-                      border: OutlineInputBorder(),
+      builder: (ctx, scroll) => ManagedTextControllers(
+        initialTexts: [
+          project.name,
+          project.objective ?? '',
+          existingTags.join(', '),
+        ],
+        builder: (ctx, ctrls) {
+          final nameCtrl = ctrls[0];
+          final objCtrl = ctrls[1];
+          final tagsCtrl = ctrls[2];
+
+          return StatefulBuilder(
+            builder: (ctx, setModalState) {
+              return SingleChildScrollView(
+                controller: scroll,
+                physics: const ClampingScrollPhysics(),
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextField(
+                      controller: nameCtrl,
+                      decoration: const InputDecoration(labelText: 'Nome do Projeto', border: OutlineInputBorder()),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  RichMarkdownToolbar(controller: objCtrl),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: objCtrl,
-                    maxLines: 3,
-                    decoration: const InputDecoration(labelText: 'Objetivo Principal (Markdown)', border: OutlineInputBorder()),
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    initialValue: ['ministry', 'personal', 'study'].contains(category) ? category : 'ministry',
-                    decoration: const InputDecoration(labelText: 'Categoria', border: OutlineInputBorder()),
-                    items: const [
-                      DropdownMenuItem(value: 'ministry', child: Text('Ministério')),
-                      DropdownMenuItem(value: 'personal', child: Text('Pessoal')),
-                      DropdownMenuItem(value: 'study', child: Text('Estudo')),
-                    ],
-                    onChanged: (v) => setModalState(() => category = v ?? 'ministry'),
-                  ),
-                  const SizedBox(height: 12),
-                  ListTile(
-                    title: Text(targetDate == null ? 'Definir Prazo / Meta (Opcional)' : 'Meta: ${_formatDate(targetDate!)}'),
-                    trailing: targetDate != null
-                        ? IconButton(
-                            icon: const Icon(Icons.clear, size: 18),
-                            onPressed: () => setModalState(() => targetDate = null),
-                          )
-                        : const Icon(Icons.flag_outlined),
-                    onTap: () async {
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: targetDate ?? DateTime.now().add(const Duration(days: 30)),
-                        firstDate: DateTime.now(),
-                        lastDate: DateTime.now().add(const Duration(days: 730)),
-                      );
-                      if (picked != null) setModalState(() => targetDate = picked);
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF3B82F6),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: tagsCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Tags (separadas por vírgula)',
+                        hintText: 'Ex: pregação, pioneiro, reforma',
+                        prefixIcon: Icon(Icons.tag, size: 18),
+                        border: OutlineInputBorder(),
+                      ),
                     ),
-                    onPressed: () async {
-                      final name = nameCtrl.text.trim();
-                      if (name.isEmpty) return;
-                      final rawTags = tagsCtrl.text.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
-                      final projMgr = ref.read(projectManagerProvider);
-                      await projMgr.updateProject(
-                        project.id,
-                        name: name,
-                        objective: objCtrl.text.trim().isNotEmpty ? objCtrl.text.trim() : null,
-                        category: category,
-                        targetDate: targetDate,
-                        tags: rawTags,
-                      );
-                      if (ctx.mounted) Navigator.of(ctx).pop();
-                    },
-                    child: const Text('Salvar Alterações', style: TextStyle(fontWeight: FontWeight.bold)),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
+                    const SizedBox(height: 12),
+                    RichMarkdownToolbar(controller: objCtrl),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: objCtrl,
+                      maxLines: 3,
+                      decoration: const InputDecoration(labelText: 'Objetivo Principal (Markdown)', border: OutlineInputBorder()),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      initialValue: ['ministry', 'personal', 'study'].contains(category) ? category : 'ministry',
+                      decoration: const InputDecoration(labelText: 'Categoria', border: OutlineInputBorder()),
+                      items: const [
+                        DropdownMenuItem(value: 'ministry', child: Text('Ministério')),
+                        DropdownMenuItem(value: 'personal', child: Text('Pessoal')),
+                        DropdownMenuItem(value: 'study', child: Text('Estudo')),
+                      ],
+                      onChanged: (v) => setModalState(() => category = v ?? 'ministry'),
+                    ),
+                    const SizedBox(height: 12),
+                    ListTile(
+                      title: Text(targetDate == null ? 'Definir Prazo / Meta (Opcional)' : 'Meta: ${_formatDate(targetDate!)}'),
+                      trailing: targetDate != null
+                          ? IconButton(
+                              icon: const Icon(Icons.clear, size: 18),
+                              onPressed: () => setModalState(() => targetDate = null),
+                            )
+                          : const Icon(Icons.flag_outlined),
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: targetDate ?? DateTime.now().add(const Duration(days: 30)),
+                          firstDate: DateTime.now(),
+                          lastDate: DateTime.now().add(const Duration(days: 730)),
+                        );
+                        if (picked != null) setModalState(() => targetDate = picked);
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF3B82F6),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      onPressed: () async {
+                        final name = nameCtrl.text.trim();
+                        if (name.isEmpty) return;
+                        final objText = objCtrl.text.trim();
+                        final rawTags = tagsCtrl.text.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+                        final projMgr = ref.read(projectManagerProvider);
+                        await projMgr.updateProject(
+                          project.id,
+                          name: name,
+                          objective: objText.isNotEmpty ? objText : null,
+                          category: category,
+                          targetDate: targetDate,
+                          tags: rawTags,
+                        );
+                        if (ctx.mounted) Navigator.of(ctx).pop();
+                      },
+                      child: const Text('Salvar Alterações', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 

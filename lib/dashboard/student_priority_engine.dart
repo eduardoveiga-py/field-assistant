@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:drift/drift.dart';
 
+import '../core/app_logger.dart';
 import '../database/app_database.dart';
 import '../publications/lff_book_catalog.dart';
 
@@ -79,7 +80,9 @@ class StudentPriorityEngine {
           manual_index INTEGER NOT NULL
         );
       ''');
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.warning('Falha ao garantir tabela student_manual_order', e, st);
+    }
   }
 
   /// Carrega as ordens manuais salvas no banco
@@ -98,7 +101,8 @@ class StudentPriorityEngine {
         map[sId] = idx;
       }
       return map;
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.warning('Falha ao carregar ordenação manual de estudantes', e, st);
       return {};
     }
   }
@@ -119,7 +123,9 @@ class StudentPriorityEngine {
           ],
         );
       }
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.warning('Falha ao salvar ordenação manual de estudantes', e, st);
+    }
   }
 
   /// Aplica a reordenação manual disparada pela ReorderableListView (onReorder legado)
@@ -280,7 +286,9 @@ class StudentPriorityEngine {
               }
             }
           }
-        } catch (_) {}
+        } catch (e, st) {
+          AppLogger.debug('Falha ao decodificar metas espirituais (${person.id}): $e', st);
+        }
       }
       // Metas cumpridas aumentam a pontuação
       score += (completedGoals * 35.0);

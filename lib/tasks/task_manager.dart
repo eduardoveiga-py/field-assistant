@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:drift/drift.dart' as drift;
 import 'package:uuid/uuid.dart';
 
+import '../core/app_logger.dart';
+import '../core/sync_timestamp.dart';
 import '../database/app_database.dart';
 
 extension TaskEntryExtension on TaskEntry {
@@ -65,8 +67,10 @@ class TaskManager {
       updatedAt: now,
     );
 
-    await db.into(db.tasks).insert(companion);
-    await _recordSyncQueue(id, 'INSERT');
+    await db.transaction(() async {
+      await db.into(db.tasks).insert(companion);
+      await _recordSyncQueue(id, 'INSERT');
+    });
 
     return (await (db.select(db.tasks)..where((t) => t.id.equals(id))).getSingle());
   }
@@ -90,27 +94,32 @@ class TaskManager {
     List<Map<String, dynamic>>? attachments,
   }) async {
     final now = DateTime.now();
-    final companion = TasksCompanion(
-      title: title != null ? drift.Value(title.trim()) : const drift.Value.absent(),
-      description: description != null ? drift.Value(description.trim()) : const drift.Value.absent(),
-      priority: priority != null ? drift.Value(priority) : const drift.Value.absent(),
-      category: category != null ? drift.Value(category) : const drift.Value.absent(),
-      status: status != null ? drift.Value(status) : const drift.Value.absent(),
-      projectId: projectId != null ? drift.Value(projectId) : const drift.Value.absent(),
-      personId: personId != null ? drift.Value(personId) : const drift.Value.absent(),
-      studyId: studyId != null ? drift.Value(studyId) : const drift.Value.absent(),
-      sectorId: sectorId != null ? drift.Value(sectorId) : const drift.Value.absent(),
-      dueDate: dueDate != null ? drift.Value(dueDate) : const drift.Value.absent(),
-      scheduledAt: scheduledAt != null ? drift.Value(scheduledAt) : const drift.Value.absent(),
-      recurrenceRule: recurrenceRule != null ? drift.Value(recurrenceRule) : const drift.Value.absent(),
-      durationMinutes: durationMinutes != null ? drift.Value(durationMinutes) : const drift.Value.absent(),
-      attachments: attachments != null ? drift.Value(jsonEncode(attachments)) : const drift.Value.absent(),
-      metadata: tags != null ? drift.Value(jsonEncode({'tags': tags})) : const drift.Value.absent(),
-      updatedAt: drift.Value(now),
-    );
+    await db.transaction(() async {
+      final existing = await (db.select(db.tasks)..where((t) => t.id.equals(id))).getSingleOrNull();
+      if (existing == null) return;
+      final companion = TasksCompanion(
+        title: title != null ? drift.Value(title.trim()) : const drift.Value.absent(),
+        description: description != null ? drift.Value(description.trim()) : const drift.Value.absent(),
+        priority: priority != null ? drift.Value(priority) : const drift.Value.absent(),
+        category: category != null ? drift.Value(category) : const drift.Value.absent(),
+        status: status != null ? drift.Value(status) : const drift.Value.absent(),
+        projectId: projectId != null ? drift.Value(projectId) : const drift.Value.absent(),
+        personId: personId != null ? drift.Value(personId) : const drift.Value.absent(),
+        studyId: studyId != null ? drift.Value(studyId) : const drift.Value.absent(),
+        sectorId: sectorId != null ? drift.Value(sectorId) : const drift.Value.absent(),
+        dueDate: dueDate != null ? drift.Value(dueDate) : const drift.Value.absent(),
+        scheduledAt: scheduledAt != null ? drift.Value(scheduledAt) : const drift.Value.absent(),
+        recurrenceRule: recurrenceRule != null ? drift.Value(recurrenceRule) : const drift.Value.absent(),
+        durationMinutes: durationMinutes != null ? drift.Value(durationMinutes) : const drift.Value.absent(),
+        attachments: attachments != null ? drift.Value(jsonEncode(attachments)) : const drift.Value.absent(),
+        metadata: tags != null ? drift.Value(jsonEncode({'tags': tags})) : const drift.Value.absent(),
+        updatedAt: drift.Value(now),
+        revision: drift.Value(existing.revision + 1),
+      );
 
-    await (db.update(db.tasks)..where((t) => t.id.equals(id))).write(companion);
-    await _recordSyncQueue(id, 'UPDATE');
+      await (db.update(db.tasks)..where((t) => t.id.equals(id))).write(companion);
+      await _recordSyncQueue(id, 'UPDATE', baseData: existing.toJson());
+    });
   }
 
   /// Alterna o estado de conclusão de uma tarefa.
@@ -123,14 +132,17 @@ class TaskManager {
     final willComplete = completed ?? (current.status != 'completed');
     final now = DateTime.now();
 
-    await (db.update(db.tasks)..where((t) => t.id.equals(id))).write(
-      TasksCompanion(
-        status: drift.Value(willComplete ? 'completed' : 'todo'),
-        completedAt: drift.Value(willComplete ? now : null),
-        updatedAt: drift.Value(now),
-      ),
-    );
-    await _recordSyncQueue(id, 'UPDATE');
+    await db.transaction(() async {
+      await (db.update(db.tasks)..where((t) => t.id.equals(id))).write(
+        TasksCompanion(
+          status: drift.Value(willComplete ? 'completed' : 'todo'),
+          completedAt: drift.Value(willComplete ? now : null),
+          updatedAt: drift.Value(now),
+          revision: drift.Value(current.revision + 1),
+        ),
+      );
+      await _recordSyncQueue(id, 'UPDATE', baseData: current.toJson());
+    });
 
     // Se completou uma tarefa com recorrência, gera a próxima tarefa automaticamente
     if (willComplete && current.recurrenceRule != null && current.recurrenceRule != 'none' && current.recurrenceRule!.isNotEmpty) {
@@ -183,13 +195,18 @@ class TaskManager {
 
   Future<void> softDeleteTask(String id) async {
     final now = DateTime.now();
-    await (db.update(db.tasks)..where((t) => t.id.equals(id))).write(
-      TasksCompanion(
-        deletedAt: drift.Value(now),
-        updatedAt: drift.Value(now),
-      ),
-    );
-    await _recordSyncQueue(id, 'DELETE');
+    await db.transaction(() async {
+      final existing = await (db.select(db.tasks)..where((t) => t.id.equals(id))).getSingleOrNull();
+      if (existing == null) return;
+      await (db.update(db.tasks)..where((t) => t.id.equals(id))).write(
+        TasksCompanion(
+          deletedAt: drift.Value(now),
+          updatedAt: drift.Value(now),
+          revision: drift.Value(existing.revision + 1),
+        ),
+      );
+      await _recordSyncQueue(id, 'DELETE', baseData: existing.toJson());
+    });
   }
 
   // ==========================================
@@ -302,19 +319,35 @@ class TaskManager {
     return q.map((r) => r.read(db.tasks.id.count()) ?? 0).watchSingle();
   }
 
-  Future<void> _recordSyncQueue(String entityId, String operation) async {
+  Future<void> _recordSyncQueue(
+    String entityId,
+    String operation, {
+    Map<String, dynamic>? baseData,
+  }) async {
     try {
       final now = DateTime.now();
+      final row = await (db.select(db.tasks)..where((t) => t.id.equals(entityId))).getSingleOrNull();
+      final payloadMap = row != null
+          ? SyncTimestamp.normalizeMapDates(row.toJson())
+          : <String, dynamic>{
+              'id': entityId,
+              'created_at': now.toUtc().toIso8601String(),
+            };
+      if (baseData != null) {
+        payloadMap['_base'] = SyncTimestamp.normalizeMapDates(baseData);
+      }
       await db.into(db.syncQueue).insert(
         SyncQueueCompanion.insert(
           id: _uuid.v4(),
           entityType: 'tasks',
           entityId: entityId,
           operation: operation,
-          payload: jsonEncode({'id': entityId, 'created_at': now.toIso8601String()}),
+          payload: jsonEncode(payloadMap),
           createdAt: now,
         ),
       );
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.error('Erro ao enfileirar mutação de Tarefa ($entityId)', e, st);
+    }
   }
 }

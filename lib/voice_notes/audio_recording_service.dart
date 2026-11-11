@@ -2,10 +2,22 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:record/record.dart';
 import 'package:audioplayers/audioplayers.dart';
+
+import '../core/app_logger.dart';
+
+/// Exceção lançada quando ocorre falha na reprodução de áudio.
+class AudioPlaybackException implements Exception {
+  final String message;
+  const AudioPlaybackException(this.message);
+
+  @override
+  String toString() => 'AudioPlaybackException: $message';
+}
 
 /// Resultado encapsulado de uma sessão de gravação de áudio.
 class RecordingResult {
@@ -39,6 +51,12 @@ abstract class AudioRecordingService {
   Future<RecordingResult?> stopRecording();
   Future<void> cancelRecording();
   void dispose();
+
+  /// Retorna a implementação recomendada para a plataforma atual.
+  static AudioRecordingService platform({AudioRecordingService? overrideService}) {
+    if (overrideService != null) return overrideService;
+    return RealAudioRecordingService();
+  }
 }
 
 /// Implementação real de gravação de áudio usando package:record.
@@ -67,7 +85,8 @@ class RealAudioRecordingService implements AudioRecordingService {
   Future<bool> hasPermission() async {
     try {
       return await _audioRecorder.hasPermission();
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.warning('Falha ao verificar permissão de microfone', e, st);
       return false;
     }
   }
@@ -76,7 +95,8 @@ class RealAudioRecordingService implements AudioRecordingService {
   Future<bool> requestPermission() async {
     try {
       return await _audioRecorder.hasPermission();
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.warning('Falha ao solicitar permissão de microfone', e, st);
       return false;
     }
   }
@@ -114,14 +134,37 @@ class RealAudioRecordingService implements AudioRecordingService {
             await voiceDir.create(recursive: true);
           }
           _currentFilePath = '${voiceDir.path}/$fileName';
-        } catch (_) {
+        } catch (e, st) {
+          AppLogger.warning('Falha ao criar diretório voice_notes; usando nome relativo', e, st);
           _currentFilePath = fileName;
         }
       }
     }
 
+    RecordConfig config;
+    if (kIsWeb) {
+      if (await _audioRecorder.isEncoderSupported(AudioEncoder.opus)) {
+        config = const RecordConfig(encoder: AudioEncoder.opus);
+        if (customPath == null || customPath.isEmpty) {
+          _currentFilePath = 'voice_note_${_uuid.v4()}.webm';
+        }
+      } else if (await _audioRecorder.isEncoderSupported(AudioEncoder.aacLc)) {
+        config = const RecordConfig(encoder: AudioEncoder.aacLc);
+        if (customPath == null || customPath.isEmpty) {
+          _currentFilePath = 'voice_note_${_uuid.v4()}.m4a';
+        }
+      } else {
+        config = const RecordConfig(encoder: AudioEncoder.wav);
+        if (customPath == null || customPath.isEmpty) {
+          _currentFilePath = 'voice_note_${_uuid.v4()}.wav';
+        }
+      }
+    } else {
+      config = const RecordConfig(encoder: AudioEncoder.aacLc);
+    }
+
     await _audioRecorder.start(
-      const RecordConfig(encoder: AudioEncoder.aacLc),
+      config,
       path: _currentFilePath!,
     );
     _isRecording = true;
@@ -158,7 +201,9 @@ class RealAudioRecordingService implements AudioRecordingService {
     String? path;
     try {
       path = await _audioRecorder.stop();
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.warning('Falha ao parar gravação de áudio nativo', e, st);
+    }
 
     path ??= _currentFilePath ?? 'voice_note_${_uuid.v4()}.m4a';
 
@@ -172,8 +217,25 @@ class RealAudioRecordingService implements AudioRecordingService {
         if (await file.exists()) {
           size = await file.length();
         }
-      } catch (_) {
+      } catch (e, st) {
+        AppLogger.warning('Falha ao medir tamanho do áudio gravado ($path)', e, st);
         size = 0;
+      }
+    } else {
+      if (path.startsWith('blob:') ||
+          path.startsWith('http://') ||
+          path.startsWith('https://')) {
+        try {
+          final response = await http
+              .get(Uri.parse(path))
+              .timeout(const Duration(seconds: 3));
+          if (response.statusCode == 200) {
+            size = response.bodyBytes.length;
+          }
+        } catch (e, st) {
+          AppLogger.debug('Falha ao medir tamanho do áudio Web ($path): $e', st);
+          size = 0;
+        }
       }
     }
 
@@ -195,7 +257,9 @@ class RealAudioRecordingService implements AudioRecordingService {
 
     try {
       await _audioRecorder.cancel();
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.debug('Falha ao cancelar gravação nativa: $e', st);
+    }
 
     if (_currentFilePath != null && !kIsWeb) {
       try {
@@ -203,7 +267,9 @@ class RealAudioRecordingService implements AudioRecordingService {
         if (file.existsSync()) {
           await file.delete();
         }
-      } catch (_) {}
+      } catch (e, st) {
+        AppLogger.debug('Falha ao remover arquivo temporário cancelado ($_currentFilePath): $e', st);
+      }
     }
     _currentFilePath = null;
     _lastResult = null;
@@ -216,13 +282,19 @@ class RealAudioRecordingService implements AudioRecordingService {
     _durationController.close();
     try {
       _audioRecorder.dispose();
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.debug('Falha ao descartar _audioRecorder: $e', st);
+    }
   }
 }
 
-/// Implementação offline-first para gravação de áudio, resiliente a todas as plataformas
-/// (Mobile, Web, Windows) e totalmente testável sem dependência de hardware real.
+/// Test double offline-first para gravação de áudio, utilizado estritamente em
+/// testes unitários e de widgets sem dependência de microfone nativo.
 class LocalAudioRecordingService implements AudioRecordingService {
+  final String? defaultFilePath;
+
+  LocalAudioRecordingService({this.defaultFilePath});
+
   final Uuid _uuid = const Uuid();
   int _maxDurationSeconds = 30;
   bool _isRecording = false;
@@ -288,6 +360,8 @@ class LocalAudioRecordingService implements AudioRecordingService {
 
     if (customPath != null && customPath.isNotEmpty) {
       _currentFilePath = customPath;
+    } else if (defaultFilePath != null && defaultFilePath!.isNotEmpty) {
+      _currentFilePath = defaultFilePath;
     } else {
       final fileName = 'voice_note_${_uuid.v4()}.m4a';
       if (kIsWeb) {
@@ -300,7 +374,8 @@ class LocalAudioRecordingService implements AudioRecordingService {
             await voiceDir.create(recursive: true);
           }
           _currentFilePath = '${voiceDir.path}/$fileName';
-        } catch (_) {
+        } catch (e, st) {
+          AppLogger.warning('Falha ao criar diretório voice_notes; usando nome relativo', e, st);
           _currentFilePath = fileName;
         }
       }
@@ -343,10 +418,11 @@ class LocalAudioRecordingService implements AudioRecordingService {
     if (!kIsWeb && !path.startsWith('web_storage://')) {
       try {
         final file = File(path);
-        if (await file.exists()) {
-          size = await file.length();
+        if (file.existsSync()) {
+          size = file.lengthSync();
         }
-      } catch (_) {
+      } catch (e, st) {
+        AppLogger.debug('Falha ao inspecionar tamanho do arquivo local ($path): $e', st);
         size = 0;
       }
     }
@@ -375,7 +451,9 @@ class LocalAudioRecordingService implements AudioRecordingService {
         if (file.existsSync()) {
           await file.delete();
         }
-      } catch (_) {}
+      } catch (e, st) {
+        AppLogger.debug('Falha ao limpar arquivo temporário local ($_currentFilePath): $e', st);
+      }
     }
     _currentFilePath = null;
     _lastResult = null;
@@ -415,11 +493,17 @@ abstract class AudioPlayerService {
   Future<void> pause();
   Future<void> stop();
   void dispose();
+
+  /// Retorna a implementação recomendada para a plataforma atual.
+  static AudioPlayerService platform({AudioPlayerService? overrideService}) {
+    if (overrideService != null) return overrideService;
+    return RealAudioPlayerService();
+  }
 }
 
 /// Implementação real do player de áudio usando package:audioplayers.
 class RealAudioPlayerService implements AudioPlayerService {
-  final AudioPlayer _player = AudioPlayer();
+  AudioPlayer? _player;
   final StreamController<Duration> _posController =
       StreamController<Duration>.broadcast();
   final StreamController<bool> _stateController =
@@ -428,18 +512,25 @@ class RealAudioPlayerService implements AudioPlayerService {
   StreamSubscription<PlayerState>? _stateSub;
   bool _isPlaying = false;
 
-  RealAudioPlayerService() {
-    _posSub = _player.onPositionChanged.listen((pos) {
+  RealAudioPlayerService();
+
+  AudioPlayer _ensurePlayer() {
+    final existing = _player;
+    if (existing != null) return existing;
+    final created = AudioPlayer();
+    _player = created;
+    _posSub = created.onPositionChanged.listen((pos) {
       if (!_posController.isClosed) {
         _posController.add(pos);
       }
     });
-    _stateSub = _player.onPlayerStateChanged.listen((state) {
+    _stateSub = created.onPlayerStateChanged.listen((state) {
       _isPlaying = state == PlayerState.playing;
       if (!_stateController.isClosed) {
         _stateController.add(_isPlaying);
       }
     });
+    return created;
   }
 
   @override
@@ -467,29 +558,46 @@ class RealAudioPlayerService implements AudioPlayerService {
           filePath.replaceFirst('asset://', '').replaceFirst('assets/', ''),
         );
       } else {
+        final file = File(filePath);
+        if (!file.existsSync() || file.lengthSync() == 0) {
+          throw AudioPlaybackException(
+            'Arquivo de áudio não existe ou está vazio: $filePath',
+          );
+        }
         source = DeviceFileSource(filePath);
       }
-      await _player.play(source);
-    } catch (_) {
-      _isPlaying = true;
-      if (!_stateController.isClosed) _stateController.add(true);
+      await _ensurePlayer().play(source);
+    } catch (e) {
+      _isPlaying = false;
+      if (!_stateController.isClosed) _stateController.add(false);
+      rethrow;
     }
   }
 
   @override
   Future<void> pause() async {
-    try {
-      await _player.pause();
-    } catch (_) {}
+    final player = _player;
+    if (player != null) {
+      try {
+        await player.pause();
+      } catch (e, st) {
+        AppLogger.debug('Falha ao pausar player de áudio: $e', st);
+      }
+    }
     _isPlaying = false;
     if (!_stateController.isClosed) _stateController.add(false);
   }
 
   @override
   Future<void> stop() async {
-    try {
-      await _player.stop();
-    } catch (_) {}
+    final player = _player;
+    if (player != null) {
+      try {
+        await player.stop();
+      } catch (e, st) {
+        AppLogger.debug('Falha ao parar player de áudio: $e', st);
+      }
+    }
     _isPlaying = false;
     if (!_stateController.isClosed) _stateController.add(false);
     if (!_posController.isClosed) _posController.add(Duration.zero);
@@ -501,13 +609,20 @@ class RealAudioPlayerService implements AudioPlayerService {
     _stateSub?.cancel();
     _posController.close();
     _stateController.close();
-    try {
-      _player.dispose();
-    } catch (_) {}
+    final player = _player;
+    _player = null;
+    if (player != null) {
+      try {
+        player.dispose();
+      } catch (e, st) {
+        AppLogger.debug('Falha ao descartar AudioPlayer: $e', st);
+      }
+    }
   }
 }
 
-/// Implementação offline do player de áudio com reatividade e controle temporal para testes.
+/// Test double offline-first para reprodução de áudio, utilizado estritamente em
+/// testes unitários e de widgets sem dependência de drivers nativos de som.
 class LocalAudioPlayerService implements AudioPlayerService {
   bool _isPlaying = false;
   Timer? _ticker;

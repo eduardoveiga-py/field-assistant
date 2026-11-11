@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/app_logger.dart';
 import '../../core/app_theme.dart';
 import '../../database/app_database.dart';
 import '../../territory/geocoding_service.dart';
@@ -11,6 +12,7 @@ import '../../territory/geolocation_helper.dart';
 import '../../territory/sector_manager.dart';
 import '../../territory/tile_cache/tile_cache_service.dart';
 import '../providers.dart';
+import '../widgets/managed_text_controllers.dart';
 import 'person_detail_screen.dart';
 
 class SectorDetailScreen extends ConsumerStatefulWidget {
@@ -140,8 +142,8 @@ class _SectorDetailScreenState extends ConsumerState<SectorDetailScreen> {
         lat = geo.latitude;
         lng = geo.longitude;
       }
-    } catch (_) {
-      // fallback silencioso para a coordenada padrão
+    } catch (e, st) {
+      AppLogger.debug('Falha ao geocodificar setor "$_currentSectorName"; usando coordenada padrão: $e', st);
     }
     if (!mounted) return;
 
@@ -193,8 +195,8 @@ class _SectorDetailScreenState extends ConsumerState<SectorDetailScreen> {
         );
         done += totalPerLevel;
       }
-    } catch (_) {
-      // falha de rede é ignorada: o que já estava em cache permanece válido
+    } catch (e, st) {
+      AppLogger.warning('Download offline de tiles de setor interrompido para "$_currentSectorName"', e, st);
     }
 
     if (mounted) {
@@ -213,57 +215,61 @@ class _SectorDetailScreenState extends ConsumerState<SectorDetailScreen> {
   }
 
   void _showEditSectorDialog() {
-    final nameController = TextEditingController(text: _currentSectorName);
-    final descController = TextEditingController(
-      text: widget.sector.description ?? '',
-    );
-
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Editar Bairro / Setor'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(labelText: 'Nome do Bairro *'),
-              autofocus: true,
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: [_currentSectorName, widget.sector.description ?? ''],
+        builder: (ctx, ctrls) {
+          final nameController = ctrls[0];
+          final descController = ctrls[1];
+
+          return AlertDialog(
+            title: const Text('Editar Bairro / Setor'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(labelText: 'Nome do Bairro *'),
+                  autofocus: true,
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: descController,
+                  decoration: const InputDecoration(
+                    labelText: 'Descrição / Limites',
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: descController,
-              decoration: const InputDecoration(
-                labelText: 'Descrição / Limites',
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancelar'),
               ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final newName = nameController.text.trim();
-              if (newName.isEmpty) return;
-              final mgr = ref.read(sectorManagerProvider);
-              final repo = ref.read(repositoryProvider);
-              await mgr.updateSector(
-                widget.sector.id,
-                newName,
-                description: descController.text.trim(),
-                repo: repo,
-              );
-              setState(() {
-                _currentSectorName = newName;
-              });
-              if (ctx.mounted) Navigator.pop(ctx);
-            },
-            child: const Text('Salvar'),
-          ),
-        ],
+              ElevatedButton(
+                onPressed: () async {
+                  final newName = nameController.text.trim();
+                  if (newName.isEmpty) return;
+                  final desc = descController.text.trim();
+                  final mgr = ref.read(sectorManagerProvider);
+                  final repo = ref.read(repositoryProvider);
+                  await mgr.updateSector(
+                    widget.sector.id,
+                    newName,
+                    description: desc,
+                    repo: repo,
+                  );
+                  setState(() {
+                    _currentSectorName = newName;
+                  });
+                  if (ctx.mounted) Navigator.pop(ctx);
+                },
+                child: const Text('Salvar'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

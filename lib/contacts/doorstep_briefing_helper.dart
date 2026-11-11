@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../core/app_logger.dart';
 import '../database/app_database.dart';
 import '../publications/publication_catalog.dart';
 import '../publications/publication_link_resolver.dart';
@@ -208,7 +209,8 @@ class DoorstepBriefingHelper {
             resolved.fallbackUrl!.trim().isNotEmpty) {
           jwLibraryUri = Uri.tryParse(resolved.fallbackUrl!.trim());
         }
-      } catch (_) {
+      } catch (e, st) {
+        AppLogger.debug('Falha ao resolver URL do JW Library no briefing: $e', st);
         jwLibraryUri = null;
       }
     }
@@ -366,7 +368,9 @@ class DoorstepBriefingHelper {
         }
         if (list.isNotEmpty) return list;
       }
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.debug('Fallback legado ao decodificar notas JSON: $e', st);
+    }
 
     return [
       {
@@ -394,7 +398,9 @@ class DoorstepBriefingHelper {
         }
         if (list.isNotEmpty) return list;
       }
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.debug('Fallback legado ao decodificar alvos JSON: $e', st);
+    }
 
     return [
       {

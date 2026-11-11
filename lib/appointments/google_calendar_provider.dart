@@ -8,6 +8,7 @@ import 'package:googleapis/calendar/v3.dart' as gcal;
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 
+import '../core/app_logger.dart';
 import '../database/app_database.dart';
 import 'calendar_provider.dart';
 
@@ -36,7 +37,7 @@ class GoogleCalendarProvider implements CalendarProvider {
   final Uuid _uuid = const Uuid();
   static const String defaultWebClientId = String.fromEnvironment(
     'GOOGLE_WEB_CLIENT_ID',
-    defaultValue: '424960288105-vi0ig8si59j4rk5j4gdfd9nv2revvitn.apps.googleusercontent.com',
+    defaultValue: '',
   );
   static const String _calendarScope =
       'https://www.googleapis.com/auth/calendar.events';
@@ -60,7 +61,8 @@ class GoogleCalendarProvider implements CalendarProvider {
         return decoded.whereType<String>().toSet();
       }
       return {};
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.warning('Falha ao ler IDs de calendários somente leitura', e, st);
       return {};
     }
   }
@@ -92,10 +94,20 @@ class GoogleCalendarProvider implements CalendarProvider {
     if (_initialized) return;
     try {
       if (kIsWeb) {
+        if (defaultWebClientId.trim().isEmpty) {
+          lastError =
+              'Google Calendar na Web requer GOOGLE_WEB_CLIENT_ID configurado via --dart-define.';
+          _initialized = true;
+          return;
+        }
         await _googleSignIn.initialize(clientId: defaultWebClientId);
         _webUserEmail ??= await _secureStorage.read(key: _keyConnectedEmail);
       } else {
-        await _googleSignIn.initialize(clientId: defaultWebClientId);
+        await _googleSignIn.initialize(
+          clientId: defaultWebClientId.trim().isNotEmpty
+              ? defaultWebClientId
+              : null,
+        );
       }
     } catch (e) {
       lastError = e.toString();
@@ -117,7 +129,9 @@ class GoogleCalendarProvider implements CalendarProvider {
           await _secureStorage.write(key: _keyConnectedEmail, value: email);
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.warning('Falha ao consultar userinfo Google Web', e, st);
+    }
   }
 
   @override
@@ -158,7 +172,8 @@ class GoogleCalendarProvider implements CalendarProvider {
       if (_currentUser != null) return true;
       final savedEmail = await _secureStorage.read(key: _keyConnectedEmail);
       return savedEmail != null && savedEmail.isNotEmpty;
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.warning('Falha ao verificar autorização do Google Calendar', e, st);
       return false;
     }
   }
@@ -298,7 +313,8 @@ class GoogleCalendarProvider implements CalendarProvider {
           isReadOnly: isReadOnly,
         );
       }).toList();
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.warning('Falha ao listar agendas do Google Calendar; usando primária', e, st);
       return [
         ExternalCalendarItem(
           id: 'primary',
@@ -340,7 +356,9 @@ class GoogleCalendarProvider implements CalendarProvider {
   Future<void> disconnect() async {
     try {
       await _googleSignIn.signOut();
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.warning('Falha ao encerrar sessão Google Sign-In', e, st);
+    }
     _currentUser = null;
     _webAuthHeaders = null;
     _webUserEmail = null;
@@ -639,7 +657,8 @@ class GoogleCalendarProvider implements CalendarProvider {
         }
         return created.id;
       }
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.warning('Falha ao criar/atualizar evento no Google Calendar', e, st);
       return null;
     }
   }
@@ -687,7 +706,8 @@ class GoogleCalendarProvider implements CalendarProvider {
         return true;
       }
       return false;
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.warning('Falha ao excluir evento no Google Calendar', e, st);
       return false;
     }
   }

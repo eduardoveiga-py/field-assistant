@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
-import 'package:drift/drift.dart';
 
+import '../core/sync_timestamp.dart';
 import '../database/app_database.dart';
 import '../database/repository.dart';
 import '../ui/providers.dart';
@@ -27,8 +28,17 @@ class TerritorySector {
       'id': id,
       'name': name,
       'description': description,
-      'created_at': createdAt.toIso8601String(),
+      'created_at': createdAt.toUtc().toIso8601String(),
     };
+  }
+
+  factory TerritorySector.fromEntry(TerritorySectorEntry e) {
+    return TerritorySector(
+      id: e.id,
+      name: e.name,
+      description: e.description,
+      createdAt: e.createdAt,
+    );
   }
 
   factory TerritorySector.fromMap(Map<String, dynamic> map) {
@@ -36,7 +46,9 @@ class TerritorySector {
       id: map['id'] as String,
       name: map['name'] as String,
       description: map['description'] as String?,
-      createdAt: DateTime.parse(map['created_at'] as String),
+      createdAt:
+          SyncTimestamp.parse(map['created_at'] ?? map['createdAt']) ??
+          DateTime.now(),
     );
   }
 }
@@ -44,164 +56,68 @@ class TerritorySector {
 class SectorManager {
   final AppDatabase db;
   final Uuid _uuid = const Uuid();
-  final StreamController<List<TerritorySector>> _sectorsController =
-      StreamController<List<TerritorySector>>.broadcast();
-  Future<void>? _initFuture;
-  bool _initialized = false;
 
-  SectorManager(this.db) {
-    _initTable();
-  }
-
-  Future<void> _initTable() async {
-    if (_initialized) return;
-    _initFuture ??= _doInitTable();
-    await _initFuture;
-  }
-
-  Future<void> _doInitTable() async {
-    try {
-      await db.customStatement('''
-        CREATE TABLE IF NOT EXISTS territory_sectors (
-          id TEXT PRIMARY KEY,
-          name TEXT NOT NULL UNIQUE,
-          description TEXT,
-          created_at TEXT NOT NULL
-        );
-      ''');
-
-      // Verifica se há setores cadastrados; se vazio, cadastra os setores padrão pedidos: Betânia, Lago Grande, Cidade
-      final existing = await db
-          .customSelect('SELECT COUNT(*) AS count FROM territory_sectors')
-          .getSingle();
-      final count = existing.read<int>('count');
-      if (count == 0) {
-        final now = DateTime.now();
-        await db.customInsert(
-          'INSERT INTO territory_sectors (id, name, description, created_at) VALUES (?, ?, ?, ?)',
-          variables: [
-            Variable.withString(_uuid.v4()),
-            Variable.withString('Betânia'),
-            Variable.withString('Setor residencial Betânia'),
-            Variable.withString(now.toIso8601String()),
-          ],
-        );
-        await db.customInsert(
-          'INSERT INTO territory_sectors (id, name, description, created_at) VALUES (?, ?, ?, ?)',
-          variables: [
-            Variable.withString(_uuid.v4()),
-            Variable.withString('Lago Grande'),
-            Variable.withString('Região do Lago Grande'),
-            Variable.withString(
-              now.add(const Duration(seconds: 1)).toIso8601String(),
-            ),
-          ],
-        );
-        await db.customInsert(
-          'INSERT INTO territory_sectors (id, name, description, created_at) VALUES (?, ?, ?, ?)',
-          variables: [
-            Variable.withString(_uuid.v4()),
-            Variable.withString('Cidade'),
-            Variable.withString('Centro urbano e área comercial'),
-            Variable.withString(
-              now.add(const Duration(seconds: 2)).toIso8601String(),
-            ),
-          ],
-        );
-      }
-    } catch (_) {
-      // Fallback gracioso
-    }
-    _initialized = true;
-    _refresh();
-  }
-
-  Future<void> _refresh() async {
-    try {
-      final list = await getSectors();
-      if (!_sectorsController.isClosed) {
-        _sectorsController.add(list);
-      }
-    } catch (_) {}
-  }
+  SectorManager(this.db);
 
   Future<List<TerritorySector>> getSectors() async {
-    await _initTable();
-    try {
-      final rows = await db
-          .customSelect('SELECT * FROM territory_sectors ORDER BY name ASC')
-          .get();
-      return rows.map((r) => TerritorySector.fromMap(r.data)).toList();
-    } catch (_) {
-      // Setores default de segurança caso haja exceção
-      final now = DateTime.now();
-      return [
-        TerritorySector(
-          id: '1',
-          name: 'Betânia',
-          description: 'Setor residencial Betânia',
-          createdAt: now,
-        ),
-        TerritorySector(
-          id: '2',
-          name: 'Lago Grande',
-          description: 'Região do Lago Grande',
-          createdAt: now,
-        ),
-        TerritorySector(
-          id: '3',
-          name: 'Cidade',
-          description: 'Centro urbano e área comercial',
-          createdAt: now,
-        ),
-      ];
-    }
+    final rows =
+        await (db.select(db.territorySectors)
+              ..where((t) => t.deletedAt.isNull())
+              ..orderBy([(t) => OrderingTerm.asc(t.name)]))
+            .get();
+    return rows.map(TerritorySector.fromEntry).toList();
   }
 
-  Stream<List<TerritorySector>> watchSectors() async* {
-    yield await getSectors();
-    yield* _sectorsController.stream;
+  Stream<List<TerritorySector>> watchSectors() {
+    return (db.select(db.territorySectors)
+          ..where((t) => t.deletedAt.isNull())
+          ..orderBy([(t) => OrderingTerm.asc(t.name)]))
+        .watch()
+        .map((rows) => rows.map(TerritorySector.fromEntry).toList());
   }
 
   Future<TerritorySector> addSector(String name, {String? description}) async {
-    await _initTable();
     final trimmed = name.trim();
-    final id = _uuid.v4();
     final now = DateTime.now();
+    final cleanDesc =
+        description != null && description.trim().isNotEmpty
+            ? description.trim()
+            : null;
 
-    await db.customInsert(
-      'INSERT OR REPLACE INTO territory_sectors (id, name, description, created_at) VALUES (?, ?, ?, ?)',
-      variables: [
-        Variable.withString(id),
-        Variable.withString(trimmed),
-        Variable.withString(description ?? ''),
-        Variable.withString(now.toIso8601String()),
-      ],
-    );
+    final existingActive = await (db.select(db.territorySectors)
+          ..where((t) => t.name.equals(trimmed) & t.deletedAt.isNull()))
+        .getSingleOrNull();
+    if (existingActive != null) {
+      return TerritorySector.fromEntry(existingActive);
+    }
 
-    final sector = TerritorySector(
+    final id = _uuid.v4();
+    final entry = TerritorySectorEntry(
       id: id,
       name: trimmed,
-      description: description,
+      description: cleanDesc,
       createdAt: now,
+      updatedAt: now,
+      deletedAt: null,
+      revision: 1,
     );
 
-    try {
+    await db.transaction(() async {
+      await db.into(db.territorySectors).insert(entry);
       await db.into(db.syncQueue).insert(
         SyncQueueCompanion.insert(
           id: _uuid.v4(),
           entityType: 'territory_sectors',
           entityId: id,
           operation: 'INSERT',
-          payload: jsonEncode(sector.toMap()),
+          payload: jsonEncode(SyncTimestamp.normalizeMapDates(entry.toJson())),
           createdAt: now,
           status: const Value('pending'),
         ),
       );
-    } catch (_) {}
+    });
 
-    await _refresh();
-    return sector;
+    return TerritorySector.fromEntry(entry);
   }
 
   Future<void> updateSector(
@@ -210,75 +126,70 @@ class SectorManager {
     String? description,
     AppRepository? repo,
   }) async {
-    await _initTable();
     final trimmed = newName.trim();
     final now = DateTime.now();
-
-    // Obtém o nome antigo para atualizar contatos associados
-    final existingRow = await db
-        .customSelect(
-          'SELECT name FROM territory_sectors WHERE id = ?',
-          variables: [Variable.withString(id)],
-        )
+    final existing = await (db.select(db.territorySectors)
+          ..where((t) => t.id.equals(id)))
         .getSingleOrNull();
-    final oldName = existingRow?.read<String>('name');
+    if (existing == null) return;
+    final oldName = existing.name;
 
-    await db.customUpdate(
-      'UPDATE territory_sectors SET name = ?, description = ? WHERE id = ?',
-      variables: [
-        Variable.withString(trimmed),
-        Variable.withString(description ?? ''),
-        Variable.withString(id),
-      ],
+    final cleanDesc = description != null
+        ? (description.trim().isNotEmpty ? description.trim() : null)
+        : existing.description;
+    final updated = existing.copyWith(
+      name: trimmed,
+      description: Value(cleanDesc),
+      updatedAt: Value(now),
+      revision: existing.revision + 1,
     );
 
-    try {
+    await db.transaction(() async {
+      await db.update(db.territorySectors).replace(updated);
+      final payload = SyncTimestamp.normalizeMapDates(updated.toJson());
+      payload['_base'] = SyncTimestamp.normalizeMapDates(existing.toJson());
       await db.into(db.syncQueue).insert(
         SyncQueueCompanion.insert(
           id: _uuid.v4(),
           entityType: 'territory_sectors',
           entityId: id,
           operation: 'UPDATE',
-          payload: jsonEncode({
-            'id': id,
-            'name': trimmed,
-            'description': description,
-            'updated_at': now.toIso8601String(),
-          }),
+          payload: jsonEncode(payload),
           createdAt: now,
           status: const Value('pending'),
         ),
       );
-    } catch (_) {}
+    });
 
-    // Se fornecido o repositório e o nome mudou, atualiza referências nos contatos
-    if (repo != null && oldName != null && oldName != trimmed) {
+    if (repo != null && oldName != trimmed) {
       final people = await repo.getAllPeople();
       for (final p in people) {
-        bool changed = false;
         String? newAddress = p.address;
         if (newAddress != null && newAddress.contains(oldName)) {
           newAddress = newAddress.replaceAll(oldName, trimmed);
-          changed = true;
-        }
-        if (changed) {
           await repo.updatePerson(p.copyWith(address: Value(newAddress)));
         }
       }
     }
-
-    await _refresh();
   }
 
   Future<void> deleteSector(String id) async {
-    await _initTable();
     final now = DateTime.now();
-    await db.customUpdate(
-      'DELETE FROM territory_sectors WHERE id = ?',
-      variables: [Variable.withString(id)],
-    );
+    final existing = await (db.select(db.territorySectors)
+          ..where((t) => t.id.equals(id)))
+        .getSingleOrNull();
+    if (existing == null) return;
 
-    try {
+    final nextRev = existing.revision + 1;
+    await db.transaction(() async {
+      await (db.update(db.territorySectors)..where((t) => t.id.equals(id)))
+          .write(
+        TerritorySectorsCompanion(
+          deletedAt: Value(now),
+          updatedAt: Value(now),
+          revision: Value(nextRev),
+        ),
+      );
       await db.into(db.syncQueue).insert(
         SyncQueueCompanion.insert(
           id: _uuid.v4(),
@@ -287,15 +198,15 @@ class SectorManager {
           operation: 'DELETE',
           payload: jsonEncode({
             'id': id,
-            'deleted_at': now.toIso8601String(),
+            'deleted_at': now.toUtc().toIso8601String(),
+            'updated_at': now.toUtc().toIso8601String(),
+            'revision': nextRev,
           }),
           createdAt: now,
           status: const Value('pending'),
         ),
       );
-    } catch (_) {}
-
-    await _refresh();
+    });
   }
 }
 

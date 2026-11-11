@@ -968,4 +968,27 @@ void main() {
       }
     });
   });
+
+  group('Audio Real Services - Regressão Zero-Byte & Erro de Reprodução (T-AUD)', () {
+    test('T-AUD-01/02: RealAudioPlayerService rejeita arquivo inexistente e arquivo de 0 bytes com AudioPlaybackException', () async {
+      final player = RealAudioPlayerService();
+      addTearDown(player.dispose);
+
+      await expectLater(
+        player.play('/caminho/que/nao/existe/audio.m4a'),
+        throwsA(isA<AudioPlaybackException>()),
+      );
+      expect(player.isPlaying, isFalse);
+
+      final tempDir = Directory.systemTemp.createTempSync('audio_zero_test_');
+      addTearDown(() => tempDir.deleteSync(recursive: true));
+      final emptyFile = File('${tempDir.path}/empty.m4a')..writeAsBytesSync([]);
+
+      await expectLater(
+        player.play(emptyFile.path),
+        throwsA(isA<AudioPlaybackException>()),
+      );
+      expect(player.isPlaying, isFalse);
+    });
+  });
 }

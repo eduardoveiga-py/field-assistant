@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import '../../core/app_logger.dart';
 import '../../core/app_version.dart';
 import 'tile_cache_service.dart';
 
@@ -38,7 +39,9 @@ class TileCacheWeb implements TileCacheBackend {
         if (text.contains('Access blocked') || text.contains('osm.wiki/Blocked')) {
           return true;
         }
-      } catch (_) {}
+      } catch (e, st) {
+        AppLogger.debug('Falha ao inspecionar bytes de tile Web: $e', st);
+      }
     }
     return false;
   }
@@ -95,7 +98,9 @@ class TileCacheWeb implements TileCacheBackend {
           _put(key, res.bodyBytes);
           return res.bodyBytes;
         }
-      } catch (_) {}
+      } catch (e, st) {
+        AppLogger.debug('Falha ao buscar tile primário Web ($z/$x/$y): $e', st);
+      }
 
       // 2ª Tentativa: Fallback OSM France (alta disponibilidade)
       final fallbackUri = Uri.parse(
@@ -124,8 +129,12 @@ class TileCacheWeb implements TileCacheBackend {
           _put(key, resFallback.bodyBytes);
           return resFallback.bodyBytes;
         }
-      } catch (_) {}
-    } catch (_) {} finally {
+      } catch (e, st) {
+        AppLogger.debug('Falha no fallback OSM France Web ($z/$x/$y): $e', st);
+      }
+    } catch (e, st) {
+      AppLogger.warning('Erro inesperado ao obter tile Web ($z/$x/$y)', e, st);
+    } finally {
       if (shouldCloseClient) {
         client.close();
       }

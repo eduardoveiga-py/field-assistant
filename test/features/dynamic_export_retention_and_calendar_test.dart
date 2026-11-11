@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:drift/native.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ministerio_pessoal/database/app_database.dart';
 import 'package:ministerio_pessoal/core/biometric_auth_service.dart';
@@ -7,6 +8,33 @@ import 'package:ministerio_pessoal/inbox/jw_email_service.dart';
 import 'package:ministerio_pessoal/knowledge/knowledge_manager.dart';
 import 'package:ministerio_pessoal/research/research_manager.dart';
 import 'package:ministerio_pessoal/ui/screens/appointments_screen.dart';
+
+class _TestJwImapClient extends JwImapClient {
+  final List<JwEmailMessage> remoteList;
+  final bool failWithNetworkError;
+
+  const _TestJwImapClient({
+    this.remoteList = const [],
+    this.failWithNetworkError = false,
+  });
+
+  @override
+  Future<List<JwEmailMessage>> fetchRemoteEmails({
+    String? host,
+    int? port,
+    String? username,
+    String? password,
+    Duration timeout = const Duration(seconds: 10),
+  }) async {
+    if (failWithNetworkError) {
+      throw const JwEmailConnectionException('Servidor IMAP inacessível na rede.');
+    }
+    if (username == null || username.trim().isEmpty || password == null || password.trim().isEmpty) {
+      return const [];
+    }
+    return remoteList;
+  }
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -196,32 +224,158 @@ void main() {
       await db.close();
     });
 
-    test('Sync saves messages locally in Drift with permanent retention flag', () async {
+    test('Sync without credentials returns 0 and does not insert fake seeds into database', () async {
       final initialCount = await emailService.syncEmails();
-      expect(initialCount, greaterThan(0));
+      expect(initialCount, equals(0));
 
       final retained = await emailService.watchRetainedEmails().first;
-      expect(retained.length, equals(initialCount));
+      expect(retained, isEmpty);
+    });
 
-      final first = retained.first;
+    test('Sync with remote messages saves to Drift with permanent retention and is idempotent', () async {
+      final sampleMessages = [
+        JwEmailMessage(
+          id: 'remote_01',
+          remoteUid: 101,
+          subject: 'Carta de Betel sobre Territórios',
+          from: 'betel@hub.jw.org',
+          to: 'anciaos@jw.org',
+          date: DateTime(2026, 11, 1),
+          bodyText: 'Orientações sobre territórios...',
+          isHubCommunication: true,
+          hubType: 'letter',
+          isPermanentRetained: true,
+        ),
+        JwEmailMessage(
+          id: 'remote_02',
+          remoteUid: 102,
+          subject: 'Formulário S-21',
+          from: 'secretaria@hub.jw.org',
+          to: 'anciaos@jw.org',
+          date: DateTime(2026, 11, 2),
+          bodyText: 'Instruções do formulário S-21...',
+          isHubCommunication: true,
+          hubType: 'form',
+          isPermanentRetained: true,
+        ),
+        JwEmailMessage(
+          id: 'remote_03',
+          remoteUid: 103,
+          subject: 'Assembleia de Circuito',
+          from: 'circuito@jw.org',
+          to: 'publicadores@jw.org',
+          date: DateTime(2026, 11, 3),
+          bodyText: 'Programação da assembleia...',
+          isHubCommunication: false,
+          isPermanentRetained: true,
+        ),
+      ];
+
+      final customService = JwEmailService(
+        db: db,
+        biometricAuth: biometricAuth,
+        imapClient: _TestJwImapClient(remoteList: sampleMessages),
+      );
+
+      final initialCount = await customService.syncEmails(username: 'user@jw.org', password: 'secretpassword');
+      expect(initialCount, equals(3));
+
+      final retained = await customService.watchRetainedEmails().first;
+      expect(retained.length, equals(3));
+
+      final first = retained.firstWhere((m) => m.id == 'remote_01');
       expect(first.isPermanentRetained, isTrue);
-      expect(first.subject, isNotEmpty);
-      expect(first.from, isNotEmpty);
+      expect(first.subject, equals('Carta de Betel sobre Territórios'));
+      expect(first.from, equals('betel@hub.jw.org'));
 
       // Re-running sync is idempotent and does not create duplicates
-      final secondSyncCount = await emailService.syncEmails();
+      final secondSyncCount = await customService.syncEmails(username: 'user@jw.org', password: 'secretpassword');
       expect(secondSyncCount, equals(0));
     });
 
     test('Hub communications filter correctly and retain restricted metadata', () async {
-      await emailService.syncEmails();
+      final sampleMessages = [
+        JwEmailMessage(
+          id: 'hub_01',
+          remoteUid: 201,
+          subject: 'Carta de Betel',
+          from: 'betel@hub.jw.org',
+          to: 'anciaos@jw.org',
+          date: DateTime(2026, 11, 1),
+          bodyText: 'Conteúdo restrito',
+          isHubCommunication: true,
+          hubType: 'letter',
+          isPermanentRetained: true,
+        ),
+        JwEmailMessage(
+          id: 'normal_01',
+          remoteUid: 202,
+          subject: 'E-mail Geral',
+          from: 'notificacoes@jw.org',
+          to: 'usuario@jw.org',
+          date: DateTime(2026, 11, 2),
+          bodyText: 'Conteúdo comum',
+          isHubCommunication: false,
+          isPermanentRetained: true,
+        ),
+      ];
 
-      final hubMessages = await emailService.watchRetainedEmails(hubOnly: true).first;
-      expect(hubMessages, isNotEmpty);
+      final customService = JwEmailService(
+        db: db,
+        biometricAuth: biometricAuth,
+        imapClient: _TestJwImapClient(remoteList: sampleMessages),
+      );
+
+      await customService.syncEmails(username: 'user@jw.org', password: 'secretpassword');
+
+      final hubMessages = await customService.watchRetainedEmails(hubOnly: true).first;
+      expect(hubMessages.length, equals(1));
       for (final msg in hubMessages) {
         expect(msg.isHubCommunication, isTrue);
         expect(msg.hubType, isNotNull);
+        expect(msg.id, equals('hub_01'));
       }
+    });
+
+    test('Sync propagates JwEmailConnectionException when connection fails without seeding fake data', () async {
+      final failingService = JwEmailService(
+        db: db,
+        biometricAuth: biometricAuth,
+        imapClient: const _TestJwImapClient(failWithNetworkError: true),
+      );
+
+      expect(
+        () => failingService.syncEmails(username: 'user@jw.org', password: 'secretpassword'),
+        throwsA(isA<JwEmailConnectionException>()),
+      );
+
+      final retained = await failingService.watchRetainedEmails().first;
+      expect(retained, isEmpty);
+    });
+
+    test('JwImapClient parses RFC2822 dates and strips FETCH envelope markers', () {
+      const client = JwImapClient();
+      final parsedDate = JwImapClient.parseEmailDate('Mon, 10 Nov 2026 12:00:00 -0400');
+      expect(parsedDate, isNotNull);
+      expect(parsedDate!.toUtc().hour, equals(16));
+
+      final msgs = client.parseImapResponsesForTest([
+        '* 1 FETCH (UID 77 BODY[HEADER.FIELDS (Subject From Date)] {80}',
+        'Subject: =?UTF-8?B?UmV1bmnDo28=?=',
+        'From: secretaria@hub.jw.org',
+        'Date: Mon, 10 Nov 2026 12:00:00 -0400',
+        '',
+        'BODY[TEXT] {32}',
+        'Corpo real da mensagem',
+        ')',
+        'A004 OK FETCH completed',
+      ]);
+
+      expect(msgs.length, equals(1));
+      expect(msgs.first.remoteUid, equals(77));
+      expect(msgs.first.subject, equals('Reunião'));
+      expect(msgs.first.bodyText, equals('Corpo real da mensagem'));
+      expect(msgs.first.date.toUtc().year, equals(2026));
     });
 
     test('Dynamic Export generates compliant Markdown, EML (RFC822) and Plain Text', () async {
@@ -285,6 +439,7 @@ void main() {
     late BiometricAuthService auth;
 
     setUp(() {
+      FlutterSecureStorage.setMockInitialValues({});
       auth = BiometricAuthService();
     });
 
@@ -292,9 +447,15 @@ void main() {
       expect(auth.isSessionUnlocked, isFalse);
     });
 
+    test('authenticate fails when biometrics unavailable and no PIN context provided (no bypass)', () async {
+      final authenticated = await auth.authenticate(localizedReason: 'Teste de segurança');
+      expect(authenticated, isFalse);
+      expect(auth.isSessionUnlocked, isFalse);
+    });
+
     test('lockSession immediately revokes active session', () async {
-      // Simulate authentication
-      final authenticated = await auth.authenticate(localizedReason: 'Teste de desbloqueio');
+      await auth.setPin('1234');
+      final authenticated = await auth.verifyPin('1234');
       expect(authenticated, isTrue);
       expect(auth.isSessionUnlocked, isTrue);
 

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/app_logger.dart';
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../../contacts/person_hand_off_helper.dart';
@@ -12,6 +13,7 @@ import '../../territory/geocoding_service.dart';
 import '../../territory/sector_manager.dart';
 import '../providers.dart';
 import '../widgets/add_person_dialog.dart';
+import '../widgets/managed_text_controllers.dart';
 import '../widgets/map_location_picker_dialog.dart';
 import 'activities_screen.dart';
 import 'contacts_map_screen.dart';
@@ -35,9 +37,11 @@ class TodayScreen extends ConsumerWidget {
   const TodayScreen({super.key, this.onTabChange, this.onFeatureNavigate});
 
   User? _getCurrentSupabaseUser() {
+    if (!SupabaseSyncService.isInitialized) return null;
     try {
       return Supabase.instance.client.auth.currentUser;
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.debug('Supabase não inicializado ao consultar usuário na Home: $e', st);
       return null;
     }
   }
@@ -218,7 +222,9 @@ class TodayScreen extends ConsumerWidget {
                       Navigator.pop(ctx);
                       try {
                         await Supabase.instance.client.auth.signOut();
-                      } catch (_) {}
+                      } catch (e, st) {
+                        AppLogger.warning('Falha ao encerrar sessão Supabase na tela Hoje', e, st);
+                      }
                     },
                   ),
                 ),
@@ -231,16 +237,19 @@ class TodayScreen extends ConsumerWidget {
   }
 
   void _showManageSectorsModal(BuildContext context, WidgetRef ref) {
-    final nameController = TextEditingController();
-    final descController = TextEditingController();
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) => Consumer(
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: const ['', ''],
+        builder: (ctx, ctrls) {
+          final nameController = ctrls[0];
+          final descController = ctrls[1];
+
+          return Consumer(
         builder: (ctx, innerRef, _) {
           final sectors = innerRef.watch(sectorsStreamProvider).value ?? [];
           final mgr = innerRef.read(sectorManagerProvider);
@@ -305,7 +314,7 @@ class TodayScreen extends ConsumerWidget {
                               controller: nameController,
                               decoration: const InputDecoration(
                                 labelText: 'Nome do Bairro',
-                                hintText: 'Ex: Betânia, Lago Grande, Cidade...',
+                                hintText: 'Ex: Centro, São Francisco, Beira-Rio...',
                               ),
                             ),
                             const SizedBox(height: 8),
@@ -395,24 +404,30 @@ class TodayScreen extends ConsumerWidget {
             ),
           );
         },
+      );
+        },
       ),
     );
   }
 
   void _showAddForeignContactDialog(BuildContext context, WidgetRef ref) {
-    final nameController = TextEditingController();
-    final langController = TextEditingController();
-    final phoneController = TextEditingController();
-    final addressController = TextEditingController();
-    final latController = TextEditingController();
-    final lngController = TextEditingController();
-    final notesController = TextEditingController();
-    final scheduleController = TextEditingController();
     bool sendViaWhatsApp = true;
 
     showDialog(
       context: context,
-      builder: (dialogCtx) => StatefulBuilder(
+      builder: (dialogCtx) => ManagedTextControllers(
+        initialTexts: const ['', '', '', '', '', '', '', ''],
+        builder: (dialogCtx, ctrls) {
+          final nameController = ctrls[0];
+          final langController = ctrls[1];
+          final phoneController = ctrls[2];
+          final addressController = ctrls[3];
+          final latController = ctrls[4];
+          final lngController = ctrls[5];
+          final notesController = ctrls[6];
+          final scheduleController = ctrls[7];
+
+          return StatefulBuilder(
         builder: (ctx, setDialogState) {
           return AlertDialog(
             title: const Row(
@@ -606,15 +621,16 @@ class TodayScreen extends ConsumerWidget {
                     tags: ['estrangeiro', if (lang.isNotEmpty) lang],
                   );
 
+                  final additionalNotes = notesController.text.trim();
                   if (dialogCtx.mounted) Navigator.pop(dialogCtx);
 
                   if (sendViaWhatsApp) {
                     await PersonHandOffHelper.sendViaWhatsApp(
                       person: person,
                       language: lang.isNotEmpty ? lang : null,
-                      additionalNotes: notesController.text.trim().isEmpty
+                      additionalNotes: additionalNotes.isEmpty
                           ? null
-                          : notesController.text.trim(),
+                          : additionalNotes,
                     );
                   }
 
@@ -631,6 +647,8 @@ class TodayScreen extends ConsumerWidget {
               ),
             ],
           );
+        },
+      );
         },
       ),
     );

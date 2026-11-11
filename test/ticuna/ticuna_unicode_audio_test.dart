@@ -206,6 +206,26 @@ void main() {
       expect(await realService.deleteAudioFile('blob:http://localhost/test'), isTrue);
       expect(await realService.deleteAudioFile(''), isFalse);
     });
+
+    test('T-AUD-05: TicunaAudioService falha na reprodução emite false e upload sem auth retorna null (M12)', () async {
+      final realService = TicunaAudioService();
+      addTearDown(realService.dispose);
+
+      final emittedStates = <bool>[];
+      final sub = realService.playerPlayingStream.listen(emittedStates.add);
+      addTearDown(sub.cancel);
+
+      await realService.play('/caminho/inexistente/ticuna_falso.m4a');
+      await Future.delayed(const Duration(milliseconds: 20));
+      expect(realService.isPlaying, isFalse);
+      expect(emittedStates.contains(false), isTrue);
+
+      final uploadRes = await realService.uploadToSupabase(
+        id: 'word_unauth_1',
+        localFilePath: '/caminho/inexistente.m4a',
+      );
+      expect(uploadRes, isNull);
+    });
   });
 
   group('TicunaRepository - Persistência de Áudio e Diacríticos no Drift/SQLite', () {

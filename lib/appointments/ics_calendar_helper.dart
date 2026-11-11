@@ -1,3 +1,4 @@
+import '../core/app_logger.dart';
 import '../database/app_database.dart';
 
 class ParsedIcsEvent {
@@ -58,7 +59,8 @@ class IcsCalendarHelper {
       }
       // Evento de dia inteiro (YYYYMMDD)
       return DateTime(y, m, d);
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.debug('Falha ao fazer parse de data ICS ($clean): $e', st);
       return null;
     }
   }

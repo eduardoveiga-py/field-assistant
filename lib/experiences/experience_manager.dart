@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
-import 'package:drift/drift.dart';
 
+import '../core/app_logger.dart';
+import '../core/sync_timestamp.dart';
 import '../database/app_database.dart';
 import '../ui/providers.dart';
 
@@ -37,114 +39,85 @@ class MinistryExperienceItem {
     'content': content,
     'media_urls': jsonEncode(mediaUrls),
     'tags': jsonEncode(tags),
-    'date_time': dateTime.toIso8601String(),
+    'date_time': dateTime.toUtc().toIso8601String(),
     'location_or_modality': locationOrModality,
-    'created_at': createdAt.toIso8601String(),
-    'updated_at': updatedAt.toIso8601String(),
+    'created_at': createdAt.toUtc().toIso8601String(),
+    'updated_at': updatedAt.toUtc().toIso8601String(),
   };
 
+  factory MinistryExperienceItem.fromEntry(MinistryExperienceEntry e) {
+    return MinistryExperienceItem(
+      id: e.id,
+      title: e.title,
+      content: e.content,
+      mediaUrls: _decodeStringList(e.mediaUrls),
+      tags: _decodeStringList(e.tags),
+      dateTime: e.dateTimeField,
+      locationOrModality: e.locationOrModality,
+      createdAt: e.createdAt,
+      updatedAt: e.updatedAt,
+    );
+  }
+
   factory MinistryExperienceItem.fromMap(Map<String, dynamic> map) {
-    List<String> parsedMedia = [];
-    try {
-      final raw = map['media_urls'];
-      if (raw != null) {
-        final decoded = jsonDecode(raw as String);
-        if (decoded is List) {
-          parsedMedia = decoded.map((e) => e.toString()).toList();
-        }
-      }
-    } catch (_) {}
-
-    List<String> parsedTags = [];
-    try {
-      final raw = map['tags'];
-      if (raw != null) {
-        final decoded = jsonDecode(raw as String);
-        if (decoded is List) {
-          parsedTags = decoded.map((e) => e.toString()).toList();
-        }
-      }
-    } catch (_) {}
-
     return MinistryExperienceItem(
       id: map['id'] as String,
       title: map['title'] as String,
       content: map['content'] as String,
-      mediaUrls: parsedMedia,
-      tags: parsedTags,
-      dateTime: DateTime.parse(map['date_time'] as String),
-      locationOrModality: map['location_or_modality'] as String?,
-      createdAt: DateTime.parse(map['created_at'] as String),
-      updatedAt: DateTime.parse(map['updated_at'] as String),
+      mediaUrls: _decodeStringList(map['media_urls']),
+      tags: _decodeStringList(map['tags']),
+      dateTime:
+          SyncTimestamp.parse(map['date_time'] ?? map['dateTimeField']) ??
+          DateTime.now(),
+      locationOrModality:
+          (map['location_or_modality'] ?? map['locationOrModality']) as String?,
+      createdAt:
+          SyncTimestamp.parse(map['created_at'] ?? map['createdAt']) ??
+          DateTime.now(),
+      updatedAt:
+          SyncTimestamp.parse(map['updated_at'] ?? map['updatedAt']) ??
+          DateTime.now(),
     );
+  }
+
+  static List<String> _decodeStringList(dynamic raw) {
+    if (raw == null) return [];
+    if (raw is List) return raw.map((e) => e.toString()).toList();
+    if (raw is String && raw.trim().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is List) {
+          return decoded.map((e) => e.toString()).toList();
+        }
+      } catch (e, st) {
+        AppLogger.warning('Falha ao decodificar lista JSON em MinistryExperience', e, st);
+      }
+    }
+    return [];
   }
 }
 
 class ExperienceManager {
   final AppDatabase db;
   final Uuid _uuid = const Uuid();
-  final StreamController<List<MinistryExperienceItem>> _controller =
-      StreamController<List<MinistryExperienceItem>>.broadcast();
-  Future<void>? _initFuture;
 
-  bool _initialized = false;
-
-  ExperienceManager(this.db) {
-    _initTable();
-  }
-
-  Future<void> _initTable() async {
-    if (_initialized) return;
-    _initFuture ??= _doInitTable();
-    await _initFuture;
-  }
-
-  Future<void> _doInitTable() async {
-    try {
-      await db.customStatement('''
-        CREATE TABLE IF NOT EXISTS ministry_experiences (
-          id TEXT PRIMARY KEY,
-          title TEXT NOT NULL,
-          content TEXT NOT NULL,
-          media_urls TEXT NOT NULL DEFAULT '[]',
-          tags TEXT NOT NULL DEFAULT '[]',
-          date_time TEXT NOT NULL,
-          location_or_modality TEXT,
-          created_at TEXT NOT NULL,
-          updated_at TEXT NOT NULL
-        );
-      ''');
-    } catch (_) {}
-    _initialized = true;
-    _refresh();
-  }
-
-  Future<void> _refresh() async {
-    try {
-      final list = await getAllExperiences();
-      if (!_controller.isClosed) {
-        _controller.add(list);
-      }
-    } catch (_) {}
-  }
+  ExperienceManager(this.db);
 
   Future<List<MinistryExperienceItem>> getAllExperiences() async {
-    await _initTable();
-    try {
-      final rows = await db
-          .customSelect(
-            'SELECT * FROM ministry_experiences ORDER BY date_time DESC',
-          )
-          .get();
-      return rows.map((r) => MinistryExperienceItem.fromMap(r.data)).toList();
-    } catch (_) {
-      return [];
-    }
+    final rows =
+        await (db.select(db.ministryExperiences)
+              ..where((t) => t.deletedAt.isNull())
+              ..orderBy([(t) => OrderingTerm.desc(t.dateTimeField)]))
+            .get();
+    return rows.map(MinistryExperienceItem.fromEntry).toList();
   }
 
-  Stream<List<MinistryExperienceItem>> watchExperiences() async* {
-    yield await getAllExperiences();
-    yield* _controller.stream;
+  Stream<List<MinistryExperienceItem>> watchExperiences() {
+    return (db.select(db.ministryExperiences)
+          ..where((t) => t.deletedAt.isNull())
+          ..orderBy([(t) => OrderingTerm.desc(t.dateTimeField)]))
+        .watch()
+        .map((rows) => rows.map(MinistryExperienceItem.fromEntry).toList());
   }
 
   Future<MinistryExperienceItem> addExperience({
@@ -155,99 +128,106 @@ class ExperienceManager {
     DateTime? dateTime,
     String? locationOrModality,
   }) async {
-    await _initTable();
     final now = DateTime.now();
     final id = _uuid.v4();
     final dt = dateTime ?? now;
+    final cleanModality =
+        locationOrModality != null && locationOrModality.trim().isNotEmpty
+            ? locationOrModality.trim()
+            : null;
 
-    await db.customInsert(
-      'INSERT INTO ministry_experiences (id, title, content, media_urls, tags, date_time, location_or_modality, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      variables: [
-        Variable.withString(id),
-        Variable.withString(title.trim()),
-        Variable.withString(content.trim()),
-        Variable.withString(jsonEncode(mediaUrls)),
-        Variable.withString(jsonEncode(tags)),
-        Variable.withString(dt.toIso8601String()),
-        Variable.withString(locationOrModality?.trim() ?? ''),
-        Variable.withString(now.toIso8601String()),
-        Variable.withString(now.toIso8601String()),
-      ],
-    );
-
-    final item = MinistryExperienceItem(
+    final entry = MinistryExperienceEntry(
       id: id,
       title: title.trim(),
       content: content.trim(),
-      mediaUrls: mediaUrls,
-      tags: tags,
-      dateTime: dt,
-      locationOrModality: locationOrModality?.trim(),
+      mediaUrls: jsonEncode(mediaUrls),
+      tags: jsonEncode(tags),
+      dateTimeField: dt,
+      locationOrModality: cleanModality,
       createdAt: now,
       updatedAt: now,
+      deletedAt: null,
+      revision: 1,
     );
 
-    try {
+    await db.transaction(() async {
+      await db.into(db.ministryExperiences).insert(entry);
       await db.into(db.syncQueue).insert(
         SyncQueueCompanion.insert(
           id: _uuid.v4(),
           entityType: 'ministry_experiences',
           entityId: id,
           operation: 'INSERT',
-          payload: jsonEncode(item.toMap()),
+          payload: jsonEncode(SyncTimestamp.normalizeMapDates(entry.toJson())),
           createdAt: now,
           status: const Value('pending'),
         ),
       );
-    } catch (_) {}
+    });
 
-    await _refresh();
-    return item;
+    return MinistryExperienceItem.fromEntry(entry);
   }
 
   Future<void> updateExperience(MinistryExperienceItem item) async {
-    await _initTable();
     final now = DateTime.now();
-    await db.customUpdate(
-      'UPDATE ministry_experiences SET title = ?, content = ?, media_urls = ?, tags = ?, date_time = ?, location_or_modality = ?, updated_at = ? WHERE id = ?',
-      variables: [
-        Variable.withString(item.title.trim()),
-        Variable.withString(item.content.trim()),
-        Variable.withString(jsonEncode(item.mediaUrls)),
-        Variable.withString(jsonEncode(item.tags)),
-        Variable.withString(item.dateTime.toIso8601String()),
-        Variable.withString(item.locationOrModality?.trim() ?? ''),
-        Variable.withString(now.toIso8601String()),
-        Variable.withString(item.id),
-      ],
+    final existing = await (db.select(db.ministryExperiences)
+          ..where((t) => t.id.equals(item.id)))
+        .getSingleOrNull();
+    final cleanModality = item.locationOrModality != null &&
+            item.locationOrModality!.trim().isNotEmpty
+        ? item.locationOrModality!.trim()
+        : null;
+    final updated = MinistryExperienceEntry(
+      id: item.id,
+      title: item.title.trim(),
+      content: item.content.trim(),
+      mediaUrls: jsonEncode(item.mediaUrls),
+      tags: jsonEncode(item.tags),
+      dateTimeField: item.dateTime,
+      locationOrModality: cleanModality,
+      createdAt: existing?.createdAt ?? item.createdAt,
+      updatedAt: now,
+      deletedAt: existing?.deletedAt,
+      revision: (existing?.revision ?? 1) + 1,
     );
 
-    try {
+    await db.transaction(() async {
+      await db.update(db.ministryExperiences).replace(updated);
+      final payload = SyncTimestamp.normalizeMapDates(updated.toJson());
+      if (existing != null) {
+        payload['_base'] = SyncTimestamp.normalizeMapDates(existing.toJson());
+      }
       await db.into(db.syncQueue).insert(
         SyncQueueCompanion.insert(
           id: _uuid.v4(),
           entityType: 'ministry_experiences',
           entityId: item.id,
           operation: 'UPDATE',
-          payload: jsonEncode(item.toMap()),
+          payload: jsonEncode(payload),
           createdAt: now,
           status: const Value('pending'),
         ),
       );
-    } catch (_) {}
-
-    await _refresh();
+    });
   }
 
   Future<void> deleteExperience(String id) async {
-    await _initTable();
     final now = DateTime.now();
-    await db.customUpdate(
-      'DELETE FROM ministry_experiences WHERE id = ?',
-      variables: [Variable.withString(id)],
-    );
+    final existing = await (db.select(db.ministryExperiences)
+          ..where((t) => t.id.equals(id)))
+        .getSingleOrNull();
+    if (existing == null) return;
 
-    try {
+    final nextRev = existing.revision + 1;
+    await db.transaction(() async {
+      await (db.update(db.ministryExperiences)..where((t) => t.id.equals(id)))
+          .write(
+        MinistryExperiencesCompanion(
+          deletedAt: Value(now),
+          updatedAt: Value(now),
+          revision: Value(nextRev),
+        ),
+      );
       await db.into(db.syncQueue).insert(
         SyncQueueCompanion.insert(
           id: _uuid.v4(),
@@ -256,15 +236,15 @@ class ExperienceManager {
           operation: 'DELETE',
           payload: jsonEncode({
             'id': id,
-            'deleted_at': now.toIso8601String(),
+            'deleted_at': now.toUtc().toIso8601String(),
+            'updated_at': now.toUtc().toIso8601String(),
+            'revision': nextRev,
           }),
           createdAt: now,
           status: const Value('pending'),
         ),
       );
-    } catch (_) {}
-
-    await _refresh();
+    });
   }
 }
 

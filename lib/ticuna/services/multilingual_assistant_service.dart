@@ -110,7 +110,9 @@ class MultilingualAssistantService {
       await (_db.delete(_db.appKvStore)
             ..where((t) => t.key.equals(searchHistoryKey)))
           .go();
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.warning('Falha ao limpar histórico de pesquisas linguísticas', e, st);
+    }
   }
 }
 

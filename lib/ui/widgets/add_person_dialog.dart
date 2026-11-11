@@ -8,19 +8,11 @@ import '../../territory/geocoding_service.dart';
 import '../../territory/geolocation_helper.dart';
 import '../../territory/sector_manager.dart';
 import '../providers.dart';
+import 'managed_text_controllers.dart';
 import 'map_location_picker_dialog.dart';
 
 /// Abre diretamente o formulário modal de cadastro de novo contato / nova pessoa.
 Future<void> showAddPersonDialog(BuildContext context, WidgetRef ref) async {
-  final nameController = TextEditingController();
-  final phoneController = TextEditingController();
-  final addressController = TextEditingController();
-  final neighborhoodController = TextEditingController();
-  final referenceController = TextEditingController();
-  final scheduleController = TextEditingController(text: 'Sábado às 09:00');
-  final latController = TextEditingController();
-  final lngController = TextEditingController();
-  final notesController = TextEditingController();
   String selectedStatus = 'interessado';
   String selectedWeekday = 'Sábado';
   TimeOfDay selectedStudyTime = const TimeOfDay(hour: 9, minute: 0);
@@ -31,7 +23,20 @@ Future<void> showAddPersonDialog(BuildContext context, WidgetRef ref) async {
 
   await showDialog(
     context: context,
-    builder: (ctx) => StatefulBuilder(
+    builder: (ctx) => ManagedTextControllers(
+      initialTexts: const ['', '', '', '', '', 'Sábado às 09:00', '', '', ''],
+      builder: (ctx, ctrls) {
+        final nameController = ctrls[0];
+        final phoneController = ctrls[1];
+        final addressController = ctrls[2];
+        final neighborhoodController = ctrls[3];
+        final referenceController = ctrls[4];
+        final scheduleController = ctrls[5];
+        final latController = ctrls[6];
+        final lngController = ctrls[7];
+        final notesController = ctrls[8];
+
+        return StatefulBuilder(
       builder: (ctx, setDialogState) => AlertDialog(
         title: const Row(
           children: [
@@ -216,7 +221,7 @@ Future<void> showAddPersonDialog(BuildContext context, WidgetRef ref) async {
                       controller: neighborhoodController,
                       decoration: const InputDecoration(
                         labelText: 'Bairro / Setor',
-                        hintText: 'Ex: Betânia, Lago Grande...',
+                        hintText: 'Ex: Centro, Vila Nova, Porto...',
                       ),
                     ),
                   ),
@@ -280,7 +285,7 @@ Future<void> showAddPersonDialog(BuildContext context, WidgetRef ref) async {
                       controller: latController,
                       decoration: const InputDecoration(
                         labelText: 'Latitude GPS',
-                        hintText: '-23.5505',
+                        hintText: '-3.1022',
                       ),
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
@@ -294,7 +299,7 @@ Future<void> showAddPersonDialog(BuildContext context, WidgetRef ref) async {
                       controller: lngController,
                       decoration: const InputDecoration(
                         labelText: 'Longitude GPS',
-                        hintText: '-46.6333',
+                        hintText: '-67.9397',
                       ),
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
@@ -326,8 +331,8 @@ Future<void> showAddPersonDialog(BuildContext context, WidgetRef ref) async {
                     onPressed: () async {
                       final pos =
                           await GeolocationHelper.getCurrentLocation();
-                      final lat = pos?.latitude ?? -23.550520;
-                      final lng = pos?.longitude ?? -46.633308;
+                      final lat = pos?.latitude ?? GeolocationHelper.defaultLat;
+                      final lng = pos?.longitude ?? GeolocationHelper.defaultLng;
                       setDialogState(() {
                         latController.text = lat.toStringAsFixed(6);
                         lngController.text = lng.toStringAsFixed(6);
@@ -623,6 +628,8 @@ Future<void> showAddPersonDialog(BuildContext context, WidgetRef ref) async {
           ),
         ],
       ),
+    );
+      },
     ),
   );
 }

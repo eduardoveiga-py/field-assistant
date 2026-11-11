@@ -7,6 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../../core/app_logger.dart';
 import '../../core/app_theme.dart';
 import '../../voice_notes/audio_recording_service.dart';
 import '../providers.dart';
@@ -17,15 +18,29 @@ import 'rich_markdown_toolbar.dart';
 /// Permite capturar pensamentos, ditados de áudio (até 5 min) e documentos/fotos
 /// sem atrito e sem exigir classificação imediata.
 class QuickCaptureSheet extends ConsumerStatefulWidget {
-  const QuickCaptureSheet({super.key});
+  final AudioRecordingService? recordingService;
+  final AudioPlayerService? playerService;
 
-  static Future<void> show(BuildContext context) {
+  const QuickCaptureSheet({
+    super.key,
+    this.recordingService,
+    this.playerService,
+  });
+
+  static Future<void> show(
+    BuildContext context, {
+    AudioRecordingService? recordingService,
+    AudioPlayerService? playerService,
+  }) {
     return showAdaptiveMinistrySheet(
       context: context,
       title: 'Captura Rápida • Inbox',
       titleLeading: const Icon(Icons.all_inbox_rounded, color: AppTheme.primaryBlue, size: 22),
       subtitle: 'Guarde ideias, tarefas, áudios ou documentos para organizar depois.',
-      builder: (ctx, scrollCtrl) => const QuickCaptureSheet(),
+      builder: (ctx, scrollCtrl) => QuickCaptureSheet(
+        recordingService: recordingService,
+        playerService: playerService,
+      ),
     );
   }
 
@@ -61,8 +76,8 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> with Sing
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    _recordingService = kIsWeb ? LocalAudioRecordingService() : RealAudioRecordingService();
-    _playerService = kIsWeb ? LocalAudioPlayerService() : RealAudioPlayerService();
+    _recordingService = widget.recordingService ?? AudioRecordingService.platform();
+    _playerService = widget.playerService ?? AudioPlayerService.platform();
 
     _durationSub = _recordingService.recordingDurationStream.listen((sec) {
       if (mounted) {
@@ -99,9 +114,17 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> with Sing
       if (mounted) {
         setState(() {
           _isRecording = false;
-          if (res != null) {
+          if (res != null && res.fileIntegrityValid) {
             _recordedAudioPath = res.filePath;
             _recordDurationSeconds = res.durationSeconds;
+          } else {
+            _recordedAudioPath = null;
+            _recordDurationSeconds = 0;
+            if (res != null && !res.fileIntegrityValid) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Gravação não capturou áudio válido.')),
+              );
+            }
           }
         });
       }
@@ -131,11 +154,19 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> with Sing
   }
 
   Future<void> _toggleAudioPlayback() async {
-    if (_recordedAudioPath == null) return;
-    if (_isPlayingAudio) {
-      await _playerService.pause();
-    } else {
-      await _playerService.play(_recordedAudioPath!);
+    if (_recordedAudioPath == null || _recordedAudioPath!.isEmpty) return;
+    try {
+      if (_isPlayingAudio) {
+        await _playerService.pause();
+      } else {
+        await _playerService.play(_recordedAudioPath!);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Falha ao reproduzir áudio: $e')),
+        );
+      }
     }
   }
 
@@ -165,13 +196,17 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> with Sing
             Uint8List? bytes;
             try {
               bytes = await f.readAsBytes();
-            } catch (_) {}
+            } catch (e, st) {
+              AppLogger.debug('Falha ao ler bytes diretos em quick capture (${f.name}): $e', st);
+            }
             if ((bytes == null || bytes.isEmpty) && f.path != null && f.path!.isNotEmpty) {
               final sf = File(f.path!);
               if (await sf.exists()) {
                 try {
                   bytes = await sf.readAsBytes();
-                } catch (_) {}
+                } catch (e, st) {
+                  AppLogger.debug('Falha ao ler arquivo local em quick capture (${f.path}): $e', st);
+                }
               }
             }
             if (bytes != null && bytes.isNotEmpty) {
@@ -210,7 +245,12 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> with Sing
   Future<void> _pickImage(ImageSource source) async {
     try {
       final picker = ImagePicker();
-      final picked = await picker.pickImage(source: source, imageQuality: 85);
+      final picked = await picker.pickImage(
+        source: source,
+        maxWidth: 1280,
+        maxHeight: 1280,
+        imageQuality: 80,
+      );
       if (picked != null) {
         final bytes = await picked.readAsBytes();
         String finalPath = picked.path;
@@ -225,7 +265,9 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> with Sing
             final targetFile = File('${imgFolder.path}/${picked.name}');
             await targetFile.writeAsBytes(bytes, flush: true);
             finalPath = targetFile.path;
-          } catch (_) {}
+          } catch (e, st) {
+            AppLogger.warning('Falha ao persistir imagem em quick capture', e, st);
+          }
         }
 
         setState(() {

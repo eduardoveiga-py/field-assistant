@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 
+import '../../core/app_logger.dart';
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../../appointments/availability_engine.dart';
@@ -26,6 +27,7 @@ import 'tasks_screen.dart';
 import '../widgets/schedule_conflict_resolution_banner.dart';
 import '../../appointments/plan_b_recommender.dart';
 import '../widgets/screen_hero_accent_band.dart';
+import '../widgets/managed_text_controllers.dart';
 import '../widgets/plan_b_dialog.dart';
 
 class _CopyWizardRoutine {
@@ -247,8 +249,8 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
       if (savedUrl != null && savedUrl.trim().isNotEmpty) {
         await _syncFromWebcalUrl(savedUrl.trim(), silent: true);
       }
-    } catch (_) {
-      // Auto-sync silencioso em segundo plano
+    } catch (e, st) {
+      AppLogger.warning('Falha no auto-sync silencioso do calendário externo', e, st);
     }
   }
 
@@ -448,73 +450,79 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
   }
 
   void _showPasteIcsDialog(BuildContext context) {
-    final textController = TextEditingController();
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.content_paste, color: AppTheme.primaryBlue),
-            SizedBox(width: 8),
-            Text('Colar Conteúdo .ics / iCal'),
-          ],
-        ),
-        content: SizedBox(
-          width: 500,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Cole abaixo o texto do arquivo .ics (do Google Agenda, Apple Calendar ou outro aplicativo):',
-                style: TextStyle(fontSize: 12),
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: const [''],
+        builder: (ctx, ctrls) {
+          final textController = ctrls[0];
+
+          return AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.content_paste, color: AppTheme.primaryBlue),
+                SizedBox(width: 8),
+                Text('Colar Conteúdo .ics / iCal'),
+              ],
+            ),
+            content: SizedBox(
+              width: 500,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Cole abaixo o texto do arquivo .ics (do Google Agenda, Apple Calendar ou outro aplicativo):',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: textController,
+                    maxLines: 8,
+                    decoration: const InputDecoration(
+                      hintText: 'BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\n...',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: textController,
-                maxLines: 8,
-                decoration: const InputDecoration(
-                  hintText: 'BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\n...',
-                  border: OutlineInputBorder(),
-                ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancelar'),
+              ),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.file_download_done, size: 16),
+                label: const Text('Importar'),
+                onPressed: () async {
+                  final raw = textController.text.trim();
+                  if (raw.isEmpty || !raw.contains('BEGIN:VEVENT')) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Conteúdo iCal inválido ou sem eventos (VEVENT).',
+                        ),
+                      ),
+                    );
+                    return;
+                  }
+                  final res = await _importIcsContent(raw);
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Importação concluída! ${res.created} novo(s), ${res.updated} atualizado(s).',
+                        ),
+                      ),
+                    );
+                  }
+                },
               ),
             ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.file_download_done, size: 16),
-            label: const Text('Importar'),
-            onPressed: () async {
-              final raw = textController.text.trim();
-              if (raw.isEmpty || !raw.contains('BEGIN:VEVENT')) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'Conteúdo iCal inválido ou sem eventos (VEVENT).',
-                    ),
-                  ),
-                );
-                return;
-              }
-              final res = await _importIcsContent(raw);
-              if (ctx.mounted) Navigator.pop(ctx);
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Importação concluída! ${res.created} novo(s), ${res.updated} atualizado(s).',
-                    ),
-                  ),
-                );
-              }
-            },
-          ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -550,14 +558,7 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
     BuildContext context,
     List<AppointmentEntry> allAppts,
   ) {
-    final googleUrlController = TextEditingController();
-    ref.read(appSettingsManagerProvider).getString('saved_calendar_url').then((
-      val,
-    ) {
-      if (val != null && val.isNotEmpty && googleUrlController.text.isEmpty) {
-        googleUrlController.text = val;
-      }
-    });
+    bool didScheduleUrlLoad = false;
     bool isSyncingGoogle = false;
 
     showModalBottomSheet(
@@ -566,7 +567,25 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) => StatefulBuilder(
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: const [''],
+        builder: (ctx, ctrls) {
+          final googleUrlController = ctrls[0];
+          if (!didScheduleUrlLoad) {
+            didScheduleUrlLoad = true;
+            ref.read(appSettingsManagerProvider).getString('saved_calendar_url').then((
+              val,
+            ) {
+              if (ctx.mounted &&
+                  val != null &&
+                  val.isNotEmpty &&
+                  googleUrlController.text.isEmpty) {
+                googleUrlController.text = val;
+              }
+            });
+          }
+
+          return StatefulBuilder(
         builder: (ctx, setSheetState) {
           final isDark = Theme.of(ctx).brightness == Brightness.dark;
 
@@ -1087,6 +1106,8 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
             ),
           );
         },
+      );
+        },
       ),
     );
   }
@@ -1095,7 +1116,6 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
     BuildContext context, {
     DateTime? initialDateTime,
   }) {
-    final titleController = TextEditingController();
     DateTime chosenDate = initialDateTime ?? _selectedDate;
     TimeOfDay chosenTime = initialDateTime != null
         ? TimeOfDay(hour: initialDateTime.hour, minute: initialDateTime.minute)
@@ -1103,14 +1123,19 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
     int durationMinutes = 30;
     String? selectedPersonId;
     String appointmentCategory = 'Revisita';
-    final locationController = TextEditingController();
     String recurrence = 'Único';
     int recurrenceCount = 8;
     bool respectAvailability = true;
 
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: const ['', ''],
+        builder: (ctx, ctrls) {
+          final titleController = ctrls[0];
+          final locationController = ctrls[1];
+
+          return StatefulBuilder(
         builder: (ctx, setDialogState) {
           final start = DateTime(
             chosenDate.year,
@@ -1641,6 +1666,8 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
               ),
             ],
           );
+        },
+      );
         },
       ),
     );
@@ -3096,14 +3123,18 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
     TimeOfDay chosenTime = const TimeOfDay(hour: 9, minute: 0);
     int durationMinutes = 120; // 2 horas padrão
     String modality = 'De Casa em Casa';
-    final locationController = TextEditingController();
     String recurrence = 'Toda semana';
     int recurrenceCount = 8;
     bool respectAvailability = true;
 
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: const [''],
+        builder: (ctx, ctrls) {
+          final locationController = ctrls[0];
+
+          return StatefulBuilder(
         builder: (ctx, setDialogState) {
           final start = DateTime(
             chosenDate.year,
@@ -3438,6 +3469,8 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
               ),
             ],
           );
+        },
+      );
         },
       ),
     );

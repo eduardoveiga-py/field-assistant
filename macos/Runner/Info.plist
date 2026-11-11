@@ -18,6 +18,8 @@
 	<string>Ministério Pessoal</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>O aplicativo precisa de acesso ao microfone para permitir o registro rápido de notas de voz após as visitas.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>O aplicativo precisa acessar sua localização para centralizar o mapa do território e registrar visitas em campo.</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

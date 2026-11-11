@@ -13,6 +13,20 @@ class TrashScreen extends ConsumerStatefulWidget {
 }
 
 class _TrashScreenState extends ConsumerState<TrashScreen> {
+  late Future<List<Map<String, dynamic>>> _deletedItemsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _deletedItemsFuture = ref.read(repositoryProvider).getDeletedItems();
+  }
+
+  void _reloadDeletedItems() {
+    setState(() {
+      _deletedItemsFuture = ref.read(repositoryProvider).getDeletedItems();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final repo = ref.watch(repositoryProvider);
@@ -21,7 +35,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Registros Excluídos (Lixeira)')),
       body: FutureBuilder<List<Map<String, dynamic>>>(
-        future: repo.getDeletedItems(),
+        future: _deletedItemsFuture,
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
@@ -115,7 +129,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
                         tooltip: 'Restaurar',
                         onPressed: () async {
                           await repo.restoreDeletedItem(type, id);
-                          setState(() {});
+                          _reloadDeletedItems();
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
@@ -159,7 +173,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
 
                           if (confirm == true) {
                             await repo.permanentlyDeleteItem(type, id);
-                            setState(() {});
+                            _reloadDeletedItems();
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
