@@ -24,3 +24,8 @@ e backup-restauração; definir procedimento de opt-in e allowlist de Auth valid
 no aparelho; tratar exclusões definitivas em conflito (ver sync-safety-rollout);
 e testar concorrência e restauração entre dois usuários/aparelhos. Ausência de
 credenciais da CI não foi verificada por falta de permissão para listar secrets.
+
+O histórico do manifesto nesta branch lista apenas versões para as quais havia
+release com IPA no momento da verificação, usando URLs fixas e os tamanhos reais
+desses assets. O mínimo da versão 1.3.3 também foi corrigido para iOS 15 conforme
+o projeto dessa tag; mínimos de versões anteriores ainda não foram revalidados.

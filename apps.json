@@ -42,8 +42,8 @@
           "date": "2026-11-11",
           "localizedDescription": "Lançamento Oficial 1.3.3: Configurações do Supabase e OAuth embutidas em tempo de compilação, schema e RLS de 26 tabelas sincronizadas + bucket ticuna_audio validados, e-mail IMAP/SMTP real, armazenamento offline de mapas em .mbtiles, geolocalização real sem seeds fictícios, PIN obrigatório em ausência de biometria, verificação SHA-256 em atualizações Android e backup cifrado completo.",
           "downloadURL": "https://github.com/eduardoveiga-py/field-assistant/releases/download/v1.3.3/app-release-unsigned.ipa",
-          "size": 14105609,
-          "minOSVersion": "14.0"
+          "size": 14341856,
+          "minOSVersion": "15.0"
         },
         {
           "version": "1.3.2",
@@ -62,27 +62,11 @@
           "minOSVersion": "14.0"
         },
         {
-          "version": "1.3.0",
-          "date": "2026-11-09",
-          "localizedDescription": "Lançamento Oficial 1.3.0 (Evolução Estratégica Completa): Módulo A — Inbox Universal com captura rápida em 1-toque (texto, ditado de até 5 minutos e anexos) e pipeline de conversão sem perda de dados; Módulo B — Tarefas & Projetos com recorrência automática (diária, semanal, mensal) e cálculo dinâmico de progresso %; Módulo C — Base de Conhecimento com notas ricas, dúvidas teocráticas/respostas, documentos locais e links JW; além de paridade total com Organic Maps (rotação contínua 360°, escala métrica, download de regiões inteiras e tela cheia).",
-          "downloadURL": "https://github.com/eduardoveiga-py/field-assistant/releases/download/v1.3.0/app-release-unsigned.ipa",
-          "size": 14500000,
-          "minOSVersion": "14.0"
-        },
-        {
-          "version": "1.2.1",
-          "date": "2026-11-08",
-          "localizedDescription": "Lançamento oficial 1.2.1: resolução completa da auditoria — isolamento RLS de áudio no Supabase Storage ($userId/$id.m4a) e bucket ticuna_audio, seleção estrita de APK no Android e IPA no iOS com diferenciação de 4 estados, parada física do gravador aos 30s com validação real de bytes, índice de cobertura triplo (residências, contatos e conversas efetivas), agendamento por proximidade com modos de transporte (a pé, veículo, embarcação) e endereços sem GPS, transações atômicas de sincronização no Ticuna e correção do overflow de menu no mapa.",
-          "downloadURL": "https://github.com/eduardoveiga-py/field-assistant/releases/download/v1.2.1/app-release-unsigned.ipa",
-          "size": 13435260,
-          "minOSVersion": "14.0"
-        },
-        {
           "version": "1.2.0",
           "date": "2026-11-08",
           "localizedDescription": "Lançamento oficial 1.2.0: atualizador automático integrado com verificação em tempo real via GitHub e LiveContainer, Assistente Linguístico expandido para múltiplos idiomas indígenas (Ticuna, Guajajara, Yanomami) com frases situacionais do ministério, comparador multilíngue, mapa territorial inteligente com cálculo do Índice de Cobertura (IC), detecção de zonas esquecidas (>90 dias) e duplicatas fonéticas/geográficas (<25m), importação/exportação KML/GeoJSON/CSV, agendamento de retorno na porta por proximidade e internacionalização (i18n) PT-BR, EN e ES.",
           "downloadURL": "https://github.com/eduardoveiga-py/field-assistant/releases/download/v1.2.0/app-release-unsigned.ipa",
-          "size": 13435260,
+          "size": 13491294,
           "minOSVersion": "14.0"
         },
         {
@@ -98,7 +82,7 @@
           "date": "2026-11-08",
           "localizedDescription": "Lançamento oficial 1.1.0: nova aba Língua Ticuna com dicionário e frases úteis, repetição espaçada estilo Anki, suporte tipográfico completo com Noto Sans e Charis SIL para as 12 vogais canônicas com acentuação GPOS combinada, teclado virtual com diacríticos, gravação e reprodução de áudio segura para Web/iPad (kIsWeb e UrlSource), atalhos de cadastro direto e revisitas filtradas na página inicial.",
           "downloadURL": "https://github.com/eduardoveiga-py/field-assistant/releases/download/v1.1.0/app-release-unsigned.ipa",
-          "size": 13435260,
+          "size": 13428010,
           "minOSVersion": "14.0"
         },
         {
