@@ -1,0 +1,60 @@
+name: Independent Flutter validation
+on:
+  push:
+    branches: ['arena/**']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  diagnostics:
+    name: Dart diagnostics (independent)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Analyze and summarize diagnostics
+        shell: bash
+        run: |
+          set +e
+          dart analyze lib test --fatal-infos --format machine > /tmp/analysis.txt 2>&1
+          status=$?
+          cat /tmp/analysis.txt
+          if [ "$status" -ne 0 ]; then
+            python3 tool/ci_diagnostics_summary.py analyze /tmp/analysis.txt
+          fi
+          exit "$status"
+  tests:
+    name: Flutter tests (${{ matrix.suite }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [maps, all]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Test and summarize failures
+        shell: bash
+        env:
+          SUITE: ${{ matrix.suite }}
+        run: |
+          set +e
+          if [ "$SUITE" = maps ]; then
+            flutter test --reporter expanded test/territory/location_picker_safety_test.dart test/territory/map_safety_regression_test.dart test/territory/mbtiles_service_real_test.dart test/tile_cache_test.dart test/layout_fixes_and_map_highlight_test.dart > /tmp/tests.txt 2>&1
+          else
+            flutter test --reporter expanded > /tmp/tests.txt 2>&1
+          fi
+          status=$?
+          cat /tmp/tests.txt
+          if [ "$status" -ne 0 ]; then
+            python3 tool/ci_diagnostics_summary.py test /tmp/tests.txt
+          fi
+          exit "$status"

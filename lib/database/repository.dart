@@ -247,13 +247,17 @@ class AppRepository {
     required double longitude,
   }) async {
     if (!latitude.isFinite || !longitude.isFinite || latitude.abs() > 90 ||
-        longitude.abs() > 180 || (latitude == 0 && longitude == 0)) return false;
+        longitude.abs() > 180 || (latitude == 0 && longitude == 0)) {
+      return false;
+    }
     return db.transaction(() async {
       final current = await getPersonById(personId);
       if (current == null || current.deletedAt != null ||
           current.address != expectedAddress ||
           (current.latitude != null && current.longitude != null &&
-              (current.latitude != 0 || current.longitude != 0))) return false;
+              (current.latitude != 0 || current.longitude != 0))) {
+        return false;
+      }
       final updated = current.copyWith(
         latitude: Value(latitude), longitude: Value(longitude),
         updatedAt: DateTime.now(), revision: current.revision + 1,

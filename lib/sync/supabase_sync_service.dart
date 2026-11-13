@@ -2401,8 +2401,7 @@ class SupabaseSyncService {
 
             if (applied) {
               successCount++;
-              if (dt != null &&
-                  (newestUpdatedAt == null || dt.isAfter(newestUpdatedAt))) {
+              if (newestUpdatedAt == null || dt.isAfter(newestUpdatedAt)) {
                 newestUpdatedAt = dt;
               }
             } else {
