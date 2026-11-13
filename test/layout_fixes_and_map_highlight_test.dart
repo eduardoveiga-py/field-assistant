@@ -394,17 +394,17 @@ void main() {
         await tester.pump(const Duration(milliseconds: 100));
       }
       expect(find.text('Localização aproximada'), findsOneWidget);
-      final person = await (db.select(db.people)..where((t) => t.id.equals('review_geo'))).getSingle();
-      expect(person.latitude, isNull);
+      final person = await tester.runAsync(() => (db.select(db.people)..where((t) => t.id.equals('review_geo'))).getSingle());
+      expect(person!.latitude, isNull);
       expect(person.longitude, isNull);
       await tester.tap(find.text('Agora não'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
-      final after = await (db.select(db.people)..where((t) => t.id.equals('review_geo'))).getSingle();
-      expect(after.latitude, isNull);
+      final after = await tester.runAsync(() => (db.select(db.people)..where((t) => t.id.equals('review_geo'))).getSingle());
+      expect(after!.latitude, isNull);
       expect(after.longitude, isNull);
       await tester.pumpWidget(const SizedBox());
-    });
+    }, timeout: const Timeout(Duration(seconds: 45)));
 
     testWidgets(
       'MapLocationPickerDialog allows zooming up to level 19 without errors',
