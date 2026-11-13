@@ -152,3 +152,22 @@ zooms e limites a partir de dados reais e espaço disponível. Conferir rios,
 canais e comunidades com usuários locais, registrar a data da base e testar sem
 rede. O mapa e os pontos são referências; não presumir navegabilidade ou
 segurança de deslocamento a partir da cartografia.
+
+## Pacote experimental de SAI gerado
+
+O pipeline `Build experimental SAI offline map`, execução 43474748369, produziu
+um arquivo raster de dados OSM do Amazonas. A área é o retângulo de longitude
+-69,95 a -67,65 e latitude -3,85 a -2,32, que abrange os limites consultados
+para o município e partes vizinhas; o extrato pode não conter dados de outras
+regiões ou países. Contém zoom 8 a 16, sem zoom 17 a 19. Os dados pessoais de
+contatos não são incorporados. Atribuição e informações de origem acompanham o
+arquivo. O artefato é temporário (retenção de 14 dias):
+https://github.com/eduardoveiga-py/field-assistant/actions/runs/43474748369
+
+A execução 43477013593 verificou a integridade SQLite, todos os blocos no
+retângulo em cada zoom e a importação e decodificação, pelo backend Flutter real,
+dos blocos da sede em zoom 8, 12 e 16. Isso não verifica a qualidade visual ou
+completude da base, a precisão de cada comunidade, nem testa aparelho ou modo
+avião. Necessária revisão por usuário local e testes no iPhone/iPad e Windows.
+O catálogo automático ainda não aponta para esse artefato temporário; por enquanto
+é preciso baixar o ZIP, extrair o .mbtiles e importá-lo no app em camada padrão.

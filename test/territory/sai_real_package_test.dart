@@ -19,6 +19,14 @@ void main() {
         final frame = await codec.getNextFrame();
         expect(frame.image.width, 256);
         expect(frame.image.height, 256);
+        if (tile.$1 == 16) {
+          // Garante que o bloco da sede não seja apenas uma cor de fundo.
+          // Não comprova exatidão ou cobertura das comunidades.
+          final rgba = await frame.image.toByteData(format: ui.ImageByteFormat.rawRgba);
+          expect(rgba, isNotNull);
+          final pixels = rgba!.buffer.asUint32List();
+          expect(pixels.toSet().length, greaterThan(2));
+        }
         frame.image.dispose();
         codec.dispose();
       }
