@@ -1,6 +1,6 @@
 # Implantação e validação da sincronização
 
-Esta branch exige a migração `20261113000000_sync_compare_and_swap.sql` para
+Esta branch exige a migração `20261113173516_sync_compare_and_swap.sql` para
 inserções/atualizações. O cliente chama `sync_upsert_if_unchanged` com a linha
 exata lida no servidor; se a função não existir ou falhar, mantém a operação na
 fila e **não** usa upsert direto. Não publicar este cliente antes de validar e
@@ -54,3 +54,20 @@ correspondem necessariamente aos prefixos de arquivo locais; reconciliar o
 histórico antes de executar um push de todas as migrações do repositório.
 A versão local SQLite permanece na versão 8: CAS não exige nova coluna. Não
 incremente a versão sem migração de dados necessária e testes de upgrade.
+
+### Proteção adicional contra perda silenciosa de campos
+
+A migração remota `20261113175529_sync_reject_unknown_columns` faz a RPC
+recusar payloads com colunas inexistentes em vez de ignorá-las. Isso preserva
+alterações pendentes, mas pode impedir a sincronização de entidades com schema
+remoto divergente até sua correção; não significa que as 26 entidades foram
+validadas ponta a ponta. Teste autenticado com rollback no projeto passou para
+inserção, rejeição de coluna desconhecida sem alterar o registro, atualização
+condicional e rejeição de atualização obsoleta. `people` e
+`territory_landmarks` possuem as colunas de coordenadas e demais campos Drift
+checados. Nenhum dado de teste foi persistido.
+
+As três migrações CAS locais usam agora os mesmos prefixos registrados no
+histórico remoto (`20261113173516`, `20261113173528`, `20261113175529`). As
+migrações **anteriores** ainda diferem entre repositório e projeto; não executar
+`supabase db push` indiscriminadamente: comparar conteúdo e histórico primeiro.
