@@ -219,7 +219,16 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           if [ "$IS_RELEASE_TAG" = "true" ]; then export ORG_GRADLE_PROJECT_requireReleaseSigning=true; fi
-          flutter build apk --target-platform android-arm64 --release $DART_DEFINES
+          set -o pipefail
+          flutter build apk --target-platform android-arm64 --release $DART_DEFINES 2>&1 | tee /tmp/android-build.log || {
+            python3 - <<'PY2'
+          from pathlib import Path
+          text = '\n'.join(Path('/tmp/android-build.log').read_text(errors='replace').splitlines()[-35:])[-5000:]
+          text = text.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+          print(f'::error title=Android build failure::{text}')
+          PY2
+            exit 1
+          }
 
       - name: Stage Web & Android Release Artifacts
         run: |
