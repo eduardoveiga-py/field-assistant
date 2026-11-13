@@ -748,8 +748,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
-          _buildExchangeConfigCard(),
           _buildJwEmailConfigCard(isDark),
+          _buildExchangeConfigCard(),
 
           const SizedBox(height: 20),
 
