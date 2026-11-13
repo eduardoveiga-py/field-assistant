@@ -817,6 +817,8 @@ void main() {
         300,
         scrollable: find.byType(Scrollable).first,
       );
+      await tester.ensureVisible(find.text('Configurar Supabase (URL/Chave)'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Configurar Supabase (URL/Chave)'));
       await tester.pumpAndSettle();
 

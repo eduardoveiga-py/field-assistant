@@ -2159,27 +2159,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Widget _buildExchangeConfigCard() => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Exchange ActiveSync (experimental)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-        const SizedBox(height: 8),
-        const Text('Somente leitura da INBOX, por senha (Basic) e HTTPS. Não suporta OAuth, políticas de dispositivo, envio ou anexos. Mensagens podem ser parciais; mantenha o correio oficial e seu backup.', style: TextStyle(fontSize: 12)),
-        const SizedBox(height: 12),
-        TextField(controller: _exchangeEmailCtrl, keyboardType: TextInputType.emailAddress,
-          decoration: const InputDecoration(labelText: 'Usuário Exchange', border: OutlineInputBorder())),
-        const SizedBox(height: 12),
-        TextField(controller: _exchangePasswordCtrl, obscureText: true,
-          decoration: const InputDecoration(labelText: 'Senha Exchange', border: OutlineInputBorder())),
-        const SizedBox(height: 12),
-        TextField(controller: _exchangeHostCtrl, keyboardType: TextInputType.url,
-          decoration: const InputDecoration(labelText: 'Servidor Exchange (somente nome)', hintText: 'eas.exemplo.org', border: OutlineInputBorder())),
-        const SizedBox(height: 8),
-        const Text('Use somente o servidor oficial autorizado pelo provedor; sua senha será enviada a esse servidor via HTTPS.', style: TextStyle(fontSize: 12)),
-        const SizedBox(height: 12),
-        ElevatedButton(onPressed: _isTestingExchange ? null : _testExchange,
-          child: Text(_isTestingExchange ? 'Testando Exchange...' : 'Testar Exchange e salvar')),
-      ]),
+    child: ExpansionTile(
+      title: const Text('Exchange ActiveSync (experimental)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+      children: [Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Somente leitura da INBOX, por senha (Basic) e HTTPS. Não suporta OAuth, políticas de dispositivo, envio ou anexos. Mensagens podem ser parciais; mantenha o correio oficial e seu backup.', style: TextStyle(fontSize: 12)),
+          const SizedBox(height: 12),
+          TextField(controller: _exchangeEmailCtrl, keyboardType: TextInputType.emailAddress,
+            decoration: const InputDecoration(labelText: 'Usuário Exchange', border: OutlineInputBorder())),
+          const SizedBox(height: 12),
+          TextField(controller: _exchangePasswordCtrl, obscureText: true,
+            decoration: const InputDecoration(labelText: 'Senha Exchange', border: OutlineInputBorder())),
+          const SizedBox(height: 12),
+          TextField(controller: _exchangeHostCtrl, keyboardType: TextInputType.url,
+            decoration: const InputDecoration(labelText: 'Servidor Exchange (somente nome)', hintText: 'eas.exemplo.org', border: OutlineInputBorder())),
+          const SizedBox(height: 8),
+          const Text('Use somente o servidor oficial autorizado pelo provedor; sua senha será enviada a esse servidor via HTTPS.', style: TextStyle(fontSize: 12)),
+          const SizedBox(height: 12),
+          ElevatedButton(onPressed: _isTestingExchange ? null : _testExchange,
+            child: Text(_isTestingExchange ? 'Testando Exchange...' : 'Testar Exchange e salvar')),
+        ]),
+      )],
     ),
   );
 
