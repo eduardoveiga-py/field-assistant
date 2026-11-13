@@ -44,7 +44,8 @@ void main() {
       }, child: const Text('Abrir')),
     ))));
     await tester.tap(find.text('Abrir'));
-    await tester.pumpAndSettle();
+    // Há um indicador animado enquanto a consulta simulada permanece pendente.
+    await tester.pump(const Duration(milliseconds: 400));
     expect(requests.length, 1);
     // Centro da janela é uma área visível do mapa, longe dos botões.
     await tester.tapAt(const Offset(460, 250));
