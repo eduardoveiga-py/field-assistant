@@ -1,0 +1,163 @@
+name: Publish iPhone IPA test v1.3.5
+on:
+  push:
+    branches: ['arena/9ee2e915-field-assistant']
+    paths: ['.github/workflows/iphone-ipa-v135.yml']
+permissions:
+  contents: write
+  actions: read
+jobs:
+  validation:
+    name: Validate Flutter tests and analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: dart analyze lib test --fatal-warnings
+      - run: flutter test --reporter expanded
+  ios:
+    needs: validation
+    name: Build iPhone test IPA
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate version and required client configuration
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          python3 - <<'PY'
+          import os, re, sys
+          from pathlib import Path
+          from urllib.parse import urlparse
+          pubspec = Path('pubspec.yaml').read_text(encoding='utf-8')
+          if not re.search(r'^version:\s*1\.3\.5\+12\s*$', pubspec, re.M):
+              sys.exit('::error::Versão incorreta para a pré-release de teste.')
+          url = os.environ.get('SUPABASE_URL','').strip()
+          key = os.environ.get('SUPABASE_ANON_KEY','').strip()
+          parsed = urlparse(url)
+          if parsed.scheme != 'https' or parsed.hostname != 'pchwrcwrvnbiywrdsvum.supabase.co' or len(key) < 20 or 'your-' in key.lower():
+              sys.exit('::error::Configuração Supabase de compilação ausente ou inválida. Não será publicado um IPA sem login/sync configurados.')
+          print('Configuração de cliente presente; valores não são exibidos.')
+          PY
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - run: flutter pub get
+      - name: Build and package IPA without signing
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
+          GOOGLE_IOS_CLIENT_ID: ${{ secrets.GOOGLE_IOS_CLIENT_ID }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          ios_client = os.environ.get('GOOGLE_IOS_CLIENT_ID', '').strip()
+          if ios_client:
+              plist = Path('ios/Runner/Info.plist')
+              text = plist.read_text(encoding='utf-8')
+              prefix = ios_client.removesuffix('.apps.googleusercontent.com')
+              text = text.replace('YOUR_GOOGLE_IOS_CLIENT_ID.apps.googleusercontent.com', prefix + '.apps.googleusercontent.com')
+              text = text.replace('com.googleusercontent.apps.YOUR_GOOGLE_IOS_CLIENT_ID', 'com.googleusercontent.apps.' + prefix)
+              plist.write_text(text, encoding='utf-8')
+          PY
+          args=("--dart-define=SUPABASE_URL=$SUPABASE_URL" "--dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY" "--dart-define=AUTH_NATIVE_CALLBACK=false")
+          if [ -n "${GOOGLE_WEB_CLIENT_ID:-}" ]; then args+=("--dart-define=GOOGLE_WEB_CLIENT_ID=$GOOGLE_WEB_CLIENT_ID"); fi
+          flutter build ios --no-codesign --release "${args[@]}"
+          mkdir -p dist-ios/Payload
+          cp -R build/ios/iphoneos/Runner.app dist-ios/Payload/
+          cp ios/Runner/Assets.xcassets/AppIcon.appiconset/*.png dist-ios/Payload/Runner.app/
+          cp ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-1024x1024@1x.png dist-ios/Payload/Runner.app/AppIcon.png
+          cp ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-60x60@2x.png dist-ios/Payload/Runner.app/AppIcon60x60.png
+          cp ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-60x60@2x.png dist-ios/Payload/Runner.app/AppIcon60x60@2x.png
+          cp ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-76x76@2x.png dist-ios/Payload/Runner.app/AppIcon76x76.png
+          cp ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-76x76@2x.png dist-ios/Payload/Runner.app/AppIcon76x76@2x~ipad.png
+          cd dist-ios && zip -qr app-release-unsigned.ipa Payload && rm -rf Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: iphone-test-ipa
+          path: dist-ios/app-release-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 14
+  publish:
+    name: Verify and publish IPA only
+    needs: ios
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: iphone-test-ipa
+          path: release-assets
+      - name: Verify IPA
+        run: |
+          python3 - <<'PY2'
+          import plistlib, zipfile
+          from pathlib import Path
+          ipa = Path('release-assets/app-release-unsigned.ipa')
+          with zipfile.ZipFile(ipa) as package:
+              broken = package.testzip()
+              if broken: raise SystemExit('IPA contém arquivo corrompido.')
+              info = plistlib.loads(package.read('Payload/Runner.app/Info.plist'))
+          assert info.get('CFBundleIdentifier') == 'com.ministeriopessoal.ministerioPessoal'
+          assert info.get('CFBundleShortVersionString') == '1.3.5'
+          assert info.get('CFBundleVersion') == '12'
+          assert info.get('MinimumOSVersion') == '15.0'
+          assert ipa.stat().st_size > 0
+          print('IPA íntegro; bundle, versão, build e iOS mínimo conferidos.')
+          PY2
+      - name: Publish isolated prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view v1.3.5 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo '::error::A release v1.3.5 já existe; não será sobrescrita.'; exit 1
+          fi
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v1.3.5" >/dev/null 2>&1; then
+            echo '::error::A tag v1.3.5 já existe; não será reutilizada.'; exit 1
+          fi
+          hash=$(sha256sum release-assets/app-release-unsigned.ipa | cut -d' ' -f1)
+          cat > /tmp/release-notes.md <<NOTES
+          ## Pré-release de teste para iPhone/iPad — apenas IPA
+
+          IPA não assinado: requer instalação/sideload compatível; iOS/iPadOS 15+.
+          Faça e verifique um backup antes de atualizar; a preservação do contêiner
+          no LiveContainer/SideStore ainda precisa ser testada.
+
+          SHA-256 do IPA: $hash
+
+          - A correção do catálogo aponta o mapa experimental para a release v1.3.4:
+            https://github.com/eduardoveiga-py/field-assistant/releases/download/v1.3.4/br_am_solimoes.mbtiles
+            Mapa e cobertura das aldeias precisam ser validados; não usar como
+            única referência de navegação.
+          - Exchange ActiveSync é experimental e de leitura parcial da INBOX,
+            apenas HTTPS com autenticação por senha (Basic), se o servidor permitir.
+            Não importa anexos ou MIME completo, nem envia mensagens; não substitui
+            o correio oficial nem um backup. OAuth e políticas do servidor não são
+            suportados e não são contornados. Não testado com o servidor do usuário.
+          - Retorno de autenticação nativo está desativado; confirmação e
+            recuperação podem redirecionar para localhost.
+          - Exclusões definitivas remotas sem base segura permanecem bloqueadas.
+          - Login, modo avião, GPS, sincronização e restauração precisam ser
+            validados no aparelho. Esta pré-release não substitui a versão estável.
+          NOTES
+          gh release create v1.3.5 --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --draft --prerelease --title 'v1.3.5 — Teste iPhone (IPA)' --notes-file /tmp/release-notes.md
+          gh release upload v1.3.5 --repo "$GITHUB_REPOSITORY" release-assets/app-release-unsigned.ipa
+          size=$(stat -c %s release-assets/app-release-unsigned.ipa)
+          gh release view v1.3.5 --repo "$GITHUB_REPOSITORY" --json assets | jq -e --argjson size "$size" '(.assets | length == 1 and .[0].name == "app-release-unsigned.ipa" and .[0].size == $size)' >/dev/null
+          gh release download v1.3.5 --repo "$GITHUB_REPOSITORY" --pattern app-release-unsigned.ipa --dir /tmp/verify-ipa
+          echo "$hash  /tmp/verify-ipa/app-release-unsigned.ipa" | sha256sum -c -
+          gh release edit v1.3.5 --repo "$GITHUB_REPOSITORY" --draft=false --prerelease

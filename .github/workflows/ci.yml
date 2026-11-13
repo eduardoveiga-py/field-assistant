@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main, master, 'arena/**' ]
     # Esta tag é reservada à pré-release iOS, não à publicação estável.
-    tags: [ 'v*', '!v1.3.4' ]
+    tags: [ 'v*', '!v1.3.4', '!v1.3.5' ]
   pull_request:
     branches: [ main, master ]
   workflow_dispatch:
@@ -514,9 +514,9 @@ jobs:
     name: Publish Release Assets
     runs-on: ubuntu-latest
     needs: [ build_android_and_web, ios_build_check, build_windows, build_linux, build_macos, verify_release_configuration, build_sai_release_map ]
-    # v1.3.4 é uma pré-release exclusiva para iPhone, publicada pelo fluxo
+    # v1.3.4 e v1.3.5 são pré-releases exclusivas para iPhone, publicadas pelo fluxo
     # próprio de teste. Nunca transformá-la automaticamente em versão estável.
-    if: startsWith(github.ref, 'refs/tags/v') && github.ref != 'refs/tags/v1.3.4'
+    if: startsWith(github.ref, 'refs/tags/v') && github.ref != 'refs/tags/v1.3.4' && github.ref != 'refs/tags/v1.3.5'
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4

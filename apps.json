@@ -6,8 +6,8 @@
   "subtitle": "Fonte oficial do Ministério Pessoal",
   "description": "Repositório oficial para instalação e atualização automática do aplicativo Ministério Pessoal no LiveContainer e AltStore.",
   "tintColor": "#1E3A8A",
-  "iconURL": "https://cdn.jsdelivr.net/gh/eduardoveiga-py/field-assistant@v1.3.4/web/icons/Icon-512.png",
-  "headerURL": "https://cdn.jsdelivr.net/gh/eduardoveiga-py/field-assistant@v1.3.4/web/icons/Icon-512.png",
+  "iconURL": "https://cdn.jsdelivr.net/gh/eduardoveiga-py/field-assistant@v1.3.5/web/icons/Icon-512.png",
+  "headerURL": "https://cdn.jsdelivr.net/gh/eduardoveiga-py/field-assistant@v1.3.5/web/icons/Icon-512.png",
   "news": [],
   "apps": [
     {
@@ -16,25 +16,31 @@
       "bundleIdentifier": "com.ministeriopessoal.ministerioPessoal",
       "developerName": "Ministério Pessoal",
       "subtitle": "Gestão eficiente e offline-first do ministério de campo",
-      "version": "1.3.4",
+      "version": "1.3.5",
       "versionDate": "2026-11-11",
-      "versionDescription": "Versão de teste: sincronização e mapa offline experimental de Santo Antônio do Içá. Requer validação em dispositivos; mapa não substitui navegação local.",
-      "downloadURL": "https://github.com/eduardoveiga-py/field-assistant/releases/download/v1.3.4/app-release-unsigned.ipa",
-      "downloadURL_apk": "https://github.com/eduardoveiga-py/field-assistant/releases/download/v1.3.4/app-arm64-v8a-release.apk",
-      "checksumsURL": "https://github.com/eduardoveiga-py/field-assistant/releases/download/v1.3.4/SHA256SUMS.txt",
+      "versionDescription": "Pré-release de teste iPhone: mapa offline e leitura experimental de Exchange ActiveSync. Não é versão de produção.",
+      "downloadURL": "https://github.com/eduardoveiga-py/field-assistant/releases/download/v1.3.5/app-release-unsigned.ipa",
       "localizedDescription": "Um aplicativo completo, rápido e focado no usuário para organizar contatos, revisitas, estudos bíblicos, compromissos e relatórios mensais.\n\n• Briefing na Porta em 30 segundos\n• Assistente Linguístico Multilíngue (Ticuna, Guajajara e outros) com frases situacionais e SRS\n• Ditado e anotações rápidas por voz\n• Agenda inteligente com agendamento por proximidade e detecção de conflitos\n• Territórios e mapas com Índice de Cobertura (IC), zonas esquecidas e importação KML/GeoJSON/CSV\n• Verificador de atualizações integrado com suporte direto ao LiveContainer\n• Modo Sol Intenso de alto contraste (WCAG AAA)\n• Relatório e contagem rigorosa de estudos e horas\n• Sincronização entre dispositivos (em validação)",
-      "iconURL": "https://cdn.jsdelivr.net/gh/eduardoveiga-py/field-assistant@v1.3.4/web/icons/Icon-512.png",
+      "iconURL": "https://cdn.jsdelivr.net/gh/eduardoveiga-py/field-assistant@v1.3.5/web/icons/Icon-512.png",
       "tintColor": "#1E3A8A",
       "category": "utilities",
       "size": 0,
       "minOSVersion": "15.0",
       "versions": [
         {
+          "version": "1.3.5",
+          "date": "2026-11-11",
+          "localizedDescription": "Pré-release de teste iPhone: mapa offline e leitura experimental de Exchange ActiveSync. Não é versão de produção.",
+          "downloadURL": "https://github.com/eduardoveiga-py/field-assistant/releases/download/v1.3.5/app-release-unsigned.ipa",
+          "size": 0,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "1.3.4",
           "date": "2026-11-11",
           "localizedDescription": "Versão de teste: sincronização e mapa offline experimental de Santo Antônio do Içá. Requer validação em dispositivos; mapa não substitui navegação local.",
           "downloadURL": "https://github.com/eduardoveiga-py/field-assistant/releases/download/v1.3.4/app-release-unsigned.ipa",
-          "size": 0,
+          "size": 14913555,
           "minOSVersion": "15.0"
         },
         {
