@@ -132,8 +132,10 @@ class MBTilesService {
           'Retângulo de SAI e entorno; não cobre todo o Alto Solimões. Aldeias, rios e caminhos podem estar incompletos. Não usar para navegação.',
       minZoom: 8,
       maxZoom: 16,
-      downloadUrl: 'https://github.com/${AppVersion.githubRepo}/releases/download/v${AppVersion.version}/br_am_solimoes.mbtiles',
-      sizeBytes: 120 * 1024 * 1024,
+      // O pacote foi publicado na pré-release v1.3.4 e não acompanha
+      // automaticamente as versões futuras do aplicativo.
+      downloadUrl: 'https://github.com/${AppVersion.githubRepo}/releases/download/v1.3.4/br_am_solimoes.mbtiles',
+      sizeBytes: 264892416,
       isInstalled: false, // Não é mais estaticamente pré-instalado
     ),
     MBTileRegion(
@@ -454,7 +456,7 @@ class MBTilesService {
     }
   }
 
-  /// Resolve a URL de download efetiva para a região (URL específica -> URL base -> padrão GitHub mbtiles-v1).
+  /// Resolve URL específica -> URL base -> URL do catálogo da região -> fallback legado.
   String resolveDownloadUrl(MBTileRegion region) {
     final perRegion = _customRegionUrls[region.id];
     if (perRegion != null && perRegion.isNotEmpty) {
@@ -560,8 +562,8 @@ class MBTilesService {
           isInstalled: isInstalled,
           downloadProgress: isInstalled ? 1.0 : 0.0,
           sizeBytes: realSize ?? baseRegion.sizeBytes,
+          // Preserve a URL padrão da região ao remover overrides.
           downloadUrl: customUrl,
-          clearDownloadUrl: customUrl == null,
         ),
       );
     }

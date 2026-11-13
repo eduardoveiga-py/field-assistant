@@ -135,8 +135,8 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'O catálogo padrão aponta para releases/download/mbtiles-v1/<id>.mbtiles. '
-                    'Configure abaixo uma URL base própria (ex: https://cdn.seudominio.org/mbtiles) ou deixe em branco para restaurar o padrão.',
+                    'Algumas regiões têm URL própria; as demais usam o catálogo legado, cuja disponibilidade não é garantida. '
+                    'Uma URL base personalizada substitui as URLs padrão; deixe em branco para restaurá-las.',
                     style: TextStyle(fontSize: 12),
                   ),
                   const SizedBox(height: 12),

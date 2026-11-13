@@ -6,6 +6,7 @@ import 'dart:io'
         SecureSocket,
         Socket,
         SocketException,
+        TlsException,
         X509Certificate;
 import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
@@ -333,6 +334,23 @@ class _EnoughMailSession implements JwImapSession {
   }
 }
 
+// Nunca exibir resposta bruta do servidor: pode conter credenciais ou mensagens.
+Future<T> _imapStage<T>(String stage, Future<T> Function() action, Duration timeout) async {
+  try {
+    return await action().timeout(timeout);
+  } on JwEmailException {
+    rethrow;
+  } on TimeoutException {
+    throw JwEmailConnectionException('Tempo esgotado na etapa IMAP: $stage. Confira servidor, porta e rede.');
+  } on TlsException {
+    throw JwEmailConnectionException('Falha TLS na etapa IMAP: $stage. Confira servidor, porta e certificado.');
+  } on SocketException {
+    throw JwEmailConnectionException('Não foi possível conectar ou manter a conexão IMAP na etapa: $stage. Confira servidor, porta e rede.');
+  } catch (_) {
+    throw JwEmailConnectionException('Falha na etapa IMAP: $stage. Confira se o servidor suporta IMAP e a configuração da conta.');
+  }
+}
+
 /// Cliente IMAP com conexão SSL/TLS para importação incremental da INBOX.
 /// Comunicação RFC 3501 autêntica sem sementes fictícias.
 class JwImapClient {
@@ -378,6 +396,26 @@ class JwImapClient {
     return 'imap_${crypto.sha256.convert(utf8.encode(scope))}_$uid';
   }
 
+  /// Verifica login e acesso à INBOX sem baixar nem ler mensagens da caixa.
+  Future<void> verifyConnection({
+    required String host, required int port, required String username,
+    required String password, Duration timeout = const Duration(seconds: 60),
+  }) async {
+    if (kIsWeb) throw const JwEmailConnectionException('IMAP direto não é suportado no navegador.');
+    if (host.trim().isEmpty || username.trim().isEmpty || password.isEmpty || port <= 0 || port > 65535) {
+      throw const JwEmailConnectionException('Informe servidor, porta e credenciais IMAP válidos.');
+    }
+    final session = sessionFactory?.call(timeout) ?? _EnoughMailSession(timeout);
+    try {
+      await _imapStage('conexão e autenticação',
+          () => session.connect(host.trim(), port, username.trim(), password, timeout), timeout);
+      final validity = await _imapStage('abertura da INBOX', session.selectInbox, timeout);
+      if (validity <= 0) throw const JwEmailConnectionException('UIDVALIDITY inválido.');
+    } finally {
+      try { await session.close(); } catch (_) {}
+    }
+  }
+
   /// Compatibilidade para consumidores que precisam de uma lista completa.
   /// A sincronização da Inbox usa a API em páginas para persistir progresso.
   Future<List<JwEmailMessage>> fetchRemoteEmails({
@@ -411,10 +449,11 @@ class JwImapClient {
     }
     final session = sessionFactory?.call(timeout) ?? _EnoughMailSession(timeout);
     try {
-      await session.connect(targetHost, targetPort, username.trim(), password, timeout);
-      final validity = await session.selectInbox().timeout(timeout);
+      await _imapStage('conexão e autenticação',
+          () => session.connect(targetHost, targetPort, username.trim(), password, timeout), timeout);
+      final validity = await _imapStage('abertura da INBOX', session.selectInbox, timeout);
       if (validity <= 0) throw const JwEmailConnectionException('UIDVALIDITY inválido.');
-      final uids = await session.searchUids().timeout(timeout);
+      final uids = await _imapStage('listagem de mensagens', session.searchUids, timeout);
       if (uids.any((uid) => uid <= 0) || uids.toSet().length != uids.length) {
         throw const JwEmailConnectionException('Lista de UIDs IMAP inválida.');
       }
@@ -428,7 +467,8 @@ class JwImapClient {
           throw const JwEmailConnectionException('Filtro de mensagens IMAP inválido.');
         }
         if (wanted.isEmpty) continue;
-        final fetched = await session.fetchUids(page.where(wanted.contains).toList()).timeout(timeout);
+        final fetched = await _imapStage('leitura de mensagens',
+            () => session.fetchUids(page.where(wanted.contains).toList()), timeout);
         final received = fetched.map((item) => item.remoteUid).toSet();
         if (fetched.length != wanted.length || received.contains(null) ||
             received.length != wanted.length || !received.containsAll(wanted)) {

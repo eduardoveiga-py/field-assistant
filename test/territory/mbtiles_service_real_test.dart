@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:ministerio_pessoal/territory/mbtiles/mbtiles_native.dart';
+import 'package:ministerio_pessoal/core/app_version.dart';
 import 'package:ministerio_pessoal/territory/mbtiles/mbtiles_service.dart';
 import 'package:sqlite3/sqlite3.dart' as sql;
 
@@ -61,6 +62,9 @@ void main() {
       expect(solimoes.isInstalled, isFalse);
       expect(solimoes.downloadProgress, equals(0.0));
       expect(backend.isRegionInstalled('br_am_solimoes'), isFalse);
+      expect(service.resolveDownloadUrl(solimoes),
+          'https://github.com/${AppVersion.githubRepo}/releases/download/v1.3.4/br_am_solimoes.mbtiles');
+      expect(solimoes.sizeBytes, 264892416);
     });
 
     test(
@@ -71,7 +75,8 @@ void main() {
 
       final mockClient = MockClient.streaming((request, stream) async {
         expect(request.method, equals('GET'));
-        expect(request.url.path, contains('br_am_solimoes.mbtiles'));
+        expect(request.url.toString(),
+            'https://github.com/${AppVersion.githubRepo}/releases/download/v1.3.4/br_am_solimoes.mbtiles');
 
         // Stream the valid MBTiles bytes in 3 discrete chunks
         final chunkSize = (validMbtilesBytes.length / 3).ceil();
@@ -263,7 +268,7 @@ void main() {
         freshService.resolveDownloadUrl(
           freshService.currentRegions.firstWhere((r) => r.id == 'br_am_solimoes'),
         ),
-        endsWith('/releases/download/mbtiles-v1/br_am_solimoes.mbtiles'),
+        endsWith('/releases/download/v1.3.4/br_am_solimoes.mbtiles'),
       );
 
       freshService.dispose();

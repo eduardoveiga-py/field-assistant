@@ -2036,7 +2036,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     try {
       if (includeImap) {
         const imapClient = JwImapClient();
-        await imapClient.fetchRemoteEmails(
+        await imapClient.verifyConnection(
           host: imapHost,
           port: imapPort,
           username: email,
@@ -2113,7 +2113,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Configure suas credenciais teocráticas para sincronizar cartas via IMAP (retenção permanente) e enviar mensagens reais via SMTP autenticado (STARTTLS/SSL).',
+              'Use os servidores e portas IMAP e SMTP fornecidos pelo seu provedor. Exchange ActiveSync não é IMAP/SMTP; o teste não valida esse protocolo. O teste IMAP verifica acesso à INBOX sem baixar mensagens.',
               style: TextStyle(
                 fontSize: 12,
                 color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted,

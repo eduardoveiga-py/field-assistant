@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:drift/native.dart';
@@ -9,20 +11,31 @@ import 'package:ministerio_pessoal/database/app_database.dart';
 import 'package:ministerio_pessoal/inbox/jw_email_service.dart';
 
 class FakeSession implements JwImapSession {
-  FakeSession(this.uids, {this.validity = 7, this.failPage, this.incompletePage});
+  FakeSession(this.uids, {this.validity = 7, this.failPage, this.incompletePage, this.connectError, this.selectError});
   final List<int> uids;
   final int validity;
   final int? failPage;
   final int? incompletePage;
+  final Object? connectError;
+  final Object? selectError;
+  bool searched = false;
   final List<List<int>> fetched = [];
   bool closed = false;
 
   @override
-  Future<void> connect(String host, int port, String username, String password, Duration timeout) async {}
+  Future<void> connect(String host, int port, String username, String password, Duration timeout) async {
+    if (connectError != null) throw connectError!;
+  }
   @override
-  Future<int> selectInbox() async => validity;
+  Future<int> selectInbox() async {
+    if (selectError != null) throw selectError!;
+    return validity;
+  }
   @override
-  Future<List<int>> searchUids() async => List.of(uids.reversed);
+  Future<List<int>> searchUids() async {
+    searched = true;
+    return List.of(uids.reversed);
+  }
   @override
   Future<List<JwEmailMessage>> fetchUids(List<int> ids) async {
     fetched.add(List.of(ids));
@@ -48,6 +61,41 @@ void main() {
     db: db, biometricAuth: BiometricAuthService(),
     imapClient: JwImapClient(sessionFactory: (_) => session),
   );
+
+  test('verificação IMAP acessa INBOX sem listar ou baixar mensagens', () async {
+    final session = FakeSession(List.generate(1000, (i) => i + 1));
+    await JwImapClient(sessionFactory: (_) => session).verifyConnection(
+      host: 'imap.example.org', port: 993, username: 'a@example.org', password: 'secret');
+    expect(session.searched, isFalse);
+    expect(session.fetched, isEmpty);
+    expect(session.closed, isTrue);
+  });
+
+  test('falhas IMAP identificam etapa e não revelam conteúdo da exceção', () async {
+    for (final entry in <(Object, String)>[
+      (const SocketException('secret'), 'conexão e autenticação'),
+      (TimeoutException('secret'), 'conexão e autenticação'),
+    ]) {
+      final session = FakeSession([], connectError: entry.$1);
+      await expectLater(
+        JwImapClient(sessionFactory: (_) => session).verifyConnection(
+          host: 'imap.example.org', port: 993, username: 'a@example.org', password: 'secret'),
+        throwsA(isA<JwEmailConnectionException>()
+            .having((e) => e.message, 'etapa', contains(entry.$2))
+            .having((e) => e.message, 'sigilo', isNot(contains('secret')))),
+      );
+      expect(session.closed, isTrue);
+    }
+    final session = FakeSession([], selectError: StateError('secret'));
+    await expectLater(
+      JwImapClient(sessionFactory: (_) => session).verifyConnection(
+        host: 'imap.example.org', port: 993, username: 'a@example.org', password: 'secret'),
+      throwsA(isA<JwEmailConnectionException>()
+          .having((e) => e.message, 'etapa', contains('abertura da INBOX'))
+          .having((e) => e.message, 'sigilo', isNot(contains('secret')))),
+    );
+    expect(session.closed, isTrue);
+  });
 
   test('importa mais de 25, pagina e não baixa UIDs já persistidos', () async {
     final ids = List.generate(73, (i) => i + 1);
