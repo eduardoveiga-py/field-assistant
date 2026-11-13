@@ -58,3 +58,45 @@ jobs:
             python3 tool/ci_diagnostics_summary.py test /tmp/tests.txt
           fi
           exit "$status"
+  build_windows_check:
+    name: Windows compilation check (no credentials)
+    needs: [tests]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter config --enable-windows-desktop
+      - run: flutter pub get
+      - name: Compile Windows
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          flutter build windows --release 2>&1 | Tee-Object -FilePath build-check.txt
+          $code = $LASTEXITCODE
+          if ($code -ne 0) { python tool/ci_diagnostics_summary.py test build-check.txt }
+          exit $code
+  build_ios_check:
+    name: iOS compilation check (unsigned, no credentials)
+    needs: [tests]
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Compile iOS without signing
+        shell: bash
+        run: |
+          set +e
+          flutter build ios --no-codesign --release > /tmp/ios-build.txt 2>&1
+          status=$?
+          cat /tmp/ios-build.txt
+          if [ "$status" -ne 0 ]; then
+            python3 tool/ci_diagnostics_summary.py test /tmp/ios-build.txt
+          fi
+          exit "$status"

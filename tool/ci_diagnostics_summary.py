@@ -13,6 +13,7 @@ if mode == 'analyze':
     selected = [f'Errors/warnings: {len(relevant)}. Informational diagnostics: {len(info_lines)}.',
                 'Info categories: ' + ', '.join(f'{k}: {v}' for k, v in counts.most_common())]
     selected += relevant[:50]
+    selected += [line for line in info_lines if '|DEPRECATED_MEMBER_USE|' not in line][:30]
 else:
     failures = [i for i, line in enumerate(lines) if '[E]' in line]
     names = [lines[i] for i in failures]
