@@ -2,9 +2,23 @@ import 'package:flutter/foundation.dart';
 
 /// Utilitário central de logging técnico para diagnóstico sem exposição de PII.
 class AppLogger {
-  static void debug(String message) {
+  static void debug(
+    String message, [
+    Object? errorOrStack,
+    StackTrace? stackTrace,
+  ]) {
     if (kDebugMode) {
-      debugPrint('[DEBUG] $message');
+      if (errorOrStack is StackTrace && stackTrace == null) {
+        debugPrint('[DEBUG] $message');
+        debugPrint(errorOrStack.toString());
+      } else {
+        debugPrint(
+          '[DEBUG] $message${errorOrStack != null ? ' : $errorOrStack' : ''}',
+        );
+        if (stackTrace != null) {
+          debugPrint(stackTrace.toString());
+        }
+      }
     }
   }
 

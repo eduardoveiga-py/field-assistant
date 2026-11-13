@@ -4,9 +4,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../core/app_logger.dart';
 import '../core/app_theme.dart';
+import '../ui/widgets/managed_text_controllers.dart';
 
 // Helper Web para seleção de arquivos diretamente via HTML se estiver no navegador
+import 'media_file_image.dart';
 import 'media_web_stub.dart' if (dart.library.js_interop) 'media_web_impl.dart';
 
 class MediaPickerHelper {
@@ -17,10 +20,12 @@ class MediaPickerHelper {
   }) async {
     return showDialog<String>(
       context: context,
-      builder: (ctx) {
-        final urlController = TextEditingController();
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: const [''],
+        builder: (ctx, ctrls) {
+          final urlController = ctrls[0];
 
-        return AlertDialog(
+          return AlertDialog(
           title: Row(
             children: [
               const Icon(Icons.add_a_photo, color: AppTheme.primaryBlue),
@@ -73,9 +78,9 @@ class MediaPickerHelper {
                         final picker = ImagePicker();
                         final XFile? file = await picker.pickImage(
                           source: ImageSource.camera,
-                          maxWidth: 1920,
-                          maxHeight: 1920,
-                          imageQuality: 85,
+                          maxWidth: 1280,
+                          maxHeight: 1280,
+                          imageQuality: 80,
                         );
                         if (file != null) {
                           final bytes = await file.readAsBytes();
@@ -140,9 +145,9 @@ class MediaPickerHelper {
                         final picker = ImagePicker();
                         final XFile? file = await picker.pickImage(
                           source: ImageSource.gallery,
-                          maxWidth: 1920,
-                          maxHeight: 1920,
-                          imageQuality: 85,
+                          maxWidth: 1280,
+                          maxHeight: 1280,
+                          imageQuality: 80,
                         );
                         if (file != null) {
                           final bytes = await file.readAsBytes();
@@ -237,7 +242,8 @@ class MediaPickerHelper {
             ),
           ],
         );
-      },
+        },
+      ),
     );
   }
 
@@ -380,7 +386,8 @@ class MediaPickerHelper {
           height: height,
           errorBuilder: (context, error, stackTrace) => _buildPlaceholderIcon(),
         );
-      } catch (_) {
+      } catch (e, st) {
+        AppLogger.debug('Falha ao decodificar data URL de imagem: $e', st);
         return _buildPlaceholderIcon();
       }
     } else if (clean.startsWith('http://') || clean.startsWith('https://')) {
@@ -391,11 +398,17 @@ class MediaPickerHelper {
         height: height,
         errorBuilder: (context, error, stackTrace) => _buildPlaceholderIcon(),
       );
+    } else if (_looksLikeFilePath(clean)) {
+      return buildLocalFileImage(
+        clean,
+        fit: fit,
+        width: width,
+        height: height,
+        fallback: _buildPlaceholderIcon,
+      );
     } else {
-      // Tenta decodificar como base64 puro somente se não for um caminho com barras/pontos
-      if (!clean.contains('/') &&
-          !clean.contains('\\') &&
-          !clean.contains(':')) {
+      // Tenta decodificar como base64 puro
+      if (!clean.contains(':')) {
         try {
           final bytes = base64Decode(clean);
           return Image.memory(
@@ -406,10 +419,24 @@ class MediaPickerHelper {
             errorBuilder: (context, error, stackTrace) =>
                 _buildPlaceholderIcon(),
           );
-        } catch (_) {}
+        } catch (e, st) {
+          AppLogger.debug('Texto não é imagem Base64 válida: $e', st);
+        }
       }
       return _buildPlaceholderIcon();
     }
+  }
+
+  static bool _looksLikeFilePath(String value) {
+    if (value.startsWith('/') || value.startsWith(r'\\')) return true;
+    if (RegExp(r'^[a-zA-Z]:[\\/]').hasMatch(value)) return true;
+    final lower = value.toLowerCase();
+    return lower.endsWith('.jpg') ||
+        lower.endsWith('.jpeg') ||
+        lower.endsWith('.png') ||
+        lower.endsWith('.webp') ||
+        lower.endsWith('.gif') ||
+        lower.endsWith('.heic');
   }
 
   static Widget buildThumbnail(

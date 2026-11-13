@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/app_logger.dart';
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../../database/app_database.dart';
@@ -19,6 +20,7 @@ import '../../contacts/recent_seeds_helper.dart';
 import '../widgets/recent_seed_badge.dart';
 import '../widgets/screen_hero_accent_band.dart';
 import '../widgets/add_person_dialog.dart';
+import '../widgets/managed_text_controllers.dart';
 
 export '../widgets/add_person_dialog.dart';
 
@@ -34,6 +36,34 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
   final TextEditingController _searchController = TextEditingController();
   late String _selectedFilter;
   String? _selectedTag;
+  List<BibleStudyEntry>? _lastStudiesRef;
+  List<StudyParticipantEntry>? _lastParticipantsRef;
+  Map<String, List<BibleStudyEntry>> _cachedPersonStudies = const {};
+
+  Map<String, List<BibleStudyEntry>> _getPersonStudiesMap(
+    List<BibleStudyEntry> allStudies,
+    List<StudyParticipantEntry> allParticipants,
+  ) {
+    if (identical(_lastStudiesRef, allStudies) &&
+        identical(_lastParticipantsRef, allParticipants)) {
+      return _cachedPersonStudies;
+    }
+    final studiesById = {
+      for (final s in allStudies)
+        if (s.deletedAt == null) s.id: s,
+    };
+    final map = <String, List<BibleStudyEntry>>{};
+    for (final part in allParticipants) {
+      final study = studiesById[part.studyId];
+      if (study != null) {
+        map.putIfAbsent(part.personId, () => []).add(study);
+      }
+    }
+    _lastStudiesRef = allStudies;
+    _lastParticipantsRef = allParticipants;
+    _cachedPersonStudies = map;
+    return map;
+  }
 
   @override
   void initState() {
@@ -58,7 +88,9 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
               .map((e) => e.toString().trim())
               .where((s) => s.isNotEmpty)
               .toList();
-        } catch (_) {}
+        } catch (e, st) {
+          AppLogger.debug('Tags não-JSON em ${person.id}: $e', st);
+        }
       } else {
         currentTags = person.tags
             .split(',')
@@ -68,117 +100,122 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
       }
     }
 
-    final tagController = TextEditingController();
-
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) {
-          return AlertDialog(
-            title: Row(
-              children: [
-                const Icon(Icons.label, color: AppTheme.primaryBlue),
-                const SizedBox(width: 8),
-                Expanded(child: Text('Etiquetas de ${person.name}')),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Gerencie tags para organizar contatos por afinidade, idioma ou situação:',
-                    style: TextStyle(fontSize: 12),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: const [''],
+        builder: (ctx, ctrls) {
+          final tagController = ctrls[0];
+
+          return StatefulBuilder(
+            builder: (ctx, setDialogState) {
+              return AlertDialog(
+                title: Row(
+                  children: [
+                    const Icon(Icons.label, color: AppTheme.primaryBlue),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text('Etiquetas de ${person.name}')),
+                  ],
+                ),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: TextField(
-                          controller: tagController,
-                          decoration: const InputDecoration(
-                            labelText: 'Nova Etiqueta',
-                            hintText: 'Ex: Jovem, Idoso, Espanhol, Cartas',
+                      const Text(
+                        'Gerencie tags para organizar contatos por afinidade, idioma ou situação:',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: tagController,
+                              decoration: const InputDecoration(
+                                labelText: 'Nova Etiqueta',
+                                hintText: 'Ex: Jovem, Idoso, Espanhol, Cartas',
+                              ),
+                              onSubmitted: (val) {
+                                final t = val.trim();
+                                if (t.isNotEmpty && !currentTags.contains(t)) {
+                                  setDialogState(() {
+                                    currentTags.add(t);
+                                    tagController.clear();
+                                  });
+                                }
+                              },
+                            ),
                           ),
-                          onSubmitted: (val) {
-                            final t = val.trim();
-                            if (t.isNotEmpty && !currentTags.contains(t)) {
-                              setDialogState(() {
-                                currentTags.add(t);
-                                tagController.clear();
-                              });
-                            }
-                          },
-                        ),
+                          const SizedBox(width: 8),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.add_circle,
+                              color: AppTheme.primaryBlue,
+                              size: 28,
+                            ),
+                            onPressed: () {
+                              final t = tagController.text.trim();
+                              if (t.isNotEmpty && !currentTags.contains(t)) {
+                                setDialogState(() {
+                                  currentTags.add(t);
+                                  tagController.clear();
+                                });
+                              }
+                            },
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.add_circle,
-                          color: AppTheme.primaryBlue,
-                          size: 28,
+                      const SizedBox(height: 14),
+                      if (currentTags.isEmpty)
+                        const Text(
+                          'Nenhuma etiqueta cadastrada.',
+                          style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                        )
+                      else
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: currentTags.map((t) {
+                            return Chip(
+                              label: Text(t),
+                              deleteIcon: const Icon(Icons.close, size: 16),
+                              onDeleted: () {
+                                setDialogState(() {
+                                  currentTags.remove(t);
+                                });
+                              },
+                            );
+                          }).toList(),
                         ),
-                        onPressed: () {
-                          final t = tagController.text.trim();
-                          if (t.isNotEmpty && !currentTags.contains(t)) {
-                            setDialogState(() {
-                              currentTags.add(t);
-                              tagController.clear();
-                            });
-                          }
-                        },
-                      ),
                     ],
                   ),
-                  const SizedBox(height: 14),
-                  if (currentTags.isEmpty)
-                    const Text(
-                      'Nenhuma etiqueta cadastrada.',
-                      style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
-                    )
-                  else
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: currentTags.map((t) {
-                        return Chip(
-                          label: Text(t),
-                          deleteIcon: const Icon(Icons.close, size: 16),
-                          onDeleted: () {
-                            setDialogState(() {
-                              currentTags.remove(t);
-                            });
-                          },
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Cancelar'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () async {
+                      final repo = ref.read(repositoryProvider);
+                      await repo.updatePerson(
+                        person.copyWith(tags: jsonEncode(currentTags)),
+                      );
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Etiquetas atualizadas com sucesso!'),
+                          ),
                         );
-                      }).toList(),
-                    ),
+                      }
+                    },
+                    child: const Text('Salvar'),
+                  ),
                 ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancelar'),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  final repo = ref.read(repositoryProvider);
-                  await repo.updatePerson(
-                    person.copyWith(tags: jsonEncode(currentTags)),
-                  );
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Etiquetas atualizadas com sucesso!'),
-                      ),
-                    );
-                  }
-                },
-                child: const Text('Salvar'),
-              ),
-            ],
+              );
+            },
           );
         },
       ),
@@ -549,7 +586,9 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                         final s = t.toString().trim();
                         if (s.isNotEmpty) allTags.add(s);
                       }
-                    } catch (_) {}
+                    } catch (e, st) {
+                      AppLogger.debug('Falha ao ler tags JSON de filtro (${p.id}): $e', st);
+                    }
                   } else {
                     for (final part in p.tags.split(',')) {
                       final s = part.trim();
@@ -653,18 +692,11 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
               data: (people) {
                 final query = _searchController.text.trim().toLowerCase();
 
-                // Mapeia personId -> lista de estudos vinculados
-                final Map<String, List<BibleStudyEntry>> personStudies = {};
-                for (final part in allParticipants) {
-                  final study = allStudies
-                      .where((s) => s.id == part.studyId && s.deletedAt == null)
-                      .firstOrNull;
-                  if (study != null) {
-                    personStudies
-                        .putIfAbsent(part.personId, () => [])
-                        .add(study);
-                  }
-                }
+                // Mapeia personId -> lista de estudos vinculados (memoizado O(P + S))
+                final personStudies = _getPersonStudiesMap(
+                  allStudies,
+                  allParticipants,
+                );
 
                 var filtered = people.where((p) {
                   final linkedStudies =
@@ -826,7 +858,9 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                               .map((e) => e.toString().trim())
                               .where((s) => s.isNotEmpty)
                               .toList();
-                        } catch (_) {}
+                        } catch (e, st) {
+                          AppLogger.debug('Falha ao ler tags JSON no card (${person.id}): $e', st);
+                        }
                       } else {
                         personTagList = person.tags
                             .split(',')

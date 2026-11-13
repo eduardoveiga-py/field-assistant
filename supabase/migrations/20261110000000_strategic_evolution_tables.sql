@@ -3,7 +3,26 @@
 -- Versão: 20261110000000
 -- ==============================================================================
 
--- 1. Colunas adicionais em tabelas existentes
+-- 1. Tabela base research_articles (caso ainda não tenha sido criada) e colunas adicionais
+CREATE TABLE IF NOT EXISTS public.research_articles (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    owner_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE DEFAULT auth.uid(),
+    title TEXT NOT NULL,
+    summary TEXT NOT NULL DEFAULT '',
+    content TEXT NOT NULL DEFAULT '',
+    tags JSONB NOT NULL DEFAULT '[]'::jsonb,
+    attachments JSONB NOT NULL DEFAULT '[]'::jsonb,
+    objective TEXT,
+    status TEXT NOT NULL DEFAULT 'active',
+    conclusion TEXT,
+    project_id TEXT,
+    main_question_id TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    deleted_at TIMESTAMPTZ,
+    revision INTEGER NOT NULL DEFAULT 1
+);
+
 ALTER TABLE public.appointments ADD COLUMN IF NOT EXISTS task_id TEXT;
 ALTER TABLE public.research_articles ADD COLUMN IF NOT EXISTS objective TEXT;
 ALTER TABLE public.research_articles ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active';
@@ -34,6 +53,7 @@ CREATE TABLE IF NOT EXISTS public.inbox_entries (
 );
 
 ALTER TABLE public.inbox_entries ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can manage their own inbox_entries" ON public.inbox_entries;
 CREATE POLICY "Users can manage their own inbox_entries"
     ON public.inbox_entries FOR ALL
     USING (auth.uid() = owner_id)
@@ -64,6 +84,7 @@ CREATE TABLE IF NOT EXISTS public.projects (
 );
 
 ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can manage their own projects" ON public.projects;
 CREATE POLICY "Users can manage their own projects"
     ON public.projects FOR ALL
     USING (auth.uid() = owner_id)
@@ -103,6 +124,7 @@ CREATE TABLE IF NOT EXISTS public.tasks (
 );
 
 ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can manage their own tasks" ON public.tasks;
 CREATE POLICY "Users can manage their own tasks"
     ON public.tasks FOR ALL
     USING (auth.uid() = owner_id)
@@ -135,6 +157,7 @@ CREATE TABLE IF NOT EXISTS public.knowledge_notes (
 );
 
 ALTER TABLE public.knowledge_notes ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can manage their own knowledge_notes" ON public.knowledge_notes;
 CREATE POLICY "Users can manage their own knowledge_notes"
     ON public.knowledge_notes FOR ALL
     USING (auth.uid() = owner_id)
@@ -164,6 +187,7 @@ CREATE TABLE IF NOT EXISTS public.knowledge_questions (
 );
 
 ALTER TABLE public.knowledge_questions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can manage their own knowledge_questions" ON public.knowledge_questions;
 CREATE POLICY "Users can manage their own knowledge_questions"
     ON public.knowledge_questions FOR ALL
     USING (auth.uid() = owner_id)
@@ -197,6 +221,7 @@ CREATE TABLE IF NOT EXISTS public.knowledge_documents (
 );
 
 ALTER TABLE public.knowledge_documents ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can manage their own knowledge_documents" ON public.knowledge_documents;
 CREATE POLICY "Users can manage their own knowledge_documents"
     ON public.knowledge_documents FOR ALL
     USING (auth.uid() = owner_id)
@@ -226,6 +251,7 @@ CREATE TABLE IF NOT EXISTS public.knowledge_resources (
 );
 
 ALTER TABLE public.knowledge_resources ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can manage their own knowledge_resources" ON public.knowledge_resources;
 CREATE POLICY "Users can manage their own knowledge_resources"
     ON public.knowledge_resources FOR ALL
     USING (auth.uid() = owner_id)
@@ -238,6 +264,7 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('knowledge_vault', 'knowledge_vault', false)
 ON CONFLICT (id) DO NOTHING;
 
+DROP POLICY IF EXISTS "Users can access their own knowledge_vault storage objects" ON storage.objects;
 CREATE POLICY "Users can access their own knowledge_vault storage objects"
     ON storage.objects
     FOR ALL

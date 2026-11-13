@@ -12,6 +12,7 @@ import '../../ticuna/widgets/ticuna_diacritics_bar.dart';
 import '../../ticuna/widgets/ministry_situational_phrases_sheet.dart';
 import '../providers.dart';
 import '../widgets/adaptive_ministry_sheet.dart';
+import '../widgets/managed_text_controllers.dart';
 import '../widgets/screen_hero_accent_band.dart';
 
 class TicunaScreen extends ConsumerStatefulWidget {
@@ -1084,187 +1085,191 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
         activeLang ?? ref.read(currentActiveLanguageProvider);
     final diacritics = activeDiacritics ?? parseLanguageDiacritics(lang.diacritics);
 
-    final wordController = TextEditingController(text: wordToEdit?.word ?? '');
-    final translationController =
-        TextEditingController(text: wordToEdit?.translation ?? '');
-    final phoneticsController =
-        TextEditingController(text: wordToEdit?.phonetics ?? '');
-    final exampleController =
-        TextEditingController(text: wordToEdit?.exampleSentence ?? '');
-    final exampleTransController =
-        TextEditingController(text: wordToEdit?.exampleTranslation ?? '');
-    final notesController =
-        TextEditingController(text: wordToEdit?.notes ?? '');
-
     String selectedClass = wordToEdit?.grammaticalClass ?? 'Substantivo';
     final selectedTags = List<String>.from(wordToEdit?.tags ?? []);
     final String targetId =
         wordToEdit?.id ?? 'word_${DateTime.now().millisecondsSinceEpoch}';
     String? formAudioPath = wordToEdit?.audioPath;
     int? formAudioDuration = wordToEdit?.audioDurationSeconds;
-
-    // Controlador que recebe o foco de digitação da barra especial
-    TextEditingController activeController = wordController;
+    int activeFieldIndex = 0;
 
     showDialog(
       context: context,
-      builder: (dialogCtx) => StatefulBuilder(
-        builder: (ctx, setDialogState) {
-          final isDark = Theme.of(ctx).brightness == Brightness.dark;
-          return AlertDialog(
-            title: Row(
-              children: [
-                const Icon(Icons.menu_book, color: Color(0xFF0D9488)),
-                const SizedBox(width: 8),
-                Text(
-                  wordToEdit != null
-                      ? (lang.id == 'tca' ? 'Editar Termo Ticuna' : 'Editar Termo (${lang.name})')
-                      : (lang.id == 'tca' ? 'Novo Termo Ticuna' : 'Novo Termo (${lang.name})'),
-                ),
-              ],
-            ),
-            content: SizedBox(
-              width: 520,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+      builder: (dialogCtx) => ManagedTextControllers(
+        initialTexts: [
+          wordToEdit?.word ?? '',
+          wordToEdit?.translation ?? '',
+          wordToEdit?.phonetics ?? '',
+          wordToEdit?.exampleSentence ?? '',
+          wordToEdit?.exampleTranslation ?? '',
+          wordToEdit?.notes ?? '',
+        ],
+        builder: (dialogCtx, ctrls) {
+          final wordController = ctrls[0];
+          final translationController = ctrls[1];
+          final phoneticsController = ctrls[2];
+          final exampleController = ctrls[3];
+          final exampleTransController = ctrls[4];
+          final notesController = ctrls[5];
+
+          return StatefulBuilder(
+            builder: (ctx, setDialogState) {
+              final activeController = ctrls[activeFieldIndex];
+              final isDark = Theme.of(ctx).brightness == Brightness.dark;
+              return AlertDialog(
+                title: Row(
                   children: [
-                    // BARRA DE CARACTERES ESPECIAIS DO IDIOMA
-                    if (diacritics.isNotEmpty) ...[
-                      TicunaDiacriticsBar(
-                        controller: activeController,
-                        diacritics: diacritics,
-                        label: 'Teclas Especiais (${lang.name}):',
-                      ),
-                      const SizedBox(height: 14),
-                    ],
-
-                    // Termo no idioma
-                    TextField(
-                      controller: wordController,
-                      autofocus: true,
-                      style: TicunaUnicodeHelper.textStyle(
-                        fontSize: 16,
-                        color: isDark ? Colors.white : Colors.black87,
-                      ),
-                      inputFormatters: const [TicunaInputFormatter()],
-                      decoration: InputDecoration(
-                        labelText: lang.id == 'tca'
-                            ? 'Palavra ou Termo em Ticuna *'
-                            : 'Palavra ou Termo (${lang.name}) *',
-                        hintText: 'Ex: Taemãẽ, Tamaü, Tupana, Duü̃...',
-                      ),
-                      onTap: () => setDialogState(() => activeController = wordController),
+                    const Icon(Icons.menu_book, color: Color(0xFF0D9488)),
+                    const SizedBox(width: 8),
+                    Text(
+                      wordToEdit != null
+                          ? (lang.id == 'tca' ? 'Editar Termo Ticuna' : 'Editar Termo (${lang.name})')
+                          : (lang.id == 'tca' ? 'Novo Termo Ticuna' : 'Novo Termo (${lang.name})'),
                     ),
-                    const SizedBox(height: 10),
-
-                    // Tradução em Português
-                    TextField(
-                      controller: translationController,
-                      decoration: const InputDecoration(
-                        labelText: 'Tradução em Português *',
-                        hintText: 'Ex: Obrigado, Olá, Deus, Pessoa...',
-                      ),
-                      onTap: () =>
-                          setDialogState(() => activeController = translationController),
-                    ),
-                    const SizedBox(height: 10),
-
-                    // Pronúncia / Fonética & Classe Gramatical
-                    Row(
+                  ],
+                ),
+                content: SizedBox(
+                  width: 520,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          flex: 3,
-                          child: TextField(
-                            controller: phoneticsController,
-                            style: TicunaUnicodeHelper.textStyle(
-                              fontSize: 14,
-                              color: isDark ? Colors.white : Colors.black87,
+                        // BARRA DE CARACTERES ESPECIAIS DO IDIOMA
+                        if (diacritics.isNotEmpty) ...[
+                          TicunaDiacriticsBar(
+                            controller: activeController,
+                            diacritics: diacritics,
+                            label: 'Teclas Especiais (${lang.name}):',
+                          ),
+                          const SizedBox(height: 14),
+                        ],
+
+                        // Termo no idioma
+                        TextField(
+                          controller: wordController,
+                          autofocus: true,
+                          style: TicunaUnicodeHelper.textStyle(
+                            fontSize: 16,
+                            color: isDark ? Colors.white : Colors.black87,
+                          ),
+                          inputFormatters: const [TicunaInputFormatter()],
+                          decoration: InputDecoration(
+                            labelText: lang.id == 'tca'
+                                ? 'Palavra ou Termo em Ticuna *'
+                                : 'Palavra ou Termo (${lang.name}) *',
+                            hintText: 'Ex: Taemãẽ, Tamaü, Tupana, Duü̃...',
+                          ),
+                          onTap: () => setDialogState(() => activeFieldIndex = 0),
+                        ),
+                        const SizedBox(height: 10),
+
+                        // Tradução em Português
+                        TextField(
+                          controller: translationController,
+                          decoration: const InputDecoration(
+                            labelText: 'Tradução em Português *',
+                            hintText: 'Ex: Obrigado, Olá, Deus, Pessoa...',
+                          ),
+                          onTap: () =>
+                              setDialogState(() => activeFieldIndex = 1),
+                        ),
+                        const SizedBox(height: 10),
+
+                        // Pronúncia / Fonética & Classe Gramatical
+                        Row(
+                          children: [
+                            Expanded(
+                              flex: 3,
+                              child: TextField(
+                                controller: phoneticsController,
+                                style: TicunaUnicodeHelper.textStyle(
+                                  fontSize: 14,
+                                  color: isDark ? Colors.white : Colors.black87,
+                                ),
+                                inputFormatters: const [TicunaInputFormatter()],
+                                decoration: const InputDecoration(
+                                  labelText: 'Pronúncia / Tons (Opcional)',
+                                  hintText: 'Ex: ta-e-mã-ẽ [tom alto]',
+                                ),
+                                onTap: () => setDialogState(
+                                  () => activeFieldIndex = 2,
+                                ),
+                              ),
                             ),
-                            inputFormatters: const [TicunaInputFormatter()],
-                            decoration: const InputDecoration(
-                              labelText: 'Pronúncia / Tons (Opcional)',
-                              hintText: 'Ex: ta-e-mã-ẽ [tom alto]',
+                            const SizedBox(width: 8),
+                            Expanded(
+                              flex: 2,
+                              child: DropdownButtonFormField<String>(
+                                isExpanded: true,
+                                initialValue: selectedClass,
+                                decoration: const InputDecoration(
+                                  labelText: 'Classe',
+                                ),
+                                items: const [
+                                  'Substantivo',
+                                  'Verbo',
+                                  'Adjetivo',
+                                  'Advérbio',
+                                  'Pronome',
+                                  'Saudação',
+                                  'Interjeição',
+                                  'Outro',
+                                ].map((c) {
+                                  return DropdownMenuItem(value: c, child: Text(c));
+                                }).toList(),
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    setDialogState(() => selectedClass = val);
+                                  }
+                                },
+                              ),
                             ),
-                            onTap: () => setDialogState(
-                              () => activeController = phoneticsController,
-                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+
+                        // Frase de Exemplo em Ticuna
+                        TextField(
+                          controller: exampleController,
+                          style: TicunaUnicodeHelper.textStyle(
+                            fontSize: 14,
+                            color: isDark ? Colors.white : Colors.black87,
+                          ),
+                          inputFormatters: const [TicunaInputFormatter()],
+                          decoration: const InputDecoration(
+                            labelText: 'Exemplo de Frase em Ticuna',
+                            hintText: 'Ex: Taemãẽ Tupana',
+                          ),
+                          onTap: () =>
+                              setDialogState(() => activeFieldIndex = 3),
+                        ),
+                        const SizedBox(height: 10),
+
+                        // Tradução da Frase de Exemplo
+                        TextField(
+                          controller: exampleTransController,
+                          decoration: const InputDecoration(
+                            labelText: 'Tradução da Frase de Exemplo',
+                            hintText: 'Ex: Muito obrigado a Deus',
+                          ),
+                          onTap: () => setDialogState(
+                            () => activeFieldIndex = 4,
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          flex: 2,
-                          child: DropdownButtonFormField<String>(
-                            isExpanded: true,
-                            initialValue: selectedClass,
-                            decoration: const InputDecoration(
-                              labelText: 'Classe',
-                            ),
-                            items: const [
-                              'Substantivo',
-                              'Verbo',
-                              'Adjetivo',
-                              'Advérbio',
-                              'Pronome',
-                              'Saudação',
-                              'Interjeição',
-                              'Outro',
-                            ].map((c) {
-                              return DropdownMenuItem(value: c, child: Text(c));
-                            }).toList(),
-                            onChanged: (val) {
-                              if (val != null) {
-                                setDialogState(() => selectedClass = val);
-                              }
-                            },
+                        const SizedBox(height: 10),
+
+                        // Observações / Contexto
+                        TextField(
+                          controller: notesController,
+                          maxLines: 2,
+                          decoration: const InputDecoration(
+                            labelText: 'Observações / Contexto Teocrático',
+                            hintText: 'Ex: Usar com respeito ao falar sobre o Reino...',
                           ),
+                          onTap: () =>
+                              setDialogState(() => activeFieldIndex = 5),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-
-                    // Frase de Exemplo em Ticuna
-                    TextField(
-                      controller: exampleController,
-                      style: TicunaUnicodeHelper.textStyle(
-                        fontSize: 14,
-                        color: isDark ? Colors.white : Colors.black87,
-                      ),
-                      inputFormatters: const [TicunaInputFormatter()],
-                      decoration: const InputDecoration(
-                        labelText: 'Exemplo de Frase em Ticuna',
-                        hintText: 'Ex: Taemãẽ Tupana',
-                      ),
-                      onTap: () =>
-                          setDialogState(() => activeController = exampleController),
-                    ),
-                    const SizedBox(height: 10),
-
-                    // Tradução da Frase de Exemplo
-                    TextField(
-                      controller: exampleTransController,
-                      decoration: const InputDecoration(
-                        labelText: 'Tradução da Frase de Exemplo',
-                        hintText: 'Ex: Muito obrigado a Deus',
-                      ),
-                      onTap: () => setDialogState(
-                        () => activeController = exampleTransController,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-
-                    // Observações / Contexto
-                    TextField(
-                      controller: notesController,
-                      maxLines: 2,
-                      decoration: const InputDecoration(
-                        labelText: 'Observações / Contexto Teocrático',
-                        hintText: 'Ex: Usar com respeito ao falar sobre o Reino...',
-                      ),
-                      onTap: () =>
-                          setDialogState(() => activeController = notesController),
-                    ),
                     const SizedBox(height: 12),
 
                     // Pronúncia em Áudio Ticuna
@@ -1395,6 +1400,8 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
             ],
           );
         },
+      );
+        },
       ),
     );
   }
@@ -1414,147 +1421,152 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
         activeLang ?? ref.read(currentActiveLanguageProvider);
     final diacritics = activeDiacritics ?? parseLanguageDiacritics(lang.diacritics);
 
-    final phraseController = TextEditingController(text: phraseToEdit?.phrase ?? '');
-    final translationController =
-        TextEditingController(text: phraseToEdit?.translation ?? '');
-    final phoneticsController =
-        TextEditingController(text: phraseToEdit?.phonetics ?? '');
-    final notesController =
-        TextEditingController(text: phraseToEdit?.notes ?? '');
-
     String selectedCategory = phraseToEdit?.category ?? 'Ministério de Casa em Casa';
     final selectedTags = List<String>.from(phraseToEdit?.tags ?? []);
     final String targetId =
         phraseToEdit?.id ?? 'phrase_${DateTime.now().millisecondsSinceEpoch}';
     String? formAudioPath = phraseToEdit?.audioPath;
     int? formAudioDuration = phraseToEdit?.audioDurationSeconds;
-
-    TextEditingController activeController = phraseController;
+    int activeFieldIndex = 0;
 
     showDialog(
       context: context,
-      builder: (dialogCtx) => StatefulBuilder(
-        builder: (ctx, setDialogState) {
-          final isDark = Theme.of(ctx).brightness == Brightness.dark;
-          return AlertDialog(
-            title: Row(
-              children: [
-                const Icon(Icons.forum_outlined, color: Color(0xFF0D9488)),
-                const SizedBox(width: 8),
-                Text(
-                  phraseToEdit != null
-                      ? (lang.id == 'tca' ? 'Editar Frase Útil Ticuna' : 'Editar Frase Útil (${lang.name})')
-                      : (lang.id == 'tca' ? 'Nova Frase Útil Ticuna' : 'Nova Frase Útil (${lang.name})'),
-                ),
-              ],
-            ),
-            content: SizedBox(
-              width: 520,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+      builder: (dialogCtx) => ManagedTextControllers(
+        initialTexts: [
+          phraseToEdit?.phrase ?? '',
+          phraseToEdit?.translation ?? '',
+          phraseToEdit?.phonetics ?? '',
+          phraseToEdit?.notes ?? '',
+        ],
+        builder: (dialogCtx, ctrls) {
+          final phraseController = ctrls[0];
+          final translationController = ctrls[1];
+          final phoneticsController = ctrls[2];
+          final notesController = ctrls[3];
+
+          return StatefulBuilder(
+            builder: (ctx, setDialogState) {
+              final activeController = ctrls[activeFieldIndex];
+              final isDark = Theme.of(ctx).brightness == Brightness.dark;
+              return AlertDialog(
+                title: Row(
                   children: [
-                    // BARRA DE CARACTERES ESPECIAIS DO IDIOMA
-                    if (diacritics.isNotEmpty) ...[
-                      TicunaDiacriticsBar(
-                        controller: activeController,
-                        diacritics: diacritics,
-                        label: 'Teclas Especiais (${lang.name}):',
-                      ),
-                      const SizedBox(height: 14),
-                    ],
-
-                    // Frase no idioma
-                    TextField(
-                      controller: phraseController,
-                      autofocus: true,
-                      maxLines: 2,
-                      style: TicunaUnicodeHelper.textStyle(
-                        fontSize: 16,
-                        color: isDark ? Colors.white : Colors.black87,
-                      ),
-                      inputFormatters: const [TicunaInputFormatter()],
-                      decoration: InputDecoration(
-                        labelText: lang.id == 'tca'
-                            ? 'Frase em Ticuna *'
-                            : 'Frase em ${lang.name} *',
-                        hintText: 'Ex: Tamaü! Ku meã pe\'ĩ?',
-                      ),
-                      onTap: () =>
-                          setDialogState(() => activeController = phraseController),
+                    const Icon(Icons.forum_outlined, color: Color(0xFF0D9488)),
+                    const SizedBox(width: 8),
+                    Text(
+                      phraseToEdit != null
+                          ? (lang.id == 'tca' ? 'Editar Frase Útil Ticuna' : 'Editar Frase Útil (${lang.name})')
+                          : (lang.id == 'tca' ? 'Nova Frase Útil Ticuna' : 'Nova Frase Útil (${lang.name})'),
                     ),
-                    const SizedBox(height: 10),
+                  ],
+                ),
+                content: SizedBox(
+                  width: 520,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // BARRA DE CARACTERES ESPECIAIS DO IDIOMA
+                        if (diacritics.isNotEmpty) ...[
+                          TicunaDiacriticsBar(
+                            controller: activeController,
+                            diacritics: diacritics,
+                            label: 'Teclas Especiais (${lang.name}):',
+                          ),
+                          const SizedBox(height: 14),
+                        ],
 
-                    // Tradução em Português
-                    TextField(
-                      controller: translationController,
-                      maxLines: 2,
-                      decoration: const InputDecoration(
-                        labelText: 'Tradução em Português *',
-                        hintText: 'Ex: Olá! Você está bem?',
-                      ),
-                      onTap: () => setDialogState(
-                        () => activeController = translationController,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
+                        // Frase no idioma
+                        TextField(
+                          controller: phraseController,
+                          autofocus: true,
+                          maxLines: 2,
+                          style: TicunaUnicodeHelper.textStyle(
+                            fontSize: 16,
+                            color: isDark ? Colors.white : Colors.black87,
+                          ),
+                          inputFormatters: const [TicunaInputFormatter()],
+                          decoration: InputDecoration(
+                            labelText: lang.id == 'tca'
+                                ? 'Frase em Ticuna *'
+                                : 'Frase em ${lang.name} *',
+                            hintText: 'Ex: Tamaü! Ku meã pe\'ĩ?',
+                          ),
+                          onTap: () =>
+                              setDialogState(() => activeFieldIndex = 0),
+                        ),
+                        const SizedBox(height: 10),
 
-                    // Categoria da Frase
-                    DropdownButtonFormField<String>(
-                      isExpanded: true,
-                      initialValue: selectedCategory,
-                      decoration: const InputDecoration(
-                        labelText: 'Tópico / Categoria de Ministério',
-                      ),
-                      items: const [
-                        'Saudação & Conversa',
-                        'Ministério de Casa em Casa',
-                        'Leitura Bíblica',
-                        'Perguntas de Ponto de Vista',
-                        'Oferecer Estudo',
-                        'Revisita',
-                        'Despedida & Gratidão',
-                        'Outra',
-                      ].map((c) {
-                        return DropdownMenuItem(value: c, child: Text(c));
-                      }).toList(),
-                      onChanged: (val) {
-                        if (val != null) {
-                          setDialogState(() => selectedCategory = val);
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 10),
+                        // Tradução em Português
+                        TextField(
+                          controller: translationController,
+                          maxLines: 2,
+                          decoration: const InputDecoration(
+                            labelText: 'Tradução em Português *',
+                            hintText: 'Ex: Olá! Você está bem?',
+                          ),
+                          onTap: () => setDialogState(
+                            () => activeFieldIndex = 1,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
 
-                    // Pronúncia sugerida
-                    TextField(
-                      controller: phoneticsController,
-                      style: TicunaUnicodeHelper.textStyle(
-                        fontSize: 14,
-                        color: isDark ? Colors.white : Colors.black87,
-                      ),
-                      inputFormatters: const [TicunaInputFormatter()],
-                      decoration: const InputDecoration(
-                        labelText: 'Pronúncia / Guia de Tons (Opcional)',
-                        hintText: 'Ex: ta-ma-ü! ku me-ã pe-ĩ?',
-                      ),
-                      onTap: () => setDialogState(
-                        () => activeController = phoneticsController,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
+                        // Categoria da Frase
+                        DropdownButtonFormField<String>(
+                          isExpanded: true,
+                          initialValue: selectedCategory,
+                          decoration: const InputDecoration(
+                            labelText: 'Tópico / Categoria de Ministério',
+                          ),
+                          items: const [
+                            'Saudação & Conversa',
+                            'Ministério de Casa em Casa',
+                            'Leitura Bíblica',
+                            'Perguntas de Ponto de Vista',
+                            'Oferecer Estudo',
+                            'Revisita',
+                            'Despedida & Gratidão',
+                            'Outra',
+                          ].map((c) {
+                            return DropdownMenuItem(value: c, child: Text(c));
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null) {
+                              setDialogState(() => selectedCategory = val);
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 10),
 
-                    // Observações / Texto Bíblico
-                    TextField(
-                      controller: notesController,
-                      decoration: const InputDecoration(
-                        labelText: 'Observação / Texto Bíblico de Referência',
-                        hintText: 'Ex: Usar com Salmo 37:29...',
-                      ),
-                      onTap: () =>
-                          setDialogState(() => activeController = notesController),
-                    ),
+                        // Pronúncia sugerida
+                        TextField(
+                          controller: phoneticsController,
+                          style: TicunaUnicodeHelper.textStyle(
+                            fontSize: 14,
+                            color: isDark ? Colors.white : Colors.black87,
+                          ),
+                          inputFormatters: const [TicunaInputFormatter()],
+                          decoration: const InputDecoration(
+                            labelText: 'Pronúncia / Guia de Tons (Opcional)',
+                            hintText: 'Ex: ta-ma-ü! ku me-ã pe-ĩ?',
+                          ),
+                          onTap: () => setDialogState(
+                            () => activeFieldIndex = 2,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+
+                        // Observações / Texto Bíblico
+                        TextField(
+                          controller: notesController,
+                          decoration: const InputDecoration(
+                            labelText: 'Observação / Texto Bíblico de Referência',
+                            hintText: 'Ex: Usar com Salmo 37:29...',
+                          ),
+                          onTap: () =>
+                              setDialogState(() => activeFieldIndex = 3),
+                        ),
                     const SizedBox(height: 12),
 
                     // Pronúncia em Áudio Ticuna
@@ -1678,6 +1690,8 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
               ),
             ],
           );
+        },
+      );
         },
       ),
     );
@@ -2053,7 +2067,6 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
 
   void _showImportExportModal(BuildContext context) {
     final repo = ref.read(ticunaRepositoryProvider);
-    final jsonController = TextEditingController();
     bool replaceExisting = false;
 
     showModalBottomSheet(
@@ -2062,8 +2075,12 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (sheetCtx) => SafeArea(
-        child: StatefulBuilder(
+      builder: (sheetCtx) => ManagedTextControllers(
+        initialTexts: const [''],
+        builder: (sheetCtx, ctrls) {
+          final jsonController = ctrls[0];
+          return SafeArea(
+            child: StatefulBuilder(
           builder: (ctx, setSheetState) {
             return Padding(
               padding: EdgeInsets.only(
@@ -2260,6 +2277,8 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
             );
           },
         ),
+      );
+        },
       ),
     );
   }
@@ -2269,102 +2288,108 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
   // ==========================================
 
   void _showManageTagsModal(BuildContext context, List<TicunaTag> tags) {
-    final newTagController = TextEditingController();
     final repo = ref.read(ticunaRepositoryProvider);
 
     showDialog(
       context: context,
-      builder: (tagCtx) => StatefulBuilder(
-        builder: (ctx, setTagState) {
-          return AlertDialog(
-            title: const Row(
-              children: [
-                Icon(Icons.label, color: Color(0xFF0D9488)),
-                SizedBox(width: 8),
-                Text('Gerenciar Tags Ticuna'),
-              ],
-            ),
-            content: SizedBox(
-              width: 400,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
+      builder: (tagCtx) => ManagedTextControllers(
+        initialTexts: const [''],
+        builder: (tagCtx, ctrls) {
+          final newTagController = ctrls[0];
+
+          return StatefulBuilder(
+            builder: (ctx, setTagState) {
+              return AlertDialog(
+                title: const Row(
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: newTagController,
-                            decoration: const InputDecoration(
-                              labelText: 'Nova Tag',
-                              hintText: 'Ex: Animais, Alimentos, Oração...',
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF0D9488),
-                            foregroundColor: Colors.white,
-                          ),
-                          onPressed: () async {
-                            final name = newTagController.text.trim();
-                            if (name.isNotEmpty) {
-                              await repo.addTag(name);
-                              newTagController.clear();
-                              if (tagCtx.mounted) Navigator.pop(tagCtx);
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Tag "$name" adicionada!')),
-                                );
-                              }
-                            }
-                          },
-                          child: const Text('Adicionar'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    const Divider(),
-                    const Text(
-                      'Tags Cadastradas:',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    ...tags.map((t) {
-                      return ListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(
-                          Icons.label_outline,
-                          size: 18,
-                          color: Color(0xFF0D9488),
-                        ),
-                        title: Text(t.name),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
-                          onPressed: () async {
-                            await repo.deleteTag(t.id);
-                            if (tagCtx.mounted) Navigator.pop(tagCtx);
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Tag "${t.name}" removida!')),
-                              );
-                            }
-                          },
-                        ),
-                      );
-                    }),
+                    Icon(Icons.label, color: Color(0xFF0D9488)),
+                    SizedBox(width: 8),
+                    Text('Gerenciar Tags Ticuna'),
                   ],
                 ),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(tagCtx),
-                child: const Text('Fechar'),
-              ),
-            ],
+                content: SizedBox(
+                  width: 400,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: newTagController,
+                                decoration: const InputDecoration(
+                                  labelText: 'Nova Tag',
+                                  hintText: 'Ex: Animais, Alimentos, Oração...',
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF0D9488),
+                                foregroundColor: Colors.white,
+                              ),
+                              onPressed: () async {
+                                final name = newTagController.text.trim();
+                                if (name.isNotEmpty) {
+                                  await repo.addTag(name);
+                                  newTagController.clear();
+                                  if (tagCtx.mounted) Navigator.pop(tagCtx);
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Tag "$name" adicionada!')),
+                                    );
+                                  }
+                                }
+                              },
+                              child: const Text('Adicionar'),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        const Divider(),
+                        const Text(
+                          'Tags Cadastradas:',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 8),
+                        ...tags.map((t) {
+                          return ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            leading: const Icon(
+                              Icons.label_outline,
+                              size: 18,
+                              color: Color(0xFF0D9488),
+                            ),
+                            title: Text(t.name),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                              onPressed: () async {
+                                await repo.deleteTag(t.id);
+                                if (tagCtx.mounted) Navigator.pop(tagCtx);
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Tag "${t.name}" removida!')),
+                                  );
+                                }
+                              },
+                            ),
+                          );
+                        }),
+                      ],
+                    ),
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(tagCtx),
+                    child: const Text('Fechar'),
+                  ),
+                ],
+              );
+            },
           );
         },
       ),
@@ -2575,165 +2600,170 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
   }
 
   void _showAddLanguageDialog(BuildContext context) {
-    final nameCtrl = TextEditingController();
-    final codeCtrl = TextEditingController();
-    final symbolCtrl = TextEditingController();
-    final diacriticsCtrl = TextEditingController();
-
     showDialog(
       context: context,
-      builder: (dialogCtx) => StatefulBuilder(
-        builder: (ctx, setDialogState) {
-          void applyPreset(LanguageMetadata preset) {
-            setDialogState(() {
-              nameCtrl.text = '${preset.name} (${preset.nativeName})';
-              codeCtrl.text = preset.code;
-              symbolCtrl.text = preset.symbol;
-              diacriticsCtrl.text = preset.diacritics.join(', ');
-            });
-          }
+      builder: (dialogCtx) => ManagedTextControllers(
+        initialTexts: const ['', '', '', ''],
+        builder: (dialogCtx, ctrls) {
+          final nameCtrl = ctrls[0];
+          final codeCtrl = ctrls[1];
+          final symbolCtrl = ctrls[2];
+          final diacriticsCtrl = ctrls[3];
 
-          return AlertDialog(
-            title: const Row(
-              children: [
-                Icon(Icons.add_circle, color: Color(0xFF0D9488)),
-                SizedBox(width: 8),
-                Text('+ Novo Idioma no Drift'),
-              ],
-            ),
-            content: SizedBox(
-              width: 500,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          return StatefulBuilder(
+            builder: (ctx, setDialogState) {
+              void applyPreset(LanguageMetadata preset) {
+                setDialogState(() {
+                  nameCtrl.text = '${preset.name} (${preset.nativeName})';
+                  codeCtrl.text = preset.code;
+                  symbolCtrl.text = preset.symbol;
+                  diacriticsCtrl.text = preset.diacritics.join(', ');
+                });
+              }
+
+              return AlertDialog(
+                title: const Row(
                   children: [
-                    const Text(
-                      'Atalhos Pré-Catalogados (1-Toque):',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
-                      children: [
-                        ActionChip(
-                          avatar: const Text('🌿'),
-                          label: const Text('Guajajara (Tenetehara)'),
-                          onPressed: () => applyPreset(LanguageRegistry.guajajara),
-                        ),
-                        ActionChip(
-                          avatar: const Text('🌳'),
-                          label: const Text('Yanomami (Yanomamõ)'),
-                          onPressed: () => applyPreset(LanguageRegistry.yanomami),
-                        ),
-                      ],
-                    ),
-                    const Divider(height: 24),
-                    TextField(
-                      controller: nameCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Nome do Idioma *',
-                        hintText: 'Ex: Guajajara, Yanomami, Wapichana',
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          flex: 2,
-                          child: TextField(
-                            controller: codeCtrl,
-                            decoration: const InputDecoration(
-                              labelText: 'Código ISO *',
-                              hintText: 'Ex: gub, yan',
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          flex: 1,
-                          child: TextField(
-                            controller: symbolCtrl,
-                            decoration: const InputDecoration(
-                              labelText: 'Símbolo / Emoji',
-                              hintText: 'Ex: 🌿',
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: diacriticsCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Caracteres Especiais / Diacríticos (separados por vírgula)',
-                        hintText: 'Ex: à, è, ì, ò, ù, ỹ, \'',
-                      ),
-                    ),
+                    Icon(Icons.add_circle, color: Color(0xFF0D9488)),
+                    SizedBox(width: 8),
+                    Text('+ Novo Idioma no Drift'),
                   ],
                 ),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogCtx),
-                child: const Text('Cancelar'),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0D9488),
-                  foregroundColor: Colors.white,
-                ),
-                onPressed: () async {
-                  final name = nameCtrl.text.trim();
-                  final code = codeCtrl.text.trim().toLowerCase();
-                  final symbol = symbolCtrl.text.trim().isEmpty ? '🌐' : symbolCtrl.text.trim();
-                  final diacriticsText = diacriticsCtrl.text.trim();
-
-                  if (name.isEmpty || code.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Preencha o nome e o código do idioma.'),
-                      ),
-                    );
-                    return;
-                  }
-
-                  final messenger = ScaffoldMessenger.of(context);
-                  final dialogNav = Navigator.of(dialogCtx);
-                  final repo = ref.read(repositoryProvider);
-                  await repo.createLanguage(
-                    id: code,
-                    name: name,
-                    code: code,
-                    symbol: symbol,
-                    diacritics: diacriticsText.isNotEmpty ? diacriticsText : null,
-                    isDefault: false,
-                  );
-
-                  final newEntry = AppLanguageEntry(
-                    id: code,
-                    name: name,
-                    code: code,
-                    symbol: symbol,
-                    diacritics: diacriticsText,
-                    isDefault: false,
-                    createdAt: DateTime.now(),
-                    updatedAt: DateTime.now(),
-                  );
-                  await ref.read(activeLanguageProvider.notifier).selectLanguage(newEntry);
-
-                  dialogNav.pop();
-                  messenger.showSnackBar(
-                    SnackBar(
-                      content: Text('Idioma "$symbol $name" criado e ativado com sucesso!'),
+                content: SizedBox(
+                  width: 500,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Atalhos Pré-Catalogados (1-Toque):',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 6,
+                          children: [
+                            ActionChip(
+                              avatar: const Text('🌿'),
+                              label: const Text('Guajajara (Tenetehara)'),
+                              onPressed: () => applyPreset(LanguageRegistry.guajajara),
+                            ),
+                            ActionChip(
+                              avatar: const Text('🌳'),
+                              label: const Text('Yanomami (Yanomamõ)'),
+                              onPressed: () => applyPreset(LanguageRegistry.yanomami),
+                            ),
+                          ],
+                        ),
+                        const Divider(height: 24),
+                        TextField(
+                          controller: nameCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Nome do Idioma *',
+                            hintText: 'Ex: Guajajara, Yanomami, Wapichana',
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Expanded(
+                              flex: 2,
+                              child: TextField(
+                                controller: codeCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Código ISO *',
+                                  hintText: 'Ex: gub, yan',
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              flex: 1,
+                              child: TextField(
+                                controller: symbolCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Símbolo / Emoji',
+                                  hintText: 'Ex: 🌿',
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        TextField(
+                          controller: diacriticsCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Caracteres Especiais / Diacríticos (separados por vírgula)',
+                            hintText: 'Ex: à, è, ì, ò, ù, ỹ, \'',
+                          ),
+                        ),
+                      ],
                     ),
-                  );
-                },
-                child: const Text('Cadastrar Idioma'),
-              ),
-            ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogCtx),
+                    child: const Text('Cancelar'),
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0D9488),
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: () async {
+                      final name = nameCtrl.text.trim();
+                      final code = codeCtrl.text.trim().toLowerCase();
+                      final symbol = symbolCtrl.text.trim().isEmpty ? '🌐' : symbolCtrl.text.trim();
+                      final diacriticsText = diacriticsCtrl.text.trim();
+
+                      if (name.isEmpty || code.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Preencha o nome e o código do idioma.'),
+                          ),
+                        );
+                        return;
+                      }
+
+                      final messenger = ScaffoldMessenger.of(context);
+                      final dialogNav = Navigator.of(dialogCtx);
+                      final repo = ref.read(repositoryProvider);
+                      await repo.createLanguage(
+                        id: code,
+                        name: name,
+                        code: code,
+                        symbol: symbol,
+                        diacritics: diacriticsText.isNotEmpty ? diacriticsText : null,
+                        isDefault: false,
+                      );
+
+                      final newEntry = AppLanguageEntry(
+                        id: code,
+                        name: name,
+                        code: code,
+                        symbol: symbol,
+                        diacritics: diacriticsText,
+                        isDefault: false,
+                        createdAt: DateTime.now(),
+                        updatedAt: DateTime.now(),
+                      );
+                      await ref.read(activeLanguageProvider.notifier).selectLanguage(newEntry);
+
+                      dialogNav.pop();
+                      messenger.showSnackBar(
+                        SnackBar(
+                          content: Text('Idioma "$symbol $name" criado e ativado com sucesso!'),
+                        ),
+                      );
+                    },
+                    child: const Text('Cadastrar Idioma'),
+                  ),
+                ],
+              );
+            },
           );
         },
       ),

@@ -10,6 +10,7 @@ import '../../core/date_utils.dart';
 import '../../experiences/experience_manager.dart';
 import '../../media/media_picker_helper.dart';
 import '../widgets/knowledge_item_reader_dialog.dart';
+import '../widgets/managed_text_controllers.dart';
 import '../widgets/markdown_preview_text.dart';
 import '../widgets/rich_markdown_toolbar.dart';
 import '../widgets/universal_attachment_viewer.dart';
@@ -154,20 +155,22 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
     BuildContext context, {
     MinistryExperienceItem? existing,
   }) {
-    final titleController = TextEditingController(text: existing?.title ?? '');
-    final contentController = TextEditingController(
-      text: existing?.content ?? '',
-    );
     DateTime chosenDate = existing?.dateTime ?? DateTime.now();
     TimeOfDay chosenTime = TimeOfDay.fromDateTime(chosenDate);
     String selectedModality = existing?.locationOrModality ?? 'De Casa em Casa';
     final mediaList = List<String>.from(existing?.mediaUrls ?? []);
     final tags = List<String>.from(existing?.tags ?? []);
-    final tagInputController = TextEditingController();
 
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: [existing?.title ?? '', existing?.content ?? '', ''],
+        builder: (ctx, ctrls) {
+          final titleController = ctrls[0];
+          final contentController = ctrls[1];
+          final tagInputController = ctrls[2];
+
+          return StatefulBuilder(
         builder: (ctx, setDialogState) {
           final isDark = Theme.of(ctx).brightness == Brightness.dark;
           return Dialog(
@@ -558,6 +561,8 @@ class _ExperiencesScreenState extends ConsumerState<ExperiencesScreen> {
               ),
             ),
           );
+        },
+      );
         },
       ),
     );

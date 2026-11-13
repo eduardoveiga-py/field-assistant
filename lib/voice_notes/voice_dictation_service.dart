@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
+import '../core/app_logger.dart';
+
 /// Contrato desacoplado para serviço de reconhecimento e ditado de voz.
 abstract class VoiceDictationService {
   bool get isListening;
@@ -99,7 +101,8 @@ class RealVoiceDictationService implements VoiceDictationService {
       return false;
     } on PlatformException {
       return false;
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.warning('Falha ao inicializar serviço de ditado por voz', e, st);
       return false;
     }
   }
@@ -146,7 +149,9 @@ class RealVoiceDictationService implements VoiceDictationService {
     _isListening = false;
     try {
       await _speech.stop();
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.debug('Falha ao parar ditado de voz: $e', st);
+    }
   }
 
   @override
@@ -154,7 +159,9 @@ class RealVoiceDictationService implements VoiceDictationService {
     _isListening = false;
     try {
       _speech.cancel();
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.debug('Falha ao cancelar ditado de voz em dispose: $e', st);
+    }
   }
 }
 

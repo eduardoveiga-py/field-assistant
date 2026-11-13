@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import '../../core/app_logger.dart';
+
 enum TicunaEntryType {
   word,
   phrase;
@@ -156,7 +158,9 @@ class TicunaWord {
           parsedTags = decoded.map((e) => e.toString()).toList();
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.debug('Falha ao parsear tags em modelo linguístico: $e', st);
+    }
 
     return TicunaWord(
       id: map['id']?.toString() ?? '',
@@ -277,7 +281,9 @@ class TicunaPhrase {
           parsedTags = decoded.map((e) => e.toString()).toList();
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.debug('Falha ao parsear tags em modelo linguístico: $e', st);
+    }
 
     return TicunaPhrase(
       id: map['id']?.toString() ?? '',

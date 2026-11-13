@@ -1,20 +1,22 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
-import 'package:drift/drift.dart';
 
+import '../core/app_logger.dart';
+import '../core/sync_timestamp.dart';
 import '../database/app_database.dart';
 import '../ui/providers.dart';
 
 class ResearchArticleItem {
   final String id;
   final String title;
-  final String summary; // Pequeno resumo exibido no bloco
-  final String content; // Conteúdo completo do artigo
+  final String summary;
+  final String content;
   final List<String> tags;
-  final List<String> attachments; // URLs / Data URIs
+  final List<String> attachments;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -36,43 +38,54 @@ class ResearchArticleItem {
     'content': content,
     'tags': jsonEncode(tags),
     'attachments': jsonEncode(attachments),
-    'created_at': createdAt.toIso8601String(),
-    'updated_at': updatedAt.toIso8601String(),
+    'created_at': createdAt.toUtc().toIso8601String(),
+    'updated_at': updatedAt.toUtc().toIso8601String(),
   };
 
+  factory ResearchArticleItem.fromEntry(ResearchArticleEntry e) {
+    return ResearchArticleItem(
+      id: e.id,
+      title: e.title,
+      summary: e.summary,
+      content: e.content,
+      tags: _decodeStringList(e.tags),
+      attachments: _decodeStringList(e.attachments),
+      createdAt: e.createdAt,
+      updatedAt: e.updatedAt,
+    );
+  }
+
   factory ResearchArticleItem.fromMap(Map<String, dynamic> map) {
-    List<String> parsedTags = [];
-    try {
-      final raw = map['tags'];
-      if (raw != null) {
-        final decoded = jsonDecode(raw as String);
-        if (decoded is List) {
-          parsedTags = decoded.map((e) => e.toString()).toList();
-        }
-      }
-    } catch (_) {}
-
-    List<String> parsedAttach = [];
-    try {
-      final raw = map['attachments'];
-      if (raw != null) {
-        final decoded = jsonDecode(raw as String);
-        if (decoded is List) {
-          parsedAttach = decoded.map((e) => e.toString()).toList();
-        }
-      }
-    } catch (_) {}
-
     return ResearchArticleItem(
       id: map['id'] as String,
       title: map['title'] as String,
       summary: map['summary'] as String,
       content: map['content'] as String,
-      tags: parsedTags,
-      attachments: parsedAttach,
-      createdAt: DateTime.parse(map['created_at'] as String),
-      updatedAt: DateTime.parse(map['updated_at'] as String),
+      tags: _decodeStringList(map['tags']),
+      attachments: _decodeStringList(map['attachments']),
+      createdAt:
+          SyncTimestamp.parse(map['created_at'] ?? map['createdAt']) ??
+          DateTime.now(),
+      updatedAt:
+          SyncTimestamp.parse(map['updated_at'] ?? map['updatedAt']) ??
+          DateTime.now(),
     );
+  }
+
+  static List<String> _decodeStringList(dynamic raw) {
+    if (raw == null) return [];
+    if (raw is List) return raw.map((e) => e.toString()).toList();
+    if (raw is String && raw.trim().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is List) {
+          return decoded.map((e) => e.toString()).toList();
+        }
+      } catch (e, st) {
+        AppLogger.warning('Falha ao decodificar lista JSON em ResearchArticle', e, st);
+      }
+    }
+    return [];
   }
 }
 
@@ -87,140 +100,93 @@ class ResearchTagItem {
     required this.createdAt,
   });
 
+  factory ResearchTagItem.fromEntry(ResearchTagEntry e) => ResearchTagItem(
+    id: e.id,
+    name: e.name,
+    createdAt: e.createdAt,
+  );
+
   factory ResearchTagItem.fromMap(Map<String, dynamic> map) => ResearchTagItem(
     id: map['id'] as String,
     name: map['name'] as String,
-    createdAt: DateTime.parse(map['created_at'] as String),
+    createdAt:
+        SyncTimestamp.parse(map['created_at'] ?? map['createdAt']) ??
+        DateTime.now(),
   );
 }
 
 class ResearchManager {
   final AppDatabase db;
   final Uuid _uuid = const Uuid();
-  final StreamController<List<ResearchArticleItem>> _articlesController =
-      StreamController<List<ResearchArticleItem>>.broadcast();
-  final StreamController<List<ResearchTagItem>> _tagsController =
-      StreamController<List<ResearchTagItem>>.broadcast();
-  Future<void>? _initFuture;
-  bool _initialized = false;
+  bool _tagsSeedChecked = false;
 
-  ResearchManager(this.db) {
-    _initTable();
-  }
+  ResearchManager(this.db);
 
-  Future<void> _initTable() async {
-    if (_initialized) return;
-    _initFuture ??= _doInitTable();
-    await _initFuture;
-  }
-
-  Future<void> _doInitTable() async {
-    try {
-      await db.customStatement('''
-        CREATE TABLE IF NOT EXISTS research_articles (
-          id TEXT PRIMARY KEY,
-          title TEXT NOT NULL,
-          summary TEXT NOT NULL,
-          content TEXT NOT NULL,
-          tags TEXT NOT NULL DEFAULT '[]',
-          attachments TEXT NOT NULL DEFAULT '[]',
-          created_at TEXT NOT NULL,
-          updated_at TEXT NOT NULL
-        );
-      ''');
-
-      await db.customStatement('''
-        CREATE TABLE IF NOT EXISTS research_tags (
-          id TEXT PRIMARY KEY,
-          name TEXT NOT NULL UNIQUE,
-          created_at TEXT NOT NULL
-        );
-      ''');
-
-      // Inicializa tags padrão se a tabela estiver vazia
-      final existingCount = await db
-          .customSelect('SELECT COUNT(*) AS count FROM research_tags')
-          .getSingle();
-      if (existingCount.read<int>('count') == 0) {
-        final now = DateTime.now();
-        final defaultTags = [
-          'Criação',
-          'Trindade',
-          'Alma e Morte',
-          'Reino de Deus',
-          'Profecias Bíblicas',
-          'Por que Deus permite o sofrimento',
-          'Cruz ou Estaca',
-        ];
+  Future<void> _ensureDefaultTags() async {
+    if (_tagsSeedChecked) return;
+    _tagsSeedChecked = true;
+    final existing = await db.select(db.researchTags).get();
+    if (existing.isEmpty) {
+      final now = DateTime.now();
+      const defaultTags = [
+        'Criação',
+        'Trindade',
+        'Alma e Morte',
+        'Reino de Deus',
+        'Profecias Bíblicas',
+        'Por que Deus permite o sofrimento',
+        'Cruz ou Estaca',
+      ];
+      await db.transaction(() async {
         for (final tag in defaultTags) {
-          await db.customInsert(
-            'INSERT INTO research_tags (id, name, created_at) VALUES (?, ?, ?)',
-            variables: [
-              Variable.withString(_uuid.v4()),
-              Variable.withString(tag),
-              Variable.withString(now.toIso8601String()),
-            ],
+          await db.into(db.researchTags).insert(
+            ResearchTagsCompanion.insert(
+              id: _uuid.v4(),
+              name: tag,
+              createdAt: now,
+              updatedAt: Value(now),
+            ),
+            mode: InsertMode.insertOrIgnore,
           );
         }
-      }
-    } catch (_) {}
-    _initialized = true;
-    _refreshArticles();
-    _refreshTags();
-  }
-
-  Future<void> _refreshArticles() async {
-    try {
-      final list = await getAllArticles();
-      if (!_articlesController.isClosed) {
-        _articlesController.add(list);
-      }
-    } catch (_) {}
-  }
-
-  Future<void> _refreshTags() async {
-    try {
-      final list = await getAllTags();
-      if (!_tagsController.isClosed) {
-        _tagsController.add(list);
-      }
-    } catch (_) {}
+      });
+    }
   }
 
   Future<List<ResearchArticleItem>> getAllArticles() async {
-    await _initTable();
-    try {
-      final rows = await db
-          .customSelect(
-            'SELECT * FROM research_articles ORDER BY created_at DESC',
-          )
-          .get();
-      return rows.map((r) => ResearchArticleItem.fromMap(r.data)).toList();
-    } catch (_) {
-      return [];
-    }
+    final rows =
+        await (db.select(db.researchArticles)
+              ..where((t) => t.deletedAt.isNull())
+              ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+            .get();
+    return rows.map(ResearchArticleItem.fromEntry).toList();
   }
 
-  Stream<List<ResearchArticleItem>> watchArticles() async* {
-    yield await getAllArticles();
-    yield* _articlesController.stream;
+  Stream<List<ResearchArticleItem>> watchArticles() {
+    return (db.select(db.researchArticles)
+          ..where((t) => t.deletedAt.isNull())
+          ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+        .watch()
+        .map((rows) => rows.map(ResearchArticleItem.fromEntry).toList());
   }
 
   Future<List<ResearchTagItem>> getAllTags() async {
-    await _initTable();
-    try {
-      final rows = await db
-          .customSelect('SELECT * FROM research_tags ORDER BY name ASC')
-          .get();
-      return rows.map((r) => ResearchTagItem.fromMap(r.data)).toList();
-    } catch (_) {
-      return [];
-    }
+    await _ensureDefaultTags();
+    final rows =
+        await (db.select(db.researchTags)
+              ..where((t) => t.deletedAt.isNull())
+              ..orderBy([(t) => OrderingTerm.asc(t.name)]))
+            .get();
+    return rows.map(ResearchTagItem.fromEntry).toList();
   }
 
   Stream<List<ResearchTagItem>> watchTags() async* {
-    yield await getAllTags();
-    yield* _tagsController.stream;
+    await _ensureDefaultTags();
+    yield* (db.select(db.researchTags)
+          ..where((t) => t.deletedAt.isNull())
+          ..orderBy([(t) => OrderingTerm.asc(t.name)]))
+        .watch()
+        .map((rows) => rows.map(ResearchTagItem.fromEntry).toList());
   }
 
   Future<ResearchArticleItem> addArticle({
@@ -230,95 +196,105 @@ class ResearchManager {
     List<String> tags = const [],
     List<String> attachments = const [],
   }) async {
-    await _initTable();
     final now = DateTime.now();
     final id = _uuid.v4();
 
-    await db.customInsert(
-      'INSERT INTO research_articles (id, title, summary, content, tags, attachments, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      variables: [
-        Variable.withString(id),
-        Variable.withString(title.trim()),
-        Variable.withString(summary.trim()),
-        Variable.withString(content.trim()),
-        Variable.withString(jsonEncode(tags)),
-        Variable.withString(jsonEncode(attachments)),
-        Variable.withString(now.toIso8601String()),
-        Variable.withString(now.toIso8601String()),
-      ],
-    );
-
-    final item = ResearchArticleItem(
+    final entry = ResearchArticleEntry(
       id: id,
       title: title.trim(),
       summary: summary.trim(),
       content: content.trim(),
-      tags: tags,
-      attachments: attachments,
+      tags: jsonEncode(tags),
+      attachments: jsonEncode(attachments),
+      objective: null,
+      status: 'active',
+      conclusion: null,
+      projectId: null,
+      mainQuestionId: null,
       createdAt: now,
       updatedAt: now,
+      deletedAt: null,
+      revision: 1,
     );
 
-    try {
+    await db.transaction(() async {
+      await db.into(db.researchArticles).insert(entry);
       await db.into(db.syncQueue).insert(
         SyncQueueCompanion.insert(
           id: _uuid.v4(),
           entityType: 'research_articles',
           entityId: id,
           operation: 'INSERT',
-          payload: jsonEncode(item.toMap()),
+          payload: jsonEncode(SyncTimestamp.normalizeMapDates(entry.toJson())),
           createdAt: now,
           status: const Value('pending'),
         ),
       );
-    } catch (_) {}
+    });
 
-    await _refreshArticles();
-    return item;
+    return ResearchArticleItem.fromEntry(entry);
   }
 
   Future<void> updateArticle(ResearchArticleItem item) async {
-    await _initTable();
     final now = DateTime.now();
-    await db.customUpdate(
-      'UPDATE research_articles SET title = ?, summary = ?, content = ?, tags = ?, attachments = ?, updated_at = ? WHERE id = ?',
-      variables: [
-        Variable.withString(item.title.trim()),
-        Variable.withString(item.summary.trim()),
-        Variable.withString(item.content.trim()),
-        Variable.withString(jsonEncode(item.tags)),
-        Variable.withString(jsonEncode(item.attachments)),
-        Variable.withString(now.toIso8601String()),
-        Variable.withString(item.id),
-      ],
+    final existing = await (db.select(db.researchArticles)
+          ..where((t) => t.id.equals(item.id)))
+        .getSingleOrNull();
+    final updated = ResearchArticleEntry(
+      id: item.id,
+      title: item.title.trim(),
+      summary: item.summary.trim(),
+      content: item.content.trim(),
+      tags: jsonEncode(item.tags),
+      attachments: jsonEncode(item.attachments),
+      objective: existing?.objective,
+      status: existing?.status ?? 'active',
+      conclusion: existing?.conclusion,
+      projectId: existing?.projectId,
+      mainQuestionId: existing?.mainQuestionId,
+      createdAt: existing?.createdAt ?? item.createdAt,
+      updatedAt: now,
+      deletedAt: existing?.deletedAt,
+      revision: (existing?.revision ?? 1) + 1,
     );
 
-    try {
+    await db.transaction(() async {
+      await db.update(db.researchArticles).replace(updated);
+      final payload = SyncTimestamp.normalizeMapDates(updated.toJson());
+      if (existing != null) {
+        payload['_base'] = SyncTimestamp.normalizeMapDates(existing.toJson());
+      }
       await db.into(db.syncQueue).insert(
         SyncQueueCompanion.insert(
           id: _uuid.v4(),
           entityType: 'research_articles',
           entityId: item.id,
           operation: 'UPDATE',
-          payload: jsonEncode(item.toMap()),
+          payload: jsonEncode(payload),
           createdAt: now,
           status: const Value('pending'),
         ),
       );
-    } catch (_) {}
-
-    await _refreshArticles();
+    });
   }
 
   Future<void> deleteArticle(String id) async {
-    await _initTable();
     final now = DateTime.now();
-    await db.customUpdate(
-      'DELETE FROM research_articles WHERE id = ?',
-      variables: [Variable.withString(id)],
-    );
+    final existing = await (db.select(db.researchArticles)
+          ..where((t) => t.id.equals(id)))
+        .getSingleOrNull();
+    if (existing == null) return;
 
-    try {
+    final nextRev = existing.revision + 1;
+    await db.transaction(() async {
+      await (db.update(db.researchArticles)..where((t) => t.id.equals(id)))
+          .write(
+        ResearchArticlesCompanion(
+          deletedAt: Value(now),
+          updatedAt: Value(now),
+          revision: Value(nextRev),
+        ),
+      );
       await db.into(db.syncQueue).insert(
         SyncQueueCompanion.insert(
           id: _uuid.v4(),
@@ -327,94 +303,89 @@ class ResearchManager {
           operation: 'DELETE',
           payload: jsonEncode({
             'id': id,
-            'deleted_at': now.toIso8601String(),
+            'deleted_at': now.toUtc().toIso8601String(),
+            'updated_at': now.toUtc().toIso8601String(),
+            'revision': nextRev,
           }),
           createdAt: now,
           status: const Value('pending'),
         ),
       );
-    } catch (_) {}
-
-    await _refreshArticles();
+    });
   }
 
   // GERENCIAMENTO DE TAGS
   Future<ResearchTagItem> addTag(String name) async {
-    await _initTable();
     final trimmed = name.trim();
-    final id = _uuid.v4();
     final now = DateTime.now();
+    final existingActive = await (db.select(db.researchTags)
+          ..where((t) => t.name.equals(trimmed) & t.deletedAt.isNull()))
+        .getSingleOrNull();
+    if (existingActive != null) {
+      return ResearchTagItem.fromEntry(existingActive);
+    }
 
-    await db.customInsert(
-      'INSERT OR IGNORE INTO research_tags (id, name, created_at) VALUES (?, ?, ?)',
-      variables: [
-        Variable.withString(id),
-        Variable.withString(trimmed),
-        Variable.withString(now.toIso8601String()),
-      ],
+    final id = _uuid.v4();
+    final entry = ResearchTagEntry(
+      id: id,
+      name: trimmed,
+      createdAt: now,
+      updatedAt: now,
+      deletedAt: null,
+      revision: 1,
     );
 
-    final item = ResearchTagItem(id: id, name: trimmed, createdAt: now);
-
-    try {
+    await db.transaction(() async {
+      await db.into(db.researchTags).insert(entry);
       await db.into(db.syncQueue).insert(
         SyncQueueCompanion.insert(
           id: _uuid.v4(),
           entityType: 'research_tags',
           entityId: id,
           operation: 'INSERT',
-          payload: jsonEncode({
-            'id': id,
-            'name': trimmed,
-            'created_at': now.toIso8601String(),
-          }),
+          payload: jsonEncode(SyncTimestamp.normalizeMapDates(entry.toJson())),
           createdAt: now,
           status: const Value('pending'),
         ),
       );
-    } catch (_) {}
+    });
 
-    await _refreshTags();
-    return item;
+    return ResearchTagItem.fromEntry(entry);
   }
 
   Future<void> updateTag(String id, String newName) async {
-    await _initTable();
     final trimmed = newName.trim();
     final now = DateTime.now();
-    final old = await db
-        .customSelect(
-          'SELECT name FROM research_tags WHERE id = ?',
-          variables: [Variable.withString(id)],
-        )
+    final existing = await (db.select(db.researchTags)
+          ..where((t) => t.id.equals(id)))
         .getSingleOrNull();
-    final oldName = old?.read<String>('name');
+    if (existing == null) return;
+    final oldName = existing.name;
 
-    await db.customUpdate(
-      'UPDATE research_tags SET name = ? WHERE id = ?',
-      variables: [Variable.withString(trimmed), Variable.withString(id)],
+    final updated = existing.copyWith(
+      name: trimmed,
+      updatedAt: Value(now),
+      revision: existing.revision + 1,
     );
 
-    try {
+    await db.transaction(() async {
+      await db.update(db.researchTags).replace(updated);
+      final payload = SyncTimestamp.normalizeMapDates(updated.toJson());
+      payload['_base'] = SyncTimestamp.normalizeMapDates(existing.toJson());
       await db.into(db.syncQueue).insert(
         SyncQueueCompanion.insert(
           id: _uuid.v4(),
           entityType: 'research_tags',
           entityId: id,
           operation: 'UPDATE',
-          payload: jsonEncode({
-            'id': id,
-            'name': trimmed,
-            'updated_at': now.toIso8601String(),
-          }),
+          payload: jsonEncode(payload),
           createdAt: now,
           status: const Value('pending'),
         ),
       );
-    } catch (_) {}
+    });
 
-    // Se o nome mudou, atualiza nos artigos que possuem essa tag
-    if (oldName != null && oldName != trimmed) {
+    if (oldName != trimmed) {
       final articles = await getAllArticles();
       for (final a in articles) {
         if (a.tags.contains(oldName)) {
@@ -436,27 +407,25 @@ class ResearchManager {
         }
       }
     }
-
-    await _refreshTags();
   }
 
   Future<void> deleteTag(String id) async {
-    await _initTable();
     final now = DateTime.now();
-    final old = await db
-        .customSelect(
-          'SELECT name FROM research_tags WHERE id = ?',
-          variables: [Variable.withString(id)],
-        )
+    final existing = await (db.select(db.researchTags)
+          ..where((t) => t.id.equals(id)))
         .getSingleOrNull();
-    final oldName = old?.read<String>('name');
+    if (existing == null) return;
+    final oldName = existing.name;
 
-    await db.customUpdate(
-      'DELETE FROM research_tags WHERE id = ?',
-      variables: [Variable.withString(id)],
-    );
-
-    try {
+    final nextRev = existing.revision + 1;
+    await db.transaction(() async {
+      await (db.update(db.researchTags)..where((t) => t.id.equals(id))).write(
+        ResearchTagsCompanion(
+          deletedAt: Value(now),
+          updatedAt: Value(now),
+          revision: Value(nextRev),
+        ),
+      );
       await db.into(db.syncQueue).insert(
         SyncQueueCompanion.insert(
           id: _uuid.v4(),
@@ -465,36 +434,34 @@ class ResearchManager {
           operation: 'DELETE',
           payload: jsonEncode({
             'id': id,
-            'deleted_at': now.toIso8601String(),
+            'deleted_at': now.toUtc().toIso8601String(),
+            'updated_at': now.toUtc().toIso8601String(),
+            'revision': nextRev,
           }),
           createdAt: now,
           status: const Value('pending'),
         ),
       );
-    } catch (_) {}
+    });
 
-    if (oldName != null) {
-      final articles = await getAllArticles();
-      for (final a in articles) {
-        if (a.tags.contains(oldName)) {
-          final newTags = a.tags.where((t) => t != oldName).toList();
-          await updateArticle(
-            ResearchArticleItem(
-              id: a.id,
-              title: a.title,
-              summary: a.summary,
-              content: a.content,
-              tags: newTags,
-              attachments: a.attachments,
-              createdAt: a.createdAt,
-              updatedAt: a.updatedAt,
-            ),
-          );
-        }
+    final articles = await getAllArticles();
+    for (final a in articles) {
+      if (a.tags.contains(oldName)) {
+        final newTags = a.tags.where((t) => t != oldName).toList();
+        await updateArticle(
+          ResearchArticleItem(
+            id: a.id,
+            title: a.title,
+            summary: a.summary,
+            content: a.content,
+            tags: newTags,
+            attachments: a.attachments,
+            createdAt: a.createdAt,
+            updatedAt: a.updatedAt,
+          ),
+        );
       }
     }
-
-    await _refreshTags();
   }
 }
 

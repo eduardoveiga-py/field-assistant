@@ -13,6 +13,20 @@ class TrashScreen extends ConsumerStatefulWidget {
 }
 
 class _TrashScreenState extends ConsumerState<TrashScreen> {
+  late Future<List<Map<String, dynamic>>> _deletedItemsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _deletedItemsFuture = ref.read(repositoryProvider).getDeletedItems();
+  }
+
+  void _reloadDeletedItems() {
+    setState(() {
+      _deletedItemsFuture = ref.read(repositoryProvider).getDeletedItems();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final repo = ref.watch(repositoryProvider);
@@ -21,7 +35,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Registros Excluídos (Lixeira)')),
       body: FutureBuilder<List<Map<String, dynamic>>>(
-        future: repo.getDeletedItems(),
+        future: _deletedItemsFuture,
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
@@ -115,7 +129,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
                         tooltip: 'Restaurar',
                         onPressed: () async {
                           await repo.restoreDeletedItem(type, id);
-                          setState(() {});
+                          _reloadDeletedItems();
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
@@ -139,7 +153,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
                             builder: (c) => AlertDialog(
                               title: const Text('Exclusão Definitiva'),
                               content: Text(
-                                'Tem certeza de que deseja apagar permanentemente "$title"? Esta ação não pode ser desfeita.',
+                                'Excluir "$title" do banco local e enfileirar a exclusão na nuvem? Arquivos locais, cópias de segurança, objetos no Storage e dados em outros dispositivos podem permanecer. A exclusão na nuvem depende da sincronização.',
                               ),
                               actions: [
                                 TextButton(
@@ -159,12 +173,12 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
 
                           if (confirm == true) {
                             await repo.permanentlyDeleteItem(type, id);
-                            setState(() {});
+                            _reloadDeletedItems();
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text(
-                                    '"$title" excluído permanentemente.',
+                                    '"$title" removido localmente; exclusão na nuvem pendente de sincronização.',
                                   ),
                                 ),
                               );

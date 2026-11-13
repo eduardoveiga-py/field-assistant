@@ -6,11 +6,10 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/app_logger.dart';
 import '../../core/app_theme.dart';
 
 /// Abre o visualizador universal de anexos (PDFs, Imagens, Áudios, Textos e outros formatos).
@@ -61,7 +60,10 @@ class _UniversalAttachmentViewerDialogState
   Duration _position = Duration.zero;
   String? _textContent;
   bool _isLoading = true;
+  bool _fileNotFound = false;
   String? _errorMessage;
+  Uint8List? _pdfBytes;
+  Uint8List? _imageBytes;
 
   String get _effectiveFileType {
     if (widget.fileType != null && widget.fileType!.isNotEmpty) {
@@ -110,8 +112,49 @@ class _UniversalAttachmentViewerDialogState
   }
 
   Future<void> _loadFileContent() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+      _fileNotFound = false;
+    });
+
     try {
-      if (_isAudio) {
+      if (_isPdf) {
+        if (widget.bytes != null && widget.bytes!.isNotEmpty) {
+          _pdfBytes = widget.bytes;
+        } else if (widget.filePath.startsWith('http://') || widget.filePath.startsWith('https://')) {
+          final resp = await http.get(Uri.parse(widget.filePath));
+          if (resp.statusCode == 200) {
+            _pdfBytes = resp.bodyBytes;
+          } else {
+            _errorMessage = 'Falha ao baixar arquivo remoto (HTTP ${resp.statusCode}).';
+          }
+        } else if (!kIsWeb) {
+          final existing = await _findExistingLocalFile(widget.filePath);
+          if (existing != null) {
+            _pdfBytes = await existing.readAsBytes();
+          } else {
+            _fileNotFound = true;
+          }
+        } else {
+          _fileNotFound = true;
+        }
+      } else if (_isImage) {
+        if (widget.bytes != null && widget.bytes!.isNotEmpty) {
+          _imageBytes = widget.bytes;
+        } else if (!widget.filePath.startsWith('http')) {
+          if (!kIsWeb) {
+            final existing = await _findExistingLocalFile(widget.filePath);
+            if (existing != null) {
+              _imageBytes = await existing.readAsBytes();
+            } else {
+              _fileNotFound = true;
+            }
+          } else {
+            _fileNotFound = true;
+          }
+        }
+      } else if (_isAudio) {
         _audioPlayer = AudioPlayer();
         _audioPlayer!.onPlayerStateChanged.listen((state) {
           if (mounted) {
@@ -124,15 +167,46 @@ class _UniversalAttachmentViewerDialogState
         _audioPlayer!.onPositionChanged.listen((p) {
           if (mounted) setState(() => _position = p);
         });
+
+        if (!widget.filePath.startsWith('http')) {
+          if (!kIsWeb) {
+            final existing = await _findExistingLocalFile(widget.filePath);
+            if (existing == null) {
+              _fileNotFound = true;
+            }
+          } else {
+            _fileNotFound = true;
+          }
+        }
       } else if (_isText) {
         if (widget.bytes != null) {
           _textContent = String.fromCharCodes(widget.bytes!);
-        } else {
+        } else if (widget.filePath.startsWith('http://') || widget.filePath.startsWith('https://')) {
+          final resp = await http.get(Uri.parse(widget.filePath));
+          if (resp.statusCode == 200) {
+            _textContent = resp.body;
+          } else {
+            _errorMessage = 'Falha ao baixar arquivo de texto (HTTP ${resp.statusCode}).';
+          }
+        } else if (!kIsWeb) {
           final existingFile = await _findExistingLocalFile(widget.filePath);
           if (existingFile != null) {
             _textContent = await existingFile.readAsString();
           } else {
-            _textContent = 'Conteúdo do arquivo não disponível para leitura de texto puro.';
+            _fileNotFound = true;
+          }
+        } else {
+          _fileNotFound = true;
+        }
+      } else {
+        if (widget.bytes == null && !widget.filePath.startsWith('http')) {
+          if (!kIsWeb) {
+            final existing = await _findExistingLocalFile(widget.filePath);
+            if (existing == null) {
+              _fileNotFound = true;
+            }
+          } else {
+            _fileNotFound = true;
           }
         }
       }
@@ -149,14 +223,18 @@ class _UniversalAttachmentViewerDialogState
     try {
       final direct = File(rawPath);
       if (await direct.exists()) return direct;
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.debug('Erro ao verificar caminho direto do anexo ($rawPath): $e', st);
+    }
 
     String decoded = rawPath;
     try {
       decoded = Uri.decodeFull(rawPath);
       final directDecoded = File(decoded);
       if (await directDecoded.exists()) return directDecoded;
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.debug('Erro ao decodificar/verificar URI do anexo ($rawPath): $e', st);
+    }
 
     final rawName = rawPath.split(RegExp(r'[\\/]')).last;
     final decodedName = decoded.split(RegExp(r'[\\/]')).last;
@@ -176,14 +254,18 @@ class _UniversalAttachmentViewerDialogState
           candidates.add(File('${supportDir.path}/documents/$n'));
           candidates.add(File('${supportDir.path}/$n'));
         }
-      } catch (_) {}
+      } catch (e, st) {
+        AppLogger.debug('ApplicationSupport indisponível na busca de anexo: $e', st);
+      }
       try {
         final tempDir = await getTemporaryDirectory();
         for (final n in fileNames) {
           candidates.add(File('${tempDir.path}/$n'));
           candidates.add(File('${tempDir.path}/file_picker/$n'));
         }
-      } catch (_) {}
+      } catch (e, st) {
+        AppLogger.debug('TempDir indisponível na busca de anexo: $e', st);
+      }
       try {
         final extDir = await getExternalStorageDirectory();
         if (extDir != null) {
@@ -193,7 +275,9 @@ class _UniversalAttachmentViewerDialogState
             candidates.add(File('${extDir.path}/documents/$n'));
           }
         }
-      } catch (_) {}
+      } catch (e, st) {
+        AppLogger.debug('ExternalStorage indisponível na busca de anexo: $e', st);
+      }
       try {
         final dlDir = await getDownloadsDirectory();
         if (dlDir != null) {
@@ -201,19 +285,26 @@ class _UniversalAttachmentViewerDialogState
             candidates.add(File('${dlDir.path}/$n'));
           }
         }
-      } catch (_) {}
+      } catch (e, st) {
+        AppLogger.debug('DownloadsDirectory indisponível na busca de anexo: $e', st);
+      }
 
       for (final f in candidates) {
         if (await f.exists()) {
           return f;
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.warning('Falha ao varrer diretórios locais para anexo', e, st);
+    }
 
     return null;
   }
 
   Future<Uint8List> _resolvePdfBytes() async {
+    if (_pdfBytes != null && _pdfBytes!.isNotEmpty) {
+      return _pdfBytes!;
+    }
     if (widget.bytes != null && widget.bytes!.isNotEmpty) {
       return widget.bytes!;
     }
@@ -221,7 +312,9 @@ class _UniversalAttachmentViewerDialogState
     if (existing != null) {
       try {
         return await existing.readAsBytes();
-      } catch (_) {}
+      } catch (e, st) {
+        AppLogger.warning('Falha ao ler bytes do PDF local (${existing.path})', e, st);
+      }
     }
 
     // Fallback caso caminho comece com http
@@ -232,64 +325,27 @@ class _UniversalAttachmentViewerDialogState
       }
     }
 
-    // Se o arquivo binário local não for encontrado, gera uma página de prévia estruturada
-    // com os metadados do documento em vez de estourar erro vermelho
-    final doc = pw.Document();
-    final displayName = widget.title ?? widget.filePath.split(RegExp(r'[\\/]')).last;
-    doc.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        build: (pw.Context ctx) {
-          return pw.Center(
-            child: pw.Column(
-              mainAxisAlignment: pw.MainAxisAlignment.center,
-              children: [
-                pw.Icon(
-                  const pw.IconData(0xe415), // description/article
-                  size: 48,
-                  color: PdfColors.blueGrey700,
-                ),
-                pw.SizedBox(height: 16),
-                pw.Text(
-                  displayName,
-                  style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
-                  textAlign: pw.TextAlign.center,
-                ),
-                pw.SizedBox(height: 8),
-                pw.Text(
-                  'Arquivo: ${widget.filePath.split(RegExp(r"[\\/]")).last}',
-                  style: const pw.TextStyle(fontSize: 13, color: PdfColors.grey700),
-                ),
-                pw.SizedBox(height: 6),
-                pw.Text(
-                  'Visualizador Integrado da Base de Conhecimento',
-                  style: const pw.TextStyle(fontSize: 11, color: PdfColors.grey600),
-                ),
-                pw.SizedBox(height: 24),
-                pw.Container(
-                  padding: const pw.EdgeInsets.all(16),
-                  decoration: pw.BoxDecoration(
-                    border: pw.Border.all(color: PdfColors.blueAccent, width: 1),
-                    borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
-                    color: PdfColors.blue50,
-                  ),
-                  child: pw.Text(
-                    'Registro teocrático confirmado na Base de Conhecimento.\nCaso o binário original tenha sido movido, use "Abrir com app do sistema" ou reanexe o documento.',
-                    textAlign: pw.TextAlign.center,
-                    style: const pw.TextStyle(fontSize: 11, color: PdfColors.blue900),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
+    throw FileSystemException(
+      'Arquivo físico do anexo não encontrado no armazenamento local. Verifique se o arquivo foi baixado ou sincronize novamente.',
+      widget.filePath,
     );
-    return await doc.save();
   }
 
   Future<void> _openExternal() async {
     try {
+      if (_fileNotFound) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Arquivo físico do anexo não encontrado no armazenamento local. Verifique se o arquivo foi baixado ou sincronize novamente.',
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
       if (kIsWeb) {
         if (_isPdf) {
           final pdfBytes = await _resolvePdfBytes();
@@ -300,29 +356,30 @@ class _UniversalAttachmentViewerDialogState
           return;
         }
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No navegador, utilize o botão de visualização ou impressão para acessar o arquivo.')),
+          const SnackBar(
+            content: Text(
+              'No navegador, utilize o botão de visualização ou impressão para acessar o arquivo.',
+            ),
+          ),
         );
         return;
       }
+
       if (widget.filePath.startsWith('http://') || widget.filePath.startsWith('https://')) {
         await launchUrl(Uri.parse(widget.filePath), mode: LaunchMode.externalApplication);
         return;
       }
+
       String targetPath = widget.filePath;
       final existing = await _findExistingLocalFile(widget.filePath);
       if (existing != null) {
         targetPath = existing.path;
       } else {
-        // Se o arquivo físico original não foi localizado no caminho gravado,
-        // mas possuímos os bytes (em memória ou gerados pelo resolvedor),
-        // gravamos temporariamente no cache para o visualizador do sistema conseguir abrir
         Uint8List? availableBytes = widget.bytes;
         if (availableBytes == null || availableBytes.isEmpty) {
-          try {
-            if (_isPdf) {
-              availableBytes = await _resolvePdfBytes();
-            }
-          } catch (_) {}
+          if (_pdfBytes != null && _pdfBytes!.isNotEmpty) {
+            availableBytes = _pdfBytes;
+          }
         }
 
         if (availableBytes != null && availableBytes.isNotEmpty) {
@@ -335,7 +392,20 @@ class _UniversalAttachmentViewerDialogState
             final tempFile = File('${tempDir.path}/$safeName');
             await tempFile.writeAsBytes(availableBytes, flush: true);
             targetPath = tempFile.path;
-          } catch (_) {}
+          } catch (e, st) {
+            AppLogger.warning('Falha ao gravar arquivo temporário para abrir externamente (${widget.filePath})', e, st);
+          }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Arquivo físico do anexo não encontrado no armazenamento local. Verifique se o arquivo foi baixado ou sincronize novamente.',
+                ),
+              ),
+            );
+          }
+          return;
         }
       }
 
@@ -464,7 +534,12 @@ class _UniversalAttachmentViewerDialogState
   }
 
   Widget _buildViewerBody(bool isDark) {
+    if (_fileNotFound) {
+      return _buildFileNotFoundView(isDark);
+    }
+
     final displayName = widget.title ?? widget.filePath.split(RegExp(r'[\\/]')).last;
+
     if (_errorMessage != null) {
       return Center(
         child: Padding(
@@ -481,9 +556,9 @@ class _UniversalAttachmentViewerDialogState
               ),
               const SizedBox(height: 16),
               ElevatedButton.icon(
-                icon: const Icon(Icons.open_in_new, size: 16),
-                label: const Text('Tentar abrir externamente'),
-                onPressed: _openExternal,
+                icon: const Icon(Icons.refresh, size: 16),
+                label: const Text('Recarregar'),
+                onPressed: _loadFileContent,
               ),
             ],
           ),
@@ -519,9 +594,9 @@ class _UniversalAttachmentViewerDialogState
                   ),
                   const SizedBox(height: 16),
                   ElevatedButton.icon(
-                    icon: const Icon(Icons.open_in_new, size: 16),
-                    label: const Text('Abrir com leitor externo de PDF'),
-                    onPressed: _openExternal,
+                    icon: const Icon(Icons.refresh, size: 16),
+                    label: const Text('Recarregar'),
+                    onPressed: _loadFileContent,
                   ),
                 ],
               ),
@@ -542,22 +617,16 @@ class _UniversalAttachmentViewerDialogState
                 ? Image.memory(widget.bytes!, fit: BoxFit.contain)
                 : widget.filePath.startsWith('http')
                     ? Image.network(widget.filePath, fit: BoxFit.contain)
-                    : FutureBuilder<File?>(
-                        future: _findExistingLocalFile(widget.filePath),
-                        builder: (ctx, snap) {
-                          if (snap.data != null) {
-                            return Image.file(snap.data!, fit: BoxFit.contain);
-                          }
-                          return Column(
+                    : _imageBytes != null
+                        ? Image.memory(_imageBytes!, fit: BoxFit.contain)
+                        : Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               const Icon(Icons.broken_image, size: 64, color: Colors.grey),
                               const SizedBox(height: 8),
                               Text('Arquivo de imagem não encontrado: ${widget.filePath}'),
                             ],
-                          );
-                        },
-                      ),
+                          ),
           ),
         ),
       );
@@ -586,7 +655,10 @@ class _UniversalAttachmentViewerDialogState
               ),
               const SizedBox(height: 16),
               Slider(
-                value: _position.inSeconds.toDouble().clamp(0.0, _duration.inSeconds.toDouble() > 0 ? _duration.inSeconds.toDouble() : 1.0),
+                value: _position.inSeconds.toDouble().clamp(
+                      0.0,
+                      _duration.inSeconds.toDouble() > 0 ? _duration.inSeconds.toDouble() : 1.0,
+                    ),
                 max: _duration.inSeconds.toDouble() > 0 ? _duration.inSeconds.toDouble() : 1.0,
                 onChanged: (val) {
                   _audioPlayer?.seek(Duration(seconds: val.toInt()));
@@ -667,6 +739,98 @@ class _UniversalAttachmentViewerDialogState
               icon: const Icon(Icons.open_in_new, size: 18),
               label: const Text('Abrir com Aplicativo do Sistema'),
               onPressed: _openExternal,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFileNotFoundView(bool isDark) {
+    final displayName = widget.title ?? widget.filePath.split(RegExp(r'[\\/]')).last;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.amber.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.file_copy_outlined,
+                size: 52,
+                color: Colors.amber,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              displayName,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                ),
+              ),
+              child: Column(
+                children: [
+                  Text(
+                    'Arquivo físico do anexo não encontrado no armazenamento local. Verifique se o arquivo foi baixado ou sincronize novamente.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.4,
+                      color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                    ),
+                  ),
+                  if (widget.filePath.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Caminho: ${widget.filePath}',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.arrow_back, size: 16),
+                  label: const Text('Voltar'),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryBlue,
+                    foregroundColor: Colors.white,
+                  ),
+                  icon: const Icon(Icons.refresh, size: 16),
+                  label: const Text('Recarregar'),
+                  onPressed: _loadFileContent,
+                ),
+              ],
             ),
           ],
         ),

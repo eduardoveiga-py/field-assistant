@@ -68,6 +68,11 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
       final userId = Supabase.instance.client.auth.currentUser?.id;
       if (userId == null) return;
       final db = repo.db;
+      final demoFlag = await (db.select(db.appKvStore)
+            ..where((row) => row.key.equals('demo_mode')))
+          .getSingleOrNull();
+      if (demoFlag?.value == 'true') return;
+
       const ownerKey = 'automatic_sync_owner_id';
       final owner = await (db.select(db.appKvStore)
             ..where((row) => row.key.equals(ownerKey)))
@@ -79,10 +84,11 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
         );
       }
       final people = await repo.getAllPeople();
-      // Não propaga automaticamente cadastros de demonstração conhecidos.
+      // Proteção adicional contra cadastros demo legados sem flag demo_mode.
       const demoNames = {
         'Maria Oliveira (Demo)', 'Carlos Pereira (Demo)',
-        'Luciana Martins (Demo)', 'Beatriz Martins (Demo - Filha)',
+        'Luciana Martins (Demo)', 'Beatriz Martins (Demo)',
+        'Beatriz Martins (Demo - Filha)',
       };
       if (people.any((person) => demoNames.contains(person.name))) return;
       final appointments = await repo.getAllAppointments();

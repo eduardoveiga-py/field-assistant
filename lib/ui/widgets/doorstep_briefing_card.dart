@@ -16,6 +16,7 @@ class DoorstepBriefingCard extends StatefulWidget {
   final void Function(Uri)? onLaunchJwLibrary;
   final void Function(String)? onPlayVoiceNote;
   final VoidCallback? onQuickRecord;
+  final AudioPlayerService? playerService;
 
   const DoorstepBriefingCard({
     super.key,
@@ -24,6 +25,7 @@ class DoorstepBriefingCard extends StatefulWidget {
     this.onLaunchJwLibrary,
     this.onPlayVoiceNote,
     this.onQuickRecord,
+    this.playerService,
   });
 
   @override
@@ -31,13 +33,14 @@ class DoorstepBriefingCard extends StatefulWidget {
 }
 
 class _DoorstepBriefingCardState extends State<DoorstepBriefingCard> {
-  final AudioPlayerService _player = LocalAudioPlayerService();
+  late final AudioPlayerService _player;
   bool _isPlaying = false;
   StreamSubscription<bool>? _playerSub;
 
   @override
   void initState() {
     super.initState();
+    _player = widget.playerService ?? AudioPlayerService.platform();
     _playerSub = _player.playingStateStream.listen((playing) {
       if (mounted) {
         setState(() {
@@ -54,14 +57,25 @@ class _DoorstepBriefingCardState extends State<DoorstepBriefingCard> {
     super.dispose();
   }
 
-  void _togglePlay(String? audioPath) {
-    if (widget.onPlayVoiceNote != null && audioPath != null) {
+  Future<void> _togglePlay(String? audioPath) async {
+    if (audioPath == null || audioPath.trim().isEmpty) return;
+    if (widget.onPlayVoiceNote != null) {
       widget.onPlayVoiceNote!(audioPath);
     }
-    if (_isPlaying) {
-      _player.pause();
-    } else {
-      _player.play(audioPath ?? 'simulated_audio.m4a');
+    try {
+      if (_isPlaying) {
+        await _player.pause();
+      } else {
+        await _player.play(audioPath);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Não foi possível reproduzir o áudio: $e'),
+          ),
+        );
+      }
     }
   }
 

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/app_logger.dart';
 import '../database/app_database.dart';
 import '../ui/providers.dart';
 import 'models/ticuna_models.dart';
@@ -61,7 +62,9 @@ class ActiveLanguageNotifier extends Notifier<AppLanguageEntry?> {
           state = lang;
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.warning('Falha ao carregar idioma ativo persistido', e, st);
+    }
   }
 
   Future<void> selectLanguage(AppLanguageEntry lang) async {
@@ -75,7 +78,9 @@ class ActiveLanguageNotifier extends Notifier<AppLanguageEntry?> {
               updatedAt: Value(DateTime.now()),
             ),
           );
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.warning('Falha ao persistir idioma ativo (${lang.id})', e, st);
+    }
   }
 
   @override
@@ -96,7 +101,8 @@ final currentActiveLanguageProvider = Provider<AppLanguageEntry>((ref) {
   if (languages != null && languages.isNotEmpty) {
     try {
       return languages.firstWhere((l) => l.isDefault);
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.debug('Idioma padrão não marcado na lista; usando o primeiro: $e', st);
       return languages.first;
     }
   }
@@ -119,7 +125,9 @@ List<String> parseLanguageDiacritics(String? raw) {
     try {
       final list = jsonDecode(trimmed) as List;
       return list.map((e) => e.toString()).toList();
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.debug('Diacríticos de idioma não-JSON ($trimmed): $e', st);
+    }
   }
   return trimmed
       .split(',')

@@ -1,5 +1,7 @@
 import 'package:intl/intl.dart';
 
+import 'app_logger.dart';
+
 class AppDateUtils {
   static final DateFormat _dateFormat = DateFormat('dd/MM/yyyy');
   static final DateFormat _timeFormat = DateFormat('HH:mm');
@@ -38,7 +40,8 @@ class AppDateUtils {
       final month = int.parse(parts[1]);
       final year = int.parse(parts[2]);
       return DateTime(year, month, day);
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.debug('Falha ao interpretar data ($text): $e', st);
       return null;
     }
   }

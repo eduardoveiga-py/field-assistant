@@ -472,21 +472,9 @@ void main() {
 
       final mockClient = MockClient((request) async {
         if (request.url.path.contains('/rest/v1/people')) {
-          final offsetParam = request.url.queryParameters['offset'];
-          final limitParam = request.url.queryParameters['limit'];
-          int from = 0;
-          int count = 100;
-          if (offsetParam != null && limitParam != null) {
-            from = int.parse(offsetParam);
-            count = int.parse(limitParam);
-          } else {
-            final rangeHeader =
-                request.headers['range'] ?? request.headers['Range'] ?? '';
-            final match = RegExp(r'(\d+)-(\d+)').firstMatch(rangeHeader);
-            from = match != null ? int.parse(match.group(1)!) : 0;
-            final to = match != null ? int.parse(match.group(2)!) : 99;
-            count = to - from + 1;
-          }
+          // A segunda página usa o último par (updated_at, id), não offset.
+          final from = request.url.queryParameters.containsKey('or') ? 100 : 0;
+          const count = 100;
 
           final pageItems = allRemotePeople.skip(from).take(count).toList();
           final end = pageItems.isEmpty ? from : from + pageItems.length - 1;
@@ -574,6 +562,9 @@ void main() {
       bool storageDownloadCalled = false;
 
       final mockClient = MockClient((request) async {
+        if (request.method == 'POST' && request.url.path.endsWith('/rest/v1/rpc/sync_upsert_if_unchanged')) {
+          return mockJsonResponse(request, {'success': true});
+        }
         final path = request.url.path;
         if (path.contains('/storage/v1/object/voice_notes') &&
             path.contains('vn_upload_test.m4a') &&
@@ -671,21 +662,9 @@ void main() {
       final mockClient = MockClient((request) async {
         final path = request.url.path;
         if (path.contains('/rest/v1/people')) {
-          final offsetParam = request.url.queryParameters['offset'];
-          final limitParam = request.url.queryParameters['limit'];
-          int from = 0;
-          int count = 100;
-          if (offsetParam != null && limitParam != null) {
-            from = int.parse(offsetParam);
-            count = int.parse(limitParam);
-          } else {
-            final rangeHeader =
-                request.headers['range'] ?? request.headers['Range'] ?? '';
-            final match = RegExp(r'(\d+)-(\d+)').firstMatch(rangeHeader);
-            from = match != null ? int.parse(match.group(1)!) : 0;
-            final to = match != null ? int.parse(match.group(2)!) : 99;
-            count = to - from + 1;
-          }
+          // A segunda página usa o último par (updated_at, id), não offset.
+          final from = request.url.queryParameters.containsKey('or') ? 100 : 0;
+          const count = 100;
 
           final pageItems = allRemotePeople.skip(from).take(count).toList();
           final end = pageItems.isEmpty ? from : from + pageItems.length - 1;
@@ -766,6 +745,9 @@ void main() {
           );
 
       final mockClient = MockClient((request) async {
+        if (request.method == 'POST' && request.url.path.endsWith('/rest/v1/rpc/sync_upsert_if_unchanged')) {
+          return mockJsonResponse(request, {'success': true});
+        }
         final path = request.url.path;
         // Metadados são aceitos pelo PostgREST
         if (path.contains('/rest/v1/voice_notes')) {
@@ -796,14 +778,34 @@ void main() {
         equals(1),
       ); // Person criada no setUp passou, nota de voz falhou
 
-      // VERIFICAÇÃO CRÍTICA:
-      // A operação da nota de voz NÃO PODE ter sido marcada como synced!
-      final opInDb = await (db.select(
+      // VERIFICAÇÃO CRÍTICA (C1):
+      // Após a 1ª falha transitória de Storage, NÃO pode ser marcada como synced nem dead-letterada imediatamente;
+      // deve permanecer pending para retry com backoff, só virando 'failed' após maxSyncAttempts (5).
+      final opAfterFirstTry = await (db.select(
         db.syncQueue,
       )..where((t) => t.id.equals('q_vn_fail_upload'))).getSingle();
-      expect(opInDb.status, equals('failed'));
-      expect(opInDb.attempts, equals(1));
-      expect(opInDb.lastError, contains('Falha no upload do arquivo binário'));
+      expect(opAfterFirstTry.status, equals('pending'));
+      expect(opAfterFirstTry.attempts, equals(1));
+      expect(opAfterFirstTry.lastError, contains('Falha no upload do arquivo binário'));
+
+      for (int i = 0; i < 4; i++) {
+        await (db.update(db.syncQueue)
+              ..where((t) => t.id.equals('q_vn_fail_upload')))
+            .write(
+              SyncQueueCompanion(
+                lastAttemptAt: drift.Value(
+                  DateTime.now().subtract(const Duration(minutes: 10)),
+                ),
+              ),
+            );
+        await customSync.processQueue();
+      }
+
+      final opDeadLetter = await (db.select(
+        db.syncQueue,
+      )..where((t) => t.id.equals('q_vn_fail_upload'))).getSingle();
+      expect(opDeadLetter.status, equals('failed'));
+      expect(opDeadLetter.attempts, equals(AppRepository.maxSyncAttempts));
     });
 
     test('TC-SYNC-ADV-03: Download de áudio pendente é registrado e recuperável via retryPendingMediaDownloads', () async {
@@ -977,6 +979,9 @@ void main() {
       bool downloadCalled = false;
 
       final mockClient = MockClient((request) async {
+        if (request.method == 'POST' && request.url.path.endsWith('/rest/v1/rpc/sync_upsert_if_unchanged')) {
+          return mockJsonResponse(request, {'success': true});
+        }
         final uri = request.url.toString();
 
         if (uri.contains('/storage/v1/object/knowledge_vault') || uri.contains('knowledge_vault')) {

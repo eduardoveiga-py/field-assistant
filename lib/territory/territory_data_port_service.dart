@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../core/app_logger.dart';
 import '../database/app_database.dart';
 
 /// Item genérico exportado ou importado de territórios
@@ -203,8 +204,8 @@ class TerritoryDataPortService {
           ),
         );
       }
-    } catch (_) {
-      // Retorna graciosamente em caso de JSON malformado
+    } catch (e, st) {
+      AppLogger.debug('JSON/GeoJSON malformado ao importar contatos de território: $e', st);
     }
 
     return results;

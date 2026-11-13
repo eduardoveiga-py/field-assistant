@@ -28,12 +28,10 @@ void main() {
     });
 
     test(
-      'Auto-inicialização insere setores padrão: Betânia, Lago Grande e Cidade',
+      'Tabela inicia completamente vazia sem setores fictícios',
       () async {
         final sectors = await sectorManager.getSectors();
-        expect(sectors.length, equals(3));
-        final names = sectors.map((s) => s.name).toList();
-        expect(names, containsAll(['Betânia', 'Lago Grande', 'Cidade']));
+        expect(sectors, isEmpty);
       },
     );
 
@@ -46,21 +44,22 @@ void main() {
       expect(sec.description, equals('Próximo à rodovia'));
 
       final sectors = await sectorManager.getSectors();
-      expect(sectors.length, equals(4));
-      expect(sectors.any((s) => s.name == 'Vila Nova'), isTrue);
+      expect(sectors.length, equals(1));
+      expect(sectors.first.name, equals('Vila Nova'));
     });
 
     test('Atualização de setor renomeia e atualiza contatos associados no repositório', () async {
+      final sec = await sectorManager.addSector(
+        'Betânia',
+        description: 'Setor residencial',
+      );
       final p1 = await repository.createPerson(
         name: 'Carlos Oliveira',
         address: 'Rua 1, Bairro: Betânia',
       );
 
-      final sectors = await sectorManager.getSectors();
-      final betania = sectors.firstWhere((s) => s.name == 'Betânia');
-
       await sectorManager.updateSector(
-        betania.id,
+        sec.id,
         'Betânia Alto',
         description: 'Setor elevado',
         repo: repository,
@@ -86,9 +85,22 @@ void main() {
 
     test('watchSectors() emite os setores existentes imediatamente na inscrição sem perder eventos', () async {
       final initialSectors = await sectorManager.watchSectors().first;
-      expect(initialSectors.length, equals(3));
-      expect(initialSectors.map((s) => s.name), contains('Betânia'));
+      expect(initialSectors, isEmpty);
     });
+
+    test(
+      'Após exclusão de setores, a tabela permanece vazia sem auto-injeção de sementes',
+      () async {
+        final sec = await sectorManager.addSector('Setor Único');
+        await sectorManager.deleteSector(sec.id);
+
+        final afterDelete = await sectorManager.getSectors();
+        expect(afterDelete, isEmpty);
+
+        final secondCheck = await sectorManager.getSectors();
+        expect(secondCheck, isEmpty);
+      },
+    );
   });
 
   group('Gerenciamento de Pontos de Referência / Marcos do Território (LandmarkManager)', () {
@@ -104,15 +116,20 @@ void main() {
       await db.close();
     });
 
+    test('Tabela de marcos inicia vazia sem sementes fictícias', () async {
+      final landmarks = await landmarkManager.getLandmarks();
+      expect(landmarks, isEmpty);
+    });
+
     test(
-      'Adiciona ponto de referência com coordenadas e categoria válidas',
+      'Adiciona ponto de referência com coordenadas do território e categoria válidas',
       () async {
         final landmark = await landmarkManager.addLandmark(
           name: 'Padaria Estrela',
           category: 'padaria',
           address: 'Av. Principal, 500',
-          latitude: -23.551,
-          longitude: -46.634,
+          latitude: -3.1030,
+          longitude: -67.9400,
           notes: 'Ponto de encontro da saída de campo',
         );
 
@@ -120,10 +137,11 @@ void main() {
         expect(landmark.name, equals('Padaria Estrela'));
         expect(landmark.category, equals('padaria'));
         expect(landmark.categoryLabel, equals('Padaria / Comércio'));
-        expect(landmark.latitude, equals(-23.551));
+        expect(landmark.latitude, equals(-3.1030));
+        expect(landmark.longitude, equals(-67.9400));
 
         final all = await landmarkManager.getLandmarks();
-        expect(all.length, equals(4)); // 3 padrão + 1 novo
+        expect(all.length, equals(1));
         expect(all.any((l) => l.name == 'Padaria Estrela'), isTrue);
       },
     );
@@ -132,6 +150,8 @@ void main() {
       final lm = await landmarkManager.addLandmark(
         name: 'Escola Municipal Nova',
         category: 'escola',
+        latitude: -3.1022,
+        longitude: -67.9397,
       );
 
       final updated = TerritoryLandmark(
@@ -139,8 +159,8 @@ void main() {
         name: 'Escola Municipal Central',
         category: 'escola',
         address: 'Rua da Educação, 10',
-        latitude: -23.555,
-        longitude: -46.635,
+        latitude: -3.1050,
+        longitude: -67.9420,
         createdAt: lm.createdAt,
       );
 
@@ -157,21 +177,46 @@ void main() {
 
       await landmarkManager.deleteLandmark(lm.id);
       all = await landmarkManager.getLandmarks();
-      expect(all.any((l) => l.id == lm.id), isFalse);
+      expect(all, isEmpty);
     });
 
     test(
-      'watchLandmarks() emite os marcos existentes imediatamente na inscrição',
+      'watchLandmarks() emite estado inicial vazio e atualiza com novos marcos',
       () async {
+        final initialLandmarks = await landmarkManager.watchLandmarks().first;
+        expect(initialLandmarks, isEmpty);
+
         await landmarkManager.addLandmark(
           name: 'Escola Municipal Teste',
           category: 'escola',
+          latitude: -3.1022,
+          longitude: -67.9397,
         );
         final landmarks = await landmarkManager.watchLandmarks().first;
         expect(
           landmarks.any((l) => l.name == 'Escola Municipal Teste'),
           isTrue,
         );
+      },
+    );
+
+    test(
+      'Após exclusão de todos os marcos, a tabela permanece vazia sem recriar sementes',
+      () async {
+        final lm = await landmarkManager.addLandmark(
+          name: 'Posto de Saúde Local',
+          category: 'saude',
+          latitude: -3.1022,
+          longitude: -67.9397,
+        );
+        await landmarkManager.deleteLandmark(lm.id);
+
+        final afterDelete = await landmarkManager.getLandmarks();
+        expect(afterDelete, isEmpty);
+
+        // Chamada subsequente a getLandmarks() não deve re-popular
+        final secondCheck = await landmarkManager.getLandmarks();
+        expect(secondCheck, isEmpty);
       },
     );
   });

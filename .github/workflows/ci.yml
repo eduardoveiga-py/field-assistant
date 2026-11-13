@@ -12,8 +12,54 @@ permissions:
   contents: write
 
 jobs:
+  version_consistency:
+    name: Check Version Consistency (pubspec / AppVersion / apps.json / Tag)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Verify Version Metadata Matches Across Files
+        run: |
+          python3 - <<'PY'
+          import json, os, re, sys
+          from pathlib import Path
+
+          pubspec = Path("pubspec.yaml").read_text(encoding="utf-8")
+          m_pub = re.search(r"^version:\s*([0-9]+\.[0-9]+\.[0-9]+)\+([0-9]+)", pubspec, re.M)
+          assert m_pub, "pubspec.yaml version not found"
+          pub_ver, pub_build = m_pub.group(1), int(m_pub.group(2))
+
+          app_ver_src = Path("lib/core/app_version.dart").read_text(encoding="utf-8")
+          m_ver = re.search(r"static const String version\s*=\s*'([^']+)'", app_ver_src)
+          m_bld = re.search(r"static const int buildNumber\s*=\s*(\d+)", app_ver_src)
+          assert m_ver and m_bld, "AppVersion constants not found"
+          assert m_ver.group(1) == pub_ver, f"AppVersion.version ({m_ver.group(1)}) != pubspec ({pub_ver})"
+          assert int(m_bld.group(1)) == pub_build, f"AppVersion.buildNumber ({m_bld.group(1)}) != pubspec ({pub_build})"
+
+          apps_root = json.loads(Path("apps.json").read_text(encoding="utf-8"))
+          apps = apps_root["apps"][0]
+          assert apps["version"] == pub_ver, f"apps.json version ({apps['version']}) != pubspec ({pub_ver})"
+          for label, url_val in [
+              ("root iconURL", apps_root.get("iconURL", "")),
+              ("root headerURL", apps_root.get("headerURL", "")),
+              ("app iconURL", apps.get("iconURL", "")),
+              ("sourceURL", apps_root.get("sourceURL", "")),
+          ]:
+              assert "@master" not in url_val and "@main" not in url_val, (
+                  f"apps.json {label} points to mutable branch: {url_val}"
+              )
+
+          ref = os.environ.get("GITHUB_REF", "")
+          if ref.startswith("refs/tags/v"):
+              tag_ver = ref[len("refs/tags/v"):]
+              assert tag_ver == pub_ver, f"Git tag v{tag_ver} != pubspec {pub_ver}"
+          print(f"Version consistency OK: {pub_ver}+{pub_build}")
+          PY
+
   test_and_lint:
     name: Flutter Analyze & Test
+    needs: [ version_consistency ]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -27,6 +73,9 @@ jobs:
 
       - name: Install Dependencies
         run: flutter pub get
+
+      - name: Check Outdated Dependencies (Informative M11)
+        run: flutter pub outdated --no-dev-dependencies || true
 
       - name: Run Static Analysis
         run: |
@@ -75,11 +124,53 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
+      - name: Inject Optional Web Client ID & Build Defines
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          web_client = os.environ.get("GOOGLE_WEB_CLIENT_ID", "").strip()
+          if web_client:
+              idx = Path("web/index.html")
+              text = idx.read_text(encoding="utf-8")
+              full_id = web_client if web_client.endswith(".apps.googleusercontent.com") else f"{web_client}.apps.googleusercontent.com"
+              idx.write_text(
+                  text.replace("YOUR_GOOGLE_WEB_CLIENT_ID.apps.googleusercontent.com", full_id),
+                  encoding="utf-8",
+              )
+
+          defines = []
+          for key in ("SUPABASE_URL", "SUPABASE_ANON_KEY", "GOOGLE_WEB_CLIENT_ID"):
+              val = os.environ.get(key, "").strip()
+              if val:
+                  defines.append(f"--dart-define={key}={val}")
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as f:
+              f.write(f"DART_DEFINES={' '.join(defines)}\n")
+          PY
+
       - name: Build Web (Release)
-        run: flutter build web --release
+        run: flutter build web --release $DART_DEFINES
+
+      - name: Decode Android Release Keystore (if configured)
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/release-keystore.jks
+            echo "ANDROID_KEYSTORE_PATH=release-keystore.jks" >> "$GITHUB_ENV"
+          fi
 
       - name: Build Android APK (Release arm64-v8a)
-        run: flutter build apk --target-platform android-arm64 --release
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: flutter build apk --target-platform android-arm64 --release $DART_DEFINES
 
       - name: Stage Web & Android Release Artifacts
         run: |
@@ -133,8 +224,38 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
+      - name: Inject Optional iOS Client ID & Build Defines
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
+          GOOGLE_IOS_CLIENT_ID: ${{ secrets.GOOGLE_IOS_CLIENT_ID }}
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          ios_client = os.environ.get("GOOGLE_IOS_CLIENT_ID", "").strip()
+          if ios_client:
+              plist = Path("ios/Runner/Info.plist")
+              text = plist.read_text(encoding="utf-8")
+              prefix = ios_client.removesuffix(".apps.googleusercontent.com")
+              full_id = f"{prefix}.apps.googleusercontent.com"
+              text = text.replace("YOUR_GOOGLE_IOS_CLIENT_ID.apps.googleusercontent.com", full_id)
+              text = text.replace("com.googleusercontent.apps.YOUR_GOOGLE_IOS_CLIENT_ID", f"com.googleusercontent.apps.{prefix}")
+              plist.write_text(text, encoding="utf-8")
+
+          defines = []
+          for key in ("SUPABASE_URL", "SUPABASE_ANON_KEY", "GOOGLE_WEB_CLIENT_ID"):
+              val = os.environ.get(key, "").strip()
+              if val:
+                  defines.append(f"--dart-define={key}={val}")
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as f:
+              f.write(f"DART_DEFINES={' '.join(defines)}\n")
+          PY
+
       - name: Build iOS (No Codesign)
-        run: flutter build ios --no-codesign --release
+        run: flutter build ios --no-codesign --release $DART_DEFINES
 
       - name: Package Unsigned iOS IPA
         run: |
@@ -178,9 +299,20 @@ jobs:
 
       - name: Build Windows Executable
         shell: pwsh
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
         run: |
           $ErrorActionPreference = 'Continue'
-          flutter build windows --release 2>&1 | Tee-Object -FilePath build-windows.log
+          $defines = @()
+          foreach ($k in @('SUPABASE_URL', 'SUPABASE_ANON_KEY', 'GOOGLE_WEB_CLIENT_ID')) {
+            $v = [Environment]::GetEnvironmentVariable($k)
+            if (-not [string]::IsNullOrWhiteSpace($v)) {
+              $defines += "--dart-define=$k=$($v.Trim())"
+            }
+          }
+          flutter build windows --release @defines 2>&1 | Tee-Object -FilePath build-windows.log
           $exitCode = $LASTEXITCODE
           if ($exitCode -ne 0) {
             $errors = Get-Content build-windows.log | Select-String -Pattern "error |CMake Error|fatal error|FAILED" | Select-Object -First 25
@@ -234,7 +366,19 @@ jobs:
         run: flutter pub get
 
       - name: Build Linux (Release)
-        run: flutter build linux --release
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
+        run: |
+          DART_DEFINES=""
+          for k in SUPABASE_URL SUPABASE_ANON_KEY GOOGLE_WEB_CLIENT_ID; do
+            v="$(eval echo "\$$k")"
+            if [ -n "$v" ]; then
+              DART_DEFINES="$DART_DEFINES --dart-define=$k=$v"
+            fi
+          done
+          flutter build linux --release $DART_DEFINES
 
       - name: Package Linux Artifact
         run: |
@@ -277,7 +421,19 @@ jobs:
         run: flutter pub get
 
       - name: Build macOS (Release)
-        run: flutter build macos --release
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
+        run: |
+          DART_DEFINES=""
+          for k in SUPABASE_URL SUPABASE_ANON_KEY GOOGLE_WEB_CLIENT_ID; do
+            v="$(eval echo "\$$k")"
+            if [ -n "$v" ]; then
+              DART_DEFINES="$DART_DEFINES --dart-define=$k=$v"
+            fi
+          done
+          flutter build macos --release $DART_DEFINES
 
       - name: Package macOS Artifact
         run: |
@@ -356,6 +512,7 @@ jobs:
             windows-dist/field-assistant-windows-x64.zip
             linux-dist/field-assistant-linux-x64.tar.gz
             macos-dist/field-assistant-macos.zip
+            apps.json
             checksums/SHA256SUMS.txt
           generate_release_notes: true
 

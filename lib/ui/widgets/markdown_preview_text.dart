@@ -155,9 +155,10 @@ class MarkdownPreviewText extends StatelessWidget {
         final markText = m.group(2)!;
         Color markBg = Colors.amber.withValues(alpha: 0.3);
         if (hex != null) {
-          try {
-            markBg = Color(int.parse(hex.replaceFirst('#', '0xFF'))).withValues(alpha: 0.35);
-          } catch (_) {}
+          final parsedColor = int.tryParse(hex.replaceFirst('#', '0xFF'));
+          if (parsedColor != null) {
+            markBg = Color(parsedColor).withValues(alpha: 0.35);
+          }
         }
         spans.add(TextSpan(
           text: markText,

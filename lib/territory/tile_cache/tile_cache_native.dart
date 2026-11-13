@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 
+import '../../core/app_logger.dart';
 import '../../core/app_version.dart';
 import 'tile_cache_service.dart';
 
@@ -101,7 +102,9 @@ class TileCacheNative implements TileCacheBackend {
             text.contains('osm.wiki/Blocked')) {
           return true;
         }
-      } catch (_) {}
+      } catch (e, st) {
+        AppLogger.debug('Falha ao inspecionar bytes de tile nativo: $e', st);
+      }
     }
     return false;
   }
@@ -124,7 +127,9 @@ class TileCacheNative implements TileCacheBackend {
         }
         try {
           await file.delete();
-        } catch (_) {}
+        } catch (e, st) {
+          AppLogger.debug('Falha ao deletar tile bloqueado (${file.path}): $e', st);
+        }
       }
 
       // Do not make live HTTP calls during automated tests unless a custom client is provided
@@ -163,8 +168,8 @@ class TileCacheNative implements TileCacheBackend {
             await saveTile(z, x, y, res.bodyBytes, s);
             return res.bodyBytes;
           }
-        } catch (_) {
-          // Falha transitória de rede; prossegue para fallback
+        } catch (e, st) {
+          AppLogger.debug('Falha transitória ao baixar tile primário ($z/$x/$y): $e', st);
         }
 
         // 2ª Tentativa (Fallback transparente de alta disponibilidade): OSM France apenas se for standard
@@ -197,8 +202,8 @@ class TileCacheNative implements TileCacheBackend {
               await saveTile(z, x, y, resFallback.bodyBytes, s);
               return resFallback.bodyBytes;
             }
-          } catch (_) {
-            // Falha de rede no fallback
+          } catch (e, st) {
+            AppLogger.debug('Falha de rede no fallback OSM France ($z/$x/$y): $e', st);
           }
         }
       } finally {
@@ -207,8 +212,8 @@ class TileCacheNative implements TileCacheBackend {
         }
         _releaseDownloadSlot();
       }
-    } catch (_) {
-      // Offline or network error
+    } catch (e, st) {
+      AppLogger.debug('Erro offline ou de rede ao carregar tile ($z/$x/$y): $e', st);
     }
     return null;
   }
@@ -224,7 +229,9 @@ class TileCacheNative implements TileCacheBackend {
         if (await file.exists()) {
           await file.delete();
         }
-      } catch (_) {}
+      } catch (e, st) {
+        AppLogger.debug('Falha ao limpar tile bloqueado ($z/$x/$y): $e', st);
+      }
       return;
     }
     try {
@@ -234,7 +241,9 @@ class TileCacheNative implements TileCacheBackend {
         await file.parent.create(recursive: true);
       }
       await file.writeAsBytes(bytes, flush: true);
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.warning('Falha ao gravar tile ($z/$x/$y) em cache', e, st);
+    }
   }
 
   @override
@@ -251,13 +260,16 @@ class TileCacheNative implements TileCacheBackend {
             len == _blockedTileByteLength) {
           try {
             await file.delete();
-          } catch (_) {}
+          } catch (e, st) {
+            AppLogger.debug('Falha ao apagar tile inválido ($z/$x/$y): $e', st);
+          }
           return false;
         }
         return true;
       }
       return false;
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.debug('Falha ao verificar cache local do tile ($z/$x/$y): $e', st);
       return false;
     }
   }
@@ -283,14 +295,17 @@ class TileCacheNative implements TileCacheBackend {
               len == _blockedTileByteLength) {
             try {
               await entity.delete();
-            } catch (_) {}
+            } catch (e, st) {
+              AppLogger.debug('Falha ao limpar tile corrompido (${entity.path}): $e', st);
+            }
           } else {
             count++;
           }
         }
       }
       return count;
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.debug('Falha ao contabilizar tiles em cache local: $e', st);
       return 0;
     }
   }

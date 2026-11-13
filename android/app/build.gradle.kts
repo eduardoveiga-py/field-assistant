@@ -15,8 +15,7 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.ministerio_pessoal"
+        applicationId = "com.ministeriopessoal.territorio"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -29,11 +28,38 @@ android {
         versionName = flutter.versionName
     }
 
+    val keystorePath = System.getenv("ANDROID_KEYSTORE_PATH") ?: "release-keystore.jks"
+    val keystorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD") ?: ""
+    val releaseKeyAlias = System.getenv("ANDROID_KEY_ALIAS") ?: ""
+    val releaseKeyPassword = System.getenv("ANDROID_KEY_PASSWORD") ?: ""
+    val hasReleaseSigning = file(keystorePath).exists() &&
+        keystorePassword.isNotBlank() &&
+        releaseKeyAlias.isNotBlank() &&
+        releaseKeyPassword.isNotBlank()
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(keystorePath)
+                storePassword = keystorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            } else if (project.hasProperty("requireReleaseSigning")) {
+                throw GradleException(
+                    "Release signing obrigatório não configurado (ANDROID_KEYSTORE_PATH/PASSWORD/ALIAS).",
+                )
+            } else {
+                logger.warn("AVISO: release keystore ausente; usando assinatura debug apenas para build local.")
+                signingConfig = signingConfigs.getByName("debug")
+            }
         }
     }
 }

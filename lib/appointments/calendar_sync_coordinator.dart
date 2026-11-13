@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart' as drift;
 
+import '../core/app_logger.dart';
 import '../database/app_database.dart';
 import '../ui/providers.dart';
 import 'calendar_provider.dart';
@@ -382,7 +383,9 @@ class CalendarSyncCoordinator {
         if (await provider.isAuthorized()) {
           await provider.pushAppointmentToExternal(db, appointment);
         }
-      } catch (_) {}
+      } catch (e, st) {
+        AppLogger.warning('Falha ao propagar compromisso (${appointment.id}) para ${provider.providerType.name}', e, st);
+      }
     }
   }
 
@@ -402,7 +405,9 @@ class CalendarSyncCoordinator {
           if (await provider.isAuthorized()) {
             await provider.deleteExternalEvent(db, link.externalEventId);
           }
-        } catch (_) {}
+        } catch (e, st) {
+          AppLogger.warning('Falha ao excluir evento externo (${link.externalEventId})', e, st);
+        }
       }
       await (db.update(
         db.calendarEventLinks,

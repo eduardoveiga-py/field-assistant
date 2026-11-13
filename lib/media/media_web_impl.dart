@@ -3,6 +3,8 @@ import 'dart:js_interop';
 
 import 'package:web/web.dart' as web;
 
+import '../core/app_logger.dart';
+
 Future<String?> pickImageFromBrowser({bool useCamera = false}) async {
   final completer = Completer<String?>();
   try {
@@ -40,7 +42,8 @@ Future<String?> pickImageFromBrowser({bool useCamera = false}) async {
     });
 
     uploadInput.click();
-  } catch (_) {
+  } catch (e, st) {
+    AppLogger.warning('Falha ao selecionar imagem pelo navegador Web', e, st);
     completer.complete(null);
   }
 

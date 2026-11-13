@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:drift/drift.dart' as drift;
 import 'package:uuid/uuid.dart';
 
+import '../core/app_logger.dart';
+import '../core/sync_timestamp.dart';
 import '../database/app_database.dart';
 
 /// Gerenciador do Módulo A — Inbox Universal do Field Assistant.
@@ -37,8 +39,11 @@ class InboxManager {
       updatedAt: now,
     );
 
-    await db.into(db.inboxEntries).insert(companion);
-    await _recordSyncQueue(id, 'INSERT', companion);
+    await db.transaction(() async {
+      await db.into(db.inboxEntries).insert(companion);
+      final inserted = await (db.select(db.inboxEntries)..where((t) => t.id.equals(id))).getSingle();
+      await _recordSyncQueue('inbox_entries', id, 'INSERT', inserted.toJson());
+    });
 
     return (await (db.select(db.inboxEntries)..where((t) => t.id.equals(id))).getSingle());
   }
@@ -67,8 +72,11 @@ class InboxManager {
       updatedAt: now,
     );
 
-    await db.into(db.inboxEntries).insert(companion);
-    await _recordSyncQueue(id, 'INSERT', companion);
+    await db.transaction(() async {
+      await db.into(db.inboxEntries).insert(companion);
+      final inserted = await (db.select(db.inboxEntries)..where((t) => t.id.equals(id))).getSingle();
+      await _recordSyncQueue('inbox_entries', id, 'INSERT', inserted.toJson());
+    });
 
     return (await (db.select(db.inboxEntries)..where((t) => t.id.equals(id))).getSingle());
   }
@@ -107,8 +115,11 @@ class InboxManager {
       updatedAt: now,
     );
 
-    await db.into(db.inboxEntries).insert(companion);
-    await _recordSyncQueue(id, 'INSERT', companion);
+    await db.transaction(() async {
+      await db.into(db.inboxEntries).insert(companion);
+      final inserted = await (db.select(db.inboxEntries)..where((t) => t.id.equals(id))).getSingle();
+      await _recordSyncQueue('inbox_entries', id, 'INSERT', inserted.toJson());
+    });
 
     return (await (db.select(db.inboxEntries)..where((t) => t.id.equals(id))).getSingle());
   }
@@ -123,17 +134,23 @@ class InboxManager {
     Map<String, dynamic>? metadata,
   }) async {
     final now = DateTime.now();
-    final companion = InboxEntriesCompanion(
-      content: content != null ? drift.Value(content.trim()) : const drift.Value.absent(),
-      suggestedCategory: suggestedCategory != null ? drift.Value(suggestedCategory) : const drift.Value.absent(),
-      attachments: attachments != null ? drift.Value(jsonEncode(attachments)) : const drift.Value.absent(),
-      status: status != null ? drift.Value(status) : const drift.Value.absent(),
-      metadata: metadata != null ? drift.Value(jsonEncode(metadata)) : const drift.Value.absent(),
-      updatedAt: drift.Value(now),
-    );
+    await db.transaction(() async {
+      final existing = await getEntryById(id);
+      if (existing == null) return;
+      final companion = InboxEntriesCompanion(
+        content: content != null ? drift.Value(content.trim()) : const drift.Value.absent(),
+        suggestedCategory: suggestedCategory != null ? drift.Value(suggestedCategory) : const drift.Value.absent(),
+        attachments: attachments != null ? drift.Value(jsonEncode(attachments)) : const drift.Value.absent(),
+        status: status != null ? drift.Value(status) : const drift.Value.absent(),
+        metadata: metadata != null ? drift.Value(jsonEncode(metadata)) : const drift.Value.absent(),
+        updatedAt: drift.Value(now),
+        revision: drift.Value(existing.revision + 1),
+      );
 
-    await (db.update(db.inboxEntries)..where((t) => t.id.equals(id))).write(companion);
-    await _recordSyncQueue(id, 'UPDATE', companion);
+      await (db.update(db.inboxEntries)..where((t) => t.id.equals(id))).write(companion);
+      final updated = await (db.select(db.inboxEntries)..where((t) => t.id.equals(id))).getSingle();
+      await _recordSyncQueue('inbox_entries', id, 'UPDATE', updated.toJson(), baseData: existing.toJson());
+    });
   }
 
   // ==========================================
@@ -177,33 +194,60 @@ class InboxManager {
 
   Future<void> markInReview(String id) async {
     final now = DateTime.now();
-    await (db.update(db.inboxEntries)..where((t) => t.id.equals(id))).write(
-      InboxEntriesCompanion(
-        status: const drift.Value('in_review'),
-        updatedAt: drift.Value(now),
-      ),
-    );
+    await db.transaction(() async {
+      final existing = await getEntryById(id);
+      if (existing == null) return;
+      await (db.update(db.inboxEntries)..where((t) => t.id.equals(id))).write(
+        InboxEntriesCompanion(
+          status: const drift.Value('in_review'),
+          updatedAt: drift.Value(now),
+          revision: drift.Value(existing.revision + 1),
+        ),
+      );
+      final updated = await getEntryById(id);
+      if (updated != null) {
+        await _recordSyncQueue('inbox_entries', id, 'UPDATE', updated.toJson(), baseData: existing.toJson());
+      }
+    });
   }
 
   Future<void> archiveEntry(String id) async {
     final now = DateTime.now();
-    await (db.update(db.inboxEntries)..where((t) => t.id.equals(id))).write(
-      InboxEntriesCompanion(
-        status: const drift.Value('archived'),
-        processedAt: drift.Value(now),
-        updatedAt: drift.Value(now),
-      ),
-    );
+    await db.transaction(() async {
+      final existing = await getEntryById(id);
+      if (existing == null) return;
+      await (db.update(db.inboxEntries)..where((t) => t.id.equals(id))).write(
+        InboxEntriesCompanion(
+          status: const drift.Value('archived'),
+          processedAt: drift.Value(now),
+          updatedAt: drift.Value(now),
+          revision: drift.Value(existing.revision + 1),
+        ),
+      );
+      final updated = await getEntryById(id);
+      if (updated != null) {
+        await _recordSyncQueue('inbox_entries', id, 'UPDATE', updated.toJson(), baseData: existing.toJson());
+      }
+    });
   }
 
   Future<void> softDeleteEntry(String id) async {
     final now = DateTime.now();
-    await (db.update(db.inboxEntries)..where((t) => t.id.equals(id))).write(
-      InboxEntriesCompanion(
-        deletedAt: drift.Value(now),
-        updatedAt: drift.Value(now),
-      ),
-    );
+    await db.transaction(() async {
+      final existing = await getEntryById(id);
+      if (existing == null) return;
+      await (db.update(db.inboxEntries)..where((t) => t.id.equals(id))).write(
+        InboxEntriesCompanion(
+          deletedAt: drift.Value(now),
+          updatedAt: drift.Value(now),
+          revision: drift.Value(existing.revision + 1),
+        ),
+      );
+      final updated = await getEntryById(id);
+      if (updated != null) {
+        await _recordSyncQueue('inbox_entries', id, 'DELETE', updated.toJson(), baseData: existing.toJson());
+      }
+    });
   }
 
   // ==========================================
@@ -246,19 +290,27 @@ class InboxManager {
       updatedAt: now,
     );
 
-    await db.into(db.tasks).insert(taskCompanion);
-    await _recordSyncQueue(taskId, 'INSERT', taskCompanion);
+    await db.transaction(() async {
+      await db.into(db.tasks).insert(taskCompanion);
+      final insertedTask = await (db.select(db.tasks)..where((t) => t.id.equals(taskId))).getSingle();
+      await _recordSyncQueue('tasks', taskId, 'INSERT', insertedTask.toJson());
 
-    // Atualiza status da entrada no Inbox sem perda de dados
-    await (db.update(db.inboxEntries)..where((t) => t.id.equals(inboxId))).write(
-      InboxEntriesCompanion(
-        status: const drift.Value('converted'),
-        convertedEntityType: const drift.Value('task'),
-        convertedEntityId: drift.Value(taskId),
-        processedAt: drift.Value(now),
-        updatedAt: drift.Value(now),
-      ),
-    );
+      // Atualiza status da entrada no Inbox sem perda de dados
+      await (db.update(db.inboxEntries)..where((t) => t.id.equals(inboxId))).write(
+        InboxEntriesCompanion(
+          status: const drift.Value('converted'),
+          convertedEntityType: const drift.Value('task'),
+          convertedEntityId: drift.Value(taskId),
+          processedAt: drift.Value(now),
+          updatedAt: drift.Value(now),
+          revision: drift.Value(inbox.revision + 1),
+        ),
+      );
+      final updatedInbox = await getEntryById(inboxId);
+      if (updatedInbox != null) {
+        await _recordSyncQueue('inbox_entries', inboxId, 'UPDATE', updatedInbox.toJson(), baseData: inbox.toJson());
+      }
+    });
 
     return (await (db.select(db.tasks)..where((t) => t.id.equals(taskId))).getSingle());
   }
@@ -294,18 +346,26 @@ class InboxManager {
       updatedAt: now,
     );
 
-    await db.into(db.projects).insert(projectCompanion);
-    await _recordSyncQueue(projectId, 'INSERT', projectCompanion);
+    await db.transaction(() async {
+      await db.into(db.projects).insert(projectCompanion);
+      final insertedProj = await (db.select(db.projects)..where((t) => t.id.equals(projectId))).getSingle();
+      await _recordSyncQueue('projects', projectId, 'INSERT', insertedProj.toJson());
 
-    await (db.update(db.inboxEntries)..where((t) => t.id.equals(inboxId))).write(
-      InboxEntriesCompanion(
-        status: const drift.Value('converted'),
-        convertedEntityType: const drift.Value('project'),
-        convertedEntityId: drift.Value(projectId),
-        processedAt: drift.Value(now),
-        updatedAt: drift.Value(now),
-      ),
-    );
+      await (db.update(db.inboxEntries)..where((t) => t.id.equals(inboxId))).write(
+        InboxEntriesCompanion(
+          status: const drift.Value('converted'),
+          convertedEntityType: const drift.Value('project'),
+          convertedEntityId: drift.Value(projectId),
+          processedAt: drift.Value(now),
+          updatedAt: drift.Value(now),
+          revision: drift.Value(inbox.revision + 1),
+        ),
+      );
+      final updatedInbox = await getEntryById(inboxId);
+      if (updatedInbox != null) {
+        await _recordSyncQueue('inbox_entries', inboxId, 'UPDATE', updatedInbox.toJson(), baseData: inbox.toJson());
+      }
+    });
 
     return (await (db.select(db.projects)..where((t) => t.id.equals(projectId))).getSingle());
   }
@@ -342,18 +402,26 @@ class InboxManager {
       updatedAt: now,
     );
 
-    await db.into(db.knowledgeNotes).insert(noteCompanion);
-    await _recordSyncQueue(noteId, 'INSERT', noteCompanion);
+    await db.transaction(() async {
+      await db.into(db.knowledgeNotes).insert(noteCompanion);
+      final insertedNote = await (db.select(db.knowledgeNotes)..where((t) => t.id.equals(noteId))).getSingle();
+      await _recordSyncQueue('knowledge_notes', noteId, 'INSERT', insertedNote.toJson());
 
-    await (db.update(db.inboxEntries)..where((t) => t.id.equals(inboxId))).write(
-      InboxEntriesCompanion(
-        status: const drift.Value('converted'),
-        convertedEntityType: const drift.Value('note'),
-        convertedEntityId: drift.Value(noteId),
-        processedAt: drift.Value(now),
-        updatedAt: drift.Value(now),
-      ),
-    );
+      await (db.update(db.inboxEntries)..where((t) => t.id.equals(inboxId))).write(
+        InboxEntriesCompanion(
+          status: const drift.Value('converted'),
+          convertedEntityType: const drift.Value('note'),
+          convertedEntityId: drift.Value(noteId),
+          processedAt: drift.Value(now),
+          updatedAt: drift.Value(now),
+          revision: drift.Value(inbox.revision + 1),
+        ),
+      );
+      final updatedInbox = await getEntryById(inboxId);
+      if (updatedInbox != null) {
+        await _recordSyncQueue('inbox_entries', inboxId, 'UPDATE', updatedInbox.toJson(), baseData: inbox.toJson());
+      }
+    });
 
     return (await (db.select(db.knowledgeNotes)..where((t) => t.id.equals(noteId))).getSingle());
   }
@@ -387,18 +455,26 @@ class InboxManager {
       updatedAt: now,
     );
 
-    await db.into(db.knowledgeQuestions).insert(questionCompanion);
-    await _recordSyncQueue(questionId, 'INSERT', questionCompanion);
+    await db.transaction(() async {
+      await db.into(db.knowledgeQuestions).insert(questionCompanion);
+      final insertedQuestion = await (db.select(db.knowledgeQuestions)..where((t) => t.id.equals(questionId))).getSingle();
+      await _recordSyncQueue('knowledge_questions', questionId, 'INSERT', insertedQuestion.toJson());
 
-    await (db.update(db.inboxEntries)..where((t) => t.id.equals(inboxId))).write(
-      InboxEntriesCompanion(
-        status: const drift.Value('converted'),
-        convertedEntityType: const drift.Value('question'),
-        convertedEntityId: drift.Value(questionId),
-        processedAt: drift.Value(now),
-        updatedAt: drift.Value(now),
-      ),
-    );
+      await (db.update(db.inboxEntries)..where((t) => t.id.equals(inboxId))).write(
+        InboxEntriesCompanion(
+          status: const drift.Value('converted'),
+          convertedEntityType: const drift.Value('question'),
+          convertedEntityId: drift.Value(questionId),
+          processedAt: drift.Value(now),
+          updatedAt: drift.Value(now),
+          revision: drift.Value(inbox.revision + 1),
+        ),
+      );
+      final updatedInbox = await getEntryById(inboxId);
+      if (updatedInbox != null) {
+        await _recordSyncQueue('inbox_entries', inboxId, 'UPDATE', updatedInbox.toJson(), baseData: inbox.toJson());
+      }
+    });
 
     return (await (db.select(db.knowledgeQuestions)..where((t) => t.id.equals(questionId))).getSingle());
   }
@@ -408,22 +484,30 @@ class InboxManager {
   // ==========================================
 
   Future<void> _recordSyncQueue(
+    String entityType,
     String entityId,
     String operation,
-    drift.UpdateCompanion companion,
-  ) async {
+    Map<String, dynamic> fullRecord, {
+    Map<String, dynamic>? baseData,
+  }) async {
     try {
       final now = DateTime.now();
+      final payloadMap = SyncTimestamp.normalizeMapDates(fullRecord);
+      if (baseData != null) {
+        payloadMap['_base'] = SyncTimestamp.normalizeMapDates(baseData);
+      }
       await db.into(db.syncQueue).insert(
         SyncQueueCompanion.insert(
           id: _uuid.v4(),
-          entityType: 'inbox_entries',
+          entityType: entityType,
           entityId: entityId,
           operation: operation,
-          payload: jsonEncode({'id': entityId, 'created_at': now.toIso8601String()}),
+          payload: jsonEncode(payloadMap),
           createdAt: now,
         ),
       );
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.error('Erro ao enfileirar mutação Inbox ($entityType/$entityId)', e, st);
+    }
   }
 }

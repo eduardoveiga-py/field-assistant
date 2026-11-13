@@ -9,6 +9,7 @@ import '../../core/app_theme.dart';
 import '../../contacts/phone_contacts_manager.dart';
 import '../../database/app_database.dart';
 import '../providers.dart';
+import '../widgets/managed_text_controllers.dart';
 import '../widgets/markdown_preview_text.dart';
 import 'person_detail_screen.dart';
 
@@ -155,28 +156,43 @@ class _PhoneContactsScreenState extends ConsumerState<PhoneContactsScreen> {
     BuildContext context, {
     PhoneContactItem? existing,
   }) {
-    final nameController = TextEditingController(text: existing?.name ?? '');
-    final phoneController = TextEditingController(text: existing?.phone ?? '');
-    final secPhoneController = TextEditingController(
-      text: existing?.secondaryPhone ?? '',
-    );
-    bool hasWhatsApp = existing?.hasWhatsApp ?? false;
-    final waInfoController = TextEditingController(
-      text: existing?.whatsAppInfo ?? '',
-    );
-    bool hasSocial = existing?.hasSocial ?? false;
-    String selectedPlatform = existing?.socialPlatform ?? 'Instagram';
-    final socialHandleController = TextEditingController(
-      text: existing?.socialHandle ?? '',
-    );
-    final notesController = TextEditingController(text: existing?.notes ?? '');
-    final tagInputController = TextEditingController();
     List<String> tags = List.from(existing?.tags ?? []);
     String selectedOrigin = existing?.origin ?? 'Testemunho na Rua';
+    bool hasWhatsApp = existing?.hasWhatsApp ?? false;
+    bool hasSocial = existing?.hasSocial ?? false;
+    const validPlatforms = [
+      'Instagram',
+      'Facebook',
+      'LinkedIn',
+      'Telegram',
+      'Outra',
+    ];
+    String selectedPlatform = validPlatforms.contains(existing?.socialPlatform)
+        ? existing!.socialPlatform!
+        : 'Instagram';
 
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: [
+          existing?.name ?? '',
+          existing?.phone ?? '',
+          existing?.secondaryPhone ?? '',
+          existing?.whatsAppInfo ?? '',
+          existing?.socialHandle ?? '',
+          existing?.notes ?? '',
+          '',
+        ],
+        builder: (ctx, ctrls) {
+          final nameController = ctrls[0];
+          final phoneController = ctrls[1];
+          final secPhoneController = ctrls[2];
+          final waInfoController = ctrls[3];
+          final socialHandleController = ctrls[4];
+          final notesController = ctrls[5];
+          final tagInputController = ctrls[6];
+
+          return StatefulBuilder(
         builder: (ctx, setDialogState) {
           final isDark = Theme.of(ctx).brightness == Brightness.dark;
 
@@ -532,6 +548,8 @@ class _PhoneContactsScreenState extends ConsumerState<PhoneContactsScreen> {
             ],
           );
         },
+      );
+        },
       ),
     );
   }
@@ -540,114 +558,120 @@ class _PhoneContactsScreenState extends ConsumerState<PhoneContactsScreen> {
     BuildContext context,
     PhoneContactItem contact,
   ) {
-    final addressController = TextEditingController();
     String selectedStatus = 'interessado';
 
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) {
-          return AlertDialog(
-            title: Row(
-              children: [
-                const Icon(Icons.person_add, color: AppTheme.accentTeal),
-                const SizedBox(width: 8),
-                Expanded(child: Text('Promover: ${contact.name}')),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Você conseguiu o endereço da casa? Promova este contato para o cadastro completo de Pessoas para gerenciar revisitas, rotas e mapa.',
-                    style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: addressController,
-                    decoration: const InputDecoration(
-                      labelText: 'Endereço da Casa (Rua, Número, Bairro) *',
-                      hintText: 'Ex: Rua das Palmeiras, 140 - Betânia',
-                    ),
-                    autofocus: true,
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    initialValue: selectedStatus,
-                    decoration: const InputDecoration(
-                      labelText: 'Situação Inicial',
-                    ),
-                    items: const [
-                      DropdownMenuItem(
-                        value: 'interessado',
-                        child: Text('Interessado'),
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: const [''],
+        builder: (ctx, ctrls) {
+          final addressController = ctrls[0];
+
+          return StatefulBuilder(
+            builder: (ctx, setDialogState) {
+              return AlertDialog(
+                title: Row(
+                  children: [
+                    const Icon(Icons.person_add, color: AppTheme.accentTeal),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text('Promover: ${contact.name}')),
+                  ],
+                ),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Você conseguiu o endereço da casa? Promova este contato para o cadastro completo de Pessoas para gerenciar revisitas, rotas e mapa.',
+                        style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
                       ),
-                      DropdownMenuItem(
-                        value: 'revisita',
-                        child: Text('Revisita'),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: addressController,
+                        decoration: const InputDecoration(
+                          labelText: 'Endereço da Casa (Rua, Número, Bairro) *',
+                          hintText: 'Ex: Rua das Palmeiras, 140 - Centro',
+                        ),
+                        autofocus: true,
                       ),
-                      DropdownMenuItem(
-                        value: 'estudo',
-                        child: Text('Estudo Bíblico'),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        initialValue: selectedStatus,
+                        decoration: const InputDecoration(
+                          labelText: 'Situação Inicial',
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'interessado',
+                            child: Text('Interessado'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'revisita',
+                            child: Text('Revisita'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'estudo',
+                            child: Text('Estudo Bíblico'),
+                          ),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) {
+                            setDialogState(() => selectedStatus = val);
+                          }
+                        },
                       ),
                     ],
-                    onChanged: (val) {
-                      if (val != null) {
-                        setDialogState(() => selectedStatus = val);
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Cancelar'),
+                  ),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.accentTeal,
+                      foregroundColor: Colors.white,
+                    ),
+                    icon: const Icon(Icons.check, size: 16),
+                    label: const Text('Promover para Pessoas'),
+                    onPressed: () async {
+                      final addr = addressController.text.trim();
+                      if (addr.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Por favor, informe o endereço da casa.'),
+                          ),
+                        );
+                        return;
+                      }
+
+                      final repo = ref.read(repositoryProvider);
+                      final mgr = ref.read(phoneContactsManagerProvider);
+
+                      await mgr.convertToPerson(
+                        contact: contact,
+                        repo: repo,
+                        address: addr,
+                        status: selectedStatus,
+                      );
+
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              '"${contact.name}" foi promovido com sucesso para a lista de Pessoas!',
+                            ),
+                          ),
+                        );
                       }
                     },
                   ),
                 ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancelar'),
-              ),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.accentTeal,
-                  foregroundColor: Colors.white,
-                ),
-                icon: const Icon(Icons.check, size: 16),
-                label: const Text('Promover para Pessoas'),
-                onPressed: () async {
-                  final addr = addressController.text.trim();
-                  if (addr.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Por favor, informe o endereço da casa.'),
-                      ),
-                    );
-                    return;
-                  }
-
-                  final repo = ref.read(repositoryProvider);
-                  final mgr = ref.read(phoneContactsManagerProvider);
-
-                  await mgr.convertToPerson(
-                    contact: contact,
-                    repo: repo,
-                    address: addr,
-                    status: selectedStatus,
-                  );
-
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          '"${contact.name}" foi promovido com sucesso para a lista de Pessoas!',
-                        ),
-                      ),
-                    );
-                  }
-                },
-              ),
-            ],
+              );
+            },
           );
         },
       ),

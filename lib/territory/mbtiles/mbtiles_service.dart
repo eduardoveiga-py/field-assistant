@@ -1,10 +1,23 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 
+import '../../core/app_logger.dart';
+import '../../core/app_version.dart';
 import 'mbtiles_backend.dart';
 import 'mbtiles_web.dart' if (dart.library.io) 'mbtiles_native.dart';
+
+/// Exceção lançada em caso de erro no download de pacotes MBTiles
+class MBTilesDownloadException implements Exception {
+  final String message;
+  final int? statusCode;
+
+  const MBTilesDownloadException(this.message, [this.statusCode]);
+
+  @override
+  String toString() => message;
+}
 
 /// Metadados de um pacote regional de mapas offline (.mbtiles)
 class MBTileRegion {
@@ -18,6 +31,7 @@ class MBTileRegion {
   final int sizeBytes;
   final bool isInstalled;
   final double downloadProgress; // 0.0 a 1.0
+  final String? downloadUrl;
 
   const MBTileRegion({
     required this.id,
@@ -30,7 +44,13 @@ class MBTileRegion {
     required this.sizeBytes,
     this.isInstalled = false,
     this.downloadProgress = 0.0,
+    this.downloadUrl,
   });
+
+  /// URL canônica para download do pacote .mbtiles
+  String get effectiveDownloadUrl =>
+      downloadUrl ??
+      'https://github.com/${AppVersion.githubRepo}/releases/download/mbtiles-v1/$id.mbtiles';
 
   String get formattedSize {
     final mb = sizeBytes / (1024 * 1024);
@@ -40,6 +60,9 @@ class MBTileRegion {
   MBTileRegion copyWith({
     bool? isInstalled,
     double? downloadProgress,
+    int? sizeBytes,
+    String? downloadUrl,
+    bool clearDownloadUrl = false,
   }) {
     return MBTileRegion(
       id: id,
@@ -49,9 +72,10 @@ class MBTileRegion {
       description: description,
       minZoom: minZoom,
       maxZoom: maxZoom,
-      sizeBytes: sizeBytes,
+      sizeBytes: sizeBytes ?? this.sizeBytes,
       isInstalled: isInstalled ?? this.isInstalled,
       downloadProgress: downloadProgress ?? this.downloadProgress,
+      downloadUrl: clearDownloadUrl ? null : (downloadUrl ?? this.downloadUrl),
     );
   }
 }
@@ -59,18 +83,45 @@ class MBTileRegion {
 /// Serviço de gerenciamento de pacotes regionais SQLite .mbtiles
 /// Oferece leitura offline ultrarrápida (<0.2ms) e sem risco de banimento de IP no OSM.
 class MBTilesService {
-  static final MBTilesService instance = MBTilesService._internal();
+  static MBTilesService instance = MBTilesService._internal();
 
-  MBTilesService._internal();
+  MBTilesService._internal([MBTilesBackend? backend])
+      : _backend = backend ?? getMBTilesBackend();
 
-  final MBTilesBackend _backend = getMBTilesBackend();
+  @visibleForTesting
+  static void setMockInstance(MBTilesService service) {
+    instance = service;
+  }
+
+  @visibleForTesting
+  factory MBTilesService.custom({MBTilesBackend? backend}) {
+    return MBTilesService._internal(backend);
+  }
+
+  final MBTilesBackend _backend;
+
+  /// Alterado quando um pacote é instalado, substituído ou removido.
+  final ValueNotifier<int> tilesRevision = ValueNotifier<int>(0);
+
 
   final StreamController<List<MBTileRegion>> _regionsController =
       StreamController<List<MBTileRegion>>.broadcast();
 
+  final Map<String, http.Client> _activeClients = {};
+  final Set<String> _cancelledRegions = {};
+  String? _customBaseUrl;
+  final Map<String, String> _customRegionUrls = {};
+  final Map<String, String> _customRegionNames = {};
+
+  String? get customBaseUrl => _customBaseUrl;
+
+  String? getRegionCustomUrl(String regionId) => _customRegionUrls[regionId];
+
   Stream<List<MBTileRegion>> get regionsStream => _regionsController.stream;
 
   // Catálogo hierárquico padrão com territórios teocráticos estratégicos estilo Organic Maps (23 regiões do Brasil)
+  // NOTA: isInstalled inicia como false para todas as regiões. O status real é determinado
+  // pela checagem física de existência de arquivo no disco pelo backend nativo.
   static const List<MBTileRegion> _defaultCatalog = [
     MBTileRegion(
       id: 'br_am_solimoes',
@@ -82,7 +133,7 @@ class MBTilesService {
       minZoom: 6,
       maxZoom: 18,
       sizeBytes: 42 * 1024 * 1024, // 42 MB
-      isInstalled: true, // Pré-instalado por padrão no app
+      isInstalled: false, // Não é mais estaticamente pré-instalado
     ),
     MBTileRegion(
       id: 'br_am_manaus',
@@ -343,9 +394,201 @@ class MBTilesService {
     return '${mb.toStringAsFixed(1)} MB';
   }
 
+  /// Inicializa o backend nativo, carrega URLs personalizadas persistidas
+  /// e atualiza o status de instalação verificando os arquivos em disco.
   Future<void> init() async {
     await _backend.init();
-    _regionsController.add(_currentRegions);
+    await _loadUrlConfig();
+    await refreshInstalledStatus();
+  }
+
+  Future<void> _loadUrlConfig() async {
+    final cfg = await _backend.loadUrlConfig();
+    final base = cfg['baseUrl']?.toString().trim();
+    _customBaseUrl = (base != null && base.isNotEmpty) ? base : null;
+
+    _customRegionUrls.clear();
+    final rawRegions = cfg['regionUrls'];
+    if (rawRegions is Map) {
+      rawRegions.forEach((k, v) {
+        final key = k.toString().trim();
+        final val = v.toString().trim();
+        if (key.isNotEmpty && val.isNotEmpty) {
+          _customRegionUrls[key] = val;
+        }
+      });
+    }
+
+    _customRegionNames.clear();
+    final rawNames = cfg['customRegionNames'];
+    if (rawNames is Map) {
+      rawNames.forEach((k, v) {
+        final key = k.toString().trim();
+        final val = v.toString().trim();
+        if (key.isNotEmpty && val.isNotEmpty) {
+          _customRegionNames[key] = val;
+        }
+      });
+    }
+  }
+
+  Future<void> _persistUrlConfig() {
+    return _backend.saveUrlConfig({
+      if (_customBaseUrl != null && _customBaseUrl!.isNotEmpty)
+        'baseUrl': _customBaseUrl,
+      'regionUrls': Map<String, String>.from(_customRegionUrls),
+      'customRegionNames': Map<String, String>.from(_customRegionNames),
+    });
+  }
+
+  static void _validateOptionalHttpUrl(String? rawUrl) {
+    if (rawUrl == null || rawUrl.trim().isEmpty) return;
+    final uri = Uri.tryParse(rawUrl.trim());
+    if (uri == null ||
+        !(uri.scheme == 'http' || uri.scheme == 'https') ||
+        uri.host.isEmpty) {
+      throw const FormatException(
+        'URL inválida. Informe um endereço completo iniciado por https:// ou http://',
+      );
+    }
+  }
+
+  /// Resolve a URL de download efetiva para a região (URL específica -> URL base -> padrão GitHub mbtiles-v1).
+  String resolveDownloadUrl(MBTileRegion region) {
+    final perRegion = _customRegionUrls[region.id];
+    if (perRegion != null && perRegion.isNotEmpty) {
+      return perRegion;
+    }
+    if (_customBaseUrl != null && _customBaseUrl!.isNotEmpty) {
+      final cleanBase = _customBaseUrl!.endsWith('/')
+          ? _customBaseUrl!.substring(0, _customBaseUrl!.length - 1)
+          : _customBaseUrl!;
+      return '$cleanBase/${region.id}.mbtiles';
+    }
+    return region.effectiveDownloadUrl;
+  }
+
+  /// Configura e persiste localmente uma URL base personalizada para o catálogo `.mbtiles`.
+  /// Passe `null` ou string vazia para restaurar o padrão oficial do repositório.
+  Future<void> setBaseCatalogUrl(String? url) async {
+    final trimmed = url?.trim();
+    _validateOptionalHttpUrl(trimmed);
+    _customBaseUrl = (trimmed != null && trimmed.isNotEmpty) ? trimmed : null;
+    await _persistUrlConfig();
+    await refreshInstalledStatus();
+  }
+
+  /// Configura e persiste localmente uma URL personalizada para uma região específica.
+  /// Passe `null` ou string vazia para remover o override da região.
+  Future<void> setRegionCustomUrl(String regionId, String? url) async {
+    final trimmed = url?.trim();
+    _validateOptionalHttpUrl(trimmed);
+    if (trimmed != null && trimmed.isNotEmpty) {
+      _customRegionUrls[regionId] = trimmed;
+    } else {
+      _customRegionUrls.remove(regionId);
+    }
+    await _persistUrlConfig();
+    await refreshInstalledStatus();
+  }
+
+  /// Importa um arquivo `.mbtiles` local via caminho em disco, validando cabeçalho SQLite
+  /// e tabela `tiles` antes de disponibilizá-lo para o mapa offline.
+  Future<MBTileRegion> importLocalMbtiles({
+    String? regionId,
+    required String sourceFilePath,
+    String? displayName,
+    void Function(double progress, int copiedBytes)? onProgress,
+  }) async {
+    await _backend.init();
+    String targetId = (regionId ?? '').trim();
+    final fileName = sourceFilePath.split(RegExp(r'[/\\]')).last;
+    final stem = fileName.toLowerCase().endsWith('.mbtiles')
+        ? fileName.substring(0, fileName.length - '.mbtiles'.length)
+        : fileName;
+
+    if (targetId.isEmpty) {
+      final sanitized = stem
+          .toLowerCase()
+          .replaceAll(RegExp(r'[^a-z0-9_]+'), '_')
+          .replaceAll(RegExp(r'^_+|_+$'), '');
+      targetId = sanitized.isNotEmpty ? 'local_$sanitized' : 'local_mbtiles';
+    }
+
+    await _backend.importRegionFile(
+      regionId: targetId,
+      sourceFilePath: sourceFilePath,
+      onProgress: onProgress,
+    );
+
+    tilesRevision.value++;
+    final isDefault = _defaultCatalog.any((r) => r.id == targetId);
+    if (!isDefault) {
+      final label = (displayName != null && displayName.trim().isNotEmpty)
+          ? displayName.trim()
+          : (stem.trim().isNotEmpty ? stem.trim() : targetId);
+      _customRegionNames[targetId] = label;
+      await _persistUrlConfig();
+    }
+
+    await refreshInstalledStatus();
+    return _currentRegions.firstWhere((r) => r.id == targetId);
+  }
+
+  /// Verifica se uma região está instalada no disco.
+  bool isRegionInstalled(String regionId) {
+    return _backend.isRegionInstalled(regionId);
+  }
+
+  /// Atualiza o status `isInstalled`, URLs resolvidas e tamanho em bytes de cada região.
+  Future<void> refreshInstalledStatus() async {
+    final installedIds = _backend.getInstalledRegionIds();
+    final updatedList = <MBTileRegion>[];
+    final knownIds = <String>{};
+
+    for (final baseRegion in _defaultCatalog) {
+      knownIds.add(baseRegion.id);
+      final isInstalled = installedIds.contains(baseRegion.id);
+      final realSize = _backend.getRegionFileSize(baseRegion.id);
+      final customUrl = _customRegionUrls[baseRegion.id] ??
+          (_customBaseUrl != null && _customBaseUrl!.isNotEmpty
+              ? resolveDownloadUrl(baseRegion)
+              : null);
+      updatedList.add(
+        baseRegion.copyWith(
+          isInstalled: isInstalled,
+          downloadProgress: isInstalled ? 1.0 : 0.0,
+          sizeBytes: realSize ?? baseRegion.sizeBytes,
+          downloadUrl: customUrl,
+          clearDownloadUrl: customUrl == null,
+        ),
+      );
+    }
+
+    for (final id in installedIds) {
+      if (knownIds.contains(id)) continue;
+      final realSize = _backend.getRegionFileSize(id) ?? 0;
+      final label = _customRegionNames[id] ??
+          id.replaceFirst(RegExp(r'^local_'), '').replaceAll('_', ' ');
+      updatedList.add(
+        MBTileRegion(
+          id: id,
+          country: 'Importado Localmente',
+          state: 'Pacote .mbtiles',
+          name: label,
+          description: 'Pacote .mbtiles local validado (SQLite + tabela tiles).',
+          sizeBytes: realSize,
+          isInstalled: true,
+          downloadProgress: 1.0,
+          downloadUrl: _customRegionUrls[id],
+        ),
+      );
+    }
+
+    _currentRegions
+      ..clear()
+      ..addAll(updatedList);
+    _regionsController.add(List.of(_currentRegions));
   }
 
   /// Busca bloco diretamente de pacotes .mbtiles locais (<0.2ms)
@@ -353,61 +596,181 @@ class MBTilesService {
     return _backend.getTile(z, x, y);
   }
 
-  /// Instala / Baixa um pacote de mapas regional
+  /// Informa se um download está ativamente em andamento para a região.
+  bool isDownloading(String regionId) => _activeClients.containsKey(regionId);
+
+  /// Cancela o download em andamento de uma região.
+  void cancelDownload(String regionId) {
+    _cancelledRegions.add(regionId);
+    final client = _activeClients.remove(regionId);
+    if (client != null) {
+      client.close();
+      AppLogger.info('Download cancelado pelo usuário para região: $regionId');
+      final idx = _currentRegions.indexWhere((r) => r.id == regionId);
+      if (idx != -1) {
+        final stillInstalled = _backend.isRegionInstalled(regionId);
+        _currentRegions[idx] = _currentRegions[idx].copyWith(
+          downloadProgress: stillInstalled ? 1.0 : 0.0,
+          isInstalled: stillInstalled,
+        );
+        _regionsController.add(List.of(_currentRegions));
+      }
+    }
+  }
+
+  /// Baixa um pacote de mapas regional via HTTP streaming real, persistindo em disco.
+  /// Suporta injeção de [httpClient] para testes automatizados.
   Future<void> downloadRegion(
     String regionId, {
+    http.Client? httpClient,
     void Function(double progress, int downloadedBytes)? onProgress,
   }) async {
     final idx = _currentRegions.indexWhere((r) => r.id == regionId);
-    if (idx == -1) return;
-
-    final target = _currentRegions[idx];
-
-    const steps = 10;
-    for (int i = 1; i <= steps; i++) {
-      await Future.delayed(const Duration(milliseconds: 60));
-      final progress = i / steps;
-      final bytes = (target.sizeBytes * progress).round();
-      _currentRegions[idx] = target.copyWith(downloadProgress: progress);
-      _regionsController.add(List.of(_currentRegions));
-      onProgress?.call(progress, bytes);
+    if (idx == -1) {
+      throw ArgumentError('Região $regionId não encontrada no catálogo.');
     }
 
-    _currentRegions[idx] = target.copyWith(
-      isInstalled: true,
-      downloadProgress: 1.0,
-    );
-    _regionsController.add(List.of(_currentRegions));
+    if (_activeClients.containsKey(regionId)) {
+      AppLogger.warning('Download já em andamento para região: $regionId');
+      return;
+    }
+
+    final target = _currentRegions[idx];
+    final ownsClient = httpClient == null;
+    final client = httpClient ?? http.Client();
+    _cancelledRegions.remove(regionId);
+    _activeClients[regionId] = client;
+
+    try {
+      _regionsController.add(List.of(_currentRegions));
+
+      final resolvedUrl = resolveDownloadUrl(target);
+      final uri = Uri.parse(resolvedUrl);
+      final request = http.Request('GET', uri);
+      request.headers['User-Agent'] = AppVersion.userAgent;
+
+      final streamedResponse = await client.send(request);
+      if (_cancelledRegions.contains(regionId)) {
+        throw const MBTilesDownloadException('Download cancelado pelo usuário.');
+      }
+      if (streamedResponse.statusCode < 200 || streamedResponse.statusCode >= 300) {
+        if (streamedResponse.statusCode == 404) {
+          throw MBTilesDownloadException(
+            'Pacote "${target.name}" indisponível no servidor (HTTP 404) em $resolvedUrl. '
+            'Configure uma URL personalizada ou importe um arquivo .mbtiles local.',
+            404,
+          );
+        }
+        throw MBTilesDownloadException(
+          'Falha no download (${streamedResponse.statusCode}): ${streamedResponse.reasonPhrase}',
+          streamedResponse.statusCode,
+        );
+      }
+
+      final totalBytes = streamedResponse.contentLength ?? target.sizeBytes;
+
+      await _backend.saveRegionStream(
+        regionId: regionId,
+        byteStream: streamedResponse.stream,
+        totalBytes: totalBytes,
+        isCancelled: () => _cancelledRegions.contains(regionId),
+        onProgress: (progress, downloadedBytes) {
+          if (_cancelledRegions.contains(regionId)) return;
+          _currentRegions[idx] = target.copyWith(
+            downloadProgress: progress,
+          );
+          _regionsController.add(List.of(_currentRegions));
+          onProgress?.call(progress, downloadedBytes);
+        },
+      );
+
+      tilesRevision.value++;
+      if (_cancelledRegions.contains(regionId)) {
+        throw const MBTilesDownloadException('Download cancelado pelo usuário.');
+      }
+
+      final realSize = _backend.getRegionFileSize(regionId) ?? totalBytes;
+      _currentRegions[idx] = target.copyWith(
+        isInstalled: true,
+        downloadProgress: 1.0,
+        sizeBytes: realSize,
+      );
+      _regionsController.add(List.of(_currentRegions));
+    } catch (e) {
+      final stillInstalled = _backend.isRegionInstalled(regionId);
+      final existingSize = _backend.getRegionFileSize(regionId);
+      _currentRegions[idx] = target.copyWith(
+        isInstalled: stillInstalled,
+        downloadProgress: stillInstalled ? 1.0 : 0.0,
+        sizeBytes: existingSize ?? target.sizeBytes,
+      );
+      _regionsController.add(List.of(_currentRegions));
+      AppLogger.error('Erro no download da região $regionId: $e');
+      rethrow;
+    } finally {
+      _activeClients.remove(regionId);
+      _cancelledRegions.remove(regionId);
+      if (ownsClient) {
+        try {
+          client.close();
+        } catch (e, st) {
+          AppLogger.debug('Falha ao fechar cliente HTTP do download MBTiles ($regionId): $e', st);
+        }
+      }
+    }
   }
 
-  /// Exclui um mapa regional instalado
+  /// Exclui um mapa regional instalado (remove o arquivo físico e fecha a conexão SQLite).
   Future<void> deleteRegion(String regionId) async {
+    cancelDownload(regionId);
+
     final idx = _currentRegions.indexWhere((r) => r.id == regionId);
     if (idx == -1) return;
 
-    final target = _currentRegions[idx];
-    _currentRegions[idx] = target.copyWith(
-      isInstalled: false,
-      downloadProgress: 0.0,
-    );
-    _regionsController.add(List.of(_currentRegions));
+    await _backend.deleteRegion(regionId);
+    tilesRevision.value++;
+    if (_customRegionNames.remove(regionId) != null) {
+      await _persistUrlConfig();
+    }
+    await refreshInstalledStatus();
   }
 
-  /// Atualiza todos os mapas instalados
-  Future<void> updateAll({
+  /// Atualiza todos os mapas instalados e retorna a lista de nomes que falharam.
+  /// Pacotes importados localmente (`local_*`) sem URL personalizada configurada são preservados sem tentativa de download remoto.
+  Future<List<String>> updateAll({
+    http.Client? httpClient,
     void Function(String regionName, double progress)? onProgress,
   }) async {
     final installed = _currentRegions.where((r) => r.isInstalled).toList();
+    final failed = <String>[];
     for (final reg in installed) {
-      await downloadRegion(
-        reg.id,
-        onProgress: (p, _) => onProgress?.call(reg.name, p),
-      );
+      final isLocalOnly = reg.id.startsWith('local_') &&
+          !_customRegionUrls.containsKey(reg.id) &&
+          (_customBaseUrl == null || _customBaseUrl!.isEmpty);
+      if (isLocalOnly) {
+        continue;
+      }
+      try {
+        await downloadRegion(
+          reg.id,
+          httpClient: httpClient,
+          onProgress: (p, _) => onProgress?.call(reg.name, p),
+        );
+      } catch (e) {
+        failed.add(reg.name);
+        AppLogger.warning('Falha ao atualizar mapa ${reg.name}: $e');
+      }
     }
+    return failed;
   }
 
   void dispose() {
+    for (final client in _activeClients.values) {
+      client.close();
+    }
+    _activeClients.clear();
     _backend.dispose();
+    tilesRevision.dispose();
     _regionsController.close();
   }
 }

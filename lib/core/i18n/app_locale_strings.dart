@@ -1,6 +1,7 @@
 import 'dart:ui' show Locale;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../app_logger.dart';
 import '../../database/app_database.dart';
 import '../../ui/providers.dart' as global_providers;
 
@@ -377,7 +378,9 @@ class AppLocaleNotifier extends Notifier<AppLocaleType> {
       if (row != null && row.value.isNotEmpty) {
         state = AppLocaleType.fromCode(row.value);
       }
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.warning('Falha ao carregar idioma salvo de app_kv_store', e, st);
+    }
   }
 
   Future<void> setLocale(AppLocaleType locale) async {
@@ -390,7 +393,9 @@ class AppLocaleNotifier extends Notifier<AppLocaleType> {
           value: locale.code,
         ),
       );
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.warning('Falha ao persistir idioma selecionado em app_kv_store', e, st);
+    }
   }
 }
 

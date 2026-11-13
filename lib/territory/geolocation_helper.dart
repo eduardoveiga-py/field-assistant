@@ -1,7 +1,12 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
+
 import 'geolocation_stub.dart'
     if (dart.library.js_interop) 'geolocation_web.dart';
+import 'geolocation_types.dart';
+
+export 'geolocation_types.dart';
 
 class GeolocationHelper {
   /// Coordenada padrão: Santo Antônio do Içá, AM
@@ -10,9 +15,21 @@ class GeolocationHelper {
   static const double defaultLat = -3.1022;
   static const double defaultLng = -67.9397;
 
+  @visibleForTesting
+  static Future<GeolocationResult> Function()? locationOverride;
+
+  /// Obtém as coordenadas atuais com detalhes de status (permissão/serviço/indisponibilidade)
+  static Future<GeolocationResult> getCurrentLocationWithStatus() {
+    if (locationOverride != null) {
+      return locationOverride!();
+    }
+    return getPlatformCoordinates();
+  }
+
   /// Obtém as coordenadas atuais do navegador/dispositivo com fallback gracioso
-  static Future<({double latitude, double longitude})?> getCurrentLocation() {
-    return getBrowserCoordinates();
+  static Future<GeoCoordinates?> getCurrentLocation() async {
+    final res = await getCurrentLocationWithStatus();
+    return res.coordinates;
   }
 
   /// Calcula a distância geográfica precisa em km pelo método Haversine

@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -94,14 +93,12 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
   void initState() {
     super.initState();
     _recordingService =
-        widget.recordingService ??
-        (kIsWeb ? LocalAudioRecordingService() : RealAudioRecordingService());
+        widget.recordingService ?? AudioRecordingService.platform();
     _dictationService =
         widget.dictationService ??
         VoiceDictationService.platform();
     _playerService =
-        widget.playerService ??
-        (kIsWeb ? LocalAudioPlayerService() : RealAudioPlayerService());
+        widget.playerService ?? AudioPlayerService.platform();
     // Inicia explicitamente como revisita por padrão seguro, exigindo confirmação do usuário para estudo
     _selectedContactType = 'revisita';
     _selectedResult = 'revisita_feita';
@@ -237,13 +234,25 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
     });
   }
 
-  void _toggleAudioPreview() {
+  Future<void> _toggleAudioPreview() async {
     if (_isPlayingAudio) {
-      _playerService.pause();
+      await _playerService.pause();
     } else {
-      _playerService.play(
-        _recordingResult?.filePath ?? 'simulated_voice_note.m4a',
-      );
+      final path = _recordingResult?.filePath;
+      if (path == null || path.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Nenhum áudio gravado para reproduzir.')),
+        );
+        return;
+      }
+      try {
+        await _playerService.play(path);
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Não foi possível reproduzir o áudio: $e')),
+        );
+      }
     }
   }
 
@@ -281,9 +290,12 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
       await manager.saveQuickVisitFromVoiceNote(
         personId: widget.person.id,
         parsedNote: finalParsed,
-        audioFilePath: _recordingResult?.filePath,
-        audioDurationSeconds:
-            _recordingResult?.durationSeconds ?? (_seconds > 0 ? _seconds : 15),
+        audioFilePath: (_recordingResult?.fileIntegrityValid == true)
+            ? _recordingResult!.filePath
+            : null,
+        audioDurationSeconds: (_recordingResult?.fileIntegrityValid == true)
+            ? _recordingResult!.durationSeconds
+            : 0,
         contactType: _selectedContactType,
         result: _selectedResult,
         updateStudyProgress: _updateStudyProgress,

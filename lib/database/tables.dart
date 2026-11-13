@@ -332,7 +332,9 @@ class PersonPhotos extends Table {
   TextColumn get id => text()(); // UUID v4
   TextColumn get personId => text().named('person_id')();
   TextColumn get photoType => text().named('photo_type')();
-  TextColumn get imageData => text().named('image_data')();
+  TextColumn get filePath => text().nullable().named('file_path')();
+  TextColumn get imageData =>
+      text().named('image_data').withDefault(const Constant(''))();
 
   // Auditoria e sincronização
   DateTimeColumn get createdAt => dateTime().named('created_at')();
@@ -751,6 +753,70 @@ class KnowledgeResources extends Table {
   DateTimeColumn get updatedAt => dateTime().named('updated_at')();
   DateTimeColumn get deletedAt => dateTime().nullable().named('deleted_at')();
   IntColumn get revision => integer().withDefault(const Constant(1))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DataClassName('TicunaWordDbEntry')
+class TicunaWords extends Table {
+  TextColumn get id => text()();
+  TextColumn get word => text()();
+  TextColumn get translation => text()();
+  TextColumn get phonetics => text().nullable()();
+  TextColumn get grammaticalClass => text().nullable().named('grammatical_class')();
+  TextColumn get exampleSentence => text().nullable().named('example_sentence')();
+  TextColumn get exampleTranslation =>
+      text().nullable().named('example_translation')();
+  TextColumn get notes => text().nullable()();
+  TextColumn get tags => text().withDefault(const Constant('[]'))();
+  IntColumn get isFavorite =>
+      integer().named('is_favorite').withDefault(const Constant(0))();
+  IntColumn get reviewLevel =>
+      integer().named('review_level').withDefault(const Constant(0))();
+  IntColumn get reviewCount =>
+      integer().named('review_count').withDefault(const Constant(0))();
+  TextColumn get lastReviewedAt => text().nullable().named('last_reviewed_at')();
+  TextColumn get audioPath => text().nullable().named('audio_path')();
+  IntColumn get audioDurationSeconds =>
+      integer().nullable().named('audio_duration_seconds')();
+  TextColumn get languageId =>
+      text().nullable().named('language_id').withDefault(const Constant('tca'))();
+  TextColumn get createdAt => text().named('created_at')();
+  TextColumn get updatedAt => text().named('updated_at')();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DataClassName('TicunaPhraseDbEntry')
+class TicunaPhrases extends Table {
+  TextColumn get id => text()();
+  TextColumn get phrase => text()();
+  TextColumn get translation => text()();
+  TextColumn get category => text().nullable()();
+  TextColumn get phonetics => text().nullable()();
+  TextColumn get notes => text().nullable()();
+  TextColumn get tags => text().withDefault(const Constant('[]'))();
+  IntColumn get isFavorite =>
+      integer().named('is_favorite').withDefault(const Constant(0))();
+  TextColumn get audioPath => text().nullable().named('audio_path')();
+  IntColumn get audioDurationSeconds =>
+      integer().nullable().named('audio_duration_seconds')();
+  TextColumn get languageId =>
+      text().nullable().named('language_id').withDefault(const Constant('tca'))();
+  TextColumn get createdAt => text().named('created_at')();
+  TextColumn get updatedAt => text().named('updated_at')();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DataClassName('TicunaTagDbEntry')
+class TicunaTags extends Table {
+  TextColumn get id => text()();
+  TextColumn get name => text().unique()();
+  TextColumn get createdAt => text().named('created_at')();
 
   @override
   Set<Column> get primaryKey => {id};

@@ -438,30 +438,17 @@ void main() {
       },
     );
 
-    test(
-      'preloadArea iterates over bounding box and reports progress',
-      () async {
-        final fakeCache = _FakeTileCacheBackend();
-        TileCacheService.instance.backend = fakeCache;
-
-        int progressReports = 0;
-        final saved = await TileCacheService.instance.preloadArea(
-          z: 14,
-          minX: 10,
-          maxX: 12, // 3 columns
-          minY: 20,
-          maxY: 21, // 2 rows -> 6 tiles total
-          onProgress: (done, total) {
-            progressReports++;
-            expect(total, equals(6));
-          },
-        );
-
-        expect(progressReports, equals(6));
-        expect(saved, equals(6));
-        expect(await TileCacheService.instance.getCachedTileCount(), equals(6));
-      },
-    );
+    test('preloadArea não baixa blocos de servidores públicos', () async {
+      final fakeCache = _FakeTileCacheBackend();
+      TileCacheService.instance.backend = fakeCache;
+      await expectLater(
+        TileCacheService.instance.preloadArea(
+          z: 14, minX: 10, maxX: 12, minY: 20, maxY: 21,
+        ),
+        throwsUnsupportedError,
+      );
+      expect(await TileCacheService.instance.getCachedTileCount(), 0);
+    });
 
     test('TileCacheNative persists and retrieves tiles from local disk without network', () async {
       final tempDir = Directory.systemTemp.createTempSync('osm_tiles_test_');

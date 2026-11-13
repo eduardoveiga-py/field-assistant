@@ -8,6 +8,7 @@ import 'package:drift/drift.dart' show Value;
 import 'package:uuid/uuid.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/app_logger.dart';
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../../database/app_database.dart';
@@ -18,6 +19,7 @@ import '../../publications/publication_link_resolver.dart';
 import '../../dashboard/counting_rules.dart';
 import '../providers.dart';
 import '../widgets/global_appointment_scheduling_section.dart';
+import '../widgets/managed_text_controllers.dart';
 import '../../media/person_photos_manager.dart';
 import '../../media/media_picker_helper.dart';
 import '../widgets/person_hand_off_dialog.dart';
@@ -51,6 +53,23 @@ class PersonDetailScreen extends ConsumerStatefulWidget {
 class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
   // Cache de rascunho de preenchimento para visita rápida da pessoa
   static final Map<String, Map<String, dynamic>> _quickVisitDrafts = {};
+  late Future<PersonEntry?> _fallbackPersonFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _fallbackPersonFuture =
+        ref.read(repositoryProvider).getPersonById(widget.personId);
+  }
+
+  @override
+  void didUpdateWidget(covariant PersonDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.personId != widget.personId) {
+      _fallbackPersonFuture =
+          ref.read(repositoryProvider).getPersonById(widget.personId);
+    }
+  }
 
   // Modal de Abertura de Publicação no JW Library / Site Oficial
   void _openPublicationLink(BuildContext context, BibleStudyEntry study) {
@@ -172,11 +191,6 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
 
   // Modal para Iniciar Estudo Bíblico diretamente do perfil da pessoa
   void _showStartStudyDialog(BuildContext context, PersonEntry person) {
-    final titleController = TextEditingController(
-      text: 'Estudo de ${person.name}',
-    );
-    final lessonController = TextEditingController(text: '1');
-    final paragraphController = TextEditingController(text: '1');
     String selectedPublicationId = 'lff-book';
     String selectedLanguage = 'pt';
     String selectedFrequency = 'semanal';
@@ -196,7 +210,17 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
 
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: [
+          'Estudo de ${person.name}',
+          '1',
+          '1',
+        ],
+        builder: (ctx, ctrls) {
+          final titleController = ctrls[0];
+          final lessonController = ctrls[1];
+          final paragraphController = ctrls[2];
+          return StatefulBuilder(
         builder: (ctx, setDialogState) {
           final isDark = Theme.of(ctx).brightness == Brightness.dark;
 
@@ -583,29 +607,34 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
             ],
           );
         },
+          );
+        },
       ),
     );
   }
 
   // Modal para editar dados de um estudo bíblico existente
   void _showEditStudyDialog(BuildContext context, BibleStudyEntry study) {
-    final titleController = TextEditingController(text: study.title);
     String selectedPublicationId = study.publicationId;
     String selectedLanguage = study.language;
     String selectedFrequency = study.frequency;
     String selectedStatus = study.status;
     DateTime realStartDate = study.startedAt;
     DateTime? lastSessionDate = study.lastSessionAt;
-    final lessonController = TextEditingController(
-      text: (study.currentLesson ?? 1).toString(),
-    );
-    final paragraphController = TextEditingController(
-      text: (study.currentParagraph ?? 1).toString(),
-    );
 
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: [
+          study.title,
+          (study.currentLesson ?? 1).toString(),
+          (study.currentParagraph ?? 1).toString(),
+        ],
+        builder: (ctx, ctrls) {
+          final titleController = ctrls[0];
+          final lessonController = ctrls[1];
+          final paragraphController = ctrls[2];
+          return StatefulBuilder(
         builder: (ctx, setDialogState) {
           return AlertDialog(
             title: const Row(
@@ -862,6 +891,8 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
             ],
           );
         },
+          );
+        },
       ),
     );
   }
@@ -880,7 +911,9 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
               .map((e) => e.toString().trim())
               .where((s) => s.isNotEmpty)
               .toList();
-        } catch (_) {}
+        } catch (e, st) {
+          AppLogger.debug('Falha ao ler tags JSON (${person.id}): $e', st);
+        }
       } else {
         currentTags = person.tags
             .split(',')
@@ -890,112 +923,117 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
       }
     }
 
-    final tagController = TextEditingController();
-
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) {
-          return AlertDialog(
-            title: Row(
-              children: [
-                const Icon(Icons.label, color: AppTheme.primaryBlue),
-                const SizedBox(width: 8),
-                Expanded(child: Text('Etiquetas de ${person.name}')),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Gerencie tags para organizar contatos por afinidade, idioma ou situação:',
-                    style: TextStyle(fontSize: 12),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: const [''],
+        builder: (ctx, ctrls) {
+          final tagController = ctrls[0];
+
+          return StatefulBuilder(
+            builder: (ctx, setDialogState) {
+              return AlertDialog(
+                title: Row(
+                  children: [
+                    const Icon(Icons.label, color: AppTheme.primaryBlue),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text('Etiquetas de ${person.name}')),
+                  ],
+                ),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: TextField(
-                          controller: tagController,
-                          decoration: const InputDecoration(
-                            labelText: 'Nova tag',
-                            hintText: 'Ex: jovem, interessado, bíblia',
-                            isDense: true,
-                          ),
-                          onSubmitted: (val) {
-                            final t = val.trim();
-                            if (t.isNotEmpty && !currentTags.contains(t)) {
-                              setDialogState(() {
-                                currentTags.add(t);
-                                tagController.clear();
-                              });
-                            }
-                          },
-                        ),
+                      const Text(
+                        'Gerencie tags para organizar contatos por afinidade, idioma ou situação:',
+                        style: TextStyle(fontSize: 12),
                       ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.add_circle,
-                          color: AppTheme.primaryBlue,
-                        ),
-                        onPressed: () {
-                          final t = tagController.text.trim();
-                          if (t.isNotEmpty && !currentTags.contains(t)) {
-                            setDialogState(() {
-                              currentTags.add(t);
-                              tagController.clear();
-                            });
-                          }
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  if (currentTags.isEmpty)
-                    const Text(
-                      'Nenhuma tag cadastrada ainda.',
-                      style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
-                    )
-                  else
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: currentTags
-                          .map(
-                            (t) => Chip(
-                              label: Text(
-                                t,
-                                style: const TextStyle(fontSize: 12),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: tagController,
+                              decoration: const InputDecoration(
+                                labelText: 'Nova tag',
+                                hintText: 'Ex: jovem, interessado, bíblia',
+                                isDense: true,
                               ),
-                              deleteIcon: const Icon(Icons.close, size: 14),
-                              onDeleted: () {
-                                setDialogState(() => currentTags.remove(t));
+                              onSubmitted: (val) {
+                                final t = val.trim();
+                                if (t.isNotEmpty && !currentTags.contains(t)) {
+                                  setDialogState(() {
+                                    currentTags.add(t);
+                                    tagController.clear();
+                                  });
+                                }
                               },
                             ),
-                          )
-                          .toList(),
-                    ),
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.add_circle,
+                              color: AppTheme.primaryBlue,
+                            ),
+                            onPressed: () {
+                              final t = tagController.text.trim();
+                              if (t.isNotEmpty && !currentTags.contains(t)) {
+                                setDialogState(() {
+                                  currentTags.add(t);
+                                  tagController.clear();
+                                });
+                              }
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      if (currentTags.isEmpty)
+                        const Text(
+                          'Nenhuma tag cadastrada ainda.',
+                          style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                        )
+                      else
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: currentTags
+                              .map(
+                                (t) => Chip(
+                                  label: Text(
+                                    t,
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
+                                  deleteIcon: const Icon(Icons.close, size: 14),
+                                  onDeleted: () {
+                                    setDialogState(() => currentTags.remove(t));
+                                  },
+                                ),
+                              )
+                              .toList(),
+                        ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Cancelar'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () async {
+                      await repo.updatePerson(
+                        person.copyWith(tags: jsonEncode(currentTags)),
+                      );
+                      if (ctx.mounted) Navigator.pop(ctx);
+                    },
+                    child: const Text('Salvar Tags'),
+                  ),
                 ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancelar'),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  await repo.updatePerson(
-                    person.copyWith(tags: jsonEncode(currentTags)),
-                  );
-                  if (ctx.mounted) Navigator.pop(ctx);
-                },
-                child: const Text('Salvar Tags'),
-              ),
-            ],
+              );
+            },
           );
         },
       ),
@@ -1009,117 +1047,123 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
     PersonEntry person,
   ) {
     String selectedReason = 'Falta de interesse / tempo';
-    final notesController = TextEditingController();
 
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: const Row(
-            children: [
-              Icon(Icons.stop_circle_outlined, color: AppTheme.alertAmber),
-              SizedBox(width: 8),
-              Expanded(child: Text('Encerrar Estudo Bíblico')),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Você está encerrando o estudo bíblico com ${person.name}. O contato NÃO será excluído e continuará preservado no seu histórico.',
-                  style: const TextStyle(fontSize: 13),
-                ),
-                const SizedBox(height: 14),
-                DropdownButtonFormField<String>(
-                  initialValue: selectedReason,
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Motivo do Encerramento *',
-                  ),
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'Falta de interesse / tempo',
-                      child: Text('Falta de interesse / tempo'),
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: const [''],
+        builder: (ctx, ctrls) {
+          final notesController = ctrls[0];
+
+          return StatefulBuilder(
+            builder: (ctx, setDialogState) => AlertDialog(
+              title: const Row(
+                children: [
+                  Icon(Icons.stop_circle_outlined, color: AppTheme.alertAmber),
+                  SizedBox(width: 8),
+                  Expanded(child: Text('Encerrar Estudo Bíblico')),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Você está encerrando o estudo bíblico com ${person.name}. O contato NÃO será excluído e continuará preservado no seu histórico.',
+                      style: const TextStyle(fontSize: 13),
                     ),
-                    DropdownMenuItem(
-                      value: 'Mudou-se de território',
-                      child: Text('Mudou-se de território'),
+                    const SizedBox(height: 14),
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedReason,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Motivo do Encerramento *',
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'Falta de interesse / tempo',
+                          child: Text('Falta de interesse / tempo'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Mudou-se de território',
+                          child: Text('Mudou-se de território'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Oposição familiar',
+                          child: Text('Oposição familiar'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Estudo concluído / Batizado',
+                          child: Text('Estudo concluído / Batizado'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Problemas de saúde',
+                          child: Text('Problemas de saúde'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Outro',
+                          child: Text('Outro motivo'),
+                        ),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) setDialogState(() => selectedReason = val);
+                      },
                     ),
-                    DropdownMenuItem(
-                      value: 'Oposição familiar',
-                      child: Text('Oposição familiar'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'Estudo concluído / Batizado',
-                      child: Text('Estudo concluído / Batizado'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'Problemas de saúde',
-                      child: Text('Problemas de saúde'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'Outro',
-                      child: Text('Outro motivo'),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: notesController,
+                      decoration: const InputDecoration(
+                        labelText: 'Observação complementar (opcional)',
+                        hintText: 'Ex: Portas abertas para contato futuro...',
+                      ),
+                      maxLines: 2,
                     ),
                   ],
-                  onChanged: (val) {
-                    if (val != null) setDialogState(() => selectedReason = val);
-                  },
                 ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: notesController,
-                  decoration: const InputDecoration(
-                    labelText: 'Observação complementar (opcional)',
-                    hintText: 'Ex: Portas abertas para contato futuro...',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.alertAmber,
+                    foregroundColor: Colors.black,
                   ),
-                  maxLines: 2,
+                  onPressed: () async {
+                    final reasonPayload = jsonEncode({
+                      'endReason': selectedReason,
+                      'notes': notesController.text.trim(),
+                      'endedAt': DateTime.now().toIso8601String(),
+                    });
+                    await repo.updateStudy(
+                      study.copyWith(
+                        status: selectedReason == 'Estudo concluído / Batizado'
+                            ? 'concluido'
+                            : 'encerrado',
+                        pauseOrCloseReason: Value(reasonPayload),
+                      ),
+                    );
+                    await repo.updatePerson(person.copyWith(status: 'revisita'));
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Estudo encerrado ($selectedReason). Contato mantido no território!',
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                  child: const Text('Confirmar Encerramento'),
                 ),
               ],
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.alertAmber,
-                foregroundColor: Colors.black,
-              ),
-              onPressed: () async {
-                final reasonPayload = jsonEncode({
-                  'endReason': selectedReason,
-                  'notes': notesController.text.trim(),
-                  'endedAt': DateTime.now().toIso8601String(),
-                });
-                await repo.updateStudy(
-                  study.copyWith(
-                    status: selectedReason == 'Estudo concluído / Batizado'
-                        ? 'concluido'
-                        : 'encerrado',
-                    pauseOrCloseReason: Value(reasonPayload),
-                  ),
-                );
-                await repo.updatePerson(person.copyWith(status: 'revisita'));
-                if (ctx.mounted) Navigator.pop(ctx);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Estudo encerrado ($selectedReason). Contato mantido no território!',
-                      ),
-                    ),
-                  );
-                }
-              },
-              child: const Text('Confirmar Encerramento'),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -1151,127 +1195,134 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
     AppRepository repo,
   ) {
     String selectedReason = 'Falta de interesse / tempo';
-    final notesController = TextEditingController();
 
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: const Row(
-            children: [
-              Icon(Icons.person_off_outlined, color: AppTheme.alertAmber),
-              SizedBox(width: 8),
-              Expanded(child: Text('Encerrar Revisita')),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Você está encerrando o acompanhamento de revisitas com ${person.name}. O contato NÃO será excluído e todas as visitas anteriores continuam preservadas no seu relatório e histórico.',
-                  style: const TextStyle(fontSize: 13),
-                ),
-                const SizedBox(height: 14),
-                DropdownButtonFormField<String>(
-                  initialValue: selectedReason,
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Motivo do Encerramento *',
-                  ),
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'Falta de interesse / tempo',
-                      child: Text('Falta de interesse / tempo'),
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: const [''],
+        builder: (ctx, ctrls) {
+          final notesController = ctrls[0];
+
+          return StatefulBuilder(
+            builder: (ctx, setDialogState) => AlertDialog(
+              title: const Row(
+                children: [
+                  Icon(Icons.person_off_outlined, color: AppTheme.alertAmber),
+                  SizedBox(width: 8),
+                  Expanded(child: Text('Encerrar Revisita')),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Você está encerrando o acompanhamento de revisitas com ${person.name}. O contato NÃO será excluído e todas as visitas anteriores continuam preservadas no seu relatório e histórico.',
+                      style: const TextStyle(fontSize: 13),
                     ),
-                    DropdownMenuItem(
-                      value: 'Mudou-se de território',
-                      child: Text('Mudou-se de território'),
+                    const SizedBox(height: 14),
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedReason,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Motivo do Encerramento *',
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'Falta de interesse / tempo',
+                          child: Text('Falta de interesse / tempo'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Mudou-se de território',
+                          child: Text('Mudou-se de território'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Pediu para não ser visitado',
+                          child: Text('Pediu para não ser visitado'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Oposição familiar',
+                          child: Text('Oposição familiar'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Problemas de saúde / Falecido',
+                          child: Text('Problemas de saúde / Falecido'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Repassada para outro publicador',
+                          child: Text('Repassada para outro publicador'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Outro',
+                          child: Text('Outro motivo'),
+                        ),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) setDialogState(() => selectedReason = val);
+                      },
                     ),
-                    DropdownMenuItem(
-                      value: 'Pediu para não ser visitado',
-                      child: Text('Pediu para não ser visitado'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'Oposição familiar',
-                      child: Text('Oposição familiar'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'Problemas de saúde / Falecido',
-                      child: Text('Problemas de saúde / Falecido'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'Repassada para outro publicador',
-                      child: Text('Repassada para outro publicador'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'Outro',
-                      child: Text('Outro motivo'),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: notesController,
+                      decoration: const InputDecoration(
+                        labelText: 'Observação complementar (opcional)',
+                        hintText:
+                            'Ex: Deixou portas abertas para uma ocasião futura...',
+                      ),
+                      maxLines: 2,
                     ),
                   ],
-                  onChanged: (val) {
-                    if (val != null) setDialogState(() => selectedReason = val);
-                  },
                 ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: notesController,
-                  decoration: const InputDecoration(
-                    labelText: 'Observação complementar (opcional)',
-                    hintText:
-                        'Ex: Deixou portas abertas para uma ocasião futura...',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.alertAmber,
+                    foregroundColor: Colors.black,
                   ),
-                  maxLines: 2,
+                  onPressed: () async {
+                    final extraNotes = notesController.text.trim();
+                    final reasonPayload = jsonEncode({
+                      'endReason': selectedReason,
+                      'notes': extraNotes,
+                      'endedAt': DateTime.now().toIso8601String(),
+                    });
+                    await repo.updatePerson(
+                      person.copyWith(
+                        status: 'revisita_encerrada',
+                        nextActionNote: Value(
+                          'Revisita encerrada: $selectedReason${extraNotes.isNotEmpty ? " - $extraNotes" : ""}',
+                        ),
+                        contactRestrictions: Value(
+                          person.contactRestrictions == null ||
+                                  person.contactRestrictions!.isEmpty
+                              ? reasonPayload
+                              : person.contactRestrictions,
+                        ),
+                      ),
+                    );
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Revisita encerrada ($selectedReason). Registro mantido no histórico!',
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                  child: const Text('Confirmar Encerramento'),
                 ),
               ],
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.alertAmber,
-                foregroundColor: Colors.black,
-              ),
-              onPressed: () async {
-                final reasonPayload = jsonEncode({
-                  'endReason': selectedReason,
-                  'notes': notesController.text.trim(),
-                  'endedAt': DateTime.now().toIso8601String(),
-                });
-                await repo.updatePerson(
-                  person.copyWith(
-                    status: 'revisita_encerrada',
-                    nextActionNote: Value(
-                      'Revisita encerrada: $selectedReason${notesController.text.trim().isNotEmpty ? " - ${notesController.text.trim()}" : ""}',
-                    ),
-                    contactRestrictions: Value(
-                      person.contactRestrictions == null ||
-                              person.contactRestrictions!.isEmpty
-                          ? reasonPayload
-                          : person.contactRestrictions,
-                    ),
-                  ),
-                );
-                if (ctx.mounted) Navigator.pop(ctx);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Revisita encerrada ($selectedReason). Registro mantido no histórico!',
-                      ),
-                    ),
-                  );
-                }
-              },
-              child: const Text('Confirmar Encerramento'),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -1384,24 +1435,6 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
       initialStreet = rawAddr;
     }
 
-    final nameCtrl = TextEditingController(text: person.name);
-    final phoneCtrl = TextEditingController(text: person.phone ?? '');
-    final addrCtrl = TextEditingController(text: initialStreet);
-    final neighborhoodCtrl = TextEditingController(text: initialNeighborhood);
-    final refCtrl = TextEditingController(text: initialRef);
-    final latCtrl = TextEditingController(
-      text: person.latitude != null && person.latitude != 0.0
-          ? person.latitude!.toStringAsFixed(6)
-          : '',
-    );
-    final lngCtrl = TextEditingController(
-      text: person.longitude != null && person.longitude != 0.0
-          ? person.longitude!.toStringAsFixed(6)
-          : '',
-    );
-    final scheduleCtrl = TextEditingController(
-      text: person.preferredSchedule ?? '',
-    );
     String currentStatus = person.status;
     DateTime editFirstContact = person.firstContactAt;
     DateTime? editLastContact = person.lastContactAt;
@@ -1409,7 +1442,31 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
 
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: [
+          person.name,
+          person.phone ?? '',
+          initialStreet,
+          initialNeighborhood,
+          initialRef,
+          person.latitude != null && person.latitude != 0.0
+              ? person.latitude!.toStringAsFixed(6)
+              : '',
+          person.longitude != null && person.longitude != 0.0
+              ? person.longitude!.toStringAsFixed(6)
+              : '',
+          person.preferredSchedule ?? '',
+        ],
+        builder: (ctx, ctrls) {
+          final nameCtrl = ctrls[0];
+          final phoneCtrl = ctrls[1];
+          final addrCtrl = ctrls[2];
+          final neighborhoodCtrl = ctrls[3];
+          final refCtrl = ctrls[4];
+          final latCtrl = ctrls[5];
+          final lngCtrl = ctrls[6];
+          final scheduleCtrl = ctrls[7];
+          return StatefulBuilder(
         builder: (ctx, setDialogState) {
           final isDark = Theme.of(ctx).brightness == Brightness.dark;
           return Dialog(
@@ -1644,7 +1701,7 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                                     controller: neighborhoodCtrl,
                                     decoration: const InputDecoration(
                                       labelText: 'Bairro / Setor',
-                                      hintText: 'Ex: Betânia, Lago Grande...',
+                                      hintText: 'Ex: Centro, Vila Nova, Porto...',
                                     ),
                                   ),
                                 ),
@@ -1712,7 +1769,7 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                                     controller: latCtrl,
                                     decoration: const InputDecoration(
                                       labelText: 'Latitude GPS',
-                                      hintText: '-23.5505',
+                                      hintText: '-3.1022',
                                     ),
                                     keyboardType:
                                         const TextInputType.numberWithOptions(
@@ -1727,7 +1784,7 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                                     controller: lngCtrl,
                                     decoration: const InputDecoration(
                                       labelText: 'Longitude GPS',
-                                      hintText: '-46.6333',
+                                      hintText: '-67.9397',
                                     ),
                                     keyboardType:
                                         const TextInputType.numberWithOptions(
@@ -1927,6 +1984,8 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
             ),
           );
         },
+          );
+        },
       ),
     );
   }
@@ -1969,18 +2028,6 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
       currentLesson: selectedLesson,
       currentPoint: selectedEndPoint,
     );
-    final lessonController = TextEditingController(
-      text: selectedLesson.toString(),
-    );
-    final paragraphsController = TextEditingController(
-      text: selectedStartPoint == selectedEndPoint
-          ? '$selectedStartPoint'
-          : '$selectedStartPoint-$selectedEndPoint',
-    );
-    final notesController = TextEditingController();
-    final nextStepController = TextEditingController(
-      text: study.nextTopic ?? initialNext.label,
-    );
     int attendanceCount = 1;
     bool scheduleNextStudy = true;
 
@@ -2017,7 +2064,21 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
 
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: [
+          selectedLesson.toString(),
+          selectedStartPoint == selectedEndPoint
+              ? '$selectedStartPoint'
+              : '$selectedStartPoint-$selectedEndPoint',
+          '',
+          study.nextTopic ?? initialNext.label,
+        ],
+        builder: (ctx, ctrls) {
+          final lessonController = ctrls[0];
+          final paragraphsController = ctrls[1];
+          final notesController = ctrls[2];
+          final nextStepController = ctrls[3];
+          return StatefulBuilder(
         builder: (ctx, setDialogState) {
           final isDark = Theme.of(ctx).brightness == Brightness.dark;
           final lessonInfo = LffBookCatalog.getLesson(selectedLesson);
@@ -2696,6 +2757,8 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
             ],
           );
         },
+          );
+        },
       ),
     );
   }
@@ -2711,46 +2774,16 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
     );
     final draft = _quickVisitDrafts[person.id];
 
-    final notesController = TextEditingController(
-      text: draft?['notes'] as String? ?? '',
-    );
-    final topicsController = TextEditingController(
-      text: draft?['topics'] as String? ?? '',
-    );
-    final nextStepController = TextEditingController(
-      text: draft?['nextStep'] as String? ?? existingStudy?.nextTopic ?? '',
-    );
     String selectedType = draft?['type'] as String? ?? 'revisita';
     bool recordStudy =
         isStudiesEnabled &&
         (draft?['recordStudy'] as bool? ?? (selectedType == 'estudo'));
     String selectedResult = 'Conversa receptiva';
     DateTime selectedDate = DateTime.now();
-
-    void updateDraft() {
-      _quickVisitDrafts[person.id] = {
-        'notes': notesController.text,
-        'topics': topicsController.text,
-        'nextStep': nextStepController.text,
-        'type': selectedType,
-        'recordStudy': recordStudy,
-      };
-    }
-
-    notesController.addListener(updateDraft);
-    topicsController.addListener(updateDraft);
-    nextStepController.addListener(updateDraft);
+    bool didAttachListeners = false;
 
     // Campos do Estudo Bíblico
     String selectedPublicationId = existingStudy?.publicationId ?? 'lff-book';
-    final lessonController = TextEditingController(
-      text: existingStudy?.currentLesson?.toString() ?? '1',
-    );
-    final paragraphsController = TextEditingController(
-      text: existingStudy?.currentParagraph != null
-          ? '${existingStudy!.currentParagraph}'
-          : '1-5',
-    );
     int attendanceCount = 1;
 
     // Campos de Agendamento Global com AvailabilityEngine
@@ -2806,7 +2839,40 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) => StatefulBuilder(
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: [
+          draft?['notes'] as String? ?? '',
+          draft?['topics'] as String? ?? '',
+          draft?['nextStep'] as String? ?? existingStudy?.nextTopic ?? '',
+          existingStudy?.currentLesson?.toString() ?? '1',
+          existingStudy?.currentParagraph != null
+              ? '${existingStudy!.currentParagraph}'
+              : '1-5',
+        ],
+        builder: (ctx, ctrls) {
+          final notesController = ctrls[0];
+          final topicsController = ctrls[1];
+          final nextStepController = ctrls[2];
+          final lessonController = ctrls[3];
+          final paragraphsController = ctrls[4];
+          void updateDraft() {
+            _quickVisitDrafts[person.id] = {
+              'notes': notesController.text,
+              'topics': topicsController.text,
+              'nextStep': nextStepController.text,
+              'type': selectedType,
+              'recordStudy': recordStudy,
+            };
+          }
+
+          if (!didAttachListeners) {
+            didAttachListeners = true;
+            notesController.addListener(updateDraft);
+            topicsController.addListener(updateDraft);
+            nextStepController.addListener(updateDraft);
+          }
+
+          return StatefulBuilder(
         builder: (ctx, setSheetState) {
           final isDark = Theme.of(ctx).brightness == Brightness.dark;
           final allAppts = ref.read(appointmentsStreamProvider).value ?? [];
@@ -3403,6 +3469,8 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
             ),
           );
         },
+          );
+        },
       ),
     );
   }
@@ -3514,14 +3582,21 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
 
     if (person == null) {
       return FutureBuilder<PersonEntry?>(
-        future: repo.getPersonById(widget.personId),
+        future: _fallbackPersonFuture,
         builder: (context, snapshot) {
-          if (!snapshot.hasData) {
+          if (snapshot.connectionState == ConnectionState.waiting &&
+              !snapshot.hasData) {
             return const Scaffold(
               body: Center(child: CircularProgressIndicator()),
             );
           }
-          final fallbackPerson = snapshot.data!;
+          final fallbackPerson = snapshot.data;
+          if (fallbackPerson == null) {
+            return Scaffold(
+              appBar: AppBar(title: const Text('Contato')),
+              body: const Center(child: Text('Contato não encontrado.')),
+            );
+          }
           return _buildMainScaffold(
             context,
             repo,
@@ -3586,9 +3661,6 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
 
     String selectedDay = 'Sábado';
     TimeOfDay selectedTime = const TimeOfDay(hour: 9, minute: 0);
-    final customController = TextEditingController(
-      text: person.preferredSchedule ?? 'Sábado às 09:00',
-    );
     bool isCustom = false;
 
     if (person.preferredSchedule != null &&
@@ -3617,7 +3689,11 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
 
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: [person.preferredSchedule ?? 'Sábado às 09:00'],
+        builder: (ctx, ctrls) {
+          final customController = ctrls[0];
+          return StatefulBuilder(
         builder: (ctx, setDialogState) {
           final formattedTime =
               '${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}';
@@ -3792,6 +3868,8 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
             ],
           );
         },
+          );
+        },
       ),
     );
   }
@@ -3803,116 +3881,120 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
     PersonEntry person, [
     Map<String, dynamic>? noteToEdit,
   ]) {
-    final textController = TextEditingController(
-      text: noteToEdit?['text'] ?? '',
-    );
     final isEditing = noteToEdit != null;
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Row(
-          children: [
-            const Icon(Icons.note_alt_outlined, color: AppTheme.accentTeal),
-            const SizedBox(width: 8),
-            Text(
-              isEditing
-                  ? 'Editar Necessidade / Obs.'
-                  : 'Nova Necessidade / Obs.',
-            ),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Registre circunstâncias familiares, dúvidas levantadas, assuntos de interesse ou necessidades de ${person.name}.',
-                style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: textController,
-                decoration: const InputDecoration(
-                  labelText: 'Descrição da necessidade ou observação *',
-                  hintText: 'Ex: Perdeu um familiar, tem dúvidas sobre a oração, etc.',
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: [noteToEdit?['text'] ?? ''],
+        builder: (ctx, ctrls) {
+          final textController = ctrls[0];
+
+          return AlertDialog(
+            title: Row(
+              children: [
+                const Icon(Icons.note_alt_outlined, color: AppTheme.accentTeal),
+                const SizedBox(width: 8),
+                Text(
+                  isEditing
+                      ? 'Editar Necessidade / Obs.'
+                      : 'Nova Necessidade / Obs.',
                 ),
-                maxLines: 4,
-                autofocus: true,
-              ),
-              const SizedBox(height: 10),
-              Row(
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(
-                    Icons.access_time,
-                    size: 14,
-                    color: AppTheme.textMuted,
-                  ),
-                  const SizedBox(width: 6),
                   Text(
-                    isEditing
-                        ? 'Criado em: ${AppDateUtils.formatDateTimeWithAt(DateTime.tryParse(noteToEdit['createdAt'] ?? ''))}'
-                        : 'Registro de data e hora automático.',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppTheme.textMuted,
+                    'Registre circunstâncias familiares, dúvidas levantadas, assuntos de interesse ou necessidades de ${person.name}.',
+                    style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: textController,
+                    decoration: const InputDecoration(
+                      labelText: 'Descrição da necessidade ou observação *',
+                      hintText: 'Ex: Perdeu um familiar, tem dúvidas sobre a oração, etc.',
                     ),
+                    maxLines: 4,
+                    autofocus: true,
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.access_time,
+                        size: 14,
+                        color: AppTheme.textMuted,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        isEditing
+                            ? 'Criado em: ${AppDateUtils.formatDateTimeWithAt(DateTime.tryParse(noteToEdit['createdAt'] ?? ''))}'
+                            : 'Registro de data e hora automático.',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.textMuted,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.accentTeal,
-              foregroundColor: Colors.white,
             ),
-            onPressed: () async {
-              final text = textController.text.trim();
-              if (text.isEmpty) return;
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancelar'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.accentTeal,
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: () async {
+                  final text = textController.text.trim();
+                  if (text.isEmpty) return;
 
-              final currentNotes = _parseNotes(person.generalNotes);
-              if (isEditing) {
-                final idx = currentNotes.indexWhere(
-                  (n) => n['id'] == noteToEdit['id'],
-                );
-                if (idx != -1) {
-                  currentNotes[idx] = {
-                    ...currentNotes[idx],
-                    'text': text,
-                    'updatedAt': DateTime.now().toIso8601String(),
-                  };
-                }
-              } else {
-                currentNotes.insert(0, {
-                  'id': const Uuid().v4(),
-                  'text': text,
-                  'createdAt': DateTime.now().toIso8601String(),
-                });
-              }
+                  final currentNotes = _parseNotes(person.generalNotes);
+                  if (isEditing) {
+                    final idx = currentNotes.indexWhere(
+                      (n) => n['id'] == noteToEdit['id'],
+                    );
+                    if (idx != -1) {
+                      currentNotes[idx] = {
+                        ...currentNotes[idx],
+                        'text': text,
+                        'updatedAt': DateTime.now().toIso8601String(),
+                      };
+                    }
+                  } else {
+                    currentNotes.insert(0, {
+                      'id': const Uuid().v4(),
+                      'text': text,
+                      'createdAt': DateTime.now().toIso8601String(),
+                    });
+                  }
 
-              await _saveNotes(repo, person, currentNotes);
-              if (ctx.mounted) Navigator.pop(ctx);
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      isEditing ? 'Anotação atualizada!' : 'Necessidade/observação registrada com data e hora!',
-                    ),
-                  ),
-                );
-              }
-            },
-            child: const Text('Salvar'),
-          ),
-        ],
+                  await _saveNotes(repo, person, currentNotes);
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          isEditing ? 'Anotação atualizada!' : 'Necessidade/observação registrada com data e hora!',
+                        ),
+                      ),
+                    );
+                  }
+                },
+                child: const Text('Salvar'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -3924,119 +4006,123 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
     PersonEntry person, [
     Map<String, dynamic>? targetToEdit,
   ]) {
-    final titleController = TextEditingController(
-      text: targetToEdit?['title'] ?? '',
-    );
     final isEditing = targetToEdit != null;
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Row(
-          children: [
-            const Icon(Icons.track_changes, color: Color(0xFF7C3AED)),
-            const SizedBox(width: 8),
-            Text(
-              isEditing
-                  ? 'Editar Alvo / Tarefa'
-                  : 'Novo Alvo ou Tarefa Espiritual',
-            ),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Defina um alvo espiritual ou tarefa deixada para ${person.name} até a próxima visita.',
-                style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: titleController,
-                decoration: const InputDecoration(
-                  labelText: 'Descrição do alvo ou tarefa *',
-                  hintText: 'Ex: Ler o Salmo 37, baixar o JW Library, ver vídeo da Lição 01...',
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: [targetToEdit?['title'] ?? ''],
+        builder: (ctx, ctrls) {
+          final titleController = ctrls[0];
+
+          return AlertDialog(
+            title: Row(
+              children: [
+                const Icon(Icons.track_changes, color: Color(0xFF7C3AED)),
+                const SizedBox(width: 8),
+                Text(
+                  isEditing
+                      ? 'Editar Alvo / Tarefa'
+                      : 'Novo Alvo ou Tarefa Espiritual',
                 ),
-                maxLines: 3,
-                autofocus: true,
-              ),
-              const SizedBox(height: 10),
-              Row(
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(
-                    Icons.access_time,
-                    size: 14,
-                    color: AppTheme.textMuted,
-                  ),
-                  const SizedBox(width: 6),
                   Text(
-                    isEditing
-                        ? 'Criado em: ${AppDateUtils.formatDateTimeWithAt(DateTime.tryParse(targetToEdit['createdAt'] ?? ''))}'
-                        : 'Data e hora da criação gravadas automaticamente.',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppTheme.textMuted,
+                    'Defina um alvo espiritual ou tarefa deixada para ${person.name} até a próxima visita.',
+                    style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: titleController,
+                    decoration: const InputDecoration(
+                      labelText: 'Descrição do alvo ou tarefa *',
+                      hintText: 'Ex: Ler o Salmo 37, baixar o JW Library, ver vídeo da Lição 01...',
                     ),
+                    maxLines: 3,
+                    autofocus: true,
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.access_time,
+                        size: 14,
+                        color: AppTheme.textMuted,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        isEditing
+                            ? 'Criado em: ${AppDateUtils.formatDateTimeWithAt(DateTime.tryParse(targetToEdit['createdAt'] ?? ''))}'
+                            : 'Data e hora da criação gravadas automaticamente.',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.textMuted,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF7C3AED),
-              foregroundColor: Colors.white,
             ),
-            onPressed: () async {
-              final title = titleController.text.trim();
-              if (title.isEmpty) return;
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancelar'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF7C3AED),
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: () async {
+                  final title = titleController.text.trim();
+                  if (title.isEmpty) return;
 
-              final currentTargets = _parseTargets(person.contactRestrictions);
-              if (isEditing) {
-                final idx = currentTargets.indexWhere(
-                  (t) => t['id'] == targetToEdit['id'],
-                );
-                if (idx != -1) {
-                  currentTargets[idx] = {
-                    ...currentTargets[idx],
-                    'title': title,
-                  };
-                }
-              } else {
-                currentTargets.insert(0, {
-                  'id': const Uuid().v4(),
-                  'title': title,
-                  'isCompleted': false,
-                  'createdAt': DateTime.now().toIso8601String(),
-                  'completedAt': null,
-                });
-              }
+                  final currentTargets = _parseTargets(person.contactRestrictions);
+                  if (isEditing) {
+                    final idx = currentTargets.indexWhere(
+                      (t) => t['id'] == targetToEdit['id'],
+                    );
+                    if (idx != -1) {
+                      currentTargets[idx] = {
+                        ...currentTargets[idx],
+                        'title': title,
+                      };
+                    }
+                  } else {
+                    currentTargets.insert(0, {
+                      'id': const Uuid().v4(),
+                      'title': title,
+                      'isCompleted': false,
+                      'createdAt': DateTime.now().toIso8601String(),
+                      'completedAt': null,
+                    });
+                  }
 
-              await _saveTargets(repo, person, currentTargets);
-              if (ctx.mounted) Navigator.pop(ctx);
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      isEditing
-                          ? 'Alvo atualizado!'
-                          : 'Novo alvo cadastrado com sucesso!',
-                    ),
-                  ),
-                );
-              }
-            },
-            child: const Text('Salvar Alvo'),
-          ),
-        ],
+                  await _saveTargets(repo, person, currentTargets);
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          isEditing
+                              ? 'Alvo atualizado!'
+                              : 'Novo alvo cadastrado com sucesso!',
+                        ),
+                      ),
+                    );
+                  }
+                },
+                child: const Text('Salvar Alvo'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -4485,7 +4571,9 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                                           .map((e) => e.toString().trim())
                                           .where((s) => s.isNotEmpty)
                                           .toList();
-                                    } catch (_) {}
+                                    } catch (e, st) {
+                                      AppLogger.debug('Falha ao ler tags JSON no cabeçalho (${person.id}): $e', st);
+                                    }
                                   } else {
                                     personTags = person.tags
                                         .split(',')
@@ -6921,7 +7009,9 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
             }
           }
         }
-      } catch (_) {}
+      } catch (e, st) {
+        AppLogger.debug('Falha ao ler alvos concluídos (${person.id}): $e', st);
+      }
     }
 
     final currentLesson = study.currentLesson ?? 1;

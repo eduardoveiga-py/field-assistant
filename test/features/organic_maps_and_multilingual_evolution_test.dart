@@ -16,9 +16,9 @@ void main() {
       final catalog = MBTilesService.instance.currentRegions;
       expect(catalog.length, equals(23));
 
-      // Verifica pre-instalação da região Ticuna / Santo Antônio do Içá
+      // Verifica que a região Ticuna / Santo Antônio do Içá inicia não instalada na ausência de arquivo físico em disco
       final solimoes = catalog.firstWhere((r) => r.id == 'br_am_solimoes');
-      expect(solimoes.isInstalled, isTrue);
+      expect(solimoes.isInstalled, isFalse);
       expect(solimoes.country, equals('Brasil'));
       expect(solimoes.state, equals('Amazonas'));
 

@@ -4,10 +4,10 @@ class AppVersion {
   AppVersion._();
 
   /// Versão Semântica Oficial (Major.Minor.Patch)
-  static const String version = '1.3.2';
+  static const String version = '1.3.3';
 
   /// Número sequencial da compilação (build number)
-  static const int buildNumber = 9;
+  static const int buildNumber = 10;
 
   /// Prefixo canônico para exibição em interfaces
   static const String displayVersion = 'v$version';
@@ -16,7 +16,7 @@ class AppVersion {
   static const String fullDisplayVersion = 'v$version+$buildNumber';
 
   /// Data oficial do lançamento (AAAA-MM-DD)
-  static const String releaseDate = '2026-11-10';
+  static const String releaseDate = '2026-11-11';
 
   /// Nome amigável do aplicativo
   static const String appName = 'Ministério Pessoal';
@@ -28,7 +28,15 @@ class AppVersion {
   static const String latestReleaseApiUrl =
       'https://api.github.com/repos/eduardoveiga-py/field-assistant/releases/latest';
 
-  /// URL oficial do arquivo apps.json para LiveContainer e AltStore
+  /// URL oficial imutável do arquivo apps.json fixada na tag da versão atual (A10)
+  static const String pinnedAppsJsonUrl =
+      'https://cdn.jsdelivr.net/gh/eduardoveiga-py/field-assistant@v$version/apps.json';
+
+  /// URL de manifesto apps.json anexado diretamente à última GitHub Release
+  static const String releaseAppsJsonUrl =
+      'https://github.com/eduardoveiga-py/field-assistant/releases/latest/download/apps.json';
+
+  /// URL legada de fallback do apps.json (usada apenas se fontes imutáveis falharem)
   static const String appsJsonUrl =
       'https://cdn.jsdelivr.net/gh/eduardoveiga-py/field-assistant@master/apps.json';
 
@@ -40,9 +48,9 @@ class AppVersion {
   static const String latestApkDownloadUrl =
       'https://github.com/eduardoveiga-py/field-assistant/releases/latest/download/app-arm64-v8a-release.apk';
 
-  /// URL oficial para adicionar a fonte de apps no LiveContainer
+  /// URL oficial para adicionar a fonte de apps no LiveContainer (aponta para release publicada, nunca para branch móvel)
   static String get liveContainerSourceUrl =>
-      'livecontainer://sources?url=${Uri.encodeComponent(appsJsonUrl)}';
+      'livecontainer://sources?url=${Uri.encodeComponent(releaseAppsJsonUrl)}';
 
   /// Alias de conveniência para liveContainerSourceUrl
   static String get liveContainerInstallUrl => liveContainerSourceUrl;

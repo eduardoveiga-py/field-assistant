@@ -7,6 +7,9 @@ import 'package:drift/wasm.dart';
 import 'package:sqlite3/wasm.dart';
 import 'package:web/web.dart' as web;
 
+import '../../core/app_logger.dart';
+import 'db_status.dart';
+
 /// Resolve URI do asset levando em conta document.baseURI (essencial para Flutter Web com subpastas ou rotas HTML5)
 Uri _resolveAssetUri(String relativePath) {
   try {
@@ -14,7 +17,9 @@ Uri _resolveAssetUri(String relativePath) {
     if (base.isNotEmpty) {
       return Uri.parse(base).resolve(relativePath);
     }
-  } catch (_) {}
+  } catch (e, st) {
+    AppLogger.debug('Fallback Uri.base em _resolveAssetUri ($relativePath): $e', st);
+  }
   return Uri.base.resolve(relativePath);
 }
 
@@ -136,17 +141,18 @@ QueryExecutor constructDb({bool inMemory = false}) {
             path: '/$dbName',
             fileSystem: fs,
           );
-        } catch (fsErr) {
+        } catch (fsErr, fsStack) {
           developer.log(
-            'Falha ao abrir IndexedDbFileSystem ($fsErr). Recorrendo a InMemoryFileSystem...',
+            'ERRO CRÍTICO [DriftWeb]: Falha ao abrir IndexedDbFileSystem ($fsErr). '
+            'Fallback para memória bloqueado para impedir perda silenciosa de dados.',
             name: 'DriftWeb',
             error: fsErr,
+            stackTrace: fsStack,
           );
-          sqlite3.registerVirtualFileSystem(
-            InMemoryFileSystem(),
-            makeDefault: true,
-          );
-          return WasmDatabase.inMemory(sqlite3);
+          dbFatalPersistenceError.value =
+              'Não foi possível abrir o armazenamento persistente (IndexedDB) no navegador: $fsErr. '
+              'Verifique se a navegação privada está desativada e se o armazenamento local está permitido.';
+          return _SafeWebUnavailableQueryExecutor();
         }
       }
     } catch (e, stack) {
@@ -158,36 +164,38 @@ QueryExecutor constructDb({bool inMemory = false}) {
       );
     }
 
-    // 3. Fallback de Segurança Robusto: Evita crash de tela vermelha e impede perda silenciosa de dados
+    // 3. Fallback de Segurança Crítica: impede perda silenciosa e sinaliza erro fatal para UI Web (C3)
     developer.log(
       'ERRO CRÍTICO [DriftWeb]: Não foi possível carregar os binários WebAssembly (sqlite3.wasm / drift_worker.js). '
-      'Executando em modo somente-leitura de segurança para proteger a integridade dos dados.',
+      'Operação bloqueada para proteger a integridade dos dados.',
       name: 'DriftWeb',
     );
+    dbFatalPersistenceError.value =
+        _SafeWebUnavailableQueryExecutor._unsupportedWriteMsg;
     return _SafeWebUnavailableQueryExecutor();
   });
 }
 
-/// Executor de segurança estrita para a Web: impede perda silenciosa de dados
+/// Executor de segurança estrita para a Web: impede perda silenciosa de dados e falsas leituras vazias
 /// caso WebAssembly/IndexedDB não estejam disponíveis no navegador.
 class _SafeWebUnavailableQueryExecutor extends QueryExecutor {
   static const String _unsupportedWriteMsg =
       'O armazenamento local no navegador requer suporte a WebAssembly e IndexedDB ativos. '
-      'Escritas foram interrompidas com segurança para evitar perda de dados do ministério.';
+      'Leituras e gravações foram bloqueadas com segurança para evitar perda de dados do ministério.';
 
   @override
   SqlDialect get dialect => SqlDialect.sqlite;
 
   @override
   Future<bool> ensureOpen(QueryExecutorUser user) async {
-    await user.beforeOpen(this, OpeningDetails(null, user.schemaVersion));
-    return true;
+    dbFatalPersistenceError.value ??= _unsupportedWriteMsg;
+    throw StateError(_unsupportedWriteMsg);
   }
 
   @override
   Future<void> runCustom(String statement, [List<Object?>? args]) async {
     final lower = statement.trim().toLowerCase();
-    if (lower.startsWith('select') || lower.startsWith('pragma')) {
+    if (lower.startsWith('pragma')) {
       return;
     }
     throw StateError(_unsupportedWriteMsg);
@@ -207,7 +215,15 @@ class _SafeWebUnavailableQueryExecutor extends QueryExecutor {
   Future<List<Map<String, Object?>>> runSelect(
     String statement,
     List<Object?> args,
-  ) async => [];
+  ) async {
+    final lower = statement.trim().toLowerCase();
+    if (lower.contains('sqlite_master') ||
+        lower.contains('pragma_table_info') ||
+        lower.startsWith('pragma')) {
+      return [];
+    }
+    throw StateError(_unsupportedWriteMsg);
+  }
 
   @override
   Future<int> runUpdate(String statement, List<Object?> args) async {

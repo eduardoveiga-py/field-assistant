@@ -701,10 +701,8 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
         // Highlight mark: <mark style="background:#hex">text</mark>
         final hexStr = m.group(1)!;
         final markText = m.group(2)!;
-        Color markColor = Colors.amber;
-        try {
-          markColor = Color(int.parse(hexStr.replaceFirst('#', '0xFF')));
-        } catch (_) {}
+        final parsedColor = int.tryParse(hexStr.replaceFirst('#', '0xFF'));
+        final Color markColor = parsedColor != null ? Color(parsedColor) : Colors.amber;
         spans.add(WidgetSpan(
           alignment: PlaceholderAlignment.middle,
           child: Container(

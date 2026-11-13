@@ -13,6 +13,8 @@ class MapLocationPickerDialog extends StatefulWidget {
   final double? initialLng;
   final String? initialAddress;
   final String? initialNeighborhood;
+  /// Permite testar respostas de geocodificação fora de ordem.
+  final Future<ReverseGeocodingResult?> Function(double, double)? reverseGeocode;
 
   const MapLocationPickerDialog({
     super.key,
@@ -20,6 +22,7 @@ class MapLocationPickerDialog extends StatefulWidget {
     this.initialLng,
     this.initialAddress,
     this.initialNeighborhood,
+    this.reverseGeocode,
   });
 
   @override
@@ -41,6 +44,9 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
   DateTime? _lastZoomChangeTime;
   bool _isLoadingAddress = false;
   ReverseGeocodingResult? _geocodedResult;
+  int _addressRequest = 0;
+  int _selectionGeneration = 0;
+  bool _hasExplicitSelection = false;
   String _statusText = 'Toque no mapa para marcar a localização exata da casa.';
 
   // Constantes de visualização de grade de blocos
@@ -110,8 +116,13 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
   @override
   void initState() {
     super.initState();
-    _selectedLat = widget.initialLat ?? -23.550520;
-    _selectedLng = widget.initialLng ?? -46.633308;
+    final lat = widget.initialLat;
+    final lng = widget.initialLng;
+    _hasExplicitSelection = lat != null && lng != null &&
+        lat.isFinite && lng.isFinite && lat.abs() <= 85.0511 && lng.abs() <= 180 &&
+        (lat != 0 || lng != 0);
+    _selectedLat = _hasExplicitSelection ? lat! : GeolocationHelper.defaultLat;
+    _selectedLng = _hasExplicitSelection ? lng! : GeolocationHelper.defaultLng;
     _viewCenterLat = _selectedLat;
     _viewCenterLng = _selectedLng;
 
@@ -129,7 +140,7 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
       0.0,
     );
 
-    if (widget.initialLat != null && widget.initialLng != null) {
+    if (_hasExplicitSelection) {
       _fetchAddressForCoords(_selectedLat, _selectedLng);
     }
   }
@@ -171,13 +182,21 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
   }
 
   Future<void> _fetchAddressForCoords(double lat, double lng) async {
+    final request = ++_addressRequest;
     setState(() {
       _isLoadingAddress = true;
+      _geocodedResult = null;
       _statusText = 'Buscando endereço via OpenStreetMap...';
     });
 
-    final res = await GeocodingService.reverseGeocode(lat, lng);
-    if (!mounted) return;
+    ReverseGeocodingResult? res;
+    try {
+      res = await (widget.reverseGeocode ?? GeocodingService.reverseGeocode)(lat, lng);
+    } catch (_) {
+      // A localização escolhida continua válida mesmo se a busca falhar.
+    }
+    if (!mounted || request != _addressRequest ||
+        lat != _selectedLat || lng != _selectedLng) return;
 
     setState(() {
       _isLoadingAddress = false;
@@ -192,23 +211,26 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
   }
 
   Future<void> _useCurrentGps() async {
+    final generation = ++_selectionGeneration;
     setState(() => _statusText = 'Obtendo GPS do dispositivo...');
-    final pos = await GeolocationHelper.getCurrentLocation();
-    if (!mounted) return;
+    final result = await GeolocationHelper.getCurrentLocationWithStatus();
+    if (!mounted || generation != _selectionGeneration) return;
 
-    if (pos != null) {
+    final pos = result.coordinates;
+    if (result.isSuccess && pos != null) {
       setState(() {
         _selectedLat = pos.latitude;
         _selectedLng = pos.longitude;
+        _hasExplicitSelection = true;
         _viewCenterLat = pos.latitude;
         _viewCenterLng = pos.longitude;
         _hasCenteredInitialView = false;
       });
       await _fetchAddressForCoords(pos.latitude, pos.longitude);
     } else {
-      setState(
-        () => _statusText = 'GPS indisponível. Toque no mapa para marcar.',
-      );
+      setState(() {
+        _statusText = '${result.userMessage} Mantendo o ponto atual; toque no mapa para ajustar.';
+      });
     }
   }
 
@@ -415,6 +437,7 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
                                   );
                                 }
                               },
+                              key: const ValueKey('location_picker_map'),
                               onTapUp: (details) {
                                 final clickX = details.localPosition.dx;
                                 final clickY = details.localPosition.dy;
@@ -426,6 +449,8 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
                                 setState(() {
                                   _selectedLat = newLat;
                                   _selectedLng = newLng;
+                                  _hasExplicitSelection = true;
+                                  _selectionGeneration++;
                                 });
 
                                 _fetchAddressForCoords(newLat, newLng);
@@ -469,9 +494,10 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
                                         ),
 
                                     // Pino da Casa / Localização Selecionada
-                                    Positioned(
-                                      left: pinX - 20,
-                                      top: pinY - 40,
+                                    if (_hasExplicitSelection) Positioned(
+                                      left: pinX - 50,
+                                      bottom: canvasHeight - pinY,
+                                      width: 100,
                                       child: IgnorePointer(
                                         child: Column(
                                           mainAxisSize: MainAxisSize.min,
@@ -651,7 +677,9 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Coordenadas: ${_selectedLat.toStringAsFixed(6)}, ${_selectedLng.toStringAsFixed(6)}',
+                    _hasExplicitSelection
+                        ? 'Coordenadas: ${_selectedLat.toStringAsFixed(6)}, ${_selectedLng.toStringAsFixed(6)}'
+                        : 'Nenhum ponto selecionado',
                     style: TextStyle(
                       fontSize: 11,
                       color: isDark
@@ -672,14 +700,21 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
                         icon: const Icon(Icons.check, size: 16),
                         label: const Text('Confirmar Este Ponto'),
                         onPressed: () {
-                          final finalResult =
-                              _geocodedResult ??
-                              ReverseGeocodingResult(
-                                latitude: _selectedLat,
-                                longitude: _selectedLng,
-                                street: widget.initialAddress,
-                                neighborhood: widget.initialNeighborhood,
-                              );
+                          if (!_hasExplicitSelection) {
+                            setState(() => _statusText = 'Selecione um ponto no mapa ou obtenha a localização antes de confirmar.');
+                            return;
+                          }
+                          final address = _geocodedResult;
+                          final finalResult = ReverseGeocodingResult(
+                            latitude: _selectedLat,
+                            longitude: _selectedLng,
+                            street: address?.street,
+                            houseNumber: address?.houseNumber,
+                            neighborhood: address?.neighborhood,
+                            city: address?.city,
+                            state: address?.state,
+                            fullAddress: address?.fullAddress,
+                          );
                           Navigator.pop(context, finalResult);
                         },
                       ),

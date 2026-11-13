@@ -118,7 +118,9 @@ class TicunaAudioService implements ITicunaAudioService {
             _playerPositionController.add(pos);
           }
         },
-        onError: (_) {},
+        onError: (Object e, StackTrace st) {
+          AppLogger.debug('Erro no stream onPositionChanged Ticuna: $e', st);
+        },
       );
 
       _durSub = _player.onDurationChanged.listen(
@@ -127,7 +129,9 @@ class TicunaAudioService implements ITicunaAudioService {
             _playerDurationController.add(dur);
           }
         },
-        onError: (_) {},
+        onError: (Object e, StackTrace st) {
+          AppLogger.debug('Erro no stream onDurationChanged Ticuna: $e', st);
+        },
       );
 
       _stateSub = _player.onPlayerStateChanged.listen(
@@ -137,9 +141,13 @@ class TicunaAudioService implements ITicunaAudioService {
             _playerPlayingController.add(isPlaying);
           }
         },
-        onError: (_) {},
+        onError: (Object e, StackTrace st) {
+          AppLogger.debug('Erro no stream onPlayerStateChanged Ticuna: $e', st);
+        },
       );
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.debug('Listeners de AudioPlayer indisponíveis na inicialização: $e', st);
+    }
   }
 
   // ==========================================
@@ -182,7 +190,9 @@ class TicunaAudioService implements ITicunaAudioService {
       if (await _recorder.isRecording()) {
         await _recorder.stop();
       }
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.debug('Falha ao verificar/parar gravação anterior Ticuna: $e', st);
+    }
 
     if (_isRecording) {
       await cancelRecording();
@@ -195,7 +205,8 @@ class TicunaAudioService implements ITicunaAudioService {
         Duration(seconds: kIsWeb ? 15 : 4),
         onTimeout: () => false,
       );
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.warning('Falha ao verificar permissão de microfone Ticuna', e, st);
       hasPerm = false;
     }
 
@@ -203,7 +214,9 @@ class TicunaAudioService implements ITicunaAudioService {
     if (!kIsWeb) {
       try {
         isTestEnv = Platform.environment.containsKey('FLUTTER_TEST');
-      } catch (_) {}
+      } catch (e, st) {
+        AppLogger.debug('Sem acesso a Platform.environment: $e', st);
+      }
     }
 
     if (!hasPerm && !isTestEnv && !kIsWeb) {
@@ -247,7 +260,9 @@ class TicunaAudioService implements ITicunaAudioService {
       // Se a instância nativa estiver corrompida, recria nova instância do gravador
       try {
         await _recorder.dispose();
-      } catch (_) {}
+      } catch (dispErr, dispSt) {
+        AppLogger.debug('Falha ao descartar gravador Ticuna antes de recriar: $dispErr', dispSt);
+      }
       _recorderInstance = AudioRecorder();
       try {
         await _recorder.start(
@@ -255,10 +270,10 @@ class TicunaAudioService implements ITicunaAudioService {
           path: targetPath,
         );
       } catch (e2) {
-        if (!isTestEnv && !kIsWeb) {
+        if (!isTestEnv) {
           rethrow;
         }
-        debugPrint('[TicunaAudio] Fallback em ambiente headless/web/teste: $e2');
+        debugPrint('[TicunaAudio] Fallback em ambiente de teste: $e2');
       }
     }
 
@@ -295,8 +310,13 @@ class TicunaAudioService implements ITicunaAudioService {
 
     String? path;
     try {
-      path = await _recorder.stop().catchError((_) => null);
-    } catch (_) {}
+      path = await _recorder.stop().catchError((Object e, StackTrace st) {
+        AppLogger.warning('Erro interno ao finalizar _recorder.stop() Ticuna', e, st);
+        return null;
+      });
+    } catch (e, st) {
+      AppLogger.warning('Falha ao parar gravação Ticuna', e, st);
+    }
 
     path ??= _currentRecordingPath ?? '';
 
@@ -312,16 +332,48 @@ class TicunaAudioService implements ITicunaAudioService {
         final file = File(path);
         if (await file.exists()) {
           sizeBytes = await file.length();
-        } else {
-          // Em ambiente sem microfone físico, cria arquivo simulado para testes
-          await file.writeAsBytes(List<int>.filled(64, 0));
-          sizeBytes = 64;
+          if (sizeBytes == 0) {
+            try {
+              await file.delete();
+            } catch (delErr, delSt) {
+              AppLogger.debug('Falha ao limpar áudio Ticuna vazio ($path): $delErr', delSt);
+            }
+          }
         }
-      } catch (_) {
-        sizeBytes = duration * 4096;
+      } catch (e, st) {
+        AppLogger.warning('Falha ao inspecionar arquivo de áudio Ticuna ($path)', e, st);
+        sizeBytes = 0;
       }
     } else {
-      sizeBytes = duration * 4096;
+      if (path.isNotEmpty &&
+          (path.startsWith('blob:') ||
+              path.startsWith('http://') ||
+              path.startsWith('https://'))) {
+        try {
+          final resp = await http
+              .get(Uri.parse(path))
+              .timeout(const Duration(seconds: 3));
+          if (resp.statusCode == 200) {
+            sizeBytes = resp.bodyBytes.length;
+          }
+        } catch (e, st) {
+          AppLogger.debug('Falha ao medir tamanho do áudio Ticuna web ($path): $e', st);
+          sizeBytes = 0;
+        }
+      }
+    }
+
+    bool isTestEnv = false;
+    if (!kIsWeb) {
+      try {
+        isTestEnv = Platform.environment.containsKey('FLUTTER_TEST');
+      } catch (e, st) {
+        AppLogger.debug('Sem acesso a Platform.environment em stopRecording: $e', st);
+      }
+    }
+    if (!isTestEnv && sizeBytes <= 0) {
+      AppLogger.warning('Gravação Ticuna abortada: arquivo de áudio vazio ou ausente ($path)');
+      return null;
     }
 
     return TicunaRecordingResult(
@@ -342,12 +394,15 @@ class TicunaAudioService implements ITicunaAudioService {
 
     try {
       if (await _recorder.isRecording()) {
-        await _recorder.cancel().catchError((_) {});
+        await _recorder.cancel();
       }
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.debug('Falha ao cancelar gravação Ticuna; descartando instância: $e', st);
       try {
-        await _recorder.dispose().catchError((_) {});
-      } catch (_) {}
+        await _recorder.dispose();
+      } catch (dispErr, dispSt) {
+        AppLogger.debug('Falha ao descartar gravador Ticuna em cancelRecording: $dispErr', dispSt);
+      }
       _recorderInstance = null;
     }
 
@@ -360,7 +415,9 @@ class TicunaAudioService implements ITicunaAudioService {
         if (await file.exists()) {
           await file.delete();
         }
-      } catch (_) {}
+      } catch (e, st) {
+        AppLogger.debug('Falha ao excluir áudio cancelado ($_currentRecordingPath): $e', st);
+      }
     }
     _currentRecordingPath = null;
   }
@@ -394,13 +451,25 @@ class TicunaAudioService implements ITicunaAudioService {
         source = DeviceFileSource(pathOrUrl);
       }
 
-      await _player.stop().catchError((_) {});
-      await _player.setPlaybackRate(_currentPlaybackSpeed).catchError((_) {});
-      await _player.play(source).catchError((_) {});
-    } catch (_) {
-      // Fallback para modo offline/testes
+      try {
+        await _player.stop();
+      } catch (stopErr, stopSt) {
+        AppLogger.debug('Falha ao interromper áudio Ticuna anterior antes do play: $stopErr', stopSt);
+      }
+      try {
+        await _player.setPlaybackRate(_currentPlaybackSpeed);
+      } catch (rateErr, rateSt) {
+        AppLogger.debug('Falha ao definir velocidade prévia ($_currentPlaybackSpeed) no play Ticuna: $rateErr', rateSt);
+      }
+      await _player.play(source);
+    } catch (e, st) {
+      AppLogger.error(
+        'Falha na reprodução de áudio Ticuna ($pathOrUrl)',
+        e,
+        st,
+      );
       if (!_playerPlayingController.isClosed) {
-        _playerPlayingController.add(true);
+        _playerPlayingController.add(false);
       }
     }
   }
@@ -410,16 +479,20 @@ class TicunaAudioService implements ITicunaAudioService {
   Future<void> setPlaybackSpeed(double speed) async {
     _currentPlaybackSpeed = speed;
     try {
-      await _player.setPlaybackRate(speed).catchError((_) {});
-    } catch (_) {}
+      await _player.setPlaybackRate(speed);
+    } catch (e, st) {
+      AppLogger.debug('Falha ao definir velocidade ($speed) no AudioPlayer Ticuna: $e', st);
+    }
   }
 
   /// Pausa a reprodução.
   @override
   Future<void> pause() async {
     try {
-      await _player.pause().catchError((_) {});
-    } catch (_) {}
+      await _player.pause();
+    } catch (e, st) {
+      AppLogger.debug('Falha ao pausar AudioPlayer Ticuna: $e', st);
+    }
     if (!_playerPlayingController.isClosed) {
       _playerPlayingController.add(false);
     }
@@ -429,8 +502,10 @@ class TicunaAudioService implements ITicunaAudioService {
   @override
   Future<void> stop() async {
     try {
-      await _player.stop().catchError((_) {});
-    } catch (_) {}
+      await _player.stop();
+    } catch (e, st) {
+      AppLogger.debug('Falha ao parar AudioPlayer Ticuna: $e', st);
+    }
     _currentlyPlayingPath = null;
     if (!_playerPlayingController.isClosed) {
       _playerPlayingController.add(false);
@@ -459,7 +534,9 @@ class TicunaAudioService implements ITicunaAudioService {
           await file.delete();
           return true;
         }
-      } catch (_) {}
+      } catch (e, st) {
+        AppLogger.warning('Falha ao apagar arquivo de áudio Ticuna ($filePath)', e, st);
+      }
     }
     return true;
   }
@@ -495,7 +572,14 @@ class TicunaAudioService implements ITicunaAudioService {
       }
 
       final ext = kIsWeb ? 'webm' : 'm4a';
-      final userFolder = client.auth.currentUser?.id ?? client.auth.currentSession?.user.id ?? '00000000-0000-0000-0000-000000000000';
+      final userFolder =
+          client.auth.currentUser?.id ?? client.auth.currentSession?.user.id;
+      if (userFolder == null || userFolder.isEmpty) {
+        AppLogger.warning(
+          'Upload de áudio Ticuna ($id) adiado: usuário não autenticado.',
+        );
+        return null;
+      }
       final rawFileName = '${id}_pronunciation.$ext';
       final storagePath = '$userFolder/$rawFileName';
 
@@ -505,24 +589,17 @@ class TicunaAudioService implements ITicunaAudioService {
           bytes,
           fileOptions: const FileOptions(upsert: true),
         );
-      } catch (e1) {
-        try {
-          await client.storage.from('voice_notes').uploadBinary(
-            '$userFolder/ticuna_$rawFileName',
-            bytes,
-            fileOptions: const FileOptions(upsert: true),
-          );
-        } catch (e2) {
-          AppLogger.error('Falha ao enviar áudio Ticuna para $bucket ($e1) e fallback voice_notes ($e2)');
-          return null;
-        }
+      } catch (e1, st1) {
+        AppLogger.error('Falha ao enviar áudio Ticuna para o bucket $bucket ($storagePath): $e1', e1, st1);
+        return null;
       }
 
       try {
         final publicUrl =
             client.storage.from(bucket).getPublicUrl(storagePath);
         return publicUrl;
-      } catch (_) {
+      } catch (urlErr, urlSt) {
+        AppLogger.debug('Não foi possível resolver publicUrl do bucket $bucket ($storagePath): $urlErr', urlSt);
         return storagePath;
       }
     } catch (e, st) {
@@ -538,7 +615,14 @@ class TicunaAudioService implements ITicunaAudioService {
   }) async {
     try {
       final client = Supabase.instance.client;
-      final userFolder = client.auth.currentUser?.id ?? client.auth.currentSession?.user.id ?? '00000000-0000-0000-0000-000000000000';
+      final userFolder =
+          client.auth.currentUser?.id ?? client.auth.currentSession?.user.id;
+      if (userFolder == null || userFolder.isEmpty) {
+        AppLogger.warning(
+          'Download de áudio Ticuna ($id) bloqueado: usuário não autenticado.',
+        );
+        return null;
+      }
       final rawFileName = '${id}_pronunciation.m4a';
       final storagePath = '$userFolder/$rawFileName';
 
@@ -551,21 +635,12 @@ class TicunaAudioService implements ITicunaAudioService {
       Uint8List? bytes;
       try {
         bytes = await client.storage.from(bucket).download(storagePath);
-      } catch (_) {
+      } catch (e1, st1) {
+        AppLogger.debug('Download Ticuna por pasta ($storagePath) falhou: $e1', st1);
         try {
           bytes = await client.storage.from(bucket).download(rawFileName);
-        } catch (_) {
-          try {
-            bytes = await client.storage
-                .from('voice_notes')
-                .download('$userFolder/ticuna_$rawFileName');
-          } catch (_) {
-            try {
-              bytes = await client.storage
-                  .from('voice_notes')
-                  .download('ticuna_$rawFileName');
-            } catch (_) {}
-          }
+        } catch (dlErr, dlSt) {
+          AppLogger.debug('Download Ticuna na raiz do bucket $bucket falhou ($rawFileName): $dlErr', dlSt);
         }
       }
 
@@ -596,7 +671,8 @@ class TicunaAudioService implements ITicunaAudioService {
         await audioDir.create(recursive: true);
       }
       return audioDir;
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.debug('DocumentsDirectory indisponível para ticuna_audio; tentando temp: $e', st);
       try {
         final sysTemp = Directory.systemTemp;
         final audioDir = Directory('${sysTemp.path}/ticuna_audio');
@@ -604,7 +680,8 @@ class TicunaAudioService implements ITicunaAudioService {
           await audioDir.create(recursive: true);
         }
         return audioDir;
-      } catch (_) {
+      } catch (tempErr, tempSt) {
+        AppLogger.warning('Falha ao inicializar diretório para ticuna_audio', tempErr, tempSt);
         return null;
       }
     }
@@ -624,14 +701,22 @@ class TicunaAudioService implements ITicunaAudioService {
 
     if (_recorderInstance != null) {
       try {
-        _recorderInstance!.dispose().catchError((_) {});
-      } catch (_) {}
+        _recorderInstance!.dispose().catchError((Object e, StackTrace st) {
+          AppLogger.debug('Falha assíncrona ao descartar _recorderInstance Ticuna: $e', st);
+        });
+      } catch (e, st) {
+        AppLogger.debug('Falha ao descartar _recorderInstance Ticuna: $e', st);
+      }
       _recorderInstance = null;
     }
     if (_playerInstance != null) {
       try {
-        _playerInstance!.dispose().catchError((_) {});
-      } catch (_) {}
+        _playerInstance!.dispose().catchError((Object e, StackTrace st) {
+          AppLogger.debug('Falha assíncrona ao descartar _playerInstance Ticuna: $e', st);
+        });
+      } catch (e, st) {
+        AppLogger.debug('Falha ao descartar _playerInstance Ticuna: $e', st);
+      }
       _playerInstance = null;
     }
   }
@@ -697,19 +782,24 @@ class FakeTicunaAudioService implements ITicunaAudioService {
 
     final basePath = kIsWeb ? 'virtual_audio' : Directory.systemTemp.path;
     final path = _currentRecordingPath ?? '$basePath/test_audio.m4a';
+    int size = 256;
     if (!kIsWeb) {
       try {
         final file = File(path);
         if (!await file.exists()) {
-          await file.writeAsBytes(List<int>.filled(64, 0));
+          await file.writeAsBytes(List<int>.filled(256, 0x55));
+        } else {
+          size = await file.length();
         }
-      } catch (_) {}
+      } catch (e, st) {
+        AppLogger.debug('Falha I/O no FakeTicunaAudioService.stopRecording: $e', st);
+      }
     }
 
     return TicunaRecordingResult(
       filePath: path,
       durationSeconds: _durationSeconds,
-      fileSizeBytes: 64,
+      fileSizeBytes: size,
       recordedAt: DateTime.now(),
     );
   }
@@ -723,7 +813,9 @@ class FakeTicunaAudioService implements ITicunaAudioService {
         if (await file.exists()) {
           await file.delete();
         }
-      } catch (_) {}
+      } catch (e, st) {
+        AppLogger.debug('Falha ao excluir áudio cancelado no FakeTicunaAudioService: $e', st);
+      }
     }
     _currentRecordingPath = null;
   }
@@ -762,7 +854,9 @@ class FakeTicunaAudioService implements ITicunaAudioService {
         if (await file.exists()) {
           await file.delete();
         }
-      } catch (_) {}
+      } catch (e, st) {
+        AppLogger.debug('Falha ao apagar arquivo em FakeTicunaAudioService: $e', st);
+      }
     }
     return true;
   }

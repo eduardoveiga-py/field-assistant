@@ -6,17 +6,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:drift/drift.dart' as drift show Value;
 
+import '../../core/app_logger.dart';
 import '../../core/app_theme.dart';
 import '../../database/app_database.dart';
 import '../../reports/report_export_service.dart';
 import '../../territory/geocoding_service.dart';
 import '../../territory/geolocation_helper.dart';
 import '../../territory/landmark_manager.dart';
+import '../../territory/mbtiles/mbtiles_service.dart';
 import '../../territory/sector_manager.dart';
 import '../../territory/tile_cache/tile_cache_service.dart';
 import '../providers.dart';
+import '../widgets/managed_text_controllers.dart';
 import '../widgets/map_location_picker_dialog.dart';
 import '../../contacts/person_hand_off_helper.dart';
 import '../../territory/territory_coverage_engine.dart';
@@ -51,12 +53,15 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
 
   final Set<String> _geocodedPersonIds = {};
   bool _hasCenteredHighlightPerson = false;
+  bool _geocodeInFlight = false;
+  ProviderSubscription<AsyncValue<List<PersonEntry>>>? _peopleSubscription;
   int _zoom = 15;
   double? _activeCenterLng;
   double? _activeCenterLat;
   static const double _tileSize = 256.0;
   DateTime? _lastZoomChangeTime;
-  double _rotation = 0.0; // Rotação 2D (em radianos) estilo Organic Maps
+  double _rotation = 0.0; // Rotação manual do mapa, não orientação magnética.
+  double _rotationAtGestureStart = 0.0;
   bool _isFullscreen = false; // Modo Tela Cheia
   ({double latitude, double longitude})? _userGpsLocation; // Localização GPS
   bool _isLocatingUser = false;
@@ -65,6 +70,89 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
   void initState() {
     super.initState();
     _highlightPersonId = widget.highlightPersonId;
+    MBTilesService.instance.init().catchError((Object e, StackTrace st) {
+      AppLogger.warning('Falha ao inicializar pacotes offline .mbtiles no mapa', e, st);
+    });
+    _peopleSubscription = ref.listenManual<AsyncValue<List<PersonEntry>>>(
+      peopleStreamProvider,
+      (_, next) {
+        next.whenData(_syncHighlightSideEffects);
+      },
+      fireImmediately: true,
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant ContactsMapScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.highlightPersonId != widget.highlightPersonId) {
+      _highlightPersonId = widget.highlightPersonId;
+      _hasCenteredHighlightPerson = false;
+      final current = ref.read(peopleStreamProvider).value;
+      if (current != null) {
+        _syncHighlightSideEffects(current);
+      }
+    }
+  }
+
+  void _syncHighlightSideEffects(List<PersonEntry> contacts) {
+    final targetId = _highlightPersonId;
+    if (targetId == null || !mounted) return;
+    PersonEntry? highlightPerson;
+    for (final c in contacts) {
+      if (c.id == targetId) {
+        highlightPerson = c;
+        break;
+      }
+    }
+    if (highlightPerson == null) return;
+
+    final hasCoords =
+        highlightPerson.latitude != null &&
+        highlightPerson.longitude != null &&
+        (highlightPerson.latitude != 0.0 || highlightPerson.longitude != 0.0) &&
+        highlightPerson.latitude!.abs() <= 90 &&
+        highlightPerson.longitude!.abs() <= 180;
+
+    if (hasCoords && _selectedPinPerson == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _selectedPinPerson != null) return;
+        setState(() {
+          _selectedPinPerson = highlightPerson;
+        });
+      });
+      return;
+    }
+
+    if (!hasCoords &&
+        !_geocodeInFlight &&
+        highlightPerson.address != null &&
+        highlightPerson.address!.trim().isNotEmpty &&
+        !_geocodedPersonIds.contains(highlightPerson.id)) {
+      _geocodedPersonIds.add(highlightPerson.id);
+      _geocodeInFlight = true;
+      final personToGeocode = highlightPerson;
+      Future.delayed(const Duration(milliseconds: 250), () async {
+        try {
+          if (!mounted) return;
+          final res = await GeocodingService.geocodeAddress(
+            personToGeocode.address!,
+          );
+          if (res != null && mounted) {
+            await ref.read(repositoryProvider).applyGeocodedCoordinates(
+              personId: personToGeocode.id,
+              expectedAddress: personToGeocode.address!,
+              latitude: res.latitude,
+              longitude: res.longitude,
+            );
+          }
+        } catch (e, st) {
+          AppLogger.warning('Não foi possível salvar a localização obtida pelo endereço.', e, st);
+        } finally {
+          _geocodeInFlight = false;
+        }
+      });
+    }
   }
 
   int _lon2tileX(double lon, int z) =>
@@ -165,6 +253,7 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
 
   @override
   void dispose() {
+    _peopleSubscription?.close();
     _transformationController.dispose();
     super.dispose();
   }
@@ -199,6 +288,31 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
     if (viewportWidth > 0 && viewportHeight > 0) {
       final dx = (viewportWidth / 2.0) - centerPx;
       final dy = (viewportHeight / 2.0) - centerPy;
+      _transformationController.value = Matrix4.translationValues(dx, dy, 0.0);
+    }
+  }
+
+  void _centerOnCoords(
+    double lat,
+    double lng,
+    double viewportWidth,
+    double viewportHeight,
+  ) {
+    const int gridHalfSize = 3;
+    final newCenterTileX = _lon2tileX(lng, _zoom);
+    final newCenterTileY = _lat2tileY(lat, _zoom);
+    final newOriginPx = (newCenterTileX - gridHalfSize) * _tileSize;
+    final newOriginPy = (newCenterTileY - gridHalfSize) * _tileSize;
+    final targetPx = _lon2pixelX(lng, _zoom) - newOriginPx;
+    final targetPy = _lat2pixelY(lat, _zoom) - newOriginPy;
+
+    setState(() {
+      _activeCenterLat = lat;
+      _activeCenterLng = lng;
+    });
+    if (viewportWidth > 0 && viewportHeight > 0) {
+      final dx = (viewportWidth / 2.0) - targetPx;
+      final dy = (viewportHeight / 2.0) - targetPy;
       _transformationController.value = Matrix4.translationValues(dx, dy, 0.0);
     }
   }
@@ -380,7 +494,7 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Rota otimizada para os primeiros 10 contatos de ${nearbyContacts.length} (limite do Google Maps).',
+            'Enviando os primeiros 10 contatos de ${nearbyContacts.length} ao Google Maps; a ordem não foi otimizada.',
           ),
         ),
       );
@@ -510,24 +624,25 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
     double? initialLat,
     double? initialLng,
   }) {
-    final nameController = TextEditingController();
-    final addressController = TextEditingController(
-      text: initialLat != null && initialLng != null
-          ? 'Marcação: ${initialLat.toStringAsFixed(5)}, ${initialLng.toStringAsFixed(5)}'
-          : '',
-    );
-    final notesController = TextEditingController();
-    final latController = TextEditingController(
-      text: initialLat != null ? initialLat.toStringAsFixed(6) : '',
-    );
-    final lngController = TextEditingController(
-      text: initialLng != null ? initialLng.toStringAsFixed(6) : '',
-    );
+    final initAddr = initialLat != null && initialLng != null
+        ? 'Marcação: ${initialLat.toStringAsFixed(5)}, ${initialLng.toStringAsFixed(5)}'
+        : '';
+    final initLat = initialLat != null ? initialLat.toStringAsFixed(6) : '';
+    final initLng = initialLng != null ? initialLng.toStringAsFixed(6) : '';
     String selectedCategory = initialLat != null ? 'outro' : 'padaria';
 
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: ['', initAddr, '', initLat, initLng],
+        builder: (ctx, ctrls) {
+          final nameController = ctrls[0];
+          final addressController = ctrls[1];
+          final notesController = ctrls[2];
+          final latController = ctrls[3];
+          final lngController = ctrls[4];
+
+          return StatefulBuilder(
         builder: (ctx, setDialogState) {
           final dialogIsDark = Theme.of(ctx).brightness == Brightness.dark;
           return AlertDialog(
@@ -558,7 +673,7 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                     decoration: const InputDecoration(
                       labelText: 'Nome do Ponto de Referência *',
                       hintText:
-                          'Ex: Padaria Central Betânia, Escola Estadual...',
+                          'Ex: Padaria do Porto, Escola Municipal...',
                     ),
                     autofocus: true,
                   ),
@@ -617,7 +732,7 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                     controller: addressController,
                     decoration: const InputDecoration(
                       labelText: 'Endereço ou Localização',
-                      hintText: 'Ex: Av. Principal com Rua 3 - Betânia',
+                      hintText: 'Ex: Av. Beira Rio com Travessa 2 - Centro',
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -798,6 +913,8 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
               ),
             ],
           );
+        },
+      );
         },
       ),
     );
@@ -1300,14 +1417,18 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
   }
 
   void _showImportTerritoryDialog(BuildContext context) {
-    final textController = TextEditingController();
     String detectedFormat = 'Auto-detectar';
     List<ImportedTerritoryContact> previewContacts = [];
     bool isImporting = false;
 
     showDialog(
       context: context,
-      builder: (dialogCtx) => StatefulBuilder(
+      builder: (dialogCtx) => ManagedTextControllers(
+        initialTexts: const [''],
+        builder: (dialogCtx, ctrls) {
+          final textController = ctrls[0];
+
+          return StatefulBuilder(
         builder: (ctx, setDialogState) {
           final isDark = Theme.of(ctx).brightness == Brightness.dark;
 
@@ -1494,6 +1615,8 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
               ),
             ],
           );
+        },
+      );
         },
       ),
     );
@@ -2117,39 +2240,12 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
         highlightPerson.latitude!.abs() <= 90 &&
         highlightPerson.longitude!.abs() <= 180;
 
-    // Se o contato em destaque não possuir coordenadas GPS mas tiver endereço, geocodifica automaticamente
-    if (highlightPerson != null &&
-        !hasHighlightCoords &&
-        highlightPerson.address != null &&
-        highlightPerson.address!.trim().isNotEmpty &&
-        !_geocodedPersonIds.contains(highlightPerson.id)) {
-      _geocodedPersonIds.add(highlightPerson.id);
-      final personToGeocode = highlightPerson;
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        if (!mounted) return;
-        final res = await GeocodingService.geocodeAddress(
-          personToGeocode.address!,
-        );
-        if (res != null && mounted) {
-          await ref
-              .read(repositoryProvider)
-              .updatePerson(
-                personToGeocode.copyWith(
-                  latitude: drift.Value(res.latitude),
-                  longitude: drift.Value(res.longitude),
-                ),
-              );
-        }
-      });
-    }
-
-    double centerLat = -23.550520;
-    double centerLng = -46.633308;
+    double centerLat = GeolocationHelper.defaultLat;
+    double centerLng = GeolocationHelper.defaultLng;
     if (hasHighlightCoords) {
-      // Centraliza no endereço específico da pessoa destacada
+      // Centraliza no endereço específico da pessoa destacada (sem mutar estado durante build - A6)
       centerLat = highlightPerson.latitude!;
       centerLng = highlightPerson.longitude!;
-      _selectedPinPerson ??= highlightPerson;
     } else if (allLats.isNotEmpty && allLngs.isNotEmpty) {
       // Usa a mediana para centralizar exatamente no agrupamento principal do território
       centerLat = allLats[allLats.length ~/ 2];
@@ -2274,24 +2370,32 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                     final effectiveScale = currentScale > 0.01 ? currentScale : 1.0;
                     final dx = m.storage[12];
                     final dy = m.storage[13];
-                    final touchCanvasX = (details.localPosition.dx - dx) / effectiveScale;
-                    final touchCanvasY = (details.localPosition.dy - dy) / effectiveScale;
+                    // A rotação é aplicada fora do InteractiveViewer: primeiro
+                    // desfazê-la em torno do centro, depois escala/translação.
+                    final offset = details.localPosition -
+                        Offset(constraints.maxWidth / 2, constraints.maxHeight / 2);
+                    final c = math.cos(_rotation);
+                    final sn = math.sin(_rotation);
+                    final localX = offset.dx * c + offset.dy * sn + constraints.maxWidth / 2;
+                    final localY = -offset.dx * sn + offset.dy * c + constraints.maxHeight / 2;
+                    final touchCanvasX = (localX - dx) / effectiveScale;
+                    final touchCanvasY = (localY - dy) / effectiveScale;
                     final touchWorldPx = originPx + touchCanvasX;
                     final touchWorldPy = originPy + touchCanvasY;
                     final touchLng = _pixelX2lon(touchWorldPx, _zoom);
                     final touchLat = _pixelY2lat(touchWorldPy, _zoom);
                     _showAddLandmarkModal(context, initialLat: touchLat, initialLng: touchLng);
                   },
+                  onScaleStart: (_) => _rotationAtGestureStart = _rotation,
                   onScaleUpdate: (details) {
-                    if (details.pointerCount >= 2 && details.rotation.abs() > 0.005) {
+                    if (details.pointerCount >= 2) {
                       setState(() {
-                        _rotation += details.rotation;
+                        _rotation = _rotationAtGestureStart + details.rotation;
                       });
                     }
                   },
                   child: Transform.rotate(
                     angle: _rotation,
-                    origin: Offset(constraints.maxWidth / 2, constraints.maxHeight / 2),
                     child: InteractiveViewer(
                     transformationController: _transformationController,
                     constrained: false, // Permite que o mapa ocupe 100% da área sem distorção ou cortes pretos
@@ -2403,13 +2507,6 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                                             color: Colors.blueAccent.withValues(alpha: 0.5),
                                             width: 1.5,
                                           ),
-                                        ),
-                                      ),
-                                      Transform.rotate(
-                                        angle: -_rotation,
-                                        child: CustomPaint(
-                                          size: const Size(28, 28),
-                                          painter: _GpsHeadingConePainter(),
                                         ),
                                       ),
                                       Container(
@@ -2566,12 +2663,12 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
               right: 12,
               child: Column(
                 children: [
-                  // Bússola Interativa (Norte Magnético estilo Organic Maps)
+                  // Rotação manual; não utiliza sensores de bússola.
                   FloatingActionButton.small(
                     heroTag: 'map_compass',
                     backgroundColor: Colors.white,
                     foregroundColor: Colors.red.shade700,
-                    tooltip: 'Norte Magnético (${(_rotation * 180 / math.pi).round()}°)\nToque para redefinir para 0° • Segure para girar 90°',
+                    tooltip: 'Rotação do mapa (${(_rotation * 180 / math.pi).round()}°). Toque para voltar ao norte.',
                     onPressed: () {
                       setState(() {
                         _rotation = 0.0;
@@ -2622,18 +2719,38 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                     foregroundColor: _isLocatingUser ? Colors.white : Colors.blue.shade700,
                     tooltip: 'Minha Localização GPS',
                     onPressed: () async {
+                      if (_isLocatingUser) return;
+                      final messenger = ScaffoldMessenger.of(context);
+                      final warningColor = Colors.orange.shade800;
                       setState(() => _isLocatingUser = true);
-                      final loc = await GeolocationHelper.getCurrentLocation();
-                      if (loc != null && mounted) {
+                      final result =
+                          await GeolocationHelper.getCurrentLocationWithStatus();
+                      if (!mounted) return;
+                      final loc = result.coordinates;
+                      if (result.isSuccess && loc != null) {
                         setState(() {
                           _userGpsLocation = loc;
                           _isLocatingUser = false;
                         });
-                        final targetPx = _lon2pixelX(loc.longitude, _zoom) - originPx;
-                        final targetPy = _lat2pixelY(loc.latitude, _zoom) - originPy;
-                        _recenterMap(constraints.maxWidth, constraints.maxHeight, targetPx, targetPy);
-                      } else if (mounted) {
+                        _centerOnCoords(
+                          loc.latitude,
+                          loc.longitude,
+                          constraints.maxWidth,
+                          constraints.maxHeight,
+                        );
+                      } else {
                         setState(() => _isLocatingUser = false);
+                        messenger
+                          ..hideCurrentSnackBar()
+                          ..showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                '${result.userMessage} O mapa permaneceu na posição anterior.',
+                              ),
+                              backgroundColor: warningColor,
+                              duration: const Duration(seconds: 4),
+                            ),
+                          );
                       }
                     },
                     child: _isLocatingUser
@@ -3117,8 +3234,9 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Positioned(
-      left: (x - 20).clamp(10.0, canvasWidth - 60.0),
-      top: (y - 35).clamp(10.0, canvasHeight - 60.0),
+      left: x - 60,
+      bottom: canvasHeight - y,
+      width: 120,
       child: GestureDetector(
         onTap: () {
           setState(() {
@@ -3243,8 +3361,9 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
     }
 
     return Positioned(
-      left: (x - (isHighlighted ? 24 : 20)).clamp(10.0, canvasWidth - 70.0),
-      top: (y - (isHighlighted ? 44 : 35)).clamp(10.0, canvasHeight - 70.0),
+      left: x - 70,
+      bottom: canvasHeight - y,
+      width: 140,
       child: GestureDetector(
         behavior: HitTestBehavior.deferToChild,
         onTap: () {
@@ -3479,34 +3598,5 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
         return const Color(0xFF2563EB);
     }
   }
-}
-
-class _GpsHeadingConePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          Colors.blueAccent.withValues(alpha: 0.4),
-          Colors.blueAccent.withValues(alpha: 0.0),
-        ],
-      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
-
-    final path = Path()
-      ..moveTo(size.width / 2, size.height / 2)
-      ..lineTo(0, 0)
-      ..arcToPoint(
-        Offset(size.width, 0),
-        radius: Radius.circular(size.width / 2),
-      )
-      ..close();
-
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 

@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:drift/drift.dart' as drift;
 import 'package:uuid/uuid.dart';
 
+import '../core/app_logger.dart';
+import '../core/sync_timestamp.dart';
 import '../database/app_database.dart';
 
 /// Estatísticas de progresso e execução de um projeto
@@ -67,8 +69,10 @@ class ProjectManager {
       updatedAt: now,
     );
 
-    await db.into(db.projects).insert(companion);
-    await _recordSyncQueue(id, 'INSERT');
+    await db.transaction(() async {
+      await db.into(db.projects).insert(companion);
+      await _recordSyncQueue(id, 'INSERT');
+    });
 
     return (await (db.select(db.projects)..where((t) => t.id.equals(id))).getSingle());
   }
@@ -86,43 +90,58 @@ class ProjectManager {
     List<String>? tags,
   }) async {
     final now = DateTime.now();
-    final companion = ProjectsCompanion(
-      name: name != null ? drift.Value(name.trim()) : const drift.Value.absent(),
-      objective: objective != null ? drift.Value(objective.trim()) : const drift.Value.absent(),
-      description: description != null ? drift.Value(description.trim()) : const drift.Value.absent(),
-      category: category != null ? drift.Value(category) : const drift.Value.absent(),
-      status: status != null ? drift.Value(status) : const drift.Value.absent(),
-      colorHex: colorHex != null ? drift.Value(colorHex) : const drift.Value.absent(),
-      iconName: iconName != null ? drift.Value(iconName) : const drift.Value.absent(),
-      targetDate: targetDate != null ? drift.Value(targetDate) : const drift.Value.absent(),
-      metadata: tags != null ? drift.Value(jsonEncode({'tags': tags})) : const drift.Value.absent(),
-      updatedAt: drift.Value(now),
-    );
+    await db.transaction(() async {
+      final existing = await getProjectById(id);
+      if (existing == null) return;
+      final companion = ProjectsCompanion(
+        name: name != null ? drift.Value(name.trim()) : const drift.Value.absent(),
+        objective: objective != null ? drift.Value(objective.trim()) : const drift.Value.absent(),
+        description: description != null ? drift.Value(description.trim()) : const drift.Value.absent(),
+        category: category != null ? drift.Value(category) : const drift.Value.absent(),
+        status: status != null ? drift.Value(status) : const drift.Value.absent(),
+        colorHex: colorHex != null ? drift.Value(colorHex) : const drift.Value.absent(),
+        iconName: iconName != null ? drift.Value(iconName) : const drift.Value.absent(),
+        targetDate: targetDate != null ? drift.Value(targetDate) : const drift.Value.absent(),
+        metadata: tags != null ? drift.Value(jsonEncode({'tags': tags})) : const drift.Value.absent(),
+        updatedAt: drift.Value(now),
+        revision: drift.Value(existing.revision + 1),
+      );
 
-    await (db.update(db.projects)..where((t) => t.id.equals(id))).write(companion);
-    await _recordSyncQueue(id, 'UPDATE');
+      await (db.update(db.projects)..where((t) => t.id.equals(id))).write(companion);
+      await _recordSyncQueue(id, 'UPDATE', baseData: existing.toJson());
+    });
   }
 
   Future<void> updateProjectStatus(String id, String status) async {
     final now = DateTime.now();
-    await (db.update(db.projects)..where((t) => t.id.equals(id))).write(
-      ProjectsCompanion(
-        status: drift.Value(status),
-        updatedAt: drift.Value(now),
-      ),
-    );
-    await _recordSyncQueue(id, 'UPDATE');
+    await db.transaction(() async {
+      final existing = await getProjectById(id);
+      if (existing == null) return;
+      await (db.update(db.projects)..where((t) => t.id.equals(id))).write(
+        ProjectsCompanion(
+          status: drift.Value(status),
+          updatedAt: drift.Value(now),
+          revision: drift.Value(existing.revision + 1),
+        ),
+      );
+      await _recordSyncQueue(id, 'UPDATE', baseData: existing.toJson());
+    });
   }
 
   Future<void> softDeleteProject(String id) async {
     final now = DateTime.now();
-    await (db.update(db.projects)..where((t) => t.id.equals(id))).write(
-      ProjectsCompanion(
-        deletedAt: drift.Value(now),
-        updatedAt: drift.Value(now),
-      ),
-    );
-    await _recordSyncQueue(id, 'DELETE');
+    await db.transaction(() async {
+      final existing = await getProjectById(id);
+      if (existing == null) return;
+      await (db.update(db.projects)..where((t) => t.id.equals(id))).write(
+        ProjectsCompanion(
+          deletedAt: drift.Value(now),
+          updatedAt: drift.Value(now),
+          revision: drift.Value(existing.revision + 1),
+        ),
+      );
+      await _recordSyncQueue(id, 'DELETE', baseData: existing.toJson());
+    });
   }
 
   // ==========================================
@@ -186,19 +205,35 @@ class ProjectManager {
     });
   }
 
-  Future<void> _recordSyncQueue(String entityId, String operation) async {
+  Future<void> _recordSyncQueue(
+    String entityId,
+    String operation, {
+    Map<String, dynamic>? baseData,
+  }) async {
     try {
       final now = DateTime.now();
+      final row = await getProjectById(entityId);
+      final payloadMap = row != null
+          ? SyncTimestamp.normalizeMapDates(row.toJson())
+          : <String, dynamic>{
+              'id': entityId,
+              'created_at': now.toUtc().toIso8601String(),
+            };
+      if (baseData != null) {
+        payloadMap['_base'] = SyncTimestamp.normalizeMapDates(baseData);
+      }
       await db.into(db.syncQueue).insert(
         SyncQueueCompanion.insert(
           id: _uuid.v4(),
           entityType: 'projects',
           entityId: entityId,
           operation: operation,
-          payload: jsonEncode({'id': entityId, 'created_at': now.toIso8601String()}),
+          payload: jsonEncode(payloadMap),
           createdAt: now,
         ),
       );
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.error('Erro ao enfileirar mutação de Projeto ($entityId)', e, st);
+    }
   }
 }

@@ -60,7 +60,7 @@
 		<string>Icon-App-1024x1024@1x</string>
 	</array>
 	<key>GIDClientID</key>
-	<string>424960288105-vi0ig8si59j4rk5j4gdfd9nv2revvitn.apps.googleusercontent.com</string>
+	<string>YOUR_GOOGLE_IOS_CLIENT_ID.apps.googleusercontent.com</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -68,7 +68,7 @@
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.googleusercontent.apps.424960288105-vi0ig8si59j4rk5j4gdfd9nv2revvitn</string>
+				<string>com.googleusercontent.apps.YOUR_GOOGLE_IOS_CLIENT_ID</string>
 			</array>
 		</dict>
 	</array>

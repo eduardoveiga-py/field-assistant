@@ -1,18 +1,28 @@
 import 'package:drift/drift.dart';
+import '../database/app_database.dart';
 import '../database/repository.dart';
 
 class DemoDataGenerator {
+  static const String demoModeKvKey = 'demo_mode';
+
   /// Popula a base com dados 100% fictícios para teste e demonstração isolada.
   static Future<void> populateDemoData(AppRepository repository) async {
+    await repository.db.into(repository.db.appKvStore).insertOnConflictUpdate(
+          AppKvStoreCompanion.insert(
+            key: demoModeKvKey,
+            value: 'true',
+            updatedAt: Value(DateTime.now()),
+          ),
+        );
     final now = DateTime.now();
 
     // 1. Pessoas fictícias com coordenadas e bairros
     final p1 = await repository.createPerson(
       name: 'Maria Oliveira (Demo)',
-      phone: '(11) 98765-4321',
-      address: 'Rua das Flores, 120 - Bairro Centro - Ref: Apto 42',
-      latitude: -23.550520,
-      longitude: -46.633308,
+      phone: '(97) 98765-4321',
+      address: 'Av. Beira Rio, 120 - Centro - Ref: Próximo ao Porto',
+      latitude: -3.102200,
+      longitude: -67.939700,
       status: 'estudo',
       preferredSchedule: 'Terças-feiras às 15h',
       generalNotes: 'Muito interessada na esperança da ressurreição. Família receptiva.\n[Alvo: Assistir à reunião presencial]\n[Tarefa: Ler a lição 06]',
@@ -25,10 +35,10 @@ class DemoDataGenerator {
 
     final p2 = await repository.createPerson(
       name: 'Carlos Pereira (Demo)',
-      phone: '(11) 91234-5678',
-      address: 'Av. Paulista, 1500 - Bairro Bela Vista',
-      latitude: -23.561684,
-      longitude: -46.655981,
+      phone: '(97) 91234-5678',
+      address: 'Rua do Porto, 350 - Centro',
+      latitude: -3.105120,
+      longitude: -67.942350,
       status: 'revisita',
       preferredSchedule: 'Sábados pela manhã',
       generalNotes: 'Perguntou por que Deus permite o sofrimento.\n[Alvo: Ler a Bíblia diariamente]',
@@ -41,10 +51,10 @@ class DemoDataGenerator {
 
     final p3 = await repository.createPerson(
       name: 'Luciana Martins (Demo)',
-      phone: '(11) 99887-1122',
-      address: 'Rua Bela Cintra, 450 - Bairro Consolação',
-      latitude: -23.554210,
-      longitude: -46.662150,
+      phone: '(97) 99887-1122',
+      address: 'Travessa Santos Dumont, 85 - Vila Nova',
+      latitude: -3.099500,
+      longitude: -67.937200,
       status: 'estudo',
       preferredSchedule: 'Quintas-feiras às 19h30',
       generalNotes: 'Estuda em conjunto com sua filha Beatriz.\n[Tarefa: Responder perguntas do quadro da lição 05]',
@@ -175,7 +185,13 @@ class DemoDataGenerator {
     'Maria Oliveira (Demo)',
     'Carlos Pereira (Demo)',
     'Luciana Martins (Demo)',
+    'Beatriz Martins (Demo)',
     'Beatriz Martins (Demo - Filha)',
+  };
+
+  static const demoActivityNotes = {
+    '[Publicações: 4] [Vídeos: 2] Manhã de campo no setor residencial.',
+    '[Publicações: 2] [Vídeos: 1] Visitas e revisitas.',
   };
 
   static const demoStudyTitles = {
@@ -203,29 +219,57 @@ class DemoDataGenerator {
     var removedCount = 0;
 
     await db.transaction(() async {
+      final clearedEntityIds = <String>{};
+
       // 1. Identifica e exclui pessoas demo e registros dependentes
       final demoPeople = await (db.select(db.people)
             ..where((t) => t.name.like('%(Demo%')))
           .get();
       final demoPersonIds = demoPeople.map((p) => p.id).toSet();
+      clearedEntityIds.addAll(demoPersonIds);
 
       if (demoPersonIds.isNotEmpty) {
         removedCount += demoPeople.length;
+        final demoVisits = await (db.select(db.visits)
+              ..where((t) => t.personId.isIn(demoPersonIds)))
+            .get();
+        clearedEntityIds.addAll(demoVisits.map((v) => v.id));
         await (db.delete(db.visits)
               ..where((t) => t.personId.isIn(demoPersonIds)))
             .go();
+
+        final demoPersonAppts = await (db.select(db.appointments)
+              ..where((t) => t.personId.isIn(demoPersonIds)))
+            .get();
+        clearedEntityIds.addAll(demoPersonAppts.map((a) => a.id));
         await (db.delete(db.appointments)
               ..where((t) => t.personId.isIn(demoPersonIds)))
             .go();
+
+        final demoPersonParts = await (db.select(db.studyParticipants)
+              ..where((t) => t.personId.isIn(demoPersonIds)))
+            .get();
+        clearedEntityIds.addAll(demoPersonParts.map((sp) => sp.id));
         await (db.delete(db.studyParticipants)
               ..where((t) => t.personId.isIn(demoPersonIds)))
             .go();
+
+        final demoPhotos = await (db.select(db.personPhotos)
+              ..where((t) => t.personId.isIn(demoPersonIds)))
+            .get();
+        clearedEntityIds.addAll(demoPhotos.map((ph) => ph.id));
         await (db.delete(db.personPhotos)
               ..where((t) => t.personId.isIn(demoPersonIds)))
             .go();
+
+        final demoPubs = await (db.select(db.personPublications)
+              ..where((t) => t.personId.isIn(demoPersonIds)))
+            .get();
+        clearedEntityIds.addAll(demoPubs.map((pb) => pb.id));
         await (db.delete(db.personPublications)
               ..where((t) => t.personId.isIn(demoPersonIds)))
             .go();
+
         await (db.delete(db.people)
               ..where((t) => t.id.isIn(demoPersonIds)))
             .go();
@@ -236,28 +280,57 @@ class DemoDataGenerator {
             ..where((t) => t.title.isIn(demoStudyTitles)))
           .get();
       final demoStudyIds = demoStudies.map((s) => s.id).toSet();
+      clearedEntityIds.addAll(demoStudyIds);
       if (demoStudyIds.isNotEmpty) {
+        final demoSessions = await (db.select(db.studySessions)
+              ..where((t) => t.studyId.isIn(demoStudyIds)))
+            .get();
+        clearedEntityIds.addAll(demoSessions.map((ss) => ss.id));
         await (db.delete(db.studySessions)
               ..where((t) => t.studyId.isIn(demoStudyIds)))
             .go();
+
+        final demoStudyParts = await (db.select(db.studyParticipants)
+              ..where((t) => t.studyId.isIn(demoStudyIds)))
+            .get();
+        clearedEntityIds.addAll(demoStudyParts.map((sp) => sp.id));
         await (db.delete(db.studyParticipants)
               ..where((t) => t.studyId.isIn(demoStudyIds)))
             .go();
+
         await (db.delete(db.bibleStudies)
               ..where((t) => t.id.isIn(demoStudyIds)))
             .go();
       }
 
       // 3. Exclui compromissos demo restantes
+      final demoTitleAppts = await (db.select(db.appointments)
+            ..where((t) => t.title.isIn(demoAppointmentTitles)))
+          .get();
+      clearedEntityIds.addAll(demoTitleAppts.map((a) => a.id));
       await (db.delete(db.appointments)
             ..where((t) => t.title.isIn(demoAppointmentTitles)))
           .go();
 
-      // 4. Exclui relatórios de atividade de demonstração
+      // 4. Exclui apenas relatórios de atividade exatos de demonstração
+      final demoActivities = await (db.select(db.activityRecords)
+            ..where((t) => t.notes.isIn(demoActivityNotes)))
+          .get();
+      clearedEntityIds.addAll(demoActivities.map((a) => a.id));
       await (db.delete(db.activityRecords)
-            ..where((t) =>
-                t.notes.like('%[Publicações: 4]%') |
-                t.notes.like('%[Publicações: 2]%')))
+            ..where((t) => t.notes.isIn(demoActivityNotes)))
+          .go();
+
+      // 5. Remove operações órfãs da sync_queue referentes aos dados demo
+      if (clearedEntityIds.isNotEmpty) {
+        await (db.delete(db.syncQueue)
+              ..where((t) => t.entityId.isIn(clearedEntityIds)))
+            .go();
+      }
+
+      // 6. Remove flag explícita demo_mode
+      await (db.delete(db.appKvStore)
+            ..where((t) => t.key.equals(demoModeKvKey)))
           .go();
     });
 

@@ -10,6 +10,7 @@ import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/app_logger.dart';
 import '../../core/app_theme.dart';
 import '../../database/app_database.dart';
 import '../../reports/web_downloader.dart';
@@ -17,6 +18,7 @@ import '../../research/research_manager.dart';
 import '../providers.dart';
 import '../widgets/adaptive_ministry_sheet.dart';
 import '../widgets/knowledge_item_reader_dialog.dart';
+import '../widgets/managed_text_controllers.dart';
 import '../widgets/markdown_preview_text.dart';
 import '../widgets/rich_markdown_toolbar.dart';
 import '../widgets/universal_attachment_viewer.dart';
@@ -189,7 +191,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                 allTags.add(t);
               }
             }
-          } catch (_) {}
+          } catch (e, st) {
+            AppLogger.debug('Falha ao ler tags JSON da nota (${n.id}): $e', st);
+          }
         }
 
         final notes = allNotes.where((n) {
@@ -197,7 +201,8 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
           try {
             final list = (jsonDecode(n.tags) as List).map((e) => e.toString()).toList();
             return list.contains(_selectedNoteTag);
-          } catch (_) {
+          } catch (e, st) {
+            AppLogger.debug('Falha ao filtrar tags da nota (${n.id}): $e', st);
             return false;
           }
         }).toList();
@@ -248,7 +253,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                         .map((e) => e.toString())
                         .where((t) => !t.startsWith('research:'))
                         .toList();
-                  } catch (_) {}
+                  } catch (e, st) {
+                    AppLogger.debug('Falha ao exibir tags da nota (${note.id}): $e', st);
+                  }
 
                   return ConstrainedBox(
                     constraints: const BoxConstraints(maxHeight: 180),
@@ -638,7 +645,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
               final t = item.toString().trim();
               if (t.isNotEmpty) allDocTags.add(t);
             }
-          } catch (_) {}
+          } catch (e, st) {
+            AppLogger.debug('Falha ao ler tags JSON do documento (${d.id}): $e', st);
+          }
         }
 
         // Filtro opcional por tag
@@ -647,7 +656,8 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
           try {
             final list = (jsonDecode(d.tags) as List).map((e) => e.toString()).toList();
             return list.contains(_selectedDocTag);
-          } catch (_) {
+          } catch (e, st) {
+            AppLogger.debug('Falha ao filtrar tags do documento (${d.id}): $e', st);
             return false;
           }
         }).toList();
@@ -730,7 +740,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                   List<String> docTags = [];
                   try {
                     docTags = (jsonDecode(doc.tags) as List).map((e) => e.toString()).toList();
-                  } catch (_) {}
+                  } catch (e, st) {
+                    AppLogger.debug('Falha ao ler tags JSON na listagem de documentos (${doc.id}): $e', st);
+                  }
 
                   return ConstrainedBox(
                     constraints: const BoxConstraints(maxHeight: 140),
@@ -867,7 +879,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
               final t = item.toString().trim();
               if (t.isNotEmpty) allResourceTags.add(t);
             }
-          } catch (_) {}
+          } catch (e, st) {
+            AppLogger.debug('Falha ao ler tags JSON de recurso (${r.id}): $e', st);
+          }
         }
 
         final resources = allResources.where((r) {
@@ -875,7 +889,8 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
           try {
             final list = (jsonDecode(r.tags) as List).map((e) => e.toString()).toList();
             return list.contains(_selectedResourceTag);
-          } catch (_) {
+          } catch (e, st) {
+            AppLogger.debug('Falha ao filtrar tags JSON de recurso (${r.id}): $e', st);
             return false;
           }
         }).toList();
@@ -923,7 +938,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                   List<String> resTags = [];
                   try {
                     resTags = (jsonDecode(r.tags) as List).map((e) => e.toString()).toList();
-                  } catch (_) {}
+                  } catch (e, st) {
+                    AppLogger.debug('Falha ao ler tags JSON na listagem de recursos (${r.id}): $e', st);
+                  }
 
                   return ConstrainedBox(
                     constraints: const BoxConstraints(maxHeight: 140),
@@ -1106,414 +1123,441 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
   }
 
   void _showCreateNoteModal() {
-    final titleCtrl = TextEditingController();
-    final contentCtrl = TextEditingController();
-    final tagsCtrl = TextEditingController();
     String category = 'general';
 
     showAdaptiveMinistrySheet(
       context: context,
       title: 'Nova Nota',
       titleLeading: const Icon(Icons.note_add, color: Color(0xFF8B5CF6)),
-      builder: (ctx, scroll) {
-        return StatefulBuilder(
-          builder: (ctx, setSheetState) {
-            return SingleChildScrollView(
-              controller: scroll,
-              physics: const ClampingScrollPhysics(),
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  TextField(
-                    controller: titleCtrl,
-                    autofocus: true,
-                    decoration: const InputDecoration(labelText: 'Título da Nota', border: OutlineInputBorder()),
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    initialValue: category,
-                    decoration: const InputDecoration(labelText: 'Categoria', border: OutlineInputBorder()),
-                    items: const [
-                      DropdownMenuItem(value: 'general', child: Text('Geral')),
-                      DropdownMenuItem(value: 'ministry', child: Text('Ministério')),
-                      DropdownMenuItem(value: 'research', child: Text('Pesquisa')),
-                      DropdownMenuItem(value: 'pastoral', child: Text('Pastoral')),
-                    ],
-                    onChanged: (v) => setSheetState(() => category = v ?? 'general'),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: tagsCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Tags (separadas por vírgula)',
-                      hintText: 'Ex: pregação, consolo, promessas',
-                      prefixIcon: Icon(Icons.tag, size: 18),
-                      border: OutlineInputBorder(),
+      builder: (ctx, scroll) => ManagedTextControllers(
+        initialTexts: const ['', '', ''],
+        builder: (ctx, ctrls) {
+          final titleCtrl = ctrls[0];
+          final contentCtrl = ctrls[1];
+          final tagsCtrl = ctrls[2];
+
+          return StatefulBuilder(
+            builder: (ctx, setSheetState) {
+              return SingleChildScrollView(
+                controller: scroll,
+                physics: const ClampingScrollPhysics(),
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextField(
+                      controller: titleCtrl,
+                      autofocus: true,
+                      decoration: const InputDecoration(labelText: 'Título da Nota', border: OutlineInputBorder()),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  RichMarkdownToolbar(controller: contentCtrl),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: contentCtrl,
-                    maxLines: 6,
-                    decoration: const InputDecoration(labelText: 'Conteúdo (Markdown suportado)...', border: OutlineInputBorder()),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          icon: const Icon(Icons.auto_stories, size: 16),
-                          label: const Text('Salvar & Pesquisar'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFF8B5CF6),
-                            side: const BorderSide(color: Color(0xFF8B5CF6)),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                          ),
-                          onPressed: () async {
-                            final title = titleCtrl.text.trim();
-                            if (title.isEmpty) return;
-                            final rawTags = tagsCtrl.text.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
-                            final km = ref.read(knowledgeManagerProvider);
-                            final note = await km.createNote(
-                              title: title,
-                              content: contentCtrl.text.trim(),
-                              category: category,
-                              tags: rawTags,
-                            );
-                            if (ctx.mounted) Navigator.of(ctx).pop();
-                            await _transformNoteToResearch(note);
-                          },
-                        ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      initialValue: category,
+                      decoration: const InputDecoration(labelText: 'Categoria', border: OutlineInputBorder()),
+                      items: const [
+                        DropdownMenuItem(value: 'general', child: Text('Geral')),
+                        DropdownMenuItem(value: 'ministry', child: Text('Ministério')),
+                        DropdownMenuItem(value: 'research', child: Text('Pesquisa')),
+                        DropdownMenuItem(value: 'pastoral', child: Text('Pastoral')),
+                      ],
+                      onChanged: (v) => setSheetState(() => category = v ?? 'general'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: tagsCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Tags (separadas por vírgula)',
+                        hintText: 'Ex: pregação, consolo, promessas',
+                        prefixIcon: Icon(Icons.tag, size: 18),
+                        border: OutlineInputBorder(),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF8B5CF6),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    const SizedBox(height: 12),
+                    RichMarkdownToolbar(controller: contentCtrl),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: contentCtrl,
+                      maxLines: 6,
+                      decoration: const InputDecoration(labelText: 'Conteúdo (Markdown suportado)...', border: OutlineInputBorder()),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            icon: const Icon(Icons.auto_stories, size: 16),
+                            label: const Text('Salvar & Pesquisar'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF8B5CF6),
+                              side: const BorderSide(color: Color(0xFF8B5CF6)),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                            ),
+                            onPressed: () async {
+                              final title = titleCtrl.text.trim();
+                              if (title.isEmpty) return;
+                              final content = contentCtrl.text.trim();
+                              final rawTags = tagsCtrl.text.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+                              final km = ref.read(knowledgeManagerProvider);
+                              final note = await km.createNote(
+                                title: title,
+                                content: content,
+                                category: category,
+                                tags: rawTags,
+                              );
+                              if (ctx.mounted) Navigator.of(ctx).pop();
+                              await _transformNoteToResearch(note);
+                            },
                           ),
-                          onPressed: () async {
-                            final title = titleCtrl.text.trim();
-                            if (title.isEmpty) return;
-                            final rawTags = tagsCtrl.text.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
-                            final km = ref.read(knowledgeManagerProvider);
-                            await km.createNote(
-                              title: title,
-                              content: contentCtrl.text.trim(),
-                              category: category,
-                              tags: rawTags,
-                            );
-                            if (ctx.mounted) Navigator.of(ctx).pop();
-                          },
-                          child: const Text('Salvar Nota', style: TextStyle(fontWeight: FontWeight.bold)),
                         ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF8B5CF6),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                            ),
+                            onPressed: () async {
+                              final title = titleCtrl.text.trim();
+                              if (title.isEmpty) return;
+                              final content = contentCtrl.text.trim();
+                              final rawTags = tagsCtrl.text.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+                              final km = ref.read(knowledgeManagerProvider);
+                              await km.createNote(
+                                title: title,
+                                content: content,
+                                category: category,
+                                tags: rawTags,
+                              );
+                              if (ctx.mounted) Navigator.of(ctx).pop();
+                            },
+                            child: const Text('Salvar Nota', style: TextStyle(fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 
   void _showEditNoteModal(KnowledgeNoteEntry note) {
-    final titleCtrl = TextEditingController(text: note.title);
-    final contentCtrl = TextEditingController(text: note.content);
     List<String> existingTags = [];
     try {
       existingTags = (jsonDecode(note.tags) as List).map((e) => e.toString()).where((t) => !t.startsWith('research:')).toList();
-    } catch (_) {}
-    final tagsCtrl = TextEditingController(text: existingTags.join(', '));
+    } catch (e, st) {
+      AppLogger.debug('Falha ao decodificar tags ao editar nota (${note.id}): $e', st);
+    }
     String category = note.category;
 
     showAdaptiveMinistrySheet(
       context: context,
       title: 'Editar Nota',
       titleLeading: const Icon(Icons.edit_note, color: Color(0xFF8B5CF6)),
-      builder: (ctx, scroll) {
-        return StatefulBuilder(
-          builder: (ctx, setSheetState) {
-            return SingleChildScrollView(
-              controller: scroll,
-              physics: const ClampingScrollPhysics(),
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  TextField(
-                    controller: titleCtrl,
-                    decoration: const InputDecoration(labelText: 'Título da Nota', border: OutlineInputBorder()),
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    initialValue: ['general', 'ministry', 'research', 'pastoral'].contains(category) ? category : 'general',
-                    decoration: const InputDecoration(labelText: 'Categoria', border: OutlineInputBorder()),
-                    items: const [
-                      DropdownMenuItem(value: 'general', child: Text('Geral')),
-                      DropdownMenuItem(value: 'ministry', child: Text('Ministério')),
-                      DropdownMenuItem(value: 'research', child: Text('Pesquisa')),
-                      DropdownMenuItem(value: 'pastoral', child: Text('Pastoral')),
-                    ],
-                    onChanged: (v) => setSheetState(() => category = v ?? 'general'),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: tagsCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Tags (separadas por vírgula)',
-                      hintText: 'Ex: pregação, consolo, promessas',
-                      prefixIcon: Icon(Icons.tag, size: 18),
-                      border: OutlineInputBorder(),
+      builder: (ctx, scroll) => ManagedTextControllers(
+        initialTexts: [note.title, note.content, existingTags.join(', ')],
+        builder: (ctx, ctrls) {
+          final titleCtrl = ctrls[0];
+          final contentCtrl = ctrls[1];
+          final tagsCtrl = ctrls[2];
+
+          return StatefulBuilder(
+            builder: (ctx, setSheetState) {
+              return SingleChildScrollView(
+                controller: scroll,
+                physics: const ClampingScrollPhysics(),
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextField(
+                      controller: titleCtrl,
+                      decoration: const InputDecoration(labelText: 'Título da Nota', border: OutlineInputBorder()),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  RichMarkdownToolbar(controller: contentCtrl),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: contentCtrl,
-                    maxLines: 6,
-                    decoration: const InputDecoration(labelText: 'Conteúdo (Markdown)...', border: OutlineInputBorder()),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          icon: const Icon(Icons.auto_stories, size: 16),
-                          label: const Text('Salvar & Pesquisar'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFF8B5CF6),
-                            side: const BorderSide(color: Color(0xFF8B5CF6)),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                          ),
-                          onPressed: () async {
-                            final title = titleCtrl.text.trim();
-                            if (title.isEmpty) return;
-                            final rawTags = tagsCtrl.text.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
-                            // Preserva eventuais tags internas como research:
-                            try {
-                              final internal = (jsonDecode(note.tags) as List).map((e) => e.toString()).where((t) => t.startsWith('research:')).toList();
-                              rawTags.addAll(internal);
-                            } catch (_) {}
-
-                            final km = ref.read(knowledgeManagerProvider);
-                            await km.updateNote(
-                              note.id,
-                              title: title,
-                              content: contentCtrl.text.trim(),
-                              category: category,
-                              tags: rawTags,
-                            );
-                            final updatedNote = await km.getNoteById(note.id);
-                            if (ctx.mounted) Navigator.of(ctx).pop();
-                            if (updatedNote != null) {
-                              await _transformNoteToResearch(updatedNote);
-                            }
-                          },
-                        ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      initialValue: ['general', 'ministry', 'research', 'pastoral'].contains(category) ? category : 'general',
+                      decoration: const InputDecoration(labelText: 'Categoria', border: OutlineInputBorder()),
+                      items: const [
+                        DropdownMenuItem(value: 'general', child: Text('Geral')),
+                        DropdownMenuItem(value: 'ministry', child: Text('Ministério')),
+                        DropdownMenuItem(value: 'research', child: Text('Pesquisa')),
+                        DropdownMenuItem(value: 'pastoral', child: Text('Pastoral')),
+                      ],
+                      onChanged: (v) => setSheetState(() => category = v ?? 'general'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: tagsCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Tags (separadas por vírgula)',
+                        hintText: 'Ex: pregação, consolo, promessas',
+                        prefixIcon: Icon(Icons.tag, size: 18),
+                        border: OutlineInputBorder(),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF8B5CF6),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                          ),
-                          onPressed: () async {
-                            final title = titleCtrl.text.trim();
-                            if (title.isEmpty) return;
-                            final rawTags = tagsCtrl.text.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
-                            try {
-                              final internal = (jsonDecode(note.tags) as List).map((e) => e.toString()).where((t) => t.startsWith('research:')).toList();
-                              rawTags.addAll(internal);
-                            } catch (_) {}
+                    ),
+                    const SizedBox(height: 12),
+                    RichMarkdownToolbar(controller: contentCtrl),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: contentCtrl,
+                      maxLines: 6,
+                      decoration: const InputDecoration(labelText: 'Conteúdo (Markdown)...', border: OutlineInputBorder()),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            icon: const Icon(Icons.auto_stories, size: 16),
+                            label: const Text('Salvar & Pesquisar'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF8B5CF6),
+                              side: const BorderSide(color: Color(0xFF8B5CF6)),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                            ),
+                            onPressed: () async {
+                              final title = titleCtrl.text.trim();
+                              if (title.isEmpty) return;
+                              final content = contentCtrl.text.trim();
+                              final rawTags = tagsCtrl.text.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+                              // Preserva eventuais tags internas como research:
+                              try {
+                                final internal = (jsonDecode(note.tags) as List).map((e) => e.toString()).where((t) => t.startsWith('research:')).toList();
+                                rawTags.addAll(internal);
+                              } catch (e, st) {
+                                AppLogger.debug('Falha ao preservar tags research ao editar nota (${note.id}): $e', st);
+                              }
 
-                            final km = ref.read(knowledgeManagerProvider);
-                            await km.updateNote(
-                              note.id,
-                              title: title,
-                              content: contentCtrl.text.trim(),
-                              category: category,
-                              tags: rawTags,
-                            );
-                            if (ctx.mounted) Navigator.of(ctx).pop();
-                          },
-                          child: const Text('Salvar Alterações', style: TextStyle(fontWeight: FontWeight.bold)),
+                              final km = ref.read(knowledgeManagerProvider);
+                              await km.updateNote(
+                                note.id,
+                                title: title,
+                                content: content,
+                                category: category,
+                                tags: rawTags,
+                              );
+                              final updatedNote = await km.getNoteById(note.id);
+                              if (ctx.mounted) Navigator.of(ctx).pop();
+                              if (updatedNote != null) {
+                                await _transformNoteToResearch(updatedNote);
+                              }
+                            },
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF8B5CF6),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                            ),
+                            onPressed: () async {
+                              final title = titleCtrl.text.trim();
+                              if (title.isEmpty) return;
+                              final content = contentCtrl.text.trim();
+                              final rawTags = tagsCtrl.text.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+                              try {
+                                final internal = (jsonDecode(note.tags) as List).map((e) => e.toString()).where((t) => t.startsWith('research:')).toList();
+                                rawTags.addAll(internal);
+                              } catch (e, st) {
+                                AppLogger.debug('Falha ao preservar tags research ao salvar nota (${note.id}): $e', st);
+                              }
+
+                              final km = ref.read(knowledgeManagerProvider);
+                              await km.updateNote(
+                                note.id,
+                                title: title,
+                                content: content,
+                                category: category,
+                                tags: rawTags,
+                              );
+                              if (ctx.mounted) Navigator.of(ctx).pop();
+                            },
+                            child: const Text('Salvar Alterações', style: TextStyle(fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 
   void _showEditQuestionModal(KnowledgeQuestionEntry q) {
-    final qCtrl = TextEditingController(text: q.question);
-    final ctxCtrl = TextEditingController(text: q.context ?? '');
-    final ansCtrl = TextEditingController(text: q.answer ?? '');
-
     showAdaptiveMinistrySheet(
       context: context,
       title: 'Editar Dúvida',
       titleLeading: const Icon(Icons.help_outline, color: Color(0xFFF59E0B)),
-      builder: (ctx, scroll) {
-        return SingleChildScrollView(
-          controller: scroll,
-          physics: const ClampingScrollPhysics(),
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TextField(
-                controller: qCtrl,
-                decoration: const InputDecoration(labelText: 'Pergunta do Morador ou Pesquisa', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 12),
-              RichMarkdownToolbar(controller: ctxCtrl),
-              const SizedBox(height: 6),
-              TextField(
-                controller: ctxCtrl,
-                maxLines: 2,
-                decoration: const InputDecoration(labelText: 'Contexto ou Objeção', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 12),
-              RichMarkdownToolbar(controller: ansCtrl),
-              const SizedBox(height: 6),
-              TextField(
-                controller: ansCtrl,
-                maxLines: 4,
-                decoration: const InputDecoration(labelText: 'Resposta Bíblica', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFF59E0B),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+      builder: (ctx, scroll) => ManagedTextControllers(
+        initialTexts: [q.question, q.context ?? '', q.answer ?? ''],
+        builder: (ctx, ctrls) {
+          final qCtrl = ctrls[0];
+          final ctxCtrl = ctrls[1];
+          final ansCtrl = ctrls[2];
+
+          return SingleChildScrollView(
+            controller: scroll,
+            physics: const ClampingScrollPhysics(),
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextField(
+                  controller: qCtrl,
+                  decoration: const InputDecoration(labelText: 'Pergunta do Morador ou Pesquisa', border: OutlineInputBorder()),
                 ),
-                onPressed: () async {
-                  final question = qCtrl.text.trim();
-                  if (question.isEmpty) return;
-                  final km = ref.read(knowledgeManagerProvider);
-                  await km.updateQuestion(
-                    q.id,
-                    question: question,
-                    context: ctxCtrl.text.trim().isNotEmpty ? ctxCtrl.text.trim() : null,
-                    answer: ansCtrl.text.trim().isNotEmpty ? ansCtrl.text.trim() : null,
-                    status: ansCtrl.text.trim().isNotEmpty ? 'answered' : 'open',
-                  );
-                  if (ctx.mounted) Navigator.of(ctx).pop();
-                },
-                child: const Text('Salvar Alterações', style: TextStyle(fontWeight: FontWeight.bold)),
-              ),
-            ],
-          ),
-        );
-      },
+                const SizedBox(height: 12),
+                RichMarkdownToolbar(controller: ctxCtrl),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: ctxCtrl,
+                  maxLines: 2,
+                  decoration: const InputDecoration(labelText: 'Contexto ou Objeção', border: OutlineInputBorder()),
+                ),
+                const SizedBox(height: 12),
+                RichMarkdownToolbar(controller: ansCtrl),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: ansCtrl,
+                  maxLines: 4,
+                  decoration: const InputDecoration(labelText: 'Resposta Bíblica', border: OutlineInputBorder()),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFF59E0B),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  onPressed: () async {
+                    final question = qCtrl.text.trim();
+                    if (question.isEmpty) return;
+                    final ctxText = ctxCtrl.text.trim();
+                    final ansText = ansCtrl.text.trim();
+                    final km = ref.read(knowledgeManagerProvider);
+                    await km.updateQuestion(
+                      q.id,
+                      question: question,
+                      context: ctxText.isNotEmpty ? ctxText : null,
+                      answer: ansText.isNotEmpty ? ansText : null,
+                      status: ansText.isNotEmpty ? 'answered' : 'open',
+                    );
+                    if (ctx.mounted) Navigator.of(ctx).pop();
+                  },
+                  child: const Text('Salvar Alterações', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 
   void _showEditDocumentModal(KnowledgeDocumentEntry doc) {
-    final titleCtrl = TextEditingController(text: doc.title);
     List<String> existingTags = [];
     try {
       existingTags = (jsonDecode(doc.tags) as List).map((e) => e.toString()).toList();
-    } catch (_) {}
-    final tagsCtrl = TextEditingController(text: existingTags.join(', '));
+    } catch (e, st) {
+      AppLogger.debug('Falha ao ler tags JSON do documento (${doc.id}): $e', st);
+    }
     String category = doc.category;
 
     showAdaptiveMinistrySheet(
       context: context,
       title: 'Editar Documento',
       titleLeading: const Icon(Icons.description, color: AppTheme.primaryBlue),
-      builder: (ctx, scroll) {
-        return StatefulBuilder(
-          builder: (ctx, setSheetState) {
-            return SingleChildScrollView(
-              controller: scroll,
-              physics: const ClampingScrollPhysics(),
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  TextField(
-                    controller: titleCtrl,
-                    decoration: const InputDecoration(labelText: 'Título do Documento', border: OutlineInputBorder()),
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    initialValue: ['manual', 'study', 'outline', 'other'].contains(category) ? category : 'manual',
-                    decoration: const InputDecoration(labelText: 'Categoria', border: OutlineInputBorder()),
-                    items: const [
-                      DropdownMenuItem(value: 'manual', child: Text('Manual / Guia')),
-                      DropdownMenuItem(value: 'study', child: Text('Estudo')),
-                      DropdownMenuItem(value: 'outline', child: Text('Esboço')),
-                      DropdownMenuItem(value: 'other', child: Text('Outro')),
-                    ],
-                    onChanged: (v) => setSheetState(() => category = v ?? 'manual'),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: tagsCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Tags (separadas por vírgula)',
-                      hintText: 'Ex: ministério, apostilas, roteiros',
-                      prefixIcon: Icon(Icons.tag, size: 18),
-                      border: OutlineInputBorder(),
+      builder: (ctx, scroll) => ManagedTextControllers(
+        initialTexts: [doc.title, existingTags.join(', ')],
+        builder: (ctx, ctrls) {
+          final titleCtrl = ctrls[0];
+          final tagsCtrl = ctrls[1];
+
+          return StatefulBuilder(
+            builder: (ctx, setSheetState) {
+              return SingleChildScrollView(
+                controller: scroll,
+                physics: const ClampingScrollPhysics(),
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextField(
+                      controller: titleCtrl,
+                      decoration: const InputDecoration(labelText: 'Título do Documento', border: OutlineInputBorder()),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryBlue,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      initialValue: ['manual', 'study', 'outline', 'other'].contains(category) ? category : 'manual',
+                      decoration: const InputDecoration(labelText: 'Categoria', border: OutlineInputBorder()),
+                      items: const [
+                        DropdownMenuItem(value: 'manual', child: Text('Manual / Guia')),
+                        DropdownMenuItem(value: 'study', child: Text('Estudo')),
+                        DropdownMenuItem(value: 'outline', child: Text('Esboço')),
+                        DropdownMenuItem(value: 'other', child: Text('Outro')),
+                      ],
+                      onChanged: (v) => setSheetState(() => category = v ?? 'manual'),
                     ),
-                    onPressed: () async {
-                      final title = titleCtrl.text.trim();
-                      if (title.isEmpty) return;
-                      final rawTags = tagsCtrl.text.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
-                      final km = ref.read(knowledgeManagerProvider);
-                      await km.updateDocument(doc.id, title: title, category: category, tags: rawTags);
-                      if (ctx.mounted) Navigator.of(ctx).pop();
-                    },
-                    child: const Text('Salvar Alterações', style: TextStyle(fontWeight: FontWeight.bold)),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: tagsCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Tags (separadas por vírgula)',
+                        hintText: 'Ex: ministério, apostilas, roteiros',
+                        prefixIcon: Icon(Icons.tag, size: 18),
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryBlue,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      onPressed: () async {
+                        final title = titleCtrl.text.trim();
+                        if (title.isEmpty) return;
+                        final rawTags = tagsCtrl.text.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+                        final km = ref.read(knowledgeManagerProvider);
+                        await km.updateDocument(doc.id, title: title, category: category, tags: rawTags);
+                        if (ctx.mounted) Navigator.of(ctx).pop();
+                      },
+                      child: const Text('Salvar Alterações', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 
   void _showEditResourceModal(KnowledgeResourceEntry resource) {
-    final titleCtrl = TextEditingController(text: resource.title);
-    final urlCtrl = TextEditingController(text: resource.url ?? '');
-    final descCtrl = TextEditingController(text: resource.description ?? '');
     List<String> existingTags = [];
     try {
       existingTags = (jsonDecode(resource.tags) as List).map((e) => e.toString()).toList();
-    } catch (_) {}
-    final tagsCtrl = TextEditingController(text: existingTags.join(', '));
+    } catch (e, st) {
+      AppLogger.debug('Falha ao ler tags JSON do recurso (${resource.id}): $e', st);
+    }
     String resourceType = resource.resourceType;
     String category = resource.category;
 
@@ -1521,88 +1565,103 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
       context: context,
       title: 'Editar Recurso',
       titleLeading: const Icon(Icons.link, color: Colors.teal),
-      builder: (ctx, scroll) {
-        return StatefulBuilder(
-          builder: (ctx, setSheetState) {
-            return SingleChildScrollView(
-              controller: scroll,
-              physics: const ClampingScrollPhysics(),
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  TextField(
-                    controller: titleCtrl,
-                    decoration: const InputDecoration(labelText: 'Título do Recurso', border: OutlineInputBorder()),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: urlCtrl,
-                    decoration: const InputDecoration(labelText: 'Link / URL (JW.org ou pesquisa)', border: OutlineInputBorder()),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: tagsCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Tags (separadas por vírgula)',
-                      hintText: 'Ex: jw, vídeos, pregação',
-                      prefixIcon: Icon(Icons.tag, size: 18),
-                      border: OutlineInputBorder(),
+      builder: (ctx, scroll) => ManagedTextControllers(
+        initialTexts: [
+          resource.title,
+          resource.url ?? '',
+          resource.description ?? '',
+          existingTags.join(', '),
+        ],
+        builder: (ctx, ctrls) {
+          final titleCtrl = ctrls[0];
+          final urlCtrl = ctrls[1];
+          final descCtrl = ctrls[2];
+          final tagsCtrl = ctrls[3];
+
+          return StatefulBuilder(
+            builder: (ctx, setSheetState) {
+              return SingleChildScrollView(
+                controller: scroll,
+                physics: const ClampingScrollPhysics(),
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextField(
+                      controller: titleCtrl,
+                      decoration: const InputDecoration(labelText: 'Título do Recurso', border: OutlineInputBorder()),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  RichMarkdownToolbar(controller: descCtrl),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: descCtrl,
-                    maxLines: 3,
-                    decoration: const InputDecoration(labelText: 'Descrição / Para que serve?', border: OutlineInputBorder()),
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    initialValue: ['jw_pub', 'video', 'article', 'scripture_chain', 'link'].contains(resourceType) ? resourceType : 'link',
-                    decoration: const InputDecoration(labelText: 'Tipo de Recurso', border: OutlineInputBorder()),
-                    items: const [
-                      DropdownMenuItem(value: 'jw_pub', child: Text('Publicação JW')),
-                      DropdownMenuItem(value: 'video', child: Text('Vídeo')),
-                      DropdownMenuItem(value: 'article', child: Text('Artigo de Revista')),
-                      DropdownMenuItem(value: 'scripture_chain', child: Text('Cadeia de Textos')),
-                      DropdownMenuItem(value: 'link', child: Text('Outro Link')),
-                    ],
-                    onChanged: (v) => setSheetState(() => resourceType = v ?? 'link'),
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.teal,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: urlCtrl,
+                      decoration: const InputDecoration(labelText: 'Link / URL (JW.org ou pesquisa)', border: OutlineInputBorder()),
                     ),
-                    onPressed: () async {
-                      final title = titleCtrl.text.trim();
-                      if (title.isEmpty) return;
-                      final rawTags = tagsCtrl.text.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
-                      final km = ref.read(knowledgeManagerProvider);
-                      await km.updateResource(
-                        resource.id,
-                        title: title,
-                        url: urlCtrl.text.trim().isNotEmpty ? urlCtrl.text.trim() : null,
-                        description: descCtrl.text.trim().isNotEmpty ? descCtrl.text.trim() : null,
-                        resourceType: resourceType,
-                        category: category,
-                        tags: rawTags,
-                      );
-                      if (ctx.mounted) Navigator.of(ctx).pop();
-                    },
-                    child: const Text('Salvar Alterações', style: TextStyle(fontWeight: FontWeight.bold)),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: tagsCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Tags (separadas por vírgula)',
+                        hintText: 'Ex: jw, vídeos, pregação',
+                        prefixIcon: Icon(Icons.tag, size: 18),
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    RichMarkdownToolbar(controller: descCtrl),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: descCtrl,
+                      maxLines: 3,
+                      decoration: const InputDecoration(labelText: 'Descrição / Para que serve?', border: OutlineInputBorder()),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      initialValue: ['jw_pub', 'video', 'article', 'scripture_chain', 'link'].contains(resourceType) ? resourceType : 'link',
+                      decoration: const InputDecoration(labelText: 'Tipo de Recurso', border: OutlineInputBorder()),
+                      items: const [
+                        DropdownMenuItem(value: 'jw_pub', child: Text('Publicação JW')),
+                        DropdownMenuItem(value: 'video', child: Text('Vídeo')),
+                        DropdownMenuItem(value: 'article', child: Text('Artigo de Revista')),
+                        DropdownMenuItem(value: 'scripture_chain', child: Text('Cadeia de Textos')),
+                        DropdownMenuItem(value: 'link', child: Text('Outro Link')),
+                      ],
+                      onChanged: (v) => setSheetState(() => resourceType = v ?? 'link'),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.teal,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      onPressed: () async {
+                        final title = titleCtrl.text.trim();
+                        if (title.isEmpty) return;
+                        final urlText = urlCtrl.text.trim();
+                        final descText = descCtrl.text.trim();
+                        final rawTags = tagsCtrl.text.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+                        final km = ref.read(knowledgeManagerProvider);
+                        await km.updateResource(
+                          resource.id,
+                          title: title,
+                          url: urlText.isNotEmpty ? urlText : null,
+                          description: descText.isNotEmpty ? descText : null,
+                          resourceType: resourceType,
+                          category: category,
+                          tags: rawTags,
+                        );
+                        if (ctx.mounted) Navigator.of(ctx).pop();
+                      },
+                      child: const Text('Salvar Alterações', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 
@@ -1621,7 +1680,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
     List<String> currentTags = [];
     try {
       currentTags = (jsonDecode(note.tags) as List).map((e) => e.toString()).toList();
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.debug('Falha ao ler tags JSON ao vincular nota à pesquisa (${note.id}): $e', st);
+    }
     if (!currentTags.contains('research:${article.id}')) {
       currentTags.add('research:${article.id}');
       await km.updateNote(note.id, tags: currentTags);
@@ -1776,113 +1837,120 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
   }
 
   void _showCreateQuestionModal() {
-    final qCtrl = TextEditingController();
-    final ctxCtrl = TextEditingController();
-
     showAdaptiveMinistrySheet(
       context: context,
       title: 'Nova Dúvida Teocrática',
       titleLeading: const Icon(Icons.help_outline, color: Color(0xFFF59E0B)),
-      builder: (ctx, scroll) {
-        return SingleChildScrollView(
-          controller: scroll,
-          physics: const ClampingScrollPhysics(),
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TextField(
-                controller: qCtrl,
-                autofocus: true,
-                decoration: const InputDecoration(labelText: 'Pergunta do Morador ou Pesquisa', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 12),
-              RichMarkdownToolbar(controller: ctxCtrl),
-              const SizedBox(height: 6),
-              TextField(
-                controller: ctxCtrl,
-                maxLines: 4,
-                decoration: const InputDecoration(labelText: 'Contexto ou Objeção (opcional)', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFF59E0B),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+      builder: (ctx, scroll) => ManagedTextControllers(
+        initialTexts: const ['', ''],
+        builder: (ctx, ctrls) {
+          final qCtrl = ctrls[0];
+          final ctxCtrl = ctrls[1];
+
+          return SingleChildScrollView(
+            controller: scroll,
+            physics: const ClampingScrollPhysics(),
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextField(
+                  controller: qCtrl,
+                  autofocus: true,
+                  decoration: const InputDecoration(labelText: 'Pergunta do Morador ou Pesquisa', border: OutlineInputBorder()),
                 ),
-                onPressed: () async {
-                  final q = qCtrl.text.trim();
-                  if (q.isEmpty) return;
-                  final km = ref.read(knowledgeManagerProvider);
-                  await km.createQuestion(
-                    question: q,
-                    context: ctxCtrl.text.trim().isNotEmpty ? ctxCtrl.text.trim() : null,
-                  );
-                  if (ctx.mounted) Navigator.of(ctx).pop();
-                },
-                child: const Text('Salvar Dúvida', style: TextStyle(fontWeight: FontWeight.bold)),
-              ),
-            ],
-          ),
-        );
-      },
+                const SizedBox(height: 12),
+                RichMarkdownToolbar(controller: ctxCtrl),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: ctxCtrl,
+                  maxLines: 4,
+                  decoration: const InputDecoration(labelText: 'Contexto ou Objeção (opcional)', border: OutlineInputBorder()),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFF59E0B),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  onPressed: () async {
+                    final q = qCtrl.text.trim();
+                    if (q.isEmpty) return;
+                    final ctxText = ctxCtrl.text.trim();
+                    final km = ref.read(knowledgeManagerProvider);
+                    await km.createQuestion(
+                      question: q,
+                      context: ctxText.isNotEmpty ? ctxText : null,
+                    );
+                    if (ctx.mounted) Navigator.of(ctx).pop();
+                  },
+                  child: const Text('Salvar Dúvida', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 
   void _showAnswerQuestionModal(KnowledgeQuestionEntry question) {
-    final ansCtrl = TextEditingController(text: question.answer ?? '');
-
     showAdaptiveMinistrySheet(
       context: context,
       title: 'Responder Dúvida',
       titleLeading: const Icon(Icons.menu_book, color: Colors.green),
-      builder: (ctx, scroll) {
-        return SingleChildScrollView(
-          controller: scroll,
-          physics: const ClampingScrollPhysics(),
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Pergunta: ${question.question}',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-              ),
-              const SizedBox(height: 12),
-              RichMarkdownToolbar(controller: ansCtrl),
-              const SizedBox(height: 6),
-              TextField(
-                controller: ansCtrl,
-                autofocus: true,
-                maxLines: 6,
-                decoration: const InputDecoration(
-                  labelText: 'Resposta Bíblica e Textos de Apoio...',
-                  border: OutlineInputBorder(),
+      builder: (ctx, scroll) => ManagedTextControllers(
+        initialTexts: [question.answer ?? ''],
+        builder: (ctx, ctrls) {
+          final ansCtrl = ctrls[0];
+
+          return SingleChildScrollView(
+            controller: scroll,
+            physics: const ClampingScrollPhysics(),
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Pergunta: ${question.question}',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                 ),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+                const SizedBox(height: 12),
+                RichMarkdownToolbar(controller: ansCtrl),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: ansCtrl,
+                  autofocus: true,
+                  maxLines: 6,
+                  decoration: const InputDecoration(
+                    labelText: 'Resposta Bíblica e Textos de Apoio...',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
-                onPressed: () async {
-                  final ans = ansCtrl.text.trim();
-                  if (ans.isEmpty) return;
-                  final km = ref.read(knowledgeManagerProvider);
-                  await km.answerQuestion(question.id, answer: ans);
-                  if (ctx.mounted) Navigator.of(ctx).pop();
-                },
-                child: const Text('Salvar Resposta', style: TextStyle(fontWeight: FontWeight.bold)),
-              ),
-            ],
-          ),
-        );
-      },
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  onPressed: () async {
+                    final ans = ansCtrl.text.trim();
+                    if (ans.isEmpty) return;
+                    final km = ref.read(knowledgeManagerProvider);
+                    await km.answerQuestion(question.id, answer: ans);
+                    if (ctx.mounted) Navigator.of(ctx).pop();
+                  },
+                  child: const Text('Salvar Resposta', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -1898,7 +1966,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
         Uint8List? fileBytes;
         try {
           fileBytes = await f.readAsBytes();
-        } catch (_) {}
+        } catch (e, st) {
+          AppLogger.debug('Falha ao ler bytes diretos do FilePicker (${f.name}): $e', st);
+        }
         int fileSize = fileBytes?.length ?? f.lengthSync() ?? (await f.length()) ?? 0;
 
         if (!kIsWeb) {
@@ -1908,7 +1978,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
               if (await sourceFile.exists()) {
                 try {
                   fileBytes = await sourceFile.readAsBytes();
-                } catch (_) {}
+                } catch (e, st) {
+                  AppLogger.debug('Falha ao ler bytes do arquivo origem (${f.path}): $e', st);
+                }
               }
             }
 
@@ -1957,7 +2029,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                     updatedAt: drift.Value(DateTime.now()),
                   ),
                 );
-          } catch (_) {}
+          } catch (e, st) {
+            AppLogger.warning('Falha ao armazenar bytes do documento (${registeredDoc.id}) em cache KV', e, st);
+          }
         }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -1975,79 +2049,84 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
   }
 
   void _showCreateResourceModal() {
-    final titleCtrl = TextEditingController();
-    final urlCtrl = TextEditingController();
-    final descCtrl = TextEditingController();
-    final tagsCtrl = TextEditingController();
-
     showAdaptiveMinistrySheet(
       context: context,
       title: 'Novo Recurso / Link',
       titleLeading: const Icon(Icons.link, color: Colors.teal),
-      builder: (ctx, scroll) {
-        return SingleChildScrollView(
-          controller: scroll,
-          physics: const ClampingScrollPhysics(),
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TextField(
-                controller: titleCtrl,
-                autofocus: true,
-                decoration: const InputDecoration(labelText: 'Título do Recurso', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: urlCtrl,
-                decoration: const InputDecoration(labelText: 'URL (ex: https://www.jw.org/...)', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: tagsCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Tags (separadas por vírgula)',
-                  hintText: 'Ex: jw, vídeos, pregação',
-                  prefixIcon: Icon(Icons.tag, size: 18),
-                  border: OutlineInputBorder(),
+      builder: (ctx, scroll) => ManagedTextControllers(
+        initialTexts: const ['', '', '', ''],
+        builder: (ctx, ctrls) {
+          final titleCtrl = ctrls[0];
+          final urlCtrl = ctrls[1];
+          final descCtrl = ctrls[2];
+          final tagsCtrl = ctrls[3];
+
+          return SingleChildScrollView(
+            controller: scroll,
+            physics: const ClampingScrollPhysics(),
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextField(
+                  controller: titleCtrl,
+                  autofocus: true,
+                  decoration: const InputDecoration(labelText: 'Título do Recurso', border: OutlineInputBorder()),
                 ),
-              ),
-              const SizedBox(height: 12),
-              RichMarkdownToolbar(controller: descCtrl),
-              const SizedBox(height: 6),
-              TextField(
-                controller: descCtrl,
-                maxLines: 4,
-                decoration: const InputDecoration(labelText: 'Descrição / Para qual ocasião serve?', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.teal,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: urlCtrl,
+                  decoration: const InputDecoration(labelText: 'URL (ex: https://www.jw.org/...)', border: OutlineInputBorder()),
                 ),
-                onPressed: () async {
-                  final title = titleCtrl.text.trim();
-                  if (title.isEmpty) return;
-                  final rawTags = tagsCtrl.text.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
-                  final km = ref.read(knowledgeManagerProvider);
-                  await km.createResource(
-                    title: title,
-                    resourceType: 'link',
-                    url: urlCtrl.text.trim().isNotEmpty ? urlCtrl.text.trim() : null,
-                    description: descCtrl.text.trim().isNotEmpty ? descCtrl.text.trim() : null,
-                    tags: rawTags,
-                  );
-                  if (ctx.mounted) Navigator.of(ctx).pop();
-                },
-                child: const Text('Salvar Recurso', style: TextStyle(fontWeight: FontWeight.bold)),
-              ),
-            ],
-          ),
-        );
-      },
+                const SizedBox(height: 12),
+                TextField(
+                  controller: tagsCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Tags (separadas por vírgula)',
+                    hintText: 'Ex: jw, vídeos, pregação',
+                    prefixIcon: Icon(Icons.tag, size: 18),
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                RichMarkdownToolbar(controller: descCtrl),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: descCtrl,
+                  maxLines: 4,
+                  decoration: const InputDecoration(labelText: 'Descrição / Para qual ocasião serve?', border: OutlineInputBorder()),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.teal,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  onPressed: () async {
+                    final title = titleCtrl.text.trim();
+                    if (title.isEmpty) return;
+                    final urlText = urlCtrl.text.trim();
+                    final descText = descCtrl.text.trim();
+                    final rawTags = tagsCtrl.text.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+                    final km = ref.read(knowledgeManagerProvider);
+                    await km.createResource(
+                      title: title,
+                      resourceType: 'link',
+                      url: urlText.isNotEmpty ? urlText : null,
+                      description: descText.isNotEmpty ? descText : null,
+                      tags: rawTags,
+                    );
+                    if (ctx.mounted) Navigator.of(ctx).pop();
+                  },
+                  child: const Text('Salvar Recurso', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -2061,7 +2140,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
           resolvedPath = direct.path;
           try {
             resolvedBytes = await direct.readAsBytes();
-          } catch (_) {}
+          } catch (e, st) {
+            AppLogger.debug('Falha ao ler arquivo direto (${doc.filePath}): $e', st);
+          }
         } else {
           final docDir = await getApplicationDocumentsDirectory();
           final fileName = doc.fileName.isNotEmpty
@@ -2075,24 +2156,32 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
             final supportDir = await getApplicationSupportDirectory();
             candidates.add(File('${supportDir.path}/documents/$fileName'));
             candidates.add(File('${supportDir.path}/$fileName'));
-          } catch (_) {}
+          } catch (e, st) {
+            AppLogger.debug('Diretório ApplicationSupport indisponível: $e', st);
+          }
           try {
             final tempDir = await getTemporaryDirectory();
             candidates.add(File('${tempDir.path}/$fileName'));
             candidates.add(File('${tempDir.path}/file_picker/$fileName'));
-          } catch (_) {}
+          } catch (e, st) {
+            AppLogger.debug('Diretório temporário indisponível: $e', st);
+          }
 
           for (final c in candidates) {
             if (await c.exists()) {
               resolvedPath = c.path;
               try {
                 resolvedBytes = await c.readAsBytes();
-              } catch (_) {}
+              } catch (e, st) {
+                AppLogger.debug('Falha ao ler candidato de documento (${c.path}): $e', st);
+              }
               break;
             }
           }
         }
-      } catch (_) {}
+      } catch (e, st) {
+        AppLogger.warning('Falha ao localizar documento (${doc.id}) no disco', e, st);
+      }
     }
 
     if (resolvedBytes == null || resolvedBytes.isEmpty) {
@@ -2104,7 +2193,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
         if (kv != null && kv.value.isNotEmpty) {
           resolvedBytes = base64Decode(kv.value);
         }
-      } catch (_) {}
+      } catch (e, st) {
+        AppLogger.warning('Falha ao ler cache doc_bytes_${doc.id}', e, st);
+      }
     }
 
     if (mounted) {
@@ -2128,7 +2219,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
           pathToOpen = direct.path;
           try {
             fileBytes = await direct.readAsBytes();
-          } catch (_) {}
+          } catch (e, st) {
+            AppLogger.debug('Falha ao ler arquivo direto para abrir (${doc.filePath}): $e', st);
+          }
         } else {
           final docDir = await getApplicationDocumentsDirectory();
           final fileName = doc.fileName.isNotEmpty
@@ -2142,24 +2235,32 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
             final supportDir = await getApplicationSupportDirectory();
             candidates.add(File('${supportDir.path}/documents/$fileName'));
             candidates.add(File('${supportDir.path}/$fileName'));
-          } catch (_) {}
+          } catch (e, st) {
+            AppLogger.debug('ApplicationSupport indisponível ao abrir anexo: $e', st);
+          }
           try {
             final tempDir = await getTemporaryDirectory();
             candidates.add(File('${tempDir.path}/$fileName'));
             candidates.add(File('${tempDir.path}/file_picker/$fileName'));
-          } catch (_) {}
+          } catch (e, st) {
+            AppLogger.debug('TempDir indisponível ao abrir anexo: $e', st);
+          }
 
           for (final c in candidates) {
             if (await c.exists()) {
               pathToOpen = c.path;
               try {
                 fileBytes = await c.readAsBytes();
-              } catch (_) {}
+              } catch (e, st) {
+                AppLogger.debug('Falha ao ler candidato para abrir (${c.path}): $e', st);
+              }
               break;
             }
           }
         }
-      } catch (_) {}
+      } catch (e, st) {
+        AppLogger.warning('Falha ao localizar documento externo (${doc.id})', e, st);
+      }
     }
 
     try {
@@ -2180,7 +2281,8 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
           );
         }
       }
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.warning('Falha ao abrir documento externamente; usando visualizador interno', e, st);
       if (mounted) {
         await showUniversalAttachmentViewer(
           context,

@@ -9,6 +9,7 @@ import '../providers.dart';
 import '../widgets/pioneer_pace_card.dart';
 import '../../activities/auto_corrective_timer_logic.dart';
 import '../widgets/auto_corrective_timer_dialog.dart';
+import '../widgets/managed_text_controllers.dart';
 
 class ActivitiesScreen extends ConsumerStatefulWidget {
   const ActivitiesScreen({super.key});
@@ -167,14 +168,18 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
     final initialH = initialSeconds ~/ 3600;
     final initialM = (initialSeconds % 3600) ~/ 60;
 
-    final hoursController = TextEditingController(text: initialH.toString());
-    final minutesController = TextEditingController(text: initialM.toString());
-    final notesController = TextEditingController();
     String selectedModality = initialModality ?? 'campo';
 
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: [initialH.toString(), initialM.toString(), ''],
+        builder: (ctx, ctrls) {
+          final hoursController = ctrls[0];
+          final minutesController = ctrls[1];
+          final notesController = ctrls[2];
+
+          return StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
           title: const Text('Registrar Atividade de Campo'),
           content: SingleChildScrollView(
@@ -323,6 +328,8 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
             ),
           ],
         ),
+        );
+        },
       ),
     );
   }

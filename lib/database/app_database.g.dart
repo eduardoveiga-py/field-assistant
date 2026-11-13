@@ -11000,6 +11000,17 @@ class $PersonPhotosTable extends PersonPhotos
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _filePathMeta = const VerificationMeta(
+    'filePath',
+  );
+  @override
+  late final GeneratedColumn<String> filePath = GeneratedColumn<String>(
+    'file_path',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _imageDataMeta = const VerificationMeta(
     'imageData',
   );
@@ -11009,7 +11020,8 @@ class $PersonPhotosTable extends PersonPhotos
     aliasedName,
     false,
     type: DriftSqlType.string,
-    requiredDuringInsert: true,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
   );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
@@ -11061,6 +11073,7 @@ class $PersonPhotosTable extends PersonPhotos
     id,
     personId,
     photoType,
+    filePath,
     imageData,
     createdAt,
     updatedAt,
@@ -11100,13 +11113,17 @@ class $PersonPhotosTable extends PersonPhotos
     } else if (isInserting) {
       context.missing(_photoTypeMeta);
     }
+    if (data.containsKey('file_path')) {
+      context.handle(
+        _filePathMeta,
+        filePath.isAcceptableOrUnknown(data['file_path']!, _filePathMeta),
+      );
+    }
     if (data.containsKey('image_data')) {
       context.handle(
         _imageDataMeta,
         imageData.isAcceptableOrUnknown(data['image_data']!, _imageDataMeta),
       );
-    } else if (isInserting) {
-      context.missing(_imageDataMeta);
     }
     if (data.containsKey('created_at')) {
       context.handle(
@@ -11155,6 +11172,10 @@ class $PersonPhotosTable extends PersonPhotos
         DriftSqlType.string,
         data['${effectivePrefix}photo_type'],
       )!,
+      filePath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}file_path'],
+      ),
       imageData: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}image_data'],
@@ -11189,6 +11210,7 @@ class PersonPhotoEntry extends DataClass
   final String id;
   final String personId;
   final String photoType;
+  final String? filePath;
   final String imageData;
   final DateTime createdAt;
   final DateTime? updatedAt;
@@ -11198,6 +11220,7 @@ class PersonPhotoEntry extends DataClass
     required this.id,
     required this.personId,
     required this.photoType,
+    this.filePath,
     required this.imageData,
     required this.createdAt,
     this.updatedAt,
@@ -11210,6 +11233,9 @@ class PersonPhotoEntry extends DataClass
     map['id'] = Variable<String>(id);
     map['person_id'] = Variable<String>(personId);
     map['photo_type'] = Variable<String>(photoType);
+    if (!nullToAbsent || filePath != null) {
+      map['file_path'] = Variable<String>(filePath);
+    }
     map['image_data'] = Variable<String>(imageData);
     map['created_at'] = Variable<DateTime>(createdAt);
     if (!nullToAbsent || updatedAt != null) {
@@ -11227,6 +11253,9 @@ class PersonPhotoEntry extends DataClass
       id: Value(id),
       personId: Value(personId),
       photoType: Value(photoType),
+      filePath: filePath == null && nullToAbsent
+          ? const Value.absent()
+          : Value(filePath),
       imageData: Value(imageData),
       createdAt: Value(createdAt),
       updatedAt: updatedAt == null && nullToAbsent
@@ -11248,6 +11277,7 @@ class PersonPhotoEntry extends DataClass
       id: serializer.fromJson<String>(json['id']),
       personId: serializer.fromJson<String>(json['personId']),
       photoType: serializer.fromJson<String>(json['photoType']),
+      filePath: serializer.fromJson<String?>(json['filePath']),
       imageData: serializer.fromJson<String>(json['imageData']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
@@ -11262,6 +11292,7 @@ class PersonPhotoEntry extends DataClass
       'id': serializer.toJson<String>(id),
       'personId': serializer.toJson<String>(personId),
       'photoType': serializer.toJson<String>(photoType),
+      'filePath': serializer.toJson<String?>(filePath),
       'imageData': serializer.toJson<String>(imageData),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime?>(updatedAt),
@@ -11274,6 +11305,7 @@ class PersonPhotoEntry extends DataClass
     String? id,
     String? personId,
     String? photoType,
+    Value<String?> filePath = const Value.absent(),
     String? imageData,
     DateTime? createdAt,
     Value<DateTime?> updatedAt = const Value.absent(),
@@ -11283,6 +11315,7 @@ class PersonPhotoEntry extends DataClass
     id: id ?? this.id,
     personId: personId ?? this.personId,
     photoType: photoType ?? this.photoType,
+    filePath: filePath.present ? filePath.value : this.filePath,
     imageData: imageData ?? this.imageData,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
@@ -11294,6 +11327,7 @@ class PersonPhotoEntry extends DataClass
       id: data.id.present ? data.id.value : this.id,
       personId: data.personId.present ? data.personId.value : this.personId,
       photoType: data.photoType.present ? data.photoType.value : this.photoType,
+      filePath: data.filePath.present ? data.filePath.value : this.filePath,
       imageData: data.imageData.present ? data.imageData.value : this.imageData,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
@@ -11308,6 +11342,7 @@ class PersonPhotoEntry extends DataClass
           ..write('id: $id, ')
           ..write('personId: $personId, ')
           ..write('photoType: $photoType, ')
+          ..write('filePath: $filePath, ')
           ..write('imageData: $imageData, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -11322,6 +11357,7 @@ class PersonPhotoEntry extends DataClass
     id,
     personId,
     photoType,
+    filePath,
     imageData,
     createdAt,
     updatedAt,
@@ -11335,6 +11371,7 @@ class PersonPhotoEntry extends DataClass
           other.id == this.id &&
           other.personId == this.personId &&
           other.photoType == this.photoType &&
+          other.filePath == this.filePath &&
           other.imageData == this.imageData &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
@@ -11346,6 +11383,7 @@ class PersonPhotosCompanion extends UpdateCompanion<PersonPhotoEntry> {
   final Value<String> id;
   final Value<String> personId;
   final Value<String> photoType;
+  final Value<String?> filePath;
   final Value<String> imageData;
   final Value<DateTime> createdAt;
   final Value<DateTime?> updatedAt;
@@ -11356,6 +11394,7 @@ class PersonPhotosCompanion extends UpdateCompanion<PersonPhotoEntry> {
     this.id = const Value.absent(),
     this.personId = const Value.absent(),
     this.photoType = const Value.absent(),
+    this.filePath = const Value.absent(),
     this.imageData = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -11367,7 +11406,8 @@ class PersonPhotosCompanion extends UpdateCompanion<PersonPhotoEntry> {
     required String id,
     required String personId,
     required String photoType,
-    required String imageData,
+    this.filePath = const Value.absent(),
+    this.imageData = const Value.absent(),
     required DateTime createdAt,
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
@@ -11376,12 +11416,12 @@ class PersonPhotosCompanion extends UpdateCompanion<PersonPhotoEntry> {
   }) : id = Value(id),
        personId = Value(personId),
        photoType = Value(photoType),
-       imageData = Value(imageData),
        createdAt = Value(createdAt);
   static Insertable<PersonPhotoEntry> custom({
     Expression<String>? id,
     Expression<String>? personId,
     Expression<String>? photoType,
+    Expression<String>? filePath,
     Expression<String>? imageData,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
@@ -11393,6 +11433,7 @@ class PersonPhotosCompanion extends UpdateCompanion<PersonPhotoEntry> {
       if (id != null) 'id': id,
       if (personId != null) 'person_id': personId,
       if (photoType != null) 'photo_type': photoType,
+      if (filePath != null) 'file_path': filePath,
       if (imageData != null) 'image_data': imageData,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -11406,6 +11447,7 @@ class PersonPhotosCompanion extends UpdateCompanion<PersonPhotoEntry> {
     Value<String>? id,
     Value<String>? personId,
     Value<String>? photoType,
+    Value<String?>? filePath,
     Value<String>? imageData,
     Value<DateTime>? createdAt,
     Value<DateTime?>? updatedAt,
@@ -11417,6 +11459,7 @@ class PersonPhotosCompanion extends UpdateCompanion<PersonPhotoEntry> {
       id: id ?? this.id,
       personId: personId ?? this.personId,
       photoType: photoType ?? this.photoType,
+      filePath: filePath ?? this.filePath,
       imageData: imageData ?? this.imageData,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -11437,6 +11480,9 @@ class PersonPhotosCompanion extends UpdateCompanion<PersonPhotoEntry> {
     }
     if (photoType.present) {
       map['photo_type'] = Variable<String>(photoType.value);
+    }
+    if (filePath.present) {
+      map['file_path'] = Variable<String>(filePath.value);
     }
     if (imageData.present) {
       map['image_data'] = Variable<String>(imageData.value);
@@ -11465,6 +11511,7 @@ class PersonPhotosCompanion extends UpdateCompanion<PersonPhotoEntry> {
           ..write('id: $id, ')
           ..write('personId: $personId, ')
           ..write('photoType: $photoType, ')
+          ..write('filePath: $filePath, ')
           ..write('imageData: $imageData, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -24096,6 +24143,2082 @@ class KnowledgeResourcesCompanion
   }
 }
 
+class $TicunaWordsTable extends TicunaWords
+    with TableInfo<$TicunaWordsTable, TicunaWordDbEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $TicunaWordsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _wordMeta = const VerificationMeta('word');
+  @override
+  late final GeneratedColumn<String> word = GeneratedColumn<String>(
+    'word',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _translationMeta = const VerificationMeta(
+    'translation',
+  );
+  @override
+  late final GeneratedColumn<String> translation = GeneratedColumn<String>(
+    'translation',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _phoneticsMeta = const VerificationMeta(
+    'phonetics',
+  );
+  @override
+  late final GeneratedColumn<String> phonetics = GeneratedColumn<String>(
+    'phonetics',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _grammaticalClassMeta = const VerificationMeta(
+    'grammaticalClass',
+  );
+  @override
+  late final GeneratedColumn<String> grammaticalClass = GeneratedColumn<String>(
+    'grammatical_class',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _exampleSentenceMeta = const VerificationMeta(
+    'exampleSentence',
+  );
+  @override
+  late final GeneratedColumn<String> exampleSentence = GeneratedColumn<String>(
+    'example_sentence',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _exampleTranslationMeta =
+      const VerificationMeta('exampleTranslation');
+  @override
+  late final GeneratedColumn<String> exampleTranslation =
+      GeneratedColumn<String>(
+        'example_translation',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _notesMeta = const VerificationMeta('notes');
+  @override
+  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
+    'notes',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _tagsMeta = const VerificationMeta('tags');
+  @override
+  late final GeneratedColumn<String> tags = GeneratedColumn<String>(
+    'tags',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  );
+  static const VerificationMeta _isFavoriteMeta = const VerificationMeta(
+    'isFavorite',
+  );
+  @override
+  late final GeneratedColumn<int> isFavorite = GeneratedColumn<int>(
+    'is_favorite',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _reviewLevelMeta = const VerificationMeta(
+    'reviewLevel',
+  );
+  @override
+  late final GeneratedColumn<int> reviewLevel = GeneratedColumn<int>(
+    'review_level',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _reviewCountMeta = const VerificationMeta(
+    'reviewCount',
+  );
+  @override
+  late final GeneratedColumn<int> reviewCount = GeneratedColumn<int>(
+    'review_count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _lastReviewedAtMeta = const VerificationMeta(
+    'lastReviewedAt',
+  );
+  @override
+  late final GeneratedColumn<String> lastReviewedAt = GeneratedColumn<String>(
+    'last_reviewed_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _audioPathMeta = const VerificationMeta(
+    'audioPath',
+  );
+  @override
+  late final GeneratedColumn<String> audioPath = GeneratedColumn<String>(
+    'audio_path',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _audioDurationSecondsMeta =
+      const VerificationMeta('audioDurationSeconds');
+  @override
+  late final GeneratedColumn<int> audioDurationSeconds = GeneratedColumn<int>(
+    'audio_duration_seconds',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _languageIdMeta = const VerificationMeta(
+    'languageId',
+  );
+  @override
+  late final GeneratedColumn<String> languageId = GeneratedColumn<String>(
+    'language_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('tca'),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<String> createdAt = GeneratedColumn<String>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<String> updatedAt = GeneratedColumn<String>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    word,
+    translation,
+    phonetics,
+    grammaticalClass,
+    exampleSentence,
+    exampleTranslation,
+    notes,
+    tags,
+    isFavorite,
+    reviewLevel,
+    reviewCount,
+    lastReviewedAt,
+    audioPath,
+    audioDurationSeconds,
+    languageId,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'ticuna_words';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<TicunaWordDbEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('word')) {
+      context.handle(
+        _wordMeta,
+        word.isAcceptableOrUnknown(data['word']!, _wordMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_wordMeta);
+    }
+    if (data.containsKey('translation')) {
+      context.handle(
+        _translationMeta,
+        translation.isAcceptableOrUnknown(
+          data['translation']!,
+          _translationMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_translationMeta);
+    }
+    if (data.containsKey('phonetics')) {
+      context.handle(
+        _phoneticsMeta,
+        phonetics.isAcceptableOrUnknown(data['phonetics']!, _phoneticsMeta),
+      );
+    }
+    if (data.containsKey('grammatical_class')) {
+      context.handle(
+        _grammaticalClassMeta,
+        grammaticalClass.isAcceptableOrUnknown(
+          data['grammatical_class']!,
+          _grammaticalClassMeta,
+        ),
+      );
+    }
+    if (data.containsKey('example_sentence')) {
+      context.handle(
+        _exampleSentenceMeta,
+        exampleSentence.isAcceptableOrUnknown(
+          data['example_sentence']!,
+          _exampleSentenceMeta,
+        ),
+      );
+    }
+    if (data.containsKey('example_translation')) {
+      context.handle(
+        _exampleTranslationMeta,
+        exampleTranslation.isAcceptableOrUnknown(
+          data['example_translation']!,
+          _exampleTranslationMeta,
+        ),
+      );
+    }
+    if (data.containsKey('notes')) {
+      context.handle(
+        _notesMeta,
+        notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
+      );
+    }
+    if (data.containsKey('tags')) {
+      context.handle(
+        _tagsMeta,
+        tags.isAcceptableOrUnknown(data['tags']!, _tagsMeta),
+      );
+    }
+    if (data.containsKey('is_favorite')) {
+      context.handle(
+        _isFavoriteMeta,
+        isFavorite.isAcceptableOrUnknown(data['is_favorite']!, _isFavoriteMeta),
+      );
+    }
+    if (data.containsKey('review_level')) {
+      context.handle(
+        _reviewLevelMeta,
+        reviewLevel.isAcceptableOrUnknown(
+          data['review_level']!,
+          _reviewLevelMeta,
+        ),
+      );
+    }
+    if (data.containsKey('review_count')) {
+      context.handle(
+        _reviewCountMeta,
+        reviewCount.isAcceptableOrUnknown(
+          data['review_count']!,
+          _reviewCountMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_reviewed_at')) {
+      context.handle(
+        _lastReviewedAtMeta,
+        lastReviewedAt.isAcceptableOrUnknown(
+          data['last_reviewed_at']!,
+          _lastReviewedAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('audio_path')) {
+      context.handle(
+        _audioPathMeta,
+        audioPath.isAcceptableOrUnknown(data['audio_path']!, _audioPathMeta),
+      );
+    }
+    if (data.containsKey('audio_duration_seconds')) {
+      context.handle(
+        _audioDurationSecondsMeta,
+        audioDurationSeconds.isAcceptableOrUnknown(
+          data['audio_duration_seconds']!,
+          _audioDurationSecondsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('language_id')) {
+      context.handle(
+        _languageIdMeta,
+        languageId.isAcceptableOrUnknown(data['language_id']!, _languageIdMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  TicunaWordDbEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return TicunaWordDbEntry(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      word: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}word'],
+      )!,
+      translation: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}translation'],
+      )!,
+      phonetics: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}phonetics'],
+      ),
+      grammaticalClass: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}grammatical_class'],
+      ),
+      exampleSentence: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}example_sentence'],
+      ),
+      exampleTranslation: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}example_translation'],
+      ),
+      notes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}notes'],
+      ),
+      tags: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}tags'],
+      )!,
+      isFavorite: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}is_favorite'],
+      )!,
+      reviewLevel: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}review_level'],
+      )!,
+      reviewCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}review_count'],
+      )!,
+      lastReviewedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}last_reviewed_at'],
+      ),
+      audioPath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}audio_path'],
+      ),
+      audioDurationSeconds: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}audio_duration_seconds'],
+      ),
+      languageId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}language_id'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $TicunaWordsTable createAlias(String alias) {
+    return $TicunaWordsTable(attachedDatabase, alias);
+  }
+}
+
+class TicunaWordDbEntry extends DataClass
+    implements Insertable<TicunaWordDbEntry> {
+  final String id;
+  final String word;
+  final String translation;
+  final String? phonetics;
+  final String? grammaticalClass;
+  final String? exampleSentence;
+  final String? exampleTranslation;
+  final String? notes;
+  final String tags;
+  final int isFavorite;
+  final int reviewLevel;
+  final int reviewCount;
+  final String? lastReviewedAt;
+  final String? audioPath;
+  final int? audioDurationSeconds;
+  final String? languageId;
+  final String createdAt;
+  final String updatedAt;
+  const TicunaWordDbEntry({
+    required this.id,
+    required this.word,
+    required this.translation,
+    this.phonetics,
+    this.grammaticalClass,
+    this.exampleSentence,
+    this.exampleTranslation,
+    this.notes,
+    required this.tags,
+    required this.isFavorite,
+    required this.reviewLevel,
+    required this.reviewCount,
+    this.lastReviewedAt,
+    this.audioPath,
+    this.audioDurationSeconds,
+    this.languageId,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['word'] = Variable<String>(word);
+    map['translation'] = Variable<String>(translation);
+    if (!nullToAbsent || phonetics != null) {
+      map['phonetics'] = Variable<String>(phonetics);
+    }
+    if (!nullToAbsent || grammaticalClass != null) {
+      map['grammatical_class'] = Variable<String>(grammaticalClass);
+    }
+    if (!nullToAbsent || exampleSentence != null) {
+      map['example_sentence'] = Variable<String>(exampleSentence);
+    }
+    if (!nullToAbsent || exampleTranslation != null) {
+      map['example_translation'] = Variable<String>(exampleTranslation);
+    }
+    if (!nullToAbsent || notes != null) {
+      map['notes'] = Variable<String>(notes);
+    }
+    map['tags'] = Variable<String>(tags);
+    map['is_favorite'] = Variable<int>(isFavorite);
+    map['review_level'] = Variable<int>(reviewLevel);
+    map['review_count'] = Variable<int>(reviewCount);
+    if (!nullToAbsent || lastReviewedAt != null) {
+      map['last_reviewed_at'] = Variable<String>(lastReviewedAt);
+    }
+    if (!nullToAbsent || audioPath != null) {
+      map['audio_path'] = Variable<String>(audioPath);
+    }
+    if (!nullToAbsent || audioDurationSeconds != null) {
+      map['audio_duration_seconds'] = Variable<int>(audioDurationSeconds);
+    }
+    if (!nullToAbsent || languageId != null) {
+      map['language_id'] = Variable<String>(languageId);
+    }
+    map['created_at'] = Variable<String>(createdAt);
+    map['updated_at'] = Variable<String>(updatedAt);
+    return map;
+  }
+
+  TicunaWordsCompanion toCompanion(bool nullToAbsent) {
+    return TicunaWordsCompanion(
+      id: Value(id),
+      word: Value(word),
+      translation: Value(translation),
+      phonetics: phonetics == null && nullToAbsent
+          ? const Value.absent()
+          : Value(phonetics),
+      grammaticalClass: grammaticalClass == null && nullToAbsent
+          ? const Value.absent()
+          : Value(grammaticalClass),
+      exampleSentence: exampleSentence == null && nullToAbsent
+          ? const Value.absent()
+          : Value(exampleSentence),
+      exampleTranslation: exampleTranslation == null && nullToAbsent
+          ? const Value.absent()
+          : Value(exampleTranslation),
+      notes: notes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(notes),
+      tags: Value(tags),
+      isFavorite: Value(isFavorite),
+      reviewLevel: Value(reviewLevel),
+      reviewCount: Value(reviewCount),
+      lastReviewedAt: lastReviewedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastReviewedAt),
+      audioPath: audioPath == null && nullToAbsent
+          ? const Value.absent()
+          : Value(audioPath),
+      audioDurationSeconds: audioDurationSeconds == null && nullToAbsent
+          ? const Value.absent()
+          : Value(audioDurationSeconds),
+      languageId: languageId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(languageId),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory TicunaWordDbEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return TicunaWordDbEntry(
+      id: serializer.fromJson<String>(json['id']),
+      word: serializer.fromJson<String>(json['word']),
+      translation: serializer.fromJson<String>(json['translation']),
+      phonetics: serializer.fromJson<String?>(json['phonetics']),
+      grammaticalClass: serializer.fromJson<String?>(json['grammaticalClass']),
+      exampleSentence: serializer.fromJson<String?>(json['exampleSentence']),
+      exampleTranslation: serializer.fromJson<String?>(
+        json['exampleTranslation'],
+      ),
+      notes: serializer.fromJson<String?>(json['notes']),
+      tags: serializer.fromJson<String>(json['tags']),
+      isFavorite: serializer.fromJson<int>(json['isFavorite']),
+      reviewLevel: serializer.fromJson<int>(json['reviewLevel']),
+      reviewCount: serializer.fromJson<int>(json['reviewCount']),
+      lastReviewedAt: serializer.fromJson<String?>(json['lastReviewedAt']),
+      audioPath: serializer.fromJson<String?>(json['audioPath']),
+      audioDurationSeconds: serializer.fromJson<int?>(
+        json['audioDurationSeconds'],
+      ),
+      languageId: serializer.fromJson<String?>(json['languageId']),
+      createdAt: serializer.fromJson<String>(json['createdAt']),
+      updatedAt: serializer.fromJson<String>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'word': serializer.toJson<String>(word),
+      'translation': serializer.toJson<String>(translation),
+      'phonetics': serializer.toJson<String?>(phonetics),
+      'grammaticalClass': serializer.toJson<String?>(grammaticalClass),
+      'exampleSentence': serializer.toJson<String?>(exampleSentence),
+      'exampleTranslation': serializer.toJson<String?>(exampleTranslation),
+      'notes': serializer.toJson<String?>(notes),
+      'tags': serializer.toJson<String>(tags),
+      'isFavorite': serializer.toJson<int>(isFavorite),
+      'reviewLevel': serializer.toJson<int>(reviewLevel),
+      'reviewCount': serializer.toJson<int>(reviewCount),
+      'lastReviewedAt': serializer.toJson<String?>(lastReviewedAt),
+      'audioPath': serializer.toJson<String?>(audioPath),
+      'audioDurationSeconds': serializer.toJson<int?>(audioDurationSeconds),
+      'languageId': serializer.toJson<String?>(languageId),
+      'createdAt': serializer.toJson<String>(createdAt),
+      'updatedAt': serializer.toJson<String>(updatedAt),
+    };
+  }
+
+  TicunaWordDbEntry copyWith({
+    String? id,
+    String? word,
+    String? translation,
+    Value<String?> phonetics = const Value.absent(),
+    Value<String?> grammaticalClass = const Value.absent(),
+    Value<String?> exampleSentence = const Value.absent(),
+    Value<String?> exampleTranslation = const Value.absent(),
+    Value<String?> notes = const Value.absent(),
+    String? tags,
+    int? isFavorite,
+    int? reviewLevel,
+    int? reviewCount,
+    Value<String?> lastReviewedAt = const Value.absent(),
+    Value<String?> audioPath = const Value.absent(),
+    Value<int?> audioDurationSeconds = const Value.absent(),
+    Value<String?> languageId = const Value.absent(),
+    String? createdAt,
+    String? updatedAt,
+  }) => TicunaWordDbEntry(
+    id: id ?? this.id,
+    word: word ?? this.word,
+    translation: translation ?? this.translation,
+    phonetics: phonetics.present ? phonetics.value : this.phonetics,
+    grammaticalClass: grammaticalClass.present
+        ? grammaticalClass.value
+        : this.grammaticalClass,
+    exampleSentence: exampleSentence.present
+        ? exampleSentence.value
+        : this.exampleSentence,
+    exampleTranslation: exampleTranslation.present
+        ? exampleTranslation.value
+        : this.exampleTranslation,
+    notes: notes.present ? notes.value : this.notes,
+    tags: tags ?? this.tags,
+    isFavorite: isFavorite ?? this.isFavorite,
+    reviewLevel: reviewLevel ?? this.reviewLevel,
+    reviewCount: reviewCount ?? this.reviewCount,
+    lastReviewedAt: lastReviewedAt.present
+        ? lastReviewedAt.value
+        : this.lastReviewedAt,
+    audioPath: audioPath.present ? audioPath.value : this.audioPath,
+    audioDurationSeconds: audioDurationSeconds.present
+        ? audioDurationSeconds.value
+        : this.audioDurationSeconds,
+    languageId: languageId.present ? languageId.value : this.languageId,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  TicunaWordDbEntry copyWithCompanion(TicunaWordsCompanion data) {
+    return TicunaWordDbEntry(
+      id: data.id.present ? data.id.value : this.id,
+      word: data.word.present ? data.word.value : this.word,
+      translation: data.translation.present
+          ? data.translation.value
+          : this.translation,
+      phonetics: data.phonetics.present ? data.phonetics.value : this.phonetics,
+      grammaticalClass: data.grammaticalClass.present
+          ? data.grammaticalClass.value
+          : this.grammaticalClass,
+      exampleSentence: data.exampleSentence.present
+          ? data.exampleSentence.value
+          : this.exampleSentence,
+      exampleTranslation: data.exampleTranslation.present
+          ? data.exampleTranslation.value
+          : this.exampleTranslation,
+      notes: data.notes.present ? data.notes.value : this.notes,
+      tags: data.tags.present ? data.tags.value : this.tags,
+      isFavorite: data.isFavorite.present
+          ? data.isFavorite.value
+          : this.isFavorite,
+      reviewLevel: data.reviewLevel.present
+          ? data.reviewLevel.value
+          : this.reviewLevel,
+      reviewCount: data.reviewCount.present
+          ? data.reviewCount.value
+          : this.reviewCount,
+      lastReviewedAt: data.lastReviewedAt.present
+          ? data.lastReviewedAt.value
+          : this.lastReviewedAt,
+      audioPath: data.audioPath.present ? data.audioPath.value : this.audioPath,
+      audioDurationSeconds: data.audioDurationSeconds.present
+          ? data.audioDurationSeconds.value
+          : this.audioDurationSeconds,
+      languageId: data.languageId.present
+          ? data.languageId.value
+          : this.languageId,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TicunaWordDbEntry(')
+          ..write('id: $id, ')
+          ..write('word: $word, ')
+          ..write('translation: $translation, ')
+          ..write('phonetics: $phonetics, ')
+          ..write('grammaticalClass: $grammaticalClass, ')
+          ..write('exampleSentence: $exampleSentence, ')
+          ..write('exampleTranslation: $exampleTranslation, ')
+          ..write('notes: $notes, ')
+          ..write('tags: $tags, ')
+          ..write('isFavorite: $isFavorite, ')
+          ..write('reviewLevel: $reviewLevel, ')
+          ..write('reviewCount: $reviewCount, ')
+          ..write('lastReviewedAt: $lastReviewedAt, ')
+          ..write('audioPath: $audioPath, ')
+          ..write('audioDurationSeconds: $audioDurationSeconds, ')
+          ..write('languageId: $languageId, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    word,
+    translation,
+    phonetics,
+    grammaticalClass,
+    exampleSentence,
+    exampleTranslation,
+    notes,
+    tags,
+    isFavorite,
+    reviewLevel,
+    reviewCount,
+    lastReviewedAt,
+    audioPath,
+    audioDurationSeconds,
+    languageId,
+    createdAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is TicunaWordDbEntry &&
+          other.id == this.id &&
+          other.word == this.word &&
+          other.translation == this.translation &&
+          other.phonetics == this.phonetics &&
+          other.grammaticalClass == this.grammaticalClass &&
+          other.exampleSentence == this.exampleSentence &&
+          other.exampleTranslation == this.exampleTranslation &&
+          other.notes == this.notes &&
+          other.tags == this.tags &&
+          other.isFavorite == this.isFavorite &&
+          other.reviewLevel == this.reviewLevel &&
+          other.reviewCount == this.reviewCount &&
+          other.lastReviewedAt == this.lastReviewedAt &&
+          other.audioPath == this.audioPath &&
+          other.audioDurationSeconds == this.audioDurationSeconds &&
+          other.languageId == this.languageId &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class TicunaWordsCompanion extends UpdateCompanion<TicunaWordDbEntry> {
+  final Value<String> id;
+  final Value<String> word;
+  final Value<String> translation;
+  final Value<String?> phonetics;
+  final Value<String?> grammaticalClass;
+  final Value<String?> exampleSentence;
+  final Value<String?> exampleTranslation;
+  final Value<String?> notes;
+  final Value<String> tags;
+  final Value<int> isFavorite;
+  final Value<int> reviewLevel;
+  final Value<int> reviewCount;
+  final Value<String?> lastReviewedAt;
+  final Value<String?> audioPath;
+  final Value<int?> audioDurationSeconds;
+  final Value<String?> languageId;
+  final Value<String> createdAt;
+  final Value<String> updatedAt;
+  final Value<int> rowid;
+  const TicunaWordsCompanion({
+    this.id = const Value.absent(),
+    this.word = const Value.absent(),
+    this.translation = const Value.absent(),
+    this.phonetics = const Value.absent(),
+    this.grammaticalClass = const Value.absent(),
+    this.exampleSentence = const Value.absent(),
+    this.exampleTranslation = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.tags = const Value.absent(),
+    this.isFavorite = const Value.absent(),
+    this.reviewLevel = const Value.absent(),
+    this.reviewCount = const Value.absent(),
+    this.lastReviewedAt = const Value.absent(),
+    this.audioPath = const Value.absent(),
+    this.audioDurationSeconds = const Value.absent(),
+    this.languageId = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  TicunaWordsCompanion.insert({
+    required String id,
+    required String word,
+    required String translation,
+    this.phonetics = const Value.absent(),
+    this.grammaticalClass = const Value.absent(),
+    this.exampleSentence = const Value.absent(),
+    this.exampleTranslation = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.tags = const Value.absent(),
+    this.isFavorite = const Value.absent(),
+    this.reviewLevel = const Value.absent(),
+    this.reviewCount = const Value.absent(),
+    this.lastReviewedAt = const Value.absent(),
+    this.audioPath = const Value.absent(),
+    this.audioDurationSeconds = const Value.absent(),
+    this.languageId = const Value.absent(),
+    required String createdAt,
+    required String updatedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       word = Value(word),
+       translation = Value(translation),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<TicunaWordDbEntry> custom({
+    Expression<String>? id,
+    Expression<String>? word,
+    Expression<String>? translation,
+    Expression<String>? phonetics,
+    Expression<String>? grammaticalClass,
+    Expression<String>? exampleSentence,
+    Expression<String>? exampleTranslation,
+    Expression<String>? notes,
+    Expression<String>? tags,
+    Expression<int>? isFavorite,
+    Expression<int>? reviewLevel,
+    Expression<int>? reviewCount,
+    Expression<String>? lastReviewedAt,
+    Expression<String>? audioPath,
+    Expression<int>? audioDurationSeconds,
+    Expression<String>? languageId,
+    Expression<String>? createdAt,
+    Expression<String>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (word != null) 'word': word,
+      if (translation != null) 'translation': translation,
+      if (phonetics != null) 'phonetics': phonetics,
+      if (grammaticalClass != null) 'grammatical_class': grammaticalClass,
+      if (exampleSentence != null) 'example_sentence': exampleSentence,
+      if (exampleTranslation != null) 'example_translation': exampleTranslation,
+      if (notes != null) 'notes': notes,
+      if (tags != null) 'tags': tags,
+      if (isFavorite != null) 'is_favorite': isFavorite,
+      if (reviewLevel != null) 'review_level': reviewLevel,
+      if (reviewCount != null) 'review_count': reviewCount,
+      if (lastReviewedAt != null) 'last_reviewed_at': lastReviewedAt,
+      if (audioPath != null) 'audio_path': audioPath,
+      if (audioDurationSeconds != null)
+        'audio_duration_seconds': audioDurationSeconds,
+      if (languageId != null) 'language_id': languageId,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  TicunaWordsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? word,
+    Value<String>? translation,
+    Value<String?>? phonetics,
+    Value<String?>? grammaticalClass,
+    Value<String?>? exampleSentence,
+    Value<String?>? exampleTranslation,
+    Value<String?>? notes,
+    Value<String>? tags,
+    Value<int>? isFavorite,
+    Value<int>? reviewLevel,
+    Value<int>? reviewCount,
+    Value<String?>? lastReviewedAt,
+    Value<String?>? audioPath,
+    Value<int?>? audioDurationSeconds,
+    Value<String?>? languageId,
+    Value<String>? createdAt,
+    Value<String>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return TicunaWordsCompanion(
+      id: id ?? this.id,
+      word: word ?? this.word,
+      translation: translation ?? this.translation,
+      phonetics: phonetics ?? this.phonetics,
+      grammaticalClass: grammaticalClass ?? this.grammaticalClass,
+      exampleSentence: exampleSentence ?? this.exampleSentence,
+      exampleTranslation: exampleTranslation ?? this.exampleTranslation,
+      notes: notes ?? this.notes,
+      tags: tags ?? this.tags,
+      isFavorite: isFavorite ?? this.isFavorite,
+      reviewLevel: reviewLevel ?? this.reviewLevel,
+      reviewCount: reviewCount ?? this.reviewCount,
+      lastReviewedAt: lastReviewedAt ?? this.lastReviewedAt,
+      audioPath: audioPath ?? this.audioPath,
+      audioDurationSeconds: audioDurationSeconds ?? this.audioDurationSeconds,
+      languageId: languageId ?? this.languageId,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (word.present) {
+      map['word'] = Variable<String>(word.value);
+    }
+    if (translation.present) {
+      map['translation'] = Variable<String>(translation.value);
+    }
+    if (phonetics.present) {
+      map['phonetics'] = Variable<String>(phonetics.value);
+    }
+    if (grammaticalClass.present) {
+      map['grammatical_class'] = Variable<String>(grammaticalClass.value);
+    }
+    if (exampleSentence.present) {
+      map['example_sentence'] = Variable<String>(exampleSentence.value);
+    }
+    if (exampleTranslation.present) {
+      map['example_translation'] = Variable<String>(exampleTranslation.value);
+    }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
+    if (tags.present) {
+      map['tags'] = Variable<String>(tags.value);
+    }
+    if (isFavorite.present) {
+      map['is_favorite'] = Variable<int>(isFavorite.value);
+    }
+    if (reviewLevel.present) {
+      map['review_level'] = Variable<int>(reviewLevel.value);
+    }
+    if (reviewCount.present) {
+      map['review_count'] = Variable<int>(reviewCount.value);
+    }
+    if (lastReviewedAt.present) {
+      map['last_reviewed_at'] = Variable<String>(lastReviewedAt.value);
+    }
+    if (audioPath.present) {
+      map['audio_path'] = Variable<String>(audioPath.value);
+    }
+    if (audioDurationSeconds.present) {
+      map['audio_duration_seconds'] = Variable<int>(audioDurationSeconds.value);
+    }
+    if (languageId.present) {
+      map['language_id'] = Variable<String>(languageId.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<String>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<String>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TicunaWordsCompanion(')
+          ..write('id: $id, ')
+          ..write('word: $word, ')
+          ..write('translation: $translation, ')
+          ..write('phonetics: $phonetics, ')
+          ..write('grammaticalClass: $grammaticalClass, ')
+          ..write('exampleSentence: $exampleSentence, ')
+          ..write('exampleTranslation: $exampleTranslation, ')
+          ..write('notes: $notes, ')
+          ..write('tags: $tags, ')
+          ..write('isFavorite: $isFavorite, ')
+          ..write('reviewLevel: $reviewLevel, ')
+          ..write('reviewCount: $reviewCount, ')
+          ..write('lastReviewedAt: $lastReviewedAt, ')
+          ..write('audioPath: $audioPath, ')
+          ..write('audioDurationSeconds: $audioDurationSeconds, ')
+          ..write('languageId: $languageId, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $TicunaPhrasesTable extends TicunaPhrases
+    with TableInfo<$TicunaPhrasesTable, TicunaPhraseDbEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $TicunaPhrasesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _phraseMeta = const VerificationMeta('phrase');
+  @override
+  late final GeneratedColumn<String> phrase = GeneratedColumn<String>(
+    'phrase',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _translationMeta = const VerificationMeta(
+    'translation',
+  );
+  @override
+  late final GeneratedColumn<String> translation = GeneratedColumn<String>(
+    'translation',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _categoryMeta = const VerificationMeta(
+    'category',
+  );
+  @override
+  late final GeneratedColumn<String> category = GeneratedColumn<String>(
+    'category',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _phoneticsMeta = const VerificationMeta(
+    'phonetics',
+  );
+  @override
+  late final GeneratedColumn<String> phonetics = GeneratedColumn<String>(
+    'phonetics',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _notesMeta = const VerificationMeta('notes');
+  @override
+  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
+    'notes',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _tagsMeta = const VerificationMeta('tags');
+  @override
+  late final GeneratedColumn<String> tags = GeneratedColumn<String>(
+    'tags',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  );
+  static const VerificationMeta _isFavoriteMeta = const VerificationMeta(
+    'isFavorite',
+  );
+  @override
+  late final GeneratedColumn<int> isFavorite = GeneratedColumn<int>(
+    'is_favorite',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _audioPathMeta = const VerificationMeta(
+    'audioPath',
+  );
+  @override
+  late final GeneratedColumn<String> audioPath = GeneratedColumn<String>(
+    'audio_path',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _audioDurationSecondsMeta =
+      const VerificationMeta('audioDurationSeconds');
+  @override
+  late final GeneratedColumn<int> audioDurationSeconds = GeneratedColumn<int>(
+    'audio_duration_seconds',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _languageIdMeta = const VerificationMeta(
+    'languageId',
+  );
+  @override
+  late final GeneratedColumn<String> languageId = GeneratedColumn<String>(
+    'language_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('tca'),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<String> createdAt = GeneratedColumn<String>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<String> updatedAt = GeneratedColumn<String>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    phrase,
+    translation,
+    category,
+    phonetics,
+    notes,
+    tags,
+    isFavorite,
+    audioPath,
+    audioDurationSeconds,
+    languageId,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'ticuna_phrases';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<TicunaPhraseDbEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('phrase')) {
+      context.handle(
+        _phraseMeta,
+        phrase.isAcceptableOrUnknown(data['phrase']!, _phraseMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_phraseMeta);
+    }
+    if (data.containsKey('translation')) {
+      context.handle(
+        _translationMeta,
+        translation.isAcceptableOrUnknown(
+          data['translation']!,
+          _translationMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_translationMeta);
+    }
+    if (data.containsKey('category')) {
+      context.handle(
+        _categoryMeta,
+        category.isAcceptableOrUnknown(data['category']!, _categoryMeta),
+      );
+    }
+    if (data.containsKey('phonetics')) {
+      context.handle(
+        _phoneticsMeta,
+        phonetics.isAcceptableOrUnknown(data['phonetics']!, _phoneticsMeta),
+      );
+    }
+    if (data.containsKey('notes')) {
+      context.handle(
+        _notesMeta,
+        notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
+      );
+    }
+    if (data.containsKey('tags')) {
+      context.handle(
+        _tagsMeta,
+        tags.isAcceptableOrUnknown(data['tags']!, _tagsMeta),
+      );
+    }
+    if (data.containsKey('is_favorite')) {
+      context.handle(
+        _isFavoriteMeta,
+        isFavorite.isAcceptableOrUnknown(data['is_favorite']!, _isFavoriteMeta),
+      );
+    }
+    if (data.containsKey('audio_path')) {
+      context.handle(
+        _audioPathMeta,
+        audioPath.isAcceptableOrUnknown(data['audio_path']!, _audioPathMeta),
+      );
+    }
+    if (data.containsKey('audio_duration_seconds')) {
+      context.handle(
+        _audioDurationSecondsMeta,
+        audioDurationSeconds.isAcceptableOrUnknown(
+          data['audio_duration_seconds']!,
+          _audioDurationSecondsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('language_id')) {
+      context.handle(
+        _languageIdMeta,
+        languageId.isAcceptableOrUnknown(data['language_id']!, _languageIdMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  TicunaPhraseDbEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return TicunaPhraseDbEntry(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      phrase: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}phrase'],
+      )!,
+      translation: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}translation'],
+      )!,
+      category: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}category'],
+      ),
+      phonetics: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}phonetics'],
+      ),
+      notes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}notes'],
+      ),
+      tags: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}tags'],
+      )!,
+      isFavorite: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}is_favorite'],
+      )!,
+      audioPath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}audio_path'],
+      ),
+      audioDurationSeconds: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}audio_duration_seconds'],
+      ),
+      languageId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}language_id'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $TicunaPhrasesTable createAlias(String alias) {
+    return $TicunaPhrasesTable(attachedDatabase, alias);
+  }
+}
+
+class TicunaPhraseDbEntry extends DataClass
+    implements Insertable<TicunaPhraseDbEntry> {
+  final String id;
+  final String phrase;
+  final String translation;
+  final String? category;
+  final String? phonetics;
+  final String? notes;
+  final String tags;
+  final int isFavorite;
+  final String? audioPath;
+  final int? audioDurationSeconds;
+  final String? languageId;
+  final String createdAt;
+  final String updatedAt;
+  const TicunaPhraseDbEntry({
+    required this.id,
+    required this.phrase,
+    required this.translation,
+    this.category,
+    this.phonetics,
+    this.notes,
+    required this.tags,
+    required this.isFavorite,
+    this.audioPath,
+    this.audioDurationSeconds,
+    this.languageId,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['phrase'] = Variable<String>(phrase);
+    map['translation'] = Variable<String>(translation);
+    if (!nullToAbsent || category != null) {
+      map['category'] = Variable<String>(category);
+    }
+    if (!nullToAbsent || phonetics != null) {
+      map['phonetics'] = Variable<String>(phonetics);
+    }
+    if (!nullToAbsent || notes != null) {
+      map['notes'] = Variable<String>(notes);
+    }
+    map['tags'] = Variable<String>(tags);
+    map['is_favorite'] = Variable<int>(isFavorite);
+    if (!nullToAbsent || audioPath != null) {
+      map['audio_path'] = Variable<String>(audioPath);
+    }
+    if (!nullToAbsent || audioDurationSeconds != null) {
+      map['audio_duration_seconds'] = Variable<int>(audioDurationSeconds);
+    }
+    if (!nullToAbsent || languageId != null) {
+      map['language_id'] = Variable<String>(languageId);
+    }
+    map['created_at'] = Variable<String>(createdAt);
+    map['updated_at'] = Variable<String>(updatedAt);
+    return map;
+  }
+
+  TicunaPhrasesCompanion toCompanion(bool nullToAbsent) {
+    return TicunaPhrasesCompanion(
+      id: Value(id),
+      phrase: Value(phrase),
+      translation: Value(translation),
+      category: category == null && nullToAbsent
+          ? const Value.absent()
+          : Value(category),
+      phonetics: phonetics == null && nullToAbsent
+          ? const Value.absent()
+          : Value(phonetics),
+      notes: notes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(notes),
+      tags: Value(tags),
+      isFavorite: Value(isFavorite),
+      audioPath: audioPath == null && nullToAbsent
+          ? const Value.absent()
+          : Value(audioPath),
+      audioDurationSeconds: audioDurationSeconds == null && nullToAbsent
+          ? const Value.absent()
+          : Value(audioDurationSeconds),
+      languageId: languageId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(languageId),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory TicunaPhraseDbEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return TicunaPhraseDbEntry(
+      id: serializer.fromJson<String>(json['id']),
+      phrase: serializer.fromJson<String>(json['phrase']),
+      translation: serializer.fromJson<String>(json['translation']),
+      category: serializer.fromJson<String?>(json['category']),
+      phonetics: serializer.fromJson<String?>(json['phonetics']),
+      notes: serializer.fromJson<String?>(json['notes']),
+      tags: serializer.fromJson<String>(json['tags']),
+      isFavorite: serializer.fromJson<int>(json['isFavorite']),
+      audioPath: serializer.fromJson<String?>(json['audioPath']),
+      audioDurationSeconds: serializer.fromJson<int?>(
+        json['audioDurationSeconds'],
+      ),
+      languageId: serializer.fromJson<String?>(json['languageId']),
+      createdAt: serializer.fromJson<String>(json['createdAt']),
+      updatedAt: serializer.fromJson<String>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'phrase': serializer.toJson<String>(phrase),
+      'translation': serializer.toJson<String>(translation),
+      'category': serializer.toJson<String?>(category),
+      'phonetics': serializer.toJson<String?>(phonetics),
+      'notes': serializer.toJson<String?>(notes),
+      'tags': serializer.toJson<String>(tags),
+      'isFavorite': serializer.toJson<int>(isFavorite),
+      'audioPath': serializer.toJson<String?>(audioPath),
+      'audioDurationSeconds': serializer.toJson<int?>(audioDurationSeconds),
+      'languageId': serializer.toJson<String?>(languageId),
+      'createdAt': serializer.toJson<String>(createdAt),
+      'updatedAt': serializer.toJson<String>(updatedAt),
+    };
+  }
+
+  TicunaPhraseDbEntry copyWith({
+    String? id,
+    String? phrase,
+    String? translation,
+    Value<String?> category = const Value.absent(),
+    Value<String?> phonetics = const Value.absent(),
+    Value<String?> notes = const Value.absent(),
+    String? tags,
+    int? isFavorite,
+    Value<String?> audioPath = const Value.absent(),
+    Value<int?> audioDurationSeconds = const Value.absent(),
+    Value<String?> languageId = const Value.absent(),
+    String? createdAt,
+    String? updatedAt,
+  }) => TicunaPhraseDbEntry(
+    id: id ?? this.id,
+    phrase: phrase ?? this.phrase,
+    translation: translation ?? this.translation,
+    category: category.present ? category.value : this.category,
+    phonetics: phonetics.present ? phonetics.value : this.phonetics,
+    notes: notes.present ? notes.value : this.notes,
+    tags: tags ?? this.tags,
+    isFavorite: isFavorite ?? this.isFavorite,
+    audioPath: audioPath.present ? audioPath.value : this.audioPath,
+    audioDurationSeconds: audioDurationSeconds.present
+        ? audioDurationSeconds.value
+        : this.audioDurationSeconds,
+    languageId: languageId.present ? languageId.value : this.languageId,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  TicunaPhraseDbEntry copyWithCompanion(TicunaPhrasesCompanion data) {
+    return TicunaPhraseDbEntry(
+      id: data.id.present ? data.id.value : this.id,
+      phrase: data.phrase.present ? data.phrase.value : this.phrase,
+      translation: data.translation.present
+          ? data.translation.value
+          : this.translation,
+      category: data.category.present ? data.category.value : this.category,
+      phonetics: data.phonetics.present ? data.phonetics.value : this.phonetics,
+      notes: data.notes.present ? data.notes.value : this.notes,
+      tags: data.tags.present ? data.tags.value : this.tags,
+      isFavorite: data.isFavorite.present
+          ? data.isFavorite.value
+          : this.isFavorite,
+      audioPath: data.audioPath.present ? data.audioPath.value : this.audioPath,
+      audioDurationSeconds: data.audioDurationSeconds.present
+          ? data.audioDurationSeconds.value
+          : this.audioDurationSeconds,
+      languageId: data.languageId.present
+          ? data.languageId.value
+          : this.languageId,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TicunaPhraseDbEntry(')
+          ..write('id: $id, ')
+          ..write('phrase: $phrase, ')
+          ..write('translation: $translation, ')
+          ..write('category: $category, ')
+          ..write('phonetics: $phonetics, ')
+          ..write('notes: $notes, ')
+          ..write('tags: $tags, ')
+          ..write('isFavorite: $isFavorite, ')
+          ..write('audioPath: $audioPath, ')
+          ..write('audioDurationSeconds: $audioDurationSeconds, ')
+          ..write('languageId: $languageId, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    phrase,
+    translation,
+    category,
+    phonetics,
+    notes,
+    tags,
+    isFavorite,
+    audioPath,
+    audioDurationSeconds,
+    languageId,
+    createdAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is TicunaPhraseDbEntry &&
+          other.id == this.id &&
+          other.phrase == this.phrase &&
+          other.translation == this.translation &&
+          other.category == this.category &&
+          other.phonetics == this.phonetics &&
+          other.notes == this.notes &&
+          other.tags == this.tags &&
+          other.isFavorite == this.isFavorite &&
+          other.audioPath == this.audioPath &&
+          other.audioDurationSeconds == this.audioDurationSeconds &&
+          other.languageId == this.languageId &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class TicunaPhrasesCompanion extends UpdateCompanion<TicunaPhraseDbEntry> {
+  final Value<String> id;
+  final Value<String> phrase;
+  final Value<String> translation;
+  final Value<String?> category;
+  final Value<String?> phonetics;
+  final Value<String?> notes;
+  final Value<String> tags;
+  final Value<int> isFavorite;
+  final Value<String?> audioPath;
+  final Value<int?> audioDurationSeconds;
+  final Value<String?> languageId;
+  final Value<String> createdAt;
+  final Value<String> updatedAt;
+  final Value<int> rowid;
+  const TicunaPhrasesCompanion({
+    this.id = const Value.absent(),
+    this.phrase = const Value.absent(),
+    this.translation = const Value.absent(),
+    this.category = const Value.absent(),
+    this.phonetics = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.tags = const Value.absent(),
+    this.isFavorite = const Value.absent(),
+    this.audioPath = const Value.absent(),
+    this.audioDurationSeconds = const Value.absent(),
+    this.languageId = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  TicunaPhrasesCompanion.insert({
+    required String id,
+    required String phrase,
+    required String translation,
+    this.category = const Value.absent(),
+    this.phonetics = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.tags = const Value.absent(),
+    this.isFavorite = const Value.absent(),
+    this.audioPath = const Value.absent(),
+    this.audioDurationSeconds = const Value.absent(),
+    this.languageId = const Value.absent(),
+    required String createdAt,
+    required String updatedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       phrase = Value(phrase),
+       translation = Value(translation),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<TicunaPhraseDbEntry> custom({
+    Expression<String>? id,
+    Expression<String>? phrase,
+    Expression<String>? translation,
+    Expression<String>? category,
+    Expression<String>? phonetics,
+    Expression<String>? notes,
+    Expression<String>? tags,
+    Expression<int>? isFavorite,
+    Expression<String>? audioPath,
+    Expression<int>? audioDurationSeconds,
+    Expression<String>? languageId,
+    Expression<String>? createdAt,
+    Expression<String>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (phrase != null) 'phrase': phrase,
+      if (translation != null) 'translation': translation,
+      if (category != null) 'category': category,
+      if (phonetics != null) 'phonetics': phonetics,
+      if (notes != null) 'notes': notes,
+      if (tags != null) 'tags': tags,
+      if (isFavorite != null) 'is_favorite': isFavorite,
+      if (audioPath != null) 'audio_path': audioPath,
+      if (audioDurationSeconds != null)
+        'audio_duration_seconds': audioDurationSeconds,
+      if (languageId != null) 'language_id': languageId,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  TicunaPhrasesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? phrase,
+    Value<String>? translation,
+    Value<String?>? category,
+    Value<String?>? phonetics,
+    Value<String?>? notes,
+    Value<String>? tags,
+    Value<int>? isFavorite,
+    Value<String?>? audioPath,
+    Value<int?>? audioDurationSeconds,
+    Value<String?>? languageId,
+    Value<String>? createdAt,
+    Value<String>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return TicunaPhrasesCompanion(
+      id: id ?? this.id,
+      phrase: phrase ?? this.phrase,
+      translation: translation ?? this.translation,
+      category: category ?? this.category,
+      phonetics: phonetics ?? this.phonetics,
+      notes: notes ?? this.notes,
+      tags: tags ?? this.tags,
+      isFavorite: isFavorite ?? this.isFavorite,
+      audioPath: audioPath ?? this.audioPath,
+      audioDurationSeconds: audioDurationSeconds ?? this.audioDurationSeconds,
+      languageId: languageId ?? this.languageId,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (phrase.present) {
+      map['phrase'] = Variable<String>(phrase.value);
+    }
+    if (translation.present) {
+      map['translation'] = Variable<String>(translation.value);
+    }
+    if (category.present) {
+      map['category'] = Variable<String>(category.value);
+    }
+    if (phonetics.present) {
+      map['phonetics'] = Variable<String>(phonetics.value);
+    }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
+    if (tags.present) {
+      map['tags'] = Variable<String>(tags.value);
+    }
+    if (isFavorite.present) {
+      map['is_favorite'] = Variable<int>(isFavorite.value);
+    }
+    if (audioPath.present) {
+      map['audio_path'] = Variable<String>(audioPath.value);
+    }
+    if (audioDurationSeconds.present) {
+      map['audio_duration_seconds'] = Variable<int>(audioDurationSeconds.value);
+    }
+    if (languageId.present) {
+      map['language_id'] = Variable<String>(languageId.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<String>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<String>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TicunaPhrasesCompanion(')
+          ..write('id: $id, ')
+          ..write('phrase: $phrase, ')
+          ..write('translation: $translation, ')
+          ..write('category: $category, ')
+          ..write('phonetics: $phonetics, ')
+          ..write('notes: $notes, ')
+          ..write('tags: $tags, ')
+          ..write('isFavorite: $isFavorite, ')
+          ..write('audioPath: $audioPath, ')
+          ..write('audioDurationSeconds: $audioDurationSeconds, ')
+          ..write('languageId: $languageId, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $TicunaTagsTable extends TicunaTags
+    with TableInfo<$TicunaTagsTable, TicunaTagDbEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $TicunaTagsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<String> createdAt = GeneratedColumn<String>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, name, createdAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'ticuna_tags';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<TicunaTagDbEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  TicunaTagDbEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return TicunaTagDbEntry(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $TicunaTagsTable createAlias(String alias) {
+    return $TicunaTagsTable(attachedDatabase, alias);
+  }
+}
+
+class TicunaTagDbEntry extends DataClass
+    implements Insertable<TicunaTagDbEntry> {
+  final String id;
+  final String name;
+  final String createdAt;
+  const TicunaTagDbEntry({
+    required this.id,
+    required this.name,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    map['created_at'] = Variable<String>(createdAt);
+    return map;
+  }
+
+  TicunaTagsCompanion toCompanion(bool nullToAbsent) {
+    return TicunaTagsCompanion(
+      id: Value(id),
+      name: Value(name),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory TicunaTagDbEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return TicunaTagDbEntry(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      createdAt: serializer.fromJson<String>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'createdAt': serializer.toJson<String>(createdAt),
+    };
+  }
+
+  TicunaTagDbEntry copyWith({String? id, String? name, String? createdAt}) =>
+      TicunaTagDbEntry(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        createdAt: createdAt ?? this.createdAt,
+      );
+  TicunaTagDbEntry copyWithCompanion(TicunaTagsCompanion data) {
+    return TicunaTagDbEntry(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TicunaTagDbEntry(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is TicunaTagDbEntry &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.createdAt == this.createdAt);
+}
+
+class TicunaTagsCompanion extends UpdateCompanion<TicunaTagDbEntry> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<String> createdAt;
+  final Value<int> rowid;
+  const TicunaTagsCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  TicunaTagsCompanion.insert({
+    required String id,
+    required String name,
+    required String createdAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name),
+       createdAt = Value(createdAt);
+  static Insertable<TicunaTagDbEntry> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<String>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  TicunaTagsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<String>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return TicunaTagsCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<String>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TicunaTagsCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -24145,6 +26268,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $KnowledgeDocumentsTable(this);
   late final $KnowledgeResourcesTable knowledgeResources =
       $KnowledgeResourcesTable(this);
+  late final $TicunaWordsTable ticunaWords = $TicunaWordsTable(this);
+  late final $TicunaPhrasesTable ticunaPhrases = $TicunaPhrasesTable(this);
+  late final $TicunaTagsTable ticunaTags = $TicunaTagsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -24180,6 +26306,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     knowledgeQuestions,
     knowledgeDocuments,
     knowledgeResources,
+    ticunaWords,
+    ticunaPhrases,
+    ticunaTags,
   ];
 }
 
@@ -31330,7 +33459,8 @@ typedef $$PersonPhotosTableCreateCompanionBuilder =
       required String id,
       required String personId,
       required String photoType,
-      required String imageData,
+      Value<String?> filePath,
+      Value<String> imageData,
       required DateTime createdAt,
       Value<DateTime?> updatedAt,
       Value<DateTime?> deletedAt,
@@ -31342,6 +33472,7 @@ typedef $$PersonPhotosTableUpdateCompanionBuilder =
       Value<String> id,
       Value<String> personId,
       Value<String> photoType,
+      Value<String?> filePath,
       Value<String> imageData,
       Value<DateTime> createdAt,
       Value<DateTime?> updatedAt,
@@ -31371,6 +33502,11 @@ class $$PersonPhotosTableFilterComposer
 
   ColumnFilters<String> get photoType => $composableBuilder(
     column: $table.photoType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get filePath => $composableBuilder(
+    column: $table.filePath,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -31424,6 +33560,11 @@ class $$PersonPhotosTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get filePath => $composableBuilder(
+    column: $table.filePath,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get imageData => $composableBuilder(
     column: $table.imageData,
     builder: (column) => ColumnOrderings(column),
@@ -31467,6 +33608,9 @@ class $$PersonPhotosTableAnnotationComposer
 
   GeneratedColumn<String> get photoType =>
       $composableBuilder(column: $table.photoType, builder: (column) => column);
+
+  GeneratedColumn<String> get filePath =>
+      $composableBuilder(column: $table.filePath, builder: (column) => column);
 
   GeneratedColumn<String> get imageData =>
       $composableBuilder(column: $table.imageData, builder: (column) => column);
@@ -31518,6 +33662,7 @@ class $$PersonPhotosTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> personId = const Value.absent(),
                 Value<String> photoType = const Value.absent(),
+                Value<String?> filePath = const Value.absent(),
                 Value<String> imageData = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime?> updatedAt = const Value.absent(),
@@ -31528,6 +33673,7 @@ class $$PersonPhotosTableTableManager
                 id: id,
                 personId: personId,
                 photoType: photoType,
+                filePath: filePath,
                 imageData: imageData,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -31540,7 +33686,8 @@ class $$PersonPhotosTableTableManager
                 required String id,
                 required String personId,
                 required String photoType,
-                required String imageData,
+                Value<String?> filePath = const Value.absent(),
+                Value<String> imageData = const Value.absent(),
                 required DateTime createdAt,
                 Value<DateTime?> updatedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
@@ -31550,6 +33697,7 @@ class $$PersonPhotosTableTableManager
                 id: id,
                 personId: personId,
                 photoType: photoType,
+                filePath: filePath,
                 imageData: imageData,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -37653,6 +39801,1024 @@ typedef $$KnowledgeResourcesTableProcessedTableManager =
       KnowledgeResourceEntry,
       PrefetchHooks Function()
     >;
+typedef $$TicunaWordsTableCreateCompanionBuilder =
+    TicunaWordsCompanion Function({
+      required String id,
+      required String word,
+      required String translation,
+      Value<String?> phonetics,
+      Value<String?> grammaticalClass,
+      Value<String?> exampleSentence,
+      Value<String?> exampleTranslation,
+      Value<String?> notes,
+      Value<String> tags,
+      Value<int> isFavorite,
+      Value<int> reviewLevel,
+      Value<int> reviewCount,
+      Value<String?> lastReviewedAt,
+      Value<String?> audioPath,
+      Value<int?> audioDurationSeconds,
+      Value<String?> languageId,
+      required String createdAt,
+      required String updatedAt,
+      Value<int> rowid,
+    });
+typedef $$TicunaWordsTableUpdateCompanionBuilder =
+    TicunaWordsCompanion Function({
+      Value<String> id,
+      Value<String> word,
+      Value<String> translation,
+      Value<String?> phonetics,
+      Value<String?> grammaticalClass,
+      Value<String?> exampleSentence,
+      Value<String?> exampleTranslation,
+      Value<String?> notes,
+      Value<String> tags,
+      Value<int> isFavorite,
+      Value<int> reviewLevel,
+      Value<int> reviewCount,
+      Value<String?> lastReviewedAt,
+      Value<String?> audioPath,
+      Value<int?> audioDurationSeconds,
+      Value<String?> languageId,
+      Value<String> createdAt,
+      Value<String> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$TicunaWordsTableFilterComposer
+    extends Composer<_$AppDatabase, $TicunaWordsTable> {
+  $$TicunaWordsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get word => $composableBuilder(
+    column: $table.word,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get translation => $composableBuilder(
+    column: $table.translation,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get phonetics => $composableBuilder(
+    column: $table.phonetics,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get grammaticalClass => $composableBuilder(
+    column: $table.grammaticalClass,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get exampleSentence => $composableBuilder(
+    column: $table.exampleSentence,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get exampleTranslation => $composableBuilder(
+    column: $table.exampleTranslation,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get tags => $composableBuilder(
+    column: $table.tags,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get isFavorite => $composableBuilder(
+    column: $table.isFavorite,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get reviewLevel => $composableBuilder(
+    column: $table.reviewLevel,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get reviewCount => $composableBuilder(
+    column: $table.reviewCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lastReviewedAt => $composableBuilder(
+    column: $table.lastReviewedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get audioPath => $composableBuilder(
+    column: $table.audioPath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get audioDurationSeconds => $composableBuilder(
+    column: $table.audioDurationSeconds,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get languageId => $composableBuilder(
+    column: $table.languageId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$TicunaWordsTableOrderingComposer
+    extends Composer<_$AppDatabase, $TicunaWordsTable> {
+  $$TicunaWordsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get word => $composableBuilder(
+    column: $table.word,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get translation => $composableBuilder(
+    column: $table.translation,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get phonetics => $composableBuilder(
+    column: $table.phonetics,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get grammaticalClass => $composableBuilder(
+    column: $table.grammaticalClass,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get exampleSentence => $composableBuilder(
+    column: $table.exampleSentence,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get exampleTranslation => $composableBuilder(
+    column: $table.exampleTranslation,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get tags => $composableBuilder(
+    column: $table.tags,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get isFavorite => $composableBuilder(
+    column: $table.isFavorite,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get reviewLevel => $composableBuilder(
+    column: $table.reviewLevel,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get reviewCount => $composableBuilder(
+    column: $table.reviewCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lastReviewedAt => $composableBuilder(
+    column: $table.lastReviewedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get audioPath => $composableBuilder(
+    column: $table.audioPath,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get audioDurationSeconds => $composableBuilder(
+    column: $table.audioDurationSeconds,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get languageId => $composableBuilder(
+    column: $table.languageId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$TicunaWordsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $TicunaWordsTable> {
+  $$TicunaWordsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get word =>
+      $composableBuilder(column: $table.word, builder: (column) => column);
+
+  GeneratedColumn<String> get translation => $composableBuilder(
+    column: $table.translation,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get phonetics =>
+      $composableBuilder(column: $table.phonetics, builder: (column) => column);
+
+  GeneratedColumn<String> get grammaticalClass => $composableBuilder(
+    column: $table.grammaticalClass,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get exampleSentence => $composableBuilder(
+    column: $table.exampleSentence,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get exampleTranslation => $composableBuilder(
+    column: $table.exampleTranslation,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get notes =>
+      $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  GeneratedColumn<String> get tags =>
+      $composableBuilder(column: $table.tags, builder: (column) => column);
+
+  GeneratedColumn<int> get isFavorite => $composableBuilder(
+    column: $table.isFavorite,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get reviewLevel => $composableBuilder(
+    column: $table.reviewLevel,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get reviewCount => $composableBuilder(
+    column: $table.reviewCount,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get lastReviewedAt => $composableBuilder(
+    column: $table.lastReviewedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get audioPath =>
+      $composableBuilder(column: $table.audioPath, builder: (column) => column);
+
+  GeneratedColumn<int> get audioDurationSeconds => $composableBuilder(
+    column: $table.audioDurationSeconds,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get languageId => $composableBuilder(
+    column: $table.languageId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$TicunaWordsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $TicunaWordsTable,
+          TicunaWordDbEntry,
+          $$TicunaWordsTableFilterComposer,
+          $$TicunaWordsTableOrderingComposer,
+          $$TicunaWordsTableAnnotationComposer,
+          $$TicunaWordsTableCreateCompanionBuilder,
+          $$TicunaWordsTableUpdateCompanionBuilder,
+          (
+            TicunaWordDbEntry,
+            BaseReferences<_$AppDatabase, $TicunaWordsTable, TicunaWordDbEntry>,
+          ),
+          TicunaWordDbEntry,
+          PrefetchHooks Function()
+        > {
+  $$TicunaWordsTableTableManager(_$AppDatabase db, $TicunaWordsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$TicunaWordsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$TicunaWordsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$TicunaWordsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> word = const Value.absent(),
+                Value<String> translation = const Value.absent(),
+                Value<String?> phonetics = const Value.absent(),
+                Value<String?> grammaticalClass = const Value.absent(),
+                Value<String?> exampleSentence = const Value.absent(),
+                Value<String?> exampleTranslation = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
+                Value<String> tags = const Value.absent(),
+                Value<int> isFavorite = const Value.absent(),
+                Value<int> reviewLevel = const Value.absent(),
+                Value<int> reviewCount = const Value.absent(),
+                Value<String?> lastReviewedAt = const Value.absent(),
+                Value<String?> audioPath = const Value.absent(),
+                Value<int?> audioDurationSeconds = const Value.absent(),
+                Value<String?> languageId = const Value.absent(),
+                Value<String> createdAt = const Value.absent(),
+                Value<String> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TicunaWordsCompanion(
+                id: id,
+                word: word,
+                translation: translation,
+                phonetics: phonetics,
+                grammaticalClass: grammaticalClass,
+                exampleSentence: exampleSentence,
+                exampleTranslation: exampleTranslation,
+                notes: notes,
+                tags: tags,
+                isFavorite: isFavorite,
+                reviewLevel: reviewLevel,
+                reviewCount: reviewCount,
+                lastReviewedAt: lastReviewedAt,
+                audioPath: audioPath,
+                audioDurationSeconds: audioDurationSeconds,
+                languageId: languageId,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String word,
+                required String translation,
+                Value<String?> phonetics = const Value.absent(),
+                Value<String?> grammaticalClass = const Value.absent(),
+                Value<String?> exampleSentence = const Value.absent(),
+                Value<String?> exampleTranslation = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
+                Value<String> tags = const Value.absent(),
+                Value<int> isFavorite = const Value.absent(),
+                Value<int> reviewLevel = const Value.absent(),
+                Value<int> reviewCount = const Value.absent(),
+                Value<String?> lastReviewedAt = const Value.absent(),
+                Value<String?> audioPath = const Value.absent(),
+                Value<int?> audioDurationSeconds = const Value.absent(),
+                Value<String?> languageId = const Value.absent(),
+                required String createdAt,
+                required String updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => TicunaWordsCompanion.insert(
+                id: id,
+                word: word,
+                translation: translation,
+                phonetics: phonetics,
+                grammaticalClass: grammaticalClass,
+                exampleSentence: exampleSentence,
+                exampleTranslation: exampleTranslation,
+                notes: notes,
+                tags: tags,
+                isFavorite: isFavorite,
+                reviewLevel: reviewLevel,
+                reviewCount: reviewCount,
+                lastReviewedAt: lastReviewedAt,
+                audioPath: audioPath,
+                audioDurationSeconds: audioDurationSeconds,
+                languageId: languageId,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$TicunaWordsTable, TicunaWordDbEntry>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $TicunaWordsTable,
+                    TicunaWordDbEntry
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$TicunaWordsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $TicunaWordsTable,
+      TicunaWordDbEntry,
+      $$TicunaWordsTableFilterComposer,
+      $$TicunaWordsTableOrderingComposer,
+      $$TicunaWordsTableAnnotationComposer,
+      $$TicunaWordsTableCreateCompanionBuilder,
+      $$TicunaWordsTableUpdateCompanionBuilder,
+      (
+        TicunaWordDbEntry,
+        BaseReferences<_$AppDatabase, $TicunaWordsTable, TicunaWordDbEntry>,
+      ),
+      TicunaWordDbEntry,
+      PrefetchHooks Function()
+    >;
+typedef $$TicunaPhrasesTableCreateCompanionBuilder =
+    TicunaPhrasesCompanion Function({
+      required String id,
+      required String phrase,
+      required String translation,
+      Value<String?> category,
+      Value<String?> phonetics,
+      Value<String?> notes,
+      Value<String> tags,
+      Value<int> isFavorite,
+      Value<String?> audioPath,
+      Value<int?> audioDurationSeconds,
+      Value<String?> languageId,
+      required String createdAt,
+      required String updatedAt,
+      Value<int> rowid,
+    });
+typedef $$TicunaPhrasesTableUpdateCompanionBuilder =
+    TicunaPhrasesCompanion Function({
+      Value<String> id,
+      Value<String> phrase,
+      Value<String> translation,
+      Value<String?> category,
+      Value<String?> phonetics,
+      Value<String?> notes,
+      Value<String> tags,
+      Value<int> isFavorite,
+      Value<String?> audioPath,
+      Value<int?> audioDurationSeconds,
+      Value<String?> languageId,
+      Value<String> createdAt,
+      Value<String> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$TicunaPhrasesTableFilterComposer
+    extends Composer<_$AppDatabase, $TicunaPhrasesTable> {
+  $$TicunaPhrasesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get phrase => $composableBuilder(
+    column: $table.phrase,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get translation => $composableBuilder(
+    column: $table.translation,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get phonetics => $composableBuilder(
+    column: $table.phonetics,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get tags => $composableBuilder(
+    column: $table.tags,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get isFavorite => $composableBuilder(
+    column: $table.isFavorite,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get audioPath => $composableBuilder(
+    column: $table.audioPath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get audioDurationSeconds => $composableBuilder(
+    column: $table.audioDurationSeconds,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get languageId => $composableBuilder(
+    column: $table.languageId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$TicunaPhrasesTableOrderingComposer
+    extends Composer<_$AppDatabase, $TicunaPhrasesTable> {
+  $$TicunaPhrasesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get phrase => $composableBuilder(
+    column: $table.phrase,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get translation => $composableBuilder(
+    column: $table.translation,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get phonetics => $composableBuilder(
+    column: $table.phonetics,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get tags => $composableBuilder(
+    column: $table.tags,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get isFavorite => $composableBuilder(
+    column: $table.isFavorite,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get audioPath => $composableBuilder(
+    column: $table.audioPath,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get audioDurationSeconds => $composableBuilder(
+    column: $table.audioDurationSeconds,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get languageId => $composableBuilder(
+    column: $table.languageId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$TicunaPhrasesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $TicunaPhrasesTable> {
+  $$TicunaPhrasesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get phrase =>
+      $composableBuilder(column: $table.phrase, builder: (column) => column);
+
+  GeneratedColumn<String> get translation => $composableBuilder(
+    column: $table.translation,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get category =>
+      $composableBuilder(column: $table.category, builder: (column) => column);
+
+  GeneratedColumn<String> get phonetics =>
+      $composableBuilder(column: $table.phonetics, builder: (column) => column);
+
+  GeneratedColumn<String> get notes =>
+      $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  GeneratedColumn<String> get tags =>
+      $composableBuilder(column: $table.tags, builder: (column) => column);
+
+  GeneratedColumn<int> get isFavorite => $composableBuilder(
+    column: $table.isFavorite,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get audioPath =>
+      $composableBuilder(column: $table.audioPath, builder: (column) => column);
+
+  GeneratedColumn<int> get audioDurationSeconds => $composableBuilder(
+    column: $table.audioDurationSeconds,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get languageId => $composableBuilder(
+    column: $table.languageId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$TicunaPhrasesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $TicunaPhrasesTable,
+          TicunaPhraseDbEntry,
+          $$TicunaPhrasesTableFilterComposer,
+          $$TicunaPhrasesTableOrderingComposer,
+          $$TicunaPhrasesTableAnnotationComposer,
+          $$TicunaPhrasesTableCreateCompanionBuilder,
+          $$TicunaPhrasesTableUpdateCompanionBuilder,
+          (
+            TicunaPhraseDbEntry,
+            BaseReferences<
+              _$AppDatabase,
+              $TicunaPhrasesTable,
+              TicunaPhraseDbEntry
+            >,
+          ),
+          TicunaPhraseDbEntry,
+          PrefetchHooks Function()
+        > {
+  $$TicunaPhrasesTableTableManager(_$AppDatabase db, $TicunaPhrasesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$TicunaPhrasesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$TicunaPhrasesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$TicunaPhrasesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> phrase = const Value.absent(),
+                Value<String> translation = const Value.absent(),
+                Value<String?> category = const Value.absent(),
+                Value<String?> phonetics = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
+                Value<String> tags = const Value.absent(),
+                Value<int> isFavorite = const Value.absent(),
+                Value<String?> audioPath = const Value.absent(),
+                Value<int?> audioDurationSeconds = const Value.absent(),
+                Value<String?> languageId = const Value.absent(),
+                Value<String> createdAt = const Value.absent(),
+                Value<String> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TicunaPhrasesCompanion(
+                id: id,
+                phrase: phrase,
+                translation: translation,
+                category: category,
+                phonetics: phonetics,
+                notes: notes,
+                tags: tags,
+                isFavorite: isFavorite,
+                audioPath: audioPath,
+                audioDurationSeconds: audioDurationSeconds,
+                languageId: languageId,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String phrase,
+                required String translation,
+                Value<String?> category = const Value.absent(),
+                Value<String?> phonetics = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
+                Value<String> tags = const Value.absent(),
+                Value<int> isFavorite = const Value.absent(),
+                Value<String?> audioPath = const Value.absent(),
+                Value<int?> audioDurationSeconds = const Value.absent(),
+                Value<String?> languageId = const Value.absent(),
+                required String createdAt,
+                required String updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => TicunaPhrasesCompanion.insert(
+                id: id,
+                phrase: phrase,
+                translation: translation,
+                category: category,
+                phonetics: phonetics,
+                notes: notes,
+                tags: tags,
+                isFavorite: isFavorite,
+                audioPath: audioPath,
+                audioDurationSeconds: audioDurationSeconds,
+                languageId: languageId,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$TicunaPhrasesTable, TicunaPhraseDbEntry>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $TicunaPhrasesTable,
+                    TicunaPhraseDbEntry
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$TicunaPhrasesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $TicunaPhrasesTable,
+      TicunaPhraseDbEntry,
+      $$TicunaPhrasesTableFilterComposer,
+      $$TicunaPhrasesTableOrderingComposer,
+      $$TicunaPhrasesTableAnnotationComposer,
+      $$TicunaPhrasesTableCreateCompanionBuilder,
+      $$TicunaPhrasesTableUpdateCompanionBuilder,
+      (
+        TicunaPhraseDbEntry,
+        BaseReferences<_$AppDatabase, $TicunaPhrasesTable, TicunaPhraseDbEntry>,
+      ),
+      TicunaPhraseDbEntry,
+      PrefetchHooks Function()
+    >;
+typedef $$TicunaTagsTableCreateCompanionBuilder = TicunaTagsCompanion Function({
+  required String id,
+  required String name,
+  required String createdAt,
+  Value<int> rowid,
+});
+typedef $$TicunaTagsTableUpdateCompanionBuilder = TicunaTagsCompanion Function({
+  Value<String> id,
+  Value<String> name,
+  Value<String> createdAt,
+  Value<int> rowid,
+});
+
+class $$TicunaTagsTableFilterComposer
+    extends Composer<_$AppDatabase, $TicunaTagsTable> {
+  $$TicunaTagsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$TicunaTagsTableOrderingComposer
+    extends Composer<_$AppDatabase, $TicunaTagsTable> {
+  $$TicunaTagsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$TicunaTagsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $TicunaTagsTable> {
+  $$TicunaTagsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$TicunaTagsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $TicunaTagsTable,
+          TicunaTagDbEntry,
+          $$TicunaTagsTableFilterComposer,
+          $$TicunaTagsTableOrderingComposer,
+          $$TicunaTagsTableAnnotationComposer,
+          $$TicunaTagsTableCreateCompanionBuilder,
+          $$TicunaTagsTableUpdateCompanionBuilder,
+          (
+            TicunaTagDbEntry,
+            BaseReferences<_$AppDatabase, $TicunaTagsTable, TicunaTagDbEntry>,
+          ),
+          TicunaTagDbEntry,
+          PrefetchHooks Function()
+        > {
+  $$TicunaTagsTableTableManager(_$AppDatabase db, $TicunaTagsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$TicunaTagsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$TicunaTagsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$TicunaTagsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TicunaTagsCompanion(
+                id: id,
+                name: name,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String name,
+                required String createdAt,
+                Value<int> rowid = const Value.absent(),
+              }) => TicunaTagsCompanion.insert(
+                id: id,
+                name: name,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$TicunaTagsTable, TicunaTagDbEntry>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $TicunaTagsTable,
+                    TicunaTagDbEntry
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$TicunaTagsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $TicunaTagsTable,
+      TicunaTagDbEntry,
+      $$TicunaTagsTableFilterComposer,
+      $$TicunaTagsTableOrderingComposer,
+      $$TicunaTagsTableAnnotationComposer,
+      $$TicunaTagsTableCreateCompanionBuilder,
+      $$TicunaTagsTableUpdateCompanionBuilder,
+      (
+        TicunaTagDbEntry,
+        BaseReferences<_$AppDatabase, $TicunaTagsTable, TicunaTagDbEntry>,
+      ),
+      TicunaTagDbEntry,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -37720,4 +40886,10 @@ class $AppDatabaseManager {
       $$KnowledgeDocumentsTableTableManager(_db, _db.knowledgeDocuments);
   $$KnowledgeResourcesTableTableManager get knowledgeResources =>
       $$KnowledgeResourcesTableTableManager(_db, _db.knowledgeResources);
+  $$TicunaWordsTableTableManager get ticunaWords =>
+      $$TicunaWordsTableTableManager(_db, _db.ticunaWords);
+  $$TicunaPhrasesTableTableManager get ticunaPhrases =>
+      $$TicunaPhrasesTableTableManager(_db, _db.ticunaPhrases);
+  $$TicunaTagsTableTableManager get ticunaTags =>
+      $$TicunaTagsTableTableManager(_db, _db.ticunaTags);
 }

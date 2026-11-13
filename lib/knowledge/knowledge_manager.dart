@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:drift/drift.dart' as drift;
 import 'package:uuid/uuid.dart';
 
+import '../core/app_logger.dart';
+import '../core/sync_timestamp.dart';
 import '../database/app_database.dart';
 
 /// Item de resultado em busca unificada na Base de Conhecimento
@@ -568,19 +570,56 @@ class KnowledgeManager {
     return results;
   }
 
-  Future<void> _recordSyncQueue(String entityId, String entityType, String operation) async {
+  Future<void> _recordSyncQueue(
+    String entityId,
+    String entityType,
+    String operation, {
+    Map<String, dynamic>? baseData,
+  }) async {
     try {
       final now = DateTime.now();
+      Map<String, dynamic>? rowJson;
+      switch (entityType) {
+        case 'knowledge_notes':
+          final row = await (db.select(db.knowledgeNotes)..where((t) => t.id.equals(entityId))).getSingleOrNull();
+          rowJson = row?.toJson();
+          break;
+        case 'knowledge_questions':
+          final row = await (db.select(db.knowledgeQuestions)..where((t) => t.id.equals(entityId))).getSingleOrNull();
+          rowJson = row?.toJson();
+          break;
+        case 'knowledge_documents':
+          final row = await (db.select(db.knowledgeDocuments)..where((t) => t.id.equals(entityId))).getSingleOrNull();
+          rowJson = row?.toJson();
+          break;
+        case 'knowledge_resources':
+          final row = await (db.select(db.knowledgeResources)..where((t) => t.id.equals(entityId))).getSingleOrNull();
+          rowJson = row?.toJson();
+          break;
+      }
+
+      final payloadMap = rowJson != null
+          ? SyncTimestamp.normalizeMapDates(rowJson)
+          : <String, dynamic>{
+              'id': entityId,
+              'created_at': now.toUtc().toIso8601String(),
+            };
+      if (baseData != null) {
+        payloadMap['_base'] = SyncTimestamp.normalizeMapDates(baseData);
+      }
+
       await db.into(db.syncQueue).insert(
         SyncQueueCompanion.insert(
           id: _uuid.v4(),
           entityType: entityType,
           entityId: entityId,
           operation: operation,
-          payload: jsonEncode({'id': entityId, 'created_at': now.toIso8601String()}),
+          payload: jsonEncode(payloadMap),
           createdAt: now,
         ),
       );
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.error('Erro ao enfileirar mutação de Conhecimento ($entityType/$entityId)', e, st);
+    }
   }
 }

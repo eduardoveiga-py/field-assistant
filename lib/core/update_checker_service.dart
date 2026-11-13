@@ -9,6 +9,21 @@ import 'package:crypto/crypto.dart' as crypto;
 
 import 'app_logger.dart';
 import 'app_version.dart';
+import 'update_installer.dart';
+
+class UpdateInstallResult {
+  final bool verified;
+  final bool launched;
+  final String? filePath;
+  final String? errorMessage;
+
+  const UpdateInstallResult({
+    required this.verified,
+    required this.launched,
+    this.filePath,
+    this.errorMessage,
+  });
+}
 
 /// Status detalhado da verificação de atualização
 enum UpdateCheckStatus {
@@ -169,8 +184,53 @@ class AppUpdateInfo {
 /// 4. Na Web: aciona invalidação de Service Worker e recarregamento instantâneo.
 class UpdateCheckerService {
   final http.Client _client;
+  String? lastInstallError;
 
   UpdateCheckerService({http.Client? client}) : _client = client ?? http.Client();
+
+  String? _extractAssetSha256(Map<String, dynamic>? asset) {
+    final digest = asset?['digest']?.toString().trim() ?? '';
+    if (digest.toLowerCase().startsWith('sha256:')) {
+      return digest.substring(7).trim().toLowerCase();
+    }
+    return null;
+  }
+
+  Future<String?> _fetchChecksumFromManifest(
+    String manifestUrl,
+    String assetFileName,
+    Duration timeout,
+  ) async {
+    try {
+      final resp = await _client
+          .get(
+            Uri.parse(manifestUrl),
+            headers: {'User-Agent': AppVersion.userAgent},
+          )
+          .timeout(timeout);
+      if (resp.statusCode != 200) return null;
+      final cleanTarget = assetFileName.toLowerCase();
+      for (final rawLine in resp.body.split(RegExp(r'\r?\n'))) {
+        final line = rawLine.trim();
+        if (line.isEmpty) continue;
+        final parts = line.split(RegExp(r'\s+'));
+        if (parts.isEmpty) continue;
+        final hash = parts.first.trim().toLowerCase();
+        if (!RegExp(r'^[a-f0-9]{64}$').hasMatch(hash)) continue;
+        if (parts.length == 1 ||
+            parts.sublist(1).join(' ').toLowerCase().contains(cleanTarget)) {
+          return hash;
+        }
+      }
+    } catch (e, st) {
+      AppLogger.warning(
+        'Falha ao consultar manifesto SHA256 ($manifestUrl)',
+        e,
+        st,
+      );
+    }
+    return null;
+  }
 
   /// Verifica se há atualizações disponíveis consultando o GitHub Releases ou fallback apps.json.
   Future<AppUpdateInfo> checkForUpdate({
@@ -254,12 +314,26 @@ class UpdateCheckerService {
 
     // Seleção de asset de acordo com a plataforma (Android -> .apk; iOS -> .ipa)
     String downloadUrl;
+    String? assetFileName;
     int? sizeBytes;
+    String? assetSha256;
+    String? sumsAssetUrl;
     final assets = data['assets'] as List<dynamic>? ?? [];
+
+    for (final asset in assets) {
+      if (asset is Map<String, dynamic>) {
+        final name = (asset['name'] as String? ?? '').toLowerCase();
+        if (name == 'sha256sums.txt' || name.endsWith('sha256sums.txt')) {
+          sumsAssetUrl = asset['browser_download_url'] as String?;
+          break;
+        }
+      }
+    }
 
     if (targetPlatform == TargetPlatform.android) {
       downloadUrl = 'https://github.com/${AppVersion.githubRepo}/releases/latest/download/app-arm64-v8a-release.apk';
-      dynamic selectedApk;
+      assetFileName = 'app-arm64-v8a-release.apk';
+      Map<String, dynamic>? selectedApk;
       // Preferência 1: app-arm64-v8a-release.apk
       for (final asset in assets) {
         if (asset is Map<String, dynamic>) {
@@ -285,12 +359,15 @@ class UpdateCheckerService {
       // Se nenhum APK específico foi encontrado nos assets, mantém a URL padrão canônica do APK
       if (selectedApk != null) {
         downloadUrl = selectedApk['browser_download_url'] as String? ?? downloadUrl;
+        assetFileName = selectedApk['name'] as String? ?? assetFileName;
         sizeBytes = selectedApk['size'] as int?;
+        assetSha256 = _extractAssetSha256(selectedApk);
       }
     } else {
       // iOS / iPadOS / macOS: seleciona .ipa
       downloadUrl = AppVersion.latestIpaDownloadUrl;
-      dynamic selectedIpa;
+      assetFileName = 'app-release-unsigned.ipa';
+      Map<String, dynamic>? selectedIpa;
       for (final asset in assets) {
         if (asset is Map<String, dynamic>) {
           final name = (asset['name'] as String? ?? '').toLowerCase();
@@ -303,8 +380,19 @@ class UpdateCheckerService {
       // Se nenhum IPA foi encontrado nos assets, mantém a URL padrão canônica do IPA
       if (selectedIpa != null) {
         downloadUrl = selectedIpa['browser_download_url'] as String? ?? downloadUrl;
+        assetFileName = selectedIpa['name'] as String? ?? assetFileName;
         sizeBytes = selectedIpa['size'] as int?;
+        assetSha256 = _extractAssetSha256(selectedIpa);
       }
+    }
+
+    if ((assetSha256 == null || assetSha256.isEmpty) &&
+        sumsAssetUrl != null) {
+      assetSha256 = await _fetchChecksumFromManifest(
+        sumsAssetUrl,
+        assetFileName,
+        timeout,
+      );
     }
 
     String releaseDate = AppVersion.releaseDate;
@@ -319,8 +407,9 @@ class UpdateCheckerService {
         releaseDate: releaseDate,
         releaseNotes: body,
         downloadUrl: downloadUrl,
-        sourceCatalogUrl: AppVersion.appsJsonUrl,
+        sourceCatalogUrl: AppVersion.pinnedAppsJsonUrl,
         sizeBytes: sizeBytes,
+        sha256: assetSha256,
       );
     } else {
       return AppUpdateInfo.upToDate(
@@ -329,6 +418,7 @@ class UpdateCheckerService {
         releaseDate: releaseDate,
         releaseNotes: 'Você já está utilizando a versão mais recente do Ministério Pessoal.',
         downloadUrl: downloadUrl,
+        sha256: assetSha256,
       );
     }
   }
@@ -338,15 +428,40 @@ class UpdateCheckerService {
     Duration timeout, {
     TargetPlatform? platform,
   }) async {
-    final uri = Uri.parse(AppVersion.appsJsonUrl);
-    final response = await _client.get(
-      uri,
-      headers: {'User-Agent': AppVersion.userAgent},
-    ).timeout(timeout);
+    const candidateUrls = [
+      AppVersion.releaseAppsJsonUrl,
+      AppVersion.pinnedAppsJsonUrl,
+      AppVersion.appsJsonUrl,
+    ];
 
-    if (response.statusCode != 200) return null;
+    http.Response? okResponse;
+    String usedUrl = AppVersion.pinnedAppsJsonUrl;
+    Object? lastNetworkError;
 
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    for (final candidate in candidateUrls) {
+      try {
+        final uri = Uri.parse(candidate);
+        final response = await _client
+            .get(uri, headers: {'User-Agent': AppVersion.userAgent})
+            .timeout(timeout);
+        if (response.statusCode == 200) {
+          okResponse = response;
+          usedUrl = candidate;
+          break;
+        }
+      } catch (e) {
+        lastNetworkError = e;
+      }
+    }
+
+    if (okResponse == null) {
+      if (lastNetworkError != null) {
+        throw lastNetworkError;
+      }
+      return null;
+    }
+
+    final data = jsonDecode(okResponse.body) as Map<String, dynamic>;
     final apps = data['apps'] as List<dynamic>? ?? [];
     if (apps.isEmpty) return null;
 
@@ -360,13 +475,16 @@ class UpdateCheckerService {
 
     final targetPlatform = platform ?? defaultTargetPlatform;
     String downloadUrl;
+    String? sha256Value;
     if (targetPlatform == TargetPlatform.android) {
       downloadUrl = appData['downloadURL_apk'] as String? ??
           appData['downloadUrlApk'] as String? ??
           appData['downloadURL'] as String? ??
           'https://github.com/${AppVersion.githubRepo}/releases/latest/download/app-arm64-v8a-release.apk';
+      sha256Value = appData['sha256_apk'] as String? ?? appData['sha256'] as String?;
     } else {
       downloadUrl = appData['downloadURL'] as String? ?? AppVersion.latestIpaDownloadUrl;
+      sha256Value = appData['sha256'] as String?;
     }
     final sizeBytes = appData['size'] as int?;
 
@@ -377,8 +495,9 @@ class UpdateCheckerService {
         releaseDate: releaseDate,
         releaseNotes: notes,
         downloadUrl: downloadUrl,
-        sourceCatalogUrl: AppVersion.appsJsonUrl,
+        sourceCatalogUrl: usedUrl,
         sizeBytes: sizeBytes,
+        sha256: sha256Value,
       );
     } else {
       return AppUpdateInfo.upToDate(
@@ -387,6 +506,96 @@ class UpdateCheckerService {
         releaseDate: releaseDate,
         releaseNotes: notes.isNotEmpty ? notes : 'Você já está utilizando a versão mais recente do Ministério Pessoal.',
         downloadUrl: downloadUrl,
+        sha256: sha256Value,
+      );
+    }
+  }
+
+  /// Baixa o pacote de atualização e valida obrigatoriamente o SHA-256 antes de abrir o instalador (A1).
+  Future<UpdateInstallResult> downloadAndVerifyUpdate(
+    AppUpdateInfo info, {
+    String? customSaveDirPath,
+    bool launchInstaller = true,
+    Duration timeout = const Duration(seconds: 45),
+  }) async {
+    lastInstallError = null;
+    try {
+      final downloadUri = Uri.parse(info.downloadUrl);
+      final assetName = downloadUri.pathSegments.isNotEmpty
+          ? downloadUri.pathSegments.last
+          : 'app-update.apk';
+
+      var expectedSha256 = info.sha256?.trim();
+      if (expectedSha256 == null || expectedSha256.isEmpty) {
+        final sumsUrl = downloadUri.resolve('SHA256SUMS.txt').toString();
+        expectedSha256 = await _fetchChecksumFromManifest(
+          sumsUrl,
+          assetName,
+          const Duration(seconds: 10),
+        );
+      }
+
+      if (expectedSha256 == null || expectedSha256.isEmpty) {
+        const msg =
+            'Manifesto SHA-256 não disponível; instalação bloqueada por segurança.';
+        lastInstallError = msg;
+        return const UpdateInstallResult(
+          verified: false,
+          launched: false,
+          errorMessage: msg,
+        );
+      }
+
+      final resp = await _client
+          .get(downloadUri, headers: {'User-Agent': AppVersion.userAgent})
+          .timeout(timeout);
+      if (resp.statusCode != 200 || resp.bodyBytes.isEmpty) {
+        final msg =
+            'Falha ao baixar pacote de atualização (HTTP ${resp.statusCode}).';
+        lastInstallError = msg;
+        return UpdateInstallResult(
+          verified: false,
+          launched: false,
+          errorMessage: msg,
+        );
+      }
+
+      if (!AppUpdateInfo.verifySha256(resp.bodyBytes, expectedSha256)) {
+        const msg =
+            'Falha de integridade SHA-256: pacote baixado rejeitado por divergência criptográfica.';
+        lastInstallError = msg;
+        AppLogger.error(msg);
+        return const UpdateInstallResult(
+          verified: false,
+          launched: false,
+          errorMessage: msg,
+        );
+      }
+
+      final savedPath = await saveVerifiedUpdateFile(
+        bytes: resp.bodyBytes,
+        fileName: assetName,
+        customDirectoryPath: customSaveDirPath,
+      );
+
+      var launched = false;
+      if (launchInstaller) {
+        launched = await openVerifiedUpdateFile(savedPath);
+      }
+
+      return UpdateInstallResult(
+        verified: true,
+        launched: launched,
+        filePath: savedPath,
+      );
+    } catch (e, st) {
+      final msg = 'Erro ao baixar/validar pacote de atualização: $e';
+      lastInstallError = msg;
+      AppLogger.error(msg, e, st);
+      return UpdateInstallResult(
+        verified: false,
+        launched: false,
+        errorMessage: msg,
       );
     }
   }
@@ -394,6 +603,7 @@ class UpdateCheckerService {
   /// Aciona o fluxo de instalação ou atualização da aplicação de acordo com a plataforma.
   Future<bool> launchUpdate(AppUpdateInfo info, {TargetPlatform? platformOverride}) async {
     final platform = platformOverride ?? defaultTargetPlatform;
+    lastInstallError = null;
     try {
       // 1. No iOS/iPadOS, tenta abrir fonte do LiveContainer via URL scheme customizado
       if (platform == TargetPlatform.iOS) {
@@ -403,17 +613,25 @@ class UpdateCheckerService {
         }
       }
 
-      // 2. No Android e fallback iOS: download direto do APK / IPA
+      // 2. No Android (A1): exige download + verificação SHA-256 local antes de abrir o instalador APK
+      if (!kIsWeb &&
+          platform == TargetPlatform.android &&
+          info.downloadUrl.toLowerCase().contains('.apk')) {
+        final res = await downloadAndVerifyUpdate(info);
+        return res.verified && res.launched;
+      }
+
+      // 3. Demais plataformas / URL web
       final downloadUri = Uri.parse(info.downloadUrl);
       if (await canLaunchUrl(downloadUri)) {
         return await launchUrl(downloadUri, mode: LaunchMode.externalApplication);
       }
 
-      // 3. Fallback genérico: abre a página do repositório
+      // 4. Fallback genérico: abre a página do repositório
       final repoUri = Uri.parse('https://github.com/${AppVersion.githubRepo}/releases/latest');
       return await launchUrl(repoUri, mode: LaunchMode.externalApplication);
-    } catch (e) {
-      AppLogger.error('Erro ao abrir link de atualização: $e');
+    } catch (e, st) {
+      AppLogger.error('Erro ao abrir link de atualização: $e', e, st);
       return false;
     }
   }

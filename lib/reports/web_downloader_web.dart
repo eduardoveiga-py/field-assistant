@@ -3,6 +3,8 @@ import 'dart:js_interop';
 
 import 'package:web/web.dart' as web;
 
+import '../core/app_logger.dart';
+
 void downloadFileWeb(String filename, String content) {
   try {
     final bytes = utf8.encode(content);
@@ -16,5 +18,7 @@ void downloadFileWeb(String filename, String content) {
       ..download = filename;
     anchor.click();
     web.URL.revokeObjectURL(url);
-  } catch (_) {}
+  } catch (e, st) {
+    AppLogger.warning('Falha ao baixar arquivo na Web ($filename)', e, st);
+  }
 }

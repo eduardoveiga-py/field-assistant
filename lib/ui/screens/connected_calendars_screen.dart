@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:drift/drift.dart' as drift;
+import '../../core/app_logger.dart';
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../../appointments/calendar_provider.dart';
@@ -74,7 +75,9 @@ class _ConnectedCalendarsScreenState
     if (coordinator.appleProvider.isSupportedOnCurrentPlatform) {
       try {
         aAuth = await coordinator.appleProvider.isAuthorized();
-      } catch (_) {}
+      } catch (e, st) {
+        AppLogger.warning('Falha ao verificar autorização Apple Calendar', e, st);
+      }
       if (aAuth) {
         try {
           aAcc = await coordinator.appleProvider.getConnectedAccountName();
@@ -82,14 +85,18 @@ class _ConnectedCalendarsScreenState
             await coordinator.appleProvider.getAvailableCalendars(),
           );
           aSelectedId = await coordinator.appleProvider.getSelectedCalendarId();
-        } catch (_) {}
+        } catch (e, st) {
+          AppLogger.warning('Falha ao obter dados do Apple Calendar', e, st);
+        }
       }
     }
 
     List<CalendarConflictItem> pendingConflicts = [];
     try {
       pendingConflicts = await coordinator.getPendingConflicts();
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.warning('Falha ao carregar conflitos pendentes de calendário', e, st);
+    }
 
     if (mounted) {
       setState(() {

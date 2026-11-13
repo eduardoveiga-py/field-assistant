@@ -74,7 +74,9 @@ class PhoneContactItem {
           parsedTags = decoded.map((e) => e.toString()).toList();
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.warning('Falha ao decodificar tags JSON de PhoneContactItem', e, st);
+    }
 
     return PhoneContactItem(
       id: map['id'] as String,
@@ -156,7 +158,8 @@ class PhoneContactsManager {
             ),
           )
           .toList();
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.warning('Falha ao consultar contatos telefônicos locais', e, st);
       return [];
     }
   }
@@ -236,7 +239,9 @@ class PhoneContactsManager {
               status: const Value('pending'),
             ),
           );
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.error('Falha ao enfileirar INSERT de phone_contact $id', e, st);
+    }
 
     await _refresh();
     return item;
@@ -278,7 +283,9 @@ class PhoneContactsManager {
               status: const Value('pending'),
             ),
           );
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.error('Falha ao enfileirar UPDATE de phone_contact ${contact.id}', e, st);
+    }
 
     await _refresh();
   }
@@ -306,7 +313,9 @@ class PhoneContactsManager {
               status: const Value('pending'),
             ),
           );
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.error('Falha ao enfileirar DELETE de phone_contact $id', e, st);
+    }
 
     await _refresh();
   }

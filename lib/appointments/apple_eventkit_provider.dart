@@ -8,6 +8,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:uuid/uuid.dart';
 
+import '../core/app_logger.dart';
 import '../database/app_database.dart';
 import 'calendar_provider.dart';
 
@@ -67,7 +68,8 @@ class AppleEventKitProvider implements CalendarProvider {
     try {
       final permissions = await _deviceCalendarPlugin.hasPermissions();
       return permissions.isSuccess && (permissions.data ?? false);
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.warning('Falha ao verificar permissões do Apple EventKit', e, st);
       return false;
     }
   }
@@ -78,7 +80,8 @@ class AppleEventKitProvider implements CalendarProvider {
     try {
       final res = await _deviceCalendarPlugin.requestPermissions();
       return res.isSuccess && (res.data ?? false);
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.warning('Falha ao solicitar autorização do Apple EventKit', e, st);
       return false;
     }
   }
@@ -115,7 +118,8 @@ class AppleEventKitProvider implements CalendarProvider {
           isReadOnly: c.isReadOnly ?? false,
         );
       }).toList();
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.warning('Falha ao listar calendários do Apple EventKit', e, st);
       return [];
     }
   }
@@ -452,7 +456,8 @@ class AppleEventKitProvider implements CalendarProvider {
         return externalId;
       }
       return null;
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.warning('Falha ao criar/atualizar evento no Apple EventKit', e, st);
       return null;
     }
   }
@@ -488,7 +493,8 @@ class AppleEventKitProvider implements CalendarProvider {
         return true;
       }
       return false;
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.warning('Falha ao excluir evento no Apple EventKit', e, st);
       return false;
     }
   }

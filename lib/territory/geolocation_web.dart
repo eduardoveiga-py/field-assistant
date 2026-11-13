@@ -3,29 +3,59 @@ import 'dart:js_interop';
 
 import 'package:web/web.dart' as web;
 
-Future<({double latitude, double longitude})?> getBrowserCoordinates() async {
-  final completer = Completer<({double latitude, double longitude})?>();
+import '../core/app_logger.dart';
+import 'geolocation_types.dart';
+
+Future<GeolocationResult> getPlatformCoordinates() async {
+  final completer = Completer<GeolocationResult>();
   try {
     web.window.navigator.geolocation.getCurrentPosition(
       (web.GeolocationPosition pos) {
         if (!completer.isCompleted) {
-          completer.complete((
-            latitude: pos.coords.latitude.toDouble(),
-            longitude: pos.coords.longitude.toDouble(),
-          ));
+          final lat = pos.coords.latitude.toDouble();
+          final lng = pos.coords.longitude.toDouble();
+          if (lat.isFinite && lng.isFinite) {
+            completer.complete(
+              GeolocationResult(
+                status: GeolocationStatus.success,
+                coordinates: (latitude: lat, longitude: lng),
+              ),
+            );
+          } else {
+            completer.complete(
+              const GeolocationResult(
+                status: GeolocationStatus.unavailableOrTimeout,
+              ),
+            );
+          }
         }
       }.toJS,
       (web.GeolocationPositionError err) {
         if (!completer.isCompleted) {
-          completer.complete(null);
+          final status = switch (err.code) {
+            1 => GeolocationStatus.permissionDenied,
+            2 => GeolocationStatus.serviceDisabled,
+            _ => GeolocationStatus.unavailableOrTimeout,
+          };
+          completer.complete(GeolocationResult(status: status));
         }
       }.toJS,
     );
-  } catch (_) {
-    return null;
+  } catch (e, st) {
+    AppLogger.warning('Falha ao invocar navigator.geolocation na Web', e, st);
+    return const GeolocationResult(
+      status: GeolocationStatus.unsupportedPlatform,
+    );
   }
   return completer.future.timeout(
-    const Duration(seconds: 7),
-    onTimeout: () => null,
+    const Duration(seconds: 8),
+    onTimeout: () => const GeolocationResult(
+      status: GeolocationStatus.unavailableOrTimeout,
+    ),
   );
+}
+
+Future<GeoCoordinates?> getBrowserCoordinates() async {
+  final res = await getPlatformCoordinates();
+  return res.coordinates;
 }

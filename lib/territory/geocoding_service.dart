@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import '../core/app_logger.dart';
+
 class ReverseGeocodingResult {
   final double latitude;
   final double longitude;
@@ -110,8 +112,8 @@ class GeocodingService {
           );
         }
       }
-    } catch (_) {
-      // Falha graciosa de rede
+    } catch (e, st) {
+      AppLogger.debug('Falha de rede na geocodificação reversa ($lat, $lon): $e', st);
     }
     return null;
   }
@@ -150,8 +152,8 @@ class GeocodingService {
           }
         }
       }
-    } catch (_) {
-      // Falha graciosa de rede
+    } catch (e, st) {
+      AppLogger.debug('Falha de rede na geocodificação direta ("$cleanQuery"): $e', st);
     }
     return null;
   }

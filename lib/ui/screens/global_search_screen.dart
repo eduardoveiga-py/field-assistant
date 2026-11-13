@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/app_logger.dart';
 import '../../core/app_theme.dart';
 import '../../core/feature_registry.dart';
 import '../providers.dart';
@@ -53,6 +54,8 @@ class GlobalSearchResultItem {
 
 class GlobalSearchDelegate extends SearchDelegate<void> {
   final WidgetRef ref;
+  String? _lastSearchSignature;
+  Future<List<GlobalSearchResultItem>>? _cachedSearchFuture;
 
   GlobalSearchDelegate({required this.ref})
     : super(
@@ -136,8 +139,11 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
       isFeatureEnabledProvider(AppFeature.phones),
     );
 
-    return FutureBuilder<List<GlobalSearchResultItem>>(
-      future: _performSearch(
+    final signature =
+        '$cleanQuery|$isStudiesEnabled|$isAgendaEnabled|$isResearchEnabled|$isPhonesEnabled';
+    if (_lastSearchSignature != signature || _cachedSearchFuture == null) {
+      _lastSearchSignature = signature;
+      _cachedSearchFuture = _performSearch(
         db: db,
         repo: repo,
         query: cleanQuery,
@@ -146,7 +152,11 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
         isAgendaEnabled: isAgendaEnabled,
         isResearchEnabled: isResearchEnabled,
         isPhonesEnabled: isPhonesEnabled,
-      ),
+      );
+    }
+
+    return FutureBuilder<List<GlobalSearchResultItem>>(
+      future: _cachedSearchFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -293,7 +303,9 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
           );
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.warning('Falha na busca global (Pessoas)', e, st);
+    }
 
     // 2. Telefones (se módulo ativo)
     if (isPhonesEnabled) {
@@ -327,7 +339,9 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
             );
           }
         }
-      } catch (_) {}
+      } catch (e, st) {
+        AppLogger.warning('Falha na busca global (Telefones)', e, st);
+      }
     }
 
     // 3. Notas de Voz
@@ -359,7 +373,9 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
           );
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.warning('Falha na busca global (Notas de Voz)', e, st);
+    }
 
     // 4. Artigos de Pesquisa (se módulo ativo)
     if (isResearchEnabled) {
@@ -391,7 +407,9 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
             );
           }
         }
-      } catch (_) {}
+      } catch (e, st) {
+        AppLogger.warning('Falha na busca global (Pesquisas)', e, st);
+      }
     }
 
     // 5. Compromissos e Agenda (se módulo ativo)
@@ -425,7 +443,9 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
             );
           }
         }
-      } catch (_) {}
+      } catch (e, st) {
+        AppLogger.warning('Falha na busca global (Compromissos)', e, st);
+      }
     }
 
     // 6. Estudos Bíblicos (se módulo ativo)
@@ -457,7 +477,9 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
             );
           }
         }
-      } catch (_) {}
+      } catch (e, st) {
+        AppLogger.warning('Falha na busca global (Estudos)', e, st);
+      }
     }
 
     // 7. Tarefas
@@ -477,7 +499,9 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
           ),
         );
       }
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.warning('Falha na busca global (Tarefas)', e, st);
+    }
 
     // 8. Projetos
     try {
@@ -496,7 +520,9 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
           ),
         );
       }
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.warning('Falha na busca global (Projetos)', e, st);
+    }
 
     // 9. Base de Conhecimento (Notas)
     try {
@@ -515,7 +541,9 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
           ),
         );
       }
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.warning('Falha na busca global (Conhecimento)', e, st);
+    }
 
     // 10. Inbox Universal
     try {
@@ -533,7 +561,9 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
           ),
         );
       }
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.warning('Falha na busca global (Inbox)', e, st);
+    }
 
     return results;
   }

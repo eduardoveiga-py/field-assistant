@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -5,9 +7,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../appointments/calendar_sync_coordinator.dart';
+import '../../core/app_logger.dart';
+import '../../core/biometric_auth_service.dart';
 import '../../database/app_database.dart';
 import '../../inbox/jw_email_service.dart';
+import '../../settings/backup_service.dart';
+import '../../sync/supabase_config.dart';
 import '../../sync/supabase_sync_service.dart';
+import '../widgets/managed_text_controllers.dart';
+import '../widgets/pin_auth_dialog.dart';
 import 'auth_splash_screen.dart';
 
 import '../../core/app_theme.dart';
@@ -34,20 +42,78 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   DateTime? _lastBackupAt;
   String? _googleAccountEmail;
   bool _isGoogleConnected = false;
+  bool _hasPinConfigured = false;
   final TextEditingController _jwEmailCtrl = TextEditingController();
   final TextEditingController _jwPasswordCtrl = TextEditingController();
   final TextEditingController _jwHostCtrl = TextEditingController(text: 'mail.jw.org');
   final TextEditingController _jwPortCtrl = TextEditingController(text: '993');
+  final TextEditingController _jwSmtpHostCtrl = TextEditingController(text: 'mail.jw.org');
+  final TextEditingController _jwSmtpPortCtrl = TextEditingController(text: '587');
+  String _jwSmtpSecurity = 'starttls';
   bool _isTestingJwEmail = false;
+  late Future<DateTime?> _lastSilentBackupFuture;
 
   @override
   void initState() {
     super.initState();
+    final backupSvc = ref.read(backupServiceProvider);
+    _lastSilentBackupFuture = backupSvc.getLastSilentBackupDate();
     Future.microtask(() async {
-      ref.read(backupServiceProvider).performSilentBackupIfNeeded();
+      await backupSvc.performSilentBackupIfNeeded();
+      if (mounted) {
+        setState(() {
+          _lastSilentBackupFuture = backupSvc.getLastSilentBackupDate();
+        });
+      }
       await _loadGoogleStatus();
       await _loadJwEmailConfig();
+      await _loadPinStatus();
     });
+  }
+
+  Future<void> _loadPinStatus() async {
+    try {
+      final hasPin = await ref.read(biometricAuthServiceProvider).hasPin();
+      if (mounted) {
+        setState(() => _hasPinConfigured = hasPin);
+      }
+    } catch (e, st) {
+      AppLogger.warning('Falha ao consultar status do PIN de segurança', e, st);
+    }
+  }
+
+  Future<void> _openPinManagement() async {
+    final bio = ref.read(biometricAuthServiceProvider);
+    final hasPin = await bio.hasPin();
+    if (!mounted) return;
+    if (!hasPin) {
+      final created = await PinSetupDialog.show(context, biometricAuth: bio);
+      if (created && mounted) {
+        await _loadPinStatus();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('PIN de segurança cadastrado com sucesso.'),
+            backgroundColor: AppTheme.successGreen,
+          ),
+        );
+      }
+    } else {
+      final changed = await showDialog<bool>(
+        context: context,
+        builder: (_) => _ChangePinDialog(biometricAuth: bio),
+      );
+      if (changed == true && mounted) {
+        await _loadPinStatus();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('PIN de segurança atualizado com sucesso.'),
+            backgroundColor: AppTheme.successGreen,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -56,6 +122,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _jwPasswordCtrl.dispose();
     _jwHostCtrl.dispose();
     _jwPortCtrl.dispose();
+    _jwSmtpHostCtrl.dispose();
+    _jwSmtpPortCtrl.dispose();
     super.dispose();
   }
 
@@ -70,7 +138,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _googleAccountEmail = account;
         });
       }
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.warning('Falha ao consultar status do Google Calendar', e, st);
+    }
   }
 
   Future<void> _loadJwEmailConfig() async {
@@ -93,6 +163,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
       final host = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_imap_host'))).getSingleOrNull();
       final port = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_imap_port'))).getSingleOrNull();
+      final smtpHost = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_smtp_host'))).getSingleOrNull();
+      final smtpPort = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_smtp_port'))).getSingleOrNull();
+      final smtpSecurity = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_smtp_security'))).getSingleOrNull();
 
       if (mounted) {
         setState(() {
@@ -100,16 +173,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           if (pass != null) _jwPasswordCtrl.text = pass;
           if (host != null && host.value.isNotEmpty) _jwHostCtrl.text = host.value;
           if (port != null && port.value.isNotEmpty) _jwPortCtrl.text = port.value;
+          if (smtpHost != null && smtpHost.value.isNotEmpty) {
+            _jwSmtpHostCtrl.text = smtpHost.value;
+          } else if (host != null && host.value.isNotEmpty) {
+            _jwSmtpHostCtrl.text = host.value;
+          }
+          if (smtpPort != null && smtpPort.value.isNotEmpty) {
+            _jwSmtpPortCtrl.text = smtpPort.value;
+          }
+          if (smtpSecurity != null &&
+              (smtpSecurity.value == 'starttls' || smtpSecurity.value == 'ssl')) {
+            _jwSmtpSecurity = smtpSecurity.value;
+          }
         });
       }
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.warning('Falha ao carregar configuração IMAP do JW Mail', e, st);
+    }
   }
 
   // Modal para cadastro de Eventos Teocráticos e Datas Especiais
   void _showAddTheocraticEventDialog(BuildContext context) {
     String selectedType = 'Visita do Superintendente de Circuito';
-    final titleController = TextEditingController();
-    final locationController = TextEditingController();
     DateTime startDate = DateTime.now().add(const Duration(days: 7));
     TimeOfDay startTime = const TimeOfDay(hour: 9, minute: 0);
     DateTime endDate = startDate;
@@ -117,7 +202,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: const ['', ''],
+        builder: (ctx, ctrls) {
+          final titleController = ctrls[0];
+          final locationController = ctrls[1];
+
+          return StatefulBuilder(
         builder: (ctx, setDialogState) {
           final isDark = Theme.of(ctx).brightness == Brightness.dark;
 
@@ -367,389 +458,48 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ],
           );
         },
+      );
+        },
       ),
     );
   }
 
   // Modal de Exportação de Backup
   void _showExportDialog(BuildContext context) {
-    final passwordController = TextEditingController();
-
-    showDialog(
+    showDialog<String>(
       context: context,
-      builder: (ctx) {
-        final isDarkDialog = Theme.of(ctx).brightness == Brightness.dark;
-        return AlertDialog(
-          title: const Text('Exportar Backup Criptografado'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Defina uma senha forte. O arquivo será criptografado com AES-256 e só poderá ser restaurado com esta senha.',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: isDarkDialog
-                      ? const Color(0xFFCBD5E1)
-                      : AppTheme.textMuted,
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: passwordController,
-                decoration: const InputDecoration(
-                  labelText: 'Senha de Criptografia',
-                  hintText: 'Mínimo 6 caracteres',
-                ),
-                obscureText: true,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final password = passwordController.text.trim();
-                if (password.length < 6) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'A senha deve conter ao menos 6 caracteres.',
-                      ),
-                    ),
-                  );
-                  return;
-                }
-
-                final backupService = ref.read(backupServiceProvider);
-                final encryptedData = await backupService.exportEncryptedBackup(
-                  password,
-                );
-
-                setState(() {
-                  _lastBackupAt = DateTime.now();
-                });
-
-                if (ctx.mounted) Navigator.pop(ctx);
-
-                // Exibe diálogo com o código criptografado pronto para copiar/salvar
-                if (context.mounted) {
-                  showDialog(
-                    context: context,
-                    builder: (c) => AlertDialog(
-                      title: const Text('Backup Gerado com Sucesso!'),
-                      content: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Text(
-                            'Copie o texto criptografado abaixo e salve-o com segurança no aplicativo Arquivos, iCloud Drive ou em seu computador:',
-                            style: TextStyle(fontSize: 13),
-                          ),
-                          const SizedBox(height: 10),
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade100,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            constraints: const BoxConstraints(maxHeight: 120),
-                            child: SingleChildScrollView(
-                              child: SelectableText(
-                                encryptedData,
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  fontFamily: 'monospace',
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      actions: [
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.copy, size: 16),
-                          label: const Text('Copiar Código do Backup'),
-                          onPressed: () {
-                            Clipboard.setData(
-                              ClipboardData(text: encryptedData),
-                            );
-                            Navigator.pop(c);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Backup copiado para a área de transferência!',
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  );
-                }
-              },
-              child: const Text('Exportar'),
-            ),
-          ],
-        );
-      },
+      builder: (_) => _ExportBackupDialog(
+        backupService: ref.read(backupServiceProvider),
+        onExported: () {
+          if (mounted) {
+            setState(() {
+              _lastBackupAt = DateTime.now();
+            });
+          }
+        },
+      ),
     );
   }
 
   // Modal de Restauração com Prévia e Confirmação
   void _showRestoreDialog(BuildContext context) {
-    final dataController = TextEditingController();
-    final passwordController = TextEditingController();
-
-    showDialog(
+    showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Restaurar Backup Criptografado'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: dataController,
-                decoration: const InputDecoration(
-                  labelText: 'Cole o código criptografado do backup',
-                  hintText: '{"iv":"...","ciphertext":"..."}',
-                ),
-                maxLines: 3,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: passwordController,
-                decoration: const InputDecoration(
-                  labelText: 'Senha utilizada na exportação',
-                ),
-                obscureText: true,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final raw = dataController.text.trim();
-              final pwd = passwordController.text.trim();
-
-              if (raw.isEmpty || pwd.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Preencha os dados do backup e a senha.'),
-                  ),
-                );
-                return;
-              }
-
-              final backupService = ref.read(backupServiceProvider);
-              try {
-                final preview = await backupService.previewBackup(
-                  encryptedDataString: raw,
-                  password: pwd,
-                );
-
-                if (ctx.mounted) Navigator.pop(ctx);
-
-                // Exibe diálogo de Prévia de Restauração
-                if (context.mounted) {
-                  showDialog(
-                    context: context,
-                    builder: (c) => AlertDialog(
-                      title: const Text('Pré-visualização da Restauração'),
-                      content: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Registros verificados com integridade SHA-256:',
-                          ),
-                          const SizedBox(height: 8),
-                          Text('• Novos contatos: ${preview.peopleToAdd}'),
-                          Text(
-                            '• Contatos a atualizar: ${preview.peopleToUpdate}',
-                          ),
-                          Text(
-                            '• Contatos inalterados: ${preview.peopleUnchanged}',
-                          ),
-                          Text('• Visitas a importar: ${preview.visitsToAdd}'),
-                          Text('• Estudos bíblicos: ${preview.studiesToAdd}'),
-                          Text('• Sessões de estudo: ${preview.sessionsToAdd}'),
-                          Text('• Compromissos: ${preview.appointmentsToAdd}'),
-                          const SizedBox(height: 10),
-                          const Text(
-                            'A restauração é idempotente e NÃO criará contatos ou estudos duplicados.',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppTheme.successGreen,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(c),
-                          child: const Text('Cancelar'),
-                        ),
-                        ElevatedButton(
-                          onPressed: () async {
-                            await backupService.commitRestore(preview);
-                            if (c.mounted) Navigator.pop(c);
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Restauração concluída com sucesso!',
-                                  ),
-                                ),
-                              );
-                            }
-                          },
-                          child: const Text('Confirmar Restauração'),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Erro na validação do backup: $e')),
-                  );
-                }
-              }
-            },
-            child: const Text('Analisar Backup'),
-          ),
-        ],
+      builder: (_) => _RestoreBackupDialog(
+        backupService: ref.read(backupServiceProvider),
       ),
     );
   }
 
-  // Modal de Inspeção da Fila de Sincronização
-  void _showSyncQueueModal(BuildContext context) async {
-    final repo = ref.read(repositoryProvider);
-    final pendingOps = await repo.getPendingSyncOperations();
-
-    if (!context.mounted) return;
-
+  // Modal Avançado de Gestão da Fila de Sincronização (Pendentes, Falhas e Conflitos - R3 / M13)
+  void _showSyncQueueModal(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(
-                  Icons.cloud_sync,
-                  color: AppTheme.primaryBlue,
-                  size: 24,
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  'Fila de Sincronização',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.pop(ctx),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              '${pendingOps.length} operação(ões) aguardando sincronização com a nuvem:',
-              style: TextStyle(
-                fontSize: 14,
-                color: Theme.of(ctx).brightness == Brightness.dark
-                    ? const Color(0xFFCBD5E1)
-                    : AppTheme.textMuted,
-              ),
-            ),
-            const SizedBox(height: 12),
-            if (pendingOps.isEmpty)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF0FDF4),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(
-                      Icons.check_circle,
-                      color: AppTheme.successGreen,
-                      size: 20,
-                    ),
-                    SizedBox(width: 8),
-                    Text(
-                      'Tudo sincronizado ou sem alterações pendentes.',
-                      style: TextStyle(
-                        color: Color(0xFF166534),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              )
-            else
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 250),
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  itemCount: pendingOps.length,
-                  separatorBuilder: (context, index) =>
-                      const Divider(height: 1),
-                  itemBuilder: (_, index) {
-                    final op = pendingOps[index];
-                    return ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      leading: Chip(
-                        label: Text(
-                          op.operation.toUpperCase(),
-                          style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        backgroundColor: op.operation == 'insert'
-                            ? const Color(0xFFDCFCE7)
-                            : op.operation == 'update'
-                            ? const Color(0xFFFEF3C7)
-                            : const Color(0xFFFEE2E2),
-                      ),
-                      title: Text(
-                        '${op.entityType} (${op.entityId.substring(0, op.entityId.length > 8 ? 8 : op.entityId.length)}...)',
-                      ),
-                      subtitle: Text(
-                        'Tentativas: ${op.attempts} • Criado em: ${AppDateUtils.formatDateTime(op.createdAt)}',
-                        style: const TextStyle(fontSize: 11),
-                      ),
-                    );
-                  },
-                ),
-              ),
-          ],
-        ),
-      ),
+      builder: (_) => const SyncQueueManagementSheet(),
     );
   }
 
@@ -757,6 +507,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final allAppointments = ref.watch(appointmentsStreamProvider).value ?? [];
+    final syncCounts = ref.watch(syncQueueCountsProvider).value ??
+        (pending: 0, failed: 0, conflict: 0);
     final theocraticEvents =
         allAppointments
             .where(
@@ -784,14 +536,38 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             child: Column(
               children: [
                 ListTile(
-                  leading: const Icon(Icons.sync, color: AppTheme.primaryBlue),
-                  title: const Text('Estado da Sincronização'),
-                  subtitle: const Text(
-                    'Operando Local-First (Offline). Alterações gravadas localmente.',
+                  leading: Icon(
+                    syncCounts.conflict > 0
+                        ? Icons.merge_type
+                        : syncCounts.failed > 0
+                        ? Icons.warning_amber_rounded
+                        : Icons.sync,
+                    color: syncCounts.conflict > 0 || syncCounts.failed > 0
+                        ? AppTheme.alertRed
+                        : AppTheme.primaryBlue,
                   ),
-                  trailing: const Chip(
-                    label: Text('Local-First', style: TextStyle(fontSize: 11)),
-                    backgroundColor: Color(0xFFE0E7FF),
+                  title: const Text('Estado da Sincronização'),
+                  subtitle: Text(
+                    syncCounts.conflict > 0
+                        ? '${syncCounts.conflict} conflito(s) aguardando resolução e ${syncCounts.pending} pendente(s).'
+                        : syncCounts.failed > 0
+                        ? '${syncCounts.failed} operação(ões) em falha e ${syncCounts.pending} pendente(s).'
+                        : syncCounts.pending > 0
+                        ? '${syncCounts.pending} alteração(ões) salva(s) localmente aguardando envio.'
+                        : 'Operando Local-First (Offline). Tudo sincronizado localmente.',
+                  ),
+                  trailing: Chip(
+                    label: Text(
+                      syncCounts.conflict > 0
+                          ? '${syncCounts.conflict} Conflitos'
+                          : syncCounts.failed > 0
+                          ? '${syncCounts.failed} Falhas'
+                          : 'Local-First',
+                      style: const TextStyle(fontSize: 11),
+                    ),
+                    backgroundColor: (syncCounts.conflict > 0 || syncCounts.failed > 0)
+                        ? const Color(0xFFFEE2E2)
+                        : const Color(0xFFE0E7FF),
                   ),
                 ),
                 Padding(
@@ -800,13 +576,45 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     right: 16,
                     bottom: 12,
                   ),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      icon: const Icon(Icons.cloud_sync),
-                      label: const Text('Verificar Fila de Sincronização'),
-                      onPressed: () => _showSyncQueueModal(context),
-                    ),
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.cloud_sync),
+                          label: Text(
+                            (syncCounts.failed > 0 || syncCounts.conflict > 0)
+                                ? 'Gerenciar Fila (${syncCounts.pending + syncCounts.failed + syncCounts.conflict})'
+                                : 'Verificar Fila de Sincronização',
+                          ),
+                          onPressed: () => _showSyncQueueModal(context),
+                        ),
+                      ),
+                      if (syncCounts.failed > 0)
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.alertAmber,
+                              foregroundColor: Colors.black87,
+                            ),
+                            icon: const Icon(Icons.refresh, size: 18),
+                            label: Text('Reprocessar ${syncCounts.failed} Falha(s) Agora'),
+                            onPressed: () async {
+                              final repo = ref.read(repositoryProvider);
+                              await repo.retryAllFailedOperations();
+                              final res = await ref.read(supabaseSyncServiceProvider).sync();
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text(res.message)),
+                                );
+                              }
+                            },
+                          ),
+                        ),
+                    ],
                   ),
                 ),
                 const Divider(height: 1),
@@ -857,7 +665,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               onPressed: () async {
                                 final coord = ref.read(calendarSyncCoordinatorProvider);
                                 final ok = await coord.googleProvider.requestAuthorization();
-                                if (ok) await _loadGoogleStatus();
+                                if (ok) {
+                                  await _loadGoogleStatus();
+                                } else if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        coord.googleProvider.lastError ??
+                                            'Não foi possível autenticar com a conta Google.',
+                                      ),
+                                    ),
+                                  );
+                                }
                               },
                               child: const Text('Trocar'),
                             ),
@@ -887,6 +706,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               if (!context.mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(content: Text('Conta Google conectada com sucesso!')),
+                              );
+                            } else if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    coord.googleProvider.lastError ??
+                                        'Não foi possível conectar a conta Google.',
+                                  ),
+                                ),
                               );
                             }
                           },
@@ -1042,9 +870,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                   const SizedBox(height: 12),
                   FutureBuilder<DateTime?>(
-                    future: ref
-                        .read(backupServiceProvider)
-                        .getLastSilentBackupDate(),
+                    future: _lastSilentBackupFuture,
                     builder: (context, snapshot) {
                       final dt = snapshot.data;
                       return Row(
@@ -1076,7 +902,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               final backupSvc = ref.read(backupServiceProvider);
                               final success = await backupSvc
                                   .performSilentBackupIfNeeded(force: true);
-                              setState(() {});
+                              if (mounted) {
+                                setState(() {
+                                  _lastSilentBackupFuture =
+                                      backupSvc.getLastSilentBackupDate();
+                                });
+                              }
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
@@ -1361,6 +1192,33 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           const SizedBox(height: 20),
 
+          // Seção: Segurança e Acesso Restrito
+          const Text(
+            'Segurança e Acesso Restrito',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Card(
+            child: ListTile(
+              leading: Icon(
+                _hasPinConfigured ? Icons.lock : Icons.lock_open_outlined,
+                color: _hasPinConfigured ? AppTheme.successGreen : AppTheme.alertAmber,
+              ),
+              title: const Text('PIN de Segurança do Aplicativo'),
+              subtitle: Text(
+                _hasPinConfigured
+                    ? 'PIN ativo para proteger cartas restritas e Hub JW quando não houver biometria.'
+                    : 'Nenhum PIN configurado. Configure um PIN obrigatório de fallback.',
+              ),
+              trailing: TextButton(
+                onPressed: _openPinManagement,
+                child: Text(_hasPinConfigured ? 'Alterar PIN' : 'Configurar'),
+              ),
+              onTap: _openPinManagement,
+            ),
+          ),
+          const SizedBox(height: 20),
+
           // Seção: Dados e Demonstração
           const Text(
             'Dados e Demonstração',
@@ -1463,7 +1321,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             builder: (ctx) => AlertDialog(
                               title: const Text('Zerar Banco de Dados Local?'),
                               content: const Text(
-                                'Esta ação apagará permanentemente todos os registros armazenados neste dispositivo.\n\nDeseja continuar?',
+                                'Esta ação apaga os registros e as configurações do banco local, inclusive alterações ainda não sincronizadas. Arquivos de mídia, backups, credenciais e dados na nuvem não serão apagados. Dados da nuvem poderão voltar na próxima sincronização.\n\nDeseja continuar?',
                               ),
                               actions: [
                                 TextButton(
@@ -1804,11 +1662,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Widget _buildSupabaseCard(BuildContext context) {
+    final isSupabaseReady = SupabaseSyncService.isInitialized;
     User? currentUser;
-    try {
-      currentUser = Supabase.instance.client.auth.currentUser;
-    } catch (_) {
-      currentUser = null;
+    if (isSupabaseReady) {
+      try {
+        currentUser = Supabase.instance.client.auth.currentUser;
+      } catch (e, st) {
+        AppLogger.warning('Falha ao obter sessão Supabase atual', e, st);
+        currentUser = null;
+      }
     }
     final isConnected = currentUser != null;
     final userEmail = currentUser?.email ?? 'Nenhum usuário autenticado';
@@ -1831,20 +1693,53 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ],
             ),
             const Divider(),
+            if (!isSupabaseReady) ...[
+              Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.amber.shade700),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.cloud_off, color: Colors.amber.shade800, size: 20),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'Sincronização na nuvem indisponível: Supabase não configurado ou falhou ao inicializar. Operando apenas localmente.',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 8),
             Row(
               children: [
                 Icon(
-                  isConnected ? Icons.check_circle : Icons.error_outline,
-                  color: isConnected ? Colors.green : Colors.orange,
+                  isConnected
+                      ? Icons.check_circle
+                      : (isSupabaseReady ? Icons.error_outline : Icons.cloud_off),
+                  color: isConnected
+                      ? Colors.green
+                      : (isSupabaseReady ? Colors.orange : Colors.red),
                   size: 20,
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  isConnected ? 'Status: Conectado' : 'Status: Não conectado',
+                  isConnected
+                      ? 'Status: Conectado'
+                      : (isSupabaseReady
+                          ? 'Status: Não conectado'
+                          : 'Status: Indisponível (offline)'),
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: isConnected ? Colors.green : Colors.orange,
+                    color: isConnected
+                        ? Colors.green
+                        : (isSupabaseReady ? Colors.orange : Colors.red),
                   ),
                 ),
               ],
@@ -1857,22 +1752,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               runSpacing: 8,
               children: [
                 ElevatedButton.icon(
-                  onPressed: () async {
-                    try {
-                      final result = await ref.read(supabaseSyncServiceProvider).sync();
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(result.message)),
-                        );
-                      }
-                    } catch (e) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Erro ao sincronizar: $e')),
-                        );
-                      }
-                    }
-                  },
+                  onPressed: !isSupabaseReady
+                      ? null
+                      : () async {
+                          try {
+                            final result =
+                                await ref.read(supabaseSyncServiceProvider).sync();
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(result.message)),
+                              );
+                            }
+                          } catch (e, st) {
+                            AppLogger.error(
+                                'Erro ao sincronizar via configurações', e, st);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Erro ao sincronizar: $e')),
+                              );
+                            }
+                          }
+                        },
                   icon: const Icon(Icons.sync, size: 18),
                   label: const Text('Sincronizar Agora'),
                 ),
@@ -1882,35 +1782,314 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       try {
                         await Supabase.instance.client.auth.signOut();
                         setState(() {});
-                      } catch (_) {}
+                      } catch (e, st) {
+                        AppLogger.warning('Falha ao fazer logout do Supabase', e, st);
+                      }
                     },
                     icon: const Icon(Icons.logout, color: Colors.red, size: 18),
-                    label: const Text('Sair da Conta (Logout)', style: TextStyle(color: Colors.red)),
+                    label: const Text('Sair da Conta (Logout)',
+                        style: TextStyle(color: Colors.red)),
                   )
                 else
                   ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (authContext) => SupabaseAuthScreen(
-                            onAuthenticated: () {
-                              if (!mounted || !authContext.mounted) return;
-                              Navigator.of(authContext).pop();
-                              setState(() {});
-                            },
-                          ),
-                        ),
-                      );
-                    },
+                    onPressed: !isSupabaseReady
+                        ? null
+                        : () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (authContext) => SupabaseAuthScreen(
+                                  onAuthenticated: () {
+                                    if (!mounted || !authContext.mounted) return;
+                                    Navigator.of(authContext).pop();
+                                    setState(() {});
+                                  },
+                                ),
+                              ),
+                            );
+                          },
                     icon: const Icon(Icons.login, size: 18),
                     label: const Text('Fazer Login'),
                   ),
+                OutlinedButton.icon(
+                  onPressed: () => _showRuntimeSupabaseConfigDialog(context),
+                  icon: const Icon(Icons.tune_rounded, size: 18),
+                  label: Text(
+                    isSupabaseReady
+                        ? 'Configurar Servidor'
+                        : 'Configurar Supabase (URL/Chave)',
+                  ),
+                ),
               ],
             ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _showRuntimeSupabaseConfigDialog(BuildContext context) async {
+    final existingUrl = await SupabaseSyncService.getRuntimeUrl() ?? '';
+    final hasRuntime = await SupabaseSyncService.hasRuntimeConfig();
+    if (!context.mounted) return;
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => ManagedTextControllers(
+        initialTexts: [existingUrl, ''],
+        builder: (ctx, ctrls) {
+          final urlCtrl = ctrls[0];
+          final keyCtrl = ctrls[1];
+          bool isSaving = false;
+          String? errorText;
+
+          return StatefulBuilder(
+            builder: (ctx, setDlgState) => AlertDialog(
+              title: const Text('Configuração Runtime do Supabase'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      SupabaseConfig.isConfigured
+                          ? 'Compilado com --dart-define. Definir URL/Chave aqui sobrescreve o servidor em runtime.'
+                          : 'Informe a URL e a Chave Anon/Publishable do seu projeto Supabase para habilitar login e sincronização em nuvem sem recompilar o app.',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: urlCtrl,
+                      enabled: !isSaving,
+                      decoration: const InputDecoration(
+                        labelText: 'Supabase URL *',
+                        hintText: 'https://seu-projeto.supabase.co',
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: TextInputType.url,
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: keyCtrl,
+                      enabled: !isSaving,
+                      obscureText: true,
+                      decoration: InputDecoration(
+                        labelText: 'Supabase Anon / Publishable Key *',
+                        hintText: hasRuntime
+                            ? 'Informe para atualizar ou cole a chave...'
+                            : 'sb_publishable_... ou eyJ...',
+                        border: const OutlineInputBorder(),
+                      ),
+                    ),
+                    if (errorText != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        errorText!,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(ctx).colorScheme.error,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                if (hasRuntime)
+                  TextButton(
+                    onPressed: isSaving
+                        ? null
+                        : () async {
+                            setDlgState(() => isSaving = true);
+                            await SupabaseSyncService.clearRuntimeConfig();
+                            await SupabaseSyncService.initialize();
+                            if (ctx.mounted) Navigator.pop(ctx);
+                            if (mounted) {
+                              setState(() {});
+                              ScaffoldMessenger.of(this.context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Configuração runtime do Supabase removida.',
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                    child: const Text(
+                      'Remover',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                  ),
+                TextButton(
+                  onPressed: isSaving ? null : () => Navigator.pop(ctx),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: isSaving
+                      ? null
+                      : () async {
+                          final validationError =
+                              SupabaseSyncService.validateSupabaseCredentials(
+                            urlCtrl.text,
+                            keyCtrl.text,
+                          );
+                          if (validationError != null) {
+                            setDlgState(() => errorText = validationError);
+                            return;
+                          }
+                          setDlgState(() {
+                            isSaving = true;
+                            errorText = null;
+                          });
+                          try {
+                            await SupabaseSyncService.configureAndInitialize(
+                              url: urlCtrl.text,
+                              anonKey: keyCtrl.text,
+                            );
+                            if (ctx.mounted) Navigator.pop(ctx);
+                            if (mounted) {
+                              setState(() {});
+                              ScaffoldMessenger.of(this.context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Supabase inicializado com sucesso em runtime!',
+                                  ),
+                                  backgroundColor: AppTheme.successGreen,
+                                ),
+                              );
+                            }
+                          } catch (e, st) {
+                            AppLogger.warning(
+                              'Falha ao inicializar Supabase em runtime',
+                              e,
+                              st,
+                            );
+                            if (ctx.mounted) {
+                              setDlgState(() {
+                                isSaving = false;
+                                errorText = 'Falha ao inicializar Supabase: $e';
+                              });
+                            }
+                          }
+                        },
+                  child: Text(isSaving ? 'Conectando...' : 'Salvar e Conectar'),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _persistEmailAccountConfig({
+    required AppDatabase db,
+    required String email,
+    required String pass,
+    required String imapHost,
+    required int imapPort,
+    required String smtpHost,
+    required int smtpPort,
+    required String smtpSecurity,
+  }) async {
+    final now = Value(DateTime.now());
+    await db.into(db.appKvStore).insertOnConflictUpdate(
+      AppKvStoreCompanion.insert(key: 'jw_imap_email', value: email, updatedAt: now),
+    );
+    await const FlutterSecureStorage().write(key: 'jw_imap_password', value: pass);
+    await (db.delete(db.appKvStore)..where((t) => t.key.equals('jw_imap_password'))).go();
+    await db.into(db.appKvStore).insertOnConflictUpdate(
+      AppKvStoreCompanion.insert(key: 'jw_imap_host', value: imapHost, updatedAt: now),
+    );
+    await db.into(db.appKvStore).insertOnConflictUpdate(
+      AppKvStoreCompanion.insert(key: 'jw_imap_port', value: imapPort.toString(), updatedAt: now),
+    );
+    await db.into(db.appKvStore).insertOnConflictUpdate(
+      AppKvStoreCompanion.insert(key: 'jw_smtp_host', value: smtpHost, updatedAt: now),
+    );
+    await db.into(db.appKvStore).insertOnConflictUpdate(
+      AppKvStoreCompanion.insert(key: 'jw_smtp_port', value: smtpPort.toString(), updatedAt: now),
+    );
+    await db.into(db.appKvStore).insertOnConflictUpdate(
+      AppKvStoreCompanion.insert(key: 'jw_smtp_security', value: smtpSecurity, updatedAt: now),
+    );
+  }
+
+  Future<void> _testAndSaveJwEmail({bool includeImap = true}) async {
+    final email = _jwEmailCtrl.text.trim();
+    final pass = _jwPasswordCtrl.text;
+    final imapHost = _jwHostCtrl.text.trim().isNotEmpty ? _jwHostCtrl.text.trim() : 'mail.jw.org';
+    final imapPort = int.tryParse(_jwPortCtrl.text.trim()) ?? 993;
+    final smtpHost = _jwSmtpHostCtrl.text.trim().isNotEmpty
+        ? _jwSmtpHostCtrl.text.trim()
+        : imapHost;
+    final defaultSmtpPort = _jwSmtpSecurity == 'ssl' ? 465 : 587;
+    final smtpPort = int.tryParse(_jwSmtpPortCtrl.text.trim()) ?? defaultSmtpPort;
+
+    if (email.isEmpty || pass.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Preencha o e-mail e a senha antes de testar a conexão.')),
+      );
+      return;
+    }
+
+    setState(() => _isTestingJwEmail = true);
+    try {
+      if (includeImap) {
+        const imapClient = JwImapClient();
+        await imapClient.fetchRemoteEmails(
+          host: imapHost,
+          port: imapPort,
+          username: email,
+          password: pass,
+        );
+      }
+
+      const smtpClient = JwSmtpClient();
+      await smtpClient.verifyConnection(
+        host: smtpHost,
+        port: smtpPort,
+        username: email,
+        password: pass,
+        securityMode: _jwSmtpSecurity,
+      );
+
+      final db = ref.read(repositoryProvider).db;
+      await _persistEmailAccountConfig(
+        db: db,
+        email: email,
+        pass: pass,
+        imapHost: imapHost,
+        imapPort: imapPort,
+        smtpHost: smtpHost,
+        smtpPort: smtpPort,
+        smtpSecurity: _jwSmtpSecurity,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              includeImap
+                  ? 'Conexões IMAP e SMTP verificadas com sucesso! Configurações salvas com segurança.'
+                  : 'Conexão SMTP ($smtpHost:$smtpPort) verificada com sucesso! Configurações salvas.',
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Falha na verificação de e-mail: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            duration: const Duration(seconds: 6),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isTestingJwEmail = false);
+    }
   }
 
   Widget _buildJwEmailConfigCard(bool isDark) {
@@ -1926,7 +2105,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Sincronização e Retenção Permanente (IMAP)',
+                    'Sincronização e Envio de E-mail (IMAP / SMTP)',
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                   ),
                 ),
@@ -1934,7 +2113,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Insira suas credenciais teocráticas para sincronizar mensagens e cartas do Hub/JW.org com retenção imune à purga de 90 dias.',
+              'Configure suas credenciais teocráticas para sincronizar cartas via IMAP (retenção permanente) e enviar mensagens reais via SMTP autenticado (STARTTLS/SSL).',
               style: TextStyle(
                 fontSize: 12,
                 color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted,
@@ -1969,7 +2148,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   child: TextField(
                     controller: _jwHostCtrl,
                     decoration: const InputDecoration(
-                      labelText: 'Servidor IMAP',
+                      labelText: 'Servidor IMAP (Entrada)',
                       border: OutlineInputBorder(),
                     ),
                   ),
@@ -1988,110 +2167,112 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryBlue,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                  flex: 3,
+                  child: TextField(
+                    controller: _jwSmtpHostCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Servidor SMTP (Saída)',
+                      border: OutlineInputBorder(),
                     ),
-                    icon: _isTestingJwEmail
-                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                        : const Icon(Icons.save_outlined, size: 18),
-                    label: Text(_isTestingJwEmail ? 'Testando Conexão...' : 'Testar Conexão e Salvar'),
-                    onPressed: _isTestingJwEmail
-                        ? null
-                        : () async {
-                            final email = _jwEmailCtrl.text.trim();
-                            final pass = _jwPasswordCtrl.text;
-                            final host = _jwHostCtrl.text.trim().isNotEmpty ? _jwHostCtrl.text.trim() : 'mail.jw.org';
-                            final port = int.tryParse(_jwPortCtrl.text.trim()) ?? 993;
-
-                            if (email.isEmpty || pass.isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Preencha o e-mail e a senha.')),
-                              );
-                              return;
-                            }
-
-                            setState(() => _isTestingJwEmail = true);
-                            try {
-                              final client = const JwImapClient();
-                              await client.fetchRemoteEmails(
-                                host: host,
-                                port: port,
-                                username: email,
-                                password: pass,
-                              );
-
-                              final db = ref.read(repositoryProvider).db;
-                              await db.into(db.appKvStore).insertOnConflictUpdate(
-                                AppKvStoreCompanion.insert(
-                                  key: 'jw_imap_email',
-                                  value: email,
-                                  updatedAt: Value(DateTime.now()),
-                                ),
-                              );
-
-                              // Salva senha com criptografia forte de hardware no Keychain/KeyStore
-                              await const FlutterSecureStorage().write(
-                                key: 'jw_imap_password',
-                                value: pass,
-                              );
-                              // Garante que o SQLite não retenha a senha em texto puro
-                              await (db.delete(db.appKvStore)..where((t) => t.key.equals('jw_imap_password'))).go();
-
-                              await db.into(db.appKvStore).insertOnConflictUpdate(
-                                AppKvStoreCompanion.insert(
-                                  key: 'jw_imap_host',
-                                  value: host,
-                                  updatedAt: Value(DateTime.now()),
-                                ),
-                              );
-                              await db.into(db.appKvStore).insertOnConflictUpdate(
-                                AppKvStoreCompanion.insert(
-                                  key: 'jw_imap_port',
-                                  value: port.toString(),
-                                  updatedAt: Value(DateTime.now()),
-                                ),
-                              );
-
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Configurações de e-mail JW.org salvas com sucesso!')),
-                                );
-                              }
-                            } catch (e) {
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Erro ao salvar ou testar: $e')),
-                                );
-                              }
-                            } finally {
-                              if (mounted) setState(() => _isTestingJwEmail = false);
-                            }
-                          },
                   ),
                 ),
+                const SizedBox(width: 10),
+                Expanded(
+                  flex: 1,
+                  child: TextField(
+                    controller: _jwSmtpPortCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Porta',
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: TextInputType.number,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                const Text('Segurança SMTP:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                const SizedBox(width: 10),
+                ChoiceChip(
+                  label: const Text('STARTTLS (587)'),
+                  selected: _jwSmtpSecurity == 'starttls',
+                  onSelected: (_) {
+                    setState(() {
+                      _jwSmtpSecurity = 'starttls';
+                      if (_jwSmtpPortCtrl.text.trim() == '465' || _jwSmtpPortCtrl.text.trim().isEmpty) {
+                        _jwSmtpPortCtrl.text = '587';
+                      }
+                    });
+                  },
+                ),
                 const SizedBox(width: 8),
+                ChoiceChip(
+                  label: const Text('SSL/TLS (465)'),
+                  selected: _jwSmtpSecurity == 'ssl',
+                  onSelected: (_) {
+                    setState(() {
+                      _jwSmtpSecurity = 'ssl';
+                      if (_jwSmtpPortCtrl.text.trim() == '587' || _jwSmtpPortCtrl.text.trim().isEmpty) {
+                        _jwSmtpPortCtrl.text = '465';
+                      }
+                    });
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryBlue,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  ),
+                  icon: _isTestingJwEmail
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Icon(Icons.save_outlined, size: 18),
+                  label: Text(_isTestingJwEmail ? 'Testando Conexão...' : 'Testar IMAP/SMTP e Salvar'),
+                  onPressed: _isTestingJwEmail ? null : () => _testAndSaveJwEmail(includeImap: true),
+                ),
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.send_rounded, size: 16),
+                  label: const Text('Testar Só SMTP'),
+                  onPressed: _isTestingJwEmail ? null : () => _testAndSaveJwEmail(includeImap: false),
+                ),
                 OutlinedButton.icon(
                   icon: const Icon(Icons.clear, size: 16),
                   label: const Text('Limpar'),
                   onPressed: () async {
                     final db = ref.read(repositoryProvider).db;
                     await const FlutterSecureStorage().delete(key: 'jw_imap_password');
-                    await (db.delete(db.appKvStore)..where((t) => t.key.equals('jw_imap_email'))).go();
-                    await (db.delete(db.appKvStore)..where((t) => t.key.equals('jw_imap_password'))).go();
-                    await (db.delete(db.appKvStore)..where((t) => t.key.equals('jw_imap_host'))).go();
-                    await (db.delete(db.appKvStore)..where((t) => t.key.equals('jw_imap_port'))).go();
+                    for (final k in const [
+                      'jw_imap_email',
+                      'jw_imap_password',
+                      'jw_imap_host',
+                      'jw_imap_port',
+                      'jw_smtp_host',
+                      'jw_smtp_port',
+                      'jw_smtp_security',
+                    ]) {
+                      await (db.delete(db.appKvStore)..where((t) => t.key.equals(k))).go();
+                    }
                     setState(() {
                       _jwEmailCtrl.clear();
                       _jwPasswordCtrl.clear();
                       _jwHostCtrl.text = 'mail.jw.org';
                       _jwPortCtrl.text = '993';
+                      _jwSmtpHostCtrl.text = 'mail.jw.org';
+                      _jwSmtpPortCtrl.text = '587';
+                      _jwSmtpSecurity = 'starttls';
                     });
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -2107,5 +2288,972 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
     );
   }
+}
 
+class _ChangePinDialog extends StatefulWidget {
+  final BiometricAuthService biometricAuth;
+
+  const _ChangePinDialog({required this.biometricAuth});
+
+  @override
+  State<_ChangePinDialog> createState() => _ChangePinDialogState();
+}
+
+class _ChangePinDialogState extends State<_ChangePinDialog> {
+  final TextEditingController _currentCtrl = TextEditingController();
+  final TextEditingController _newCtrl = TextEditingController();
+  final TextEditingController _confirmCtrl = TextEditingController();
+  String? _error;
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _currentCtrl.dispose();
+    _newCtrl.dispose();
+    _confirmCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final current = _currentCtrl.text.trim();
+    final next = _newCtrl.text.trim();
+    final confirm = _confirmCtrl.text.trim();
+    if (next.length < 4 || next.length > 8) {
+      setState(() => _error = 'O novo PIN deve ter entre 4 e 8 dígitos.');
+      return;
+    }
+    if (next != confirm) {
+      setState(() => _error = 'Os novos PINs não coincidem.');
+      return;
+    }
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      final ok = await widget.biometricAuth.changePin(
+        currentPin: current,
+        newPin: next,
+      );
+      if (!mounted) return;
+      if (ok) {
+        Navigator.pop(context, true);
+      } else {
+        setState(() {
+          _error = 'PIN atual incorreto.';
+          _saving = false;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = '$e';
+        _saving = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Alterar PIN de Segurança'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _currentCtrl,
+            obscureText: true,
+            keyboardType: TextInputType.number,
+            maxLength: 8,
+            decoration: const InputDecoration(
+              labelText: 'PIN Atual',
+              counterText: '',
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _newCtrl,
+            obscureText: true,
+            keyboardType: TextInputType.number,
+            maxLength: 8,
+            decoration: const InputDecoration(
+              labelText: 'Novo PIN (4 a 8 dígitos)',
+              counterText: '',
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _confirmCtrl,
+            obscureText: true,
+            keyboardType: TextInputType.number,
+            maxLength: 8,
+            decoration: const InputDecoration(
+              labelText: 'Confirmar Novo PIN',
+              counterText: '',
+            ),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              _error!,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.error,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.pop(context, false),
+          child: const Text('Cancelar'),
+        ),
+        ElevatedButton(
+          onPressed: _saving ? null : _submit,
+          child: _saving
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Salvar Novo PIN'),
+        ),
+      ],
+    );
+  }
+}
+
+class SyncQueueManagementSheet extends ConsumerStatefulWidget {
+  const SyncQueueManagementSheet({super.key});
+
+  @override
+  ConsumerState<SyncQueueManagementSheet> createState() =>
+      _SyncQueueManagementSheetState();
+}
+
+class _SyncQueueManagementSheetState
+    extends ConsumerState<SyncQueueManagementSheet> {
+  List<SyncQueueEntry> _items = const [];
+  String _filter = 'all';
+  bool _loading = true;
+  bool _busy = false;
+  String? _statusMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadQueue();
+  }
+
+  Future<void> _loadQueue() async {
+    if (!mounted) return;
+    setState(() => _loading = true);
+    try {
+      final list =
+          await ref.read(repositoryProvider).getUnresolvedSyncOperations();
+      if (!mounted) return;
+      setState(() {
+        _items = list;
+        _loading = false;
+      });
+    } catch (e, st) {
+      AppLogger.error('Erro ao carregar fila de sincronização', e, st);
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _statusMessage = 'Erro ao carregar fila: $e';
+      });
+    }
+  }
+
+  Future<void> _retryOne(SyncQueueEntry op) async {
+    setState(() => _busy = true);
+    try {
+      final repo = ref.read(repositoryProvider);
+      await repo.retrySyncOperation(op.id);
+      if (SupabaseSyncService.isInitialized) {
+        final res = await ref.read(supabaseSyncServiceProvider).sync();
+        _statusMessage = res.message;
+      } else {
+        _statusMessage = 'Operação marcada como pendente para reenvio.';
+      }
+      await _loadQueue();
+    } catch (e, st) {
+      AppLogger.error('Erro ao reprocessar operação ${op.id}', e, st);
+      if (mounted) {
+        setState(() => _statusMessage = 'Falha ao reprocessar: $e');
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _retryAllFailed() async {
+    setState(() => _busy = true);
+    try {
+      final repo = ref.read(repositoryProvider);
+      final count = await repo.retryAllFailedOperations();
+      if (SupabaseSyncService.isInitialized) {
+        final res = await ref.read(supabaseSyncServiceProvider).sync();
+        _statusMessage = '$count reativada(s). ${res.message}';
+      } else {
+        _statusMessage = '$count operação(ões) marcada(s) como pendente(s).';
+      }
+      await _loadQueue();
+    } catch (e, st) {
+      AppLogger.error('Erro ao reprocessar falhas em lote', e, st);
+      if (mounted) {
+        setState(() => _statusMessage = 'Falha ao reprocessar: $e');
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _resolveKeepLocal(SyncQueueEntry op) async {
+    setState(() => _busy = true);
+    try {
+      await ref.read(repositoryProvider).resolveSyncConflictKeepLocal(op.id);
+      if (SupabaseSyncService.isInitialized) {
+        final res = await ref.read(supabaseSyncServiceProvider).sync();
+        _statusMessage = 'Versão local mantida. ${res.message}';
+      } else {
+        _statusMessage = 'Versão local selecionada e enfileirada para envio.';
+      }
+      await _loadQueue();
+    } catch (e, st) {
+      AppLogger.error('Erro ao resolver conflito mantendo local ${op.id}', e, st);
+      if (mounted) {
+        setState(() => _statusMessage = 'Erro ao resolver conflito: $e');
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _resolveAcceptRemote(SyncQueueEntry op) async {
+    setState(() => _busy = true);
+    try {
+      final ok = await ref
+          .read(supabaseSyncServiceProvider)
+          .resolveConflictAcceptRemote(op.id);
+      _statusMessage = ok
+          ? 'Versão remota aplicada localmente com sucesso.'
+          : 'Não foi possível obter os dados remotos deste registro.';
+      await _loadQueue();
+    } catch (e, st) {
+      AppLogger.error('Erro ao aceitar versão remota ${op.id}', e, st);
+      if (mounted) {
+        setState(() => _statusMessage = 'Erro ao aplicar versão remota: $e');
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  List<Map<String, String>> _extractConflictFields(SyncQueueEntry op) {
+    final diffs = <Map<String, String>>[];
+    try {
+      final raw = jsonDecode(op.payload);
+      if (raw is! Map<String, dynamic>) return diffs;
+      final explicit = raw['_conflicts'];
+      if (explicit is List) {
+        for (final item in explicit) {
+          if (item is Map) {
+            diffs.add({
+              'field': '${item['fieldName'] ?? item['field'] ?? 'campo'}',
+              'local': '${item['local'] ?? item['localValue'] ?? ''}',
+              'remote': '${item['remote'] ?? item['remoteValue'] ?? ''}',
+            });
+          }
+        }
+      }
+      if (diffs.isEmpty && raw['_remote'] is Map) {
+        final remote = Map<String, dynamic>.from(raw['_remote'] as Map);
+        const ignored = {'_remote', '_conflicts', '_base', 'id', 'user_id', 'userId'};
+        for (final key in remote.keys) {
+          if (ignored.contains(key)) continue;
+          final rVal = remote[key]?.toString() ?? '';
+          final lVal = (raw[key] ?? '')?.toString() ?? '';
+          if (lVal != rVal) {
+            diffs.add({'field': key, 'local': lVal, 'remote': rVal});
+          }
+        }
+      }
+    } catch (e, st) {
+      AppLogger.warning('Falha ao extrair diff de conflito de ${op.id}', e, st);
+    }
+    return diffs;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pendingCount = _items.where((i) => i.status == 'pending' || i.status == 'in_progress').length;
+    final failedCount = _items.where((i) => i.status == 'failed').length;
+    final conflictCount = _items.where((i) => i.status == 'conflict').length;
+    final filtered = _items.where((i) {
+      if (_filter == 'all') return true;
+      if (_filter == 'pending') return i.status == 'pending' || i.status == 'in_progress';
+      return i.status == _filter;
+    }).toList();
+
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.78,
+      minChildSize: 0.45,
+      maxChildSize: 0.95,
+      builder: (context, scrollController) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade400,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Fila de Sincronização (Sync Queue)',
+                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.refresh),
+                    tooltip: 'Atualizar',
+                    onPressed: _busy ? null : _loadQueue,
+                  ),
+                ],
+              ),
+              if (_statusMessage != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  _statusMessage!,
+                  style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+                ),
+              ],
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  ChoiceChip(
+                    label: Text('Todos (${_items.length})'),
+                    selected: _filter == 'all',
+                    onSelected: (_) => setState(() => _filter = 'all'),
+                  ),
+                  ChoiceChip(
+                    label: Text('Pendentes ($pendingCount)'),
+                    selected: _filter == 'pending',
+                    onSelected: (_) => setState(() => _filter = 'pending'),
+                  ),
+                  ChoiceChip(
+                    label: Text('Falhas ($failedCount)'),
+                    selected: _filter == 'failed',
+                    onSelected: (_) => setState(() => _filter = 'failed'),
+                  ),
+                  ChoiceChip(
+                    label: Text('Conflitos ($conflictCount)'),
+                    selected: _filter == 'conflict',
+                    onSelected: (_) => setState(() => _filter = 'conflict'),
+                  ),
+                ],
+              ),
+              if (failedCount > 0 || SupabaseSyncService.isInitialized) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    if (failedCount > 0)
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.alertAmber,
+                          foregroundColor: Colors.black87,
+                        ),
+                        onPressed: _busy ? null : _retryAllFailed,
+                        icon: const Icon(Icons.replay, size: 16),
+                        label: Text('Reprocessar $failedCount Falha(s)'),
+                      ),
+                    if (SupabaseSyncService.isInitialized && _items.isNotEmpty)
+                      OutlinedButton.icon(
+                        onPressed: _busy
+                            ? null
+                            : () async {
+                                setState(() => _busy = true);
+                                try {
+                                  final res = await ref
+                                      .read(supabaseSyncServiceProvider)
+                                      .sync();
+                                  _statusMessage = res.message;
+                                  await _loadQueue();
+                                } finally {
+                                  if (mounted) setState(() => _busy = false);
+                                }
+                              },
+                        icon: const Icon(Icons.sync, size: 16),
+                        label: const Text('Sincronizar Agora'),
+                      ),
+                  ],
+                ),
+              ],
+              const Divider(height: 16),
+              Expanded(
+                child: _loading
+                    ? const Center(child: CircularProgressIndicator())
+                    : filtered.isEmpty
+                        ? const Center(
+                            child: Text(
+                              'Nenhum item pendente, com falha ou conflito neste filtro.',
+                              textAlign: TextAlign.center,
+                            ),
+                          )
+                        : ListView.builder(
+                            controller: scrollController,
+                            itemCount: filtered.length,
+                            itemBuilder: (context, index) {
+                              final op = filtered[index];
+                              final isConflict = op.status == 'conflict';
+                              final isFailed = op.status == 'failed';
+                              final badgeColor = isConflict
+                                  ? AppTheme.alertAmber
+                                  : isFailed
+                                      ? AppTheme.alertRed
+                                      : AppTheme.primaryBlue;
+                              final badgeLabel = isConflict
+                                  ? 'CONFLITO'
+                                  : isFailed
+                                      ? 'FALHA'
+                                      : 'PENDENTE';
+                              final diffs = isConflict
+                                  ? _extractConflictFields(op)
+                                  : const <Map<String, String>>[];
+
+                              return Card(
+                                margin: const EdgeInsets.only(bottom: 10),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 3,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: badgeColor.withValues(alpha: 0.16),
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: Text(
+                                              badgeLabel,
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold,
+                                                color: isConflict
+                                                    ? Colors.orange.shade900
+                                                    : badgeColor,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              '${op.entityType} • ${op.operation}',
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 13,
+                                              ),
+                                            ),
+                                          ),
+                                          Text(
+                                            'Tentativas: ${op.attempts}',
+                                            style: const TextStyle(fontSize: 11),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'ID: ${op.entityId}',
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                      if (op.lastError != null &&
+                                          op.lastError!.trim().isNotEmpty) ...[
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          op.lastError!,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: isConflict
+                                                ? Colors.orange.shade900
+                                                : AppTheme.alertRed,
+                                          ),
+                                        ),
+                                      ],
+                                      if (diffs.isNotEmpty) ...[
+                                        const SizedBox(height: 8),
+                                        Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: Colors.amber.withValues(alpha: 0.1),
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              const Text(
+                                                'Campos divergentes:',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              for (final d in diffs.take(6))
+                                                Padding(
+                                                  padding: const EdgeInsets.only(
+                                                    bottom: 2,
+                                                  ),
+                                                  child: Text(
+                                                    '• ${d['field']}: Local="${d['local']}" vs Remoto="${d['remote']}"',
+                                                    style: const TextStyle(
+                                                      fontSize: 11,
+                                                    ),
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                      const SizedBox(height: 8),
+                                      Wrap(
+                                        spacing: 8,
+                                        runSpacing: 6,
+                                        children: [
+                                          if (isConflict) ...[
+                                            ElevatedButton.icon(
+                                              onPressed: _busy
+                                                  ? null
+                                                  : () => _resolveKeepLocal(op),
+                                              icon: const Icon(
+                                                Icons.upload,
+                                                size: 16,
+                                              ),
+                                              label: const Text('Manter Local'),
+                                            ),
+                                            OutlinedButton.icon(
+                                              onPressed: _busy
+                                                  ? null
+                                                  : () => _resolveAcceptRemote(op),
+                                              icon: const Icon(
+                                                Icons.download,
+                                                size: 16,
+                                              ),
+                                              label: const Text('Aceitar Remoto'),
+                                            ),
+                                          ] else
+                                            OutlinedButton.icon(
+                                              onPressed: _busy
+                                                  ? null
+                                                  : () => _retryOne(op),
+                                              icon: const Icon(
+                                                Icons.refresh,
+                                                size: 16,
+                                              ),
+                                              label: Text(
+                                                isFailed
+                                                    ? 'Reprocessar'
+                                                    : 'Tentar Enviar Agora',
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ExportBackupDialog extends StatefulWidget {
+  final BackupService backupService;
+  final VoidCallback onExported;
+
+  const _ExportBackupDialog({
+    required this.backupService,
+    required this.onExported,
+  });
+
+  @override
+  State<_ExportBackupDialog> createState() => _ExportBackupDialogState();
+}
+
+class _ExportBackupDialogState extends State<_ExportBackupDialog> {
+  final TextEditingController _passwordController = TextEditingController();
+  bool _exporting = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _export() async {
+    final password = _passwordController.text.trim();
+    if (password.length < 6) {
+      setState(() => _error = 'A senha deve conter ao menos 6 caracteres.');
+      return;
+    }
+
+    setState(() {
+      _exporting = true;
+      _error = null;
+    });
+
+    try {
+      final encryptedData = await widget.backupService.exportEncryptedBackup(
+        password,
+      );
+      widget.onExported();
+      if (!mounted) return;
+      final messenger = ScaffoldMessenger.of(context);
+      Navigator.pop(context);
+
+      showDialog<void>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: const Text('Backup Gerado com Sucesso!'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Copie o texto criptografado abaixo e salve-o com segurança no aplicativo Arquivos, iCloud Drive ou em seu computador:',
+                style: TextStyle(fontSize: 13),
+              ),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                constraints: const BoxConstraints(maxHeight: 120),
+                child: SingleChildScrollView(
+                  child: SelectableText(
+                    encryptedData,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            ElevatedButton.icon(
+              icon: const Icon(Icons.copy, size: 16),
+              label: const Text('Copiar Código do Backup'),
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: encryptedData));
+                Navigator.pop(c);
+                messenger.showSnackBar(
+                  const SnackBar(
+                    content: Text('Backup copiado para a área de transferência!'),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      );
+    } catch (e, st) {
+      AppLogger.error('Erro ao exportar backup criptografado', e, st);
+      if (mounted) {
+        setState(() {
+          _exporting = false;
+          _error = 'Erro ao exportar backup: $e';
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDarkDialog = Theme.of(context).brightness == Brightness.dark;
+    return AlertDialog(
+      title: const Text('Exportar Backup Criptografado'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Defina uma senha forte. O arquivo será criptografado com AES-256-GCM (PBKDF2 100k) e só poderá ser restaurado com esta senha.',
+            style: TextStyle(
+              fontSize: 13,
+              color: isDarkDialog ? const Color(0xFFCBD5E1) : AppTheme.textMuted,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _passwordController,
+            decoration: const InputDecoration(
+              labelText: 'Senha de Criptografia',
+              hintText: 'Mínimo 6 caracteres',
+            ),
+            obscureText: true,
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              _error!,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.error,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: _exporting ? null : () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
+        ElevatedButton(
+          onPressed: _exporting ? null : _export,
+          child: _exporting
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Exportar'),
+        ),
+      ],
+    );
+  }
+}
+
+class _RestoreBackupDialog extends StatefulWidget {
+  final BackupService backupService;
+
+  const _RestoreBackupDialog({required this.backupService});
+
+  @override
+  State<_RestoreBackupDialog> createState() => _RestoreBackupDialogState();
+}
+
+class _RestoreBackupDialogState extends State<_RestoreBackupDialog> {
+  final TextEditingController _dataController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  bool _allowLegacyV1 = false;
+  bool _showLegacyOption = false;
+  bool _busy = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _dataController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _analyze() async {
+    final raw = _dataController.text.trim();
+    final pwd = _passwordController.text.trim();
+    if (raw.isEmpty || pwd.isEmpty) {
+      setState(() => _error = 'Preencha os dados do backup e a senha.');
+      return;
+    }
+
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+
+    try {
+      final preview = await widget.backupService.previewBackup(
+        encryptedDataString: raw,
+        password: pwd,
+        allowLegacyV1: _allowLegacyV1,
+      );
+
+      if (!mounted) return;
+      final messenger = ScaffoldMessenger.of(context);
+      Navigator.pop(context);
+
+      showDialog<void>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: const Text('Pré-visualização da Restauração'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Registros verificados com integridade SHA-256:'),
+                const SizedBox(height: 8),
+                Text('• Novos contatos: ${preview.peopleToAdd}'),
+                Text('• Contatos a atualizar: ${preview.peopleToUpdate}'),
+                Text('• Contatos inalterados: ${preview.peopleUnchanged}'),
+                Text('• Visitas a importar: ${preview.visitsToAdd}'),
+                Text('• Estudos bíblicos: ${preview.studiesToAdd}'),
+                Text('• Sessões de estudo: ${preview.sessionsToAdd}'),
+                Text('• Compromissos: ${preview.appointmentsToAdd}'),
+                Text('• Idiomas / Ticuna: ${preview.appLanguagesToAdd + preview.ticunaWordsToAdd + preview.ticunaPhrasesToAdd}'),
+                Text('• Documentos de conhecimento: ${preview.knowledgeDocumentsToAdd}'),
+                if (!preview.isIntegral) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Atenção: ${preview.corruptedAudioIds.length} áudio(s) e ${preview.corruptedDocumentIds.length} documento(s) falharam na verificação SHA-256 e não serão restaurados.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(c).colorScheme.error,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 10),
+                const Text(
+                  'A restauração é idempotente e NÃO criará contatos ou estudos duplicados.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.successGreen,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(c),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                await widget.backupService.commitRestore(preview);
+                if (c.mounted) Navigator.pop(c);
+                messenger.showSnackBar(
+                  const SnackBar(
+                    content: Text('Restauração concluída com sucesso!'),
+                  ),
+                );
+              },
+              child: const Text('Confirmar Restauração'),
+            ),
+          ],
+        ),
+      );
+    } on LegacyBackupNotAllowedException catch (e) {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _showLegacyOption = true;
+          _error = e.message;
+        });
+      }
+    } catch (e, st) {
+      AppLogger.warning('Erro na validação do backup', e, st);
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _error = 'Erro na validação do backup: $e';
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Restaurar Backup Criptografado'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _dataController,
+              decoration: const InputDecoration(
+                labelText: 'Cole o código criptografado do backup',
+                hintText: '{"iv":"...","ciphertext":"..."}',
+              ),
+              maxLines: 3,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _passwordController,
+              decoration: const InputDecoration(
+                labelText: 'Senha utilizada na exportação',
+              ),
+              obscureText: true,
+            ),
+            if (_showLegacyOption || _allowLegacyV1) ...[
+              const SizedBox(height: 8),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                value: _allowLegacyV1,
+                onChanged: (val) => setState(() => _allowLegacyV1 = val ?? false),
+                title: const Text(
+                  'Permitir backup legado (v1, criptografia antiga sem salt)',
+                  style: TextStyle(fontSize: 12),
+                ),
+              ),
+            ],
+            if (_error != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                _error!,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.error,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _busy ? null : () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
+        ElevatedButton(
+          onPressed: _busy ? null : _analyze,
+          child: _busy
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Analisar Backup'),
+        ),
+      ],
+    );
+  }
 }

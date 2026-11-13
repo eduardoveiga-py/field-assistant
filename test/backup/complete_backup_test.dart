@@ -170,7 +170,7 @@ void main() {
               id: 'photo_1',
               personId: person.id,
               photoType: 'person',
-              imageData: 'data:image/jpeg;base64,/9j/4AAQSkZJRg==',
+              imageData: const drift.Value('data:image/jpeg;base64,/9j/4AAQSkZJRg=='),
               createdAt: now,
               revision: const drift.Value(1),
             ),

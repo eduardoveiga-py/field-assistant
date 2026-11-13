@@ -3,7 +3,7 @@
 # 📖 Ministério Pessoal
 ### *Gestão Eficiente, Discreta e Offline-First do Ministério de Campo*
 
-[![Versão](https://img.shields.io/badge/Versão-1.3.2%20(Build%209)-blue?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/eduardoveiga-py/field-assistant/releases/latest)
+[![Versão](https://img.shields.io/badge/Versão-1.3.3%20(Build%2010)-blue?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/eduardoveiga-py/field-assistant/releases/latest)
 [![Flutter](https://img.shields.io/badge/Flutter-3.27+-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-3.5+-0175C2?style=for-the-badge&logo=dart&logoColor=white)](https://dart.dev)
 [![Offline First](https://img.shields.io/badge/Arquitetura-Offline--First-success?style=for-the-badge&logo=sqlite&logoColor=white)](https://drift.simonbinder.eu/)
@@ -330,6 +330,14 @@ flowchart LR
 ---
 
 ## 📋 Histórico de Lançamentos e Changelog
+
+### 🚀 Versão 1.3.3 (Build 10) — 11/11/2026: Operação Integral Sem Stubs, Endurecimento Supabase e Secrets Embutidos no CI
+- **Configuração Supabase & OAuth Embutida nos Binários**:
+  - `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `GOOGLE_WEB_CLIENT_ID` e `GOOGLE_IOS_CLIENT_ID` injetados automaticamente nos 6 alvos de build do GitHub Actions (`Web`, `Android APK`, `iOS IPA`, `Windows`, `Linux` e `macOS`) via `--dart-define`, sem credenciais hardcoded no código-fonte.
+- **Alinhamento Completo do Banco Supabase e Segurança**:
+  - Schema remoto e migrações locais alinhados para todas as 26 tabelas sincronizadas + `sync_queue`, criação e políticas RLS do bucket privado `ticuna_audio`, proteção otimista em `sync_upsert`, índices de chave estrangeira e RLS otimizado com `(select auth.uid())`.
+- **Funcionalidades Reais e Segurança Local**:
+  - E-mail IMAP/SMTP operacional (`JwEmailService`), armazenamento offline de mapas `.mbtiles` (`MbtilesService`), geolocalização real (`geolocator`) sem coordenadas ou seeds fictícios, PIN obrigatório na ausência de biometria, verificação SHA-256 fail-closed para atualizações Android, sincronização completa das 7 tabelas estratégicas com tela de resolução de conflitos e backup/restauração cifrados integrais.
 
 ### 🚀 Versão 1.3.2 (Build 9) — 10/11/2026: Suporte Nativo Completo para Desktop (Windows, Linux e macOS)
 - **Compilação Nativa Desktop e Distribuição Universal**:

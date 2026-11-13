@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:drift/native.dart';
 import 'package:ministerio_pessoal/database/app_database.dart';
@@ -765,15 +768,20 @@ void main() {
     late AppDatabase db;
     late AppRepository repo;
     late BackupService backupService;
+    late Directory docsDir;
 
-    setUp(() {
+    setUp(() async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      FlutterSecureStorage.setMockInitialValues({});
+      docsDir = await Directory.systemTemp.createTemp('silent_backup_test_');
       db = AppDatabase.forTesting(NativeDatabase.memory());
       repo = AppRepository(db);
-      backupService = BackupService(repo);
+      backupService = BackupService(repo, documentsDirectoryProvider: () async => docsDir);
     });
 
     tearDown(() async {
       await db.close();
+      await docsDir.delete(recursive: true);
     });
 
     test('performSilentBackupIfNeeded executa backup inicial e respeita intervalo de 24h', () async {

@@ -4,15 +4,25 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:crypto/crypto.dart';
 import 'package:encrypt/encrypt.dart' as enc;
-import 'package:drift/drift.dart' show Value;
+import 'package:drift/drift.dart' show Value, Variable;
 import 'package:uuid/uuid.dart';
 
+import '../core/app_logger.dart';
 import '../core/sync_timestamp.dart';
 import '../database/app_database.dart';
 import '../database/repository.dart';
+
+/// Lançado quando um backup legado (v1 sem salt PBKDF2) é submetido sem confirmação explícita.
+class LegacyBackupNotAllowedException extends FormatException {
+  const LegacyBackupNotAllowedException([
+    super.message =
+        'Backup no formato legado (v1, SHA-256 sem salt). Confirme explicitamente para importar e re-exporte na v2.',
+  ]);
+}
 
 /// Lançado quando a criação do snapshot de segurança falha antes da restauração.
 /// A restauração NÃO prossegue quando este erro é lançado.
@@ -76,11 +86,19 @@ class RestorePreview {
   final int sectorsToAdd;
   final int calendarEventsToAdd;
   final int calendarLinksToAdd;
+  final int appLanguagesToAdd;
+  final int ticunaWordsToAdd;
+  final int ticunaPhrasesToAdd;
+  final int ticunaTagsToAdd;
+  final int knowledgeNotesToAdd;
+  final int knowledgeDocumentsToAdd;
   final List<String> inventoryTables;
   final List<String> corruptedAudioIds;
+  final List<String> corruptedDocumentIds;
   final Map<String, dynamic> rawDecryptedData;
 
-  bool get isIntegral => corruptedAudioIds.isEmpty;
+  bool get isIntegral =>
+      corruptedAudioIds.isEmpty && corruptedDocumentIds.isEmpty;
 
   RestorePreview({
     required this.peopleToAdd,
@@ -104,8 +122,15 @@ class RestorePreview {
     this.sectorsToAdd = 0,
     this.calendarEventsToAdd = 0,
     this.calendarLinksToAdd = 0,
+    this.appLanguagesToAdd = 0,
+    this.ticunaWordsToAdd = 0,
+    this.ticunaPhrasesToAdd = 0,
+    this.ticunaTagsToAdd = 0,
+    this.knowledgeNotesToAdd = 0,
+    this.knowledgeDocumentsToAdd = 0,
     this.inventoryTables = const [],
     this.corruptedAudioIds = const [],
+    this.corruptedDocumentIds = const [],
     required this.rawDecryptedData,
   });
 }
@@ -113,12 +138,93 @@ class RestorePreview {
 class BackupService {
   final AppRepository repository;
   final Future<Directory> Function()? documentsDirectoryProvider;
+  final FlutterSecureStorage? secureStorage;
   final Uuid _uuid = const Uuid();
   String? _lastPreRestoreSafetyBackup;
 
   String? get lastPreRestoreSafetyBackup => _lastPreRestoreSafetyBackup;
 
-  BackupService(this.repository, {this.documentsDirectoryProvider});
+  FlutterSecureStorage get _storage =>
+      secureStorage ?? const FlutterSecureStorage();
+
+  BackupService(
+    this.repository, {
+    this.documentsDirectoryProvider,
+    this.secureStorage,
+  });
+
+  Future<bool> _tableExists(String tableName) async {
+    try {
+      final rows = await repository.db.customSelect(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+        variables: [Variable.withString(tableName)],
+      ).get();
+      return rows.isNotEmpty;
+    } catch (e, st) {
+      AppLogger.warning(
+        'Erro ao verificar existência da tabela $tableName no backup',
+        e,
+        st,
+      );
+      return false;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _readRawTableRows(String tableName) async {
+    if (!await _tableExists(tableName)) return const [];
+    final rows = await repository.db.customSelect('SELECT * FROM $tableName').get();
+    return rows.map((r) => Map<String, dynamic>.from(r.data)).toList();
+  }
+
+  Future<void> _ensureTicunaTables() async {
+    final db = repository.db;
+    await db.customStatement('''
+      CREATE TABLE IF NOT EXISTS ticuna_words (
+        id TEXT PRIMARY KEY,
+        word TEXT NOT NULL,
+        translation TEXT NOT NULL,
+        phonetics TEXT,
+        grammatical_class TEXT,
+        example_sentence TEXT,
+        example_translation TEXT,
+        notes TEXT,
+        tags TEXT NOT NULL DEFAULT '[]',
+        is_favorite INTEGER NOT NULL DEFAULT 0,
+        review_level INTEGER NOT NULL DEFAULT 0,
+        review_count INTEGER NOT NULL DEFAULT 0,
+        last_reviewed_at TEXT,
+        audio_path TEXT,
+        audio_duration_seconds INTEGER,
+        language_id TEXT DEFAULT 'tca',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+    ''');
+    await db.customStatement('''
+      CREATE TABLE IF NOT EXISTS ticuna_phrases (
+        id TEXT PRIMARY KEY,
+        phrase TEXT NOT NULL,
+        translation TEXT NOT NULL,
+        category TEXT,
+        phonetics TEXT,
+        notes TEXT,
+        tags TEXT NOT NULL DEFAULT '[]',
+        is_favorite INTEGER NOT NULL DEFAULT 0,
+        audio_path TEXT,
+        audio_duration_seconds INTEGER,
+        language_id TEXT DEFAULT 'tca',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+    ''');
+    await db.customStatement('''
+      CREATE TABLE IF NOT EXISTS ticuna_tags (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE,
+        created_at TEXT NOT NULL
+      );
+    ''');
+  }
 
   Future<Directory> _getDocsDir() async {
     try {
@@ -265,6 +371,10 @@ class BackupService {
     final knowledgeQuestions = await db.select(db.knowledgeQuestions).get();
     final knowledgeDocuments = await db.select(db.knowledgeDocuments).get();
     final knowledgeResources = await db.select(db.knowledgeResources).get();
+    final appLanguages = await db.select(db.appLanguages).get();
+    final ticunaWords = await _readRawTableRows('ticuna_words');
+    final ticunaPhrases = await _readRawTableRows('ticuna_phrases');
+    final ticunaTags = await _readRawTableRows('ticuna_tags');
     final kvStore = await (db.select(
       db.appKvStore,
     )..where((t) => t.key.isNotValue(_silentBackupKeySecret))).get();
@@ -272,6 +382,10 @@ class BackupService {
     // Saneamento e portabilidade multimídia: serializa arquivos físicos de áudio em base64 e gera hashes SHA-256
     final Map<String, String> voiceNoteAudios = {};
     final Map<String, String> voiceNoteAudioHashes = {};
+    final Map<String, String> ticunaAudios = {};
+    final Map<String, String> ticunaAudioHashes = {};
+    final Map<String, String> knowledgeDocumentFiles = {};
+    final Map<String, String> knowledgeDocumentHashes = {};
     if (!kIsWeb) {
       for (final vn in voiceNotes) {
         if (vn.audioFilePath != null && vn.audioFilePath!.isNotEmpty) {
@@ -282,7 +396,80 @@ class BackupService {
               voiceNoteAudios[vn.id] = base64Encode(bytes);
               voiceNoteAudioHashes[vn.id] = sha256.convert(bytes).toString();
             }
-          } catch (_) {}
+          } catch (e, st) {
+            AppLogger.warning(
+              'Falha ao serializar áudio da nota de voz ${vn.id} para backup',
+              e,
+              st,
+            );
+          }
+        }
+      }
+
+      for (final w in ticunaWords) {
+        final audioPath = w['audio_path']?.toString();
+        final id = w['id']?.toString();
+        if (id != null && audioPath != null && audioPath.isNotEmpty) {
+          try {
+            final f = File(audioPath);
+            if (await f.exists()) {
+              final bytes = await f.readAsBytes();
+              final key = 'word_$id';
+              ticunaAudios[key] = base64Encode(bytes);
+              ticunaAudioHashes[key] = sha256.convert(bytes).toString();
+            }
+          } catch (e, st) {
+            AppLogger.warning(
+              'Falha ao serializar áudio Ticuna palavra $id para backup',
+              e,
+              st,
+            );
+          }
+        }
+      }
+
+      for (final pRow in ticunaPhrases) {
+        final audioPath = pRow['audio_path']?.toString();
+        final id = pRow['id']?.toString();
+        if (id != null && audioPath != null && audioPath.isNotEmpty) {
+          try {
+            final f = File(audioPath);
+            if (await f.exists()) {
+              final bytes = await f.readAsBytes();
+              final key = 'phrase_$id';
+              ticunaAudios[key] = base64Encode(bytes);
+              ticunaAudioHashes[key] = sha256.convert(bytes).toString();
+            }
+          } catch (e, st) {
+            AppLogger.warning(
+              'Falha ao serializar áudio Ticuna frase $id para backup',
+              e,
+              st,
+            );
+          }
+        }
+      }
+
+      for (final doc in knowledgeDocuments) {
+        if (doc.filePath.isNotEmpty) {
+          try {
+            var f = File(doc.filePath);
+            if (!await f.exists() && !f.isAbsolute) {
+              final docs = await _getDocsDir();
+              f = File('${docs.path}/${doc.filePath}');
+            }
+            if (await f.exists()) {
+              final bytes = await f.readAsBytes();
+              knowledgeDocumentFiles[doc.id] = base64Encode(bytes);
+              knowledgeDocumentHashes[doc.id] = sha256.convert(bytes).toString();
+            }
+          } catch (e, st) {
+            AppLogger.warning(
+              'Falha ao serializar binário de documento ${doc.id} para backup',
+              e,
+              st,
+            );
+          }
         }
       }
     }
@@ -292,25 +479,43 @@ class BackupService {
     final List<Map<String, dynamic>> exportedPhotos = [];
     for (final p in photos) {
       final photoMap = p.toJson();
+      final sourcePath = (p.filePath != null && p.filePath!.isNotEmpty)
+          ? p.filePath!
+          : p.imageData;
       if (!kIsWeb &&
-          p.imageData.isNotEmpty &&
-          !p.imageData.startsWith('data:image') &&
-          !p.imageData.startsWith('data:video') &&
-          !p.imageData.startsWith('http://') &&
-          !p.imageData.startsWith('https://')) {
+          sourcePath.isNotEmpty &&
+          !sourcePath.startsWith('data:image') &&
+          !sourcePath.startsWith('data:video') &&
+          !sourcePath.startsWith('http://') &&
+          !sourcePath.startsWith('https://')) {
         try {
-          final f = File(p.imageData);
+          final f = File(sourcePath);
           if (await f.exists()) {
             final bytes = await f.readAsBytes();
-            photoMap['imageData'] = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+            final ext = sourcePath.toLowerCase();
+            final mime = ext.endsWith('.png')
+                ? 'image/png'
+                : ext.endsWith('.webp')
+                    ? 'image/webp'
+                    : ext.endsWith('.gif')
+                        ? 'image/gif'
+                        : 'image/jpeg';
+            photoMap['imageData'] = 'data:$mime;base64,${base64Encode(bytes)}';
+            photoMap['filePath'] = null;
           }
-        } catch (_) {}
+        } catch (e, st) {
+          AppLogger.warning(
+            'Falha ao serializar arquivo de foto ${p.id} para backup',
+            e,
+            st,
+          );
+        }
       }
       exportedPhotos.add(photoMap);
     }
 
     final payload = {
-      'exported_tables_count': 29,
+      'exported_tables_count': 33,
       'exported_tables': [
         'people',
         'visits',
@@ -340,6 +545,10 @@ class BackupService {
         'knowledgeQuestions',
         'knowledgeDocuments',
         'knowledgeResources',
+        'appLanguages',
+        'ticunaWords',
+        'ticunaPhrases',
+        'ticunaTags',
         'appKvStore',
       ],
       'people': people.map((p) => p.toJson()).toList(),
@@ -371,7 +580,15 @@ class BackupService {
       'knowledgeNotes': knowledgeNotes.map((n) => n.toJson()).toList(),
       'knowledgeQuestions': knowledgeQuestions.map((q) => q.toJson()).toList(),
       'knowledgeDocuments': knowledgeDocuments.map((d) => d.toJson()).toList(),
+      'knowledgeDocumentFiles': knowledgeDocumentFiles,
+      'knowledgeDocumentHashes': knowledgeDocumentHashes,
       'knowledgeResources': knowledgeResources.map((r) => r.toJson()).toList(),
+      'appLanguages': appLanguages.map((l) => l.toJson()).toList(),
+      'ticunaWords': ticunaWords,
+      'ticunaPhrases': ticunaPhrases,
+      'ticunaTags': ticunaTags,
+      'ticunaAudios': ticunaAudios,
+      'ticunaAudioHashes': ticunaAudioHashes,
       'appKvStore': kvStore.map((k) => k.toJson()).toList(),
     };
 
@@ -422,6 +639,7 @@ class BackupService {
   Future<RestorePreview> previewBackup({
     required String encryptedDataString,
     required String password,
+    bool allowLegacyV1 = false,
   }) async {
     final Map<String, dynamic> container = jsonDecode(encryptedDataString);
     final int containerVersion = container['version'] as int? ?? 1;
@@ -446,7 +664,10 @@ class BackupService {
 
         decryptedEnvelopeJson = encrypter.decrypt64(ciphertext, iv: iv);
       } else {
-        // Compatibilidade reversa: Versão 1 legada
+        if (!allowLegacyV1) {
+          throw const LegacyBackupNotAllowedException();
+        }
+        // Compatibilidade reversa: Versão 1 legada (somente opt-in explícito)
         final iv = enc.IV.fromBase64(container['iv'] as String);
         final ciphertext = container['ciphertext'] as String;
         final key = _deriveKeyV1(password, 'ministerio_pessoal_salt_v1');
@@ -454,7 +675,10 @@ class BackupService {
 
         decryptedEnvelopeJson = encrypter.decrypt64(ciphertext, iv: iv);
       }
-    } catch (_) {
+    } on LegacyBackupNotAllowedException {
+      rethrow;
+    } catch (e, st) {
+      AppLogger.warning('Falha ao descriptografar backup', e, st);
       throw const FormatException(
         'Senha incorreta ou arquivo de backup corrompido.',
       );
@@ -666,6 +890,63 @@ class BackupService {
       if (!existingCalLinkIds.contains(item['id'] as String)) calLinkAdd++;
     }
 
+    // Prévia: Idiomas
+    final importedLangs = (data['appLanguages'] as List<dynamic>?) ?? [];
+    final existingLangs = await db.select(db.appLanguages).get();
+    final existingLangIds = {for (var l in existingLangs) l.id};
+    int langAdd = 0;
+    for (final item in importedLangs) {
+      if (!existingLangIds.contains(item['id'] as String)) langAdd++;
+    }
+
+    // Prévia: Ticuna
+    final importedTicunaWords = (data['ticunaWords'] as List<dynamic>?) ?? [];
+    final existingTicunaWordIds = {
+      for (var w in await _readRawTableRows('ticuna_words')) w['id'] as String,
+    };
+    int twAdd = 0;
+    for (final item in importedTicunaWords) {
+      if (!existingTicunaWordIds.contains(item['id'] as String)) twAdd++;
+    }
+
+    final importedTicunaPhrases =
+        (data['ticunaPhrases'] as List<dynamic>?) ?? [];
+    final existingTicunaPhraseIds = {
+      for (var pRow in await _readRawTableRows('ticuna_phrases'))
+        pRow['id'] as String,
+    };
+    int tpAdd = 0;
+    for (final item in importedTicunaPhrases) {
+      if (!existingTicunaPhraseIds.contains(item['id'] as String)) tpAdd++;
+    }
+
+    final importedTicunaTags = (data['ticunaTags'] as List<dynamic>?) ?? [];
+    final existingTicunaTagIds = {
+      for (var tRow in await _readRawTableRows('ticuna_tags'))
+        tRow['id'] as String,
+    };
+    int ttAdd = 0;
+    for (final item in importedTicunaTags) {
+      if (!existingTicunaTagIds.contains(item['id'] as String)) ttAdd++;
+    }
+
+    // Prévia: Notas & Documentos de Conhecimento
+    final importedKNotes = (data['knowledgeNotes'] as List<dynamic>?) ?? [];
+    final existingKNotes = await db.select(db.knowledgeNotes).get();
+    final existingKNoteIds = {for (var n in existingKNotes) n.id};
+    int kNoteAdd = 0;
+    for (final item in importedKNotes) {
+      if (!existingKNoteIds.contains(item['id'] as String)) kNoteAdd++;
+    }
+
+    final importedKDocs = (data['knowledgeDocuments'] as List<dynamic>?) ?? [];
+    final existingKDocs = await db.select(db.knowledgeDocuments).get();
+    final existingKDocIds = {for (var d in existingKDocs) d.id};
+    int kDocAdd = 0;
+    for (final item in importedKDocs) {
+      if (!existingKDocIds.contains(item['id'] as String)) kDocAdd++;
+    }
+
     // Prévia: Sync Queue (22ª Tabela)
     final importedSyncQueue = (data['syncQueue'] as List<dynamic>?) ?? [];
     final existingSyncQueue = await db.select(db.syncQueue).get();
@@ -688,11 +969,54 @@ class BackupService {
           if (actualHash != voiceNoteAudioHashes[entry.key]) {
             corruptedAudioIds.add(entry.key);
           }
-        } catch (_) {
+        } catch (e, st) {
+          AppLogger.warning('Falha ao validar hash de áudio voiceNote (${entry.key})', e, st);
           corruptedAudioIds.add(entry.key);
         }
       } else {
         corruptedAudioIds.add(entry.key);
+      }
+    }
+
+    final ticunaAudios = (data['ticunaAudios'] as Map<String, dynamic>?) ?? {};
+    final ticunaAudioHashes =
+        (data['ticunaAudioHashes'] as Map<String, dynamic>?) ?? {};
+    for (final entry in ticunaAudios.entries) {
+      if (ticunaAudioHashes.containsKey(entry.key)) {
+        try {
+          final bytes = base64Decode(entry.value as String);
+          final actualHash = sha256.convert(bytes).toString();
+          if (actualHash != ticunaAudioHashes[entry.key]) {
+            corruptedAudioIds.add(entry.key);
+          }
+        } catch (e, st) {
+          AppLogger.warning('Falha ao validar hash de áudio Ticuna (${entry.key})', e, st);
+          corruptedAudioIds.add(entry.key);
+        }
+      } else {
+        corruptedAudioIds.add(entry.key);
+      }
+    }
+
+    final docFiles =
+        (data['knowledgeDocumentFiles'] as Map<String, dynamic>?) ?? {};
+    final docHashes =
+        (data['knowledgeDocumentHashes'] as Map<String, dynamic>?) ?? {};
+    final corruptedDocumentIds = <String>[];
+    for (final entry in docFiles.entries) {
+      if (docHashes.containsKey(entry.key)) {
+        try {
+          final bytes = base64Decode(entry.value as String);
+          final actualHash = sha256.convert(bytes).toString();
+          if (actualHash != docHashes[entry.key]) {
+            corruptedDocumentIds.add(entry.key);
+          }
+        } catch (e, st) {
+          AppLogger.warning('Falha ao validar hash de documento (${entry.key})', e, st);
+          corruptedDocumentIds.add(entry.key);
+        }
+      } else {
+        corruptedDocumentIds.add(entry.key);
       }
     }
 
@@ -724,8 +1048,15 @@ class BackupService {
       sectorsToAdd: secAdd,
       calendarEventsToAdd: calEventAdd,
       calendarLinksToAdd: calLinkAdd,
+      appLanguagesToAdd: langAdd,
+      ticunaWordsToAdd: twAdd,
+      ticunaPhrasesToAdd: tpAdd,
+      ticunaTagsToAdd: ttAdd,
+      knowledgeNotesToAdd: kNoteAdd,
+      knowledgeDocumentsToAdd: kDocAdd,
       inventoryTables: tableList,
       corruptedAudioIds: corruptedAudioIds,
+      corruptedDocumentIds: corruptedDocumentIds,
       rawDecryptedData: data,
     );
   }
@@ -788,7 +1119,13 @@ class BackupService {
               status: const Value('pending'),
             ),
           );
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.warning(
+        'Falha ao reconstituir sync_queue para $entityType/$entityId',
+        e,
+        st,
+      );
+    }
   }
 
   /// Aplica a restauração de forma transacional e idempotente,
@@ -804,7 +1141,7 @@ class BackupService {
     final safetyKey = await _getOrCreateSilentBackupKey();
     final String snapshotData;
     try {
-      snapshotData = await exportEncryptedBackup(safetyKey, iterations: 1000);
+      snapshotData = await exportEncryptedBackup(safetyKey, iterations: 100000);
     } catch (e) {
       throw RestoreAbortedException(
         'Falha ao gerar snapshot de segurança antes da restauração: $e',
@@ -853,7 +1190,11 @@ class BackupService {
     Directory? stagingDir;
     Directory? audioBackupDir;
     Directory? restoredAudioDir;
+    Directory? restoredTicunaDir;
+    Directory? restoredDocsDir;
     final stagedFiles = <String, File>{};
+    final stagedTicunaFiles = <String, File>{};
+    final stagedDocFiles = <String, File>{};
     final replacedOriginalsBackup = <File, File>{};
     final newlyAddedFiles = <File>[];
 
@@ -863,7 +1204,24 @@ class BackupService {
     final voiceNoteAudioHashes =
         (data['voiceNoteAudioHashes'] as Map<String, dynamic>?) ?? {};
 
-    if (!kIsWeb && voiceNoteAudios.isNotEmpty) {
+    final ticunaWordsRows = (data['ticunaWords'] as List<dynamic>?) ?? [];
+    final ticunaPhrasesRows = (data['ticunaPhrases'] as List<dynamic>?) ?? [];
+    final ticunaTagsRows = (data['ticunaTags'] as List<dynamic>?) ?? [];
+    final ticunaAudios =
+        (data['ticunaAudios'] as Map<String, dynamic>?) ?? {};
+    final ticunaAudioHashes =
+        (data['ticunaAudioHashes'] as Map<String, dynamic>?) ?? {};
+
+    final docRows = (data['knowledgeDocuments'] as List<dynamic>?) ?? [];
+    final docFiles =
+        (data['knowledgeDocumentFiles'] as Map<String, dynamic>?) ?? {};
+    final docHashes =
+        (data['knowledgeDocumentHashes'] as Map<String, dynamic>?) ?? {};
+
+    if (!kIsWeb &&
+        (voiceNoteAudios.isNotEmpty ||
+            ticunaAudios.isNotEmpty ||
+            docFiles.isNotEmpty)) {
       try {
         docsDir = await _getDocsDir();
         final runId =
@@ -875,40 +1233,130 @@ class BackupService {
         await stagingDir.create(recursive: true);
         await audioBackupDir.create(recursive: true);
 
-        restoredAudioDir = Directory('${docsDir.path}/voice_notes');
-        if (!restoredAudioDir.existsSync()) {
-          await restoredAudioDir.create(recursive: true);
+        if (voiceNoteAudios.isNotEmpty) {
+          restoredAudioDir = Directory('${docsDir.path}/voice_notes');
+          if (!restoredAudioDir.existsSync()) {
+            await restoredAudioDir.create(recursive: true);
+          }
+
+          // Etapa 1: Extrair e validar notas de voz em staging antes de tocar no destino
+          for (final item in voiceNotes) {
+            final id = (item as Map<String, dynamic>)['id'] as String?;
+            if (id != null && voiceNoteAudios.containsKey(id)) {
+              try {
+                final audioBytes = base64Decode(voiceNoteAudios[id] as String);
+                if (voiceNoteAudioHashes.containsKey(id)) {
+                  final expectedHash = voiceNoteAudioHashes[id] as String;
+                  final actualHash = sha256.convert(audioBytes).toString();
+                  if (actualHash != expectedHash) {
+                    corruptedFiles.add(id);
+                    continue;
+                  }
+                }
+                final stagingFile = File('${stagingDir.path}/vn_$id.m4a');
+                await stagingFile.writeAsBytes(audioBytes, flush: true);
+                stagedFiles[id] = stagingFile;
+
+                final targetFile = File('${restoredAudioDir.path}/vn_$id.m4a');
+                if (await targetFile.exists()) {
+                  final backupFile = File('${audioBackupDir.path}/vn_$id.m4a');
+                  await targetFile.copy(backupFile.path);
+                  replacedOriginalsBackup[targetFile] = backupFile;
+                } else {
+                  newlyAddedFiles.add(targetFile);
+                }
+              } catch (e, st) {
+                AppLogger.warning('Falha ao preparar restauração de áudio voiceNote ($id)', e, st);
+                corruptedFiles.add(id);
+              }
+            }
+          }
         }
 
-        // Etapa 1: Extrair e validar em staging antes de tocar no destino
-        for (final item in voiceNotes) {
-          final id = (item as Map<String, dynamic>)['id'] as String?;
-          if (id != null && voiceNoteAudios.containsKey(id)) {
+        if (ticunaAudios.isNotEmpty) {
+          restoredTicunaDir = Directory('${docsDir.path}/ticuna_audios');
+          if (!restoredTicunaDir.existsSync()) {
+            await restoredTicunaDir.create(recursive: true);
+          }
+
+          for (final entry in ticunaAudios.entries) {
+            final key = entry.key;
             try {
-              final audioBytes = base64Decode(voiceNoteAudios[id] as String);
-              if (voiceNoteAudioHashes.containsKey(id)) {
-                final expectedHash = voiceNoteAudioHashes[id] as String;
+              final audioBytes = base64Decode(entry.value as String);
+              if (ticunaAudioHashes.containsKey(key)) {
+                final expectedHash = ticunaAudioHashes[key] as String;
                 final actualHash = sha256.convert(audioBytes).toString();
                 if (actualHash != expectedHash) {
-                  corruptedFiles.add(id);
+                  corruptedFiles.add(key);
                   continue;
                 }
               }
-              final stagingFile = File('${stagingDir.path}/vn_$id.m4a');
+              final safeKey = key.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+              final stagingFile = File('${stagingDir.path}/tc_$safeKey.m4a');
               await stagingFile.writeAsBytes(audioBytes, flush: true);
-              stagedFiles[id] = stagingFile;
+              stagedTicunaFiles[key] = stagingFile;
 
-              final targetFile = File('${restoredAudioDir.path}/vn_$id.m4a');
+              final targetFile =
+                  File('${restoredTicunaDir.path}/$safeKey.m4a');
               if (await targetFile.exists()) {
-                // Etapa 2: Preservar arquivo original antes de qualquer sobrescrita
-                final backupFile = File('${audioBackupDir.path}/vn_$id.m4a');
+                final backupFile =
+                    File('${audioBackupDir.path}/tc_$safeKey.m4a');
                 await targetFile.copy(backupFile.path);
                 replacedOriginalsBackup[targetFile] = backupFile;
               } else {
                 newlyAddedFiles.add(targetFile);
               }
-            } catch (_) {
-              corruptedFiles.add(id);
+            } catch (e, st) {
+              AppLogger.warning('Falha ao preparar restauração de áudio Ticuna ($key)', e, st);
+              corruptedFiles.add(key);
+            }
+          }
+        }
+
+        if (docFiles.isNotEmpty) {
+          restoredDocsDir = Directory('${docsDir.path}/knowledge_documents');
+          if (!restoredDocsDir.existsSync()) {
+            await restoredDocsDir.create(recursive: true);
+          }
+
+          for (final item in docRows) {
+            final docMap = item as Map<String, dynamic>;
+            final id = docMap['id'] as String?;
+            if (id != null && docFiles.containsKey(id)) {
+              try {
+                final bytes = base64Decode(docFiles[id] as String);
+                if (docHashes.containsKey(id)) {
+                  final expectedHash = docHashes[id] as String;
+                  final actualHash = sha256.convert(bytes).toString();
+                  if (actualHash != expectedHash) {
+                    corruptedFiles.add(id);
+                    continue;
+                  }
+                }
+                final rawName =
+                    (docMap['fileName'] ?? docMap['file_name'] ?? 'doc')
+                        .toString();
+                final safeName =
+                    rawName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+                final stagingFile =
+                    File('${stagingDir.path}/doc_${id}_$safeName');
+                await stagingFile.writeAsBytes(bytes, flush: true);
+                stagedDocFiles[id] = stagingFile;
+
+                final targetFile =
+                    File('${restoredDocsDir.path}/doc_${id}_$safeName');
+                if (await targetFile.exists()) {
+                  final backupFile =
+                      File('${audioBackupDir.path}/doc_${id}_$safeName');
+                  await targetFile.copy(backupFile.path);
+                  replacedOriginalsBackup[targetFile] = backupFile;
+                } else {
+                  newlyAddedFiles.add(targetFile);
+                }
+              } catch (e, st) {
+                AppLogger.warning('Falha ao preparar restauração de documento ($id)', e, st);
+                corruptedFiles.add(id);
+              }
             }
           }
         }
@@ -916,17 +1364,27 @@ class BackupService {
         if (stagingDir != null && stagingDir.existsSync()) {
           try {
             stagingDir.deleteSync(recursive: true);
-          } catch (_) {}
+          } catch (delErr, delSt) {
+            AppLogger.warning('Falha ao limpar stagingDir após erro de mídia', delErr, delSt);
+          }
         }
         if (audioBackupDir != null && audioBackupDir.existsSync()) {
           try {
             audioBackupDir.deleteSync(recursive: true);
-          } catch (_) {}
+          } catch (delErr, delSt) {
+            AppLogger.warning('Falha ao limpar audioBackupDir após erro de mídia', delErr, delSt);
+          }
         }
         throw RestoreMediaException(
-          'Falha na preparação da área de staging de áudios: $e',
+          'Falha na preparação da área de staging de mídia/documentos: $e',
         );
       }
+    }
+
+    if (ticunaWordsRows.isNotEmpty ||
+        ticunaPhrasesRows.isNotEmpty ||
+        ticunaTagsRows.isNotEmpty) {
+      await _ensureTicunaTables();
     }
 
     try {
@@ -1226,18 +1684,21 @@ class BackupService {
         // 11. Vínculos Familiares
         final familyTies = (data['familyTies'] as List<dynamic>?) ?? [];
         for (final item in familyTies) {
-          final entry = FamilyTieEntry.fromJson(item as Map<String, dynamic>);
+          final map = item as Map<String, dynamic>;
+          final entry = FamilyTieEntry.fromJson(map);
           final existing = await (db.select(
             db.familyTies,
           )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
           if (existing == null) {
             await db.into(db.familyTies).insert(entry);
+            await _reconstituteSyncQueue('family_ties', entry.id, 'INSERT', map);
             totalRestoredCount++;
           } else if ((entry.updatedAt ?? entry.createdAt).isAfter(
                 existing.updatedAt ?? existing.createdAt,
               ) ||
               entry.revision > existing.revision) {
             await db.update(db.familyTies).replace(entry);
+            await _reconstituteSyncQueue('family_ties', entry.id, 'UPDATE', map);
             totalRestoredCount++;
           }
         }
@@ -1246,18 +1707,29 @@ class BackupService {
         final experiences =
             (data['ministryExperiences'] as List<dynamic>?) ?? [];
         for (final item in experiences) {
-          final entry = MinistryExperienceEntry.fromJson(
-            item as Map<String, dynamic>,
-          );
+          final map = item as Map<String, dynamic>;
+          final entry = MinistryExperienceEntry.fromJson(map);
           final existing = await (db.select(
             db.ministryExperiences,
           )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
           if (existing == null) {
             await db.into(db.ministryExperiences).insert(entry);
+            await _reconstituteSyncQueue(
+              'ministry_experiences',
+              entry.id,
+              'INSERT',
+              map,
+            );
             totalRestoredCount++;
           } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
               entry.revision > existing.revision) {
             await db.update(db.ministryExperiences).replace(entry);
+            await _reconstituteSyncQueue(
+              'ministry_experiences',
+              entry.id,
+              'UPDATE',
+              map,
+            );
             totalRestoredCount++;
           }
         }
@@ -1268,6 +1740,9 @@ class BackupService {
           final map = Map<String, dynamic>.from(item as Map);
           if (map.containsKey('image_data') && !map.containsKey('imageData')) {
             map['imageData'] = map['image_data'];
+          }
+          if (map.containsKey('file_path') && !map.containsKey('filePath')) {
+            map['filePath'] = map['file_path'];
           }
           if (map.containsKey('person_id') && !map.containsKey('personId')) {
             map['personId'] = map['person_id'];
@@ -1284,18 +1759,38 @@ class BackupService {
           if (map.containsKey('deleted_at') && !map.containsKey('deletedAt')) {
             map['deletedAt'] = map['deleted_at'];
           }
+          final restoredFilePath = map['filePath']?.toString() ?? '';
+          final restoredImageData = map['imageData']?.toString() ?? '';
+          if (restoredFilePath.isNotEmpty &&
+              !restoredFilePath.startsWith('http') &&
+              restoredImageData.isNotEmpty &&
+              (kIsWeb || !File(restoredFilePath).existsSync())) {
+            map['filePath'] = null;
+          }
           final entry = PersonPhotoEntry.fromJson(map);
           final existing = await (db.select(
             db.personPhotos,
           )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
           if (existing == null) {
             await db.into(db.personPhotos).insert(entry);
+            await _reconstituteSyncQueue(
+              'person_photos',
+              entry.id,
+              'INSERT',
+              entry.toJson(),
+            );
             totalRestoredCount++;
           } else if ((entry.updatedAt ?? entry.createdAt).isAfter(
                 existing.updatedAt ?? existing.createdAt,
               ) ||
               entry.revision > existing.revision) {
             await db.update(db.personPhotos).replace(entry);
+            await _reconstituteSyncQueue(
+              'person_photos',
+              entry.id,
+              'UPDATE',
+              entry.toJson(),
+            );
             totalRestoredCount++;
           }
         }
@@ -1304,20 +1799,31 @@ class BackupService {
         final publications =
             (data['personPublications'] as List<dynamic>?) ?? [];
         for (final item in publications) {
-          final entry = PersonPublicationEntry.fromJson(
-            item as Map<String, dynamic>,
-          );
+          final map = item as Map<String, dynamic>;
+          final entry = PersonPublicationEntry.fromJson(map);
           final existing = await (db.select(
             db.personPublications,
           )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
           if (existing == null) {
             await db.into(db.personPublications).insert(entry);
+            await _reconstituteSyncQueue(
+              'person_publications',
+              entry.id,
+              'INSERT',
+              map,
+            );
             totalRestoredCount++;
           } else if ((entry.updatedAt ?? entry.createdAt).isAfter(
                 existing.updatedAt ?? existing.createdAt,
               ) ||
               entry.revision > existing.revision) {
             await db.update(db.personPublications).replace(entry);
+            await _reconstituteSyncQueue(
+              'person_publications',
+              entry.id,
+              'UPDATE',
+              map,
+            );
             totalRestoredCount++;
           }
         }
@@ -1325,18 +1831,29 @@ class BackupService {
         // 15. Artigos de Pesquisa
         final articles = (data['researchArticles'] as List<dynamic>?) ?? [];
         for (final item in articles) {
-          final entry = ResearchArticleEntry.fromJson(
-            item as Map<String, dynamic>,
-          );
+          final map = item as Map<String, dynamic>;
+          final entry = ResearchArticleEntry.fromJson(map);
           final existing = await (db.select(
             db.researchArticles,
           )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
           if (existing == null) {
             await db.into(db.researchArticles).insert(entry);
+            await _reconstituteSyncQueue(
+              'research_articles',
+              entry.id,
+              'INSERT',
+              map,
+            );
             totalRestoredCount++;
           } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
               entry.revision > existing.revision) {
             await db.update(db.researchArticles).replace(entry);
+            await _reconstituteSyncQueue(
+              'research_articles',
+              entry.id,
+              'UPDATE',
+              map,
+            );
             totalRestoredCount++;
           }
         }
@@ -1344,12 +1861,28 @@ class BackupService {
         // 16. Tags de Pesquisa
         final tags = (data['researchTags'] as List<dynamic>?) ?? [];
         for (final item in tags) {
-          final entry = ResearchTagEntry.fromJson(item as Map<String, dynamic>);
+          final map = item as Map<String, dynamic>;
+          final entry = ResearchTagEntry.fromJson(map);
           final existing = await (db.select(
             db.researchTags,
           )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
           if (existing == null) {
             await db.into(db.researchTags).insert(entry);
+            await _reconstituteSyncQueue(
+              'research_tags',
+              entry.id,
+              'INSERT',
+              map,
+            );
+            totalRestoredCount++;
+          } else if (entry.revision > existing.revision) {
+            await db.update(db.researchTags).replace(entry);
+            await _reconstituteSyncQueue(
+              'research_tags',
+              entry.id,
+              'UPDATE',
+              map,
+            );
             totalRestoredCount++;
           }
         }
@@ -1357,20 +1890,31 @@ class BackupService {
         // 17. Setores de Território
         final sectors = (data['territorySectors'] as List<dynamic>?) ?? [];
         for (final item in sectors) {
-          final entry = TerritorySectorEntry.fromJson(
-            item as Map<String, dynamic>,
-          );
+          final map = item as Map<String, dynamic>;
+          final entry = TerritorySectorEntry.fromJson(map);
           final existing = await (db.select(
             db.territorySectors,
           )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
           if (existing == null) {
             await db.into(db.territorySectors).insert(entry);
+            await _reconstituteSyncQueue(
+              'territory_sectors',
+              entry.id,
+              'INSERT',
+              map,
+            );
             totalRestoredCount++;
           } else if ((entry.updatedAt ?? entry.createdAt).isAfter(
                 existing.updatedAt ?? existing.createdAt,
               ) ||
               entry.revision > existing.revision) {
             await db.update(db.territorySectors).replace(entry);
+            await _reconstituteSyncQueue(
+              'territory_sectors',
+              entry.id,
+              'UPDATE',
+              map,
+            );
             totalRestoredCount++;
           }
         }
@@ -1441,16 +1985,29 @@ class BackupService {
         // 21. Inbox Universal
         final inboxRows = (data['inboxEntries'] as List<dynamic>?) ?? [];
         for (final item in inboxRows) {
-          final entry = InboxEntry.fromJson(item as Map<String, dynamic>);
+          final map = item as Map<String, dynamic>;
+          final entry = InboxEntry.fromJson(map);
           final existing = await (db.select(
             db.inboxEntries,
           )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
           if (existing == null) {
             await db.into(db.inboxEntries).insert(entry);
+            await _reconstituteSyncQueue(
+              'inbox_entries',
+              entry.id,
+              'INSERT',
+              map,
+            );
             totalRestoredCount++;
           } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
               entry.revision > existing.revision) {
             await db.update(db.inboxEntries).replace(entry);
+            await _reconstituteSyncQueue(
+              'inbox_entries',
+              entry.id,
+              'UPDATE',
+              map,
+            );
             totalRestoredCount++;
           }
         }
@@ -1458,16 +2015,19 @@ class BackupService {
         // 22. Projetos
         final projectRows = (data['projects'] as List<dynamic>?) ?? [];
         for (final item in projectRows) {
-          final entry = ProjectEntry.fromJson(item as Map<String, dynamic>);
+          final map = item as Map<String, dynamic>;
+          final entry = ProjectEntry.fromJson(map);
           final existing = await (db.select(
             db.projects,
           )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
           if (existing == null) {
             await db.into(db.projects).insert(entry);
+            await _reconstituteSyncQueue('projects', entry.id, 'INSERT', map);
             totalRestoredCount++;
           } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
               entry.revision > existing.revision) {
             await db.update(db.projects).replace(entry);
+            await _reconstituteSyncQueue('projects', entry.id, 'UPDATE', map);
             totalRestoredCount++;
           }
         }
@@ -1475,16 +2035,19 @@ class BackupService {
         // 23. Tarefas
         final taskRows = (data['tasks'] as List<dynamic>?) ?? [];
         for (final item in taskRows) {
-          final entry = TaskEntry.fromJson(item as Map<String, dynamic>);
+          final map = item as Map<String, dynamic>;
+          final entry = TaskEntry.fromJson(map);
           final existing = await (db.select(
             db.tasks,
           )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
           if (existing == null) {
             await db.into(db.tasks).insert(entry);
+            await _reconstituteSyncQueue('tasks', entry.id, 'INSERT', map);
             totalRestoredCount++;
           } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
               entry.revision > existing.revision) {
             await db.update(db.tasks).replace(entry);
+            await _reconstituteSyncQueue('tasks', entry.id, 'UPDATE', map);
             totalRestoredCount++;
           }
         }
@@ -1492,16 +2055,29 @@ class BackupService {
         // 24. Notas de Conhecimento
         final noteRows = (data['knowledgeNotes'] as List<dynamic>?) ?? [];
         for (final item in noteRows) {
-          final entry = KnowledgeNoteEntry.fromJson(item as Map<String, dynamic>);
+          final map = item as Map<String, dynamic>;
+          final entry = KnowledgeNoteEntry.fromJson(map);
           final existing = await (db.select(
             db.knowledgeNotes,
           )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
           if (existing == null) {
             await db.into(db.knowledgeNotes).insert(entry);
+            await _reconstituteSyncQueue(
+              'knowledge_notes',
+              entry.id,
+              'INSERT',
+              map,
+            );
             totalRestoredCount++;
           } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
               entry.revision > existing.revision) {
             await db.update(db.knowledgeNotes).replace(entry);
+            await _reconstituteSyncQueue(
+              'knowledge_notes',
+              entry.id,
+              'UPDATE',
+              map,
+            );
             totalRestoredCount++;
           }
         }
@@ -1509,33 +2085,70 @@ class BackupService {
         // 25. Perguntas de Conhecimento
         final questionRows = (data['knowledgeQuestions'] as List<dynamic>?) ?? [];
         for (final item in questionRows) {
-          final entry = KnowledgeQuestionEntry.fromJson(item as Map<String, dynamic>);
+          final map = item as Map<String, dynamic>;
+          final entry = KnowledgeQuestionEntry.fromJson(map);
           final existing = await (db.select(
             db.knowledgeQuestions,
           )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
           if (existing == null) {
             await db.into(db.knowledgeQuestions).insert(entry);
+            await _reconstituteSyncQueue(
+              'knowledge_questions',
+              entry.id,
+              'INSERT',
+              map,
+            );
             totalRestoredCount++;
           } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
               entry.revision > existing.revision) {
             await db.update(db.knowledgeQuestions).replace(entry);
+            await _reconstituteSyncQueue(
+              'knowledge_questions',
+              entry.id,
+              'UPDATE',
+              map,
+            );
             totalRestoredCount++;
           }
         }
 
-        // 26. Documentos de Conhecimento
-        final docRows = (data['knowledgeDocuments'] as List<dynamic>?) ?? [];
+        // 26. Documentos de Conhecimento & Binários
         for (final item in docRows) {
-          final entry = KnowledgeDocumentEntry.fromJson(item as Map<String, dynamic>);
+          final map = Map<String, dynamic>.from(item as Map<String, dynamic>);
+          var entry = KnowledgeDocumentEntry.fromJson(map);
+          if (stagedDocFiles.containsKey(entry.id) && restoredDocsDir != null) {
+            final safeName = entry.fileName.replaceAll(
+              RegExp(r'[^a-zA-Z0-9._-]'),
+              '_',
+            );
+            final targetFile = File(
+              '${restoredDocsDir.path}/doc_${entry.id}_$safeName',
+            );
+            await stagedDocFiles[entry.id]!.copy(targetFile.path);
+            entry = entry.copyWith(filePath: targetFile.path);
+            map['filePath'] = targetFile.path;
+          }
           final existing = await (db.select(
             db.knowledgeDocuments,
           )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
           if (existing == null) {
             await db.into(db.knowledgeDocuments).insert(entry);
+            await _reconstituteSyncQueue(
+              'knowledge_documents',
+              entry.id,
+              'INSERT',
+              map,
+            );
             totalRestoredCount++;
           } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
               entry.revision > existing.revision) {
             await db.update(db.knowledgeDocuments).replace(entry);
+            await _reconstituteSyncQueue(
+              'knowledge_documents',
+              entry.id,
+              'UPDATE',
+              map,
+            );
             totalRestoredCount++;
           }
         }
@@ -1543,16 +2156,201 @@ class BackupService {
         // 27. Recursos de Conhecimento
         final resRows = (data['knowledgeResources'] as List<dynamic>?) ?? [];
         for (final item in resRows) {
-          final entry = KnowledgeResourceEntry.fromJson(item as Map<String, dynamic>);
+          final map = item as Map<String, dynamic>;
+          final entry = KnowledgeResourceEntry.fromJson(map);
           final existing = await (db.select(
             db.knowledgeResources,
           )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
           if (existing == null) {
             await db.into(db.knowledgeResources).insert(entry);
+            await _reconstituteSyncQueue(
+              'knowledge_resources',
+              entry.id,
+              'INSERT',
+              map,
+            );
             totalRestoredCount++;
           } else if (entry.updatedAt.isAfter(existing.updatedAt) ||
               entry.revision > existing.revision) {
             await db.update(db.knowledgeResources).replace(entry);
+            await _reconstituteSyncQueue(
+              'knowledge_resources',
+              entry.id,
+              'UPDATE',
+              map,
+            );
+            totalRestoredCount++;
+          }
+        }
+
+        // 29. Idiomas da Aplicação (appLanguages)
+        final langRows = (data['appLanguages'] as List<dynamic>?) ?? [];
+        for (final item in langRows) {
+          final entry = AppLanguageEntry.fromJson(item as Map<String, dynamic>);
+          final existing = await (db.select(
+            db.appLanguages,
+          )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
+          if (existing == null) {
+            await db.into(db.appLanguages).insert(entry);
+            totalRestoredCount++;
+          } else if (entry.updatedAt.isAfter(existing.updatedAt)) {
+            await db.update(db.appLanguages).replace(entry);
+            totalRestoredCount++;
+          }
+        }
+
+        // 30-32. Dicionário, Frases e Tags Ticuna (F10)
+        for (final item in ticunaWordsRows) {
+          final map = Map<String, dynamic>.from(item as Map<String, dynamic>);
+          final id = map['id']?.toString();
+          if (id == null || id.isEmpty) continue;
+          final audioKey = 'word_$id';
+          if (stagedTicunaFiles.containsKey(audioKey) &&
+              restoredTicunaDir != null) {
+            final safeKey = audioKey.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+            final targetFile = File('${restoredTicunaDir.path}/$safeKey.m4a');
+            await stagedTicunaFiles[audioKey]!.copy(targetFile.path);
+            map['audio_path'] = targetFile.path;
+          }
+          final existingRows = await db.customSelect(
+            'SELECT updated_at FROM ticuna_words WHERE id = ?',
+            variables: [Variable.withString(id)],
+          ).get();
+          final existingUpdated = existingRows.isEmpty
+              ? null
+              : DateTime.tryParse(
+                  existingRows.first.data['updated_at']?.toString() ?? '',
+                );
+          final incomingUpdated = DateTime.tryParse(
+            map['updated_at']?.toString() ?? '',
+          );
+          final shouldWrite = existingRows.isEmpty ||
+              (incomingUpdated != null &&
+                  (existingUpdated == null ||
+                      incomingUpdated.isAfter(existingUpdated)));
+          if (shouldWrite) {
+            await db.customStatement(
+              '''
+              INSERT OR REPLACE INTO ticuna_words (
+                id, word, translation, phonetics, grammatical_class,
+                example_sentence, example_translation, notes, tags,
+                is_favorite, review_level, review_count, last_reviewed_at,
+                audio_path, audio_duration_seconds, language_id,
+                created_at, updated_at
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              ''',
+              [
+                id,
+                map['word'] ?? '',
+                map['translation'] ?? '',
+                map['phonetics'],
+                map['grammatical_class'],
+                map['example_sentence'],
+                map['example_translation'],
+                map['notes'],
+                map['tags'] ?? '[]',
+                (map['is_favorite'] as num?)?.toInt() ?? 0,
+                (map['review_level'] as num?)?.toInt() ?? 0,
+                (map['review_count'] as num?)?.toInt() ?? 0,
+                map['last_reviewed_at'],
+                map['audio_path'],
+                (map['audio_duration_seconds'] as num?)?.toInt(),
+                map['language_id'] ?? 'tca',
+                map['created_at'] ?? DateTime.now().toIso8601String(),
+                map['updated_at'] ?? DateTime.now().toIso8601String(),
+              ],
+            );
+            await _reconstituteSyncQueue(
+              'ticuna_words',
+              id,
+              existingRows.isEmpty ? 'INSERT' : 'UPDATE',
+              map,
+            );
+            totalRestoredCount++;
+          }
+        }
+
+        for (final item in ticunaPhrasesRows) {
+          final map = Map<String, dynamic>.from(item as Map<String, dynamic>);
+          final id = map['id']?.toString();
+          if (id == null || id.isEmpty) continue;
+          final audioKey = 'phrase_$id';
+          if (stagedTicunaFiles.containsKey(audioKey) &&
+              restoredTicunaDir != null) {
+            final safeKey = audioKey.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+            final targetFile = File('${restoredTicunaDir.path}/$safeKey.m4a');
+            await stagedTicunaFiles[audioKey]!.copy(targetFile.path);
+            map['audio_path'] = targetFile.path;
+          }
+          final existingRows = await db.customSelect(
+            'SELECT updated_at FROM ticuna_phrases WHERE id = ?',
+            variables: [Variable.withString(id)],
+          ).get();
+          final existingUpdated = existingRows.isEmpty
+              ? null
+              : DateTime.tryParse(
+                  existingRows.first.data['updated_at']?.toString() ?? '',
+                );
+          final incomingUpdated = DateTime.tryParse(
+            map['updated_at']?.toString() ?? '',
+          );
+          final shouldWrite = existingRows.isEmpty ||
+              (incomingUpdated != null &&
+                  (existingUpdated == null ||
+                      incomingUpdated.isAfter(existingUpdated)));
+          if (shouldWrite) {
+            await db.customStatement(
+              '''
+              INSERT OR REPLACE INTO ticuna_phrases (
+                id, phrase, translation, category, phonetics, notes,
+                tags, is_favorite, audio_path, audio_duration_seconds,
+                language_id, created_at, updated_at
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              ''',
+              [
+                id,
+                map['phrase'] ?? '',
+                map['translation'] ?? '',
+                map['category'],
+                map['phonetics'],
+                map['notes'],
+                map['tags'] ?? '[]',
+                (map['is_favorite'] as num?)?.toInt() ?? 0,
+                map['audio_path'],
+                (map['audio_duration_seconds'] as num?)?.toInt(),
+                map['language_id'] ?? 'tca',
+                map['created_at'] ?? DateTime.now().toIso8601String(),
+                map['updated_at'] ?? DateTime.now().toIso8601String(),
+              ],
+            );
+            await _reconstituteSyncQueue(
+              'ticuna_phrases',
+              id,
+              existingRows.isEmpty ? 'INSERT' : 'UPDATE',
+              map,
+            );
+            totalRestoredCount++;
+          }
+        }
+
+        for (final item in ticunaTagsRows) {
+          final map = Map<String, dynamic>.from(item as Map<String, dynamic>);
+          final id = map['id']?.toString();
+          final name = map['name']?.toString();
+          if (id == null || id.isEmpty || name == null || name.isEmpty) continue;
+          final existing = await db.customSelect(
+            'SELECT id FROM ticuna_tags WHERE id = ? OR name = ?',
+            variables: [Variable.withString(id), Variable.withString(name)],
+          ).get();
+          if (existing.isEmpty) {
+            await db.customStatement(
+              'INSERT OR IGNORE INTO ticuna_tags (id, name, created_at) VALUES (?, ?, ?)',
+              [
+                id,
+                name,
+                map['created_at'] ?? DateTime.now().toIso8601String(),
+              ],
+            );
             totalRestoredCount++;
           }
         }
@@ -1585,7 +2383,9 @@ class BackupService {
                 final normalized = _normalizePayloadDates(decodedPayload);
                 rawMap['payload'] = jsonEncode(normalized);
               }
-            } catch (_) {}
+            } catch (e, st) {
+              AppLogger.warning('Falha ao normalizar payload de syncQueue na restauração', e, st);
+            }
           }
           final entry = SyncQueueEntry.fromJson(rawMap);
           final existing = await (db.select(
@@ -1605,7 +2405,13 @@ class BackupService {
           if (f.existsSync()) {
             f.deleteSync();
           }
-        } catch (_) {}
+        } catch (cleanupErr, cleanupSt) {
+          AppLogger.warning(
+            'Falha ao limpar arquivo recém-adicionado no rollback (${f.path})',
+            cleanupErr,
+            cleanupSt,
+          );
+        }
       }
 
       // 2. Restaura integralmente os arquivos originais pré-existentes a partir do backup de segurança
@@ -1614,19 +2420,29 @@ class BackupService {
           if (entry.value.existsSync()) {
             entry.value.copySync(entry.key.path);
           }
-        } catch (_) {}
+        } catch (cleanupErr, cleanupSt) {
+          AppLogger.warning(
+            'Falha ao restaurar arquivo original no rollback (${entry.key.path})',
+            cleanupErr,
+            cleanupSt,
+          );
+        }
       }
 
       // 3. Limpa diretórios transitórios de staging e backup
       if (stagingDir != null && stagingDir.existsSync()) {
         try {
           stagingDir.deleteSync(recursive: true);
-        } catch (_) {}
+        } catch (cleanupErr, cleanupSt) {
+          AppLogger.warning('Falha ao remover stagingDir no rollback', cleanupErr, cleanupSt);
+        }
       }
       if (audioBackupDir != null && audioBackupDir.existsSync()) {
         try {
           audioBackupDir.deleteSync(recursive: true);
-        } catch (_) {}
+        } catch (cleanupErr, cleanupSt) {
+          AppLogger.warning('Falha ao remover audioBackupDir no rollback', cleanupErr, cleanupSt);
+        }
       }
 
       rethrow;
@@ -1636,12 +2452,16 @@ class BackupService {
     if (stagingDir != null && stagingDir.existsSync()) {
       try {
         stagingDir.deleteSync(recursive: true);
-      } catch (_) {}
+      } catch (cleanupErr, cleanupSt) {
+        AppLogger.warning('Falha ao remover stagingDir após restauração', cleanupErr, cleanupSt);
+      }
     }
     if (audioBackupDir != null && audioBackupDir.existsSync()) {
       try {
         audioBackupDir.deleteSync(recursive: true);
-      } catch (_) {}
+      } catch (cleanupErr, cleanupSt) {
+        AppLogger.warning('Falha ao remover audioBackupDir após restauração', cleanupErr, cleanupSt);
+      }
     }
 
     return RestoreResult(
@@ -1656,28 +2476,38 @@ class BackupService {
 
   Future<String> _getOrCreateSilentBackupKey() async {
     final db = repository.db;
-    final row =
+    final legacyRow =
         await (db.select(db.appKvStore)
               ..where((tbl) => tbl.key.equals(_silentBackupKeySecret)))
             .getSingleOrNull();
-    if (row != null && row.value.isNotEmpty) {
-      return row.value;
+
+    final stored = await _storage.read(key: _silentBackupKeySecret);
+    if (stored != null && stored.isNotEmpty) {
+      if (legacyRow != null) {
+        await (db.delete(db.appKvStore)
+              ..where((tbl) => tbl.key.equals(_silentBackupKeySecret)))
+            .go();
+      }
+      return stored;
     }
-    final generatedSecret = base64Encode(_generateSecureRandom(32));
-    await db
-        .into(db.appKvStore)
-        .insertOnConflictUpdate(
-          AppKvStoreCompanion.insert(
-            key: _silentBackupKeySecret,
-            value: generatedSecret,
-            updatedAt: Value(DateTime.now()),
-          ),
-        );
-    return generatedSecret;
+
+    final secret = (legacyRow != null && legacyRow.value.isNotEmpty)
+        ? legacyRow.value
+        : base64Encode(_generateSecureRandom(32));
+    await _storage.write(key: _silentBackupKeySecret, value: secret);
+    if (await _storage.read(key: _silentBackupKeySecret) != secret) {
+      throw const StorageUnavailableException('Não foi possível persistir a chave do backup.');
+    }
+    if (legacyRow != null) {
+      await (db.delete(db.appKvStore)
+            ..where((tbl) => tbl.key.equals(_silentBackupKeySecret)))
+          .go();
+    }
+    return secret;
   }
 
   /// Realiza backup silencioso se o último foi há mais de 24 horas (ou se force = true).
-  /// Utiliza chave segura vinculada ao dispositivo e grava arquivo local no sistema de arquivos.
+  /// Utiliza chave segura vinculada ao dispositivo (Keychain/Keystore) e grava arquivo local no sistema de arquivos.
   Future<bool> performSilentBackupIfNeeded({bool force = false}) async {
     final db = repository.db;
     try {
@@ -1694,24 +2524,28 @@ class BackupService {
         }
       }
 
+      // Não anuncie um backup quando não existe destino persistente na Web.
+      if (kIsWeb) return false;
+
       final deviceSecret = await _getOrCreateSilentBackupKey();
       final backupJson = await exportEncryptedBackup(
         deviceSecret,
-        iterations: 1000,
+        iterations: 100000,
       );
       final nowStr = DateTime.now().toIso8601String();
 
-      // Salva em arquivo físico no diretório de documentos quando disponível
-      if (!kIsWeb) {
-        try {
-          final dir = await getApplicationDocumentsDirectory();
-          final backupDir = Directory('${dir.path}/backups');
-          if (!backupDir.existsSync()) {
-            await backupDir.create(recursive: true);
-          }
-          final backupFile = File('${backupDir.path}/silent_backup.bak');
-          await backupFile.writeAsString(backupJson, flush: true);
-        } catch (_) {}
+      final dir = await _getDocsDir();
+      final backupDir = Directory('${dir.path}/backups');
+      await backupDir.create(recursive: true);
+      final backupFile = File('${backupDir.path}/silent_backup.bak');
+      final temporaryFile = File('${backupDir.path}/silent_backup_${_uuid.v4()}.tmp');
+      try {
+        await temporaryFile.writeAsString(backupJson, flush: true);
+        await _validateSnapshotFile(temporaryFile, password: deviceSecret);
+        // Mantém a última cópia válida se a gravação ou validação falhar.
+        await temporaryFile.rename(backupFile.path);
+      } finally {
+        if (await temporaryFile.exists()) await temporaryFile.delete();
       }
 
       await db
@@ -1725,7 +2559,8 @@ class BackupService {
           );
 
       return true;
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.error('Falha ao executar backup silencioso automático', e, st);
       return false;
     }
   }
@@ -1741,7 +2576,8 @@ class BackupService {
         return DateTime.tryParse(row.value);
       }
       return null;
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.warning('Falha ao ler data do último backup silencioso', e, st);
       return null;
     }
   }

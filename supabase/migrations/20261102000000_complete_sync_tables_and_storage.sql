@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS public.voice_notes (
 
 ALTER TABLE public.voice_notes ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can manage their own voice_notes" ON public.voice_notes;
 CREATE POLICY "Users can manage their own voice_notes"
     ON public.voice_notes
     FOR ALL
@@ -27,6 +28,7 @@ CREATE TABLE IF NOT EXISTS public.phone_contacts (
 
 ALTER TABLE public.phone_contacts ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can manage their own phone_contacts" ON public.phone_contacts;
 CREATE POLICY "Users can manage their own phone_contacts"
     ON public.phone_contacts
     FOR ALL
@@ -46,6 +48,7 @@ CREATE TABLE IF NOT EXISTS public.territory_landmarks (
 
 ALTER TABLE public.territory_landmarks ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can manage their own territory_landmarks" ON public.territory_landmarks;
 CREATE POLICY "Users can manage their own territory_landmarks"
     ON public.territory_landmarks
     FOR ALL
@@ -56,6 +59,7 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('voice_notes', 'voice_notes', false)
 ON CONFLICT (id) DO NOTHING;
 
+DROP POLICY IF EXISTS "Users can access their own voice_notes storage objects" ON storage.objects;
 CREATE POLICY "Users can access their own voice_notes storage objects"
     ON storage.objects
     FOR ALL
@@ -66,6 +70,7 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('ticuna_audio', 'ticuna_audio', false)
 ON CONFLICT (id) DO NOTHING;
 
+DROP POLICY IF EXISTS "Users can access their own ticuna_audio storage objects" ON storage.objects;
 CREATE POLICY "Users can access their own ticuna_audio storage objects"
     ON storage.objects
     FOR ALL

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../core/app_logger.dart';
 import '../database/app_database.dart';
 
 class DashboardMetrics {
@@ -235,7 +236,11 @@ class DashboardCalculator {
           } else {
             reason = s.pauseOrCloseReason!.trim();
           }
-        } catch (_) {
+        } catch (e, st) {
+          AppLogger.debug(
+            'Motivo de encerramento do estudo ${s.id} em texto livre (não JSON): $e',
+            st,
+          );
           reason = s.pauseOrCloseReason!.trim();
         }
       } else if (s.status.toLowerCase() == 'concluido') {
@@ -261,7 +266,9 @@ class DashboardCalculator {
               decoded['endReason'].toString().trim().isNotEmpty) {
             reason = decoded['endReason'].toString().trim();
           }
-        } catch (_) {}
+        } catch (e, st) {
+          AppLogger.debug('Falha ao ler endReason JSON (${p.id}): $e', st);
+        }
       } else if (p.nextActionNote != null &&
           p.nextActionNote!.contains('Revisita encerrada:')) {
         reason = p.nextActionNote!
@@ -283,7 +290,9 @@ class DashboardCalculator {
             uniqueParticipants.add(id);
           }
         }
-      } catch (_) {}
+      } catch (e, st) {
+        AppLogger.debug('Falha ao decodificar participantes da sessão (${session.id}): $e', st);
+      }
     }
 
     // 5. Revisitas Realizadas no Período (Nada é perdido mesmo se contato foi repassado ou excluído depois)
@@ -540,7 +549,9 @@ class DashboardCalculator {
                 .where((p) => p.id == partIds.first)
                 .firstOrNull;
           }
-        } catch (_) {}
+        } catch (e, st) {
+          AppLogger.debug('Falha ao ler participantIds em regularidade (${s.id}): $e', st);
+        }
         if (participant == null) {
           final partIds = studyParticipantMap[study.id];
           if (partIds != null && partIds.isNotEmpty) {
@@ -724,7 +735,9 @@ class DashboardCalculator {
     try {
       final List<dynamic> ids = jsonDecode(session.participantIds);
       if (ids.isNotEmpty) return ids.length;
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.debug('Falha ao contar participantIds da sessão (${session.id}): $e', st);
+    }
     return 1;
   }
 
@@ -1068,7 +1081,11 @@ class DashboardCalculator {
       try {
         final d = jsonDecode(study.pauseOrCloseReason!);
         if (d is Map && d.containsKey('endReason')) endReason = d['endReason'];
-      } catch (_) {
+      } catch (e, st) {
+        AppLogger.debug(
+          'Motivo do estudo ${study.id} em texto simples (não JSON): $e',
+          st,
+        );
         endReason = study.pauseOrCloseReason;
       }
     }

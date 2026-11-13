@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
+import '../../core/app_logger.dart';
 import '../mbtiles/mbtiles_service.dart';
 import 'tile_cache_interface.dart';
 import 'tile_cache_web.dart' if (dart.library.io) 'tile_cache_native.dart';
@@ -48,19 +49,22 @@ class TileCacheService {
     _memoryCache.clear();
   }
 
+  static String _cacheKey(int z, int x, int y, MapLayerStyle style) {
+    final version = style == MapLayerStyle.standard
+        ? MBTilesService.instance.tilesRevision.value : 0;
+    return '${style.id}/$version/$z/$x/$y';
+  }
+
   static Uint8List? getFromMemory(int z, int x, int y, [MapLayerStyle? style]) {
     final s = style ?? instance.activeStyle;
-    final key = '${s.id}/$z/$x/$y';
+    final key = _cacheKey(z, x, y, s);
     final mem = _memoryCache[key];
     if (mem != null) return mem;
-    if (s == MapLayerStyle.standard) {
-      return _memoryCache['$z/$x/$y'];
-    }
     return null;
   }
 
-  /// Retorna bloco pai de menor resolução quando o nível atual ainda está carregando,
-  /// eliminando 100% dos piscas/flashes cinzas na tela durante o zoom estilo Organic Maps.
+  /// Retorna bytes do ancestral apenas para consumidores que recortem o
+  /// quadrante correto; não serve para exibir diretamente como tile filho.
   static Uint8List? getFallbackFromMemory(int z, int x, int y, [MapLayerStyle? style]) {
     final s = style ?? instance.activeStyle;
     final exact = getFromMemory(z, x, y, s);
@@ -78,7 +82,7 @@ class TileCacheService {
 
   Future<Uint8List?> getTileBytes(int z, int x, int y, [MapLayerStyle? style]) {
     final s = style ?? _activeStyle;
-    final key = '${s.id}/$z/$x/$y';
+    final key = _cacheKey(z, x, y, s);
     final mem = _memoryCache[key];
     if (mem != null) return Future.value(mem);
 
@@ -86,13 +90,17 @@ class TileCacheService {
       try {
         // 1. Tenta carregar do pacote regional .mbtiles (<0.2ms)
         if (s == MapLayerStyle.standard) {
-          final mbtile = await MBTilesService.instance.getTile(z, x, y);
-          if (mbtile != null && mbtile.isNotEmpty) {
-            if (_memoryCache.length > 600) {
-              _memoryCache.remove(_memoryCache.keys.first);
+          try {
+            final mbtile = await MBTilesService.instance.getTile(z, x, y);
+            if (mbtile != null && mbtile.isNotEmpty) {
+              if (_memoryCache.length > 600) {
+                _memoryCache.remove(_memoryCache.keys.first);
+              }
+              _memoryCache[key] = mbtile;
+              return mbtile;
             }
-            _memoryCache[key] = mbtile;
-            return mbtile;
+          } catch (e, st) {
+            AppLogger.warning('Falha ao abrir mapa offline; tentando cache local.', e, st);
           }
         }
 
@@ -125,7 +133,7 @@ class TileCacheService {
     return _backend.getCachedTileCount(style ?? _activeStyle);
   }
 
-  /// Pré-carrega uma região inteira de blocos para uso offline no ministério
+  /// Bloqueado até haver uma fonte que permita explicitamente o pré-download.
   Future<int> preloadArea({
     required int z,
     required int minX,
@@ -135,32 +143,9 @@ class TileCacheService {
     MapLayerStyle? style,
     void Function(int completed, int total)? onProgress,
   }) async {
-    final s = style ?? _activeStyle;
-    final maxCoord = (1 << z) - 1;
-    final actualMinX = (minX <= maxX ? minX : maxX).clamp(0, maxCoord);
-    final actualMaxX = (minX <= maxX ? maxX : minX).clamp(0, maxCoord);
-    final actualMinY = (minY <= maxY ? minY : maxY).clamp(0, maxCoord);
-    final actualMaxY = (minY <= maxY ? maxY : minY).clamp(0, maxCoord);
-
-    int total = (actualMaxX - actualMinX + 1) * (actualMaxY - actualMinY + 1);
-    if (total <= 0) return 0;
-    int completed = 0;
-    int savedCount = 0;
-
-    for (int x = actualMinX; x <= actualMaxX; x++) {
-      for (int y = actualMinY; y <= actualMaxY; y++) {
-        try {
-          final bytes = await _backend.getTile(z, x, y, s);
-          if (bytes != null && bytes.isNotEmpty) {
-            savedCount++;
-          }
-        } catch (_) {}
-        completed++;
-        onProgress?.call(completed, total);
-      }
-    }
-
-    return savedCount;
+    // Os servidores públicos configurados neste aplicativo não oferecem
+    // permissão verificada para download preventivo de áreas. Use MBTiles.
+    throw UnsupportedError('Pré-download indisponível; importe um pacote MBTiles com licença apropriada.');
   }
 }
 
@@ -190,6 +175,7 @@ class CachedTileWidget extends StatefulWidget {
 class _CachedTileWidgetState extends State<CachedTileWidget> {
   Uint8List? _tileBytes;
   int _requestId = 0;
+  late final MBTilesService _mapService;
 
   MapLayerStyle get _effectiveStyle =>
       widget.layerStyle ?? TileCacheService.instance.activeStyle;
@@ -197,11 +183,26 @@ class _CachedTileWidgetState extends State<CachedTileWidget> {
   @override
   void initState() {
     super.initState();
-    _tileBytes = TileCacheService.getFromMemory(widget.z, widget.x, widget.y, _effectiveStyle) ??
-        TileCacheService.getFallbackFromMemory(widget.z, widget.x, widget.y, _effectiveStyle);
+    _mapService = MBTilesService.instance;
+    _mapService.tilesRevision.addListener(_onPackagesChanged);
+    // Um tile pai inteiro não representa o quadrante do tile atual. É melhor
+    // mostrar ausência do mapa do que desenhar ruas fora da posição dos pinos.
+    _tileBytes = TileCacheService.getFromMemory(widget.z, widget.x, widget.y, _effectiveStyle);
     if (TileCacheService.getFromMemory(widget.z, widget.x, widget.y, _effectiveStyle) == null) {
       _loadTile();
     }
+  }
+
+  void _onPackagesChanged() {
+    if (_effectiveStyle != MapLayerStyle.standard) return;
+    setState(() => _tileBytes = null);
+    _loadTile();
+  }
+
+  @override
+  void dispose() {
+    _mapService.tilesRevision.removeListener(_onPackagesChanged);
+    super.dispose();
   }
 
   @override
@@ -213,12 +214,12 @@ class _CachedTileWidgetState extends State<CachedTileWidget> {
         oldWidget.x != widget.x ||
         oldWidget.y != widget.y ||
         oldStyle != newStyle) {
+      ++_requestId; // invalida qualquer resposta anterior mesmo se houver cache exato
       final exact = TileCacheService.getFromMemory(widget.z, widget.x, widget.y, newStyle);
       if (exact != null) {
         _tileBytes = exact;
       } else {
-        // Preserva o tile anterior ou obtém fallback em memória do zoom adjacente
-        _tileBytes = TileCacheService.getFallbackFromMemory(widget.z, widget.x, widget.y, newStyle);
+        _tileBytes = null;
         _loadTile();
       }
     }
@@ -227,12 +228,14 @@ class _CachedTileWidgetState extends State<CachedTileWidget> {
   Future<void> _loadTile() async {
     final requestId = ++_requestId;
     final style = _effectiveStyle;
-    final bytes = await TileCacheService.instance.getTileBytes(
-      widget.z,
-      widget.x,
-      widget.y,
-      style,
-    );
+    Uint8List? bytes;
+    try {
+      bytes = await TileCacheService.instance.getTileBytes(
+        widget.z, widget.x, widget.y, style,
+      );
+    } catch (e, st) {
+      AppLogger.debug('Falha ao carregar tile.', e, st);
+    }
     if (mounted && requestId == _requestId) {
       setState(() {
         _tileBytes = bytes;
@@ -248,7 +251,8 @@ class _CachedTileWidgetState extends State<CachedTileWidget> {
         width: widget.size,
         height: widget.size,
         fit: BoxFit.cover,
-        gaplessPlayback: true,
+        // Não manter a imagem do tile anterior ao trocar de coordenadas.
+        gaplessPlayback: false,
       );
     }
 
