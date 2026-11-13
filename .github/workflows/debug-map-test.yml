@@ -1,0 +1,22 @@
+name: Debug map confirmation test
+on:
+  push:
+    branches: ['arena/**']
+    paths: ['.github/workflows/debug-map-test.yml', 'test/layout_fixes_and_map_highlight_test.dart']
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Focused widget test
+        run: |
+          set -o pipefail
+          flutter test --reporter expanded test/layout_fixes_and_map_highlight_test.dart --plain-name 'Busca aproximada não grava coordenadas sem confirmação' 2>&1 | tee /tmp/map-test.log || { python3 tool/ci_diagnostics_summary.py test /tmp/map-test.log; exit 1; }

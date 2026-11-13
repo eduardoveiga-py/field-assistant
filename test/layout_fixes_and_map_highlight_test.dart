@@ -378,31 +378,40 @@ void main() {
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
+      print('::notice::GEO_TEST_1');
       final db = AppDatabase.forTesting(NativeDatabase.memory());
       addTearDown(db.close);
       final now = DateTime.now();
+      print('::notice::GEO_TEST_2');
       await db.into(db.people).insert(PeopleCompanion.insert(
         id: 'review_geo', name: 'Pessoa', address: const Value('Endereço aproximado'),
         firstContactAt: now, createdAt: now, updatedAt: now,
       ));
+      print('::notice::GEO_TEST_3');
       await tester.pumpWidget(ProviderScope(
         overrides: [databaseProvider.overrideWithValue(db)],
         child: MaterialApp(home: ContactsMapScreen(highlightPersonId: 'review_geo',
           geocodeAddress: (_) async => const ReverseGeocodingResult(latitude: -3.1, longitude: -67.9))),
       ));
+      print('::notice::GEO_TEST_4');
       for (var i = 0; i < 15; i++) {
         await tester.pump(const Duration(milliseconds: 100));
       }
+      print('::notice::GEO_TEST_5');
       expect(find.text('Localização aproximada'), findsOneWidget);
+      print('::notice::GEO_TEST_6');
       final person = await tester.runAsync(() => (db.select(db.people)..where((t) => t.id.equals('review_geo'))).getSingle());
       expect(person!.latitude, isNull);
       expect(person.longitude, isNull);
+      print('::notice::GEO_TEST_7');
       await tester.tap(find.text('Agora não'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
+      print('::notice::GEO_TEST_8');
       final after = await tester.runAsync(() => (db.select(db.people)..where((t) => t.id.equals('review_geo'))).getSingle());
       expect(after!.latitude, isNull);
       expect(after.longitude, isNull);
+      print('::notice::GEO_TEST_9');
       await tester.pumpWidget(const SizedBox());
     }, timeout: const Timeout(Duration(seconds: 45)));
 
