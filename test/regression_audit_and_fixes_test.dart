@@ -297,7 +297,7 @@ void main() {
     );
 
     test(
-      'HARD_DELETE operation executes remote DELETE and leaves zero stuck pending items',
+      'HARD_DELETE without a verifiable base blocks remote deletion',
       () async {
         final person = await repo.createPerson(name: 'Para Excluir Definitivamente');
         await db.delete(db.syncQueue).go();
@@ -327,14 +327,14 @@ void main() {
         addTearDown(syncSvc.dispose);
 
         final res = await syncSvc.processQueue();
-        expect(deleteCalled, isTrue);
-        expect(res.successCount, equals(1));
-        expect(res.failureCount, equals(0));
+        expect(deleteCalled, isFalse);
+        expect(res.successCount, equals(0));
+        expect(res.conflictCount, equals(1));
 
         final remaining = await (db.select(db.syncQueue)
-              ..where((t) => t.status.equals('pending')))
+              ..where((t) => t.status.equals('conflict')))
             .get();
-        expect(remaining, isEmpty);
+        expect(remaining, hasLength(1));
       },
     );
 
