@@ -413,6 +413,8 @@ void main() {
       expect(after.longitude, isNull);
       print('::notice::GEO_TEST_9');
       await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(milliseconds: 200));
+      print('::notice::GEO_TEST_10');
     }, timeout: const Timeout(Duration(seconds: 45)));
 
     testWidgets(
