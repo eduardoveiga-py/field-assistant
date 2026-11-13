@@ -132,6 +132,7 @@ class MBTilesService {
           'Retângulo de SAI e entorno; não cobre todo o Alto Solimões. Aldeias, rios e caminhos podem estar incompletos. Não usar para navegação.',
       minZoom: 8,
       maxZoom: 16,
+      downloadUrl: 'https://github.com/${AppVersion.githubRepo}/releases/download/v${AppVersion.version}/br_am_solimoes.mbtiles',
       sizeBytes: 120 * 1024 * 1024,
       isInstalled: false, // Não é mais estaticamente pré-instalado
     ),

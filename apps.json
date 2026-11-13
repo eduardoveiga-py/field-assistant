@@ -6,34 +6,42 @@
   "subtitle": "Fonte oficial do Ministério Pessoal",
   "description": "Repositório oficial para instalação e atualização automática do aplicativo Ministério Pessoal no LiveContainer e AltStore.",
   "tintColor": "#1E3A8A",
-  "iconURL": "https://cdn.jsdelivr.net/gh/eduardoveiga-py/field-assistant@v1.3.3/web/icons/Icon-512.png",
-  "headerURL": "https://cdn.jsdelivr.net/gh/eduardoveiga-py/field-assistant@v1.3.3/web/icons/Icon-512.png",
+  "iconURL": "https://cdn.jsdelivr.net/gh/eduardoveiga-py/field-assistant@v1.3.4/web/icons/Icon-512.png",
+  "headerURL": "https://cdn.jsdelivr.net/gh/eduardoveiga-py/field-assistant@v1.3.4/web/icons/Icon-512.png",
   "news": [],
   "apps": [
     {
-      "beta": false,
+      "beta": true,
       "name": "Ministério Pessoal",
       "bundleIdentifier": "com.ministeriopessoal.ministerioPessoal",
       "developerName": "Ministério Pessoal",
       "subtitle": "Gestão eficiente e offline-first do ministério de campo",
-      "version": "1.3.3",
+      "version": "1.3.4",
       "versionDate": "2026-11-11",
-      "versionDescription": "Lançamento Oficial 1.3.3: Configurações do Supabase e OAuth embutidas em tempo de compilação, schema e RLS de 26 tabelas sincronizadas + bucket ticuna_audio validados, e-mail IMAP/SMTP real, armazenamento offline de mapas em .mbtiles, geolocalização real sem seeds fictícios, PIN obrigatório em ausência de biometria, verificação SHA-256 em atualizações Android e backup cifrado completo.",
-      "downloadURL": "https://github.com/eduardoveiga-py/field-assistant/releases/download/v1.3.3/app-release-unsigned.ipa",
-      "downloadURL_apk": "https://github.com/eduardoveiga-py/field-assistant/releases/download/v1.3.3/app-arm64-v8a-release.apk",
-      "checksumsURL": "https://github.com/eduardoveiga-py/field-assistant/releases/download/v1.3.3/SHA256SUMS.txt",
-      "localizedDescription": "Um aplicativo completo, rápido e focado no usuário para organizar contatos, revisitas, estudos bíblicos, compromissos e relatórios mensais.\n\n• Briefing na Porta em 30 segundos\n• Assistente Linguístico Multilíngue (Ticuna, Guajajara e outros) com frases situacionais e SRS\n• Ditado e anotações rápidas por voz\n• Agenda inteligente com agendamento por proximidade e detecção de conflitos\n• Territórios e mapas com Índice de Cobertura (IC), zonas esquecidas e importação KML/GeoJSON/CSV\n• Verificador de atualizações integrado com suporte direto ao LiveContainer\n• Modo Sol Intenso de alto contraste (WCAG AAA)\n• Relatório e contagem rigorosa de estudos e horas\n• Sincronização multi-dispositivo segura",
-      "iconURL": "https://cdn.jsdelivr.net/gh/eduardoveiga-py/field-assistant@v1.3.3/web/icons/Icon-512.png",
+      "versionDescription": "Versão de teste: sincronização e mapa offline experimental de Santo Antônio do Içá. Requer validação em dispositivos; mapa não substitui navegação local.",
+      "downloadURL": "https://github.com/eduardoveiga-py/field-assistant/releases/download/v1.3.4/app-release-unsigned.ipa",
+      "downloadURL_apk": "https://github.com/eduardoveiga-py/field-assistant/releases/download/v1.3.4/app-arm64-v8a-release.apk",
+      "checksumsURL": "https://github.com/eduardoveiga-py/field-assistant/releases/download/v1.3.4/SHA256SUMS.txt",
+      "localizedDescription": "Um aplicativo completo, rápido e focado no usuário para organizar contatos, revisitas, estudos bíblicos, compromissos e relatórios mensais.\n\n• Briefing na Porta em 30 segundos\n• Assistente Linguístico Multilíngue (Ticuna, Guajajara e outros) com frases situacionais e SRS\n• Ditado e anotações rápidas por voz\n• Agenda inteligente com agendamento por proximidade e detecção de conflitos\n• Territórios e mapas com Índice de Cobertura (IC), zonas esquecidas e importação KML/GeoJSON/CSV\n• Verificador de atualizações integrado com suporte direto ao LiveContainer\n• Modo Sol Intenso de alto contraste (WCAG AAA)\n• Relatório e contagem rigorosa de estudos e horas\n• Sincronização entre dispositivos (em validação)",
+      "iconURL": "https://cdn.jsdelivr.net/gh/eduardoveiga-py/field-assistant@v1.3.4/web/icons/Icon-512.png",
       "tintColor": "#1E3A8A",
       "category": "utilities",
-      "size": 14105609,
-      "minOSVersion": "14.0",
+      "size": 0,
+      "minOSVersion": "15.0",
       "versions": [
+        {
+          "version": "1.3.4",
+          "date": "2026-11-11",
+          "localizedDescription": "Versão de teste: sincronização e mapa offline experimental de Santo Antônio do Içá. Requer validação em dispositivos; mapa não substitui navegação local.",
+          "downloadURL": "https://github.com/eduardoveiga-py/field-assistant/releases/download/v1.3.4/app-release-unsigned.ipa",
+          "size": 0,
+          "minOSVersion": "15.0"
+        },
         {
           "version": "1.3.3",
           "date": "2026-11-11",
           "localizedDescription": "Lançamento Oficial 1.3.3: Configurações do Supabase e OAuth embutidas em tempo de compilação, schema e RLS de 26 tabelas sincronizadas + bucket ticuna_audio validados, e-mail IMAP/SMTP real, armazenamento offline de mapas em .mbtiles, geolocalização real sem seeds fictícios, PIN obrigatório em ausência de biometria, verificação SHA-256 em atualizações Android e backup cifrado completo.",
-          "downloadURL": "https://github.com/eduardoveiga-py/field-assistant/releases/latest/download/app-release-unsigned.ipa",
+          "downloadURL": "https://github.com/eduardoveiga-py/field-assistant/releases/download/v1.3.3/app-release-unsigned.ipa",
           "size": 14105609,
           "minOSVersion": "14.0"
         },
@@ -41,7 +49,7 @@
           "version": "1.3.2",
           "date": "2026-11-10",
           "localizedDescription": "Lançamento Oficial 1.3.2: Compilação nativa multiplataforma completa (Android, iOS/iPadOS, Web, Windows 10/11 x64, Linux GTK x64 e macOS Universal) com manifesto SHA256SUMS.txt, abstrações seguras para ditado por voz (VoiceDictationService) e calendário nativo (CalendarProvider / AppleEventKitProvider) em desktop, e compatibilidade com MSVC 14.51 e GStreamer.",
-          "downloadURL": "https://github.com/eduardoveiga-py/field-assistant/releases/latest/download/app-release-unsigned.ipa",
+          "downloadURL": "https://github.com/eduardoveiga-py/field-assistant/releases/download/v1.3.2/app-release-unsigned.ipa",
           "size": 14105609,
           "minOSVersion": "14.0"
         },
@@ -49,7 +57,7 @@
           "version": "1.3.1",
           "date": "2026-11-09",
           "localizedDescription": "Lançamento Oficial 1.3.1: Pacote integral de estabilidade, segurança e compilação multiplataforma (Android, iOS/iPadOS e Web). Resolução inteligente de conflitos de agenda em 1 toque, sincronização binária multi-dispositivo de documentos na Base de Conhecimento, exclusão em cascata na lixeira definitiva, proteção teocrática de senhas de e-mail no FlutterSecureStorage com migração retroativa, portabilidade de fotos em base64 no backup cifrado e descarte LRU no mapa web.",
-          "downloadURL": "https://github.com/eduardoveiga-py/field-assistant/releases/latest/download/app-release-unsigned.ipa",
+          "downloadURL": "https://github.com/eduardoveiga-py/field-assistant/releases/download/v1.3.1/app-release-unsigned.ipa",
           "size": 14105434,
           "minOSVersion": "14.0"
         },
@@ -57,7 +65,7 @@
           "version": "1.3.0",
           "date": "2026-11-09",
           "localizedDescription": "Lançamento Oficial 1.3.0 (Evolução Estratégica Completa): Módulo A — Inbox Universal com captura rápida em 1-toque (texto, ditado de até 5 minutos e anexos) e pipeline de conversão sem perda de dados; Módulo B — Tarefas & Projetos com recorrência automática (diária, semanal, mensal) e cálculo dinâmico de progresso %; Módulo C — Base de Conhecimento com notas ricas, dúvidas teocráticas/respostas, documentos locais e links JW; além de paridade total com Organic Maps (rotação contínua 360°, escala métrica, download de regiões inteiras e tela cheia).",
-          "downloadURL": "https://github.com/eduardoveiga-py/field-assistant/releases/latest/download/app-release-unsigned.ipa",
+          "downloadURL": "https://github.com/eduardoveiga-py/field-assistant/releases/download/v1.3.0/app-release-unsigned.ipa",
           "size": 14500000,
           "minOSVersion": "14.0"
         },
@@ -65,7 +73,7 @@
           "version": "1.2.1",
           "date": "2026-11-08",
           "localizedDescription": "Lançamento oficial 1.2.1: resolução completa da auditoria — isolamento RLS de áudio no Supabase Storage ($userId/$id.m4a) e bucket ticuna_audio, seleção estrita de APK no Android e IPA no iOS com diferenciação de 4 estados, parada física do gravador aos 30s com validação real de bytes, índice de cobertura triplo (residências, contatos e conversas efetivas), agendamento por proximidade com modos de transporte (a pé, veículo, embarcação) e endereços sem GPS, transações atômicas de sincronização no Ticuna e correção do overflow de menu no mapa.",
-          "downloadURL": "https://github.com/eduardoveiga-py/field-assistant/releases/latest/download/app-release-unsigned.ipa",
+          "downloadURL": "https://github.com/eduardoveiga-py/field-assistant/releases/download/v1.2.1/app-release-unsigned.ipa",
           "size": 13435260,
           "minOSVersion": "14.0"
         },
@@ -73,7 +81,7 @@
           "version": "1.2.0",
           "date": "2026-11-08",
           "localizedDescription": "Lançamento oficial 1.2.0: atualizador automático integrado com verificação em tempo real via GitHub e LiveContainer, Assistente Linguístico expandido para múltiplos idiomas indígenas (Ticuna, Guajajara, Yanomami) com frases situacionais do ministério, comparador multilíngue, mapa territorial inteligente com cálculo do Índice de Cobertura (IC), detecção de zonas esquecidas (>90 dias) e duplicatas fonéticas/geográficas (<25m), importação/exportação KML/GeoJSON/CSV, agendamento de retorno na porta por proximidade e internacionalização (i18n) PT-BR, EN e ES.",
-          "downloadURL": "https://github.com/eduardoveiga-py/field-assistant/releases/latest/download/app-release-unsigned.ipa",
+          "downloadURL": "https://github.com/eduardoveiga-py/field-assistant/releases/download/v1.2.0/app-release-unsigned.ipa",
           "size": 13435260,
           "minOSVersion": "14.0"
         },
@@ -81,7 +89,7 @@
           "version": "1.1.1",
           "date": "2026-11-08",
           "localizedDescription": "Lançamento oficial 1.1.1: correção definitiva do mapa de contatos e territórios com OpenStreetMap oficial, provedor de contingência OSM France de alta disponibilidade, auto-cura e exclusão automática de blocos corrompidos ou com marcas d'água no cache do iPadOS e conformidade com limites de requisição.",
-          "downloadURL": "https://github.com/eduardoveiga-py/field-assistant/releases/latest/download/app-release-unsigned.ipa",
+          "downloadURL": "https://github.com/eduardoveiga-py/field-assistant/releases/download/v1.1.1/app-release-unsigned.ipa",
           "size": 13435260,
           "minOSVersion": "14.0"
         },
@@ -89,7 +97,7 @@
           "version": "1.1.0",
           "date": "2026-11-08",
           "localizedDescription": "Lançamento oficial 1.1.0: nova aba Língua Ticuna com dicionário e frases úteis, repetição espaçada estilo Anki, suporte tipográfico completo com Noto Sans e Charis SIL para as 12 vogais canônicas com acentuação GPOS combinada, teclado virtual com diacríticos, gravação e reprodução de áudio segura para Web/iPad (kIsWeb e UrlSource), atalhos de cadastro direto e revisitas filtradas na página inicial.",
-          "downloadURL": "https://github.com/eduardoveiga-py/field-assistant/releases/latest/download/app-release-unsigned.ipa",
+          "downloadURL": "https://github.com/eduardoveiga-py/field-assistant/releases/download/v1.1.0/app-release-unsigned.ipa",
           "size": 13435260,
           "minOSVersion": "14.0"
         },
@@ -97,7 +105,7 @@
           "version": "1.0.1",
           "date": "2026-11-07",
           "localizedDescription": "Lançamento oficial 1.0.1: novo ícone nativo ministerial, correção da integração com Google Agenda no iPadOS, carregamento de mapas de alta velocidade com fallback automático para evitar bloqueios 403 e suporte à fonte oficial no LiveContainer.",
-          "downloadURL": "https://github.com/eduardoveiga-py/field-assistant/releases/latest/download/app-release-unsigned.ipa",
+          "downloadURL": "https://github.com/eduardoveiga-py/field-assistant/releases/download/v1.0.1/app-release-unsigned.ipa",
           "size": 12571776,
           "minOSVersion": "14.0"
         }

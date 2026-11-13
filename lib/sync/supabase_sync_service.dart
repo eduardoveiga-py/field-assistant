@@ -1737,30 +1737,6 @@ class SupabaseSyncService {
     }
   }
 
-  /// Exclui o arquivo físico no Supabase Storage quando o documento é removido
-  Future<void> _deleteKnowledgeDocumentStorage(
-    String id,
-    SupabaseClient client,
-  ) async {
-    try {
-      final userFolder = _resolveStorageFolder(client);
-      if (userFolder == null) return;
-      await client.storage.from('knowledge_vault').remove([
-        '$userFolder/$id.pdf',
-        '$userFolder/$id.epub',
-        '$userFolder/$id.doc',
-        '$userFolder/$id.docx',
-        '$userFolder/$id.txt',
-        '$userFolder/$id',
-        '$id.pdf',
-        id,
-      ]);
-      await (db.delete(db.appKvStore)..where((t) => t.key.equals('doc_bytes_$id'))).go();
-    } catch (e, st) {
-      AppLogger.warning('Falha ao excluir documento $id do storage', e, st);
-    }
-  }
-
   Future<bool> _uploadPersonPhoto(
     String id,
     Map<String, dynamic> remotePayload,
@@ -1921,22 +1897,6 @@ class SupabaseSyncService {
         AppLogger.warning('Falha ao registrar pendência de download de foto $id', e2, st2);
       }
       return false;
-    }
-  }
-
-  Future<void> _deletePersonPhotoStorage(
-    String id,
-    SupabaseClient client,
-  ) async {
-    try {
-      final userFolder = _resolveStorageFolder(client);
-      if (userFolder == null) return;
-      await client.storage.from('person_photos').remove([
-        '$userFolder/$id.jpg',
-        '$id.jpg',
-      ]);
-    } catch (e, st) {
-      AppLogger.warning('Falha ao excluir foto $id do storage', e, st);
     }
   }
 
