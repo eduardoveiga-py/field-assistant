@@ -83,6 +83,7 @@ void main() {
       expect(result.totalProcessed, greaterThanOrEqualTo(1));
       expect(result.successCount, equals(0));
       expect(result.success, isFalse);
+      expect((await syncService.sync()).success, isFalse);
       expect(result.message, contains('não configurado'));
       expect(syncService.currentStatus, equals(SyncStatus.waitingConnection));
     });
@@ -807,6 +808,39 @@ void main() {
       )..where((t) => t.id.equals('q_vn_fail_upload'))).getSingle();
       expect(opDeadLetter.status, equals('failed'));
       expect(opDeadLetter.attempts, equals(AppRepository.maxSyncAttempts));
+    });
+
+    test('Áudio ausente não confirma sincronização da nota', () async {
+      final now = DateTime.now().toUtc();
+      final person = await repo.createPerson(name: 'Áudio ausente');
+      await db.delete(db.syncQueue).go();
+      await db.into(db.voiceNotes).insert(VoiceNotesCompanion.insert(
+        id: 'note_missing', personId: person.id, transcription: 'Teste',
+        audioFilePath: drift.Value(p.join(tempDir.path, 'missing.m4a')),
+        createdAt: now, updatedAt: now,
+      ));
+      await db.into(db.syncQueue).insert(SyncQueueCompanion.insert(
+        id: 'q_missing', entityType: 'voice_notes', entityId: 'note_missing',
+        operation: 'INSERT', payload: jsonEncode({'id': 'note_missing', 'personId': person.id}),
+        createdAt: now,
+      ));
+      var uploaded = false;
+      final mock = MockClient((request) async {
+        if (request.url.path.contains('/storage/v1/')) uploaded = true;
+        if (request.url.path.endsWith('/rpc/sync_upsert_if_unchanged')) {
+          return mockJsonResponse(request, {'success': true});
+        }
+        return mockJsonResponse(request, []);
+      });
+      final sync = SupabaseSyncService(db: db, repository: repo,
+        clientOverride: SupabaseClient('https://mock.supabase.co', 'dummy-key', httpClient: mock));
+      addTearDown(sync.dispose);
+      final result = await sync.processQueue();
+      expect(result.success, isFalse);
+      expect(result.failureCount, 1);
+      expect(uploaded, isFalse);
+      final op = await (db.select(db.syncQueue)..where((t) => t.id.equals('q_missing'))).getSingle();
+      expect(op.status, 'pending');
     });
 
     test('TC-SYNC-ADV-03: Download de áudio pendente é registrado e recuperável via retryPendingMediaDownloads', () async {
