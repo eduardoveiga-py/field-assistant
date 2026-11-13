@@ -34,3 +34,23 @@ Execute os testes e valide com um servidor IMAP real antes de publicar.
 Para Auth, configure URLs de produção e allowlist somente depois de validar os
 destinos de confirmação/recuperação e os callbacks nas plataformas suportadas.
 Não pressupor que um scheme cadastrado apenas no iOS trate Android ou Web.
+
+## Estado remoto após implantação controlada
+
+No projeto `field-assistant`, em 2026-11-13 foi instalada a função CAS por
+migração `sync_compare_and_swap` e, em seguida, `sync_cas_revoke_anon` removeu
+um privilégio explícito de execução concedido por padrão ao papel anon. A
+verificação posterior confirmou SECURITY INVOKER, execução por authenticated e
+negação de execução por anon. As 26 tabelas esperadas existiam com RLS, ID único,
+owner_id UUID, revision e updated_at. Um teste remoto usando conta existente e
+registro temporário em subtransação com rollback confirmou insert, update e
+rejeição de alteração obsoleta; após o teste não restaram registros temporários.
+Não houve alteração de Auth, templates, tabelas, políticas ou dados persistentes.
+
+Isso não valida todos os campos/tabelas ou sincronização entre dispositivos,
+Storage, exclusões e retomada; tampouco impede clientes legados de escrever.
+As versões de histórico criadas pelo conector são geradas remotamente e não
+correspondem necessariamente aos prefixos de arquivo locais; reconciliar o
+histórico antes de executar um push de todas as migrações do repositório.
+A versão local SQLite permanece na versão 8: CAS não exige nova coluna. Não
+incremente a versão sem migração de dados necessária e testes de upgrade.

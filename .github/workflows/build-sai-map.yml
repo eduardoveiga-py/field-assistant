@@ -1,0 +1,26 @@
+name: Build experimental SAI offline map
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build_map:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install local vector rendering tools
+        run: |
+          set -o pipefail
+          (sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends qgis python3-qgis gdal-bin osmium-tool fonts-dejavu-core) 2>&1 | tee /tmp/install-sai.log || { python3 tool/ci_diagnostics_summary.py test /tmp/install-sai.log; exit 1; }
+      - name: Render from OSM data and verify
+        run: |
+          set -o pipefail
+          bash tool/map/build_sai.sh "$RUNNER_TEMP/sai" 2>&1 | tee /tmp/render-sai.log || { python3 tool/ci_diagnostics_summary.py test /tmp/render-sai.log; exit 1; }
+      - name: Upload experimental MBTiles and provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: sai-mapa-offline-experimental
+          path: ${{ runner.temp }}/sai/output/
+          if-no-files-found: error
+          retention-days: 14

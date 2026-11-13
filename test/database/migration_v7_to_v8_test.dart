@@ -228,6 +228,14 @@ void main() {
 
         // Insere dados legados v7 com datas ISO TEXT e sem colunas v8
         sqliteDb.execute(
+          "INSERT INTO people (id, name, latitude, longitude, first_contact_at, created_at, updated_at) "
+          "VALUES ('p_mapa_1', 'Ponto local', -3.1022, -67.9397, 1700000000, 1700000000, 1700000000)",
+        );
+        sqliteDb.execute(
+          "INSERT INTO sync_queue (id, entity_type, entity_id, operation, payload, created_at, status) "
+          "VALUES ('q_mapa_1', 'people', 'p_mapa_1', 'UPDATE', '{\"latitude\":-3.1022}', 1700000000, 'pending')",
+        );
+        sqliteDb.execute(
           "INSERT INTO person_photos (id, person_id, photo_type, image_data, created_at, updated_at) "
           "VALUES ('ph_legacy_1', 'p_1', 'person', 'data:image/jpeg;base64,AA==', '2026-10-15T14:30:00.000Z', '2026-10-16T10:00:00.000Z')",
         );
@@ -256,6 +264,18 @@ void main() {
         // Dispara migração v7 -> v8
         final verRow = await appDb.customSelect('PRAGMA user_version;').getSingle();
         expect(verRow.read<int>('user_version'), equals(8));
+
+        // Coordenadas e alterações offline devem sobreviver ao upgrade.
+        final ponto = await appDb.customSelect(
+          "SELECT latitude, longitude FROM people WHERE id = 'p_mapa_1'",
+        ).getSingle();
+        expect(ponto.read<double>('latitude'), closeTo(-3.1022, 0.000001));
+        expect(ponto.read<double>('longitude'), closeTo(-67.9397, 0.000001));
+        final pendencia = await appDb.customSelect(
+          "SELECT status, payload FROM sync_queue WHERE id = 'q_mapa_1'",
+        ).getSingle();
+        expect(pendencia.read<String>('status'), 'pending');
+        expect(pendencia.read<String>('payload'), contains('-3.1022'));
 
         // 1. Valida adição de person_photos.file_path e leitura tipada Drift de datas migradas
         final photosCols = await appDb.customSelect('PRAGMA table_info(person_photos)').get();
