@@ -26,3 +26,20 @@ Não registrar tokens nem links completos nos logs ou testes.
 
 Os testes Flutter não foram executados neste ambiente; sintaxe isolada não
 comprova compilação, integração ou comportamento em dispositivo.
+
+## Retorno nativo opt-in preparado, ainda não habilitado
+
+A branch inclui o destino `ministeriopessoal://auth/callback` registrado no
+iOS e no Android, tratamento de link único após instalar o listener de Auth,
+e uso opcional do destino em cadastro, reenvio e recuperação. Para não alterar
+o login existente sem validação de entrega, ele só é ativado compilando com
+`--dart-define=AUTH_NATIVE_CALLBACK=true`; sem a flag o SDK e os redirecionamentos
+anteriores permanecem como estavam. A URI não é escrita nos logs.
+
+Antes de ativar a flag para usuários, configurar a allowlist do projeto para
+esse destino e validar em instalação descartável no iOS, LiveContainer/SideStore
+e Android: app aberto e fechado, cadastro, link expirado, recuperação e sessão
+existente. Testar que o SDK e o handler não consomem o mesmo código duas vezes.
+Custom schemes não provam identidade do app: verificar proteção PKCE e se o
+contêiner realmente entrega o retorno ao aplicativo. A configuração remota Auth
+não foi alterada nesta etapa; localhost continua sendo um problema no modo atual.

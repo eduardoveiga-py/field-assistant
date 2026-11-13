@@ -71,3 +71,22 @@ As três migrações CAS locais usam agora os mesmos prefixos registrados no
 histórico remoto (`20261113173516`, `20261113173528`, `20261113175529`). As
 migrações **anteriores** ainda diferem entre repositório e projeto; não executar
 `supabase db push` indiscriminadamente: comparar conteúdo e histórico primeiro.
+
+## Salvaguardas de exclusão e mídia nesta branch
+
+A exclusão lógica exige base, revisão e timestamp compatíveis, e usa a mesma RPC
+CAS para verificar a linha inteira no instante do UPDATE. Não remove arquivos de
+Storage ao enviar para a lixeira. Comparação de timestamp considera segundos por
+causa da precisão do SQLite legado; clientes que não incrementam revision ainda
+não são protegidos integralmente contra alterações no mesmo segundo.
+
+Exclusões definitivas legadas não contêm a base necessária para comprovar o que
+seria apagado, e a exclusão de arquivo e banco não é transação única. Por isso,
+a exclusão remota definitiva é deliberadamente suspensa como conflito, sem
+remover registro ou binário. A exclusão local já solicitada ainda ocorre; a
+remoção remota e dependentes exigem protocolo durável e resolução. Não confundir
+esta salvaguarda com uma implementação completa da exclusão definitiva.
+Arquivos locais de áudio, foto ou documento que deveriam ser enviados mas estão
+ausentes ou vazios passam a gerar erro e manter a operação sem confirmação.
+Fila em backoff, não configurada ou com operações não resolvidas não deve ser
+apresentada como totalmente sincronizada.

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui';
 
 import 'package:drift/drift.dart' as drift;
+import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -13,6 +14,7 @@ import '../../core/app_theme.dart';
 import '../../core/app_version.dart';
 import '../../database/app_database.dart';
 import '../../sync/supabase_sync_service.dart';
+import '../../sync/native_auth_callback.dart';
 import '../main_navigation_shell.dart';
 import '../providers.dart';
 import 'auth_return_screen.dart';
@@ -37,6 +39,8 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
   Session? _latestSession;
   String _statusMessage = 'Inicializando Assistente de Campo...';
   StreamSubscription<AuthState>? _authSub;
+  StreamSubscription<Uri>? _linkSub;
+  final NativeAuthCallback _callback = NativeAuthCallback();
   late final AnimationController _pulseController;
 
   @override
@@ -114,8 +118,22 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
       });
     }
 
-    // O SDK Supabase já processa o callback. Não trocar o mesmo código duas
-    // vezes: um código PKCE ou link de uso único pode falhar na segunda troca.
+    // Na modalidade opt-in, o SDK não processa o link automaticamente. A
+    // assinatura é criada APÓS o listener de autenticação, inclusive no cold start.
+    if (client != null && NativeAuthCallback.enabled) {
+      final callbackClient = client;
+      _linkSub = AppLinks().uriLinkStream.listen((uri) async {
+        if (!_callback.claim(uri)) return;
+        try {
+          await callbackClient.auth.getSessionFromUrl(uri);
+        } catch (_) {
+          // Nunca imprimir a URI: ela pode conter códigos ou tokens.
+          if (mounted) setState(() => _gateState = _AuthGateState.callbackError);
+        }
+      }, onError: (Object _, StackTrace __) {
+        if (mounted) setState(() => _gateState = _AuthGateState.callbackError);
+      });
+    }
 
     // Verifica se modo offline foi ativado previamente
     bool isOfflineMode = false;
@@ -243,6 +261,7 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
   @override
   void dispose() {
     _authSub?.cancel();
+    _linkSub?.cancel();
     _pulseController.dispose();
     super.dispose();
   }
@@ -572,6 +591,7 @@ class _SupabaseAuthScreenState extends State<SupabaseAuthScreen> {
         final res = await client.auth.signUp(
           email: email,
           password: password,
+          emailRedirectTo: NativeAuthCallback.redirectTo,
           data: name.isNotEmpty ? {'full_name': name} : null,
         );
         if (res.session != null) {
@@ -641,6 +661,7 @@ class _SupabaseAuthScreenState extends State<SupabaseAuthScreen> {
       await Supabase.instance.client.auth.resend(
         type: OtpType.signup,
         email: email,
+        emailRedirectTo: NativeAuthCallback.redirectTo,
       );
       setState(() {
         _infoMessage =
@@ -679,7 +700,7 @@ class _SupabaseAuthScreenState extends State<SupabaseAuthScreen> {
       _errorMessage = null;
     });
     try {
-      await Supabase.instance.client.auth.resetPasswordForEmail(email);
+      await Supabase.instance.client.auth.resetPasswordForEmail(email, redirectTo: NativeAuthCallback.redirectTo);
       setState(() {
         _infoMessage = 'E-mail de recuperação de senha enviado para $email.';
       });

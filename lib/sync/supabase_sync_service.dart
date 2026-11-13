@@ -14,6 +14,7 @@ import '../database/app_database.dart';
 import '../database/repository.dart';
 import '../ui/providers.dart';
 import 'media_bytes.dart';
+import 'native_auth_callback.dart';
 import 'sync_engine.dart';
 import 'supabase_config.dart';
 
@@ -124,6 +125,7 @@ class SupabaseSyncService {
       await Supabase.initialize(
         url: url,
         publishableKey: anonKey,
+        authOptions: FlutterAuthClientOptions(detectSessionInUri: !NativeAuthCallback.enabled),
       );
     }
   }
@@ -150,6 +152,7 @@ class SupabaseSyncService {
       await Supabase.initialize(
         url: cleanUrl,
         publishableKey: cleanKey,
+        authOptions: FlutterAuthClientOptions(detectSessionInUri: !NativeAuthCallback.enabled),
       );
     }
 
@@ -2282,11 +2285,13 @@ class SupabaseSyncService {
 
   Future<SyncProcessResult> _fetchRemoteChanges() async {
     if (!isConfigured) {
+      _setStatus(SyncStatus.waitingConnection);
       return const SyncProcessResult(
         totalProcessed: 0,
         successCount: 0,
         failureCount: 0,
         conflictCount: 0,
+        errors: ['Supabase não configurado. Busca remota suspensa.'],
         message: 'Supabase não configurado. Busca remota suspensa.',
       );
     }
