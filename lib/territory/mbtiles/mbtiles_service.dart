@@ -127,12 +127,12 @@ class MBTilesService {
       id: 'br_am_solimoes',
       country: 'Brasil',
       state: 'Amazonas',
-      name: 'Santo Antônio do Içá & Alto Solimões',
+      name: 'Santo Antônio do Içá e entorno (experimental)',
       description:
-          'Território fronteiriço, comunidades ribeirinhas e aldeias Ticuna ao longo do Rio Solimões.',
-      minZoom: 6,
-      maxZoom: 18,
-      sizeBytes: 42 * 1024 * 1024, // 42 MB
+          'Retângulo de SAI e entorno; não cobre todo o Alto Solimões. Aldeias, rios e caminhos podem estar incompletos. Não usar para navegação.',
+      minZoom: 8,
+      maxZoom: 16,
+      sizeBytes: 120 * 1024 * 1024,
       isInstalled: false, // Não é mais estaticamente pré-instalado
     ),
     MBTileRegion(

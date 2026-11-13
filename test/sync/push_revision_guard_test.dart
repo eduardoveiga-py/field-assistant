@@ -185,6 +185,7 @@ void main() {
         final now = DateTime.now().toUtc();
         final pBlocked = await repo.createPerson(name: 'Excluir Bloqueado');
         final pAllowed = await repo.createPerson(name: 'Excluir Permitido');
+        final storedAllowed = (await repo.getPersonById(pAllowed.id))!;
 
         // Remove INSERTs da fila e deixa apenas DELETEs
         await db.delete(db.syncQueue).go();
@@ -227,7 +228,7 @@ void main() {
                     'tags': '[]',
                     'first_contact_at': now.toIso8601String(),
                     'created_at': now.toIso8601String(),
-                    'updated_at': now.subtract(const Duration(minutes: 10)).toIso8601String(),
+                    'updated_at': storedAllowed.updatedAt.toUtc().toIso8601String(),
                     'revision': 1,
                   },
                 ],
@@ -235,10 +236,13 @@ void main() {
               );
             }
           }
-          if (request.method == 'PATCH' && path.contains('/rest/v1/people')) {
-            if (query.contains(pBlocked.id)) patchedBlocked = true;
-            if (query.contains(pAllowed.id)) patchedAllowed = true;
-            return _mockJson(request, []);
+          if (request.method == 'POST' && path.endsWith('/rpc/sync_upsert_if_unchanged')) {
+            final payload = jsonDecode(request.body) as Map<String, dynamic>;
+            final id = (payload['p_payload'] as Map)['id'];
+            if (id == pBlocked.id) patchedBlocked = true;
+            if (id == pAllowed.id) patchedAllowed = true;
+            expect(payload['p_expected_record'], isNotNull);
+            return _mockJson(request, {'success': true});
           }
           return _mockJson(request, []);
         });
@@ -264,6 +268,26 @@ void main() {
         expect(res.successCount, equals(1));
       },
     );
+
+    test('Exclusão definitiva legada sem base não remove registros nem mídia remotamente', () async {
+      final person = await repo.createPerson(name: 'Exclusão protegida');
+      await db.delete(db.syncQueue).go();
+      await repo.permanentlyDeleteItem('people', person.id);
+      var requests = 0;
+      final client = MockClient((request) async {
+        requests++;
+        return _mockJson(request, []);
+      });
+      final sync = SupabaseSyncService(db: db, repository: repo,
+          clientOverride: SupabaseClient('https://mock.supabase.co', 'dummy-key', httpClient: client));
+      addTearDown(sync.dispose);
+      final result = await sync.processQueue();
+      expect(requests, 0);
+      expect(result.success, isFalse);
+      expect(result.conflictCount, 1);
+      final op = (await db.select(db.syncQueue).get()).single;
+      expect(op.status, 'conflict');
+    });
 
     test(
       'A3: person_photos realiza upload binário para Storage limpando image_data no PostgREST e persiste file_path no pull',

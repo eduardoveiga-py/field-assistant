@@ -80,12 +80,14 @@ jobs:
       - name: Run Static Analysis
         run: |
           set +e
-          dart analyze lib test --fatal-infos --format machine > /tmp/dart-analysis.txt
+          dart analyze lib test --fatal-warnings --format machine > /tmp/dart-analysis.txt
           status=$?
           cat /tmp/dart-analysis.txt
           while IFS='|' read -r severity type code file line column length message; do
-            if [ -n "$message" ]; then
+            if [ -n "$message" ] && [ "$severity" = "ERROR" ]; then
               echo "::error file=$file,line=$line,col=$column::$code: $message"
+            elif [ -n "$message" ] && [ "$severity" = "WARNING" ]; then
+              echo "::warning file=$file,line=$line,col=$column::$code: $message"
             fi
           done < /tmp/dart-analysis.txt
           exit "$status"

@@ -10,6 +10,7 @@ import 'package:ministerio_pessoal/contacts/phone_contacts_manager.dart';
 import 'package:ministerio_pessoal/database/app_database.dart';
 import 'package:ministerio_pessoal/database/repository.dart';
 import 'package:ministerio_pessoal/sync/supabase_sync_service.dart';
+import 'package:ministerio_pessoal/sync/sync_engine.dart';
 import 'package:ministerio_pessoal/territory/landmark_manager.dart';
 import 'package:ministerio_pessoal/voice_notes/voice_note_models.dart';
 import 'package:ministerio_pessoal/voice_notes/voice_notes_manager.dart';
@@ -113,7 +114,9 @@ void main() {
         );
         addTearDown(syncSvc.dispose);
 
-        await syncSvc.processQueue();
+        final deferred = await syncSvc.processQueue();
+        expect(deferred.success, isFalse);
+        expect(syncSvc.currentStatus, isNot(SyncStatus.synced));
         expect(networkHits, equals(0), reason: 'Operação dentro da janela de backoff (2^4 = 16s) deve aguardar');
 
         // 5ª falha promove para dead-letter ('failed')

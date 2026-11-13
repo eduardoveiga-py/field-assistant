@@ -82,6 +82,7 @@ void main() {
 
       expect(result.totalProcessed, greaterThanOrEqualTo(1));
       expect(result.successCount, equals(0));
+      expect(result.success, isFalse);
       expect(result.message, contains('não configurado'));
       expect(syncService.currentStatus, equals(SyncStatus.waitingConnection));
     });

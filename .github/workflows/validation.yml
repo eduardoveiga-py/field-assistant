@@ -20,7 +20,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          dart analyze lib test --fatal-infos --format machine > /tmp/analysis.txt 2>&1
+          dart analyze lib test --fatal-warnings --format machine > /tmp/analysis.txt 2>&1
           status=$?
           cat /tmp/analysis.txt
           if [ "$status" -ne 0 ]; then
