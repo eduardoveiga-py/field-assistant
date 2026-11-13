@@ -1,0 +1,176 @@
+name: Publish iPhone test prerelease
+on:
+  push:
+    branches: ['arena/9ee2e915-field-assistant']
+    paths: ['.github/workflows/iphone-test-release.yml']
+permissions:
+  contents: write
+  actions: read
+jobs:
+  ios:
+    name: Build iPhone test IPA
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate version and required client configuration
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          python3 - <<'PY'
+          import os, re, sys
+          from pathlib import Path
+          from urllib.parse import urlparse
+          pubspec = Path('pubspec.yaml').read_text(encoding='utf-8')
+          if not re.search(r'^version:\s*1\.3\.4\+11\s*$', pubspec, re.M):
+              sys.exit('::error::Versão incorreta para a pré-release de teste.')
+          url = os.environ.get('SUPABASE_URL','').strip()
+          key = os.environ.get('SUPABASE_ANON_KEY','').strip()
+          parsed = urlparse(url)
+          if parsed.scheme != 'https' or parsed.hostname != 'pchwrcwrvnbiywrdsvum.supabase.co' or len(key) < 20 or 'your-' in key.lower():
+              sys.exit('::error::Configuração Supabase de compilação ausente ou inválida. Não será publicado um IPA sem login/sync configurados.')
+          print('Configuração de cliente presente; valores não são exibidos.')
+          PY
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - run: flutter pub get
+      - name: Build and package IPA without signing
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
+          GOOGLE_IOS_CLIENT_ID: ${{ secrets.GOOGLE_IOS_CLIENT_ID }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          ios_client = os.environ.get('GOOGLE_IOS_CLIENT_ID', '').strip()
+          if ios_client:
+              plist = Path('ios/Runner/Info.plist')
+              text = plist.read_text(encoding='utf-8')
+              prefix = ios_client.removesuffix('.apps.googleusercontent.com')
+              text = text.replace('YOUR_GOOGLE_IOS_CLIENT_ID.apps.googleusercontent.com', prefix + '.apps.googleusercontent.com')
+              text = text.replace('com.googleusercontent.apps.YOUR_GOOGLE_IOS_CLIENT_ID', 'com.googleusercontent.apps.' + prefix)
+              plist.write_text(text, encoding='utf-8')
+          PY
+          args=("--dart-define=SUPABASE_URL=$SUPABASE_URL" "--dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY" "--dart-define=AUTH_NATIVE_CALLBACK=false")
+          if [ -n "${GOOGLE_WEB_CLIENT_ID:-}" ]; then args+=("--dart-define=GOOGLE_WEB_CLIENT_ID=$GOOGLE_WEB_CLIENT_ID"); fi
+          flutter build ios --no-codesign --release "${args[@]}"
+          mkdir -p dist-ios/Payload
+          cp -R build/ios/iphoneos/Runner.app dist-ios/Payload/
+          cp ios/Runner/Assets.xcassets/AppIcon.appiconset/*.png dist-ios/Payload/Runner.app/
+          cp ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-1024x1024@1x.png dist-ios/Payload/Runner.app/AppIcon.png
+          cp ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-60x60@2x.png dist-ios/Payload/Runner.app/AppIcon60x60.png
+          cp ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-60x60@2x.png dist-ios/Payload/Runner.app/AppIcon60x60@2x.png
+          cp ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-76x76@2x.png dist-ios/Payload/Runner.app/AppIcon76x76.png
+          cp ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-76x76@2x.png dist-ios/Payload/Runner.app/AppIcon76x76@2x~ipad.png
+          cd dist-ios && zip -qr app-release-unsigned.ipa Payload && rm -rf Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: iphone-test-ipa
+          path: dist-ios/app-release-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 14
+  publish:
+    name: Verify and publish prerelease
+    needs: ios
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: iphone-test-ipa
+          path: release-assets
+      - name: Download previously validated SAI map
+        uses: actions/download-artifact@v4
+        with:
+          name: sai-mapa-offline-experimental
+          path: map-artifact
+          run-id: 43474748369
+          github-token: ${{ github.token }}
+      - name: Verify IPA, map, manifest and checksums
+        run: |
+          set -euo pipefail
+          (cd map-artifact && sha256sum -c SHA256SUMS.txt)
+          python3 tool/map/verify_full_extent.py map-artifact/sai-experimental.mbtiles
+          cp map-artifact/sai-experimental.mbtiles release-assets/br_am_solimoes.mbtiles
+          (cd map-artifact && zip -q ../release-assets/mapa-sai-proveniencia.zip LEIA-ME.txt source-sha256.txt source-info.txt SHA256SUMS.txt)
+          python3 - <<'PY'
+          import json, plistlib, zipfile
+          from pathlib import Path
+          ipa = Path('release-assets/app-release-unsigned.ipa')
+          with zipfile.ZipFile(ipa) as package:
+              broken = package.testzip()
+              if broken:
+                  raise SystemExit('IPA contém entrada corrompida: ' + broken)
+              info = plistlib.loads(package.read('Payload/Runner.app/Info.plist'))
+          if info.get('CFBundleIdentifier') != 'com.ministeriopessoal.ministerioPessoal':
+              raise SystemExit('Bundle identifier inesperado.')
+          if info.get('CFBundleShortVersionString') != '1.3.4':
+              raise SystemExit('Versão inesperada dentro do IPA.')
+          if info.get('MinimumOSVersion') != '15.0':
+              raise SystemExit('Versão mínima iOS inesperada: ' + str(info.get('MinimumOSVersion')))
+          data = json.loads(Path('apps.json').read_text(encoding='utf-8'))
+          app = data['apps'][0]
+          if app['version'] != '1.3.4' or app['versions'][0]['version'] != '1.3.4':
+              raise SystemExit('Manifesto de versão inconsistente.')
+          url = 'https://github.com/eduardoveiga-py/field-assistant/releases/download/v1.3.4/apps.json'
+          data['sourceURL'] = url
+          app['size'] = ipa.stat().st_size
+          app['versions'][0]['size'] = ipa.stat().st_size
+          # Esta pré-release contém apenas IPA e mapa; não anuncie APK nem checksums Android.
+          app.pop('downloadURL_apk', None)
+          Path('release-assets/apps.json').write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          print('IPA verificado: iOS mínimo 15, bundle e versão corretos; tamanho:', ipa.stat().st_size)
+          PY
+          (cd release-assets && sha256sum app-release-unsigned.ipa br_am_solimoes.mbtiles mapa-sai-proveniencia.zip apps.json > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+      - name: Create draft prerelease, attach verified assets and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view v1.3.4 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo '::error::A release v1.3.4 já existe; não será sobrescrita.'
+            exit 1
+          fi
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v1.3.4" >/dev/null 2>&1; then
+            echo '::error::A tag v1.3.4 já existe; não será reutilizada automaticamente.'
+            exit 1
+          fi
+          cat > /tmp/release-notes.md <<'NOTES'
+          ## Pré-release experimental para testes no iPhone/iPad
+
+          Esta versão não substitui a release estável. O IPA é **não assinado** e
+          requer instalação/sideload compatível, como o método usado com
+          LiveContainer/SideStore. Requer iOS/iPadOS 15 ou superior. Antes de
+          atualizar, faça e verifique um backup: a preservação dos dados no seu
+          contêiner ainda precisa ser testada.
+
+          - Fonte de teste (adicionar manualmente ao LiveContainer/SideStore):
+            https://github.com/eduardoveiga-py/field-assistant/releases/download/v1.3.4/apps.json
+          - O mapa raster de Santo Antônio do Içá e entorno é experimental,
+            zooms 8–16. Comunidades, rios e vias podem estar ausentes. Não usar
+            como única referência para navegação.
+          - Login com Google depende dos IDs OAuth iOS/Web configurados e ainda
+            requer teste; sua presença não garante a configuração do provedor.
+          - O retorno de autenticação nativo continua desativado; confirmação
+            e recuperação podem redirecionar para localhost.
+          - Exclusões definitivas remotas antigas sem base verificável estão
+            bloqueadas para preservar dados.
+          - Modo avião, GPS, restauração, concorrência entre aparelhos e cobertura
+            das aldeias ainda precisam ser validados em campo.
+          - `SHA256SUMS.txt` permite verificar integridade dos arquivos; não
+            constitui assinatura criptográfica de desenvolvedor do IPA.
+          NOTES
+          gh release create v1.3.4 --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --draft --prerelease --title 'v1.3.4 — Teste iPhone e mapa offline' --notes-file /tmp/release-notes.md
+          gh release upload v1.3.4 --repo "$GITHUB_REPOSITORY" release-assets/app-release-unsigned.ipa release-assets/apps.json release-assets/br_am_solimoes.mbtiles release-assets/mapa-sai-proveniencia.zip release-assets/SHA256SUMS.txt
+          gh release view v1.3.4 --repo "$GITHUB_REPOSITORY" --json assets --jq '[.assets[].name] | if length == 5 and (index("app-release-unsigned.ipa") != null) and (index("apps.json") != null) and (index("br_am_solimoes.mbtiles") != null) and (index("mapa-sai-proveniencia.zip") != null) and (index("SHA256SUMS.txt") != null) then "Assets conferidos" else error("Assets faltando") end'
+          gh release edit v1.3.4 --repo "$GITHUB_REPOSITORY" --draft=false --prerelease
