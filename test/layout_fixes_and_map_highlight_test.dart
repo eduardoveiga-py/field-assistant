@@ -390,14 +390,16 @@ void main() {
         child: MaterialApp(home: ContactsMapScreen(highlightPersonId: 'review_geo',
           geocodeAddress: (_) async => const ReverseGeocodingResult(latitude: -3.1, longitude: -67.9))),
       ));
-      await tester.pump(const Duration(milliseconds: 500));
-      await tester.pumpAndSettle();
+      for (var i = 0; i < 15; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
       expect(find.text('Localização aproximada'), findsOneWidget);
       final person = await (db.select(db.people)..where((t) => t.id.equals('review_geo'))).getSingle();
       expect(person.latitude, isNull);
       expect(person.longitude, isNull);
       await tester.tap(find.text('Agora não'));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
       final after = await (db.select(db.people)..where((t) => t.id.equals('review_geo'))).getSingle();
       expect(after.latitude, isNull);
       expect(after.longitude, isNull);
