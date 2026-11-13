@@ -48,8 +48,9 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     expect(requests.length, 1);
     // Centro da janela é uma área visível do mapa, longe dos botões.
-    await tester.tapAt(const Offset(460, 250));
-    await tester.pump();
+    await tester.tapAt(tester.getCenter(find.byType(InteractiveViewer)) + const Offset(60, 0));
+    // O mesmo gesto também oferece duplo toque: aguarda o prazo de desambiguação.
+    await tester.pump(const Duration(milliseconds: 400));
     expect(requests.length, 2);
     requests[0].complete(const ReverseGeocodingResult(latitude: -3, longitude: -60, street: 'Resposta antiga'));
     await tester.pump();

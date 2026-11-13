@@ -170,7 +170,7 @@ void main() {
     });
 
     testWidgets(
-      'ContactsMapScreen GPS button shows feedback and falls back to Santo Antônio do Içá when permission denied',
+      'ContactsMapScreen GPS denial preserves the current map view',
       (tester) async {
         tester.view.physicalSize = const Size(1024, 768);
         tester.view.devicePixelRatio = 1.0;
@@ -207,8 +207,8 @@ void main() {
           findsOneWidget,
         );
         expect(
-          find.textContaining('Santo Antônio do Içá'),
-          findsAtLeastNWidgets(1),
+          find.textContaining('O mapa permaneceu na posição anterior'),
+          findsOneWidget,
         );
 
         await tester.pumpWidget(const SizedBox());
@@ -872,7 +872,7 @@ void main() {
       await tester.tap(find.byTooltip('Minha Posição GPS'));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Mantendo ponto atual'), findsOneWidget);
+      expect(find.textContaining('Mantendo o ponto atual'), findsOneWidget);
       expect(find.textContaining('-3.150000, -67.900000'), findsOneWidget);
     });
   });

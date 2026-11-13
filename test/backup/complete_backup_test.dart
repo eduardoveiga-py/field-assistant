@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:drift/native.dart';
 import 'package:drift/drift.dart' as drift;
 import 'package:ministerio_pessoal/database/app_database.dart';
@@ -17,6 +18,7 @@ void main() {
     late Directory testDocsDir;
 
     setUp(() async {
+      FlutterSecureStorage.setMockInitialValues({});
       testDocsDir = await Directory.systemTemp.createTemp(
         'complete_backup_test_',
       );

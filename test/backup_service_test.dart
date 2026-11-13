@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:drift/native.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:crypto/crypto.dart';
@@ -12,6 +13,7 @@ import 'package:ministerio_pessoal/database/repository.dart';
 import 'package:ministerio_pessoal/settings/backup_service.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   group('Serviço de Backup Criptografado e Restauração', () {
     late AppDatabase db;
     late AppRepository repository;
@@ -19,6 +21,7 @@ void main() {
     late Directory testDocsDir;
 
     setUp(() async {
+      FlutterSecureStorage.setMockInitialValues({});
       testDocsDir = await Directory.systemTemp.createTemp('bak_test_docs_');
       db = AppDatabase.forTesting(NativeDatabase.memory());
       repository = AppRepository(db);
