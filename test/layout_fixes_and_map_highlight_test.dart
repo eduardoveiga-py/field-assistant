@@ -9,6 +9,7 @@ import 'package:ministerio_pessoal/ui/main_navigation_shell.dart';
 import 'package:ministerio_pessoal/ui/providers.dart';
 import 'package:ministerio_pessoal/ui/screens/contacts_map_screen.dart';
 import 'package:ministerio_pessoal/territory/tile_cache/tile_cache_service.dart';
+import 'package:ministerio_pessoal/territory/geocoding_service.dart';
 import 'package:ministerio_pessoal/ui/screens/experiences_screen.dart';
 import 'package:ministerio_pessoal/ui/screens/research_screen.dart';
 import 'package:ministerio_pessoal/appointments/ics_picker_helper.dart';
@@ -371,6 +372,37 @@ void main() {
         await tester.pump(const Duration(milliseconds: 100));
       },
     );
+
+    testWidgets('Busca aproximada não grava coordenadas sem confirmação', (tester) async {
+      tester.view.physicalSize = const Size(1024, 768);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final db = AppDatabase.forTesting(NativeDatabase.memory());
+      addTearDown(db.close);
+      final now = DateTime.now();
+      await db.into(db.people).insert(PeopleCompanion.insert(
+        id: 'review_geo', name: 'Pessoa', address: const Value('Endereço aproximado'),
+        firstContactAt: now, createdAt: now, updatedAt: now,
+      ));
+      await tester.pumpWidget(ProviderScope(
+        overrides: [databaseProvider.overrideWithValue(db)],
+        child: MaterialApp(home: ContactsMapScreen(highlightPersonId: 'review_geo',
+          geocodeAddress: (_) async => const ReverseGeocodingResult(latitude: -3.1, longitude: -67.9))),
+      ));
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pumpAndSettle();
+      expect(find.text('Localização aproximada'), findsOneWidget);
+      final person = await (db.select(db.people)..where((t) => t.id.equals('review_geo'))).getSingle();
+      expect(person.latitude, isNull);
+      expect(person.longitude, isNull);
+      await tester.tap(find.text('Agora não'));
+      await tester.pumpAndSettle();
+      final after = await (db.select(db.people)..where((t) => t.id.equals('review_geo'))).getSingle();
+      expect(after.latitude, isNull);
+      expect(after.longitude, isNull);
+      await tester.pumpWidget(const SizedBox());
+    });
 
     testWidgets(
       'MapLocationPickerDialog allows zooming up to level 19 without errors',

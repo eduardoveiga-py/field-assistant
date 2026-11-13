@@ -30,8 +30,9 @@ import 'download_maps_screen.dart';
 
 class ContactsMapScreen extends ConsumerStatefulWidget {
   final String? highlightPersonId;
+  final Future<ReverseGeocodingResult?> Function(String)? geocodeAddress;
 
-  const ContactsMapScreen({super.key, this.highlightPersonId});
+  const ContactsMapScreen({super.key, this.highlightPersonId, this.geocodeAddress});
 
   @override
   ConsumerState<ContactsMapScreen> createState() => _ContactsMapScreenState();
@@ -135,15 +136,34 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
       Future.delayed(const Duration(milliseconds: 250), () async {
         try {
           if (!mounted) return;
-          final res = await GeocodingService.geocodeAddress(
-            personToGeocode.address!,
+          final geocode = widget.geocodeAddress ?? GeocodingService.geocodeAddress;
+          final res = await geocode(personToGeocode.address!);
+          if (res == null || !mounted) return;
+          final review = await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Localização aproximada'),
+              content: const Text('A busca por endereço pode apontar para o lugar errado. Revise e selecione o ponto no mapa antes de salvar.'),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Agora não')),
+                FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Revisar no mapa')),
+              ],
+            ),
           );
-          if (res != null && mounted) {
+          if (review != true || !mounted) return;
+          final selected = await showDialog<ReverseGeocodingResult>(
+            context: context,
+            builder: (_) => MapLocationPickerDialog(
+              initialLat: res.latitude, initialLng: res.longitude,
+              initialAddress: personToGeocode.address,
+            ),
+          );
+          if (selected != null && mounted) {
             await ref.read(repositoryProvider).applyGeocodedCoordinates(
               personId: personToGeocode.id,
               expectedAddress: personToGeocode.address!,
-              latitude: res.latitude,
-              longitude: res.longitude,
+              latitude: selected.latitude,
+              longitude: selected.longitude,
             );
           }
         } catch (e, st) {
