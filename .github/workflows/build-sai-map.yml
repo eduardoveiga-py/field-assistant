@@ -1,5 +1,8 @@
 name: Build experimental SAI offline map
 on:
+  push:
+    branches: ['arena/**']
+    paths: ['tool/map/**', '.github/workflows/build-sai-map.yml']
   workflow_dispatch:
 permissions:
   contents: read
