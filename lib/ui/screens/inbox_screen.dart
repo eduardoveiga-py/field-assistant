@@ -8,6 +8,7 @@ import '../../core/app_logger.dart';
 import '../../core/app_theme.dart';
 import '../../database/app_database.dart';
 import '../../inbox/inbox_manager.dart';
+import '../../inbox/exchange_service.dart';
 import '../../inbox/jw_email_service.dart';
 import '../../research/research_manager.dart';
 import '../../voice_notes/audio_recording_service.dart';
@@ -81,6 +82,26 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
     setState(() => _isSyncingEmails = true);
     try {
       final db = ref.read(repositoryProvider).db;
+      final protocol = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_mail_protocol'))).getSingleOrNull();
+      if (protocol?.value == 'exchange') {
+        final email = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_eas_email'))).getSingleOrNull();
+        final host = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_eas_host'))).getSingleOrNull();
+        const storage = FlutterSecureStorage();
+        final password = await storage.read(key: 'jw_eas_password');
+        final deviceId = await storage.read(key: 'jw_eas_device_id');
+        if (email == null || host == null || password == null || password.isEmpty || deviceId == null || deviceId.isEmpty) {
+          throw const ExchangeException('Configure novamente a conta Exchange em Configurações.');
+        }
+        final session = ExchangeProtocolSession(host: host.value, username: email.value,
+          password: password, deviceId: deviceId);
+        final result = await ExchangeReadService(db).sync(session: session, host: host.value,
+          account: email.value, deviceId: deviceId);
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('${result.saved} prévia(s) Exchange salva(s). '
+            '${result.moreAvailable ? 'Há mais mensagens; sincronize novamente. ' : ''}'
+            'Corpos podem ser parciais; anexos não foram importados.')));
+        return;
+      }
       final emailEntry = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_imap_email'))).getSingleOrNull();
       const secureStorage = FlutterSecureStorage();
       String? password = await secureStorage.read(key: 'jw_imap_password');
@@ -2296,6 +2317,15 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
 
                                     try {
                                       final db = ref.read(repositoryProvider).db;
+                                      final protocol = await (db.select(db.appKvStore)
+                                            ..where((t) => t.key.equals('jw_mail_protocol'))).getSingleOrNull();
+                                      if (protocol?.value == 'exchange') {
+                                        if (ctx.mounted) setSheetState(() {
+                                          isSending = false;
+                                          inlineError = 'Envio pelo Exchange ainda não disponível. Salve o rascunho e use o correio oficial.';
+                                        });
+                                        return;
+                                      }
                                       final emailEntry = await (db.select(db.appKvStore)
                                             ..where((t) => t.key.equals('jw_imap_email')))
                                           .getSingleOrNull();

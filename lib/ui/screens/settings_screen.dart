@@ -6,6 +6,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:uuid/uuid.dart';
+import 'package:eas_client/eas_client.dart' as eas;
+import '../../inbox/exchange_service.dart';
 import '../../appointments/calendar_sync_coordinator.dart';
 import '../../core/app_logger.dart';
 import '../../core/biometric_auth_service.dart';
@@ -51,6 +54,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final TextEditingController _jwSmtpPortCtrl = TextEditingController(text: '587');
   String _jwSmtpSecurity = 'starttls';
   bool _isTestingJwEmail = false;
+  bool _isTestingExchange = false;
+  final _exchangeEmailCtrl = TextEditingController();
+  final _exchangePasswordCtrl = TextEditingController();
+  final _exchangeHostCtrl = TextEditingController();
   late Future<DateTime?> _lastSilentBackupFuture;
 
   @override
@@ -118,6 +125,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   @override
   void dispose() {
+    _exchangeEmailCtrl.dispose();
+    _exchangePasswordCtrl.dispose();
+    _exchangeHostCtrl.dispose();
     _jwEmailCtrl.dispose();
     _jwPasswordCtrl.dispose();
     _jwHostCtrl.dispose();
@@ -161,6 +171,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         }
       }
 
+      final easEmail = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_eas_email'))).getSingleOrNull();
+      final easHost = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_eas_host'))).getSingleOrNull();
+      final easPassword = await secureStorage.read(key: 'jw_eas_password');
       final host = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_imap_host'))).getSingleOrNull();
       final port = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_imap_port'))).getSingleOrNull();
       final smtpHost = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_smtp_host'))).getSingleOrNull();
@@ -169,6 +182,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
       if (mounted) {
         setState(() {
+          if (easEmail != null) _exchangeEmailCtrl.text = easEmail.value;
+          if (easHost != null) _exchangeHostCtrl.text = easHost.value;
+          if (easPassword != null) _exchangePasswordCtrl.text = easPassword;
           if (email != null) _jwEmailCtrl.text = email.value;
           if (pass != null) _jwPasswordCtrl.text = pass;
           if (host != null && host.value.isNotEmpty) _jwHostCtrl.text = host.value;
@@ -728,10 +744,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
           // Seção: E-mail Teocrático e JW Pub (IMAP)
           const Text(
-            'E-mail Teocrático JW.org (JW Pub / IMAP)',
+            'E-mail Teocrático',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
+          _buildExchangeConfigCard(),
           _buildJwEmailConfigCard(isDark),
 
           const SizedBox(height: 20),
@@ -2065,6 +2082,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         smtpSecurity: _jwSmtpSecurity,
       );
 
+      await db.into(db.appKvStore).insertOnConflictUpdate(
+        AppKvStoreCompanion.insert(key: 'jw_mail_protocol', value: 'imap', updatedAt: Value(DateTime.now())),
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -2091,6 +2111,77 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (mounted) setState(() => _isTestingJwEmail = false);
     }
   }
+
+  Future<void> _testExchange() async {
+    final host = _exchangeHostCtrl.text.trim();
+    final email = _exchangeEmailCtrl.text.trim();
+    final password = _exchangePasswordCtrl.text;
+    if (host.isEmpty || email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Informe servidor, usuário e senha Exchange.')));
+      return;
+    }
+    setState(() => _isTestingExchange = true);
+    try {
+      const storage = FlutterSecureStorage();
+      var deviceId = await storage.read(key: 'jw_eas_device_id');
+      if (deviceId == null || deviceId.isEmpty) {
+        deviceId = const Uuid().v4().replaceAll('-', '');
+        await storage.write(key: 'jw_eas_device_id', value: deviceId);
+      }
+      final session = ExchangeProtocolSession(host: host, username: email, password: password, deviceId: deviceId);
+      try {
+        await session.inboxId();
+      } finally {
+        session.close();
+      }
+      await storage.write(key: 'jw_eas_password', value: password);
+      final db = ref.read(repositoryProvider).db;
+      await db.transaction(() async {
+        final now = Value(DateTime.now());
+        for (final entry in {'jw_eas_host': host.toLowerCase(), 'jw_eas_email': email, 'jw_mail_protocol': 'exchange'}.entries) {
+          await db.into(db.appKvStore).insertOnConflictUpdate(
+            AppKvStoreCompanion.insert(key: entry.key, value: entry.value, updatedAt: now));
+        }
+      });
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Conexão e INBOX Exchange verificadas. A leitura ainda é experimental.'), backgroundColor: Colors.green));
+    } catch (e) {
+      String message = 'Não foi possível verificar o Exchange. Confira servidor, autenticação e rede.';
+      if (e is ExchangeException) message = e.message;
+      if (e is eas.EasAuthException) message = 'Autenticação Exchange recusada. O provedor pode exigir OAuth ou outro método.';
+      if (e is eas.EasForbiddenException) message = 'O servidor negou acesso para este dispositivo ou conta.';
+      if (e is eas.EasCommandException && e.requiresProvisioning) message = 'O servidor exige políticas de segurança que o app ainda não aplica.';
+      if (e is eas.EasRemoteWipeException) message = 'O servidor solicita ação de segurança; nada foi apagado ou confirmado pelo aplicativo.';
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), duration: const Duration(seconds: 8)));
+    } finally {
+      if (mounted) setState(() => _isTestingExchange = false);
+    }
+  }
+
+  Widget _buildExchangeConfigCard() => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Exchange ActiveSync (experimental)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+        const SizedBox(height: 8),
+        const Text('Somente leitura da INBOX, por senha (Basic) e HTTPS. Não suporta OAuth, políticas de dispositivo, envio ou anexos. Mensagens podem ser parciais; mantenha o correio oficial e seu backup.', style: TextStyle(fontSize: 12)),
+        const SizedBox(height: 12),
+        TextField(controller: _exchangeEmailCtrl, keyboardType: TextInputType.emailAddress,
+          decoration: const InputDecoration(labelText: 'Usuário Exchange', border: OutlineInputBorder())),
+        const SizedBox(height: 12),
+        TextField(controller: _exchangePasswordCtrl, obscureText: true,
+          decoration: const InputDecoration(labelText: 'Senha Exchange', border: OutlineInputBorder())),
+        const SizedBox(height: 12),
+        TextField(controller: _exchangeHostCtrl, keyboardType: TextInputType.url,
+          decoration: const InputDecoration(labelText: 'Servidor Exchange (somente nome)', hintText: 'eas.exemplo.org', border: OutlineInputBorder())),
+        const SizedBox(height: 8),
+        const Text('Use somente o servidor oficial autorizado pelo provedor; sua senha será enviada a esse servidor via HTTPS.', style: TextStyle(fontSize: 12)),
+        const SizedBox(height: 12),
+        ElevatedButton(onPressed: _isTestingExchange ? null : _testExchange,
+          child: Text(_isTestingExchange ? 'Testando Exchange...' : 'Testar Exchange e salvar')),
+      ]),
+    ),
+  );
 
   Widget _buildJwEmailConfigCard(bool isDark) {
     return Card(
