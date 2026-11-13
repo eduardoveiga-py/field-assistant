@@ -43,3 +43,8 @@ existente. Testar que o SDK e o handler não consomem o mesmo código duas vezes
 Custom schemes não provam identidade do app: verificar proteção PKCE e se o
 contêiner realmente entrega o retorno ao aplicativo. A configuração remota Auth
 não foi alterada nesta etapa; localhost continua sendo um problema no modo atual.
+
+Nos builds Android/iOS da CI, a variável de repositório `AUTH_NATIVE_CALLBACK`
+permite incluir a flag quando seu valor for `true`. Deixe-a desativada até
+terminar as validações acima; habilitar a variável não configura a allowlist nem
+comprova a recepção de links no contêiner.

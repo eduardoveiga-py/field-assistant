@@ -1297,7 +1297,11 @@ class SupabaseSyncService {
       final vn = await (db.select(
         db.voiceNotes,
       )..where((t) => t.id.equals(id))).getSingleOrNull();
-      if (vn?.audioFilePath != null && vn!.audioFilePath!.isNotEmpty) {
+      if (vn == null) {
+        errors.add('Nota de voz local ausente ($id); upload não confirmado.');
+        return false;
+      }
+      if (vn.audioFilePath != null && vn.audioFilePath!.isNotEmpty) {
         final bytes = await readMediaBytes(vn.audioFilePath!);
         if (bytes != null && bytes.isNotEmpty) {
           final userFolder = _resolveStorageFolder(client);
@@ -1586,7 +1590,10 @@ class SupabaseSyncService {
       final doc = await (db.select(
         db.knowledgeDocuments,
       )..where((t) => t.id.equals(id))).getSingleOrNull();
-      if (doc == null) return true;
+      if (doc == null) {
+        errors.add('Documento local ausente ($id); upload não confirmado.');
+        return false;
+      }
 
       Uint8List? bytes;
 
@@ -1750,8 +1757,12 @@ class SupabaseSyncService {
       final photo = await (db.select(db.personPhotos)
             ..where((t) => t.id.equals(id)))
           .getSingleOrNull();
-      final localPath = photo?.filePath;
-      final inlineData = photo?.imageData ?? '';
+      if (photo == null) {
+        errors.add('Foto local ausente ($id); upload não confirmado.');
+        return false;
+      }
+      final localPath = photo.filePath;
+      final inlineData = photo.imageData;
 
       Uint8List? bytes;
       if (localPath != null &&
