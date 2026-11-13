@@ -48,7 +48,7 @@ jobs:
         run: |
           set +e
           if [ "$SUITE" = maps ]; then
-            flutter test --reporter expanded test/territory/location_picker_safety_test.dart test/territory/map_safety_regression_test.dart test/territory/mbtiles_service_real_test.dart test/tile_cache_test.dart test/layout_fixes_and_map_highlight_test.dart > /tmp/tests.txt 2>&1
+            flutter test --concurrency=1 --reporter expanded test/territory/location_picker_safety_test.dart test/territory/map_safety_regression_test.dart test/territory/mbtiles_service_real_test.dart test/tile_cache_test.dart test/layout_fixes_and_map_highlight_test.dart > /tmp/tests.txt 2>&1
           else
             flutter test --reporter expanded > /tmp/tests.txt 2>&1
           fi

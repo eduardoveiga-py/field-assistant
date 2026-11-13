@@ -14,15 +14,16 @@ if mode == 'analyze':
                 'Info categories: ' + ', '.join(f'{k}: {v}' for k, v in counts.most_common())]
     selected += relevant[:50]
 else:
-    # Ordinary debug logs can contain expected exceptions. Prioritize actual
-    # failed-test markers, compiler errors, and final summaries.
-    failures = [i for i, line in enumerate(lines)
-                if re.search(r'\[E\]|^.*Error:|Failed to load|Some tests failed|timed out', line, re.I)
-                and '[DEBUG]' not in line and '[ERROR]' not in line]
-    selected = ['Final test output:'] + lines[-15:] + ['Failure excerpts:']
-    for i in failures[:20]:
-        selected.extend(lines[max(0, i-1):min(len(lines), i+5)])
-# GitHub limits annotation messages to approximately 4096 characters.
+    failures = [i for i, line in enumerate(lines) if '[E]' in line]
+    names = [lines[i] for i in failures]
+    selected = ['Failing test markers:'] + names + ['Final test output:'] + lines[-6:]
+    # Actual assertions normally precede the [E] marker. Separate annotations
+    # preserve context despite GitHub's per-message length limit.
+    for i in failures[:8]:
+        context = lines[max(0, i-24):min(len(lines), i+4)]
+        text = '\n'.join(context)[-3400:]
+        text = text.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+        print(f'::error title=Failure detail::{text}')
 text = '\n'.join(selected)[:3500]
 text = text.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
 print(f'::error title=CI diagnostic summary::{text}')
