@@ -171,3 +171,18 @@ completude da base, a precisão de cada comunidade, nem testa aparelho ou modo
 avião. Necessária revisão por usuário local e testes no iPhone/iPad e Windows.
 O catálogo automático ainda não aponta para esse artefato temporário; por enquanto
 é preciso baixar o ZIP, extrair o .mbtiles e importá-lo no app em camada padrão.
+
+## Preparação posterior da distribuição
+
+Nesta branch o catálogo identifica o pacote como **SAI e entorno experimental**,
+zooms 8–16, e direciona para um arquivo `.mbtiles` da própria versão do app.
+O pipeline preparado para uma futura tag deve gerar novamente o pacote a partir
+dos dados brutos OSM, conferir o retângulo, anexar MBTiles, proveniência e SHA-256
+à release. Não existe esse endereço de versão até a publicação realmente ocorrer;
+o pacote temporário indicado acima continua sendo a alternativa de teste manual.
+
+Uma busca automática por endereço não grava mais coordenadas por conta própria:
+a pessoa pode dispensar a sugestão ou revisar o ponto no mapa e confirmá-lo. A
+comparação do endereço e das coordenadas existentes protege edição concorrente.
+Isso não verifica se o endereço geocodificado corresponde à casa correta; a
+confirmação e os testes sem internet em aparelhos seguem indispensáveis.
