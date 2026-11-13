@@ -20,7 +20,7 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - name: Compile unsigned test APK
+      - name: Compile test APK with debug signing
         run: |
           set -o pipefail
           flutter build apk --target-platform android-arm64 --release 2>&1 | tee /tmp/android-check.log || {
