@@ -84,3 +84,9 @@ a identidade do cofre deve ser verificada com estado confiável, e uma criação
 futura precisa ser atômica e nunca substituir um marcador preexistente. Uma
 resposta remota ausente ou falha de rede não autoriza automaticamente criar
 outro cofre. Isso não ativa a sincronização.
+
+O método experimental `restoreVerified` só instala a chave local depois de
+verificar o marcador e comparar o ID com um valor fornecido por fonte confiável,
+além de confirmar a frase e preservar a chave local existente. A origem confiável
+para esse ID e a aquisição do marcador ainda não foram implementadas; passar um
+ID vindo apenas do mesmo servidor não protege contra substituição.

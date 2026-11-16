@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'recovery_crypto.dart';
+import 'recovery_vault_verifier.dart';
 
 /// Armazenamento local experimental. Não estabelece ou verifica um cofre no
 /// servidor, não ativa sincronização e não altera chaves já existentes.
@@ -50,6 +51,25 @@ class RecoveryKeyStore {
     final value = await _storage.read(key: _storageKey(owner));
     return value == null ? null : SecretKey(_decode(value));
   });
+
+  /// Valida a chave e a identidade de um cofre já conhecido antes de guardar a
+  /// chave. O chamador precisa obter [expectedVaultId] por uma fonte confiável
+  /// independente do servidor e deve rejeitar ausência/falha na leitura remota.
+  /// Esta verificação isolada não habilita a sincronização nem detecta replay.
+  Future<void> restoreVerified({
+    required String owner,
+    required String phrase,
+    required String confirmation,
+    required Map<String, dynamic> marker,
+    required String expectedVaultId,
+  }) async {
+    final key = await RecoveryCrypto.keyFromPhrase(phrase);
+    final id = await RecoveryVaultVerifier.verify(root: key, owner: owner, marker: marker);
+    if (id != expectedVaultId) {
+      throw StateError('Identidade do cofre não confere; chave não instalada.');
+    }
+    await install(owner: owner, phrase: phrase, confirmation: confirmation);
+  }
 
   /// Exige repetição integral da frase e recusa substituir outra chave local.
   /// A confirmação de que a frase pertence ao cofre remoto é tarefa separada e
