@@ -570,7 +570,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ? '${syncCounts.failed} operação(ões) em falha e ${syncCounts.pending} pendente(s).'
                         : syncCounts.pending > 0
                         ? '${syncCounts.pending} alteração(ões) salva(s) localmente aguardando envio.'
-                        : 'Operando Local-First (Offline). Tudo sincronizado localmente.',
+                        : 'Dados locais; a sincronização com a nuvem está pausada.',
                   ),
                   trailing: Chip(
                     label: Text(
@@ -1338,7 +1338,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             builder: (ctx) => AlertDialog(
                               title: const Text('Zerar Banco de Dados Local?'),
                               content: const Text(
-                                'Esta ação apaga os registros e as configurações do banco local, inclusive alterações ainda não sincronizadas. Arquivos de mídia, backups, credenciais e dados na nuvem não serão apagados. Dados da nuvem poderão voltar na próxima sincronização.\n\nDeseja continuar?',
+                                'Esta ação apaga os registros e as configurações do banco local, inclusive alterações ainda não sincronizadas. A sincronização está pausada: os dados da nuvem não serão restaurados automaticamente. Verifique um backup antes de continuar. Arquivos de mídia, backups, credenciais e dados na nuvem não serão apagados.\n\nDeseja continuar?',
                               ),
                               actions: [
                                 TextButton(
@@ -1874,7 +1874,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     Text(
                       SupabaseConfig.isConfigured
                           ? 'Compilado com --dart-define. Definir URL/Chave aqui sobrescreve o servidor em runtime.'
-                          : 'Informe a URL e a Chave Anon/Publishable do seu projeto Supabase para habilitar login e sincronização em nuvem sem recompilar o app.',
+                          : 'Informe a URL e a Chave Anon/Publishable para configurar o login sem recompilar o app. A sincronização em nuvem permanece pausada.',
                       style: const TextStyle(fontSize: 12),
                     ),
                     const SizedBox(height: 12),

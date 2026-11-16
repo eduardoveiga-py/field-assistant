@@ -823,10 +823,18 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Configuração Runtime do Supabase'), findsOneWidget);
+      expect(find.textContaining('A sincronização em nuvem permanece pausada.'), findsOneWidget);
       await tester.tap(find.text('Salvar e Conectar'));
       await tester.pumpAndSettle();
       expect(find.textContaining('Informe a URL do projeto Supabase'), findsOneWidget);
 
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Zerar Banco Local'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Zerar Banco Local'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('não serão restaurados automaticamente'), findsOneWidget);
       await tester.tap(find.text('Cancelar'));
       await tester.pumpAndSettle();
       await tester.pumpWidget(const SizedBox());
