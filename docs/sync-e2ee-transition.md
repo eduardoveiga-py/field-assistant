@@ -74,3 +74,13 @@ e revisão são autenticadas. Ainda são visíveis ao servidor a conta, a rota
 opaca repetida, a revisão e o tamanho; nenhuma proteção contra replay integral,
 exclusão ou negação de serviço está implementada. Esse formato ainda não está
 ligado a nenhuma tabela remota e pode mudar após revisão de segurança.
+
+`RecoveryVaultVerifier` é um marcador experimental autenticado que permite
+verificar uma frase contra um marcador já obtido e vinculado à conta, usando
+uma subchave distinta e ID aleatório. Não consulta nem cria um cofre remoto e
+não está ligado à interface ou ao armazenamento de chave. Aceitar um marcador
+apresentado pelo servidor por si só não impede substituição, exclusão ou replay;
+a identidade do cofre deve ser verificada com estado confiável, e uma criação
+futura precisa ser atômica e nunca substituir um marcador preexistente. Uma
+resposta remota ausente ou falha de rede não autoriza automaticamente criar
+outro cofre. Isso não ativa a sincronização.
