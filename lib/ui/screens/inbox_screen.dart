@@ -1370,7 +1370,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
 
     return Column(
       children: [
-        // Banner do Motor de Retenção Permanente
+        // Informa limitações das cópias locais e prévias
         Container(
           margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
           padding: const EdgeInsets.all(12),
@@ -1390,7 +1390,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Retenção Permanente Ativa',
+                      'Cópias locais e prévias',
                       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1D4ED8)),
                     ),
                     SizedBox(height: 2),
