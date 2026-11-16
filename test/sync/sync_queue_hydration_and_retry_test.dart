@@ -103,6 +103,7 @@ void main() {
           return http.Response('Server Error', 500, request: request);
         });
         final syncSvc = SupabaseSyncService(
+          allowLegacySyncForTesting: true,
           db: db,
           repository: repo,
           clientOverride: SupabaseClient(
@@ -275,6 +276,7 @@ void main() {
         });
 
         final syncSvc = SupabaseSyncService(
+          allowLegacySyncForTesting: true,
           db: db,
           repository: repo,
           clientOverride: SupabaseClient(

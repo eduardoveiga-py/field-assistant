@@ -98,6 +98,7 @@ class E2ETestContext {
     );
 
     final syncService = SupabaseSyncService(
+          allowLegacySyncForTesting: true,
       db: db,
       repository: repo,
       supabaseUrl: effectiveUrl,

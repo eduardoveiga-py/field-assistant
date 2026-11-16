@@ -1762,6 +1762,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ],
             ),
             const SizedBox(height: 6),
+            const Text(
+              'Sincronização com Supabase pausada até a criptografia ponta a ponta estar pronta. Dados e alterações continuam locais.',
+            ),
+            const SizedBox(height: 6),
             Text('E-mail: $userEmail', style: const TextStyle(fontSize: 14)),
             const SizedBox(height: 12),
             Wrap(

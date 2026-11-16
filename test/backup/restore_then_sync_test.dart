@@ -283,6 +283,7 @@ void main() {
         });
 
         final syncSvc = SupabaseSyncService(
+          allowLegacySyncForTesting: true,
           db: targetDb,
           repository: targetRepo,
           clientOverride: SupabaseClient(

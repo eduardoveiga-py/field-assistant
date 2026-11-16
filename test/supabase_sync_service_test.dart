@@ -235,6 +235,7 @@ void main() {
       });
 
       final customSync = SupabaseSyncService(
+          allowLegacySyncForTesting: true,
         db: db,
         repository: repo,
         clientOverride: SupabaseClient(
@@ -322,6 +323,7 @@ void main() {
       });
 
       final customSync = SupabaseSyncService(
+          allowLegacySyncForTesting: true,
         db: db,
         repository: repo,
         clientOverride: SupabaseClient(
@@ -389,6 +391,7 @@ void main() {
       });
 
       final customSync = SupabaseSyncService(
+          allowLegacySyncForTesting: true,
         db: db,
         repository: repo,
         clientOverride: SupabaseClient(
@@ -434,6 +437,7 @@ void main() {
       });
 
       final customSync = SupabaseSyncService(
+          allowLegacySyncForTesting: true,
         db: db,
         repository: repo,
         clientOverride: SupabaseClient(
@@ -490,6 +494,7 @@ void main() {
       });
 
       final customSync = SupabaseSyncService(
+          allowLegacySyncForTesting: true,
         db: db,
         repository: repo,
         clientOverride: SupabaseClient(
@@ -608,6 +613,7 @@ void main() {
       });
 
       final customSync = SupabaseSyncService(
+          allowLegacySyncForTesting: true,
         db: db,
         repository: repo,
         clientOverride: SupabaseClient(
@@ -680,6 +686,7 @@ void main() {
       });
 
       final customSync = SupabaseSyncService(
+          allowLegacySyncForTesting: true,
         db: db,
         repository: repo,
         clientOverride: SupabaseClient(
@@ -763,6 +770,7 @@ void main() {
       });
 
       final customSync = SupabaseSyncService(
+          allowLegacySyncForTesting: true,
         db: db,
         repository: repo,
         clientOverride: SupabaseClient(
@@ -832,7 +840,7 @@ void main() {
         }
         return mockJsonResponse(request, []);
       });
-      final sync = SupabaseSyncService(db: db, repository: repo,
+      final sync = SupabaseSyncService(allowLegacySyncForTesting: true, db: db, repository: repo,
         clientOverride: SupabaseClient('https://mock.supabase.co', 'dummy-key', httpClient: mock));
       addTearDown(sync.dispose);
       final result = await sync.processQueue();
@@ -879,6 +887,7 @@ void main() {
       });
 
       final customSync = SupabaseSyncService(
+          allowLegacySyncForTesting: true,
         db: db,
         repository: repo,
         clientOverride: SupabaseClient(
@@ -968,6 +977,7 @@ void main() {
       });
 
       final customSync = SupabaseSyncService(
+          allowLegacySyncForTesting: true,
         db: db,
         repository: repo,
         clientOverride: SupabaseClient(
@@ -1057,6 +1067,7 @@ void main() {
       });
 
       final customSync = SupabaseSyncService(
+          allowLegacySyncForTesting: true,
         db: db,
         repository: repo,
         clientOverride: SupabaseClient(

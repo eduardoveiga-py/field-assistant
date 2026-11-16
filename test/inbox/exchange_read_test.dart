@@ -161,7 +161,7 @@ void main() {
           headers: {'content-type': 'application/json', 'content-range': '*/0'});
     });
     final client = SupabaseClient('https://mock.supabase.co', 'dummy-key', httpClient: httpClient);
-    final sender = SupabaseSyncService(db: db, repository: AppRepository(db), clientOverride: client);
+    final sender = SupabaseSyncService(allowLegacySyncForTesting: true, db: db, repository: AppRepository(db), clientOverride: client);
     addTearDown(sender.dispose);
     final pushed = await sender.processQueue();
     expect(pushed.success, isTrue, reason: pushed.errors.toString());
@@ -169,7 +169,7 @@ void main() {
     expect(stored, isNotNull);
     final other = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(other.close);
-    final receiver = SupabaseSyncService(db: other, repository: AppRepository(other), clientOverride: client);
+    final receiver = SupabaseSyncService(allowLegacySyncForTesting: true, db: other, repository: AppRepository(other), clientOverride: client);
     addTearDown(receiver.dispose);
     final pulled = await receiver.fetchRemoteChanges();
     expect(pulled.success, isTrue, reason: pulled.errors.toString());

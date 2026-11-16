@@ -102,7 +102,7 @@ class TodayScreen extends ConsumerWidget {
               Row(
                 children: [
                   Icon(
-                    currentUser != null ? Icons.cloud_done : Icons.cloud_sync,
+                    Icons.cloud_off,
                     color: currentUser != null
                         ? AppTheme.successGreen
                         : AppTheme.primaryBlue,
@@ -169,8 +169,8 @@ class TodayScreen extends ConsumerWidget {
                           const SizedBox(height: 2),
                           Text(
                             currentUser != null
-                                ? 'Sincronização automática em nuvem ativa + banco local SQLite/Wasm.'
-                                : 'Faça login para sincronizar seus dados na nuvem.',
+                                ? 'Conta conectada. Sincronização pausada até a proteção ponta a ponta estar pronta; dados mantidos localmente.'
+                                : 'Sincronização com Supabase pausada até a proteção ponta a ponta estar pronta.',
                             style: const TextStyle(fontSize: 11.5),
                           ),
                         ],

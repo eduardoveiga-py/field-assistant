@@ -229,7 +229,24 @@ class SupabaseSyncService {
     this.clientOverride,
     this.documentsDirectoryProvider,
     this.strictStorageAuth = false,
+    this.allowLegacySyncForTesting = false,
   });
+
+  /// Apenas testes com cliente simulado; nunca habilita transferência em release.
+  @visibleForTesting
+  final bool allowLegacySyncForTesting;
+
+  bool get _legacyTestMode => kDebugMode && allowLegacySyncForTesting && clientOverride != null;
+
+  static const _encryptedSyncPending =
+      'Sincronização com Supabase pausada: criptografia ponta a ponta ainda não está pronta. Dados e fila locais preservados.';
+
+  SyncProcessResult _blockedUntilEncryption() {
+    _setStatus(SyncStatus.error);
+    return const SyncProcessResult(totalProcessed: 0, successCount: 0,
+        failureCount: 0, conflictCount: 0, errors: [_encryptedSyncPending],
+        message: _encryptedSyncPending);
+  }
 
   SyncStatus get currentStatus => _currentStatus;
   Stream<SyncStatus> get statusStream => _statusController.stream;
@@ -1520,7 +1537,7 @@ class SupabaseSyncService {
 
   /// Exclui o arquivo de áudio de uma nota de voz no Supabase Storage
   Future<bool> deleteVoiceNoteAudio(String id) async {
-    if (!isConfigured) return false;
+    if (!_legacyTestMode || !isConfigured) return false;
     SupabaseClient? client;
     try {
       client = clientOverride ?? Supabase.instance.client;
@@ -1549,7 +1566,7 @@ class SupabaseSyncService {
 
   /// Exclui o arquivo de pronúncia Ticuna no Supabase Storage
   Future<bool> deleteTicunaAudio(String id) async {
-    if (!isConfigured) return false;
+    if (!_legacyTestMode || !isConfigured) return false;
     SupabaseClient? client;
     try {
       client = clientOverride ?? Supabase.instance.client;
@@ -1916,7 +1933,7 @@ class SupabaseSyncService {
 
   /// Retenta o download de áudios que falharam durante a recepção de metadados
   Future<int> retryPendingMediaDownloads() async {
-    if (!isConfigured) return 0;
+    if (!_legacyTestMode || !isConfigured) return 0;
     SupabaseClient? client;
     try {
       client = clientOverride ?? Supabase.instance.client;
@@ -2295,6 +2312,7 @@ class SupabaseSyncService {
       _serializeSyncOperation(_fetchRemoteChanges);
 
   Future<SyncProcessResult> _fetchRemoteChanges() async {
+    if (isConfigured && !_legacyTestMode) return _blockedUntilEncryption();
     if (!isConfigured) {
       _setStatus(SyncStatus.waitingConnection);
       return const SyncProcessResult(
@@ -2454,6 +2472,7 @@ class SupabaseSyncService {
 
   /// Resolve um conflito da sync_queue aceitando a versão remota armazenada (ou baixando do servidor).
   Future<bool> resolveConflictAcceptRemote(String syncQueueId) async {
+    if (!_legacyTestMode) return false;
     final op = await (db.select(db.syncQueue)
           ..where((t) => t.id.equals(syncQueueId)))
         .getSingleOrNull();
@@ -2512,6 +2531,7 @@ class SupabaseSyncService {
       _serializeSyncOperation(_processQueue);
 
   Future<SyncProcessResult> _processQueue() async {
+    if (isConfigured && !_legacyTestMode) return _blockedUntilEncryption();
     await _coalescePendingChanges();
     final pendingOps = await repository.getPendingSyncOperations();
     if (pendingOps.isEmpty) {

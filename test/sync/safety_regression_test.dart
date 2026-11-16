@@ -27,6 +27,7 @@ void main() {
 
   SupabaseSyncService service(MockClient mock) {
     final result = SupabaseSyncService(
+          allowLegacySyncForTesting: true,
       db: db,
       repository: repo,
       clientOverride: SupabaseClient('https://mock.supabase.co', 'dummy-key', httpClient: mock),
