@@ -830,6 +830,11 @@ void main() {
 
       await tester.tap(find.text('Cancelar'));
       await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Zerar Banco Local'),
+        -300,
+        scrollable: find.byType(Scrollable).first,
+      );
       await tester.ensureVisible(find.text('Zerar Banco Local'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Zerar Banco Local'));
