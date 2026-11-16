@@ -67,3 +67,10 @@ usá-lo em outro dispositivo é necessário verificar que a chave corresponde ao
 cofre remoto. O armazenamento para Web está explicitamente desativado até ser
 avaliado. Essa etapa não criptografa o banco local nem oferece recuperação caso
 a frase e todos os aparelhos com a chave sejam perdidos.
+
+O protótipo de envelopes de registros gera um identificador opaco por HMAC com
+chave separada e cifra o tipo, o identificador original e os dados. Conta, rota
+e revisão são autenticadas. Ainda são visíveis ao servidor a conta, a rota
+opaca repetida, a revisão e o tamanho; nenhuma proteção contra replay integral,
+exclusão ou negação de serviço está implementada. Esse formato ainda não está
+ligado a nenhuma tabela remota e pode mudar após revisão de segurança.
