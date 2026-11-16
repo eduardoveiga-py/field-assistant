@@ -18,7 +18,7 @@ jobs:
       - run: flutter pub get
       - name: Capture resolved dependency lock
         run: |
-          python3 -c "import base64,gzip,pathlib; print('::notice title=Resolved dependency lock::' + base64.b64encode(gzip.compress(pathlib.Path('pubspec.lock').read_bytes())).decode())"
+          python3 -c "import base64,gzip,pathlib; s=base64.b64encode(gzip.compress(pathlib.Path('pubspec.lock').read_bytes())).decode(); [print(f'::notice title=Lock chunk {i//3500:03d}::'+s[i:i+3500]) for i in range(0,len(s),3500)]"
       - name: Analyze and summarize diagnostics
         shell: bash
         run: |
