@@ -260,7 +260,7 @@ void main() {
               );
             }
           }
-          if (request.method == 'POST' && path.endsWith('/rest/v1/rpc/sync_upsert')) {
+          if (request.method == 'POST' && path.endsWith('/rest/v1/rpc/sync_upsert_if_unchanged')) {
             final body = jsonDecode(request.body) as Map<String, dynamic>;
             final p = Map<String, dynamic>.from(body['p_payload'] as Map);
             pushedUpserts[p['id'] as String] = p;
@@ -270,6 +270,7 @@ void main() {
         });
 
         final syncSvc = SupabaseSyncService(
+          allowLegacySyncForTesting: true,
           db: db,
           repository: repo,
           clientOverride: SupabaseClient(
@@ -297,7 +298,7 @@ void main() {
     );
 
     test(
-      'HARD_DELETE operation executes remote DELETE and leaves zero stuck pending items',
+      'HARD_DELETE without a verifiable base blocks remote deletion',
       () async {
         final person = await repo.createPerson(name: 'Para Excluir Definitivamente');
         await db.delete(db.syncQueue).go();
@@ -315,6 +316,7 @@ void main() {
         });
 
         final syncSvc = SupabaseSyncService(
+          allowLegacySyncForTesting: true,
           db: db,
           repository: repo,
           clientOverride: SupabaseClient(
@@ -327,14 +329,14 @@ void main() {
         addTearDown(syncSvc.dispose);
 
         final res = await syncSvc.processQueue();
-        expect(deleteCalled, isTrue);
-        expect(res.successCount, equals(1));
-        expect(res.failureCount, equals(0));
+        expect(deleteCalled, isFalse);
+        expect(res.successCount, equals(0));
+        expect(res.conflictCount, equals(1));
 
         final remaining = await (db.select(db.syncQueue)
-              ..where((t) => t.status.equals('pending')))
+              ..where((t) => t.status.equals('conflict')))
             .get();
-        expect(remaining, isEmpty);
+        expect(remaining, hasLength(1));
       },
     );
 
@@ -439,7 +441,7 @@ void main() {
           if (path.contains('/storage/v1/object/ticuna_audio')) {
             return _jsonRes(request, {'error': 'Bucket missing'}, statusCode: 500);
           }
-          if (request.method == 'POST' && path.endsWith('/rest/v1/rpc/sync_upsert')) {
+          if (request.method == 'POST' && path.endsWith('/rest/v1/rpc/sync_upsert_if_unchanged')) {
             final body = jsonDecode(request.body) as Map<String, dynamic>;
             final p = Map<String, dynamic>.from(body['p_payload'] as Map);
             pushed[p['id'] as String] = p;
@@ -487,6 +489,7 @@ void main() {
         });
 
         final syncSvc = SupabaseSyncService(
+          allowLegacySyncForTesting: true,
           db: db,
           repository: repo,
           clientOverride: SupabaseClient(

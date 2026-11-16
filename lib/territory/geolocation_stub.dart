@@ -65,18 +65,8 @@ Future<GeolocationResult> getPlatformCoordinates() async {
     AppLogger.debug('Permissão de localização negada: $e', st);
     return const GeolocationResult(status: GeolocationStatus.permissionDenied);
   } on TimeoutException catch (e, st) {
-    AppLogger.debug('Timeout ao obter posição GPS atual; tentando última conhecida: $e', st);
-    try {
-      final last = await Geolocator.getLastKnownPosition();
-      if (last != null && last.latitude.isFinite && last.longitude.isFinite) {
-        return GeolocationResult(
-          status: GeolocationStatus.success,
-          coordinates: (latitude: last.latitude, longitude: last.longitude),
-        );
-      }
-    } catch (lastErr, lastSt) {
-      AppLogger.debug('Falha ao ler última posição GPS conhecida: $lastErr', lastSt);
-    }
+    // Não apresentar uma posição antiga como se fosse a localização atual.
+    AppLogger.debug('Tempo esgotado ao obter posição GPS atual: $e', st);
     return const GeolocationResult(
       status: GeolocationStatus.unavailableOrTimeout,
     );

@@ -14,6 +14,7 @@ import '../database/app_database.dart';
 import '../database/repository.dart';
 import '../ui/providers.dart';
 import 'media_bytes.dart';
+import 'native_auth_callback.dart';
 import 'sync_engine.dart';
 import 'supabase_config.dart';
 
@@ -34,7 +35,7 @@ class SyncProcessResult {
     this.errors = const [],
   });
 
-  bool get success => failureCount == 0 && errors.isEmpty;
+  bool get success => failureCount == 0 && conflictCount == 0 && errors.isEmpty;
 }
 
 typedef SyncResult = SyncProcessResult;
@@ -124,6 +125,7 @@ class SupabaseSyncService {
       await Supabase.initialize(
         url: url,
         publishableKey: anonKey,
+        authOptions: FlutterAuthClientOptions(detectSessionInUri: !NativeAuthCallback.enabled),
       );
     }
   }
@@ -150,6 +152,7 @@ class SupabaseSyncService {
       await Supabase.initialize(
         url: cleanUrl,
         publishableKey: cleanKey,
+        authOptions: FlutterAuthClientOptions(detectSessionInUri: !NativeAuthCallback.enabled),
       );
     }
 
@@ -226,7 +229,24 @@ class SupabaseSyncService {
     this.clientOverride,
     this.documentsDirectoryProvider,
     this.strictStorageAuth = false,
+    this.allowLegacySyncForTesting = false,
   });
+
+  /// Apenas testes com cliente simulado; nunca habilita transferência em release.
+  @visibleForTesting
+  final bool allowLegacySyncForTesting;
+
+  bool get _legacyTestMode => kDebugMode && allowLegacySyncForTesting && clientOverride != null;
+
+  static const _encryptedSyncPending =
+      'Sincronização com Supabase pausada: criptografia ponta a ponta ainda não está pronta. Dados e fila locais preservados.';
+
+  SyncProcessResult _blockedUntilEncryption() {
+    _setStatus(SyncStatus.error);
+    return const SyncProcessResult(totalProcessed: 0, successCount: 0,
+        failureCount: 0, conflictCount: 0, errors: [_encryptedSyncPending],
+        message: _encryptedSyncPending);
+  }
 
   SyncStatus get currentStatus => _currentStatus;
   Stream<SyncStatus> get statusStream => _statusController.stream;
@@ -1294,7 +1314,11 @@ class SupabaseSyncService {
       final vn = await (db.select(
         db.voiceNotes,
       )..where((t) => t.id.equals(id))).getSingleOrNull();
-      if (vn?.audioFilePath != null && vn!.audioFilePath!.isNotEmpty) {
+      if (vn == null) {
+        errors.add('Nota de voz local ausente ($id); upload não confirmado.');
+        return false;
+      }
+      if (vn.audioFilePath != null && vn.audioFilePath!.isNotEmpty) {
         final bytes = await readMediaBytes(vn.audioFilePath!);
         if (bytes != null && bytes.isNotEmpty) {
           final userFolder = _resolveStorageFolder(client);
@@ -1313,6 +1337,8 @@ class SupabaseSyncService {
               );
           return true;
         }
+        errors.add('Arquivo de áudio local ausente ou vazio ($id).');
+        return false;
       }
       return true;
     } catch (e) {
@@ -1358,6 +1384,9 @@ class SupabaseSyncService {
             );
             return false;
           }
+        } else {
+          errors.add('Arquivo de áudio Ticuna local ausente ou vazio ($id).');
+          return false;
         }
       }
       return true;
@@ -1508,7 +1537,7 @@ class SupabaseSyncService {
 
   /// Exclui o arquivo de áudio de uma nota de voz no Supabase Storage
   Future<bool> deleteVoiceNoteAudio(String id) async {
-    if (!isConfigured) return false;
+    if (!_legacyTestMode || !isConfigured) return false;
     SupabaseClient? client;
     try {
       client = clientOverride ?? Supabase.instance.client;
@@ -1537,7 +1566,7 @@ class SupabaseSyncService {
 
   /// Exclui o arquivo de pronúncia Ticuna no Supabase Storage
   Future<bool> deleteTicunaAudio(String id) async {
-    if (!isConfigured) return false;
+    if (!_legacyTestMode || !isConfigured) return false;
     SupabaseClient? client;
     try {
       client = clientOverride ?? Supabase.instance.client;
@@ -1578,7 +1607,10 @@ class SupabaseSyncService {
       final doc = await (db.select(
         db.knowledgeDocuments,
       )..where((t) => t.id.equals(id))).getSingleOrNull();
-      if (doc == null) return true;
+      if (doc == null) {
+        errors.add('Documento local ausente ($id); upload não confirmado.');
+        return false;
+      }
 
       Uint8List? bytes;
 
@@ -1641,7 +1673,8 @@ class SupabaseSyncService {
             );
         return true;
       }
-      return true;
+      errors.add('Arquivo do documento ausente ou vazio ($id); metadados não comprovam upload.');
+      return false;
     } catch (e) {
       errors.add('Erro no upload de documento para knowledge_vault ($id): $e');
       return false;
@@ -1731,30 +1764,6 @@ class SupabaseSyncService {
     }
   }
 
-  /// Exclui o arquivo físico no Supabase Storage quando o documento é removido
-  Future<void> _deleteKnowledgeDocumentStorage(
-    String id,
-    SupabaseClient client,
-  ) async {
-    try {
-      final userFolder = _resolveStorageFolder(client);
-      if (userFolder == null) return;
-      await client.storage.from('knowledge_vault').remove([
-        '$userFolder/$id.pdf',
-        '$userFolder/$id.epub',
-        '$userFolder/$id.doc',
-        '$userFolder/$id.docx',
-        '$userFolder/$id.txt',
-        '$userFolder/$id',
-        '$id.pdf',
-        id,
-      ]);
-      await (db.delete(db.appKvStore)..where((t) => t.key.equals('doc_bytes_$id'))).go();
-    } catch (e, st) {
-      AppLogger.warning('Falha ao excluir documento $id do storage', e, st);
-    }
-  }
-
   Future<bool> _uploadPersonPhoto(
     String id,
     Map<String, dynamic> remotePayload,
@@ -1765,8 +1774,12 @@ class SupabaseSyncService {
       final photo = await (db.select(db.personPhotos)
             ..where((t) => t.id.equals(id)))
           .getSingleOrNull();
-      final localPath = photo?.filePath;
-      final inlineData = photo?.imageData ?? '';
+      if (photo == null) {
+        errors.add('Foto local ausente ($id); upload não confirmado.');
+        return false;
+      }
+      final localPath = photo.filePath;
+      final inlineData = photo.imageData;
 
       Uint8List? bytes;
       if (localPath != null &&
@@ -1801,7 +1814,10 @@ class SupabaseSyncService {
       }
 
       if (bytes == null || bytes.isEmpty) {
-        return true;
+        // Um caminho de Storage já sincronizado não é um arquivo local pendente.
+        if ((localPath == null || localPath.isEmpty || localPath.startsWith('http')) && inlineData.isEmpty) return true;
+        errors.add('Arquivo da foto ausente ou vazio ($id).');
+        return false;
       }
 
       final userFolder = _resolveStorageFolder(client);
@@ -1915,25 +1931,9 @@ class SupabaseSyncService {
     }
   }
 
-  Future<void> _deletePersonPhotoStorage(
-    String id,
-    SupabaseClient client,
-  ) async {
-    try {
-      final userFolder = _resolveStorageFolder(client);
-      if (userFolder == null) return;
-      await client.storage.from('person_photos').remove([
-        '$userFolder/$id.jpg',
-        '$id.jpg',
-      ]);
-    } catch (e, st) {
-      AppLogger.warning('Falha ao excluir foto $id do storage', e, st);
-    }
-  }
-
   /// Retenta o download de áudios que falharam durante a recepção de metadados
   Future<int> retryPendingMediaDownloads() async {
-    if (!isConfigured) return 0;
+    if (!_legacyTestMode || !isConfigured) return 0;
     SupabaseClient? client;
     try {
       client = clientOverride ?? Supabase.instance.client;
@@ -1992,6 +1992,98 @@ class SupabaseSyncService {
     return recovered;
   }
 
+  bool _sameQueuedSnapshot(Map<String, dynamic> a, Map<String, dynamic> b) {
+    const audit = {'ownerId', 'owner_id', 'revision', 'createdAt', 'updatedAt'};
+    for (final key in {...a.keys, ...b.keys}) {
+      if (audit.contains(key)) continue;
+      final x = a[key], y = b[key];
+      if (SyncTimestamp.dateFieldKeys.contains(key) && x != null && y != null) {
+        final dx = SyncTimestamp.parse(x), dy = SyncTimestamp.parse(y);
+        if (dx != null && dy != null &&
+            dx.millisecondsSinceEpoch ~/ 1000 == dy.millisecondsSinceEpoch ~/ 1000) continue;
+      }
+      if (!_valuesEqualNormalized(x, y)) return false;
+    }
+    return true;
+  }
+
+  /// Compacta apenas cadeias verificáveis, ainda não enviadas. Qualquer fila
+  /// ambígua ou com tentativa anterior permanece intacta para resolução.
+  Future<void> _coalescePendingChanges() async {
+    await db.transaction(() async {
+      final all = await repository.getUnresolvedSyncOperations();
+      final groups = <String, List<SyncQueueEntry>>{};
+      for (final op in all) {
+        final key = jsonEncode([mapEntityToRemoteTable(op.entityType), op.entityId]);
+        (groups[key] ??= []).add(op);
+      }
+      for (final operations in groups.values) {
+        if (operations.length < 2 || operations.any((op) =>
+            op.status != 'pending' || op.attempts != 0 ||
+            !const {'INSERT', 'UPDATE'}.contains(op.operation.toUpperCase()))) {
+          continue;
+        }
+        try {
+          final payloads = <String, Map<String, dynamic>>{};
+          int? revision(SyncQueueEntry op) {
+            final payload = payloads[op.id]!;
+            return (payload['revision'] as num?)?.toInt();
+          }
+          for (final op in operations) {
+            final decoded = jsonDecode(op.payload);
+            if (decoded is! Map<String, dynamic>) throw const FormatException('payload');
+            payloads[op.id] = decoded;
+          }
+          if (operations.any((op) => revision(op) == null)) continue;
+          operations.sort((a, b) => revision(a)!.compareTo(revision(b)!));
+          if (operations.skip(1).any((op) => op.operation.toUpperCase() != 'UPDATE')) continue;
+          var valid = true;
+          for (var i = 1; i < operations.length; i++) {
+            final previous = operations[i - 1];
+            final current = operations[i];
+            final base = payloads[current.id]!['_base'];
+            if (base is! Map || revision(current) != revision(previous)! + 1) {
+              valid = false;
+              break;
+            }
+            final previousSnapshot = normalizeRemotePayload(sanitizePayload(
+              previous.entityType, payloads[previous.id]!));
+            final currentBase = normalizeRemotePayload(Map<String, dynamic>.from(base));
+            if ((currentBase['revision'] as num?)?.toInt() != revision(previous) ||
+                !_sameQueuedSnapshot(previousSnapshot, currentBase)) {
+              valid = false;
+              break;
+            }
+          }
+          final first = operations.first;
+          final last = operations.last;
+          final local = await _getLocalMap(mapEntityToRemoteTable(last.entityType), last.entityId);
+          final latest = normalizeRemotePayload(sanitizePayload(last.entityType, payloads[last.id]!));
+          if (!valid || local == null || (local['revision'] as num?)?.toInt() != revision(last) ||
+              !_sameQueuedSnapshot(latest, local)) continue;
+          final combined = Map<String, dynamic>.from(payloads[last.id]!);
+          combined.remove('_base');
+          combined.remove('baseData');
+          final firstPayload = payloads[first.id]!;
+          if (first.operation.toUpperCase() == 'UPDATE' &&
+              firstPayload['_base'] is! Map && firstPayload['baseData'] is! Map) continue;
+          if (firstPayload['_base'] is Map) combined['_base'] = firstPayload['_base'];
+          if (firstPayload['baseData'] is Map) combined['baseData'] = firstPayload['baseData'];
+          await (db.update(db.syncQueue)..where((t) => t.id.equals(first.id))).write(
+            SyncQueueCompanion(payload: drift.Value(jsonEncode(combined))),
+          );
+          for (final superseded in operations.skip(1)) {
+            await (db.delete(db.syncQueue)..where((t) => t.id.equals(superseded.id))).go();
+          }
+        } on FormatException {
+          // Dados antigos ou incompletos não são consolidados automaticamente.
+        } on TypeError {
+          // Revisões ou bases incompatíveis exigem resolução explícita.
+        }
+      }
+    });
+  }
+
   Future<bool> _applyRemoteRecord({
     required String table,
     required Map<String, dynamic> remoteRecord,
@@ -2003,31 +2095,56 @@ class SupabaseSyncService {
     if (id == null || id.isEmpty) return false;
 
     try {
+      var shouldDownloadMedia = false;
+      final applied = await db.transaction(() async {
       final localMap = await _getLocalMap(table, id);
-      final pendingOp =
-          await (db.select(db.syncQueue)..where(
-                (t) =>
-                    t.entityId.equals(id) &
-                    (t.status.equals('pending') |
-                        t.status.equals('in_progress')),
-              ))
-              .getSingleOrNull();
+      final unresolved = (await (db.select(db.syncQueue)..where(
+        (t) => t.entityId.equals(id) &
+            (t.status.equals('pending') | t.status.equals('in_progress') |
+             t.status.equals('conflict') | t.status.equals('failed')),
+      )).get()).where((op) => mapEntityToRemoteTable(op.entityType) == table).toList()
+        ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
 
+      // Não sobrescreva edições enquanto há divergências não resolvidas.
+      if (unresolved.any((op) => op.status == 'conflict' || op.status == 'failed')) {
+        errors.add('Há operações não resolvidas em $table ($id).');
+        _setStatus(SyncStatus.conflict);
+        return false;
+      }
+      if (unresolved.length > 1) {
+        final message = 'Múltiplas alterações pendentes em $table ($id) exigem resolução.';
+        errors.add(message);
+        // Preserve todas as operações: resolvê-las individualmente como
+        // conflitos poderia substituir alterações locais mais recentes.
+        return false;
+      }
+      final pendingOp = unresolved.isEmpty ? null : unresolved.first;
+
+      // Uma exclusão definitiva local não pode ser desfeita pelo pull.
+      if (localMap == null && pendingOp?.operation.toUpperCase() == 'HARD_DELETE') {
+        return true;
+      }
       if (localMap == null) {
-        await _insertLocalEntry(table, normalized);
-        if (table == 'voice_notes' && client != null) {
-          await _downloadVoiceNoteAudio(id, client);
-        } else if ((table == 'ticuna_words' || table == 'ticuna_phrases') && client != null) {
-          await _downloadTicunaAudio(id, table, client);
-        } else if (table == 'knowledge_documents' && client != null) {
-          await _downloadKnowledgeDocument(id, client);
-        } else if (table == 'person_photos' && client != null) {
-          await _downloadPersonPhoto(id, client);
+        if (pendingOp != null) {
+          errors.add('Registro local ausente com alteração pendente em $table ($id).');
+          return false;
         }
+        await _insertLocalEntry(table, normalized);
+        shouldDownloadMedia = true;
         return true;
       }
 
       if (pendingOp != null) {
+        if (pendingOp.operation.toUpperCase() == 'INSERT') {
+          if (_recordsDifferNonAudit(localMap, normalized)) {
+            final message = 'Inserção local coincide com registro remoto diferente em $table ($id).';
+            errors.add(message);
+            await repository.markSyncOperationConflict(pendingOp.id, message, remoteData: normalized);
+            _setStatus(SyncStatus.conflict);
+            return false;
+          }
+          return true;
+        }
         final rawPayload =
             jsonDecode(pendingOp.payload) as Map<String, dynamic>;
         final Map<String, dynamic> baseData;
@@ -2079,14 +2196,23 @@ class SupabaseSyncService {
           _setStatus(SyncStatus.conflict);
           return false;
         } else {
-          await _updateLocalEntry(table, mergeResult.mergedData);
-          await (db.update(
-            db.syncQueue,
-          )..where((t) => t.id.equals(pendingOp.id))).write(
-            SyncQueueCompanion(
-              payload: drift.Value(jsonEncode(mergeResult.mergedData)),
-            ),
-          );
+          final merged = Map<String, dynamic>.from(mergeResult.mergedData);
+          if (rawPayload['_base'] is Map || rawPayload['baseData'] is Map) {
+            final remoteRev = (normalized['revision'] as num?)?.toInt() ?? 1;
+            final localRev = (localMap['revision'] as num?)?.toInt() ?? 1;
+            merged['revision'] = max(remoteRev, localRev) + 1;
+            merged['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+          }
+          await db.transaction(() async {
+            await _updateLocalEntry(table, merged);
+            final queued = Map<String, dynamic>.from(merged);
+            if (rawPayload['_base'] is Map || rawPayload['baseData'] is Map) {
+              queued['_base'] = normalized;
+            }
+            await (db.update(db.syncQueue)..where((t) => t.id.equals(pendingOp.id))).write(
+              SyncQueueCompanion(payload: drift.Value(jsonEncode(queued))),
+            );
+          });
           return true;
         }
       } else {
@@ -2117,19 +2243,24 @@ class SupabaseSyncService {
 
           if (isRemoteNewer) {
             await _updateLocalEntry(table, normalized);
-            if (table == 'voice_notes' && client != null) {
-              await _downloadVoiceNoteAudio(id, client);
-            } else if ((table == 'ticuna_words' || table == 'ticuna_phrases') && client != null) {
-              await _downloadTicunaAudio(id, table, client);
-            } else if (table == 'knowledge_documents' && client != null) {
-              await _downloadKnowledgeDocument(id, client);
-            } else if (table == 'person_photos' && client != null) {
-              await _downloadPersonPhoto(id, client);
-            }
+            shouldDownloadMedia = true;
           }
           return true;
         }
       }
+      });
+      if (applied && shouldDownloadMedia && client != null) {
+        if (table == 'voice_notes') {
+          await _downloadVoiceNoteAudio(id, client);
+        } else if (table == 'ticuna_words' || table == 'ticuna_phrases') {
+          await _downloadTicunaAudio(id, table, client);
+        } else if (table == 'knowledge_documents') {
+          await _downloadKnowledgeDocument(id, client);
+        } else if (table == 'person_photos') {
+          await _downloadPersonPhoto(id, client);
+        }
+      }
+      return applied;
     } catch (e) {
       errors.add('Erro ao aplicar registro remoto em $table ($id): $e');
       return false;
@@ -2137,9 +2268,18 @@ class SupabaseSyncService {
   }
 
   /// Realiza o ciclo completo de sincronização bidirecional:
-  /// 1. Envia mutações locais pendentes da fila (push)
-  /// 2. Busca e mescla alterações remotas (pull), respeitando integridade offline-first
+  /// 1. Busca e mescla alterações remotas (pull)
+  /// 2. Envia mutações locais pendentes somente se o pull for bem-sucedido
   Future<SyncProcessResult>? _activeSync;
+  Future<void> _operationsTail = Future<void>.value();
+
+  // Pull e push não podem alterar a mesma fila simultaneamente, inclusive
+  // quando acionados diretamente pela interface além do ciclo automático.
+  Future<T> _serializeSyncOperation<T>(Future<T> Function() operation) {
+    final result = _operationsTail.then((_) => operation());
+    _operationsTail = result.then<void>((_) {}, onError: (Object error, StackTrace stack) {});
+    return result;
+  }
 
   Future<SyncProcessResult> sync() {
     return _activeSync ??= _runSync().whenComplete(() => _activeSync = null);
@@ -2148,7 +2288,12 @@ class SupabaseSyncService {
   Future<SyncProcessResult> _runSync() async {
     // C2: Pull-before-push: busca alterações remotas antes de enviar mutações locais
     final pullResult = await fetchRemoteChanges();
-    if (!isConfigured) return pullResult;
+    // Uma falha no pull impede o push: sem a versão remota não é seguro
+    // decidir se uma edição local pode ser enviada.
+    if (!isConfigured || pullResult.failureCount > 0 ||
+        pullResult.conflictCount > 0 || pullResult.errors.isNotEmpty) {
+      return pullResult;
+    }
     final pushResult = await processQueue();
     final allErrors = [...pullResult.errors, ...pushResult.errors];
     return SyncProcessResult(
@@ -2163,13 +2308,19 @@ class SupabaseSyncService {
   }
 
   /// Busca e avalia alterações remotas mais recentes de forma incremental e paginada
-  Future<SyncProcessResult> fetchRemoteChanges() async {
+  Future<SyncProcessResult> fetchRemoteChanges() =>
+      _serializeSyncOperation(_fetchRemoteChanges);
+
+  Future<SyncProcessResult> _fetchRemoteChanges() async {
+    if (isConfigured && !_legacyTestMode) return _blockedUntilEncryption();
     if (!isConfigured) {
+      _setStatus(SyncStatus.waitingConnection);
       return const SyncProcessResult(
         totalProcessed: 0,
         successCount: 0,
         failureCount: 0,
         conflictCount: 0,
+        errors: ['Supabase não configurado. Busca remota suspensa.'],
         message: 'Supabase não configurado. Busca remota suspensa.',
       );
     }
@@ -2189,6 +2340,7 @@ class SupabaseSyncService {
       );
     }
 
+    await _coalescePendingChanges();
     int totalProcessed = 0;
     int successCount = 0;
     int failureCount = 0;
@@ -2203,23 +2355,31 @@ class SupabaseSyncService {
                 .getSingleOrNull();
         final lastSyncedAt = SyncTimestamp.parse(kvRow?.value);
 
-        int offset = 0;
         const pageSize = 100;
         DateTime? newestUpdatedAt;
+        String? pageTimestamp;
+        String? pageId;
+        var tableHadFailure = false;
 
         while (true) {
           var query = client.from(table).select();
           if (lastSyncedAt != null) {
-            query = query.gt(
+            // Releia o último timestamp: registros distintos podem compartilhá-lo.
+            query = query.gte(
               'updated_at',
               lastSyncedAt.toUtc().toIso8601String(),
+            );
+          }
+          if (pageTimestamp != null && pageId != null) {
+            query = query.or(
+              'updated_at.gt.$pageTimestamp,and(updated_at.eq.$pageTimestamp,id.gt.$pageId)',
             );
           }
 
           final res = await query
               .order('updated_at', ascending: true)
               .order('id', ascending: true)
-              .range(offset, offset + pageSize - 1);
+              .limit(pageSize);
           final List rows = res as List;
           if (rows.isEmpty) break;
 
@@ -2228,6 +2388,12 @@ class SupabaseSyncService {
             final map = rawItem as Map<String, dynamic>;
             final updatedAtRaw = map['updated_at'] ?? map['updatedAt'];
             final dt = SyncTimestamp.parse(updatedAtRaw);
+            if (dt == null || map['id'] == null || map['id'].toString().isEmpty) {
+              tableHadFailure = true;
+              failureCount++;
+              errors.add('Registro remoto em $table sem ID ou updated_at válido.');
+              continue;
+            }
 
             final applied = await _applyRemoteRecord(
               table: table,
@@ -2238,11 +2404,11 @@ class SupabaseSyncService {
 
             if (applied) {
               successCount++;
-              if (dt != null &&
-                  (newestUpdatedAt == null || dt.isAfter(newestUpdatedAt))) {
+              if (newestUpdatedAt == null || dt.isAfter(newestUpdatedAt)) {
                 newestUpdatedAt = dt;
               }
             } else {
+              tableHadFailure = true;
               if (_currentStatus == SyncStatus.conflict) {
                 conflictCount++;
               } else {
@@ -2252,10 +2418,21 @@ class SupabaseSyncService {
           }
 
           if (rows.length < pageSize) break;
-          offset += pageSize;
+          final last = rows.last as Map<String, dynamic>;
+          final lastTimestamp = SyncTimestamp.parse(last['updated_at'] ?? last['updatedAt']);
+          final lastId = last['id']?.toString();
+          if (lastTimestamp == null || lastId == null || lastId.isEmpty) {
+            throw StateError('Página de $table sem timestamp ou ID válido.');
+          }
+          final nextTimestamp = lastTimestamp.toUtc().toIso8601String();
+          if (pageTimestamp == nextTimestamp && pageId == lastId) {
+            throw StateError('A paginação de $table não avançou.');
+          }
+          pageTimestamp = nextTimestamp;
+          pageId = lastId;
         }
 
-        if (newestUpdatedAt != null) {
+        if (!tableHadFailure && newestUpdatedAt != null) {
           await db
               .into(db.appKvStore)
               .insertOnConflictUpdate(
@@ -2295,12 +2472,20 @@ class SupabaseSyncService {
 
   /// Resolve um conflito da sync_queue aceitando a versão remota armazenada (ou baixando do servidor).
   Future<bool> resolveConflictAcceptRemote(String syncQueueId) async {
+    if (!_legacyTestMode) return false;
     final op = await (db.select(db.syncQueue)
           ..where((t) => t.id.equals(syncQueueId)))
         .getSingleOrNull();
     if (op == null) return false;
 
     final tableName = mapEntityToRemoteTable(op.entityType);
+    final otherOperations = await (db.select(db.syncQueue)..where((t) =>
+      t.entityId.equals(op.entityId) & t.id.isNotValue(op.id) &
+      t.status.isIn(['pending', 'in_progress', 'failed', 'conflict'])
+    )).get();
+    if (otherOperations.any((item) => mapEntityToRemoteTable(item.entityType) == tableName)) {
+      return false;
+    }
     Map<String, dynamic>? remoteMap;
     try {
       final decoded = jsonDecode(op.payload);
@@ -2342,9 +2527,26 @@ class SupabaseSyncService {
   }
 
   /// Processa a fila persistente de sincronização com backoff exponencial e detecção de conflitos.
-  Future<SyncProcessResult> processQueue() async {
+  Future<SyncProcessResult> processQueue() =>
+      _serializeSyncOperation(_processQueue);
+
+  Future<SyncProcessResult> _processQueue() async {
+    if (isConfigured && !_legacyTestMode) return _blockedUntilEncryption();
+    await _coalescePendingChanges();
     final pendingOps = await repository.getPendingSyncOperations();
     if (pendingOps.isEmpty) {
+      final unresolved = await repository.getUnresolvedSyncOperations();
+      if (unresolved.isNotEmpty) {
+        final conflicts = unresolved.where((op) => op.status == 'conflict').length;
+        final failures = unresolved.length - conflicts;
+        _setStatus(conflicts > 0 ? SyncStatus.conflict : SyncStatus.error);
+        return SyncProcessResult(
+          totalProcessed: 0, successCount: 0, failureCount: failures,
+          conflictCount: conflicts,
+          errors: ['Há ${unresolved.length} operações não resolvidas na fila.'],
+          message: 'Existem alterações locais pendentes de resolução.',
+        );
+      }
       _setStatus(SyncStatus.synced);
       return const SyncProcessResult(
         totalProcessed: 0,
@@ -2362,6 +2564,7 @@ class SupabaseSyncService {
         successCount: 0,
         failureCount: 0,
         conflictCount: 0,
+        errors: const ['Supabase não configurado; alterações ainda não enviadas.'],
         message:
             'Supabase não configurado. ${pendingOps.length} registros mantidos salvos localmente no SQLite.',
       );
@@ -2388,6 +2591,7 @@ class SupabaseSyncService {
     int success = 0;
     int failure = 0;
     int conflicts = 0;
+    int deferred = 0;
     final List<String> errors = [];
 
     for (final op in pendingOps) {
@@ -2409,13 +2613,25 @@ class SupabaseSyncService {
       final lastAttempt = op.lastAttemptAt ?? op.createdAt;
       if (now.difference(lastAttempt).inSeconds < backoffSeconds &&
           op.attempts > 0) {
+        deferred++;
         continue;
       }
 
       try {
+        final tableName = mapEntityToRemoteTable(op.entityType);
+        final related = (await (db.select(db.syncQueue)..where(
+          (t) => t.entityId.equals(op.entityId) &
+              (t.status.equals('pending') | t.status.equals('in_progress') |
+               t.status.equals('conflict') | t.status.equals('failed')),
+        )).get()).where((item) => mapEntityToRemoteTable(item.entityType) == tableName).toList();
+        if (related.length > 1 || related.any((item) =>
+            item.status == 'conflict' || item.status == 'failed')) {
+          failure++;
+          errors.add('Operações não resolvidas para $tableName (${op.entityId}); envio suspenso para preservar os dados.');
+          continue;
+        }
         final Map<String, dynamic> rawPayload =
             jsonDecode(op.payload) as Map<String, dynamic>;
-        final tableName = mapEntityToRemoteTable(op.entityType);
         final operation = op.operation.toUpperCase();
 
         // F7/M10: Hidratação completa a partir do SQLite local antes do envio
@@ -2510,7 +2726,17 @@ class SupabaseSyncService {
                 cleanPayload.addAll(mergeResult.mergedData);
                 cleanPayload['revision'] = remoteRev + 1;
                 cleanPayload['updatedAt'] = DateTime.now().toUtc().toIso8601String();
-                await _updateLocalEntry(tableName, cleanPayload);
+                await db.transaction(() async {
+                  final currentOp = await (db.select(db.syncQueue)
+                    ..where((t) => t.id.equals(op.id))).getSingleOrNull();
+                  final currentLocal = await _getLocalMap(tableName, op.entityId);
+                  if (currentOp == null || currentOp.status != 'pending' ||
+                      currentOp.payload != op.payload ||
+                      jsonEncode(currentLocal) != jsonEncode(localRowMap)) {
+                    throw StateError('Registro local mudou durante a sincronização; tente novamente.');
+                  }
+                  await _updateLocalEntry(tableName, cleanPayload);
+                });
               }
             }
           }
@@ -2539,51 +2765,32 @@ class SupabaseSyncService {
             }
           }
 
-          // C2 Camada 2: RPC Server-Side `sync_upsert` com trava otimista
-          bool pushedViaRpc = false;
-          try {
-            final rpcRes = await client.rpc(
-              'sync_upsert',
-              params: {
-                'p_table': tableName,
-                'p_payload': remotePayload,
-              },
-            );
-            if (rpcRes is Map<String, dynamic>) {
-              if (rpcRes['conflict'] == true ||
-                  rpcRes['code']?.toString() == '23505') {
-                conflicts++;
-                _setStatus(SyncStatus.conflict);
-                final serverRec = rpcRes['server_record'] is Map<String, dynamic>
-                    ? normalizeRemotePayload(
-                        rpcRes['server_record'] as Map<String, dynamic>,
-                      )
-                    : null;
-                final err =
-                    'Conflito otimista detectado pelo servidor em ${op.entityType} (${op.entityId}): ${rpcRes['message'] ?? ''}';
-                errors.add(err);
-                await repository.markSyncOperationConflict(
-                  op.id,
-                  err,
-                  remoteData: serverRec,
-                );
-                continue;
-              }
-              if (rpcRes['success'] == true) {
-                pushedViaRpc = true;
-              }
-            }
-          } on PostgrestException catch (rpcErr) {
-            if (rpcErr.code == '23505' || rpcErr.code == '409') {
-              rethrow;
-            }
-            AppLogger.warning(
-              'RPC sync_upsert indisponível (${rpcErr.code}): fallback para upsert após pré-check.',
-            );
+          // A gravação deve ser atômica no servidor. Nunca contorne a trava
+          // com um upsert direto quando a RPC falhar ou retornar algo inesperado.
+          final rpcRes = await client.rpc(
+            'sync_upsert_if_unchanged',
+            params: {
+              'p_table': tableName,
+              'p_payload': remotePayload,
+              'p_expected_record': remoteRows.isEmpty ? null : remoteRows.first,
+            },
+          );
+          if (rpcRes is! Map<String, dynamic>) {
+            throw StateError('Resposta inválida da RPC sync_upsert_if_unchanged.');
           }
-
-          if (!pushedViaRpc) {
-            await client.from(tableName).upsert(remotePayload);
+          if (rpcRes['conflict'] == true || rpcRes['code']?.toString() == '23505') {
+            conflicts++;
+            _setStatus(SyncStatus.conflict);
+            final serverRec = rpcRes['server_record'] is Map<String, dynamic>
+                ? normalizeRemotePayload(rpcRes['server_record'] as Map<String, dynamic>)
+                : null;
+            final err = 'Conflito otimista detectado pelo servidor em ${op.entityType} (${op.entityId})';
+            errors.add(err);
+            await repository.markSyncOperationConflict(op.id, err, remoteData: serverRec);
+            continue;
+          }
+          if (rpcRes['success'] != true) {
+            throw StateError('RPC sync_upsert_if_unchanged não confirmou a gravação.');
           }
 
           if (tableName == 'voice_notes') {
@@ -2632,75 +2839,77 @@ class SupabaseSyncService {
             }
           }
 
-          await repository.markSyncOperationSuccess(op.id);
-          success++;
+          final acknowledged = await (db.update(db.syncQueue)..where((t) =>
+              t.id.equals(op.id) & t.payload.equals(op.payload) &
+              t.status.isIn(['pending', 'in_progress']))).write(
+            const SyncQueueCompanion(status: drift.Value('synced')),
+          );
+          if (acknowledged == 0) {
+            failure++;
+            errors.add('A operação ${op.id} mudou durante o envio e permanece pendente.');
+          } else {
+            success++;
+          }
         } else if (operation == 'DELETE') {
-          // M5: Verificação de revisão remota antes de aplicar tombstone
-          final localRev = cleanPayload['revision'] as int? ?? 1;
-          final rawRemoteRows = await client
-              .from(tableName)
-              .select()
-              .eq('id', op.entityId)
-              .limit(1);
-          final remoteRows = (rawRemoteRows as List)
-              .whereType<Map<String, dynamic>>()
-              .where((r) => r['id']?.toString() == op.entityId)
-              .toList();
-          if (remoteRows.isNotEmpty) {
-            final remoteRecord = normalizeRemotePayload(remoteRows.first);
-            final remoteRev = remoteRecord['revision'] as int? ?? 1;
-            if (remoteRev > localRev) {
+          // Sem base verificável, apagar poderia ocultar alteração feita em outro aparelho.
+          final rows = await client.from(tableName).select().eq('id', op.entityId).limit(1);
+          if (rows.isNotEmpty) {
+            final remote = Map<String, dynamic>.from(rows.first);
+            final base = rawPayload['_base'];
+            final baseRevision = base is Map ? (base['revision'] as num?)?.toInt() : null;
+            final remoteRevision = (remote['revision'] as num?)?.toInt();
+            final baseUpdated = base is Map ? SyncTimestamp.parse(base['updatedAt'] ?? base['updated_at']) : null;
+            final remoteUpdated = SyncTimestamp.parse(remote['updated_at']);
+            if (baseRevision == null || remoteRevision != baseRevision ||
+                baseUpdated == null || remoteUpdated == null ||
+                baseUpdated.millisecondsSinceEpoch ~/ 1000 != remoteUpdated.millisecondsSinceEpoch ~/ 1000) {
               conflicts++;
-              _setStatus(SyncStatus.conflict);
-              final err =
-                  'Conflito em DELETE de ${op.entityType} (${op.entityId}): registro remoto (rev $remoteRev) foi alterado após exclusão local (rev $localRev).';
-              errors.add(err);
-              await repository.markSyncOperationConflict(
-                op.id,
-                err,
-                remoteData: remoteRecord,
-              );
+              final message = 'Exclusão suspensa: estado remoto não corresponde à base em $tableName (${op.entityId}).';
+              errors.add(message);
+              await repository.markSyncOperationConflict(op.id, message,
+                  remoteData: normalizeRemotePayload(remote));
+              continue;
+            }
+            final nowIso = DateTime.now().toUtc().toIso8601String();
+            final result = await client.rpc('sync_upsert_if_unchanged', params: {
+              'p_table': tableName,
+              'p_payload': {'id': op.entityId, 'deleted_at': nowIso,
+                'updated_at': nowIso, 'revision': (cleanPayload['revision'] as num?)?.toInt() ?? baseRevision + 1},
+              'p_expected_record': remote,
+            });
+            if (result is! Map || result['success'] != true) {
+              conflicts++;
+              final message = 'Exclusão suspensa: registro remoto mudou durante a operação em $tableName (${op.entityId}).';
+              errors.add(message);
+              await repository.markSyncOperationConflict(op.id, message);
               continue;
             }
           }
-
-          // Exclui arquivos binários associados no Storage
-          if (tableName == 'voice_notes') {
-            await _deleteVoiceNoteAudio(op.entityId, client);
-          } else if (tableName == 'ticuna_words' || tableName == 'ticuna_phrases') {
-            await _deleteTicunaAudio(op.entityId, client);
-          } else if (tableName == 'knowledge_documents') {
-            await _deleteKnowledgeDocumentStorage(op.entityId, client);
-          } else if (tableName == 'person_photos') {
-            await _deletePersonPhotoStorage(op.entityId, client);
+          // A lixeira deve ser restaurável: não remover binários no soft delete.
+          final acknowledged = await (db.update(db.syncQueue)..where((t) =>
+              t.id.equals(op.id) & t.payload.equals(op.payload) &
+              t.status.isIn(['pending', 'in_progress']))).write(
+            const SyncQueueCompanion(status: drift.Value('synced')),
+          );
+          if (acknowledged == 0) {
+            failure++;
+            errors.add('A operação ${op.id} mudou durante o envio e permanece pendente.');
+          } else {
+            success++;
           }
-
-          final nowIso = DateTime.now().toUtc().toIso8601String();
-          await client
-              .from(tableName)
-              .update({
-                'deleted_at': nowIso,
-                'updated_at': nowIso,
-                'revision': localRev,
-              })
-              .eq('id', op.entityId)
-              .lte('revision', localRev);
-          await repository.markSyncOperationSuccess(op.id);
-          success++;
         } else if (operation == 'HARD_DELETE') {
-          if (tableName == 'voice_notes') {
-            await _deleteVoiceNoteAudio(op.entityId, client);
-          } else if (tableName == 'ticuna_words' || tableName == 'ticuna_phrases') {
-            await _deleteTicunaAudio(op.entityId, client);
-          } else if (tableName == 'knowledge_documents') {
-            await _deleteKnowledgeDocumentStorage(op.entityId, client);
-          } else if (tableName == 'person_photos') {
-            await _deletePersonPhotoStorage(op.entityId, client);
-          }
-
-          await client.from(tableName).delete().eq('id', op.entityId);
-          await repository.markSyncOperationSuccess(op.id);
-          success++;
+          // Filas legadas não conservam a base da exclusão definitiva, e remover
+          // objetos de Storage não é atômico com PostgreSQL. Falhar fechado até
+          // existir um protocolo recuperável com base e limpeza idempotente.
+          conflicts++;
+          final message = 'Exclusão definitiva remota suspensa para proteger dados; requer revisão (${op.entityType}).';
+          errors.add(message);
+          await repository.markSyncOperationConflict(op.id, message);
+        } else {
+          failure++;
+          final message = 'Operação de sincronização desconhecida: $operation';
+          errors.add(message);
+          await repository.markSyncOperationFailed(op.id, message, forceFailed: true);
         }
       } on PostgrestException catch (e) {
         if (e.code == '23505' || e.code == '409') {
@@ -2725,12 +2934,18 @@ class SupabaseSyncService {
       }
     }
 
-    if (conflicts > 0) {
+    final remaining = await repository.getUnresolvedSyncOperations();
+    if (remaining.any((op) => op.status == 'conflict') || conflicts > 0) {
       _setStatus(SyncStatus.conflict);
-    } else if (failure > 0 || errors.isNotEmpty) {
+    } else if (failure > 0 || errors.isNotEmpty || remaining.any((op) => op.status == 'failed')) {
       _setStatus(SyncStatus.error);
+    } else if (remaining.isNotEmpty || deferred > 0) {
+      _setStatus(SyncStatus.savedLocally);
     } else {
       _setStatus(SyncStatus.synced);
+    }
+    if (remaining.isNotEmpty && errors.isEmpty) {
+      errors.add('${remaining.length} operações ainda aguardam sincronização.');
     }
 
     // Expulga operações sincronizadas antigas (> 30 dias) para manter o SQLite leve e veloz
@@ -2747,7 +2962,7 @@ class SupabaseSyncService {
       conflictCount: conflicts,
       errors: errors,
       message:
-          'Sincronização concluída: $success enviados, $failure falhas, $conflicts conflitos.',
+          'Sincronização: $success enviados, $failure falhas, $conflicts conflitos, ${remaining.length} pendentes.',
     );
   }
 

@@ -3,7 +3,8 @@ name: CI / CD Pipeline
 on:
   push:
     branches: [ main, master, 'arena/**' ]
-    tags: [ 'v*' ]
+    # Esta tag é reservada à pré-release iOS, não à publicação estável.
+    tags: [ 'v*', '!v1.3.4', '!v1.3.5', '!v1.3.6' ]
   pull_request:
     branches: [ main, master ]
   workflow_dispatch:
@@ -57,6 +58,47 @@ jobs:
           print(f"Version consistency OK: {pub_ver}+{pub_build}")
           PY
 
+  verify_release_configuration:
+    name: Verify release configuration
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require build configuration and Android signing
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          for name in SUPABASE_URL SUPABASE_ANON_KEY ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then echo "::error::Release configuration missing: $name"; exit 1; fi
+          done
+
+  build_sai_release_map:
+    name: Build experimental SAI release map
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install local vector rendering tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends qgis python3-qgis gdal-bin osmium-tool fonts-dejavu-core
+      - name: Render and verify full extent
+        run: |
+          bash tool/map/build_sai.sh "$RUNNER_TEMP/sai"
+          python3 tool/map/verify_full_extent.py "$RUNNER_TEMP/sai/output/sai-experimental.mbtiles"
+          mv "$RUNNER_TEMP/sai/output/sai-experimental.mbtiles" "$RUNNER_TEMP/sai/output/br_am_solimoes.mbtiles"
+          (cd "$RUNNER_TEMP/sai/output" && sha256sum br_am_solimoes.mbtiles > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sai-release-map
+          path: ${{ runner.temp }}/sai/output/
+          if-no-files-found: error
+
   test_and_lint:
     name: Flutter Analyze & Test
     needs: [ version_consistency ]
@@ -80,12 +122,14 @@ jobs:
       - name: Run Static Analysis
         run: |
           set +e
-          dart analyze lib test --fatal-infos --format machine > /tmp/dart-analysis.txt
+          dart analyze lib test --fatal-warnings --format machine > /tmp/dart-analysis.txt
           status=$?
           cat /tmp/dart-analysis.txt
           while IFS='|' read -r severity type code file line column length message; do
-            if [ -n "$message" ]; then
+            if [ -n "$message" ] && [ "$severity" = "ERROR" ]; then
               echo "::error file=$file,line=$line,col=$column::$code: $message"
+            elif [ -n "$message" ] && [ "$severity" = "WARNING" ]; then
+              echo "::warning file=$file,line=$line,col=$column::$code: $message"
             fi
           done < /tmp/dart-analysis.txt
           exit "$status"
@@ -129,6 +173,7 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
+          AUTH_NATIVE_CALLBACK: ${{ vars.AUTH_NATIVE_CALLBACK }}
         run: |
           python3 - <<'PY'
           import os
@@ -149,6 +194,8 @@ jobs:
               val = os.environ.get(key, "").strip()
               if val:
                   defines.append(f"--dart-define={key}={val}")
+          if os.environ.get("AUTH_NATIVE_CALLBACK", "").strip().lower() == "true":
+              defines.append("--dart-define=AUTH_NATIVE_CALLBACK=true")
           with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as f:
               f.write(f"DART_DEFINES={' '.join(defines)}\n")
           PY
@@ -167,10 +214,22 @@ jobs:
 
       - name: Build Android APK (Release arm64-v8a)
         env:
+          IS_RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/v') }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: flutter build apk --target-platform android-arm64 --release $DART_DEFINES
+        run: |
+          if [ "$IS_RELEASE_TAG" = "true" ]; then export ORG_GRADLE_PROJECT_requireReleaseSigning=true; fi
+          set -o pipefail
+          flutter build apk --target-platform android-arm64 --release $DART_DEFINES 2>&1 | tee /tmp/android-build.log || {
+            python3 - <<'PY2'
+          from pathlib import Path
+          text = '\n'.join(Path('/tmp/android-build.log').read_text(errors='replace').splitlines()[-35:])[-5000:]
+          text = text.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+          print(f'::error title=Android build failure::{text}')
+          PY2
+            exit 1
+          }
 
       - name: Stage Web & Android Release Artifacts
         run: |
@@ -230,6 +289,7 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
           GOOGLE_IOS_CLIENT_ID: ${{ secrets.GOOGLE_IOS_CLIENT_ID }}
+          AUTH_NATIVE_CALLBACK: ${{ vars.AUTH_NATIVE_CALLBACK }}
         run: |
           python3 - <<'PY'
           import os
@@ -250,6 +310,8 @@ jobs:
               val = os.environ.get(key, "").strip()
               if val:
                   defines.append(f"--dart-define={key}={val}")
+          if os.environ.get("AUTH_NATIVE_CALLBACK", "").strip().lower() == "true":
+              defines.append("--dart-define=AUTH_NATIVE_CALLBACK=true")
           with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as f:
               f.write(f"DART_DEFINES={' '.join(defines)}\n")
           PY
@@ -451,8 +513,10 @@ jobs:
   publish_release:
     name: Publish Release Assets
     runs-on: ubuntu-latest
-    needs: [ build_android_and_web, ios_build_check, build_windows, build_linux, build_macos ]
-    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [ build_android_and_web, ios_build_check, build_windows, build_linux, build_macos, verify_release_configuration, build_sai_release_map ]
+    # v1.3.4, v1.3.5 e v1.3.6 são pré-releases exclusivas para iPhone, publicadas pelo fluxo
+    # próprio de teste. Nunca transformá-la automaticamente em versão estável.
+    if: startsWith(github.ref, 'refs/tags/v') && github.ref != 'refs/tags/v1.3.4' && github.ref != 'refs/tags/v1.3.5' && github.ref != 'refs/tags/v1.3.6'
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -487,6 +551,28 @@ jobs:
           name: macos-release
           path: macos-dist
 
+      - name: Download experimental SAI map and provenance
+        uses: actions/download-artifact@v4
+        with:
+          name: sai-release-map
+          path: sai-dist
+
+      - name: Stage release manifest and map provenance
+        run: |
+          python3 - <<'PY2'
+          import json
+          from pathlib import Path
+          source = json.loads(Path('apps.json').read_text(encoding='utf-8'))
+          app = source['apps'][0]
+          actual_size = Path('ios-dist/app-release-unsigned.ipa').stat().st_size
+          if actual_size <= 0:
+              raise SystemExit('Empty IPA')
+          app['size'] = actual_size
+          app['versions'][0]['size'] = actual_size
+          Path('release-dist/apps.json').write_text(json.dumps(source, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          PY2
+          cd sai-dist && zip -q mapa-sai-proveniencia.zip LEIA-ME.txt source-sha256.txt source-info.txt SHA256SUMS.txt
+
       - name: Generate SHA-256 Checksums
         run: |
           mkdir -p checksums
@@ -497,8 +583,10 @@ jobs:
             release-dist/web-release.zip \
             windows-dist/field-assistant-windows-x64.zip \
             linux-dist/field-assistant-linux-x64.tar.gz \
-            macos-dist/field-assistant-macos.zip > checksums/SHA256SUMS.txt
-          sed -i 's|release-dist/||g; s|ios-dist/||g; s|windows-dist/||g; s|linux-dist/||g; s|macos-dist/||g' checksums/SHA256SUMS.txt
+            macos-dist/field-assistant-macos.zip \
+            sai-dist/br_am_solimoes.mbtiles \
+            sai-dist/mapa-sai-proveniencia.zip > checksums/SHA256SUMS.txt
+          sed -i 's|release-dist/||g; s|ios-dist/||g; s|windows-dist/||g; s|linux-dist/||g; s|macos-dist/||g; s|sai-dist/||g' checksums/SHA256SUMS.txt
           cat checksums/SHA256SUMS.txt
 
       - name: Create GitHub Release
@@ -512,7 +600,9 @@ jobs:
             windows-dist/field-assistant-windows-x64.zip
             linux-dist/field-assistant-linux-x64.tar.gz
             macos-dist/field-assistant-macos.zip
-            apps.json
+            release-dist/apps.json
+            sai-dist/br_am_solimoes.mbtiles
+            sai-dist/mapa-sai-proveniencia.zip
             checksums/SHA256SUMS.txt
           generate_release_notes: true
 

@@ -81,7 +81,7 @@ class MBTileRegion {
 }
 
 /// Serviço de gerenciamento de pacotes regionais SQLite .mbtiles
-/// Oferece leitura offline ultrarrápida (<0.2ms) e sem risco de banimento de IP no OSM.
+/// Oferece leitura offline e sem risco de banimento de IP no OSM.
 class MBTilesService {
   static MBTilesService instance = MBTilesService._internal();
 
@@ -99,6 +99,10 @@ class MBTilesService {
   }
 
   final MBTilesBackend _backend;
+
+  /// Alterado quando um pacote é instalado, substituído ou removido.
+  final ValueNotifier<int> tilesRevision = ValueNotifier<int>(0);
+
 
   final StreamController<List<MBTileRegion>> _regionsController =
       StreamController<List<MBTileRegion>>.broadcast();
@@ -123,12 +127,15 @@ class MBTilesService {
       id: 'br_am_solimoes',
       country: 'Brasil',
       state: 'Amazonas',
-      name: 'Santo Antônio do Içá & Alto Solimões',
+      name: 'Santo Antônio do Içá e entorno (experimental)',
       description:
-          'Território fronteiriço, comunidades ribeirinhas e aldeias Ticuna ao longo do Rio Solimões.',
-      minZoom: 6,
-      maxZoom: 18,
-      sizeBytes: 42 * 1024 * 1024, // 42 MB
+          'Retângulo de SAI e entorno; não cobre todo o Alto Solimões. Aldeias, rios e caminhos podem estar incompletos. Não usar para navegação.',
+      minZoom: 8,
+      maxZoom: 16,
+      // O pacote foi publicado na pré-release v1.3.4 e não acompanha
+      // automaticamente as versões futuras do aplicativo.
+      downloadUrl: 'https://github.com/${AppVersion.githubRepo}/releases/download/v1.3.4/br_am_solimoes.mbtiles',
+      sizeBytes: 264892416,
       isInstalled: false, // Não é mais estaticamente pré-instalado
     ),
     MBTileRegion(
@@ -449,7 +456,7 @@ class MBTilesService {
     }
   }
 
-  /// Resolve a URL de download efetiva para a região (URL específica -> URL base -> padrão GitHub mbtiles-v1).
+  /// Resolve URL específica -> URL base -> URL do catálogo da região -> fallback legado.
   String resolveDownloadUrl(MBTileRegion region) {
     final perRegion = _customRegionUrls[region.id];
     if (perRegion != null && perRegion.isNotEmpty) {
@@ -517,6 +524,7 @@ class MBTilesService {
       onProgress: onProgress,
     );
 
+    tilesRevision.value++;
     final isDefault = _defaultCatalog.any((r) => r.id == targetId);
     if (!isDefault) {
       final label = (displayName != null && displayName.trim().isNotEmpty)
@@ -554,8 +562,8 @@ class MBTilesService {
           isInstalled: isInstalled,
           downloadProgress: isInstalled ? 1.0 : 0.0,
           sizeBytes: realSize ?? baseRegion.sizeBytes,
+          // Preserve a URL padrão da região ao remover overrides.
           downloadUrl: customUrl,
-          clearDownloadUrl: customUrl == null,
         ),
       );
     }
@@ -679,6 +687,7 @@ class MBTilesService {
         },
       );
 
+      tilesRevision.value++;
       if (_cancelledRegions.contains(regionId)) {
         throw const MBTilesDownloadException('Download cancelado pelo usuário.');
       }
@@ -722,6 +731,7 @@ class MBTilesService {
     if (idx == -1) return;
 
     await _backend.deleteRegion(regionId);
+    tilesRevision.value++;
     if (_customRegionNames.remove(regionId) != null) {
       await _persistUrlConfig();
     }
@@ -763,6 +773,7 @@ class MBTilesService {
     }
     _activeClients.clear();
     _backend.dispose();
+    tilesRevision.dispose();
     _regionsController.close();
   }
 }

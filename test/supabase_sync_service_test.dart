@@ -82,6 +82,8 @@ void main() {
 
       expect(result.totalProcessed, greaterThanOrEqualTo(1));
       expect(result.successCount, equals(0));
+      expect(result.success, isFalse);
+      expect((await syncService.sync()).success, isFalse);
       expect(result.message, contains('não configurado'));
       expect(syncService.currentStatus, equals(SyncStatus.waitingConnection));
     });
@@ -233,6 +235,7 @@ void main() {
       });
 
       final customSync = SupabaseSyncService(
+          allowLegacySyncForTesting: true,
         db: db,
         repository: repo,
         clientOverride: SupabaseClient(
@@ -320,6 +323,7 @@ void main() {
       });
 
       final customSync = SupabaseSyncService(
+          allowLegacySyncForTesting: true,
         db: db,
         repository: repo,
         clientOverride: SupabaseClient(
@@ -387,6 +391,7 @@ void main() {
       });
 
       final customSync = SupabaseSyncService(
+          allowLegacySyncForTesting: true,
         db: db,
         repository: repo,
         clientOverride: SupabaseClient(
@@ -432,6 +437,7 @@ void main() {
       });
 
       final customSync = SupabaseSyncService(
+          allowLegacySyncForTesting: true,
         db: db,
         repository: repo,
         clientOverride: SupabaseClient(
@@ -472,21 +478,9 @@ void main() {
 
       final mockClient = MockClient((request) async {
         if (request.url.path.contains('/rest/v1/people')) {
-          final offsetParam = request.url.queryParameters['offset'];
-          final limitParam = request.url.queryParameters['limit'];
-          int from = 0;
-          int count = 100;
-          if (offsetParam != null && limitParam != null) {
-            from = int.parse(offsetParam);
-            count = int.parse(limitParam);
-          } else {
-            final rangeHeader =
-                request.headers['range'] ?? request.headers['Range'] ?? '';
-            final match = RegExp(r'(\d+)-(\d+)').firstMatch(rangeHeader);
-            from = match != null ? int.parse(match.group(1)!) : 0;
-            final to = match != null ? int.parse(match.group(2)!) : 99;
-            count = to - from + 1;
-          }
+          // A segunda página usa o último par (updated_at, id), não offset.
+          final from = request.url.queryParameters.containsKey('or') ? 100 : 0;
+          const count = 100;
 
           final pageItems = allRemotePeople.skip(from).take(count).toList();
           final end = pageItems.isEmpty ? from : from + pageItems.length - 1;
@@ -500,6 +494,7 @@ void main() {
       });
 
       final customSync = SupabaseSyncService(
+          allowLegacySyncForTesting: true,
         db: db,
         repository: repo,
         clientOverride: SupabaseClient(
@@ -574,6 +569,9 @@ void main() {
       bool storageDownloadCalled = false;
 
       final mockClient = MockClient((request) async {
+        if (request.method == 'POST' && request.url.path.endsWith('/rest/v1/rpc/sync_upsert_if_unchanged')) {
+          return mockJsonResponse(request, {'success': true});
+        }
         final path = request.url.path;
         if (path.contains('/storage/v1/object/voice_notes') &&
             path.contains('vn_upload_test.m4a') &&
@@ -615,6 +613,7 @@ void main() {
       });
 
       final customSync = SupabaseSyncService(
+          allowLegacySyncForTesting: true,
         db: db,
         repository: repo,
         clientOverride: SupabaseClient(
@@ -671,21 +670,9 @@ void main() {
       final mockClient = MockClient((request) async {
         final path = request.url.path;
         if (path.contains('/rest/v1/people')) {
-          final offsetParam = request.url.queryParameters['offset'];
-          final limitParam = request.url.queryParameters['limit'];
-          int from = 0;
-          int count = 100;
-          if (offsetParam != null && limitParam != null) {
-            from = int.parse(offsetParam);
-            count = int.parse(limitParam);
-          } else {
-            final rangeHeader =
-                request.headers['range'] ?? request.headers['Range'] ?? '';
-            final match = RegExp(r'(\d+)-(\d+)').firstMatch(rangeHeader);
-            from = match != null ? int.parse(match.group(1)!) : 0;
-            final to = match != null ? int.parse(match.group(2)!) : 99;
-            count = to - from + 1;
-          }
+          // A segunda página usa o último par (updated_at, id), não offset.
+          final from = request.url.queryParameters.containsKey('or') ? 100 : 0;
+          const count = 100;
 
           final pageItems = allRemotePeople.skip(from).take(count).toList();
           final end = pageItems.isEmpty ? from : from + pageItems.length - 1;
@@ -699,6 +686,7 @@ void main() {
       });
 
       final customSync = SupabaseSyncService(
+          allowLegacySyncForTesting: true,
         db: db,
         repository: repo,
         clientOverride: SupabaseClient(
@@ -766,6 +754,9 @@ void main() {
           );
 
       final mockClient = MockClient((request) async {
+        if (request.method == 'POST' && request.url.path.endsWith('/rest/v1/rpc/sync_upsert_if_unchanged')) {
+          return mockJsonResponse(request, {'success': true});
+        }
         final path = request.url.path;
         // Metadados são aceitos pelo PostgREST
         if (path.contains('/rest/v1/voice_notes')) {
@@ -779,6 +770,7 @@ void main() {
       });
 
       final customSync = SupabaseSyncService(
+          allowLegacySyncForTesting: true,
         db: db,
         repository: repo,
         clientOverride: SupabaseClient(
@@ -826,6 +818,39 @@ void main() {
       expect(opDeadLetter.attempts, equals(AppRepository.maxSyncAttempts));
     });
 
+    test('Áudio ausente não confirma sincronização da nota', () async {
+      final now = DateTime.now().toUtc();
+      final person = await repo.createPerson(name: 'Áudio ausente');
+      await db.delete(db.syncQueue).go();
+      await db.into(db.voiceNotes).insert(VoiceNotesCompanion.insert(
+        id: 'note_missing', personId: person.id, transcription: 'Teste',
+        audioFilePath: drift.Value(p.join(tempDir.path, 'missing.m4a')),
+        createdAt: now, updatedAt: now,
+      ));
+      await db.into(db.syncQueue).insert(SyncQueueCompanion.insert(
+        id: 'q_missing', entityType: 'voice_notes', entityId: 'note_missing',
+        operation: 'INSERT', payload: jsonEncode({'id': 'note_missing', 'personId': person.id}),
+        createdAt: now,
+      ));
+      var uploaded = false;
+      final mock = MockClient((request) async {
+        if (request.url.path.contains('/storage/v1/')) uploaded = true;
+        if (request.url.path.endsWith('/rpc/sync_upsert_if_unchanged')) {
+          return mockJsonResponse(request, {'success': true});
+        }
+        return mockJsonResponse(request, []);
+      });
+      final sync = SupabaseSyncService(allowLegacySyncForTesting: true, db: db, repository: repo,
+        clientOverride: SupabaseClient('https://mock.supabase.co', 'dummy-key', httpClient: mock));
+      addTearDown(sync.dispose);
+      final result = await sync.processQueue();
+      expect(result.success, isFalse);
+      expect(result.failureCount, 1);
+      expect(uploaded, isFalse);
+      final op = await (db.select(db.syncQueue)..where((t) => t.id.equals('q_missing'))).getSingle();
+      expect(op.status, 'pending');
+    });
+
     test('TC-SYNC-ADV-03: Download de áudio pendente é registrado e recuperável via retryPendingMediaDownloads', () async {
       final now = DateTime.now().toUtc();
       final person = await repo.createPerson(name: 'Irmão com Áudio Pendente');
@@ -862,6 +887,7 @@ void main() {
       });
 
       final customSync = SupabaseSyncService(
+          allowLegacySyncForTesting: true,
         db: db,
         repository: repo,
         clientOverride: SupabaseClient(
@@ -951,6 +977,7 @@ void main() {
       });
 
       final customSync = SupabaseSyncService(
+          allowLegacySyncForTesting: true,
         db: db,
         repository: repo,
         clientOverride: SupabaseClient(
@@ -997,6 +1024,9 @@ void main() {
       bool downloadCalled = false;
 
       final mockClient = MockClient((request) async {
+        if (request.method == 'POST' && request.url.path.endsWith('/rest/v1/rpc/sync_upsert_if_unchanged')) {
+          return mockJsonResponse(request, {'success': true});
+        }
         final uri = request.url.toString();
 
         if (uri.contains('/storage/v1/object/knowledge_vault') || uri.contains('knowledge_vault')) {
@@ -1037,6 +1067,7 @@ void main() {
       });
 
       final customSync = SupabaseSyncService(
+          allowLegacySyncForTesting: true,
         db: db,
         repository: repo,
         clientOverride: SupabaseClient(

@@ -154,4 +154,3 @@ class _PinAuthDialogState extends State<PinAuthDialog> {
     );
   }
 }
-

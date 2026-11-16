@@ -70,7 +70,7 @@ class E2ETestContext {
               headers: {'content-type': 'application/json'},
             );
           }
-          if (path.contains('/rest/v1/rpc/sync_upsert')) {
+          if (path.contains('/rest/v1/rpc/sync_upsert_if_unchanged')) {
             return http.Response(
               '{"success": true, "processed_count": 1, "errors": []}',
               200,
@@ -98,6 +98,7 @@ class E2ETestContext {
     );
 
     final syncService = SupabaseSyncService(
+          allowLegacySyncForTesting: true,
       db: db,
       repository: repo,
       supabaseUrl: effectiveUrl,

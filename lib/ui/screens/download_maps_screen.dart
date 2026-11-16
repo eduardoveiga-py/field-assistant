@@ -31,7 +31,14 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
   @override
   void initState() {
     super.initState();
-    MBTilesService.instance.init();
+    MBTilesService.instance.init().catchError((Object e, StackTrace st) {
+      AppLogger.warning('Falha ao inicializar mapas offline.', e, st);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Não foi possível acessar os mapas offline.')),
+        );
+      }
+    });
   }
 
   @override
@@ -128,8 +135,8 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'O catálogo padrão aponta para releases/download/mbtiles-v1/<id>.mbtiles. '
-                    'Configure abaixo uma URL base própria (ex: https://cdn.seudominio.org/mbtiles) ou deixe em branco para restaurar o padrão.',
+                    'Algumas regiões têm URL própria; as demais usam o catálogo legado, cuja disponibilidade não é garantida. '
+                    'Uma URL base personalizada substitui as URLs padrão; deixe em branco para restaurá-las.',
                     style: TextStyle(fontSize: 12),
                   ),
                   const SizedBox(height: 12),
@@ -367,6 +374,14 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
           body: Column(
             children: [
               ScreenHeroAccentBand.territory(),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: Text(
+                  'A disponibilidade do catálogo padrão não é garantida. '
+                  'Para uso offline, importe um arquivo MBTiles raster licenciado '
+                  'com cobertura e níveis de zoom da sua área e teste sem internet.',
+                ),
+              ),
               // Campo de busca: Localizar mapa
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),

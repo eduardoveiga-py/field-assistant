@@ -9,6 +9,7 @@ import 'package:record/record.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/app_logger.dart';
+import '../../sync/sync_privacy_policy.dart';
 
 /// Resultado de uma gravação de pronúncia Ticuna.
 class TicunaRecordingResult {
@@ -551,6 +552,7 @@ class TicunaAudioService implements ITicunaAudioService {
     required String localFilePath,
     String bucket = 'ticuna_audio',
   }) async {
+    if (!SyncPrivacyPolicy.unencryptedMediaAllowed) return null;
     try {
       final client = Supabase.instance.client;
       Uint8List bytes;
@@ -613,6 +615,7 @@ class TicunaAudioService implements ITicunaAudioService {
     required String id,
     String bucket = 'ticuna_audio',
   }) async {
+    if (!SyncPrivacyPolicy.unencryptedMediaAllowed) return null;
     try {
       final client = Supabase.instance.client;
       final userFolder =

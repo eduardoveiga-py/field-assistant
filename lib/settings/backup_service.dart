@@ -3,8 +3,7 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart' show FlutterError, kIsWeb;
-import 'package:flutter/services.dart' show MissingPluginException;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:crypto/crypto.dart';
@@ -2483,47 +2482,29 @@ class BackupService {
               ..where((tbl) => tbl.key.equals(_silentBackupKeySecret)))
             .getSingleOrNull();
 
-    try {
-      final stored = await _storage.read(key: _silentBackupKeySecret);
-      if (stored != null && stored.isNotEmpty) {
-        if (legacyRow != null) {
-          await (db.delete(db.appKvStore)
-                ..where((tbl) => tbl.key.equals(_silentBackupKeySecret)))
-              .go();
-        }
-        return stored;
-      }
-
-      final secret = (legacyRow != null && legacyRow.value.isNotEmpty)
-          ? legacyRow.value
-          : base64Encode(_generateSecureRandom(32));
-      await _storage.write(key: _silentBackupKeySecret, value: secret);
+    final stored = await _storage.read(key: _silentBackupKeySecret);
+    if (stored != null && stored.isNotEmpty) {
       if (legacyRow != null) {
         await (db.delete(db.appKvStore)
               ..where((tbl) => tbl.key.equals(_silentBackupKeySecret)))
             .go();
       }
-      return secret;
-    } on MissingPluginException {
-      // Ambiente VM de teste sem canal nativo de Keystore/Keychain:
-      // jamais persiste segredo em SQLite não criptografado; mantém apenas em RAM.
-      if (legacyRow != null) {
-        await (db.delete(db.appKvStore)
-              ..where((tbl) => tbl.key.equals(_silentBackupKeySecret)))
-            .go();
-      }
-      return _ephemeralSilentKey ??= base64Encode(_generateSecureRandom(32));
-    } on FlutterError catch (e) {
-      if (!e.message.contains('Binding has not yet been initialized')) {
-        rethrow;
-      }
-      if (legacyRow != null) {
-        await (db.delete(db.appKvStore)
-              ..where((tbl) => tbl.key.equals(_silentBackupKeySecret)))
-            .go();
-      }
-      return _ephemeralSilentKey ??= base64Encode(_generateSecureRandom(32));
+      return stored;
     }
+
+    final secret = (legacyRow != null && legacyRow.value.isNotEmpty)
+        ? legacyRow.value
+        : base64Encode(_generateSecureRandom(32));
+    await _storage.write(key: _silentBackupKeySecret, value: secret);
+    if (await _storage.read(key: _silentBackupKeySecret) != secret) {
+      throw const StorageUnavailableException('Não foi possível persistir a chave do backup.');
+    }
+    if (legacyRow != null) {
+      await (db.delete(db.appKvStore)
+            ..where((tbl) => tbl.key.equals(_silentBackupKeySecret)))
+          .go();
+    }
+    return secret;
   }
 
   /// Realiza backup silencioso se o último foi há mais de 24 horas (ou se force = true).
@@ -2544,6 +2525,9 @@ class BackupService {
         }
       }
 
+      // Não anuncie um backup quando não existe destino persistente na Web.
+      if (kIsWeb) return false;
+
       final deviceSecret = await _getOrCreateSilentBackupKey();
       final backupJson = await exportEncryptedBackup(
         deviceSecret,
@@ -2551,23 +2535,18 @@ class BackupService {
       );
       final nowStr = DateTime.now().toIso8601String();
 
-      // Salva em arquivo físico no diretório de documentos quando disponível
-      if (!kIsWeb) {
-        try {
-          final dir = await _getDocsDir();
-          final backupDir = Directory('${dir.path}/backups');
-          if (!backupDir.existsSync()) {
-            await backupDir.create(recursive: true);
-          }
-          final backupFile = File('${backupDir.path}/silent_backup.bak');
-          await backupFile.writeAsString(backupJson, flush: true);
-        } catch (e, st) {
-          AppLogger.warning(
-            'Não foi possível gravar arquivo de backup silencioso em disco',
-            e,
-            st,
-          );
-        }
+      final dir = await _getDocsDir();
+      final backupDir = Directory('${dir.path}/backups');
+      await backupDir.create(recursive: true);
+      final backupFile = File('${backupDir.path}/silent_backup.bak');
+      final temporaryFile = File('${backupDir.path}/silent_backup_${_uuid.v4()}.tmp');
+      try {
+        await temporaryFile.writeAsString(backupJson, flush: true);
+        await _validateSnapshotFile(temporaryFile, password: deviceSecret);
+        // Mantém a última cópia válida se a gravação ou validação falhar.
+        await temporaryFile.rename(backupFile.path);
+      } finally {
+        if (await temporaryFile.exists()) await temporaryFile.delete();
       }
 
       await db

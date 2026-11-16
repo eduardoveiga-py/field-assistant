@@ -10,6 +10,7 @@ import 'package:ministerio_pessoal/contacts/phone_contacts_manager.dart';
 import 'package:ministerio_pessoal/database/app_database.dart';
 import 'package:ministerio_pessoal/database/repository.dart';
 import 'package:ministerio_pessoal/sync/supabase_sync_service.dart';
+import 'package:ministerio_pessoal/sync/sync_engine.dart';
 import 'package:ministerio_pessoal/territory/landmark_manager.dart';
 import 'package:ministerio_pessoal/voice_notes/voice_note_models.dart';
 import 'package:ministerio_pessoal/voice_notes/voice_notes_manager.dart';
@@ -102,6 +103,7 @@ void main() {
           return http.Response('Server Error', 500, request: request);
         });
         final syncSvc = SupabaseSyncService(
+          allowLegacySyncForTesting: true,
           db: db,
           repository: repo,
           clientOverride: SupabaseClient(
@@ -113,7 +115,9 @@ void main() {
         );
         addTearDown(syncSvc.dispose);
 
-        await syncSvc.processQueue();
+        final deferred = await syncSvc.processQueue();
+        expect(deferred.success, isFalse);
+        expect(syncSvc.currentStatus, isNot(SyncStatus.synced));
         expect(networkHits, equals(0), reason: 'Operação dentro da janela de backoff (2^4 = 16s) deve aguardar');
 
         // 5ª falha promove para dead-letter ('failed')
@@ -261,7 +265,7 @@ void main() {
         final pushedByTable = <String, Map<String, dynamic>>{};
         final mockClient = MockClient((request) async {
           final path = request.url.path;
-          if (request.method == 'POST' && path.endsWith('/rest/v1/rpc/sync_upsert')) {
+          if (request.method == 'POST' && path.endsWith('/rest/v1/rpc/sync_upsert_if_unchanged')) {
             final body = jsonDecode(request.body) as Map<String, dynamic>;
             final table = body['p_table'] as String;
             final payload = Map<String, dynamic>.from(body['p_payload'] as Map);
@@ -272,6 +276,7 @@ void main() {
         });
 
         final syncSvc = SupabaseSyncService(
+          allowLegacySyncForTesting: true,
           db: db,
           repository: repo,
           clientOverride: SupabaseClient(

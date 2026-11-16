@@ -269,7 +269,7 @@ void main() {
         final pushedTables = <String, Map<String, dynamic>>{};
         final mockClient = MockClient((request) async {
           final path = request.url.path;
-          if (request.method == 'POST' && path.endsWith('/rest/v1/rpc/sync_upsert')) {
+          if (request.method == 'POST' && path.endsWith('/rest/v1/rpc/sync_upsert_if_unchanged')) {
             final body = jsonDecode(request.body) as Map<String, dynamic>;
             final table = body['p_table'] as String;
             final payload = Map<String, dynamic>.from(body['p_payload'] as Map);
@@ -283,6 +283,7 @@ void main() {
         });
 
         final syncSvc = SupabaseSyncService(
+          allowLegacySyncForTesting: true,
           db: targetDb,
           repository: targetRepo,
           clientOverride: SupabaseClient(
@@ -382,5 +383,24 @@ void main() {
         expect(bakFile.existsSync(), isTrue);
       },
     );
+    test('backup silencioso não registra sucesso quando diretório falha', () async {
+      final unavailable = BackupService(sourceRepo,
+        documentsDirectoryProvider: () async => throw const StorageUnavailableException('indisponível'));
+      expect(await unavailable.performSilentBackupIfNeeded(force: true), isFalse);
+      expect(await unavailable.getLastSilentBackupDate(), isNull);
+      expect(await File(p.join(sourceDocsDir.path, 'backups', 'silent_backup.bak')).exists(), isFalse);
+    });
+
+    test('falha em novo backup conserva arquivo anterior e data anterior', () async {
+      expect(await sourceBackup.performSilentBackupIfNeeded(force: true), isTrue);
+      final file = File(p.join(sourceDocsDir.path, 'backups', 'silent_backup.bak'));
+      final before = await file.readAsBytes();
+      final timestamp = await sourceBackup.getLastSilentBackupDate();
+      final unavailable = BackupService(sourceRepo,
+        documentsDirectoryProvider: () async => throw const StorageUnavailableException('indisponível'));
+      expect(await unavailable.performSilentBackupIfNeeded(force: true), isFalse);
+      expect(await file.readAsBytes(), before);
+      expect(await unavailable.getLastSilentBackupDate(), timestamp);
+    });
   });
 }

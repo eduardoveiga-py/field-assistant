@@ -143,7 +143,7 @@ void main() {
       // Verifica que NavigationBar inferior é usada em tela mobile e NavigationRail não existe
       expect(find.byType(NavigationBar), findsOneWidget);
       expect(find.byType(NavigationRail), findsNothing);
-      expect(find.text('Salvo Localmente'), findsOneWidget);
+      expect(find.byTooltip('Salvo Localmente'), findsOneWidget);
 
       // Toca no destino Estudos na NavigationBar inferior
       final estudosNav = find.descendant(

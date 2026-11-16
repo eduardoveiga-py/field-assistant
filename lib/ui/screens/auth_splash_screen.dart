@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui';
 
 import 'package:drift/drift.dart' as drift;
+import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -13,10 +14,12 @@ import '../../core/app_theme.dart';
 import '../../core/app_version.dart';
 import '../../database/app_database.dart';
 import '../../sync/supabase_sync_service.dart';
+import '../../sync/native_auth_callback.dart';
 import '../main_navigation_shell.dart';
 import '../providers.dart';
+import 'auth_return_screen.dart';
 
-enum _AuthGateState { loadingSplash, unauthenticated, authenticated }
+enum _AuthGateState { loadingSplash, unauthenticated, authenticated, recovery, recoverySuccess, callbackError }
 
 class AuthSplashScreen extends AuthGateShell {
   const AuthSplashScreen({super.key});
@@ -36,6 +39,8 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
   Session? _latestSession;
   String _statusMessage = 'Inicializando Assistente de Campo...';
   StreamSubscription<AuthState>? _authSub;
+  StreamSubscription<Uri>? _linkSub;
+  final NativeAuthCallback _callback = NativeAuthCallback();
   late final AnimationController _pulseController;
 
   @override
@@ -62,6 +67,18 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
       _authSub = client.auth.onAuthStateChange.listen((data) async {
         if (!mounted) return;
         _latestSession = data.session;
+        if (data.event == AuthChangeEvent.passwordRecovery && data.session != null) {
+          setState(() => _gateState = _AuthGateState.recovery);
+          return;
+        }
+        // Não sair da recuperação porque updateUser/refresh emitem outros eventos.
+        if (_gateState == _AuthGateState.recovery ||
+            _gateState == _AuthGateState.recoverySuccess) {
+          if (data.event == AuthChangeEvent.signedOut) {
+            setState(() => _gateState = _AuthGateState.unauthenticated);
+          }
+          return;
+        }
         // Não transiciona prematuramente se a splash screen ainda estiver ativa
         if (!_isSplashActive) {
           if (data.session == null) {
@@ -88,22 +105,34 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
             });
           }
         }
+      }, onError: (Object error, StackTrace stackTrace) {
+        // Erros do stream também podem vir da renovação de sessão; não os
+        // rotulamos como falha de um link sem saber sua origem.
+        AppLogger.warning('Falha em evento de autenticação Supabase');
+        // Estes códigos identificam links de uso único inválidos/expirados;
+        // erros genéricos de rede ou login não são interpretados como callback.
+        if (mounted && error is AuthException &&
+            (error.code == 'otp_expired' || error.statusCode == 'otp_expired')) {
+          setState(() => _gateState = _AuthGateState.callbackError);
+        }
       });
     }
 
-    // Trata links mágicos / callback Supabase se presentes na URL
-    if (client != null) {
-      final uriStr = Uri.base.toString();
-      if (uriStr.contains('access_token=') ||
-          uriStr.contains('refresh_token=') ||
-          uriStr.contains('code=')) {
+    // Na modalidade opt-in, o SDK não processa o link automaticamente. A
+    // assinatura é criada APÓS o listener de autenticação, inclusive no cold start.
+    if (client != null && NativeAuthCallback.enabled) {
+      final callbackClient = client;
+      _linkSub = AppLinks().uriLinkStream.listen((uri) async {
+        if (!_callback.claim(uri)) return;
         try {
-          await client.auth.getSessionFromUrl(Uri.base);
-          _latestSession = client.auth.currentSession;
-        } catch (e, st) {
-          AppLogger.warning('Falha ao processar callback de autenticação na URL', e, st);
+          await callbackClient.auth.getSessionFromUrl(uri);
+        } catch (_) {
+          // Nunca imprimir a URI: ela pode conter códigos ou tokens.
+          if (mounted) setState(() => _gateState = _AuthGateState.callbackError);
         }
-      }
+      }, onError: (Object _, StackTrace __) {
+        if (mounted) setState(() => _gateState = _AuthGateState.callbackError);
+      });
     }
 
     // Verifica se modo offline foi ativado previamente
@@ -210,9 +239,13 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
     _pulseController.stop();
 
     setState(() {
-      _gateState = shouldAuthenticate
-          ? _AuthGateState.authenticated
-          : _AuthGateState.unauthenticated;
+      if (_gateState != _AuthGateState.recovery &&
+          _gateState != _AuthGateState.recoverySuccess &&
+          _gateState != _AuthGateState.callbackError) {
+        _gateState = (client?.auth.currentSession != null || isOfflineMode)
+            ? _AuthGateState.authenticated
+            : _AuthGateState.unauthenticated;
+      }
     });
 
     if (shouldAuthenticate && hasSession) {
@@ -228,6 +261,7 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
   @override
   void dispose() {
     _authSub?.cancel();
+    _linkSub?.cancel();
     _pulseController.dispose();
     super.dispose();
   }
@@ -284,6 +318,45 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
         );
       case _AuthGateState.authenticated:
         return const MainNavigationShell();
+      case _AuthGateState.callbackError:
+        return AuthReturnScreen(
+          success: false,
+          title: 'Link inválido ou expirado',
+          message: 'Solicite um novo link de confirmação ou recuperação na tela de acesso.',
+          actionLabel: 'Voltar',
+          onAction: () => setState(() {
+            _gateState = Supabase.instance.client.auth.currentSession != null
+                ? _AuthGateState.authenticated : _AuthGateState.unauthenticated;
+          }),
+        );
+      case _AuthGateState.recovery:
+        return AuthNewPasswordScreen(
+          updatePassword: (password) async {
+            await Supabase.instance.client.auth.updateUser(
+              UserAttributes(password: password),
+            );
+          },
+          onSuccess: () => setState(() => _gateState = _AuthGateState.recoverySuccess),
+          onCancel: () async {
+            try {
+              await Supabase.instance.client.auth.signOut(scope: SignOutScope.local);
+            } catch (_) {
+              // Sessão local pode já ter expirado.
+            }
+            if (mounted) setState(() => _gateState = _AuthGateState.unauthenticated);
+          },
+        );
+      case _AuthGateState.recoverySuccess:
+        return AuthReturnScreen(
+          success: true,
+          title: 'Senha atualizada',
+          message: 'Sua senha foi alterada com sucesso.',
+          actionLabel: 'Continuar',
+          onAction: () => setState(() {
+            _gateState = Supabase.instance.client.auth.currentSession != null
+                ? _AuthGateState.authenticated : _AuthGateState.unauthenticated;
+          }),
+        );
     }
   }
 }
@@ -518,6 +591,7 @@ class _SupabaseAuthScreenState extends State<SupabaseAuthScreen> {
         final res = await client.auth.signUp(
           email: email,
           password: password,
+          emailRedirectTo: NativeAuthCallback.redirectTo,
           data: name.isNotEmpty ? {'full_name': name} : null,
         );
         if (res.session != null) {
@@ -587,6 +661,7 @@ class _SupabaseAuthScreenState extends State<SupabaseAuthScreen> {
       await Supabase.instance.client.auth.resend(
         type: OtpType.signup,
         email: email,
+        emailRedirectTo: NativeAuthCallback.redirectTo,
       );
       setState(() {
         _infoMessage =
@@ -625,7 +700,7 @@ class _SupabaseAuthScreenState extends State<SupabaseAuthScreen> {
       _errorMessage = null;
     });
     try {
-      await Supabase.instance.client.auth.resetPasswordForEmail(email);
+      await Supabase.instance.client.auth.resetPasswordForEmail(email, redirectTo: NativeAuthCallback.redirectTo);
       setState(() {
         _infoMessage = 'E-mail de recuperação de senha enviado para $email.';
       });

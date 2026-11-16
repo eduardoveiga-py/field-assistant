@@ -6,7 +6,7 @@ abstract class MBTilesBackend {
   /// Inicializa o diretório e abre os arquivos .mbtiles existentes.
   Future<void> init();
 
-  /// Busca o bloco (tile) de imagem diretamente dos pacotes locais (<0.2ms).
+  /// Busca o bloco (tile) de imagem diretamente dos pacotes locais.
   Future<Uint8List?> getTile(int z, int x, int y);
 
   /// Verifica se o arquivo da região existe fisicamente no disco e possui tamanho > 0.

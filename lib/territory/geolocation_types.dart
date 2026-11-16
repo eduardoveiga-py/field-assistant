@@ -39,7 +39,7 @@ class GeolocationResult {
       case GeolocationStatus.unsupportedPlatform:
         return 'GPS nativo indisponível nesta plataforma.';
       case GeolocationStatus.unavailableOrTimeout:
-        return 'Não foi possível obter sinal GPS no momento.';
+        return 'Não foi possível obter a localização atual. Confira a permissão de localização do app nos Ajustes do iPhone e tente novamente em local aberto.';
     }
   }
 }

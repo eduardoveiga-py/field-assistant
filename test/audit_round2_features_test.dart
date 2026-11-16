@@ -170,7 +170,7 @@ void main() {
     });
 
     testWidgets(
-      'ContactsMapScreen GPS button shows feedback and falls back to Santo Antônio do Içá when permission denied',
+      'ContactsMapScreen GPS denial preserves the current map view',
       (tester) async {
         tester.view.physicalSize = const Size(1024, 768);
         tester.view.devicePixelRatio = 1.0;
@@ -207,8 +207,8 @@ void main() {
           findsOneWidget,
         );
         expect(
-          find.textContaining('Santo Antônio do Içá'),
-          findsAtLeastNWidgets(1),
+          find.textContaining('O mapa permaneceu na posição anterior'),
+          findsOneWidget,
         );
 
         await tester.pumpWidget(const SizedBox());
@@ -817,14 +817,29 @@ void main() {
         300,
         scrollable: find.byType(Scrollable).first,
       );
+      await tester.ensureVisible(find.text('Configurar Supabase (URL/Chave)'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Configurar Supabase (URL/Chave)'));
       await tester.pumpAndSettle();
 
       expect(find.text('Configuração Runtime do Supabase'), findsOneWidget);
+      expect(find.textContaining('A sincronização em nuvem permanece pausada.'), findsOneWidget);
       await tester.tap(find.text('Salvar e Conectar'));
       await tester.pumpAndSettle();
       expect(find.textContaining('Informe a URL do projeto Supabase'), findsOneWidget);
 
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Zerar Banco Local'),
+        -300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.ensureVisible(find.text('Zerar Banco Local'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Zerar Banco Local'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('não serão restaurados automaticamente'), findsOneWidget);
       await tester.tap(find.text('Cancelar'));
       await tester.pumpAndSettle();
       await tester.pumpWidget(const SizedBox());
@@ -872,7 +887,7 @@ void main() {
       await tester.tap(find.byTooltip('Minha Posição GPS'));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Mantendo ponto atual'), findsOneWidget);
+      expect(find.textContaining('Mantendo o ponto atual'), findsOneWidget);
       expect(find.textContaining('-3.150000, -67.900000'), findsOneWidget);
     });
   });

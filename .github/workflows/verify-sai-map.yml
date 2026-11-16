@@ -1,0 +1,35 @@
+name: Verify actual SAI offline package
+on:
+  push:
+    branches: ['arena/**']
+    paths: ['.github/workflows/verify-sai-map.yml', 'tool/map/verify_full_extent.py', 'test/territory/sai_real_package_test.dart']
+permissions:
+  contents: read
+  actions: read
+jobs:
+  real_package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download exact generated regional artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: sai-mapa-offline-experimental
+          path: sai-artifact
+          run-id: 43474748369
+          github-token: ${{ github.token }}
+      - name: Check entire rectangle at each zoom
+        run: |
+          set -o pipefail
+          python3 tool/map/verify_full_extent.py sai-artifact/sai-experimental.mbtiles 2>&1 | tee /tmp/verify-sai.log || { python3 tool/ci_diagnostics_summary.py test /tmp/verify-sai.log; exit 1; }
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Import and decode actual package through application backend
+        env:
+          SAI_MBTILES: ${{ github.workspace }}/sai-artifact/sai-experimental.mbtiles
+        run: |
+          set -o pipefail
+          flutter test --reporter expanded test/territory/sai_real_package_test.dart 2>&1 | tee /tmp/test-real-sai.log || { python3 tool/ci_diagnostics_summary.py test /tmp/test-real-sai.log; exit 1; }

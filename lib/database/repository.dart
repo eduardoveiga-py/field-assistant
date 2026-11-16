@@ -238,6 +238,39 @@ class AppRepository {
     });
   }
 
+  /// Salva geocodificação apenas se o endereço ainda for o mesmo e ninguém
+  /// tiver definido coordenadas enquanto a consulta estava em andamento.
+  Future<bool> applyGeocodedCoordinates({
+    required String personId,
+    required String expectedAddress,
+    required double latitude,
+    required double longitude,
+  }) async {
+    if (!latitude.isFinite || !longitude.isFinite || latitude.abs() > 90 ||
+        longitude.abs() > 180 || (latitude == 0 && longitude == 0)) {
+      return false;
+    }
+    return db.transaction(() async {
+      final current = await getPersonById(personId);
+      if (current == null || current.deletedAt != null ||
+          current.address != expectedAddress ||
+          (current.latitude != null && current.longitude != null &&
+              (current.latitude != 0 || current.longitude != 0))) {
+        return false;
+      }
+      final updated = current.copyWith(
+        latitude: Value(latitude), longitude: Value(longitude),
+        updatedAt: DateTime.now(), revision: current.revision + 1,
+      );
+      await db.update(db.people).replace(updated);
+      await _recordSyncOperation(
+        entityType: 'people', entityId: personId, operation: 'UPDATE',
+        payload: updated.toJson(), baseData: current.toJson(),
+      );
+      return true;
+    });
+  }
+
   Future<void> deletePerson(String id) async {
     final person = await getPersonById(id);
     if (person == null) return;
@@ -1299,22 +1332,34 @@ class AppRepository {
   Future<void> permanentlyDeleteItem(String entityType, String id) async {
     await db.transaction(() async {
       if (entityType == 'people') {
-        // Exclui em cascata todas as entidades filhas para respeitar integridade de chaves estrangeiras
+        // Uma nota pode referenciar uma visita desta pessoa mesmo quando seu
+        // personId é outro; remova-a antes da visita para respeitar a FK.
+        final visits = await (db.select(db.visits)..where((t) => t.personId.equals(id))).get();
+        final visitIds = visits.map((v) => v.id).toList();
+        final appointments = await (db.select(db.appointments)..where((t) => t.personId.equals(id))).get();
+        final appointmentIds = appointments.map((a) => a.id).toList();
+        await (db.delete(db.calendarEventLinks)..where((t) => t.appointmentId.isIn(appointmentIds))).go();
+        await (db.delete(db.voiceNotes)..where((t) => t.personId.equals(id) | t.visitId.isIn(visitIds))).go();
+        await (db.update(db.phoneContacts)..where((t) => t.convertedPersonId.equals(id)))
+            .write(const PhoneContactsCompanion(convertedPersonId: Value(null)));
         await (db.delete(db.visits)..where((t) => t.personId.equals(id))).go();
         await (db.delete(db.studyParticipants)..where((t) => t.personId.equals(id))).go();
         await (db.delete(db.appointments)..where((t) => t.personId.equals(id))).go();
         await (db.delete(db.familyTies)..where((t) => t.personId.equals(id) | t.relatedPersonId.equals(id))).go();
         await (db.delete(db.personPhotos)..where((t) => t.personId.equals(id))).go();
         await (db.delete(db.personPublications)..where((t) => t.personId.equals(id))).go();
-        await (db.delete(db.voiceNotes)..where((t) => t.personId.equals(id))).go();
         await (db.delete(db.people)..where((t) => t.id.equals(id))).go();
       } else if (entityType == 'visits') {
         await (db.delete(db.voiceNotes)..where((t) => t.visitId.equals(id))).go();
         await (db.delete(db.visits)..where((t) => t.id.equals(id))).go();
       } else if (entityType == 'bible_studies') {
+        await (db.delete(db.voiceNotes)..where((t) => t.studyId.equals(id))).go();
         await (db.delete(db.studyParticipants)..where((t) => t.studyId.equals(id))).go();
         await (db.delete(db.studySessions)..where((t) => t.studyId.equals(id))).go();
-        await (db.delete(db.voiceNotes)..where((t) => t.studyId.equals(id))).go();
+        final appointments = await (db.select(db.appointments)..where((t) => t.studyId.equals(id))).get();
+        await (db.delete(db.calendarEventLinks)..where(
+          (t) => t.appointmentId.isIn(appointments.map((a) => a.id).toList()),
+        )).go();
         await (db.delete(db.appointments)..where((t) => t.studyId.equals(id))).go();
         await (db.delete(db.bibleStudies)..where((t) => t.id.equals(id))).go();
       } else if (entityType == 'appointments') {
@@ -1640,26 +1685,40 @@ class AppRepository {
   /// Limpa todos os dados locais do aplicativo (util para zerar banco de teste).
   Future<void> clearAllLocalData() async {
     await db.transaction(() async {
-      await db.delete(db.people).go();
-      await db.delete(db.visits).go();
-      await db.delete(db.bibleStudies).go();
+      // Remover dependências antes dos pais: SQLite aplica foreign_keys = ON.
+      await db.delete(db.voiceNotes).go();
       await db.delete(db.studyParticipants).go();
       await db.delete(db.studySessions).go();
+      await db.delete(db.calendarEventLinks).go();
       await db.delete(db.appointments).go();
-      await db.delete(db.activityRecords).go();
-      await db.delete(db.voiceNotes).go();
+      await db.delete(db.visits).go();
       await db.delete(db.phoneContacts).go();
-      await db.delete(db.territoryLandmarks).go();
       await db.delete(db.familyTies).go();
-      await db.delete(db.ministryExperiences).go();
       await db.delete(db.personPhotos).go();
       await db.delete(db.personPublications).go();
+      await db.delete(db.studentManualOrder).go();
+      await db.delete(db.knowledgeResources).go();
+      await db.delete(db.knowledgeDocuments).go();
+      await db.delete(db.knowledgeQuestions).go();
+      await db.delete(db.knowledgeNotes).go();
+      await db.delete(db.tasks).go();
+      await db.delete(db.projects).go();
+      await db.delete(db.inboxEntries).go();
+      await db.delete(db.bibleStudies).go();
+      await db.delete(db.people).go();
+      await db.delete(db.activityRecords).go();
+      await db.delete(db.territoryLandmarks).go();
+      await db.delete(db.ministryExperiences).go();
       await db.delete(db.researchArticles).go();
       await db.delete(db.researchTags).go();
       await db.delete(db.territorySectors).go();
       await db.delete(db.syncQueue).go();
       await db.delete(db.externalCalendarEvents).go();
       await db.delete(db.appLanguages).go();
+      await db.delete(db.appKvStore).go();
+      await db.delete(db.ticunaWords).go();
+      await db.delete(db.ticunaPhrases).go();
+      await db.delete(db.ticunaTags).go();
     });
   }
 

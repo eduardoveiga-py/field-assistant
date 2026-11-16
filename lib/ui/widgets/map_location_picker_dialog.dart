@@ -13,6 +13,8 @@ class MapLocationPickerDialog extends StatefulWidget {
   final double? initialLng;
   final String? initialAddress;
   final String? initialNeighborhood;
+  /// Permite testar respostas de geocodificação fora de ordem.
+  final Future<ReverseGeocodingResult?> Function(double, double)? reverseGeocode;
 
   const MapLocationPickerDialog({
     super.key,
@@ -20,6 +22,7 @@ class MapLocationPickerDialog extends StatefulWidget {
     this.initialLng,
     this.initialAddress,
     this.initialNeighborhood,
+    this.reverseGeocode,
   });
 
   @override
@@ -41,6 +44,9 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
   DateTime? _lastZoomChangeTime;
   bool _isLoadingAddress = false;
   ReverseGeocodingResult? _geocodedResult;
+  int _addressRequest = 0;
+  int _selectionGeneration = 0;
+  bool _hasExplicitSelection = false;
   String _statusText = 'Toque no mapa para marcar a localização exata da casa.';
 
   // Constantes de visualização de grade de blocos
@@ -72,8 +78,8 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
     final focalLng = _pixelX2lon(worldPx, _zoom);
     final focalLat = _pixelY2lat(worldPy, _zoom);
 
-    final newCenterTileX = _lon2tileX(_viewCenterLng, targetZoom);
-    final newCenterTileY = _lat2tileY(_viewCenterLat, targetZoom);
+    final newCenterTileX = _lon2tileX(focalLng, targetZoom);
+    final newCenterTileY = _lat2tileY(focalLat, targetZoom);
     final newMinTileX = newCenterTileX - _gridHalfSize;
     final newMinTileY = newCenterTileY - _gridHalfSize;
     final newOriginPx = newMinTileX * _tileSize;
@@ -98,6 +104,8 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
 
     setState(() {
       _zoom = targetZoom;
+      _viewCenterLat = focalLat;
+      _viewCenterLng = focalLng;
     });
 
     _transformationController.value = Matrix4.translationValues(
@@ -110,8 +118,13 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
   @override
   void initState() {
     super.initState();
-    _selectedLat = widget.initialLat ?? GeolocationHelper.defaultLat;
-    _selectedLng = widget.initialLng ?? GeolocationHelper.defaultLng;
+    final lat = widget.initialLat;
+    final lng = widget.initialLng;
+    _hasExplicitSelection = lat != null && lng != null &&
+        lat.isFinite && lng.isFinite && lat.abs() <= 85.0511 && lng.abs() <= 180 &&
+        (lat != 0 || lng != 0);
+    _selectedLat = _hasExplicitSelection ? lat! : GeolocationHelper.defaultLat;
+    _selectedLng = _hasExplicitSelection ? lng! : GeolocationHelper.defaultLng;
     _viewCenterLat = _selectedLat;
     _viewCenterLng = _selectedLng;
 
@@ -129,7 +142,7 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
       0.0,
     );
 
-    if (widget.initialLat != null && widget.initialLng != null) {
+    if (_hasExplicitSelection) {
       _fetchAddressForCoords(_selectedLat, _selectedLng);
     }
   }
@@ -171,13 +184,21 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
   }
 
   Future<void> _fetchAddressForCoords(double lat, double lng) async {
+    final request = ++_addressRequest;
     setState(() {
       _isLoadingAddress = true;
+      _geocodedResult = null;
       _statusText = 'Buscando endereço via OpenStreetMap...';
     });
 
-    final res = await GeocodingService.reverseGeocode(lat, lng);
-    if (!mounted) return;
+    ReverseGeocodingResult? res;
+    try {
+      res = await (widget.reverseGeocode ?? GeocodingService.reverseGeocode)(lat, lng);
+    } catch (_) {
+      // A localização escolhida continua válida mesmo se a busca falhar.
+    }
+    if (!mounted || request != _addressRequest ||
+        lat != _selectedLat || lng != _selectedLng) return;
 
     setState(() {
       _isLoadingAddress = false;
@@ -192,15 +213,17 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
   }
 
   Future<void> _useCurrentGps() async {
+    final generation = ++_selectionGeneration;
     setState(() => _statusText = 'Obtendo GPS do dispositivo...');
     final result = await GeolocationHelper.getCurrentLocationWithStatus();
-    if (!mounted) return;
+    if (!mounted || generation != _selectionGeneration) return;
 
     final pos = result.coordinates;
     if (result.isSuccess && pos != null) {
       setState(() {
         _selectedLat = pos.latitude;
         _selectedLng = pos.longitude;
+        _hasExplicitSelection = true;
         _viewCenterLat = pos.latitude;
         _viewCenterLng = pos.longitude;
         _hasCenteredInitialView = false;
@@ -218,8 +241,7 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
       });
     } else {
       setState(() {
-        _statusText =
-            '${result.userMessage} Mantendo ponto atual; toque no mapa para ajustar.';
+        _statusText = '${result.userMessage} Mantendo o ponto atual; toque no mapa para ajustar.';
       });
     }
   }
@@ -379,6 +401,8 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
                             trackpadScrollCausesScale: false,
                             minScale: 0.65,
                             maxScale: 1.8,
+                            // A grade é realinhada ao fim do gesto.
+                            interactionEndFrictionCoefficient: 1e-100,
                             onInteractionStart: (details) {
                               _basePinchScale = 1.0;
                             },
@@ -408,13 +432,23 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
                             onInteractionEnd: (details) {
                               _basePinchScale = 1.0;
                               final m = _transformationController.value;
-                              final currentScale = m.getMaxScaleOnAxis();
-                              if ((currentScale - 1.0).abs() > 0.05) {
-                                final dx = m.storage[12];
-                                final dy = m.storage[13];
-                                _transformationController.value =
-                                    Matrix4.translationValues(dx, dy, 0.0);
-                              }
+                              final scale = m.getMaxScaleOnAxis();
+                              final dx = m.storage[12];
+                              final dy = m.storage[13];
+                              final px = originPx + (constraints.maxWidth / 2 - dx) / scale;
+                              final py = originPy + (constraints.maxHeight / 2 - dy) / scale;
+                              final lng = _pixelX2lon(px, _zoom).clamp(-179.999999, 179.999999);
+                              final lat = _pixelY2lat(py, _zoom).clamp(-85.0511, 85.0511);
+                              final newOriginX = (_lon2tileX(lng, _zoom) - _gridHalfSize) * _tileSize;
+                              final newOriginY = (_lat2tileY(lat, _zoom) - _gridHalfSize) * _tileSize;
+                              setState(() {
+                                _viewCenterLat = lat;
+                                _viewCenterLng = lng;
+                              });
+                              _transformationController.value = Matrix4.identity()
+                                ..translateByDouble(dx + (newOriginX - originPx) * scale,
+                                    dy + (newOriginY - originPy) * scale, 0, 1)
+                                ..scaleByDouble(scale, scale, 1, 1);
                             },
                             child: GestureDetector(
                               onDoubleTap: () {
@@ -427,6 +461,7 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
                                   );
                                 }
                               },
+                              key: const ValueKey('location_picker_map'),
                               onTapUp: (details) {
                                 final clickX = details.localPosition.dx;
                                 final clickY = details.localPosition.dy;
@@ -438,6 +473,8 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
                                 setState(() {
                                   _selectedLat = newLat;
                                   _selectedLng = newLng;
+                                  _hasExplicitSelection = true;
+                                  _selectionGeneration++;
                                 });
 
                                 _fetchAddressForCoords(newLat, newLng);
@@ -481,9 +518,10 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
                                         ),
 
                                     // Pino da Casa / Localização Selecionada
-                                    Positioned(
-                                      left: pinX - 20,
-                                      top: pinY - 40,
+                                    if (_hasExplicitSelection) Positioned(
+                                      left: pinX - 50,
+                                      bottom: canvasHeight - pinY,
+                                      width: 100,
                                       child: IgnorePointer(
                                         child: Column(
                                           mainAxisSize: MainAxisSize.min,
@@ -663,7 +701,9 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Coordenadas: ${_selectedLat.toStringAsFixed(6)}, ${_selectedLng.toStringAsFixed(6)}',
+                    _hasExplicitSelection
+                        ? 'Coordenadas: ${_selectedLat.toStringAsFixed(6)}, ${_selectedLng.toStringAsFixed(6)}'
+                        : 'Nenhum ponto selecionado',
                     style: TextStyle(
                       fontSize: 11,
                       color: isDark
@@ -684,14 +724,21 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
                         icon: const Icon(Icons.check, size: 16),
                         label: const Text('Confirmar Este Ponto'),
                         onPressed: () {
-                          final finalResult =
-                              _geocodedResult ??
-                              ReverseGeocodingResult(
-                                latitude: _selectedLat,
-                                longitude: _selectedLng,
-                                street: widget.initialAddress,
-                                neighborhood: widget.initialNeighborhood,
-                              );
+                          if (!_hasExplicitSelection) {
+                            setState(() => _statusText = 'Selecione um ponto no mapa ou obtenha a localização antes de confirmar.');
+                            return;
+                          }
+                          final address = _geocodedResult;
+                          final finalResult = ReverseGeocodingResult(
+                            latitude: _selectedLat,
+                            longitude: _selectedLng,
+                            street: address?.street,
+                            houseNumber: address?.houseNumber,
+                            neighborhood: address?.neighborhood,
+                            city: address?.city,
+                            state: address?.state,
+                            fullAddress: address?.fullAddress,
+                          );
                           Navigator.pop(context, finalResult);
                         },
                       ),

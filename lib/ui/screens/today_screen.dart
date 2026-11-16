@@ -102,7 +102,7 @@ class TodayScreen extends ConsumerWidget {
               Row(
                 children: [
                   Icon(
-                    currentUser != null ? Icons.cloud_done : Icons.cloud_sync,
+                    Icons.cloud_off,
                     color: currentUser != null
                         ? AppTheme.successGreen
                         : AppTheme.primaryBlue,
@@ -169,8 +169,8 @@ class TodayScreen extends ConsumerWidget {
                           const SizedBox(height: 2),
                           Text(
                             currentUser != null
-                                ? 'Sincronização automática em nuvem ativa + banco local SQLite/Wasm.'
-                                : 'Faça login para sincronizar seus dados na nuvem.',
+                                ? 'Conta conectada. Sincronização pausada até a proteção ponta a ponta estar pronta; dados mantidos localmente.'
+                                : 'Sincronização com Supabase pausada até a proteção ponta a ponta estar pronta.',
                             style: const TextStyle(fontSize: 11.5),
                           ),
                         ],
@@ -734,7 +734,7 @@ class TodayScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Hoje no Ministério'),
+        title: Text(MediaQuery.sizeOf(context).width < 600 ? 'Hoje' : 'Hoje no Ministério'),
         actions: [
           IconButton(
             visualDensity: VisualDensity.compact,
@@ -770,7 +770,9 @@ class TodayScreen extends ConsumerWidget {
               );
             },
           ),
-          InkWell(
+          Tooltip(
+            message: supabaseUser != null ? 'Supabase Online' : 'Salvo Localmente',
+            child: InkWell(
             onTap: () => _showSyncStatusModal(context, ref),
             borderRadius: BorderRadius.circular(16),
             child: Container(
@@ -799,8 +801,8 @@ class TodayScreen extends ConsumerWidget {
                         ? const Color(0xFF4ADE80)
                         : Colors.white,
                   ),
-                  const SizedBox(width: 4),
-                  Text(
+                  if (MediaQuery.sizeOf(context).width >= 600) const SizedBox(width: 4),
+                  if (MediaQuery.sizeOf(context).width >= 600) Text(
                     supabaseUser != null
                         ? 'Supabase Online'
                         : 'Salvo Localmente',
@@ -812,6 +814,7 @@ class TodayScreen extends ConsumerWidget {
                   ),
                 ],
               ),
+            ),
             ),
           ),
           Consumer(

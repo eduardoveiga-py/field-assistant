@@ -6,11 +6,14 @@ import 'dart:io'
         SecureSocket,
         Socket,
         SocketException,
+        TlsException,
         X509Certificate;
 import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:drift/drift.dart' as drift;
 import 'package:intl/intl.dart';
+import 'package:crypto/crypto.dart' as crypto;
+import 'package:enough_mail/imap.dart' as mail;
 import 'package:uuid/uuid.dart';
 
 import '../core/app_logger.dart';
@@ -22,12 +25,16 @@ import '../reports/web_downloader.dart';
 class JwEmailMessage {
   final String id;
   final int? remoteUid;
+  final String? folderId;
+  final String? folderName;
   final String subject;
   final String from;
   final String to;
   final DateTime date;
   final String bodyText;
   final String? bodyHtml;
+  /// MIME original em Base64, incluindo anexos, quando obtido via IMAP.
+  final String? rawEmlBase64;
   final List<Map<String, dynamic>> attachments;
   final bool isRead;
   final bool isDraft;
@@ -39,12 +46,15 @@ class JwEmailMessage {
   JwEmailMessage({
     required this.id,
     this.remoteUid,
+    this.folderId,
+    this.folderName,
     required this.subject,
     required this.from,
     required this.to,
     required this.date,
     required this.bodyText,
     this.bodyHtml,
+    this.rawEmlBase64,
     this.attachments = const [],
     this.isRead = false,
     this.isDraft = false,
@@ -57,12 +67,15 @@ class JwEmailMessage {
   Map<String, dynamic> toJson() => {
         'id': id,
         'remoteUid': remoteUid,
+        'folderId': folderId,
+        'folderName': folderName,
         'subject': subject,
         'from': from,
         'to': to,
         'date': date.toIso8601String(),
         'bodyText': bodyText,
         'bodyHtml': bodyHtml,
+        'rawEmlBase64': rawEmlBase64,
         'attachments': attachments,
         'isRead': isRead,
         'isDraft': isDraft,
@@ -75,6 +88,8 @@ class JwEmailMessage {
   factory JwEmailMessage.fromJson(Map<String, dynamic> json) => JwEmailMessage(
         id: json['id'] as String? ?? const Uuid().v4(),
         remoteUid: json['remoteUid'] as int?,
+        folderId: json['folderId'] as String?,
+        folderName: json['folderName'] as String?,
         subject: json['subject'] as String? ?? '(Sem Assunto)',
         from: json['from'] as String? ?? 'jw@jw.org',
         to: json['to'] as String? ?? '',
@@ -83,6 +98,7 @@ class JwEmailMessage {
             : DateTime.now(),
         bodyText: json['bodyText'] as String? ?? '',
         bodyHtml: json['bodyHtml'] as String?,
+        rawEmlBase64: json['rawEmlBase64'] as String?,
         attachments: (json['attachments'] as List<dynamic>?)
                 ?.map((e) => Map<String, dynamic>.from(e as Map))
                 .toList() ??
@@ -99,12 +115,15 @@ class JwEmailMessage {
   JwEmailMessage copyWith({
     String? id,
     int? remoteUid,
+    String? folderId,
+    String? folderName,
     String? subject,
     String? from,
     String? to,
     DateTime? date,
     String? bodyText,
     String? bodyHtml,
+    String? rawEmlBase64,
     List<Map<String, dynamic>>? attachments,
     bool? isRead,
     bool? isDraft,
@@ -116,12 +135,15 @@ class JwEmailMessage {
     return JwEmailMessage(
       id: id ?? this.id,
       remoteUid: remoteUid ?? this.remoteUid,
+      folderId: folderId ?? this.folderId,
+      folderName: folderName ?? this.folderName,
       subject: subject ?? this.subject,
       from: from ?? this.from,
       to: to ?? this.to,
       date: date ?? this.date,
       bodyText: bodyText ?? this.bodyText,
       bodyHtml: bodyHtml ?? this.bodyHtml,
+      rawEmlBase64: rawEmlBase64 ?? this.rawEmlBase64,
       attachments: attachments ?? this.attachments,
       isRead: isRead ?? this.isRead,
       isDraft: isDraft ?? this.isDraft,
@@ -218,74 +240,140 @@ class JwEmailAuthException extends JwEmailException {
   const JwEmailAuthException(super.message, [super.cause]);
 }
 
-/// Leitor assíncrono linha-a-linha de streams TCP/TLS para protocolos orientados a texto (RFC 3501 IMAP)
-class _ImapLineReader {
-  final StreamSubscription<String> _subscription;
-  final List<String> _bufferedLines = [];
-  final List<Completer<String>> _waiters = [];
-  bool _isClosed = false;
+/// Interface para permitir testes com sessões IMAP determinísticas.
+abstract class JwImapSession {
+  Future<void> connect(String host, int port, String username, String password, Duration timeout);
+  Future<int> selectInbox();
+  Future<List<int>> searchUids();
+  Future<List<JwEmailMessage>> fetchUids(List<int> uids);
+  Future<void> close();
+}
 
-  _ImapLineReader(Stream<String> lineStream)
-      : _subscription = lineStream.listen(null) {
-    _subscription.onData((line) {
-      if (_waiters.isNotEmpty) {
-        _waiters.removeAt(0).complete(line);
-      } else {
-        _bufferedLines.add(line);
-      }
-    });
-    _subscription.onDone(() {
-      _isClosed = true;
-      for (final w in _waiters) {
-        if (!w.isCompleted) {
-          w.completeError(const JwEmailConnectionException('Conexão encerrada pelo servidor IMAP.'));
-        }
-      }
-      _waiters.clear();
-    });
-    _subscription.onError((err) {
-      for (final w in _waiters) {
-        if (!w.isCompleted) {
-          w.completeError(JwEmailConnectionException('Erro no fluxo de comunicação IMAP: $err', err));
-        }
-      }
-      _waiters.clear();
-    });
+typedef JwImapSessionFactory = JwImapSession Function(Duration timeout);
+typedef JwMissingUids = Future<Set<int>> Function(int uidValidity, List<int> uids);
+
+/// Converte a mensagem MIME já analisada pela biblioteca sem perder os bytes.
+@visibleForTesting
+JwEmailMessage jwEmailFromMime(mail.MimeMessage message) {
+  final uid = message.uid;
+  final data = message.mimeData;
+  if (uid == null || data == null || !data.containsHeader) {
+    throw const JwEmailConnectionException('Resposta IMAP incompleta: UID ou corpo ausente.');
+  }
+  // Não reconstruir bytes de um texto já decodificado: isso poderia alterar
+  // silenciosamente o MIME ou anexos com codificação diferente de UTF-8.
+  if (data is! mail.BinaryMimeData) {
+    throw const JwEmailConnectionException('Servidor IMAP não retornou o MIME em bytes.');
+  }
+  final raw = data.data;
+  if (message.size != null && message.size != raw.length) {
+    throw const JwEmailConnectionException('Tamanho do MIME IMAP não confere; sincronize novamente.');
+  }
+  final from = message.decodeHeaderValue('from') ?? 'desconhecido';
+  final subject = message.decodeSubject() ?? '(Sem Assunto)';
+  final isHub = from.toLowerCase().contains('hub.jw.org');
+  return JwEmailMessage(
+    id: 'imap_$uid', remoteUid: uid, subject: subject, from: from,
+    to: message.decodeHeaderValue('to') ?? '',
+    date: message.decodeDate() ?? DateTime.now(),
+    bodyText: message.decodeTextPlainPart() ?? '',
+    bodyHtml: message.decodeTextHtmlPart(), rawEmlBase64: base64Encode(raw),
+    isHubCommunication: isHub,
+    hubType: isHub ? (subject.toLowerCase().contains('formulário') ? 'form' : 'letter') : null,
+  );
+}
+
+class _EnoughMailSession implements JwImapSession {
+  final mail.ImapClient client;
+  _EnoughMailSession(Duration timeout) : client = mail.ImapClient(
+    defaultWriteTimeout: timeout, defaultResponseTimeout: timeout);
+
+  @override
+  Future<void> connect(String host, int port, String username, String password, Duration timeout) async {
+    // LOGIN da biblioteca envolve os argumentos em aspas, portanto precisamos
+    // escapar esses caracteres e rejeitar controles para evitar injeção IMAP.
+    if (RegExp(r'[\x00-\x1f\x7f]').hasMatch(username) ||
+        RegExp(r'[\x00-\x1f\x7f]').hasMatch(password)) {
+      throw const JwEmailAuthException('Credenciais IMAP contêm caracteres de controle inválidos.');
+    }
+    String quoted(String value) => value.replaceAll(r'\', r'\\').replaceAll('"', r'\"');
+    await client.connectToServer(host, port, isSecure: true, timeout: timeout).timeout(timeout);
+    try {
+      await client.login(quoted(username), quoted(password)).timeout(timeout);
+    } on mail.ImapException {
+      throw const JwEmailAuthException('Falha de autenticação IMAP. Verifique usuário e senha.');
+    }
   }
 
-  Future<String> readLine({Duration timeout = const Duration(seconds: 10)}) async {
-    if (_bufferedLines.isNotEmpty) {
-      return _bufferedLines.removeAt(0);
+  @override
+  Future<int> selectInbox() async {
+    final box = await client.selectInbox();
+    final validity = box.uidValidity;
+    if (validity == null || validity <= 0) {
+      throw const JwEmailConnectionException('Servidor IMAP não informou UIDVALIDITY.');
     }
-    if (_isClosed) {
-      throw const JwEmailConnectionException('Conexão encerrada pelo servidor IMAP.');
-    }
-    final completer = Completer<String>();
-    _waiters.add(completer);
-    return completer.future.timeout(
-      timeout,
-      onTimeout: () {
-        _waiters.remove(completer);
-        throw const JwEmailConnectionException('Tempo limite esgotado aguardando resposta do servidor IMAP.');
-      },
-    );
+    return validity;
   }
 
+  @override
+  Future<List<int>> searchUids() async {
+    final result = await client.uidSearchMessages(
+      searchCriteria: 'ALL', responseTimeout: client.defaultResponseTimeout);
+    final sequence = result.matchingSequence;
+    if (sequence == null) {
+      throw const JwEmailConnectionException('Servidor IMAP não retornou lista de UIDs.');
+    }
+    return sequence.toList();
+  }
+
+  @override
+  Future<List<JwEmailMessage>> fetchUids(List<int> uids) async {
+    final result = await client.uidFetchMessages(
+      mail.MessageSequence.fromIds(uids, isUid: true), '(UID RFC822.SIZE BODY.PEEK[])',
+      responseTimeout: client.defaultResponseTimeout);
+    if (result.messages.any((message) => message.size == null)) {
+      throw const JwEmailConnectionException('Servidor IMAP não informou o tamanho da mensagem.');
+    }
+    return result.messages.map(jwEmailFromMime).toList();
+  }
+
+  @override
   Future<void> close() async {
-    await _subscription.cancel();
+    if (client.isConnected) {
+      try { await client.logout().timeout(const Duration(seconds: 3)); } catch (_) {}
+      await client.disconnect().timeout(const Duration(seconds: 3));
+    }
   }
 }
 
-/// Cliente IMAP puro Dart para conexão SSL/TLS na porta 993 de mail.jw.org
-/// com resiliência total para modo offline e retenção permanente.
+// Nunca exibir resposta bruta do servidor: pode conter credenciais ou mensagens.
+Future<T> _imapStage<T>(String stage, Future<T> Function() action, Duration timeout) async {
+  try {
+    return await action().timeout(timeout);
+  } on JwEmailException {
+    rethrow;
+  } on TimeoutException {
+    throw JwEmailConnectionException('Tempo esgotado na etapa IMAP: $stage. Confira servidor, porta e rede.');
+  } on TlsException {
+    throw JwEmailConnectionException('Falha TLS na etapa IMAP: $stage. Confira servidor, porta e certificado.');
+  } on SocketException {
+    throw JwEmailConnectionException('Não foi possível conectar ou manter a conexão IMAP na etapa: $stage. Confira servidor, porta e rede.');
+  } catch (_) {
+    throw JwEmailConnectionException('Falha na etapa IMAP: $stage. Confira se o servidor suporta IMAP e a configuração da conta.');
+  }
+}
+
+/// Cliente IMAP com conexão SSL/TLS para importação incremental da INBOX.
 /// Comunicação RFC 3501 autêntica sem sementes fictícias.
 class JwImapClient {
   final String defaultHost;
   final int defaultPort;
+  final JwImapSessionFactory? sessionFactory;
 
   const JwImapClient({
     this.defaultHost = 'mail.jw.org',
     this.defaultPort = 993,
+    this.sessionFactory,
   });
 
   /// Decodifica cabeçalhos MIME RFC 2047 (=?UTF-8?B?...?= ou =?UTF-8?Q?...?=)
@@ -312,149 +400,104 @@ class JwImapClient {
     });
   }
 
-  /// Conecta ao servidor IMAP com TLS e sincroniza as mensagens
-  Future<List<JwEmailMessage>> fetchRemoteEmails({
-    String? host,
-    int? port,
-    String? username,
-    String? password,
-    Duration timeout = const Duration(seconds: 10),
+  /// UID só é único dentro de uma conta, caixa e geração de UIDVALIDITY.
+  @visibleForTesting
+  static String scopedMessageId({required String host, required int port,
+      required String username, required int uidValidity, required int uid}) {
+    final scope = jsonEncode([host.trim().toLowerCase(), port, username.trim(), 'INBOX', uidValidity]);
+    return 'imap_${crypto.sha256.convert(utf8.encode(scope))}_$uid';
+  }
+
+  /// Verifica login e acesso à INBOX sem baixar nem ler mensagens da caixa.
+  Future<void> verifyConnection({
+    required String host, required int port, required String username,
+    required String password, Duration timeout = const Duration(seconds: 60),
   }) async {
-    // 1. Se credenciais não forem fornecidas, retorna lista vazia imediatamente sem erro e sem seeds
-    if (username == null || username.trim().isEmpty || password == null || password.trim().isEmpty) {
-      return const <JwEmailMessage>[];
+    if (kIsWeb) throw const JwEmailConnectionException('IMAP direto não é suportado no navegador.');
+    if (host.trim().isEmpty || username.trim().isEmpty || password.isEmpty || port <= 0 || port > 65535) {
+      throw const JwEmailConnectionException('Informe servidor, porta e credenciais IMAP válidos.');
     }
+    final session = sessionFactory?.call(timeout) ?? _EnoughMailSession(timeout);
+    try {
+      await _imapStage('conexão e autenticação',
+          () => session.connect(host.trim(), port, username.trim(), password, timeout), timeout);
+      final validity = await _imapStage('abertura da INBOX', session.selectInbox, timeout);
+      if (validity <= 0) throw const JwEmailConnectionException('UIDVALIDITY inválido.');
+    } finally {
+      try { await session.close(); } catch (_) {}
+    }
+  }
 
-    // 2. Ambiente Web não possui suporte a sockets TCP diretos via dart:io
+  /// Compatibilidade para consumidores que precisam de uma lista completa.
+  /// A sincronização da Inbox usa a API em páginas para persistir progresso.
+  Future<List<JwEmailMessage>> fetchRemoteEmails({
+    String? host, int? port, String? username, String? password,
+    Duration timeout = const Duration(seconds: 60),
+  }) async {
+    final result = <JwEmailMessage>[];
+    await for (final page in fetchRemoteEmailPages(
+      host: host, port: port, username: username, password: password, timeout: timeout,
+    )) {
+      result.addAll(page);
+    }
+    return result;
+  }
+
+  /// Varre todos os UIDs presentes na INBOX; cada página é entregue antes de
+  /// buscar a próxima, permitindo gravação incremental e retomada após falhas.
+  Stream<List<JwEmailMessage>> fetchRemoteEmailPages({
+    String? host, int? port, String? username, String? password,
+    Duration timeout = const Duration(seconds: 60),
+    JwMissingUids? missingUids,
+  }) async* {
+    if (username == null || username.trim().isEmpty || password == null || password.isEmpty) return;
     if (kIsWeb) {
-      throw const JwEmailConnectionException(
-        'Conexão direta a sockets IMAP não é suportada no navegador Web. Utilize o aplicativo Desktop ou Mobile.',
-      );
+      throw const JwEmailConnectionException('IMAP direto não é suportado no navegador.');
     }
-
-    final targetHost = (host != null && host.trim().isNotEmpty)
-        ? host.trim()
-        : defaultHost;
+    final targetHost = host?.trim().isNotEmpty == true ? host!.trim() : defaultHost;
     final targetPort = port ?? defaultPort;
     if (targetPort <= 0 || targetPort > 65535) {
-      throw JwEmailConnectionException(
-        'Porta IMAP inválida ($targetPort). Informe um valor entre 1 e 65535.',
-      );
+      throw JwEmailConnectionException('Porta IMAP inválida ($targetPort). Informe um valor entre 1 e 65535.');
     }
-
-    SecureSocket socket;
+    final session = sessionFactory?.call(timeout) ?? _EnoughMailSession(timeout);
     try {
-      socket = await SecureSocket.connect(
-        targetHost,
-        targetPort,
-        timeout: timeout,
-      );
-    } on SocketException catch (e) {
-      throw JwEmailConnectionException(
-        'Não foi possível conectar ao servidor IMAP em $targetHost:$targetPort: ${e.message}',
-        e,
-      );
-    } on TimeoutException catch (e) {
-      throw JwEmailConnectionException(
-        'Tempo limite esgotado ao conectar ao servidor IMAP ($targetHost:$targetPort).',
-        e,
-      );
-    } catch (e) {
-      throw JwEmailConnectionException(
-        'Erro na conexão segura SSL/TLS com $targetHost:$targetPort: $e',
-        e,
-      );
-    }
-
-    final lineStream = utf8.decoder.bind(socket).transform(const LineSplitter());
-    final reader = _ImapLineReader(lineStream);
-
-    try {
-      // 1. Saudação do Servidor (* OK ...)
-      final greeting = await reader.readLine(timeout: timeout);
-      if (greeting.startsWith('* BYE')) {
-        throw JwEmailConnectionException('Servidor IMAP recusou a conexão: $greeting');
+      await _imapStage('conexão e autenticação',
+          () => session.connect(targetHost, targetPort, username.trim(), password, timeout), timeout);
+      final validity = await _imapStage('abertura da INBOX', session.selectInbox, timeout);
+      if (validity <= 0) throw const JwEmailConnectionException('UIDVALIDITY inválido.');
+      final uids = await _imapStage('listagem de mensagens', session.searchUids, timeout);
+      if (uids.any((uid) => uid <= 0) || uids.toSet().length != uids.length) {
+        throw const JwEmailConnectionException('Lista de UIDs IMAP inválida.');
       }
-
-      // 2. Autenticação (LOGIN)
-      final safeUser = username.trim().replaceAll(r'\', r'\\').replaceAll('"', r'\"');
-      final safePass = password.replaceAll(r'\', r'\\').replaceAll('"', r'\"');
-      socket.write('A01 LOGIN "$safeUser" "$safePass"\r\n');
-      await socket.flush();
-
-      while (true) {
-        final line = await reader.readLine(timeout: timeout);
-        if (line.startsWith('A01 OK')) {
-          break; // Autenticação bem-sucedida
-        } else if (line.startsWith('A01 NO')) {
-          throw const JwEmailAuthException('Falha de autenticação IMAP: usuário ou senha incorretos.');
-        } else if (line.startsWith('A01 BAD')) {
-          throw JwEmailAuthException('Comando de autenticação rejeitado pelo servidor: $line');
+      uids.sort();
+      const pageSize = 10; // Tamanho de lote, não limite da caixa.
+      for (var start = 0; start < uids.length; start += pageSize) {
+        final end = start + pageSize < uids.length ? start + pageSize : uids.length;
+        final page = uids.sublist(start, end);
+        final wanted = missingUids == null ? page.toSet() : await missingUids(validity, page);
+        if (!page.toSet().containsAll(wanted)) {
+          throw const JwEmailConnectionException('Filtro de mensagens IMAP inválido.');
         }
-      }
-
-      // 3. Seleção da Caixa de Entrada (SELECT INBOX)
-      socket.write('A02 SELECT INBOX\r\n');
-      await socket.flush();
-
-      int existsCount = 0;
-      while (true) {
-        final line = await reader.readLine(timeout: timeout);
-        if (line.startsWith('* ') && line.contains('EXISTS')) {
-          final match = RegExp(r'\*\s+(\d+)\s+EXISTS').firstMatch(line);
-          if (match != null) {
-            existsCount = int.tryParse(match.group(1) ?? '0') ?? 0;
-          }
+        if (wanted.isEmpty) continue;
+        final fetched = await _imapStage('leitura de mensagens',
+            () => session.fetchUids(page.where(wanted.contains).toList()), timeout);
+        final received = fetched.map((item) => item.remoteUid).toSet();
+        if (fetched.length != wanted.length || received.contains(null) ||
+            received.length != wanted.length || !received.containsAll(wanted)) {
+          throw const JwEmailConnectionException('Página IMAP incompleta; sincronize novamente para retomar.');
         }
-        if (line.startsWith('A02 OK')) {
-          break;
-        } else if (line.startsWith('A02 NO') || line.startsWith('A02 BAD')) {
-          throw JwEmailConnectionException('Falha ao selecionar caixa de entrada (INBOX): $line');
-        }
+        yield fetched.map((item) => item.copyWith(id: scopedMessageId(
+          host: targetHost, port: targetPort, username: username.trim(),
+          uidValidity: validity, uid: item.remoteUid!,
+        ))).toList();
       }
-
-      // Se a caixa estiver vazia, encerra normalmente
-      if (existsCount == 0) {
-        try {
-          socket.write('A03 LOGOUT\r\n');
-          await socket.flush();
-        } catch (e, st) {
-          AppLogger.debug('Falha ao enviar LOGOUT IMAP (INBOX vazia): $e', st);
-        }
-        return const <JwEmailMessage>[];
-      }
-
-      // 4. Busca das Mensagens (FETCH das mensagens mais recentes, até 25)
-      final startIdx = existsCount > 25 ? (existsCount - 24) : 1;
-      socket.write('A03 FETCH $startIdx:$existsCount (UID RFC822.SIZE BODY.PEEK[HEADER.FIELDS (SUBJECT FROM TO DATE)] BODY.PEEK[TEXT])\r\n');
-      await socket.flush();
-
-      final responseLines = <String>[];
-      while (true) {
-        final line = await reader.readLine(timeout: timeout);
-        if (line.startsWith('A03 OK') || line.startsWith('A03 NO') || line.startsWith('A03 BAD')) {
-          break;
-        }
-        responseLines.add(line);
-      }
-
-      // 5. Logout gracioso
-      try {
-        socket.write('A04 LOGOUT\r\n');
-        await socket.flush();
-      } catch (e, st) {
-        AppLogger.debug('Falha ao enviar LOGOUT IMAP: $e', st);
-      }
-
-      // 6. Parsing estruturado das mensagens recebidas
-      return _parseImapResponses(responseLines);
+    } on JwEmailException {
+      rethrow;
+    } catch (_) {
+      // Não incluir respostas brutas: podem conter credenciais ou mensagens.
+      throw const JwEmailConnectionException('Falha na conexão ou na leitura IMAP. Tente novamente.');
     } finally {
-      await reader.close();
-      try {
-        await socket.close();
-      } catch (e, st) {
-        AppLogger.debug('Falha ao fechar socket IMAP: $e', st);
-      }
+      try { await session.close(); } catch (_) {}
     }
   }
 
@@ -1150,8 +1193,7 @@ class JwSmtpClient {
 }
 
 /// Motor de Retenção Permanente e Gerenciador de E-mail / Hub JW.org
-/// Garante que correspondências, cartas do Hub e anexos permaneçam
-/// salvos localmente no Drift SQLite, imunes à purga remota de 90 dias do servidor.
+/// Persiste localmente as mensagens IMAP importadas no Drift SQLite.
 class JwEmailService {
   final AppDatabase db;
   final BiometricAuthService biometricAuth;
@@ -1176,54 +1218,54 @@ class JwEmailService {
     String? username,
     String? password,
   }) async {
-    final remoteMessages = await imapClient.fetchRemoteEmails(
-      host: host,
-      port: port,
-      username: username,
-      password: password,
-    );
-
+    final targetHost = host?.trim().isNotEmpty == true ? host!.trim() : imapClient.defaultHost;
+    final targetPort = port ?? imapClient.defaultPort;
+    final account = username?.trim() ?? '';
     int savedCount = 0;
-    final now = DateTime.now();
 
-    for (final msg in remoteMessages) {
-      final entryId = 'email_${msg.id}';
-
-      // Verifica se já existe retido localmente
-      final existing = await (db.select(db.inboxEntries)
-            ..where((t) => t.id.equals(entryId)))
-          .getSingleOrNull();
-
-      if (existing != null) {
-        continue; // Já protegido na retenção permanente
-      }
-
-      final sourceType = msg.isHubCommunication
-          ? (msg.hubType == 'form' ? 'hub_form' : 'hub_letter')
-          : 'email';
-
-      final metadata = {
-        'permanentRetention': true,
-        'retentionDate': now.toIso8601String(),
-        'email': msg.toJson(),
-      };
-
-      final companion = InboxEntriesCompanion.insert(
-        id: entryId,
-        content: '${msg.subject}\n\n${msg.bodyText}',
-        sourceType: drift.Value(sourceType),
-        suggestedCategory: drift.Value(
-          msg.isHubCommunication ? 'hub_comms' : 'email_jw',
-        ),
-        attachments: drift.Value(jsonEncode(msg.attachments)),
-        capturedAt: msg.date,
-        metadata: drift.Value(jsonEncode(metadata)),
-        createdAt: now,
-        updatedAt: now,
-      );
-
-      await db.into(db.inboxEntries).insert(companion);
-      savedCount++;
+    await for (final page in imapClient.fetchRemoteEmailPages(
+      host: host, port: port, username: username, password: password,
+      missingUids: (validity, uids) async {
+        final ids = {for (final uid in uids) uid: 'email_${JwImapClient.scopedMessageId(
+          host: targetHost, port: targetPort, username: account,
+          uidValidity: validity, uid: uid)}'};
+        final existing = await (db.select(db.inboxEntries)
+          ..where((t) => t.id.isIn(ids.values.toList()))).get();
+        final retained = existing.map((item) => item.id).toSet();
+        return ids.entries.where((item) => !retained.contains(item.value))
+            .map((item) => item.key).toSet();
+      },
+    )) {
+      // Cada lote é confirmado antes de solicitar o próximo. Em interrupção,
+      // a próxima execução consulta o banco e busca somente UIDs ausentes.
+      await db.transaction(() async {
+        final now = DateTime.now();
+        for (final msg in page) {
+          final entryId = 'email_${msg.id}';
+          final existing = await (db.select(db.inboxEntries)
+                ..where((t) => t.id.equals(entryId))).getSingleOrNull();
+          if (existing != null) continue;
+          final sourceType = msg.isHubCommunication
+              ? (msg.hubType == 'form' ? 'hub_form' : 'hub_letter') : 'email';
+          final metadata = {
+            'permanentRetention': true,
+            'retentionDate': now.toIso8601String(),
+            'email': msg.toJson(),
+          };
+          await db.into(db.inboxEntries).insert(InboxEntriesCompanion.insert(
+            id: entryId,
+            content: '${msg.subject}\n\n${msg.bodyText}',
+            sourceType: drift.Value(sourceType),
+            suggestedCategory: drift.Value(msg.isHubCommunication ? 'hub_comms' : 'email_jw'),
+            attachments: drift.Value(jsonEncode(msg.attachments)),
+            capturedAt: msg.date,
+            metadata: drift.Value(jsonEncode(metadata)),
+            createdAt: now,
+            updatedAt: now,
+          ));
+          savedCount++;
+        }
+      });
     }
 
     return savedCount;

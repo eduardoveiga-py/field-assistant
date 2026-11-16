@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:drift/drift.dart' as drift show Value;
 
 import '../../core/app_logger.dart';
 import '../../core/app_theme.dart';
@@ -31,8 +30,9 @@ import 'download_maps_screen.dart';
 
 class ContactsMapScreen extends ConsumerStatefulWidget {
   final String? highlightPersonId;
+  final Future<ReverseGeocodingResult?> Function(String)? geocodeAddress;
 
-  const ContactsMapScreen({super.key, this.highlightPersonId});
+  const ContactsMapScreen({super.key, this.highlightPersonId, this.geocodeAddress});
 
   @override
   ConsumerState<ContactsMapScreen> createState() => _ContactsMapScreenState();
@@ -61,7 +61,8 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
   double? _activeCenterLat;
   static const double _tileSize = 256.0;
   DateTime? _lastZoomChangeTime;
-  double _rotation = 0.0; // Rotação 2D (em radianos) estilo Organic Maps
+  double _rotation = 0.0; // Rotação manual do mapa, não orientação magnética.
+  double _rotationAtGestureStart = 0.0;
   bool _isFullscreen = false; // Modo Tela Cheia
   ({double latitude, double longitude})? _userGpsLocation; // Localização GPS
   bool _isLocatingUser = false;
@@ -135,19 +136,38 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
       Future.delayed(const Duration(milliseconds: 250), () async {
         try {
           if (!mounted) return;
-          final res = await GeocodingService.geocodeAddress(
-            personToGeocode.address!,
+          final geocode = widget.geocodeAddress ?? GeocodingService.geocodeAddress;
+          final res = await geocode(personToGeocode.address!);
+          if (res == null || !mounted) return;
+          final review = await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Localização aproximada'),
+              content: const Text('A busca por endereço pode apontar para o lugar errado. Revise e selecione o ponto no mapa antes de salvar.'),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Agora não')),
+                FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Revisar no mapa')),
+              ],
+            ),
           );
-          if (res != null && mounted) {
-            await ref
-                .read(repositoryProvider)
-                .updatePerson(
-                  personToGeocode.copyWith(
-                    latitude: drift.Value(res.latitude),
-                    longitude: drift.Value(res.longitude),
-                  ),
-                );
+          if (review != true || !mounted) return;
+          final selected = await showDialog<ReverseGeocodingResult>(
+            context: context,
+            builder: (_) => MapLocationPickerDialog(
+              initialLat: res.latitude, initialLng: res.longitude,
+              initialAddress: personToGeocode.address,
+            ),
+          );
+          if (selected != null && mounted) {
+            await ref.read(repositoryProvider).applyGeocodedCoordinates(
+              personId: personToGeocode.id,
+              expectedAddress: personToGeocode.address!,
+              latitude: selected.latitude,
+              longitude: selected.longitude,
+            );
           }
+        } catch (e, st) {
+          AppLogger.warning('Não foi possível salvar a localização obtida pelo endereço.', e, st);
         } finally {
           _geocodeInFlight = false;
         }
@@ -275,19 +295,27 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
     return 12742 * math.asin(math.sqrt(a));
   }
 
-  void _recenterMap(
+  void _centerOnCoords(
+    double lat,
+    double lng,
     double viewportWidth,
     double viewportHeight,
-    double centerPx,
-    double centerPy,
   ) {
+    const int gridHalfSize = 3;
+    final newCenterTileX = _lon2tileX(lng, _zoom);
+    final newCenterTileY = _lat2tileY(lat, _zoom);
+    final newOriginPx = (newCenterTileX - gridHalfSize) * _tileSize;
+    final newOriginPy = (newCenterTileY - gridHalfSize) * _tileSize;
+    final targetPx = _lon2pixelX(lng, _zoom) - newOriginPx;
+    final targetPy = _lat2pixelY(lat, _zoom) - newOriginPy;
+
     setState(() {
-      _activeCenterLat = null;
-      _activeCenterLng = null;
+      _activeCenterLat = lat;
+      _activeCenterLng = lng;
     });
     if (viewportWidth > 0 && viewportHeight > 0) {
-      final dx = (viewportWidth / 2.0) - centerPx;
-      final dy = (viewportHeight / 2.0) - centerPy;
+      final dx = (viewportWidth / 2.0) - targetPx;
+      final dy = (viewportHeight / 2.0) - targetPy;
       _transformationController.value = Matrix4.translationValues(dx, dy, 0.0);
     }
   }
@@ -494,7 +522,7 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Rota otimizada para os primeiros 10 contatos de ${nearbyContacts.length} (limite do Google Maps).',
+            'Enviando os primeiros 10 contatos de ${nearbyContacts.length} ao Google Maps; a ordem não foi otimizada.',
           ),
         ),
       );
@@ -2058,7 +2086,10 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Row(
+                        Flexible(
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
                           children: [
                             OutlinedButton.icon(
                               style: OutlinedButton.styleFrom(
@@ -2097,6 +2128,8 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                                     _openMultiContactRoute(filtered),
                               ),
                           ],
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -2213,15 +2246,6 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
               .toList()
         : <TerritoryLandmark>[];
 
-    final allLats = [
-      ...geoContacts.map((c) => c.latitude!),
-      ...geoLandmarks.map((l) => l.latitude!),
-    ]..sort();
-    final allLngs = [
-      ...geoContacts.map((c) => c.longitude!),
-      ...geoLandmarks.map((l) => l.longitude!),
-    ]..sort();
-
     PersonEntry? highlightPerson;
     if (_highlightPersonId != null) {
       for (final c in contacts) {
@@ -2246,10 +2270,6 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
       // Centraliza no endereço específico da pessoa destacada (sem mutar estado durante build - A6)
       centerLat = highlightPerson.latitude!;
       centerLng = highlightPerson.longitude!;
-    } else if (allLats.isNotEmpty && allLngs.isNotEmpty) {
-      // Usa a mediana para centralizar exatamente no agrupamento principal do território
-      centerLat = allLats[allLats.length ~/ 2];
-      centerLng = allLngs[allLngs.length ~/ 2];
     }
 
     final effectiveCenterLat = _activeCenterLat ?? centerLat;
@@ -2258,7 +2278,7 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
     final centerTileX = _lon2tileX(effectiveCenterLng, _zoom);
     final centerTileY = _lat2tileY(effectiveCenterLat, _zoom);
 
-    // Grade ampla (15x15 blocos = 3840x3840 px) que cobre 100% da tela em qualquer dispositivo móvel, tablet ou desktop
+    // Grade 7x7; a origem acompanha o centro após cada gesto.
     const int gridHalfSize = 3;
     final minTileX = centerTileX - gridHalfSize;
     final maxTileX = centerTileX + gridHalfSize;
@@ -2309,17 +2329,31 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
           _hasCenteredHighlightPerson = true;
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) {
-              final dx = (constraints.maxWidth / 2.0) - centerPx;
-              final dy = (constraints.maxHeight / 2.0) - centerPy;
-              _transformationController.value = Matrix4.translationValues(
-                dx,
-                dy,
-                0.0,
-              );
+              _centerOnCoords(centerLat, centerLng,
+                  constraints.maxWidth, constraints.maxHeight);
             }
           });
         }
 
+        // Solicita somente blocos próximos à tela, com margem para gestos.
+        final radius = math.sqrt(constraints.maxWidth * constraints.maxWidth +
+            constraints.maxHeight * constraints.maxHeight) /
+            (2 * math.max(0.6, _transformationController.value.getMaxScaleOnAxis())) + _tileSize;
+        final tileCenterX = _lon2pixelX(effectiveCenterLng, _zoom);
+        final tileCenterY = _lat2pixelY(effectiveCenterLat, _zoom);
+        final visibleTiles = <({int x, int y})>[
+          for (int x = minTileX; x <= maxTileX; x++)
+            for (int y = minTileY; y <= maxTileY; y++)
+              if ((x * _tileSize + _tileSize / 2 - tileCenterX).abs() <= radius &&
+                  (y * _tileSize + _tileSize / 2 - tileCenterY).abs() <= radius &&
+                  x >= 0 && y >= 0 && x < (1 << _zoom) && y < (1 << _zoom))
+                (x: x, y: y),
+        ]..sort((a, b) {
+          double distance(({int x, int y}) t) =>
+              math.pow(t.x * _tileSize + _tileSize / 2 - tileCenterX, 2).toDouble() +
+              math.pow(t.y * _tileSize + _tileSize / 2 - tileCenterY, 2).toDouble();
+          return distance(a).compareTo(distance(b));
+        });
         return Stack(
           children: [
             ClipRect(
@@ -2370,24 +2404,32 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                     final effectiveScale = currentScale > 0.01 ? currentScale : 1.0;
                     final dx = m.storage[12];
                     final dy = m.storage[13];
-                    final touchCanvasX = (details.localPosition.dx - dx) / effectiveScale;
-                    final touchCanvasY = (details.localPosition.dy - dy) / effectiveScale;
+                    // A rotação é aplicada fora do InteractiveViewer: primeiro
+                    // desfazê-la em torno do centro, depois escala/translação.
+                    final offset = details.localPosition -
+                        Offset(constraints.maxWidth / 2, constraints.maxHeight / 2);
+                    final c = math.cos(_rotation);
+                    final sn = math.sin(_rotation);
+                    final localX = offset.dx * c + offset.dy * sn + constraints.maxWidth / 2;
+                    final localY = -offset.dx * sn + offset.dy * c + constraints.maxHeight / 2;
+                    final touchCanvasX = (localX - dx) / effectiveScale;
+                    final touchCanvasY = (localY - dy) / effectiveScale;
                     final touchWorldPx = originPx + touchCanvasX;
                     final touchWorldPy = originPy + touchCanvasY;
                     final touchLng = _pixelX2lon(touchWorldPx, _zoom);
                     final touchLat = _pixelY2lat(touchWorldPy, _zoom);
                     _showAddLandmarkModal(context, initialLat: touchLat, initialLng: touchLng);
                   },
+                  onScaleStart: (_) => _rotationAtGestureStart = _rotation,
                   onScaleUpdate: (details) {
-                    if (details.pointerCount >= 2 && details.rotation.abs() > 0.005) {
+                    if (details.pointerCount >= 2) {
                       setState(() {
-                        _rotation += details.rotation;
+                        _rotation = _rotationAtGestureStart + details.rotation;
                       });
                     }
                   },
                   child: Transform.rotate(
                     angle: _rotation,
-                    origin: Offset(constraints.maxWidth / 2, constraints.maxHeight / 2),
                     child: InteractiveViewer(
                     transformationController: _transformationController,
                     constrained: false, // Permite que o mapa ocupe 100% da área sem distorção ou cortes pretos
@@ -2399,6 +2441,8 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                     trackpadScrollCausesScale: true, // Garante que pinça de trackpad aplique ZOOM em vez de deslizar para os lados
                     minScale: 0.6,
                     maxScale: 2.0,
+                    // Quase sem inércia: a origem é realinhada ao fim do gesto.
+                    interactionEndFrictionCoefficient: 1e-100,
                     onInteractionEnd: (details) {
                       final m = _transformationController.value;
                       final currentScale = m.getMaxScaleOnAxis();
@@ -2412,8 +2456,8 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                           ((constraints.maxHeight / 2.0) - dy) / effectiveScale;
                       final worldPx = originPx + canvasCenterX;
                       final worldPy = originPy + canvasCenterY;
-                      _activeCenterLng = _pixelX2lon(worldPx, _zoom);
-                      _activeCenterLat = _pixelY2lat(worldPy, _zoom);
+                      final focalLng = _pixelX2lon(worldPx, _zoom).clamp(-179.999999, 179.999999);
+                      final focalLat = _pixelY2lat(worldPy, _zoom).clamp(-85.0511, 85.0511);
 
                       final now = clock.now();
                       if (_lastZoomChangeTime == null ||
@@ -2427,6 +2471,7 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                             originPx,
                             originPy,
                           );
+                          return;
                         } else if (currentScale <= 0.75 && _zoom > 6) {
                           _lastZoomChangeTime = now;
                           _changeZoom(
@@ -2435,8 +2480,19 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                             originPx,
                             originPy,
                           );
+                          return;
                         }
                       }
+                      final newOriginX = (_lon2tileX(focalLng, _zoom) - gridHalfSize) * _tileSize;
+                      final newOriginY = (_lat2tileY(focalLat, _zoom) - gridHalfSize) * _tileSize;
+                      setState(() {
+                        _activeCenterLng = focalLng;
+                        _activeCenterLat = focalLat;
+                      });
+                      _transformationController.value = Matrix4.identity()
+                        ..translateByDouble(dx + (newOriginX - originPx) * effectiveScale,
+                            dy + (newOriginY - originPy) * effectiveScale, 0, 1)
+                        ..scaleByDouble(effectiveScale, effectiveScale, 1, 1);
                     },
                     child: Container(
                       width: canvasWidth,
@@ -2447,17 +2503,16 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                       child: Stack(
                         children: [
                           // Camada de Tiles do OpenStreetMap com suporte a cache offline móvel
-                          for (int tx = minTileX; tx <= maxTileX; tx++)
-                            for (int ty = minTileY; ty <= maxTileY; ty++)
+                          for (final tile in visibleTiles)
                               Positioned(
-                                key: ValueKey('tile_pos_${_zoom}_${tx}_$ty'),
-                                left: (tx - minTileX) * _tileSize,
-                                top: (ty - minTileY) * _tileSize,
+                                key: ValueKey('tile_pos_${_zoom}_${tile.x}_${tile.y}'),
+                                left: (tile.x - minTileX) * _tileSize,
+                                top: (tile.y - minTileY) * _tileSize,
                                 child: CachedTileWidget(
-                                  key: ValueKey('tile_${TileCacheService.instance.activeStyle.id}_${_zoom}_${tx}_$ty'),
+                                  key: ValueKey('tile_${TileCacheService.instance.activeStyle.id}_${_zoom}_${tile.x}_${tile.y}'),
                                   z: _zoom,
-                                  x: tx,
-                                  y: ty,
+                                  x: tile.x,
+                                  y: tile.y,
                                   size: _tileSize,
                                   isDark: isDark,
                                   layerStyle: TileCacheService.instance.activeStyle,
@@ -2499,13 +2554,6 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                                             color: Colors.blueAccent.withValues(alpha: 0.5),
                                             width: 1.5,
                                           ),
-                                        ),
-                                      ),
-                                      Transform.rotate(
-                                        angle: -_rotation,
-                                        child: CustomPaint(
-                                          size: const Size(28, 28),
-                                          painter: _GpsHeadingConePainter(),
                                         ),
                                       ),
                                       Container(
@@ -2662,12 +2710,12 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
               right: 12,
               child: Column(
                 children: [
-                  // Bússola Interativa (Norte Magnético estilo Organic Maps)
+                  // Rotação manual; não utiliza sensores de bússola.
                   FloatingActionButton.small(
                     heroTag: 'map_compass',
                     backgroundColor: Colors.white,
                     foregroundColor: Colors.red.shade700,
-                    tooltip: 'Norte Magnético (${(_rotation * 180 / math.pi).round()}°)\nToque para redefinir para 0° • Segure para girar 90°',
+                    tooltip: 'Rotação do mapa (${(_rotation * 180 / math.pi).round()}°). Toque para voltar ao norte.',
                     onPressed: () {
                       setState(() {
                         _rotation = 0.0;
@@ -2739,18 +2787,12 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                         );
                       } else {
                         setState(() => _isLocatingUser = false);
-                        _centerOnCoords(
-                          GeolocationHelper.defaultLat,
-                          GeolocationHelper.defaultLng,
-                          constraints.maxWidth,
-                          constraints.maxHeight,
-                        );
                         messenger
                           ..hideCurrentSnackBar()
                           ..showSnackBar(
                             SnackBar(
                               content: Text(
-                                '${result.userMessage} Centralizado em Santo Antônio do Içá (-3.1022, -67.9397).',
+                                '${result.userMessage} O mapa permaneceu na posição anterior.',
                               ),
                               backgroundColor: warningColor,
                               duration: const Duration(seconds: 4),
@@ -2827,12 +2869,12 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                     heroTag: 'map_recenter',
                     backgroundColor: AppTheme.primaryBlue,
                     foregroundColor: Colors.white,
-                    tooltip: 'Centralizar Território',
-                    onPressed: () => _recenterMap(
+                    tooltip: 'Ir para Santo Antônio do Içá (mapa offline: camada Padrão, zoom 8 a 16)',
+                    onPressed: () => _centerOnCoords(
+                      GeolocationHelper.defaultLat,
+                      GeolocationHelper.defaultLng,
                       constraints.maxWidth,
                       constraints.maxHeight,
-                      centerPx,
-                      centerPy,
                     ),
                     child: const Icon(Icons.filter_center_focus, size: 18),
                   ),
@@ -2848,6 +2890,13 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  if (_zoom > 16 && TileCacheService.instance.activeStyle == MapLayerStyle.standard)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      color: Colors.white.withValues(alpha: 0.9),
+                      child: const Text('Pacote SAI: detalhe nativo até Z16',
+                          style: TextStyle(fontSize: 10, color: Colors.black87)),
+                    ),
                   _buildMetricScaleBar(
                     _transformationController.value.getMaxScaleOnAxis(),
                     effectiveCenterLat,
@@ -3239,8 +3288,9 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Positioned(
-      left: (x - 20).clamp(10.0, canvasWidth - 60.0),
-      top: (y - 35).clamp(10.0, canvasHeight - 60.0),
+      left: x - 60,
+      bottom: canvasHeight - y,
+      width: 120,
       child: GestureDetector(
         onTap: () {
           setState(() {
@@ -3365,8 +3415,9 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
     }
 
     return Positioned(
-      left: (x - (isHighlighted ? 24 : 20)).clamp(10.0, canvasWidth - 70.0),
-      top: (y - (isHighlighted ? 44 : 35)).clamp(10.0, canvasHeight - 70.0),
+      left: x - 70,
+      bottom: canvasHeight - y,
+      width: 140,
       child: GestureDetector(
         behavior: HitTestBehavior.deferToChild,
         onTap: () {
@@ -3601,34 +3652,5 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
         return const Color(0xFF2563EB);
     }
   }
-}
-
-class _GpsHeadingConePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          Colors.blueAccent.withValues(alpha: 0.4),
-          Colors.blueAccent.withValues(alpha: 0.0),
-        ],
-      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
-
-    final path = Path()
-      ..moveTo(size.width / 2, size.height / 2)
-      ..lineTo(0, 0)
-      ..arcToPoint(
-        Offset(size.width, 0),
-        radius: Radius.circular(size.width / 2),
-      )
-      ..close();
-
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 

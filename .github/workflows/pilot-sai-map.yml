@@ -1,0 +1,45 @@
+name: Build SAI town pilot offline map
+on:
+  push:
+    branches: ['arena/**']
+    paths: ['.github/workflows/pilot-sai-map.yml']
+permissions:
+  contents: read
+jobs:
+  pilot_map:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install local vector rendering tools
+        run: |
+          set -o pipefail
+          (sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends qgis python3-qgis gdal-bin osmium-tool fonts-dejavu-core) 2>&1 | tee /tmp/install-sai.log || { python3 tool/ci_diagnostics_summary.py test /tmp/install-sai.log; exit 1; }
+      - name: Render small pilot from local OSM data
+        run: |
+          set -o pipefail
+          # A small pilot makes the renderer and installation testable while
+          # the full municipality rendering continues separately.
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('tool/map/render_sai_qgis.py')
+          s = p.read_text().replace('-69.95,-67.65,-3.85,-2.32 [EPSG:4326]', '-68.10,-67.78,-3.26,-2.98 [EPSG:4326]')
+          s = s.replace('-69.95,-3.85,-67.65,-2.32', '-68.10,-3.26,-67.78,-2.98')
+          p.write_text(s)
+          PY
+          bash tool/map/build_sai.sh "$RUNNER_TEMP/pilot" 2>&1 | tee /tmp/pilot-sai.log || { python3 tool/ci_diagnostics_summary.py test /tmp/pilot-sai.log; exit 1; }
+          cat > "$RUNNER_TEMP/pilot/output/LEIA-ME.txt" <<'TXT'
+          MAPA PILOTO EXPERIMENTAL - NÃO COBRE TODO O MUNICÍPIO OU ALDEIAS
+          Retângulo: longitude -68.10 a -67.78; latitude -3.26 a -2.98.
+          Dados © contribuidores do OpenStreetMap: https://www.openstreetmap.org/copyright
+          Fonte de dados: https://download.openstreetmap.fr/extracts/south-america/brazil/north/
+          Zoom 8 a 16. Comunidades e vias podem estar ausentes ou imprecisas.
+          Não use como única fonte para navegação. Teste no app em modo avião.
+          Os pontos de contatos ficam no banco do aplicativo, não neste mapa.
+          TXT
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sai-sede-piloto-experimental
+          path: ${{ runner.temp }}/pilot/output/
+          if-no-files-found: error
+          retention-days: 14

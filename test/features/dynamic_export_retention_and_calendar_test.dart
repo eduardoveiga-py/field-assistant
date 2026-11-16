@@ -19,21 +19,21 @@ class _TestJwImapClient extends JwImapClient {
   });
 
   @override
-  Future<List<JwEmailMessage>> fetchRemoteEmails({
+  Stream<List<JwEmailMessage>> fetchRemoteEmailPages({
     String? host,
     int? port,
     String? username,
     String? password,
-    Duration timeout = const Duration(seconds: 10),
-  }) async {
+    Duration timeout = const Duration(seconds: 60),
+    JwMissingUids? missingUids,
+  }) async* {
     if (failWithNetworkError) {
       throw const JwEmailConnectionException('Servidor IMAP inacessível na rede.');
     }
-    if (username == null || username.trim().isEmpty || password == null || password.trim().isEmpty) {
-      return const [];
-    }
-    return remoteList;
+    if (username == null || username.trim().isEmpty || password == null || password.trim().isEmpty) return;
+    yield remoteList;
   }
+
 }
 
 void main() {
@@ -351,6 +351,16 @@ void main() {
 
       final retained = await failingService.watchRetainedEmails().first;
       expect(retained, isEmpty);
+    });
+
+    test('identidade IMAP isola conta, servidor e UIDVALIDITY', () {
+      String id(String username, int validity, {String host = 'mail.jw.org'}) =>
+          JwImapClient.scopedMessageId(host: host, port: 993, username: username,
+              uidValidity: validity, uid: 42);
+      expect(id('a@example.org', 1), id('a@example.org', 1));
+      expect(id('a@example.org', 1), isNot(id('b@example.org', 1)));
+      expect(id('a@example.org', 1), isNot(id('a@example.org', 2)));
+      expect(id('a@example.org', 1), isNot(id('a@example.org', 1, host: 'other.example.org')));
     });
 
     test('JwImapClient parses RFC2822 dates and strips FETCH envelope markers', () {

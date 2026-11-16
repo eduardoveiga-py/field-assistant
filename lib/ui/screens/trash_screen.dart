@@ -153,7 +153,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
                             builder: (c) => AlertDialog(
                               title: const Text('Exclusão Definitiva'),
                               content: Text(
-                                'Tem certeza de que deseja apagar permanentemente "$title"? Esta ação não pode ser desfeita.',
+                                'Excluir "$title" do banco local e enfileirar a exclusão na nuvem? Arquivos locais, cópias de segurança, objetos no Storage e dados em outros dispositivos podem permanecer. A exclusão na nuvem depende da sincronização.',
                               ),
                               actions: [
                                 TextButton(
@@ -178,7 +178,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text(
-                                    '"$title" excluído permanentemente.',
+                                    '"$title" removido localmente; exclusão na nuvem pendente de sincronização.',
                                   ),
                                 ),
                               );
