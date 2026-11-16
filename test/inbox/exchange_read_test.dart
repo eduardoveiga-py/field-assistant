@@ -133,14 +133,18 @@ void main() {
 
   test('falha ao enfileirar prévia reverte página e chave Exchange', () async {
     await db.customStatement("CREATE TRIGGER reject_queue BEFORE INSERT ON sync_queue BEGIN SELECT RAISE(ABORT, 'queue failed'); END");
-    final fake = FakeExchange([page('k1'), page('k2', emails: [const eas.EasEmail(serverId: 'x', body: 'x')])]);
+    const mail = eas.EasEmail(serverId: 'x', body: 'x', attachments: [
+      eas.EasAttachment(displayName: 'doc', fileReference: 'ref')]);
+    final fake = FakeExchange([page('k1'), page('k2', emails: [mail])]);
     await expectLater(sync(fake), throwsA(isA<ExchangeException>()));
     expect(await db.select(db.inboxEntries).get(), isEmpty);
     expect(await db.select(db.syncQueue).get(), isEmpty);
+    expect(await (db.select(db.appKvStore)..where((t) => t.key.like('eas_attachment_refs_%'))).get(), isEmpty);
     await db.customStatement('DROP TRIGGER reject_queue');
-    final retry = FakeExchange([page('k2', emails: [const eas.EasEmail(serverId: 'x', body: 'x')])]);
+    final retry = FakeExchange([page('k2', emails: [mail])]);
     expect((await sync(retry)).saved, 1);
     expect(retry.keys, ['k1']);
+    expect(await (db.select(db.appKvStore)..where((t) => t.key.like('eas_attachment_refs_%'))).get(), hasLength(1));
   });
 
   test('prévia enfileirada atravessa push e pull simulados para outro dispositivo', () async {
@@ -248,6 +252,30 @@ void main() {
     expect(result.syncKey, '124');
     expect(result.status, 1);
     session.close();
+  });
+
+  test('referências de anexos persistem e mudança parcial não as apaga', () async {
+    final first = FakeExchange([
+      page('1'),
+      page('2', emails: [const eas.EasEmail(serverId: 'm1', subject: 'Com anexo',
+        attachments: [eas.EasAttachment(displayName: 'documento.pdf', fileReference: 'ref-1', estimatedSize: 42)])]),
+    ]);
+    await ExchangeReadService(db).sync(session: first, host: 'mail.example.org', account: 'user', deviceId: 'd');
+    var refs = await (db.select(db.appKvStore)..where((t) => t.key.like('eas_attachment_refs_%'))).get();
+    expect(refs, hasLength(1));
+    final saved = jsonDecode(refs.single.value) as Map;
+    expect(saved['serverId'], 'm1');
+    expect((saved['attachments'] as List).single['fileReference'], 'ref-1');
+    expect((saved['attachments'] as List).single['estimatedSize'], 42);
+
+    final second = FakeExchange([
+      eas.SyncResult(status: 1, syncKey: '3', collectionId: 'inbox', changedEmails: [
+        const eas.EasEmail(serverId: 'm1', read: true),
+      ]),
+    ]);
+    await ExchangeReadService(db).sync(session: second, host: 'mail.example.org', account: 'user', deviceId: 'd');
+    refs = await (db.select(db.appKvStore)..where((t) => t.key.like('eas_attachment_refs_%'))).get();
+    expect(refs.single.value, jsonEncode(saved));
   });
 
 }

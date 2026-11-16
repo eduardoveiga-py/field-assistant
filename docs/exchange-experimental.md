@@ -35,3 +35,10 @@ podem enviar o conteúdo legível; isso não constitui criptografia ponta a pont
 nem prova de entrega ao outro aparelho.
 Esta versão não implementa download de anexos, MIME integral nem um arquivo
 permanente completo e não deve ser usada como único backup da conta.
+
+As novas prévias com anexos preservam localmente metadados e referências EAS
+para uma futura implementação de download, inclusive quando uma atualização
+parcial não inclui anexos. Isso não baixa nem garante a disponibilidade dos
+arquivos; referências antigas podem deixar de funcionar. Prévias já baixadas
+sem referências não são preenchidas automaticamente. Nenhum anexo é incluído
+no backup completo enquanto seu conteúdo não for efetivamente baixado.

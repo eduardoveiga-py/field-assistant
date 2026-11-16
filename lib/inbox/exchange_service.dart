@@ -154,6 +154,44 @@ class ExchangeReadService {
         await db.transaction(() async {
           final now = DateTime.now();
           for (final item in changes) {
+            // Preserve download references locally even though attachment bytes
+            // are not imported yet. A partial Change with no attachment field
+            // must never erase known references.
+            if (item.attachments.isNotEmpty) {
+              final refKey = 'eas_attachment_refs_${_digest([host.toLowerCase(), account.toLowerCase(), folder, item.serverId])}';
+              final prior = await (db.select(db.appKvStore)..where((t) => t.key.equals(refKey))).getSingleOrNull();
+              final savedRefs = <Map<String, dynamic>>[];
+              if (prior != null) {
+                final decoded = jsonDecode(prior.value);
+                if (decoded is! Map || decoded['version'] != 1 || decoded['attachments'] is! List) {
+                  throw const FormatException('Índice local de anexos inválido; lote preservado.');
+                }
+                for (final value in decoded['attachments'] as List) {
+                  if (value is! Map) throw const FormatException('Índice local de anexos inválido.');
+                  savedRefs.add(Map<String, dynamic>.from(value));
+                }
+              }
+              for (final attachment in item.attachments) {
+                final ref = attachment.fileReference;
+                final entry = <String, dynamic>{
+                  'fileReference': ref, 'name': attachment.displayName,
+                  'estimatedSize': attachment.estimatedSize, 'contentType': attachment.contentType,
+                  'isInline': attachment.isInline, 'method': attachment.method,
+                };
+                final index = ref.isEmpty ? -1 : savedRefs.indexWhere((e) => e['fileReference'] == ref);
+                if (index >= 0) {
+                  savedRefs[index] = entry;
+                } else if (!savedRefs.any((e) => jsonEncode(e) == jsonEncode(entry))) {
+                  savedRefs.add(entry);
+                }
+              }
+              await db.into(db.appKvStore).insertOnConflictUpdate(AppKvStoreCompanion.insert(
+                key: refKey,
+                value: jsonEncode({'version': 1, 'host': host.toLowerCase(), 'account': account.toLowerCase(),
+                  'folderId': folder, 'serverId': item.serverId, 'attachments': savedRefs}),
+                updatedAt: drift.Value(now),
+              ));
+            }
             // Change responses can be partial; keep previous snapshots rather
             // than replacing them with blank fields.
             final data = [item.subject, item.from, item.to, item.body, item.bodyTruncated,
