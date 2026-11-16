@@ -13,6 +13,7 @@ class TileCacheService {
   static final TileCacheService instance = TileCacheService._internal();
   TileCacheBackend _backend = getTileBackend();
   final Map<String, Future<Uint8List?>> _inFlight = {};
+  int _cacheGeneration = 0;
   final Map<String, Future<Uint8List?>> _offlineInFlight = {};
   final Map<String, Uint8List> _offlineParents = {};
   MBTilesService? _offlineOwner;
@@ -30,6 +31,7 @@ class TileCacheService {
   void setLayerStyle(MapLayerStyle style) {
     if (_activeStyle != style) {
       _activeStyle = style;
+      _cacheGeneration++;
       _memoryCache.clear();
       _inFlight.clear();
     }
@@ -52,6 +54,7 @@ class TileCacheService {
   @visibleForTesting
   set backend(TileCacheBackend b) {
     _backend = b;
+    _cacheGeneration++;
     _inFlight.clear();
     _memoryCache.clear();
   }
@@ -137,17 +140,24 @@ class TileCacheService {
     final mem = _memoryCache[key];
     if (mem != null) return Future.value(mem);
 
-    return _inFlight.putIfAbsent(key, () async {
+    final existing = _inFlight[key];
+    if (existing != null) return existing;
+    final generation = _cacheGeneration;
+    final backend = _backend;
+    late final Future<Uint8List?> request;
+    request = (() async {
+      // Deixa a referência do Future ser registrada antes de qualquer retorno.
+      await Future<void>.value();
       try {
         // 1. Tenta carregar do pacote regional .mbtiles
         if (s == MapLayerStyle.standard) {
           try {
             final mbtile = await MBTilesService.instance.getTile(z, x, y);
             if (mbtile != null && mbtile.isNotEmpty) {
-              if (_memoryCache.length > 600) {
-                _memoryCache.remove(_memoryCache.keys.first);
+              if (_cacheGeneration == generation) {
+                if (_memoryCache.length >= 600) _memoryCache.remove(_memoryCache.keys.first);
+                _memoryCache[key] = mbtile;
               }
-              _memoryCache[key] = mbtile;
               return mbtile;
             }
           } catch (e, st) {
@@ -155,19 +165,19 @@ class TileCacheService {
           }
         }
 
-        // 2. Tenta carregar do backend padrão (cache local no disco / download online)
-        final res = await _backend.getTile(z, x, y, s);
-        if (res != null && res.isNotEmpty) {
-          if (_memoryCache.length > 600) {
-            _memoryCache.remove(_memoryCache.keys.first);
-          }
+        // 2. Cache em disco / rede. Resultados antigos não alimentam cache novo.
+        final res = await backend.getTile(z, x, y, s);
+        if (res != null && res.isNotEmpty && _cacheGeneration == generation) {
+          if (_memoryCache.length >= 600) _memoryCache.remove(_memoryCache.keys.first);
           _memoryCache[key] = res;
         }
         return res;
       } finally {
-        _inFlight.remove(key);
+        if (identical(_inFlight[key], request)) _inFlight.remove(key);
       }
-    });
+    })();
+    _inFlight[key] = request;
+    return request;
   }
 
   Future<void> saveTile(int z, int x, int y, Uint8List bytes, [MapLayerStyle? style]) {
