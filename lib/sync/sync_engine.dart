@@ -1,3 +1,5 @@
+import 'package:collection/collection.dart';
+
 enum SyncStatus {
   savedLocally,
   syncing,
@@ -51,6 +53,7 @@ class SyncEngine {
   }) {
     final merged = Map<String, dynamic>.from(localData);
     final conflicts = <ConflictItem>[];
+    const equality = DeepCollectionEquality();
 
     final allKeys = {...localData.keys, ...remoteData.keys};
 
@@ -77,8 +80,8 @@ class SyncEngine {
           ? baseVal.toUtc().toIso8601String()
           : baseVal;
 
-      final localChanged = normLocal != normBase;
-      final remoteChanged = normRemote != normBase;
+      final localChanged = !equality.equals(normLocal, normBase);
+      final remoteChanged = !equality.equals(normRemote, normBase);
 
       if (!localChanged && remoteChanged) {
         // Remoto alterou, local não: aceita remoto com segurança
@@ -88,7 +91,7 @@ class SyncEngine {
         merged[key] = localVal;
       } else if (localChanged && remoteChanged) {
         // Ambos alteraram
-        if (normLocal == normRemote) {
+        if (equality.equals(normLocal, normRemote)) {
           // Alterações idênticas: sem conflito
           merged[key] = localVal;
         } else {
