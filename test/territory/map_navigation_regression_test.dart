@@ -83,9 +83,16 @@ void main() {
     expect(tiles().any((t) => t.z == 15 && t.x == cityX), isTrue);
     final originalMin = tiles().map((t) => t.x).reduce((a, b) => a < b ? a : b);
     final viewer = find.byType(InteractiveViewer).first;
+    final tile = tiles().firstWhere((t) => t.x == cityX);
+    final anchor = find.byKey(ValueKey('tile_pos_15_${tile.x}_${tile.y}'));
+    final before = tester.getCenter(anchor);
     for (var i = 0; i < 4; i++) {
       await tester.timedDrag(viewer, const Offset(-180, 0), const Duration(milliseconds: 400));
       await tester.pumpAndSettle();
+      if (i == 0) {
+        expect(tester.getCenter(anchor).dx - before.dx, closeTo(-180, 40));
+        expect(tester.getCenter(anchor).dy, closeTo(before.dy, 1));
+      }
     }
     final movedMin = tiles().map((t) => t.x).reduce((a, b) => a < b ? a : b);
     expect(movedMin, greaterThan(originalMin));

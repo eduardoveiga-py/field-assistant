@@ -770,7 +770,9 @@ class TodayScreen extends ConsumerWidget {
               );
             },
           ),
-          InkWell(
+          Tooltip(
+            message: supabaseUser != null ? 'Supabase Online' : 'Salvo Localmente',
+            child: InkWell(
             onTap: () => _showSyncStatusModal(context, ref),
             borderRadius: BorderRadius.circular(16),
             child: Container(
@@ -812,6 +814,7 @@ class TodayScreen extends ConsumerWidget {
                   ),
                 ],
               ),
+            ),
             ),
           ),
           Consumer(
