@@ -119,4 +119,12 @@ void main() {
     expect(eas.FetchAttachmentCommand(fileReference: 'ref').parseResponse(response).status, 2);
   });
 
+  test('status global inválido 10 não é interpretado como arquivo vazio', () {
+    final root = eas.WbxmlElement(namespace: 'ItemOperations', tag: 'ItemOperations', codePageIndex: 20, children: [
+      eas.WbxmlElement(namespace: 'ItemOperations', tag: 'Status', text: '10', codePageIndex: 20),
+    ]);
+    final result = eas.FetchAttachmentCommand(fileReference: 'ref').parseResponse(eas.WbxmlDocument(root: root));
+    expect(result.status, 2);
+  });
+
 }

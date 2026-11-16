@@ -628,7 +628,11 @@ abstract class ItemOperationsFetchCommand
   WbxmlDocument buildRequest() => _inner.buildRequest();
 
   ItemOperationsResult _first(ItemOperationsResponse r) {
-    if (r.status != 1) return ItemOperationsResult(status: r.status);
+    // Status 10 means an empty file only at Fetch (item) scope. A
+    // malformed global status must never be mistaken for an empty file.
+    if (r.status != 1) {
+      return ItemOperationsResult(status: r.status == 10 ? 2 : r.status);
+    }
     // A single-item command must not accept an ambiguous response.
     if (r.fetches.length != 1) return const ItemOperationsResult(status: 2);
     return r.fetches.single;
