@@ -139,12 +139,12 @@ void main() {
     await expectLater(sync(fake), throwsA(isA<ExchangeException>()));
     expect(await db.select(db.inboxEntries).get(), isEmpty);
     expect(await db.select(db.syncQueue).get(), isEmpty);
-    expect(await (db.select(db.appKvStore)..where((t) => t.key.like('eas_attachment_refs_%'))).get(), isEmpty);
+    expect((await db.select(db.appKvStore).get()).where((row) => row.key.startsWith('eas_attachment_refs_')).toList(), isEmpty);
     await db.customStatement('DROP TRIGGER reject_queue');
     final retry = FakeExchange([page('k2', emails: [mail])]);
     expect((await sync(retry)).saved, 1);
     expect(retry.keys, ['k1']);
-    expect(await (db.select(db.appKvStore)..where((t) => t.key.like('eas_attachment_refs_%'))).get(), hasLength(1));
+    expect((await db.select(db.appKvStore).get()).where((row) => row.key.startsWith('eas_attachment_refs_')).toList(), hasLength(1));
   });
 
   test('prévia enfileirada atravessa push e pull simulados para outro dispositivo', () async {
@@ -261,7 +261,7 @@ void main() {
         attachments: [eas.EasAttachment(displayName: 'documento.pdf', fileReference: 'ref-1', estimatedSize: 42)])]),
     ]);
     await ExchangeReadService(db).sync(session: first, host: 'mail.example.org', account: 'user', deviceId: 'd');
-    var refs = await (db.select(db.appKvStore)..where((t) => t.key.like('eas_attachment_refs_%'))).get();
+    var refs = (await db.select(db.appKvStore).get()).where((row) => row.key.startsWith('eas_attachment_refs_')).toList();
     expect(refs, hasLength(1));
     final saved = jsonDecode(refs.single.value) as Map;
     expect(saved['serverId'], 'm1');
@@ -274,7 +274,7 @@ void main() {
       ]),
     ]);
     await ExchangeReadService(db).sync(session: second, host: 'mail.example.org', account: 'user', deviceId: 'd');
-    refs = await (db.select(db.appKvStore)..where((t) => t.key.like('eas_attachment_refs_%'))).get();
+    refs = (await db.select(db.appKvStore).get()).where((row) => row.key.startsWith('eas_attachment_refs_')).toList();
     expect(refs.single.value, jsonEncode(saved));
   });
 
