@@ -94,4 +94,17 @@ void main() {
     session.close();
   });
 
+  test('erro geral não é mascarado por Fetch aparentemente bem-sucedido', () {
+    eas.WbxmlElement node(String tag, {String? text, List<eas.WbxmlElement>? children}) =>
+      eas.WbxmlElement(namespace: 'ItemOperations', tag: tag, text: text, children: children, codePageIndex: 20);
+    final response = eas.WbxmlDocument(root: node('ItemOperations', children: [
+      node('Status', text: '3'), node('Response', children: [node('Fetch', children: [
+        node('Status', text: '1'), node('Properties', children: [node('Data', text: 'AQI=')]),
+      ])]),
+    ]));
+    final result = eas.FetchAttachmentCommand(fileReference: 'ref').parseResponse(response);
+    expect(result.status, 3);
+    expect(result.data, isNull);
+  });
+
 }

@@ -628,7 +628,8 @@ abstract class ItemOperationsFetchCommand
   WbxmlDocument buildRequest() => _inner.buildRequest();
 
   ItemOperationsResult _first(ItemOperationsResponse r) =>
-      r.fetches.firstOrNull ?? ItemOperationsResult(status: r.status);
+      r.status != 1 ? ItemOperationsResult(status: r.status) :
+      (r.fetches.firstOrNull ?? ItemOperationsResult(status: r.status));
 
   @override
   ItemOperationsResult parseResponse(WbxmlDocument response) =>
