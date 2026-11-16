@@ -83,12 +83,9 @@ void main() {
     expect(tiles().any((t) => t.z == 15 && t.x == cityX), isTrue);
     final originalMin = tiles().map((t) => t.x).reduce((a, b) => a < b ? a : b);
     final viewer = find.byType(InteractiveViewer).first;
-    debugPrint('MAP VIEWER ${tester.getRect(viewer)} TRANSFORM ${tester.widget<InteractiveViewer>(viewer).transformationController!.value}');
-    debugPrint('HIT ${tester.hitTestOnBinding(tester.getCenter(viewer)).path.map((e) => e.target.runtimeType).toList()}');
     for (var i = 0; i < 4; i++) {
-      await tester.drag(viewer, const Offset(-220, 0));
+      await tester.timedDrag(viewer, const Offset(-180, 0), const Duration(milliseconds: 400));
       await tester.pumpAndSettle();
-      debugPrint('MAP DRAG $i TRANSFORM ${tester.widget<InteractiveViewer>(viewer).transformationController!.value} X ${tiles().map((t) => t.x).toSet()}');
     }
     final movedMin = tiles().map((t) => t.x).reduce((a, b) => a < b ? a : b);
     expect(movedMin, greaterThan(originalMin));
