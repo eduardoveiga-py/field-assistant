@@ -9,7 +9,7 @@ usuário nem em iPhone/LiveContainer.
   O usuário deve inserir o servidor oficial confiável. O cliente não segue
   redirecionamentos HTTP com credenciais; OAuth e descoberta não estão ativos.
 - FolderSync e Sync de pastas classificadas como correio pelo servidor, com até 256 KiB de corpo por mensagem. Os itens são prévias: anexos/MIME completos não são recuperados. O cliente oficial permanece a fonte de verdade; pastas de tipo desconhecido não são importadas.
-- Páginas de prévias, operações da fila de sincronização e SyncKey são persistidos juntos; a fila precisa ser processada com login e a chegada em outro dispositivo ainda requer validação; falhas mantêm os lotes
+- Páginas de prévias, operações da fila de sincronização e SyncKey são persistidos juntos; a fila de envio ao Supabase está pausada até a proteção ponta a ponta ficar pronta; a chegada em outro dispositivo ainda requer implementação e validação; falhas mantêm os lotes
   anteriores e a chave da página anterior. A invalidação da chave inicia uma
   nova leitura sem remover prévias. Alterações parciais criam novas prévias;
   exclusões do servidor não são propagadas. Não há comandos de escrita ou de
@@ -29,7 +29,8 @@ usuário nem em iPhone/LiveContainer.
   sincronização integral. Não substituir a caixa original nem apagar dados.
 
 Prévias importadas antes da inclusão na fila não são automaticamente reenfileiradas.
-O conteúdo enfileirado pode ser enviado ao projeto Supabase autenticado; isso
-não constitui criptografia ponta a ponta nem prova de entrega ao outro aparelho.
+Nesta branch, o envio da fila pelo Supabase está pausado. Versões antigas ainda
+podem enviar o conteúdo legível; isso não constitui criptografia ponta a ponta
+nem prova de entrega ao outro aparelho.
 Esta versão não implementa download de anexos, MIME integral nem um arquivo
 permanente completo e não deve ser usada como único backup da conta.

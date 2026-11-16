@@ -16,6 +16,9 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
+      - name: Capture resolved dependency lock
+        run: |
+          python3 -c "import base64,gzip,pathlib; print('::notice title=Resolved dependency lock::' + base64.b64encode(gzip.compress(pathlib.Path('pubspec.lock').read_bytes())).decode())"
       - name: Analyze and summarize diagnostics
         shell: bash
         run: |
