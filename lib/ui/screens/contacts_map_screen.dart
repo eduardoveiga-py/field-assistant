@@ -320,31 +320,6 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
     }
   }
 
-  void _centerOnCoords(
-    double lat,
-    double lng,
-    double viewportWidth,
-    double viewportHeight,
-  ) {
-    const int gridHalfSize = 3;
-    final newCenterTileX = _lon2tileX(lng, _zoom);
-    final newCenterTileY = _lat2tileY(lat, _zoom);
-    final newOriginPx = (newCenterTileX - gridHalfSize) * _tileSize;
-    final newOriginPy = (newCenterTileY - gridHalfSize) * _tileSize;
-    final targetPx = _lon2pixelX(lng, _zoom) - newOriginPx;
-    final targetPy = _lat2pixelY(lat, _zoom) - newOriginPy;
-
-    setState(() {
-      _activeCenterLat = lat;
-      _activeCenterLng = lng;
-    });
-    if (viewportWidth > 0 && viewportHeight > 0) {
-      final dx = (viewportWidth / 2.0) - targetPx;
-      final dy = (viewportHeight / 2.0) - targetPy;
-      _transformationController.value = Matrix4.translationValues(dx, dy, 0.0);
-    }
-  }
-
   Widget _buildMetricScaleBar(double effectiveScale, double latitude, int zoom) {
     final latRad = latitude.clamp(-85.0, 85.0) * math.pi / 180.0;
     final scale = effectiveScale > 0.01 ? effectiveScale : 1.0;

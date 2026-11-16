@@ -141,7 +141,6 @@ class BackupService {
   final FlutterSecureStorage? secureStorage;
   final Uuid _uuid = const Uuid();
   String? _lastPreRestoreSafetyBackup;
-  String? _ephemeralSilentKey;
 
   String? get lastPreRestoreSafetyBackup => _lastPreRestoreSafetyBackup;
 

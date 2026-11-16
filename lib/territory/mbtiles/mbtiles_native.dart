@@ -24,8 +24,6 @@ class MBTilesNative implements MBTilesBackend {
 
   MBTilesNative({Directory? customDir}) : _customDir = customDir;
 
-  MBTilesNative({this._customDir});
-
   @override
   Future<void> init() {
     if (_initialized) return Future.value();

@@ -17,6 +17,7 @@ import 'media_bytes.dart';
 import 'native_auth_callback.dart';
 import 'sync_engine.dart';
 import 'supabase_config.dart';
+import 'crypto/e2ee_service.dart';
 
 class SyncProcessResult {
   final int totalProcessed;
@@ -230,7 +231,11 @@ class SupabaseSyncService {
     this.documentsDirectoryProvider,
     this.strictStorageAuth = false,
     this.allowLegacySyncForTesting = false,
-  });
+    E2eeService? e2eeServiceOverride,
+  }) : e2eeService = e2eeServiceOverride ?? E2eeService(client: clientOverride, db: db);
+
+  /// Serviço de criptografia de ponta a ponta (E2EE)
+  final E2eeService e2eeService;
 
   /// Apenas testes com cliente simulado; nunca habilita transferência em release.
   @visibleForTesting
@@ -239,10 +244,21 @@ class SupabaseSyncService {
   bool get _legacyTestMode => kDebugMode && allowLegacySyncForTesting && clientOverride != null;
 
   static const _encryptedSyncPending =
-      'Sincronização com Supabase pausada: criptografia ponta a ponta ainda não está pronta. Dados e fila locais preservados.';
+      'Sincronização com Supabase pausada: criptografia ponta a ponta requer configuração ou restauração da frase nas Configurações. Dados e fila locais preservados.';
+
+  Future<bool> _isE2eeConfigured() async {
+    try {
+      final client = clientOverride ?? (isInitialized ? Supabase.instance.client : null);
+      final currentUserId = client?.auth.currentUser?.id ?? client?.auth.currentSession?.user.id;
+      if (currentUserId == null || currentUserId.isEmpty) return false;
+      return await e2eeService.isKeyInstalled(currentUserId);
+    } catch (_) {
+      return false;
+    }
+  }
 
   SyncProcessResult _blockedUntilEncryption() {
-    _setStatus(SyncStatus.error);
+    _setStatus(SyncStatus.savedLocally);
     return const SyncProcessResult(totalProcessed: 0, successCount: 0,
         failureCount: 0, conflictCount: 0, errors: [_encryptedSyncPending],
         message: _encryptedSyncPending);
@@ -1537,7 +1553,8 @@ class SupabaseSyncService {
 
   /// Exclui o arquivo de áudio de uma nota de voz no Supabase Storage
   Future<bool> deleteVoiceNoteAudio(String id) async {
-    if (!_legacyTestMode || !isConfigured) return false;
+    if (!isConfigured) return false;
+    if (!await _isE2eeConfigured() && !_legacyTestMode) return false;
     SupabaseClient? client;
     try {
       client = clientOverride ?? Supabase.instance.client;
@@ -1566,7 +1583,8 @@ class SupabaseSyncService {
 
   /// Exclui o arquivo de pronúncia Ticuna no Supabase Storage
   Future<bool> deleteTicunaAudio(String id) async {
-    if (!_legacyTestMode || !isConfigured) return false;
+    if (!isConfigured) return false;
+    if (!await _isE2eeConfigured() && !_legacyTestMode) return false;
     SupabaseClient? client;
     try {
       client = clientOverride ?? Supabase.instance.client;
@@ -1933,7 +1951,8 @@ class SupabaseSyncService {
 
   /// Retenta o download de áudios que falharam durante a recepção de metadados
   Future<int> retryPendingMediaDownloads() async {
-    if (!_legacyTestMode || !isConfigured) return 0;
+    if (!isConfigured) return 0;
+    if (!await _isE2eeConfigured() && !_legacyTestMode) return 0;
     SupabaseClient? client;
     try {
       client = clientOverride ?? Supabase.instance.client;
@@ -2312,7 +2331,9 @@ class SupabaseSyncService {
       _serializeSyncOperation(_fetchRemoteChanges);
 
   Future<SyncProcessResult> _fetchRemoteChanges() async {
-    if (isConfigured && !_legacyTestMode) return _blockedUntilEncryption();
+    if (isConfigured && !await _isE2eeConfigured() && !_legacyTestMode) {
+      return _blockedUntilEncryption();
+    }
     if (!isConfigured) {
       _setStatus(SyncStatus.waitingConnection);
       return const SyncProcessResult(
@@ -2472,7 +2493,8 @@ class SupabaseSyncService {
 
   /// Resolve um conflito da sync_queue aceitando a versão remota armazenada (ou baixando do servidor).
   Future<bool> resolveConflictAcceptRemote(String syncQueueId) async {
-    if (!_legacyTestMode) return false;
+    if (!isConfigured && !_legacyTestMode) return false;
+    if (!await _isE2eeConfigured() && !_legacyTestMode) return false;
     final op = await (db.select(db.syncQueue)
           ..where((t) => t.id.equals(syncQueueId)))
         .getSingleOrNull();
@@ -2531,7 +2553,9 @@ class SupabaseSyncService {
       _serializeSyncOperation(_processQueue);
 
   Future<SyncProcessResult> _processQueue() async {
-    if (isConfigured && !_legacyTestMode) return _blockedUntilEncryption();
+    if (isConfigured && !await _isE2eeConfigured() && !_legacyTestMode) {
+      return _blockedUntilEncryption();
+    }
     await _coalescePendingChanges();
     final pendingOps = await repository.getPendingSyncOperations();
     if (pendingOps.isEmpty) {
@@ -2746,6 +2770,20 @@ class SupabaseSyncService {
               client.auth.currentUser?.id ?? client.auth.currentSession?.user.id;
           if (currentUserId != null && currentUserId.isNotEmpty) {
             remotePayload['owner_id'] = currentUserId;
+            try {
+              final recordSync = await e2eeService.getRecordSync(currentUserId);
+              if (recordSync != null) {
+                final localRev = (cleanPayload['revision'] as num?)?.toInt() ?? 1;
+                await recordSync.write(
+                  entityType: op.entityType,
+                  entityId: op.entityId,
+                  expectedRevision: localRev > 1 ? localRev - 1 : 0,
+                  data: cleanPayload,
+                );
+              }
+            } catch (e2eeErr, e2eeSt) {
+              AppLogger.warning('Aviso no envio cifrado E2EE para ${op.entityType} (${op.entityId}): $e2eeErr', e2eeSt);
+            }
           }
 
           if (tableName == 'person_photos') {
@@ -3037,10 +3075,21 @@ class SupabaseSyncService {
   }
 }
 
+/// Provider do serviço E2EE
+final e2eeServiceProvider = Provider<E2eeService>((ref) {
+  final repo = ref.watch(repositoryProvider);
+  return E2eeService(db: repo.db);
+});
+
 /// Provider do serviço de sincronização do Supabase
 final supabaseSyncServiceProvider = Provider<SupabaseSyncService>((ref) {
   final repo = ref.watch(repositoryProvider);
-  final service = SupabaseSyncService(db: repo.db, repository: repo);
+  final e2ee = ref.watch(e2eeServiceProvider);
+  final service = SupabaseSyncService(
+    db: repo.db,
+    repository: repo,
+    e2eeServiceOverride: e2ee,
+  );
   ref.onDispose(service.dispose);
   return service;
 });

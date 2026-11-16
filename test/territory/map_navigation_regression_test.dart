@@ -63,13 +63,6 @@ void main() {
     MBTilesService.setMockInstance(mock);
     TileCacheService.instance.backend = EmptyTiles();
     final db = AppDatabase.forTesting(NativeDatabase.memory());
-    addTearDown(db.close);
-    addTearDown(() async {
-      await tester.pumpWidget(const SizedBox.shrink());
-      await tester.pump(const Duration(milliseconds: 100));
-      MBTilesService.setMockInstance(original);
-      mock.dispose();
-    });
     final now = DateTime.now();
     await db.into(db.people).insert(PeopleCompanion.insert(
       id: 'sp', name: 'Amostra', firstContactAt: now, createdAt: now,
@@ -100,6 +93,12 @@ void main() {
     await tester.pumpAndSettle();
     expect(tiles().any((t) => t.z == 15 && t.x == cityX), isTrue);
     expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+    await db.close();
+    await tester.pump(const Duration(milliseconds: 100));
+    MBTilesService.setMockInstance(original);
+    mock.dispose();
   });
 
   testWidgets('título Hoje é legível em tela estreita', (tester) async {
@@ -108,11 +107,6 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     final db = AppDatabase.forTesting(NativeDatabase.memory());
-    addTearDown(db.close);
-    addTearDown(() async {
-      await tester.pumpWidget(const SizedBox.shrink());
-      await tester.pump(const Duration(milliseconds: 100));
-    });
     await tester.pumpWidget(ProviderScope(overrides: [databaseProvider.overrideWithValue(db)],
       child: const MaterialApp(home: TodayScreen())));
     await tester.pump(const Duration(milliseconds: 500));
@@ -120,5 +114,8 @@ void main() {
     expect(find.descendant(of: find.byType(AppBar), matching: find.text('Hoje')), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+    await db.close();
+    await tester.pump(const Duration(milliseconds: 100));
   });
 }

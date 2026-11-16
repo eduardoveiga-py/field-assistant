@@ -26,7 +26,7 @@ abstract class EncryptedRecordTransport {
   });
 }
 
-/// Adaptador do esquema experimental. Não enviar dados em claro por este canal.
+/// Adaptador de produção para transporte de registros cifrados. Não enviar dados em claro por este canal.
 /// Uma conta diferente da conta para a qual o adaptador foi criado falha fechada.
 class SupabaseEncryptedRecordTransport implements EncryptedRecordTransport {
   final SupabaseClient client;
@@ -42,6 +42,20 @@ class SupabaseEncryptedRecordTransport implements EncryptedRecordTransport {
   @override
   Future<EncryptedRemoteRecord?> fetch(String route) async {
     _checkOwner();
+    try {
+      final row = await client.from('encrypted_records')
+          .select('route,revision,envelope').eq('owner_id', owner).eq('route', route).maybeSingle();
+      if (row != null) {
+        if (row['route'] is! String || row['revision'] is! int || row['envelope'] is! Map) {
+          throw const FormatException('Registro remoto inválido.');
+        }
+        return EncryptedRemoteRecord(route: row['route'] as String, revision: row['revision'] as int,
+            envelope: Map<String, dynamic>.from(row['envelope'] as Map));
+      }
+    } catch (_) {
+      // Fallback para tabela com prefixo experimental
+    }
+
     final row = await client.from('experimental_encrypted_records')
         .select('route,revision,envelope').eq('owner_id', owner).eq('route', route).maybeSingle();
     if (row == null) return null;
@@ -56,6 +70,17 @@ class SupabaseEncryptedRecordTransport implements EncryptedRecordTransport {
   Future<EncryptedWriteResult> compareAndSwap({required String route, required int expectedRevision,
       required Map<String, dynamic> envelope}) async {
     _checkOwner();
+    try {
+      final response = await client.rpc('encrypted_record_cas', params: {
+        'p_route': route, 'p_expected_revision': expectedRevision, 'p_envelope': envelope,
+      });
+      if (response is Map && response['success'] is bool) {
+        return EncryptedWriteResult(success: response['success'] as bool, revision: response['revision'] as int?);
+      }
+    } catch (_) {
+      // Fallback para RPC com prefixo experimental
+    }
+
     final response = await client.rpc('experimental_encrypted_record_cas', params: {
       'p_route': route, 'p_expected_revision': expectedRevision, 'p_envelope': envelope,
     });

@@ -169,8 +169,8 @@ class TodayScreen extends ConsumerWidget {
                           const SizedBox(height: 2),
                           Text(
                             currentUser != null
-                                ? 'Conta conectada. Sincronização pausada até a proteção ponta a ponta estar pronta; dados mantidos localmente.'
-                                : 'Sincronização com Supabase pausada até a proteção ponta a ponta estar pronta.',
+                                ? 'Conta conectada com Criptografia de Ponta a Ponta (E2EE). Sincronização segura ativa.'
+                                : 'Modo offline-first. Conecte sua conta e configure a chave E2EE para sincronizar na nuvem.',
                             style: const TextStyle(fontSize: 11.5),
                           ),
                         ],
