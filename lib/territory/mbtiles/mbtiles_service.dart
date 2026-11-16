@@ -81,7 +81,7 @@ class MBTileRegion {
 }
 
 /// Serviço de gerenciamento de pacotes regionais SQLite .mbtiles
-/// Oferece leitura offline ultrarrápida (<0.2ms) e sem risco de banimento de IP no OSM.
+/// Oferece leitura offline e sem risco de banimento de IP no OSM.
 class MBTilesService {
   static MBTilesService instance = MBTilesService._internal();
 

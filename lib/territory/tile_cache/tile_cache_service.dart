@@ -13,6 +13,13 @@ class TileCacheService {
   static final TileCacheService instance = TileCacheService._internal();
   TileCacheBackend _backend = getTileBackend();
   final Map<String, Future<Uint8List?>> _inFlight = {};
+  final Map<String, Future<Uint8List?>> _offlineInFlight = {};
+  final Map<String, Uint8List> _offlineParents = {};
+  MBTilesService? _offlineOwner;
+  int _offlineRevision = -1;
+  int _offlineBytes = 0;
+  static const int _offlineByteLimit = 8 * 1024 * 1024;
+  static const int _offlineTileLimit = 256;
   static final Map<String, Uint8List> _memoryCache = {};
   MapLayerStyle _activeStyle = MapLayerStyle.standard;
 
@@ -80,6 +87,50 @@ class TileCacheService {
     return null;
   }
 
+  /// Compartilha leituras de ancestrais entre tiles filhos, sem fazer rede.
+  /// A revisão invalida o cache e respostas antigas não entram no cache novo.
+  Future<Uint8List?> getOfflineTileBytes(int z, int x, int y) {
+    final owner = MBTilesService.instance;
+    final revision = owner.tilesRevision.value;
+    if (!identical(owner, _offlineOwner) || revision != _offlineRevision) {
+      _offlineOwner = owner;
+      _offlineRevision = revision;
+      _offlineParents.clear();
+      _offlineInFlight.clear();
+      _offlineBytes = 0;
+    }
+    final key = '$z/$x/$y';
+    final cached = _offlineParents.remove(key);
+    if (cached != null) {
+      _offlineParents[key] = cached; // LRU: prioriza os tiles usados recentemente.
+      return Future.value(cached);
+    }
+    final existing = _offlineInFlight[key];
+    if (existing != null) return existing;
+    late final Future<Uint8List?> future;
+    future = (() async {
+      try {
+        final bytes = await Future<Uint8List?>.sync(() => owner.getTile(z, x, y));
+        if (bytes != null && bytes.isNotEmpty && bytes.length <= _offlineByteLimit &&
+            identical(owner, _offlineOwner) && revision == _offlineRevision &&
+            owner.tilesRevision.value == revision) {
+          while (_offlineParents.isNotEmpty &&
+              (_offlineParents.length >= _offlineTileLimit ||
+               _offlineBytes + bytes.length > _offlineByteLimit)) {
+            _offlineBytes -= _offlineParents.remove(_offlineParents.keys.first)!.length;
+          }
+          _offlineParents[key] = bytes;
+          _offlineBytes += bytes.length;
+        }
+        return bytes;
+      } finally {
+        if (identical(_offlineInFlight[key], future)) _offlineInFlight.remove(key);
+      }
+    })();
+    _offlineInFlight[key] = future;
+    return future;
+  }
+
   Future<Uint8List?> getTileBytes(int z, int x, int y, [MapLayerStyle? style]) {
     final s = style ?? _activeStyle;
     final key = _cacheKey(z, x, y, s);
@@ -88,7 +139,7 @@ class TileCacheService {
 
     return _inFlight.putIfAbsent(key, () async {
       try {
-        // 1. Tenta carregar do pacote regional .mbtiles (<0.2ms)
+        // 1. Tenta carregar do pacote regional .mbtiles
         if (s == MapLayerStyle.standard) {
           try {
             final mbtile = await MBTilesService.instance.getTile(z, x, y);
@@ -245,8 +296,8 @@ class _CachedTileWidgetState extends State<CachedTileWidget> {
     if (style == MapLayerStyle.standard && widget.z > 16) {
       for (var levels = 1; levels <= 3 && widget.z - levels >= 0; levels++) {
         try {
-          final parent = await _mapService.getTile(widget.z - levels,
-              widget.x >> levels, widget.y >> levels);
+          final parent = await TileCacheService.instance.getOfflineTileBytes(
+              widget.z - levels, widget.x >> levels, widget.y >> levels);
           if (!mounted || requestId != _requestId) return;
           if (parent != null && parent.isNotEmpty) {
             setState(() {
