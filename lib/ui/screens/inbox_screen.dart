@@ -42,6 +42,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
   late final TabController _tabController;
   final TextEditingController _emailSearchController = TextEditingController();
   String? _selectedEmailTag;
+  String? _selectedEmailFolder;
   bool _isSyncingEmails = false;
 
   @override
@@ -95,9 +96,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
         final session = ExchangeProtocolSession(host: host.value, username: email.value,
           password: password, deviceId: deviceId);
         final result = await ExchangeReadService(db).sync(session: session, host: host.value,
-          account: email.value, deviceId: deviceId);
+          account: email.value, deviceId: deviceId, allMailFolders: true);
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('${result.saved} prévia(s) Exchange salva(s). '
+          content: Text('${result.saved} prévia(s) Exchange salva(s) em ${result.foldersRead} pasta(s). '
             '${result.moreAvailable ? 'Há mais mensagens; sincronize novamente. ' : ''}'
             'Corpos podem ser parciais; anexos não foram importados.')));
         return;
@@ -1394,7 +1395,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                     ),
                     SizedBox(height: 2),
                     Text(
-                      'Correspondências salvas localmente nunca expiram após os 90 dias do servidor.',
+                      'Cópias locais permanecem após a remoção no servidor; prévias Exchange podem estar incompletas.',
                       style: TextStyle(fontSize: 11, color: Colors.blueGrey),
                     ),
                   ],
@@ -1532,12 +1533,35 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                 );
               }
 
-              return ListView.separated(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                itemCount: emails.length,
-                separatorBuilder: (c, i) => const SizedBox(height: 10),
-                itemBuilder: (c, i) => _buildEmailCard(emails[i], isDark, isHub: false),
-              );
+              final folders = <String, String>{};
+              for (final email in emails) {
+                if (email.folderId != null) {
+                  folders[email.folderId!] = email.folderName ?? 'Pasta Exchange';
+                }
+              }
+              final selected = folders.containsKey(_selectedEmailFolder) ? _selectedEmailFolder : null;
+              final visible = selected == null ? emails : emails.where((email) => email.folderId == selected).toList();
+              return Column(children: [
+                if (folders.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: DropdownButton<String>(
+                      isExpanded: true,
+                      value: selected ?? '',
+                      items: [
+                        const DropdownMenuItem(value: '', child: Text('Todas as pastas')),
+                        ...folders.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value, overflow: TextOverflow.ellipsis))),
+                      ],
+                      onChanged: (value) => setState(() => _selectedEmailFolder = value == '' ? null : value),
+                    ),
+                  ),
+                Expanded(child: ListView.separated(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  itemCount: visible.length,
+                  separatorBuilder: (c, i) => const SizedBox(height: 10),
+                  itemBuilder: (c, i) => _buildEmailCard(visible[i], isDark, isHub: false),
+                )),
+              ]);
             },
           ),
         ),
@@ -1747,9 +1771,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Tooltip(
-                  message: 'Retenção Permanente (não expira após 90 dias)',
-                  child: Icon(Icons.shield_rounded, size: 14, color: Color(0xFF10B981)),
+                Tooltip(
+                  message: msg.isPermanentRetained ? 'Cópia local salva' : 'Prévia Exchange incompleta; não é backup',
+                  child: Icon(msg.isPermanentRetained ? Icons.shield_rounded : Icons.info_outline,
+                    size: 14, color: msg.isPermanentRetained ? const Color(0xFF10B981) : Colors.orange),
                 ),
                 const Spacer(),
                 Text(
@@ -1941,13 +1966,14 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                         children: [
                           const Icon(Icons.shield_outlined, size: 14, color: Color(0xFF10B981)),
                           const SizedBox(width: 6),
-                          const Text(
-                            'Retido Permanentemente (Protegido contra exclusão de 90 dias)',
+                          Text(
+                            msg.isPermanentRetained ? 'Cópia local salva' : 'Prévia parcial: não é backup completo',
                             style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF047857)),
                           ),
                         ],
                       ),
                       const SizedBox(height: 6),
+                      if (msg.folderName != null) Text('Pasta: ${msg.folderName}', style: const TextStyle(fontSize: 12)),
                       Text('De: ${msg.from}', style: const TextStyle(fontSize: 12)),
                       Text('Para: ${msg.to}', style: const TextStyle(fontSize: 12)),
                       Text('Data: ${msg.date.day}/${msg.date.month}/${msg.date.year} às ${msg.date.hour}:${msg.date.minute.toString().padLeft(2, '0')}',

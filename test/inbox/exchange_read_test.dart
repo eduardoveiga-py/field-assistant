@@ -17,6 +17,8 @@ class FakeExchange implements ExchangeSession {
   @override
   Future<String> inboxId() async => 'inbox';
   @override
+  Future<List<eas.EasFolder>> mailFolders() async => const [eas.EasFolder(serverId: 'inbox', parentId: '0', displayName: 'Inbox', type: eas.EasFolderType.defaultInbox)];
+  @override
   Future<eas.SyncResult> readPage(String folder, String key) async {
     keys.add(key);
     if (failureAt == keys.length) throw StateError('sensitive secret');
@@ -24,6 +26,27 @@ class FakeExchange implements ExchangeSession {
   }
   @override
   void close() { closed = true; }
+}
+
+class MultiFolderExchange implements ExchangeSession {
+  final List<String> calls = [];
+  @override
+  Future<String> inboxId() async => 'inbox';
+  @override
+  Future<List<eas.EasFolder>> mailFolders() async => const [
+    eas.EasFolder(serverId: 'inbox', parentId: '0', displayName: 'Entrada', type: eas.EasFolderType.defaultInbox),
+    eas.EasFolder(serverId: 'sent', parentId: '0', displayName: 'Enviados', type: eas.EasFolderType.defaultSentItems),
+  ];
+  @override
+  Future<eas.SyncResult> readPage(String folder, String key) async {
+    calls.add('$folder:$key');
+    return eas.SyncResult(status: 1, syncKey: key == '0' ? '${folder}_1' : '${folder}_2',
+      collectionId: folder, addedEmails: key == '0' ? [] : [
+        eas.EasEmail(serverId: 'same-id', subject: 'Mensagem $folder', body: 'Corpo $folder'),
+      ]);
+  }
+  @override
+  void close() {}
 }
 
 eas.SyncResult page(String key, {int status = 1, bool more = false, List<eas.EasEmail> emails = const [], List<String> deleted = const []}) =>
@@ -49,6 +72,10 @@ void main() {
     expect(items.length, 1);
     expect((jsonDecode(items.single.metadata) as Map)['exchangePreview'], isTrue);
     expect(items.single.deletedAt, isNull);
+    final queue = await db.select(db.syncQueue).get();
+    expect(queue.single.entityType, 'inbox_entries');
+    expect(queue.single.entityId, items.single.id);
+    expect(queue.single.operation, 'INSERT');
     final second = FakeExchange([page('k4', emails: [mail])]);
     expect((await sync(second)).saved, 0);
     expect(second.keys, ['k3']);
@@ -79,6 +106,38 @@ void main() {
     final first = FakeExchange([page('k1'), page('k2', more: true)]);
     final result = await sync(first, maxPages: 2);
     expect(result.moreAvailable, isTrue);
+  });
+
+  test('pastas recebem chaves independentes e prévias enfileiradas', () async {
+    final session = MultiFolderExchange();
+    final result = await ExchangeReadService(db).sync(session: session,
+      host: 'mail.example.org', account: 'user', deviceId: 'device1', allMailFolders: true);
+    expect(result.foldersRead, 2);
+    expect(result.saved, 2);
+    expect(result.moreAvailable, isFalse);
+    expect(session.calls, ['inbox:0', 'inbox:inbox_1', 'sent:0', 'sent:sent_1']);
+    final rows = await db.select(db.inboxEntries).get();
+    final names = rows.map((row) => (jsonDecode(row.metadata)['email'] as Map)['folderName']).toSet();
+    expect(names, {'Entrada', 'Enviados'});
+    expect((await db.select(db.syncQueue).get()).length, 2);
+    final second = MultiFolderExchange();
+    await ExchangeReadService(db).sync(session: second, host: 'mail.example.org',
+        account: 'user', deviceId: 'device1', allMailFolders: true);
+    expect(second.calls, ['inbox:inbox_2', 'sent:sent_2']);
+    expect((await db.select(db.inboxEntries).get()).length, 2);
+    expect((await db.select(db.syncQueue).get()).length, 2);
+  });
+
+  test('falha ao enfileirar prévia reverte página e chave Exchange', () async {
+    await db.customStatement("CREATE TRIGGER reject_queue BEFORE INSERT ON sync_queue BEGIN SELECT RAISE(ABORT, 'queue failed'); END");
+    final fake = FakeExchange([page('k1'), page('k2', emails: [const eas.EasEmail(serverId: 'x', body: 'x')])]);
+    await expectLater(sync(fake), throwsA(isA<ExchangeException>()));
+    expect(await db.select(db.inboxEntries).get(), isEmpty);
+    expect(await db.select(db.syncQueue).get(), isEmpty);
+    await db.customStatement('DROP TRIGGER reject_queue');
+    final retry = FakeExchange([page('k2', emails: [const eas.EasEmail(serverId: 'x', body: 'x')])]);
+    expect((await sync(retry)).saved, 1);
+    expect(retry.keys, ['k1']);
   });
 
   test('FolderSync usa HTTPS, sem redirecionamento e decodifica INBOX', () async {

@@ -6,6 +6,9 @@ import 'package:drift/drift.dart' as drift;
 import 'package:eas_client/eas_client.dart' as eas;
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:uuid/uuid.dart';
+
+import '../core/sync_timestamp.dart';
 
 import '../database/app_database.dart';
 import 'jw_email_service.dart';
@@ -34,6 +37,7 @@ class _NoRedirectClient extends http.BaseClient {
 
 abstract class ExchangeSession {
   Future<String> inboxId();
+  Future<List<eas.EasFolder>> mailFolders();
   Future<eas.SyncResult> readPage(String folder, String key);
   void close();
 }
@@ -66,13 +70,20 @@ class ExchangeProtocolSession implements ExchangeSession {
   }
 
   @override
-  Future<String> inboxId() async {
+  Future<List<eas.EasFolder>> mailFolders() async {
     final folders = await eas.FolderSyncCommand(syncKey: '0').execute(_client);
     if (!folders.isSuccess) throw ExchangeException('Exchange recusou a listagem de pastas (código ${folders.status}).');
-    final matches = folders.addedFolders.where((f) => f.type == eas.EasFolderType.defaultInbox && f.serverId.isNotEmpty).toList();
-    if (matches.length != 1) throw const ExchangeException('Exchange não retornou uma caixa de entrada identificável.');
-    return matches.single.serverId;
+    final result = folders.addedFolders.where((f) => f.isMailFolder && f.serverId.isNotEmpty).toList();
+    if (result.where((f) => f.type == eas.EasFolderType.defaultInbox).length != 1 ||
+        result.map((f) => f.serverId).toSet().length != result.length) {
+      throw const ExchangeException('Exchange não retornou uma lista de pastas de correio válida.');
+    }
+    return result;
   }
+
+  @override
+  Future<String> inboxId() async =>
+      (await mailFolders()).singleWhere((f) => f.type == eas.EasFolderType.defaultInbox).serverId;
 
   @override
   Future<eas.SyncResult> readPage(String folder, String key) => eas.SyncCommand(
@@ -89,22 +100,33 @@ String _digest(Object value) => crypto.sha256.convert(utf8.encode(jsonEncode(val
 class ExchangeReadResult {
   final int saved;
   final bool moreAvailable;
-  const ExchangeReadResult(this.saved, this.moreAvailable);
+  final int foldersRead;
+  const ExchangeReadResult(this.saved, this.moreAvailable, {this.foldersRead = 1});
 }
 
 class ExchangeReadService {
   final AppDatabase db;
   ExchangeReadService(this.db);
 
-  /// Each batch and its next key commit together. No remote or local deletion.
-  /// Replaying a page is safe. Content/attachments may be incomplete: this is
-  /// not a backup or a replacement for the official mail client.
+  /// Saves previews only; not a complete mailbox backup. Each page, its
+  /// outgoing sync queue records and its new Exchange key commit atomically.
   Future<ExchangeReadResult> sync({required ExchangeSession session,
       required String host, required String account, required String deviceId,
-      int maxPages = 50}) async {
+      int maxPages = 50, bool allMailFolders = false}) async {
     if (maxPages < 1) throw ArgumentError.value(maxPages, 'maxPages');
     try {
-      final folder = await session.inboxId();
+      final folders = allMailFolders
+          ? await session.mailFolders()
+          : [eas.EasFolder(serverId: await session.inboxId(), parentId: '0',
+              displayName: 'Caixa de entrada', type: eas.EasFolderType.defaultInbox)];
+      if (folders.isEmpty || folders.any((f) => !f.isMailFolder || f.serverId.isEmpty) ||
+          folders.map((f) => f.serverId).toSet().length != folders.length) {
+        throw const ExchangeException('Exchange retornou pastas de correio inválidas; nada foi apagado.');
+      }
+      var totalSaved = 0;
+      var anyMore = false;
+      for (final mailFolder in folders) {
+      final folder = mailFolder.serverId;
       final keyId = 'eas_sync_${_digest([host.toLowerCase(), account.toLowerCase(), deviceId, folder])}';
       final row = await (db.select(db.appKvStore)..where((t) => t.key.equals(keyId))).getSingleOrNull();
       var key = row?.value ?? '0';
@@ -141,6 +163,7 @@ class ExchangeReadService {
             if (exists != null) continue;
             final body = item.body ?? '';
             final message = JwEmailMessage(
+              folderId: folder, folderName: mailFolder.displayName,
               id: id.substring('email_'.length), subject: item.subject.isEmpty ? '(Sem assunto)' : item.subject,
               from: item.from, to: item.to, date: item.dateReceived ?? now,
               bodyText: '[Prévia experimental do Exchange: corpo pode estar incompleto; anexos não são importados. Consulte a mensagem original.]\n\n$body',
@@ -155,6 +178,12 @@ class ExchangeReadService {
               suggestedCategory: const drift.Value('email_jw'),
               capturedAt: message.date, metadata: drift.Value(jsonEncode(metadata)),
               createdAt: now, updatedAt: now));
+            // Do not advance the EAS key if durable cross-device queueing fails.
+            final inserted = await (db.select(db.inboxEntries)..where((t) => t.id.equals(id))).getSingle();
+            await db.into(db.syncQueue).insert(SyncQueueCompanion.insert(
+              id: const Uuid().v4(), entityType: 'inbox_entries', entityId: id,
+              operation: 'INSERT', payload: jsonEncode(SyncTimestamp.normalizeMapDates(inserted.toJson())),
+              createdAt: now));
             saved++;
           }
           await db.into(db.appKvStore).insertOnConflictUpdate(AppKvStoreCompanion.insert(
@@ -165,7 +194,10 @@ class ExchangeReadService {
         // response has no MoreAvailable flag.
         more = initial || result.moreAvailable;
       }
-      return ExchangeReadResult(saved, more);
+      totalSaved += saved;
+      anyMore = anyMore || more;
+      }
+      return ExchangeReadResult(totalSaved, anyMore, foldersRead: folders.length);
     } on ExchangeException {
       rethrow;
     } on eas.EasRemoteWipeException {

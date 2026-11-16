@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:isolate';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -18,6 +20,7 @@ class MBTilesNative implements MBTilesBackend {
   bool _initialized = false;
   Future<void>? _initializing;
   final Set<String> _xyzDatabases = {};
+  _TileReader? _reader;
 
   MBTilesNative({Directory? customDir}) : _customDir = customDir;
 
@@ -422,29 +425,25 @@ class MBTilesNative implements MBTilesBackend {
     if (z < 0 || z > 30) return null;
     final width = 1 << z;
     if (x < 0 || y < 0 || x >= width || y >= width) return null;
-    final tmsY = width - 1 - y;
-
-    for (final entry in _openDbs.entries) {
-      try {
-        final row = _xyzDatabases.contains(entry.key) ? y : tmsY;
-        final result = entry.value.select(
-          'SELECT tile_data FROM tiles WHERE zoom_level = ? AND tile_column = ? AND tile_row = ? LIMIT 1;',
-          [z, x, row],
-        );
-        if (result.isNotEmpty && result.first['tile_data'] != null) {
-          final data = result.first['tile_data'];
-          if (data is Uint8List) return data;
-          if (data is List<int>) return Uint8List.fromList(data);
-        }
-      } catch (e, st) {
-        AppLogger.debug('Falha ao consultar tile ($z/$x/$y) em MBTiles: $e', st);
-      }
+    if (_openDbs.isEmpty) return null;
+    // SQLite and file I/O run on a long-lived worker, not Flutter's UI isolate.
+    // Each lookup opens read-only and closes its handles, so package replacement
+    // and deletion do not leave a long-lived worker handle to an old file.
+    final reader = (_reader == null || _reader!.isClosed)
+        ? (_reader = _TileReader())! : _reader!;
+    try {
+      final paths = _openDbs.keys.map((path) => [path, _xyzDatabases.contains(path)]).toList();
+      return await reader.getTile(paths, z, x, y);
+    } catch (e, st) {
+      AppLogger.debug('Falha ao consultar tile offline ($z/$x/$y): $e', st);
+      return null;
     }
-    return null;
   }
 
   @override
   void dispose() {
+    _reader?.dispose();
+    _reader = null;
     for (final db in _openDbs.values) {
       try {
         db.close();
@@ -456,4 +455,104 @@ class MBTilesNative implements MBTilesBackend {
     _xyzDatabases.clear();
     _initialized = false;
   }
+}
+
+/// Serial SQLite lookups on a background isolate. Never shares SQLite handles
+/// across isolates and returns independent byte buffers.
+class _TileReader {
+  final ReceivePort _responses = ReceivePort();
+  final ReceivePort _errors = ReceivePort();
+  final ReceivePort _exits = ReceivePort();
+  final Completer<SendPort> _ready = Completer<SendPort>();
+  final Map<int, Completer<Uint8List?>> _pending = {};
+  Isolate? _isolate;
+  bool isClosed = false;
+  int _nextId = 0;
+
+  _TileReader() {
+    _responses.listen((message) {
+      if (message is SendPort) {
+        if (!_ready.isCompleted) _ready.complete(message);
+      } else if (message is List && message.length == 2 && message[0] is int) {
+        final completer = _pending.remove(message[0]);
+        if (completer != null && !completer.isCompleted) {
+          completer.complete(message[1] as Uint8List?);
+        }
+      }
+    });
+    _errors.listen((_) => dispose());
+    _exits.listen((_) => dispose());
+    Isolate.spawn(_tileReaderMain, _responses.sendPort,
+        onError: _errors.sendPort, onExit: _exits.sendPort).then((isolate) {
+      if (isClosed) {
+        isolate.kill(priority: Isolate.immediate);
+      } else {
+        _isolate = isolate;
+      }
+    }).catchError((Object _) => dispose());
+  }
+
+  Future<Uint8List?> getTile(List<List<Object>> paths, int z, int x, int y) async {
+    final port = await _ready.future.timeout(const Duration(seconds: 10));
+    if (isClosed) return null;
+    final id = _nextId++;
+    final result = Completer<Uint8List?>();
+    _pending[id] = result;
+    port.send([id, paths, z, x, y]);
+    try {
+      return await result.future.timeout(const Duration(seconds: 10));
+    } finally {
+      _pending.remove(id);
+    }
+  }
+
+  void dispose() {
+    if (isClosed) return;
+    isClosed = true;
+    if (!_ready.isCompleted) _ready.completeError(StateError('Leitor de mapas encerrado.'));
+    for (final c in _pending.values) {
+      if (!c.isCompleted) c.complete(null);
+    }
+    _pending.clear();
+    _isolate?.kill(priority: Isolate.immediate);
+    _responses.close();
+    _errors.close();
+    _exits.close();
+  }
+}
+
+void _tileReaderMain(SendPort reply) {
+  final requests = ReceivePort();
+  reply.send(requests.sendPort);
+  requests.listen((message) {
+    if (message is! List || message.length != 5) return;
+    final id = message[0] as int;
+    final paths = message[1] as List;
+    final z = message[2] as int;
+    final x = message[3] as int;
+    final y = message[4] as int;
+    Uint8List? tile;
+    for (final item in paths) {
+      sql.Database? db;
+      try {
+        final path = item[0] as String;
+        final xyz = item[1] as bool;
+        db = sql.sqlite3.open(path, mode: sql.OpenMode.readOnly);
+        final row = xyz ? y : (1 << z) - 1 - y;
+        final result = db.select(
+          'SELECT tile_data FROM tiles WHERE zoom_level = ? AND tile_column = ? AND tile_row = ? LIMIT 1;',
+          [z, x, row],
+        );
+        if (result.isNotEmpty && result.first['tile_data'] is List<int>) {
+          tile = Uint8List.fromList(result.first['tile_data'] as List<int>);
+          break;
+        }
+      } catch (_) {
+        // Try another installed package; the UI receives a missing-tile result.
+      } finally {
+        db?.close();
+      }
+    }
+    reply.send([id, tile]);
+  });
 }

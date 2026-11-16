@@ -25,6 +25,8 @@ import '../reports/web_downloader.dart';
 class JwEmailMessage {
   final String id;
   final int? remoteUid;
+  final String? folderId;
+  final String? folderName;
   final String subject;
   final String from;
   final String to;
@@ -44,6 +46,8 @@ class JwEmailMessage {
   JwEmailMessage({
     required this.id,
     this.remoteUid,
+    this.folderId,
+    this.folderName,
     required this.subject,
     required this.from,
     required this.to,
@@ -63,6 +67,8 @@ class JwEmailMessage {
   Map<String, dynamic> toJson() => {
         'id': id,
         'remoteUid': remoteUid,
+        'folderId': folderId,
+        'folderName': folderName,
         'subject': subject,
         'from': from,
         'to': to,
@@ -82,6 +88,8 @@ class JwEmailMessage {
   factory JwEmailMessage.fromJson(Map<String, dynamic> json) => JwEmailMessage(
         id: json['id'] as String? ?? const Uuid().v4(),
         remoteUid: json['remoteUid'] as int?,
+        folderId: json['folderId'] as String?,
+        folderName: json['folderName'] as String?,
         subject: json['subject'] as String? ?? '(Sem Assunto)',
         from: json['from'] as String? ?? 'jw@jw.org',
         to: json['to'] as String? ?? '',
@@ -107,6 +115,8 @@ class JwEmailMessage {
   JwEmailMessage copyWith({
     String? id,
     int? remoteUid,
+    String? folderId,
+    String? folderName,
     String? subject,
     String? from,
     String? to,
@@ -125,6 +135,8 @@ class JwEmailMessage {
     return JwEmailMessage(
       id: id ?? this.id,
       remoteUid: remoteUid ?? this.remoteUid,
+      folderId: folderId ?? this.folderId,
+      folderName: folderName ?? this.folderName,
       subject: subject ?? this.subject,
       from: from ?? this.from,
       to: to ?? this.to,

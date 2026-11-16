@@ -8,10 +8,8 @@ usuário nem em iPhone/LiveContainer.
 - Configuração separada de IMAP/SMTP; HTTPS e Basic (usuário/senha) somente.
   O usuário deve inserir o servidor oficial confiável. O cliente não segue
   redirecionamentos HTTP com credenciais; OAuth e descoberta não estão ativos.
-- Apenas FolderSync e Sync da INBOX, com dados de até 256 KiB de corpo por
-  mensagem; anexos/MIME completos não são recuperados. Os itens são marcados
-  como prévias parciais. O cliente oficial permanece a fonte de verdade.
-- Páginas de prévias e SyncKey são persistidos juntos; falhas mantêm os lotes
+- FolderSync e Sync de pastas classificadas como correio pelo servidor, com até 256 KiB de corpo por mensagem. Os itens são prévias: anexos/MIME completos não são recuperados. O cliente oficial permanece a fonte de verdade; pastas de tipo desconhecido não são importadas.
+- Páginas de prévias, operações da fila de sincronização e SyncKey são persistidos juntos; a fila precisa ser processada com login e a chegada em outro dispositivo ainda requer validação; falhas mantêm os lotes
   anteriores e a chave da página anterior. A invalidação da chave inicia uma
   nova leitura sem remover prévias. Alterações parciais criam novas prévias;
   exclusões do servidor não são propagadas. Não há comandos de escrita ou de
@@ -20,7 +18,7 @@ usuário nem em iPhone/LiveContainer.
   no Keychain/Keystore, não no banco ou em logs. Somente a configuração de
   servidor/usuário e as prévias entram no armazenamento local e no backup.
 - Provisionamento, políticas corporativas, remote wipe, OAuth, envio, leitura
-  de anexos, pastas adicionais, atualização fiel de mensagens e contatos e
+  de anexos, atualização fiel de mensagens e contatos e
   calendário **não estão implementados**. Se o servidor exigir política, o
   app falha sem declarar conformidade nem executar wipe. Consulte o
   administrador; não tente contornar as políticas.
@@ -29,3 +27,9 @@ usuário nem em iPhone/LiveContainer.
   e bloqueios, paginação, resets/erros, respostas parciais, anexos, privacidade,
   retentativas e recuperação. Validar MIME, envio e políticas antes de prometer
   sincronização integral. Não substituir a caixa original nem apagar dados.
+
+Prévias importadas antes da inclusão na fila não são automaticamente reenfileiradas.
+O conteúdo enfileirado pode ser enviado ao projeto Supabase autenticado; isso
+não constitui criptografia ponta a ponta nem prova de entrega ao outro aparelho.
+Esta versão não implementa download de anexos, MIME integral nem um arquivo
+permanente completo e não deve ser usada como único backup da conta.

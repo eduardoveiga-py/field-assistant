@@ -73,4 +73,26 @@ void main() {
     backend.dispose();
     dir.deleteSync(recursive: true);
   });
+  test('consultas paralelas do mapa sobrevivem à troca e não reutilizam o banco antigo', () async {
+    final dir = Directory.systemTemp.createTempSync('map_worker_');
+    final path = '${dir.path}/test.mbtiles';
+    void writePackage(String hex) {
+      final db = sql.sqlite3.open(path);
+      db.execute('CREATE TABLE tiles (zoom_level INTEGER, tile_column INTEGER, tile_row INTEGER, tile_data BLOB)');
+      db.execute("INSERT INTO tiles VALUES (2, 1, 3, X'$hex')");
+      db.close();
+    }
+    writePackage('89504E470D0A1A0A');
+    final backend = MBTilesNative(customDir: dir);
+    await backend.init();
+    final reads = await Future.wait(List.generate(30, (_) => backend.getTile(2, 1, 0)));
+    expect(reads.every((bytes) => bytes != null && bytes.length == 8), isTrue);
+    await backend.deleteRegion('test');
+    writePackage('89504E470D0A1A0A01');
+    await backend.reload();
+    expect((await backend.getTile(2, 1, 0))!.length, 9);
+    backend.dispose();
+    dir.deleteSync(recursive: true);
+  });
+
 }
