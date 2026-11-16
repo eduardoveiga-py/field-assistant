@@ -91,6 +91,10 @@ class ExchangeProtocolSession implements ExchangeSession {
     bodyType: 1, bodyTruncationSize: 262144,
   ).execute(_client);
 
+  /// Leitura experimental por intervalo; não instala nem salva anexos no app.
+  Future<eas.ItemOperationsResult> readAttachmentRange(String reference, int start, int end) =>
+      eas.FetchAttachmentCommand(fileReference: reference, rangeStart: start, rangeEnd: end).execute(_client);
+
   @override
   void close() => _client.dispose();
 }

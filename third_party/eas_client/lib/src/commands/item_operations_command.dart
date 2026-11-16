@@ -469,7 +469,9 @@ class ItemOperationsResult {
     try {
       return base64.decode(text.replaceAll(RegExp(r'\s'), ''));
     } on FormatException {
-      return Uint8List.fromList(utf8.encode(text));
+      // ItemOperations inline binary data is base64. Treat invalid data as an
+      // error instead of silently returning the encoded text as file bytes.
+      throw const FormatException('Invalid base64 ItemOperations data');
     }
   }
 }

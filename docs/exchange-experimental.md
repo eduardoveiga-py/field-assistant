@@ -42,3 +42,11 @@ parcial não inclui anexos. Isso não baixa nem garante a disponibilidade dos
 arquivos; referências antigas podem deixar de funcionar. Prévias já baixadas
 sem referências não são preenchidas automaticamente. Nenhum anexo é incluído
 no backup completo enquanto seu conteúdo não for efetivamente baixado.
+
+Há agora um leitor experimental de anexos por intervalos, com validação de
+identidade, total, posição e bytes e testes simulados. Ele ainda não está ligado
+à sincronização, ao armazenamento ou à interface e não foi testado com o
+servidor real. Quem o integrar deve usar arquivo temporário e só publicar após
+todos os intervalos serem concluídos; versões parciais não são backups.
+O protocolo não confirma que um anexo de mesmo tamanho não foi alterado entre
+intervalos; isso ainda precisa ser resolvido antes do uso como cópia confiável.
