@@ -29,3 +29,5 @@ jobs:
           print(f'::error title=Focused map test output::{text}')
           PY
           exit "$status"
+
+# repeat focused check

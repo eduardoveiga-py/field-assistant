@@ -64,6 +64,12 @@ void main() {
     TileCacheService.instance.backend = EmptyTiles();
     final db = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(milliseconds: 100));
+      MBTilesService.setMockInstance(original);
+      mock.dispose();
+    });
     final now = DateTime.now();
     await db.into(db.people).insert(PeopleCompanion.insert(
       id: 'sp', name: 'Amostra', firstContactAt: now, createdAt: now,
@@ -76,9 +82,12 @@ void main() {
     final cityX = ((GeolocationHelper.defaultLng + 180) / 360 * (1 << 15)).floor();
     expect(tiles().any((t) => t.z == 15 && t.x == cityX), isTrue);
     final originalMin = tiles().map((t) => t.x).reduce((a, b) => a < b ? a : b);
+    final viewer = find.byType(InteractiveViewer).first;
+    debugPrint('MAP VIEWER ${tester.getRect(viewer)} TRANSFORM ${tester.widget<InteractiveViewer>(viewer).transformationController!.value}');
     for (var i = 0; i < 4; i++) {
-      await tester.drag(find.byType(InteractiveViewer).first, const Offset(-220, 0));
+      await tester.drag(viewer, const Offset(-220, 0));
       await tester.pumpAndSettle();
+      debugPrint('MAP DRAG $i TRANSFORM ${tester.widget<InteractiveViewer>(viewer).transformationController!.value} X ${tiles().map((t) => t.x).toSet()}');
     }
     final movedMin = tiles().map((t) => t.x).reduce((a, b) => a < b ? a : b);
     expect(movedMin, greaterThan(originalMin));
@@ -86,9 +95,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(tiles().any((t) => t.z == 15 && t.x == cityX), isTrue);
     expect(tester.takeException(), isNull);
-    await tester.pumpWidget(const SizedBox.shrink());
-    MBTilesService.setMockInstance(original);
-    mock.dispose();
   });
 
   testWidgets('título Hoje é legível em tela estreita', (tester) async {

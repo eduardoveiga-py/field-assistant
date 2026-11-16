@@ -2061,7 +2061,10 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Row(
+                        Flexible(
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
                           children: [
                             OutlinedButton.icon(
                               style: OutlinedButton.styleFrom(
@@ -2100,6 +2103,8 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                                     _openMultiContactRoute(filtered),
                               ),
                           ],
+                            ),
+                          ),
                         ),
                       ],
                     ),

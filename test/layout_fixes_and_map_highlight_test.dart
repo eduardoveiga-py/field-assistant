@@ -304,8 +304,8 @@ void main() {
       });
       final now = DateTime.now();
       await db.into(db.people).insert(PeopleCompanion.insert(
-        id: 'zoom-test', name: 'Contatozoom', latitude: const Value(-23.55),
-        longitude: const Value(-46.63), firstContactAt: now, createdAt: now, updatedAt: now,
+        id: 'zoom-test', name: 'Contatozoom', latitude: const Value(-3.1022),
+        longitude: const Value(-67.9397), firstContactAt: now, createdAt: now, updatedAt: now,
       ));
       await tester.pumpWidget(ProviderScope(
         overrides: [databaseProvider.overrideWithValue(db)],
