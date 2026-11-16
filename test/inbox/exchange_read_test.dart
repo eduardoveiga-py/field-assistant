@@ -7,6 +7,9 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:ministerio_pessoal/database/app_database.dart';
 import 'package:ministerio_pessoal/inbox/exchange_service.dart';
+import 'package:ministerio_pessoal/database/repository.dart';
+import 'package:ministerio_pessoal/sync/supabase_sync_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class FakeExchange implements ExchangeSession {
   FakeExchange(this.pages, {this.failureAt});
@@ -138,6 +141,43 @@ void main() {
     final retry = FakeExchange([page('k2', emails: [const eas.EasEmail(serverId: 'x', body: 'x')])]);
     expect((await sync(retry)).saved, 1);
     expect(retry.keys, ['k1']);
+  });
+
+  test('prévia enfileirada atravessa push e pull simulados para outro dispositivo', () async {
+    const mail = eas.EasEmail(serverId: 'm1', subject: 'Teste', from: 'from@example.org', body: 'Texto');
+    await sync(FakeExchange([page('k1'), page('k2', emails: [mail])]));
+    Map<String, dynamic>? stored;
+    final httpClient = MockClient((request) async {
+      Object body = <dynamic>[];
+      if (request.method == 'POST' && request.url.path.endsWith('/rpc/sync_upsert_if_unchanged')) {
+        final payload = jsonDecode(request.body) as Map<String, dynamic>;
+        expect(payload['p_table'], 'inbox_entries');
+        stored = Map<String, dynamic>.from(payload['p_payload'] as Map);
+        body = {'success': true};
+      } else if (request.method == 'GET' && request.url.path.endsWith('/inbox_entries') && stored != null) {
+        body = [stored!];
+      }
+      return http.Response(jsonEncode(body), 200, request: request,
+          headers: {'content-type': 'application/json', 'content-range': '*/0'});
+    });
+    final client = SupabaseClient('https://mock.supabase.co', 'dummy-key', httpClient: httpClient);
+    final sender = SupabaseSyncService(db: db, repository: AppRepository(db), clientOverride: client);
+    addTearDown(sender.dispose);
+    final pushed = await sender.processQueue();
+    expect(pushed.success, isTrue, reason: pushed.errors.toString());
+    expect((await db.select(db.syncQueue).get()).single.status, 'synced');
+    expect(stored, isNotNull);
+    final other = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(other.close);
+    final receiver = SupabaseSyncService(db: other, repository: AppRepository(other), clientOverride: client);
+    addTearDown(receiver.dispose);
+    final pulled = await receiver.fetchRemoteChanges();
+    expect(pulled.success, isTrue, reason: pulled.errors.toString());
+    final copied = (await other.select(other.inboxEntries).get()).single;
+    final email = (jsonDecode(copied.metadata) as Map)['email'] as Map;
+    expect(email['subject'], 'Teste');
+    expect(email['bodyText'], contains('Texto'));
+    expect(email['isPermanentRetained'], isFalse);
   });
 
   test('FolderSync usa HTTPS, sem redirecionamento e decodifica INBOX', () async {

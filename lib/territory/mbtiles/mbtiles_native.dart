@@ -430,7 +430,7 @@ class MBTilesNative implements MBTilesBackend {
     // Each lookup opens read-only and closes its handles, so package replacement
     // and deletion do not leave a long-lived worker handle to an old file.
     final reader = (_reader == null || _reader!.isClosed)
-        ? (_reader = _TileReader())! : _reader!;
+        ? (_reader = _TileReader()) : _reader!;
     try {
       final paths = _openDbs.keys.map((path) => [path, _xyzDatabases.contains(path)]).toList();
       return await reader.getTile(paths, z, x, y);
