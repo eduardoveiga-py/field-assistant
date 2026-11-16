@@ -74,6 +74,8 @@ class RecoveryCrypto {
   }) async {
     if (envelope.length != 5 || envelope['v'] != 1 || envelope['algorithm'] != 'A256GCM' ||
         envelope['nonce'] is! String || envelope['ciphertext'] is! String || envelope['tag'] is! String ||
+        (envelope['nonce'] as String).length != 16 ||
+        (envelope['tag'] as String).length != 24 ||
         (envelope['ciphertext'] as String).length > 1398104) {
       throw const FormatException('Envelope criptografado inválido ou não suportado.');
     }

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:bip39_mnemonic/bip39_mnemonic.dart';
+import 'package:cryptography/cryptography.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ministerio_pessoal/sync/crypto/recovery_crypto.dart';
 
@@ -31,11 +32,11 @@ void main() {
     expect(box['nonce'], isNot(second['nonce']));
     expect(jsonEncode(box), isNot(contains('Nota pessoal')));
     expect(await RecoveryCrypto.open(key: key, owner: 'conta', kind: 'nota', id: 'id', envelope: box), plain);
-    await expectLater(RecoveryCrypto.open(key: otherKey, owner: 'conta', kind: 'nota', id: 'id', envelope: box), throwsA(isA<Object>()));
-    await expectLater(RecoveryCrypto.open(key: key, owner: 'conta', kind: 'nota', id: 'outro', envelope: box), throwsA(isA<Object>()));
+    await expectLater(RecoveryCrypto.open(key: otherKey, owner: 'conta', kind: 'nota', id: 'id', envelope: box), throwsA(isA<SecretBoxAuthenticationError>()));
+    await expectLater(RecoveryCrypto.open(key: key, owner: 'conta', kind: 'nota', id: 'outro', envelope: box), throwsA(isA<SecretBoxAuthenticationError>()));
     final ciphertext = base64Decode(box['ciphertext']! as String)..[0] ^= 1;
     final altered = {...box, 'ciphertext': base64Encode(ciphertext)};
-    await expectLater(RecoveryCrypto.open(key: key, owner: 'conta', kind: 'nota', id: 'id', envelope: altered), throwsA(isA<Object>()));
+    await expectLater(RecoveryCrypto.open(key: key, owner: 'conta', kind: 'nota', id: 'id', envelope: altered), throwsA(isA<SecretBoxAuthenticationError>()));
     await expectLater(RecoveryCrypto.open(key: key, owner: 'conta', kind: 'nota', id: 'id', envelope: {...box, 'v': 0}), throwsFormatException);
   });
 }

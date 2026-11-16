@@ -50,3 +50,12 @@ rotação de chaves/nonces, recuperação e associação segura entre aparelhos,
 protocolo de mídia, migração, anti-replay e prevenção de downgrade. Os testes
 unitários não substituem uma revisão de segurança nem validam interoperabilidade
 com dados reais.
+
+A base experimental inclui também blocos de mídia com manifesto cifrado e
+integridade vinculada à conta, ao arquivo, à posição e aos envelopes dos
+blocos. O receptor precisa gravar em arquivo temporário e publicar apenas
+após validar o manifesto e todos os blocos: o stream pode falhar depois de
+emitir dados. Blocos enviados antes de uma falha precisam de coleta segura de
+órfãos. Um manifesto inteiro antigo ainda pode ser reapresentado pelo servidor;
+anti-replay exige protocolo de versões e estado confiável. Isso ainda não é a
+sincronização de mídia e não libera o bloqueio de upload legado.
