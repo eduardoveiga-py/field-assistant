@@ -2144,7 +2144,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         }
       });
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Conexão e INBOX Exchange verificadas. A leitura ainda é experimental.'), backgroundColor: Colors.green));
+        content: Text('Conexão Exchange verificada e salva. As mensagens ainda não foram baixadas: abra Inbox & JW Mail e toque em Sincronizar. Leitura experimental.'), backgroundColor: Colors.green, duration: Duration(seconds: 10)));
     } catch (e) {
       String message = 'Não foi possível verificar o Exchange. Confira servidor, autenticação e rede.';
       if (e is ExchangeException) message = e.message;

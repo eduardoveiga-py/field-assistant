@@ -78,8 +78,8 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
     final focalLng = _pixelX2lon(worldPx, _zoom);
     final focalLat = _pixelY2lat(worldPy, _zoom);
 
-    final newCenterTileX = _lon2tileX(_viewCenterLng, targetZoom);
-    final newCenterTileY = _lat2tileY(_viewCenterLat, targetZoom);
+    final newCenterTileX = _lon2tileX(focalLng, targetZoom);
+    final newCenterTileY = _lat2tileY(focalLat, targetZoom);
     final newMinTileX = newCenterTileX - _gridHalfSize;
     final newMinTileY = newCenterTileY - _gridHalfSize;
     final newOriginPx = newMinTileX * _tileSize;
@@ -104,6 +104,8 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
 
     setState(() {
       _zoom = targetZoom;
+      _viewCenterLat = focalLat;
+      _viewCenterLng = focalLng;
     });
 
     _transformationController.value = Matrix4.translationValues(
@@ -389,6 +391,7 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
                             trackpadScrollCausesScale: false,
                             minScale: 0.65,
                             maxScale: 1.8,
+                            interactionEndFrictionCoefficient: 100.0,
                             onInteractionStart: (details) {
                               _basePinchScale = 1.0;
                             },
@@ -418,13 +421,23 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
                             onInteractionEnd: (details) {
                               _basePinchScale = 1.0;
                               final m = _transformationController.value;
-                              final currentScale = m.getMaxScaleOnAxis();
-                              if ((currentScale - 1.0).abs() > 0.05) {
-                                final dx = m.storage[12];
-                                final dy = m.storage[13];
-                                _transformationController.value =
-                                    Matrix4.translationValues(dx, dy, 0.0);
-                              }
+                              final scale = m.getMaxScaleOnAxis();
+                              final dx = m.storage[12];
+                              final dy = m.storage[13];
+                              final px = originPx + (constraints.maxWidth / 2 - dx) / scale;
+                              final py = originPy + (constraints.maxHeight / 2 - dy) / scale;
+                              final lng = _pixelX2lon(px, _zoom).clamp(-179.999999, 179.999999);
+                              final lat = _pixelY2lat(py, _zoom).clamp(-85.0511, 85.0511);
+                              final newOriginX = (_lon2tileX(lng, _zoom) - _gridHalfSize) * _tileSize;
+                              final newOriginY = (_lat2tileY(lat, _zoom) - _gridHalfSize) * _tileSize;
+                              setState(() {
+                                _viewCenterLat = lat;
+                                _viewCenterLng = lng;
+                              });
+                              _transformationController.value = Matrix4.identity()
+                                ..translateByDouble(dx + (newOriginX - originPx) * scale,
+                                    dy + (newOriginY - originPy) * scale, 0, 1)
+                                ..scaleByDouble(scale, scale, 1, 1);
                             },
                             child: GestureDetector(
                               onDoubleTap: () {

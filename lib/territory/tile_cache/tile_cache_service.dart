@@ -174,6 +174,8 @@ class CachedTileWidget extends StatefulWidget {
 
 class _CachedTileWidgetState extends State<CachedTileWidget> {
   Uint8List? _tileBytes;
+  int _parentLevels = 0;
+  bool _loading = true;
   int _requestId = 0;
   late final MBTilesService _mapService;
 
@@ -188,14 +190,20 @@ class _CachedTileWidgetState extends State<CachedTileWidget> {
     // Um tile pai inteiro não representa o quadrante do tile atual. É melhor
     // mostrar ausência do mapa do que desenhar ruas fora da posição dos pinos.
     _tileBytes = TileCacheService.getFromMemory(widget.z, widget.x, widget.y, _effectiveStyle);
-    if (TileCacheService.getFromMemory(widget.z, widget.x, widget.y, _effectiveStyle) == null) {
+    if (_tileBytes == null) {
       _loadTile();
+    } else {
+      _loading = false;
     }
   }
 
   void _onPackagesChanged() {
     if (_effectiveStyle != MapLayerStyle.standard) return;
-    setState(() => _tileBytes = null);
+    setState(() {
+      _tileBytes = null;
+      _parentLevels = 0;
+      _loading = true;
+    });
     _loadTile();
   }
 
@@ -216,10 +224,13 @@ class _CachedTileWidgetState extends State<CachedTileWidget> {
         oldStyle != newStyle) {
       ++_requestId; // invalida qualquer resposta anterior mesmo se houver cache exato
       final exact = TileCacheService.getFromMemory(widget.z, widget.x, widget.y, newStyle);
+      _parentLevels = 0;
       if (exact != null) {
         _tileBytes = exact;
+        _loading = false;
       } else {
         _tileBytes = null;
+        _loading = true;
         _loadTile();
       }
     }
@@ -229,6 +240,27 @@ class _CachedTileWidgetState extends State<CachedTileWidget> {
     final requestId = ++_requestId;
     final style = _effectiveStyle;
     Uint8List? bytes;
+    // Zooms acima da resolução nativa do pacote usam um recorte do ancestral,
+    // nunca a imagem inteira: ruas e pinos continuam na posição correta.
+    if (style == MapLayerStyle.standard && widget.z > 16) {
+      for (var levels = 1; levels <= 3 && widget.z - levels >= 0; levels++) {
+        try {
+          final parent = await _mapService.getTile(widget.z - levels,
+              widget.x >> levels, widget.y >> levels);
+          if (!mounted || requestId != _requestId) return;
+          if (parent != null && parent.isNotEmpty) {
+            setState(() {
+              _tileBytes = parent;
+              _parentLevels = levels;
+            });
+            break;
+          }
+        } catch (e, st) {
+          AppLogger.debug('Falha ao consultar tile ancestral offline.', e, st);
+          break;
+        }
+      }
+    }
     try {
       bytes = await TileCacheService.instance.getTileBytes(
         widget.z, widget.x, widget.y, style,
@@ -238,7 +270,11 @@ class _CachedTileWidgetState extends State<CachedTileWidget> {
     }
     if (mounted && requestId == _requestId) {
       setState(() {
-        _tileBytes = bytes;
+        _loading = false;
+        if (bytes != null && bytes.isNotEmpty) {
+          _tileBytes = bytes;
+          _parentLevels = 0;
+        }
       });
     }
   }
@@ -246,6 +282,26 @@ class _CachedTileWidgetState extends State<CachedTileWidget> {
   @override
   Widget build(BuildContext context) {
     if (_tileBytes != null && _tileBytes!.isNotEmpty) {
+      if (_parentLevels > 0) {
+        final factor = 1 << _parentLevels;
+        final offsetX = widget.x % factor;
+        final offsetY = widget.y % factor;
+        return ClipRect(
+          child: SizedBox(
+            width: widget.size, height: widget.size,
+            child: OverflowBox(
+              alignment: Alignment.topLeft,
+              minWidth: widget.size * factor, maxWidth: widget.size * factor,
+              minHeight: widget.size * factor, maxHeight: widget.size * factor,
+              child: Transform.translate(
+                offset: Offset(-offsetX * widget.size, -offsetY * widget.size),
+                child: Image.memory(_tileBytes!, width: widget.size * factor,
+                    height: widget.size * factor, fit: BoxFit.fill),
+              ),
+            ),
+          ),
+        );
+      }
       return Image.memory(
         _tileBytes!,
         width: widget.size,
@@ -280,7 +336,7 @@ class _CachedTileWidgetState extends State<CachedTileWidget> {
             ),
             const SizedBox(height: 2),
             Text(
-              'Mapa indisponível',
+              _loading ? 'Carregando mapa…' : 'Sem mapa nesta área ou zoom',
               style: TextStyle(
                 fontSize: 9,
                 fontWeight: FontWeight.w500,

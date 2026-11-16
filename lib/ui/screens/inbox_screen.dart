@@ -1499,7 +1499,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                         ),
                         const SizedBox(height: 8),
                         const Text(
-                          'Conecte sua conta IMAP em Configurações para importar mensagens da caixa de entrada. O MIME original é salvo localmente, mas anexos ainda não podem ser abertos individualmente. Mantenha um backup de e-mail.',
+                          'Configure Exchange ActiveSync ou IMAP em Ajustes e toque em Sincronizar Agora. Exchange salva apenas prévias experimentais, sem anexos; mantenha o correio oficial e seu backup.',
                           textAlign: TextAlign.center,
                           style: TextStyle(fontSize: 13, color: Colors.grey, height: 1.4),
                         ),

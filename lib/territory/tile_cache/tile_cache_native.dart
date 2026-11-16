@@ -31,14 +31,21 @@ class TileCacheNative implements TileCacheBackend {
     _downloadQueue.clear();
   }
 
-  static Future<void> _acquireDownloadSlot() async {
+  static Future<bool> _acquireDownloadSlot() async {
     if (_activeDownloads < 2) {
       _activeDownloads++;
-      return;
+      return true;
     }
     final c = Completer<void>();
     _downloadQueue.add(c);
-    await c.future;
+    try {
+      await c.future.timeout(const Duration(seconds: 3));
+      return true;
+    } on TimeoutException {
+      // A consulta que esperou demais não deve ocupar uma conexão depois.
+      _downloadQueue.remove(c);
+      return false;
+    }
   }
 
   static void _releaseDownloadSlot() {
@@ -137,7 +144,7 @@ class TileCacheNative implements TileCacheBackend {
         return null;
       }
 
-      await _acquireDownloadSlot();
+      if (!await _acquireDownloadSlot()) return null;
       final client = httpClient ?? http.Client();
       final shouldCloseClient = httpClient == null;
       try {
@@ -152,7 +159,7 @@ class TileCacheNative implements TileCacheBackend {
                   'Accept': 'image/png,image/*',
                 },
               )
-              .timeout(const Duration(seconds: 5));
+              .timeout(const Duration(seconds: 3));
 
           final etag = res.headers['etag']?.toLowerCase() ?? '';
           final isWatermarked = etag.contains('wm-') ||
@@ -186,7 +193,7 @@ class TileCacheNative implements TileCacheBackend {
                     'Accept': 'image/png,image/*',
                   },
                 )
-                .timeout(const Duration(seconds: 6));
+                .timeout(const Duration(seconds: 3));
 
             final fallbackEtag = resFallback.headers['etag']?.toLowerCase() ?? '';
             final isFallbackWatermarked = fallbackEtag.contains('wm-') ||
