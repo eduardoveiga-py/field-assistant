@@ -90,3 +90,30 @@ verificar o marcador e comparar o ID com um valor fornecido por fonte confiável
 além de confirmar a frase e preservar a chave local existente. A origem confiável
 para esse ID e a aquisição do marcador ainda não foram implementadas; passar um
 ID vindo apenas do mesmo servidor não protege contra substituição.
+
+## Transporte experimental de registros cifrados
+
+A migração local `20261116190000_experimental_encrypted_records.sql` cria uma
+área separada com leitura por proprietário, sem permissão de escrita direta,
+e um RPC atômico que compara e incrementa a revisão. Não foi aplicada ao projeto
+remoto. O adaptador `EncryptedRecordSync` cifra antes do transporte, valida o
+contexto ao abrir e devolve conflitos sem substituição automática. Um checkpoint
+mínimo fornecido pelo chamador detecta ausência ou revisão anterior conhecida.
+
+Essa infraestrutura **não ativa a sincronização**: ainda faltam a criação e
+validação confiável do cofre, persistência transacional de checkpoints com dados
+locais, integração da fila e de todas as entidades, mídia, migração conservadora,
+tratamento completo de conflitos e testes reais entre aparelhos. Checkpoints não
+protegem um aparelho novo sem estado confiável contra replay ou omissões. O
+servidor pode recusar serviço e vê conta, rota repetida, revisão e tamanho. O
+RPC valida formato e concorrência, mas não tem como provar que o cliente cifrou
+o conteúdo. Não executar `supabase db push` sobre o projeto existente: os
+históricos local e remoto divergem; planejar e validar a implantação separadamente.
+
+Para executar os testes SQL isolados, com Node.js instalado:
+
+```sh
+npm install --no-save --no-package-lock @electric-sql/pglite@0.5.16
+node test/sql/sync_compare_and_swap_test.mjs
+node test/sql/experimental_encrypted_records_test.mjs
+```

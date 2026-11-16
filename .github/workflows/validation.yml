@@ -6,6 +6,17 @@ on:
 permissions:
   contents: read
 jobs:
+  sql_safety:
+    name: SQL isolation and compare-and-swap
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-save --no-package-lock @electric-sql/pglite@0.5.16
+      - run: node test/sql/sync_compare_and_swap_test.mjs
+      - run: node test/sql/experimental_encrypted_records_test.mjs
   diagnostics:
     name: Dart diagnostics (independent)
     runs-on: ubuntu-latest
