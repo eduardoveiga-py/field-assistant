@@ -8,6 +8,7 @@ usuário nem em iPhone/LiveContainer.
 - Configuração separada de IMAP/SMTP; HTTPS e Basic (usuário/senha) somente.
   O usuário deve inserir o servidor oficial confiável. O cliente não segue
   redirecionamentos HTTP com credenciais; OAuth e descoberta não estão ativos.
+- Sem filtro de idade no Sync (o protocolo pede todos os itens disponíveis, mas isso não garante que o servidor os entregue).
 - FolderSync e Sync de pastas classificadas como correio pelo servidor, com até 256 KiB de corpo por mensagem. Os itens são prévias: anexos/MIME completos não são recuperados. O cliente oficial permanece a fonte de verdade; pastas de tipo desconhecido não são importadas.
 - Páginas de prévias, operações da fila de sincronização e SyncKey são persistidos juntos; a fila de envio ao Supabase está pausada até a proteção ponta a ponta ficar pronta; a chegada em outro dispositivo ainda requer implementação e validação; falhas mantêm os lotes
   anteriores e a chave da página anterior. A invalidação da chave inicia uma

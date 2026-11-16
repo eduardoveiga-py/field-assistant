@@ -218,4 +218,36 @@ void main() {
     expect(() => ExchangeProtocolSession(host: 'https://mail.example.org', username: 'u', password: 'p', deviceId: 'd'),
       throwsA(isA<ExchangeException>()));
   });
+  test('Sync de leitura pede todas as idades sem comandos de escrita', () async {
+    eas.WbxmlElement node(String tag, {String? text, List<eas.WbxmlElement>? children}) =>
+        eas.WbxmlElement(namespace: 'AirSync', tag: tag, text: text, children: children);
+    final response = eas.WbxmlEncoder().encode(eas.WbxmlDocument(root: node('Sync', children: [
+      node('Collections', children: [node('Collection', children: [
+        node('SyncKey', text: '124'), node('CollectionId', text: 'inbox'), node('Status', text: '1'),
+      ])]),
+    ])));
+    final client = MockClient((request) async {
+      expect(request.url.queryParameters['Cmd'], 'Sync');
+      final root = eas.WbxmlDecoder().decode(request.bodyBytes).root;
+      Iterable<eas.WbxmlElement> descendants(eas.WbxmlElement node) sync* {
+        yield node;
+        for (final child in node.children) { yield* descendants(child); }
+      }
+      final nodes = descendants(root).toList();
+      expect(nodes.where((n) => n.namespace == 'AirSync' && n.tag == 'FilterType'), isEmpty,
+          reason: 'sem filtro de tempo, o protocolo solicita todos os itens disponíveis');
+      expect(nodes.where((n) => n.namespace == 'AirSync' && n.tag == 'Commands'), isEmpty);
+      expect(nodes.singleWhere((n) => n.tag == 'CollectionId').text, 'inbox');
+      expect(nodes.singleWhere((n) => n.tag == 'TruncationSize').text, '262144',
+          reason: 'o corpo continua sendo apenas prévia, não MIME completo');
+      return http.Response.bytes(response, 200);
+    });
+    final session = ExchangeProtocolSession(host: 'mail.example.org', username: 'user',
+      password: 'secret', deviceId: 'device1', httpClient: client);
+    final result = await session.readPage('inbox', '123');
+    expect(result.syncKey, '124');
+    expect(result.status, 1);
+    session.close();
+  });
+
 }
