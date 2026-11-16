@@ -84,6 +84,7 @@ void main() {
     final originalMin = tiles().map((t) => t.x).reduce((a, b) => a < b ? a : b);
     final viewer = find.byType(InteractiveViewer).first;
     debugPrint('MAP VIEWER ${tester.getRect(viewer)} TRANSFORM ${tester.widget<InteractiveViewer>(viewer).transformationController!.value}');
+    debugPrint('HIT ${tester.hitTestOnBinding(tester.getCenter(viewer)).path.map((e) => e.target.runtimeType).toList()}');
     for (var i = 0; i < 4; i++) {
       await tester.drag(viewer, const Offset(-220, 0));
       await tester.pumpAndSettle();
@@ -104,9 +105,14 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     final db = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(milliseconds: 100));
+    });
     await tester.pumpWidget(ProviderScope(overrides: [databaseProvider.overrideWithValue(db)],
       child: const MaterialApp(home: TodayScreen())));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 500));
     expect(find.descendant(of: find.byType(AppBar), matching: find.text('Hoje')), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
