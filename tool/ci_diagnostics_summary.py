@@ -21,8 +21,16 @@ else:
     # Actual assertions normally precede the [E] marker. Separate annotations
     # preserve context despite GitHub's per-message length limit.
     for i in failures[:8]:
-        context = lines[max(0, i-24):min(len(lines), i+4)]
-        text = '\n'.join(context)[-3400:]
+        # Stack traces can exceed the annotation limit. Keep the exception
+        # heading and assertion itself, not only the tail of the stack.
+        start = max(0, i - 300)
+        headings = [j for j in range(start, i) if 'EXCEPTION CAUGHT' in lines[j]]
+        if headings:
+            start = headings[-1]
+        else:
+            start = max(0, i - 24)
+        context = lines[start:min(len(lines), start + 24, i + 4)]
+        text = '\n'.join(context)[:3400]
         text = text.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
         print(f'::error title=Failure detail::{text}')
 text = '\n'.join(selected)[:3500]
