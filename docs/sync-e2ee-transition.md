@@ -116,4 +116,14 @@ Para executar os testes SQL isolados, com Node.js instalado:
 npm install --no-save --no-package-lock @electric-sql/pglite@0.5.16
 node test/sql/sync_compare_and_swap_test.mjs
 node test/sql/experimental_encrypted_records_test.mjs
+node test/sql/experimental_recovery_vault_test.mjs
 ```
+
+A migração local `20261116190100_experimental_recovery_vault.sql` e o adaptador
+`RecoveryVaultSetup` oferecem criação exclusiva de um marcador por conta, sem
+substituição. Antes de criar, o chamador deve confirmar a frase e decidir
+explicitamente o procedimento de migração; uma falha de rede pode acontecer
+depois da gravação, portanto a frase e o ID propostos devem ser preservados.
+Uma restauração ainda exige o ID obtido por uma fonte confiável independente
+do servidor. As migrações não foram aplicadas no projeto remoto, e nenhuma
+interface ou sincronização de produção usa esses adaptadores.
