@@ -59,3 +59,11 @@ emitir dados. Blocos enviados antes de uma falha precisam de coleta segura de
 órfãos. Um manifesto inteiro antigo ainda pode ser reapresentado pelo servidor;
 anti-replay exige protocolo de versões e estado confiável. Isso ainda não é a
 sincronização de mídia e não libera o bloqueio de upload legado.
+
+Existe também um armazenamento local experimental da chave derivada usando o
+serviço de credenciais do sistema, com confirmação da frase e recusa de
+substituição de uma chave existente. Ainda não está ligado à interface; antes de
+usá-lo em outro dispositivo é necessário verificar que a chave corresponde ao
+cofre remoto. O armazenamento para Web está explicitamente desativado até ser
+avaliado. Essa etapa não criptografa o banco local nem oferece recuperação caso
+a frase e todos os aparelhos com a chave sejam perdidos.
