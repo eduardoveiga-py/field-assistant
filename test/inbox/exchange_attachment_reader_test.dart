@@ -107,4 +107,16 @@ void main() {
     expect(result.data, isNull);
   });
 
+  test('resposta ambígua com múltiplos Fetch não é aceita', () {
+    eas.WbxmlElement node(String tag, {String? text, List<eas.WbxmlElement>? children}) =>
+      eas.WbxmlElement(namespace: 'ItemOperations', tag: tag, text: text, children: children, codePageIndex: 20);
+    final response = eas.WbxmlDocument(root: node('ItemOperations', children: [
+      node('Status', text: '1'), node('Response', children: [
+        node('Fetch', children: [node('Status', text: '1')]),
+        node('Fetch', children: [node('Status', text: '1')]),
+      ]),
+    ]));
+    expect(eas.FetchAttachmentCommand(fileReference: 'ref').parseResponse(response).status, 2);
+  });
+
 }

@@ -627,9 +627,12 @@ abstract class ItemOperationsFetchCommand
   @override
   WbxmlDocument buildRequest() => _inner.buildRequest();
 
-  ItemOperationsResult _first(ItemOperationsResponse r) =>
-      r.status != 1 ? ItemOperationsResult(status: r.status) :
-      (r.fetches.firstOrNull ?? ItemOperationsResult(status: r.status));
+  ItemOperationsResult _first(ItemOperationsResponse r) {
+    if (r.status != 1) return ItemOperationsResult(status: r.status);
+    // A single-item command must not accept an ambiguous response.
+    if (r.fetches.length != 1) return const ItemOperationsResult(status: 2);
+    return r.fetches.single;
+  }
 
   @override
   ItemOperationsResult parseResponse(WbxmlDocument response) =>
