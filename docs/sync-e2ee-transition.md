@@ -38,3 +38,15 @@ opção para habilitar sincronização em produção.
 Nenhum bloqueio no cliente substitui políticas no servidor contra versões
 antigas. Mudanças remotas, limpeza de dados legados e nova publicação exigem
 plano e autorização apropriados.
+
+## Base experimental em desenvolvimento
+
+`RecoveryCrypto` implementa isoladamente frase BIP39 de 24 palavras em
+português, derivação de chave e envelopes AES-256-GCM autenticados com
+contexto. Não está ligada à interface, ao armazenamento de chaves ou ao
+Supabase e não torna os dados existentes cifrados. É uma base sujeita a revisão
+antes de uso real. Faltam confirmação da frase, persistência segura, limites e
+rotação de chaves/nonces, recuperação e associação segura entre aparelhos,
+protocolo de mídia, migração, anti-replay e prevenção de downgrade. Os testes
+unitários não substituem uma revisão de segurança nem validam interoperabilidade
+com dados reais.
