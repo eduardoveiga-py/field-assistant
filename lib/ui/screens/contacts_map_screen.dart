@@ -2411,7 +2411,8 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                     trackpadScrollCausesScale: true, // Garante que pinça de trackpad aplique ZOOM em vez de deslizar para os lados
                     minScale: 0.6,
                     maxScale: 2.0,
-                    interactionEndFrictionCoefficient: 100.0,
+                    // Quase sem inércia: a origem é realinhada ao fim do gesto.
+                    interactionEndFrictionCoefficient: 1e-100,
                     onInteractionEnd: (details) {
                       final m = _transformationController.value;
                       final currentScale = m.getMaxScaleOnAxis();
@@ -2859,6 +2860,13 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  if (_zoom > 16 && TileCacheService.instance.activeStyle == MapLayerStyle.standard)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      color: Colors.white.withValues(alpha: 0.9),
+                      child: const Text('Pacote SAI: detalhe nativo até Z16',
+                          style: TextStyle(fontSize: 10, color: Colors.black87)),
+                    ),
                   _buildMetricScaleBar(
                     _transformationController.value.getMaxScaleOnAxis(),
                     effectiveCenterLat,

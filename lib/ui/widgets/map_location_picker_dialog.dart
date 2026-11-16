@@ -391,7 +391,8 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
                             trackpadScrollCausesScale: false,
                             minScale: 0.65,
                             maxScale: 1.8,
-                            interactionEndFrictionCoefficient: 100.0,
+                            // A grade é realinhada ao fim do gesto.
+                            interactionEndFrictionCoefficient: 1e-100,
                             onInteractionStart: (details) {
                               _basePinchScale = 1.0;
                             },
