@@ -127,3 +127,12 @@ depois da gravação, portanto a frase e o ID propostos devem ser preservados.
 Uma restauração ainda exige o ID obtido por uma fonte confiável independente
 do servidor. As migrações não foram aplicadas no projeto remoto, e nenhuma
 interface ou sincronização de produção usa esses adaptadores.
+
+`EncryptedRecordCheckpoint` fornece aplicação experimental de registro e
+checkpoint na mesma transação Drift: rejeita revisões anteriores, ausência de
+registro conhecido e alterações de envelope com a mesma revisão. Falhas do
+callback revertem o checkpoint e os dados gravados na mesma transação. Não está
+integrado às entidades ou à fila; o callback não pode escrever em outro banco
+ou arquivos esperando atomicidade. Checkpoints locais não impedem replay depois
+de restauração de um backup antigo, exclusão do app ou em um novo aparelho;
+precisam de vinculação a estado confiável antes de uso real.
