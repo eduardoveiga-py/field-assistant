@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:drift/native.dart';
@@ -12,6 +13,7 @@ import 'package:ministerio_pessoal/database/repository.dart';
 import 'package:ministerio_pessoal/inbox/jw_email_service.dart';
 import 'package:ministerio_pessoal/sync/crypto/recovery_crypto.dart';
 import 'package:ministerio_pessoal/sync/crypto/recovery_key_store.dart';
+import 'package:ministerio_pessoal/territory/geolocation_helper.dart';
 import 'package:ministerio_pessoal/territory/mbtiles/mbtiles_service.dart';
 import 'package:ministerio_pessoal/territory/mbtiles/mbtiles_web.dart';
 import 'package:ministerio_pessoal/territory/tile_cache/tile_cache_service.dart';
@@ -21,8 +23,14 @@ import 'package:ministerio_pessoal/ui/screens/settings_screen.dart';
 import 'package:ministerio_pessoal/ui/widgets/e2ee_setup_dialog.dart';
 
 class _EmptyTiles implements TileCacheBackend {
+  final Set<String> requestedKeys = {};
+
   @override
-  Future<Uint8List?> getTile(int z, int x, int y, [MapLayerStyle? style]) async => null;
+  Future<Uint8List?> getTile(int z, int x, int y, [MapLayerStyle? style]) async {
+    requestedKeys.add('$z/$x/$y');
+    return null;
+  }
+
   @override
   Future<void> saveTile(int z, int x, int y, Uint8List bytes, [MapLayerStyle? style]) async {}
   @override
@@ -106,6 +114,255 @@ void main() {
       final transform0Widget = tester.widget<Transform>(transform0Finder);
       expect(transform0Widget.transform.storage[0], closeTo(1.0, 0.01));
       expect(transform0Widget.transform.storage[1], closeTo(0.0, 0.01));
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('Redimensionamento de viewport expande altura do mapa dinamicamente e preserva o centro', (tester) async {
+      tester.view.physicalSize = const Size(800, 460);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final db = AppDatabase.forTesting(NativeDatabase.memory());
+      addTearDown(db.close);
+      final original = MBTilesService.instance;
+      final mock = MBTilesService.custom(backend: MBTilesWeb());
+      MBTilesService.setMockInstance(mock);
+      addTearDown(() {
+        MBTilesService.setMockInstance(original);
+        mock.dispose();
+      });
+      final tileBackend = _EmptyTiles();
+      TileCacheService.instance.backend = tileBackend;
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [databaseProvider.overrideWithValue(db)],
+          child: const MaterialApp(home: ContactsMapScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      Iterable<CachedTileWidget> tiles() =>
+          tester.widgetList<CachedTileWidget>(find.byType(CachedTileWidget));
+
+      final cityX = ((GeolocationHelper.defaultLng + 180.0) / 360.0 * (1 << 15)).floor();
+      final latRad = GeolocationHelper.defaultLat * math.pi / 180.0;
+      final cityY = ((1.0 - math.log(math.tan(latRad) + 1.0 / math.cos(latRad)) / math.pi) / 2.0 * (1 << 15)).floor();
+
+      // Garante que o tile central já carrega na inicialização
+      expect(tiles().any((t) => t.z == 15 && t.x == cityX && t.y == cityY), isTrue);
+
+      final mapViewportFinder = find.ancestor(
+        of: find.byType(InteractiveViewer).first,
+        matching: find.byType(ClipRect),
+      ).first;
+      final initialViewportRect = tester.getRect(mapViewportFinder);
+      final initialMinY = tiles().map((t) => t.y).reduce(math.min);
+      final initialMaxY = tiles().map((t) => t.y).reduce(math.max);
+      final initialRowSpan = initialMaxY - initialMinY + 1;
+
+      // Expande drasticamente a altura da janela (não pode ficar limitado à altura do primeiro carregamento)
+      tester.view.physicalSize = const Size(800, 1450);
+      await tester.pumpAndSettle();
+
+      final expandedViewportRect = tester.getRect(mapViewportFinder);
+      expect(expandedViewportRect.height, greaterThan(initialViewportRect.height + 900));
+
+      final expandedMinY = tiles().map((t) => t.y).reduce(math.min);
+      final expandedMaxY = tiles().map((t) => t.y).reduce(math.max);
+      final expandedRowSpan = expandedMaxY - expandedMinY + 1;
+      expect(expandedRowSpan, greaterThan(initialRowSpan));
+
+      // Confirma cobertura física de 100% da nova altura por tiles montados
+      double tilesTop = double.infinity;
+      double tilesBottom = double.negativeInfinity;
+      for (final t in tiles()) {
+        final rect = tester.getRect(find.byKey(ValueKey('tile_pos_${t.z}_${t.x}_${t.y}')));
+        if (rect.top < tilesTop) tilesTop = rect.top;
+        if (rect.bottom > tilesBottom) tilesBottom = rect.bottom;
+      }
+      expect(tilesTop, lessThanOrEqualTo(expandedViewportRect.top + 1.0));
+      expect(tilesBottom, greaterThanOrEqualTo(expandedViewportRect.bottom - 1.0));
+
+      // Confirma que o centro geográfico foi preservado após a mudança de altura e gridHalfSize
+      final centerTileRect = tester.getRect(
+        find.byKey(ValueKey('tile_pos_15_${cityX}_$cityY')),
+      );
+      expect(
+        (centerTileRect.center.dx - expandedViewportRect.center.dx).abs(),
+        lessThan(256.0),
+      );
+      expect(
+        (centerTileRect.center.dy - expandedViewportRect.center.dy).abs(),
+        lessThan(256.0),
+      );
+
+      // Alterna para Tela Cheia e verifica nova expansão de altura sem erro
+      await tester.tap(find.byTooltip('Modo Tela Cheia'));
+      await tester.pumpAndSettle();
+      final fullscreenViewportRect = tester.getRect(mapViewportFinder);
+      expect(fullscreenViewportRect.height, greaterThan(expandedViewportRect.height));
+      expect(tester.takeException(), isNull);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('Rotação em tela paisagem preenche 100% da altura e largura sem corte nas bordas', (tester) async {
+      tester.view.physicalSize = const Size(1280, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final db = AppDatabase.forTesting(NativeDatabase.memory());
+      addTearDown(db.close);
+      final original = MBTilesService.instance;
+      final mock = MBTilesService.custom(backend: MBTilesWeb());
+      MBTilesService.setMockInstance(mock);
+      addTearDown(() {
+        MBTilesService.setMockInstance(original);
+        mock.dispose();
+      });
+      TileCacheService.instance.backend = _EmptyTiles();
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [databaseProvider.overrideWithValue(db)],
+          child: const MaterialApp(home: ContactsMapScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final mapViewportFinder = find.ancestor(
+        of: find.byType(InteractiveViewer).first,
+        matching: find.byType(ClipRect),
+      ).first;
+      final viewportRect = tester.getRect(mapViewportFinder);
+      final expectedDiagonal = math.sqrt(
+        viewportRect.width * viewportRect.width +
+            viewportRect.height * viewportRect.height,
+      );
+
+      // O InteractiveViewer deve ter extensão >= diagonal para nunca expor bordas escuras ao girar
+      final viewerSize = tester.getSize(find.byType(InteractiveViewer).first);
+      expect(viewerSize.width, greaterThanOrEqualTo(expectedDiagonal - 1.0));
+      expect(viewerSize.height, greaterThanOrEqualTo(expectedDiagonal - 1.0));
+
+      void expectFullViewportCoverage() {
+        final renderedTiles = tester
+            .widgetList<CachedTileWidget>(find.byType(CachedTileWidget))
+            .toList();
+        expect(renderedTiles, isNotEmpty);
+
+        double minLeft = double.infinity;
+        double maxRight = double.negativeInfinity;
+        double minTop = double.infinity;
+        double maxBottom = double.negativeInfinity;
+
+        for (final t in renderedTiles) {
+          final rect = tester.getRect(
+            find.byKey(ValueKey('tile_pos_${t.z}_${t.x}_${t.y}')),
+          );
+          if (rect.left < minLeft) minLeft = rect.left;
+          if (rect.right > maxRight) maxRight = rect.right;
+          if (rect.top < minTop) minTop = rect.top;
+          if (rect.bottom > maxBottom) maxBottom = rect.bottom;
+        }
+
+        expect(minLeft, lessThanOrEqualTo(viewportRect.left + 1.0));
+        expect(maxRight, greaterThanOrEqualTo(viewportRect.right - 1.0));
+        expect(minTop, lessThanOrEqualTo(viewportRect.top + 1.0));
+        expect(maxBottom, greaterThanOrEqualTo(viewportRect.bottom - 1.0));
+      }
+
+      // Gira 45° em paisagem e valida cobertura total
+      await tester.tap(find.byTooltip('Girar 45° à direita'));
+      await tester.pumpAndSettle();
+      expectFullViewportCoverage();
+
+      // Gira mais 45° (90° total em paisagem) e valida cobertura total sem corte de altura
+      await tester.tap(find.byTooltip('Girar 45° à direita'));
+      await tester.pumpAndSettle();
+      expectFullViewportCoverage();
+
+      expect(tester.takeException(), isNull);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('Carregamento dinâmico de tiles ocorre continuamente durante o arraste antes de soltar', (tester) async {
+      tester.view.physicalSize = const Size(600, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final db = AppDatabase.forTesting(NativeDatabase.memory());
+      addTearDown(db.close);
+      final original = MBTilesService.instance;
+      final mock = MBTilesService.custom(backend: MBTilesWeb());
+      MBTilesService.setMockInstance(mock);
+      addTearDown(() {
+        MBTilesService.setMockInstance(original);
+        mock.dispose();
+      });
+      final tileBackend = _EmptyTiles();
+      TileCacheService.instance.backend = tileBackend;
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [databaseProvider.overrideWithValue(db)],
+          child: const MaterialApp(home: ContactsMapScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      Iterable<CachedTileWidget> tiles() =>
+          tester.widgetList<CachedTileWidget>(find.byType(CachedTileWidget));
+
+      final initialMinX = tiles().map((t) => t.x).reduce(math.min);
+      final initialMaxX = tiles().map((t) => t.x).reduce(math.max);
+      final initialMaxY = tiles().map((t) => t.y).reduce(math.max);
+
+      final mapViewportFinder = find.ancestor(
+        of: find.byType(InteractiveViewer).first,
+        matching: find.byType(ClipRect),
+      ).first;
+      final startPoint = tester.getCenter(mapViewportFinder);
+
+      // Inicia arraste contínuo SEM soltar o ponteiro (testa carregamento mid-drag)
+      final gesture = await tester.startGesture(startPoint);
+      for (var i = 0; i < 4; i++) {
+        await gesture.moveBy(const Offset(-160, 0));
+        await tester.pump(const Duration(milliseconds: 40));
+      }
+
+      // Mesmo antes de gesture.up(), novos tiles à direita já devem estar montados e solicitados
+      final midDragMinX = tiles().map((t) => t.x).reduce(math.min);
+      final midDragMaxX = tiles().map((t) => t.x).reduce(math.max);
+      expect(midDragMaxX, greaterThan(initialMaxX));
+      expect(midDragMinX, greaterThan(initialMinX));
+      expect(
+        tileBackend.requestedKeys.any((k) => k.startsWith('15/$midDragMaxX/')),
+        isTrue,
+      );
+
+      // Continua arrastando verticalmente SEM soltar o ponteiro
+      for (var i = 0; i < 3; i++) {
+        await gesture.moveBy(const Offset(0, -160));
+        await tester.pump(const Duration(milliseconds: 40));
+      }
+
+      final midDragMaxY = tiles().map((t) => t.y).reduce(math.max);
+      expect(midDragMaxY, greaterThan(initialMaxY));
+
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
 
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pumpAndSettle();

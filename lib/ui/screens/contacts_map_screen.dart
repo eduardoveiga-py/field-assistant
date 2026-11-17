@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:clock/clock.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -42,7 +43,10 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
     with SingleTickerProviderStateMixin {
   final TransformationController _transformationController =
       TransformationController();
-  bool _hasCenteredInitialView = false;
+  bool _hasAppliedInitialMatrix = false;
+  bool _hasScheduledInitialCenter = false;
+  double _pendingInitialDx = 0.0;
+  double _pendingInitialDy = 0.0;
   String? _highlightPersonId;
   String _selectedStatusFilter =
       'Todos'; // 'Todos', 'Estudos', 'Revisitas', 'Interessados'
@@ -62,15 +66,17 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
   double? _activeCenterLat;
   static const double _tileSize = 256.0;
   DateTime? _lastZoomChangeTime;
-  double _rotation = 0.0; // Rotação manual do mapa, não orientação magnética.
+  // Rotação manual do mapa via ValueNotifier para evitar rebuild da tela a 60/120fps.
+  final ValueNotifier<double> _rotationNotifier = ValueNotifier<double>(0.0);
   late final AnimationController _rotationAnimController;
   Animation<double>? _rotationAnimation;
   final Map<int, Offset> _touchPointers = {};
   double _twoFingerStartAngle = 0.0;
   double _rotationAtTouchStart = 0.0;
-  bool _isFullscreen = false; // Modo Tela Cheia
   ({double latitude, double longitude})? _userGpsLocation; // Localização GPS
   bool _isLocatingUser = false;
+  Size? _lastConstraintsSize;
+  int? _lastGridHalfSize;
 
   @override
   void initState() {
@@ -80,15 +86,11 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
       duration: const Duration(milliseconds: 350),
     )..addListener(() {
         if (_rotationAnimation != null) {
-          setState(() {
-            _rotation = _rotationAnimation!.value;
-          });
+          _rotationNotifier.value = _rotationAnimation!.value;
         }
       })..addStatusListener((status) {
         if (status == AnimationStatus.completed) {
-          setState(() {
-            _rotation = 0.0;
-          });
+          _rotationNotifier.value = 0.0;
         }
       });
     _highlightPersonId = widget.highlightPersonId;
@@ -226,12 +228,38 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
     return 180.0 / math.pi * math.atan(0.5 * (math.exp(n) - math.exp(-n)));
   }
 
+  ({
+    double viewportW,
+    double viewportH,
+    double viewerW,
+    double viewerH,
+    int gridHalfSize,
+  }) _computeMapMetrics(double rawWidth, double rawHeight) {
+    final viewportW = rawWidth > 0 ? rawWidth : 400.0;
+    final viewportH = rawHeight > 0 ? rawHeight : 600.0;
+    final rotExtent = math
+        .sqrt(viewportW * viewportW + viewportH * viewportH)
+        .ceilToDouble();
+    final minTilesFromCenter = (rotExtent / (2.0 * 0.6 * _tileSize)).ceil();
+    final gridHalfSize = math.max(6, minTilesFromCenter + 4);
+    return (
+      viewportW: viewportW,
+      viewportH: viewportH,
+      viewerW: rotExtent,
+      viewerH: rotExtent,
+      gridHalfSize: gridHalfSize,
+    );
+  }
+
   void _changeZoom(
     int newZoom,
     BoxConstraints constraints,
     double originPx,
-    double originPy,
-  ) {
+    double originPy, {
+    double? viewerW,
+    double? viewerH,
+    int? gridHalfSize,
+  }) {
     final targetZoom = newZoom.clamp(6, 19);
     if (targetZoom == _zoom) return;
 
@@ -241,23 +269,27 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
     final dx = currentMatrix.storage[12];
     final dy = currentMatrix.storage[13];
 
-    final viewportW = constraints.maxWidth > 0 ? constraints.maxWidth : 400.0;
-    final viewportH = constraints.maxHeight > 0 ? constraints.maxHeight : 600.0;
+    final metrics = _computeMapMetrics(
+      constraints.maxWidth,
+      constraints.maxHeight,
+    );
+    final vW = viewerW ?? metrics.viewerW;
+    final vH = viewerH ?? metrics.viewerH;
+    final gHalf = gridHalfSize ?? metrics.gridHalfSize;
 
     // Ponto geográfico central atualmente visualizado (compensando a escala do InteractiveViewer)
-    final canvasCenterX = ((viewportW / 2.0) - dx) / effectiveScale;
-    final canvasCenterY = ((viewportH / 2.0) - dy) / effectiveScale;
+    final canvasCenterX = ((vW / 2.0) - dx) / effectiveScale;
+    final canvasCenterY = ((vH / 2.0) - dy) / effectiveScale;
     final worldPx = originPx + canvasCenterX;
     final worldPy = originPy + canvasCenterY;
-    final focalLng = _pixelX2lon(worldPx, _zoom);
-    final focalLat = _pixelY2lat(worldPy, _zoom);
+    final focalLng = _pixelX2lon(worldPx, _zoom).clamp(-179.999999, 179.999999);
+    final focalLat = _pixelY2lat(worldPy, _zoom).clamp(-85.0511, 85.0511);
 
     // Reprojeção para novo nível de resolução 'z' centrando exatamente no ponto focal
-    const int gridHalfSize = 3;
     final newCenterTileX = _lon2tileX(focalLng, targetZoom);
     final newCenterTileY = _lat2tileY(focalLat, targetZoom);
-    final newMinTileX = newCenterTileX - gridHalfSize;
-    final newMinTileY = newCenterTileY - gridHalfSize;
+    final newMinTileX = newCenterTileX - gHalf;
+    final newMinTileY = newCenterTileY - gHalf;
     final newOriginPx = newMinTileX * _tileSize;
     final newOriginPy = newMinTileY * _tileSize;
 
@@ -267,18 +299,10 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
     final newCanvasX = newWorldPx - newOriginPx;
     final newCanvasY = newWorldPy - newOriginPy;
 
-    final canvasWidth = (gridHalfSize * 2 + 1) * _tileSize;
-    final canvasHeight = (gridHalfSize * 2 + 1) * _tileSize;
-    const margin = 250.0;
-    final newDx = ((viewportW / 2.0) - newCanvasX).clamp(
-      viewportW - canvasWidth - margin,
-      margin,
-    );
-    final newDy = ((viewportH / 2.0) - newCanvasY).clamp(
-      viewportH - canvasHeight - margin,
-      margin,
-    );
+    final newDx = (vW / 2.0) - newCanvasX;
+    final newDy = (vH / 2.0) - newCanvasY;
 
+    _hasAppliedInitialMatrix = true;
     setState(() {
       _activeCenterLng = focalLng;
       _activeCenterLat = focalLat;
@@ -297,24 +321,26 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
     _peopleSubscription?.close();
     _transformationController.dispose();
     _rotationAnimController.dispose();
+    _rotationNotifier.dispose();
     super.dispose();
   }
 
   void _animateResetRotationToNorth() {
-    if (_rotation.abs() < 1e-4) {
-      if (_rotation != 0.0) {
-        setState(() => _rotation = 0.0);
+    final current = _rotationNotifier.value;
+    if (current.abs() < 1e-4) {
+      if (current != 0.0) {
+        _rotationNotifier.value = 0.0;
       }
       return;
     }
     _rotationAnimController.stop();
 
     // Normaliza a rotação inicial no intervalo (-pi, pi]
-    var start = _rotation % (2 * math.pi);
+    var start = current % (2 * math.pi);
     if (start > math.pi) start -= 2 * math.pi;
     if (start < -math.pi) start += 2 * math.pi;
 
-    _rotation = start;
+    _rotationNotifier.value = start;
     _rotationAnimation = Tween<double>(begin: start, end: 0.0).animate(
       CurvedAnimation(
         parent: _rotationAnimController,
@@ -327,9 +353,8 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
 
   void _rotateBy(double deltaRadians) {
     _rotationAnimController.stop();
-    setState(() {
-      _rotation = (_rotation + deltaRadians) % (2 * math.pi);
-    });
+    _rotationNotifier.value =
+        (_rotationNotifier.value + deltaRadians) % (2 * math.pi);
   }
 
   double _calculateDistanceKm(
@@ -353,23 +378,31 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
     double lat,
     double lng,
     double viewportWidth,
-    double viewportHeight,
-  ) {
-    const int gridHalfSize = 3;
+    double viewportHeight, {
+    double? viewerW,
+    double? viewerH,
+    int? gridHalfSize,
+  }) {
+    final metrics = _computeMapMetrics(viewportWidth, viewportHeight);
+    final vW = viewerW ?? metrics.viewerW;
+    final vH = viewerH ?? metrics.viewerH;
+    final gHalf = gridHalfSize ?? metrics.gridHalfSize;
+
     final newCenterTileX = _lon2tileX(lng, _zoom);
     final newCenterTileY = _lat2tileY(lat, _zoom);
-    final newOriginPx = (newCenterTileX - gridHalfSize) * _tileSize;
-    final newOriginPy = (newCenterTileY - gridHalfSize) * _tileSize;
+    final newOriginPx = (newCenterTileX - gHalf) * _tileSize;
+    final newOriginPy = (newCenterTileY - gHalf) * _tileSize;
     final targetPx = _lon2pixelX(lng, _zoom) - newOriginPx;
     final targetPy = _lat2pixelY(lat, _zoom) - newOriginPy;
 
+    _hasAppliedInitialMatrix = true;
     setState(() {
       _activeCenterLat = lat;
       _activeCenterLng = lng;
     });
-    if (viewportWidth > 0 && viewportHeight > 0) {
-      final dx = (viewportWidth / 2.0) - targetPx;
-      final dy = (viewportHeight / 2.0) - targetPy;
+    if (vW > 0 && vH > 0) {
+      final dx = (vW / 2.0) - targetPx;
+      final dy = (vH / 2.0) - targetPy;
       _transformationController.value = Matrix4.translationValues(dx, dy, 0.0);
     }
   }
@@ -1685,9 +1718,10 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
     final landmarks = ref.watch(landmarksStreamProvider).value ?? [];
     final studies = ref.watch(studiesStreamProvider).value ?? [];
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isFullscreen = ref.watch(isMapFullscreenProvider);
 
     return Scaffold(
-      appBar: _isFullscreen
+      appBar: isFullscreen
           ? null
           : AppBar(
               title: const Text('Mapa dos Contatos e Território'),
@@ -2307,22 +2341,6 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
     final centerTileX = _lon2tileX(effectiveCenterLng, _zoom);
     final centerTileY = _lat2tileY(effectiveCenterLat, _zoom);
 
-    // Grade 7x7; a origem acompanha o centro após cada gesto.
-    const int gridHalfSize = 3;
-    final minTileX = centerTileX - gridHalfSize;
-    final maxTileX = centerTileX + gridHalfSize;
-    final minTileY = centerTileY - gridHalfSize;
-    final maxTileY = centerTileY + gridHalfSize;
-
-    final originPx = minTileX * _tileSize;
-    final originPy = minTileY * _tileSize;
-
-    final canvasWidth = (gridHalfSize * 2 + 1) * _tileSize;
-    final canvasHeight = (gridHalfSize * 2 + 1) * _tileSize;
-
-    final centerPx = _lon2pixelX(centerLng, _zoom) - originPx;
-    final centerPy = _lat2pixelY(centerLat, _zoom) - originPy;
-
     // Ordena para que o pino destacado seja renderizado por último (no topo de pinos próximos)
     final orderedContacts = List<PersonEntry>.from(geoContacts);
     if (_highlightPersonId != null) {
@@ -2333,388 +2351,500 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
       });
     }
 
+    final Map<String, TerritoryPinLayer> pinLayers = {
+      for (final p in orderedContacts)
+        p.id: TerritoryCoverageEngine.classifyPin(
+          p,
+          hasActiveStudy: p.status.toLowerCase() == 'estudo',
+          lastVisitDate: lastVisitMap[p.id],
+          nextAppointmentDate: nextApptMap[p.id],
+        ),
+    };
+    final isFullscreen = ref.watch(isMapFullscreenProvider);
+    final activeLayerStyle = TileCacheService.instance.activeStyle;
+
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (!_hasCenteredInitialView &&
-            constraints.maxWidth > 0 &&
-            constraints.maxHeight > 0) {
-          _hasCenteredInitialView = true;
+        if (constraints.maxWidth <= 0 || constraints.maxHeight <= 0) {
+          return const SizedBox.shrink();
+        }
+
+        final metrics = _computeMapMetrics(
+          constraints.maxWidth,
+          constraints.maxHeight,
+        );
+        final viewportW = metrics.viewportW;
+        final viewportH = metrics.viewportH;
+        final viewerW = metrics.viewerW;
+        final viewerH = metrics.viewerH;
+        final gridHalfSize = metrics.gridHalfSize;
+
+        final minTileX = centerTileX - gridHalfSize;
+        final maxTileX = centerTileX + gridHalfSize;
+        final minTileY = centerTileY - gridHalfSize;
+        final maxTileY = centerTileY + gridHalfSize;
+
+        final originPx = minTileX * _tileSize;
+        final originPy = minTileY * _tileSize;
+
+        final canvasWidth = (gridHalfSize * 2 + 1) * _tileSize;
+        final canvasHeight = (gridHalfSize * 2 + 1) * _tileSize;
+
+        final centerPx = _lon2pixelX(centerLng, _zoom) - originPx;
+        final centerPy = _lat2pixelY(centerLat, _zoom) - originPy;
+
+        Matrix4? frameMatrixOverride;
+        if (!_hasAppliedInitialMatrix) {
+          _lastConstraintsSize = constraints.biggest;
+          _lastGridHalfSize = gridHalfSize;
           if (hasHighlightCoords) _hasCenteredHighlightPerson = true;
+          final dx = (viewerW / 2.0) - centerPx;
+          final dy = (viewerH / 2.0) - centerPy;
+          _pendingInitialDx = dx;
+          _pendingInitialDy = dy;
+          frameMatrixOverride = Matrix4.translationValues(dx, dy, 0.0);
+          if (!_hasScheduledInitialCenter) {
+            _hasScheduledInitialCenter = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _hasScheduledInitialCenter = false;
+              if (!mounted || _hasAppliedInitialMatrix) return;
+              _hasAppliedInitialMatrix = true;
+              _transformationController.value = Matrix4.translationValues(
+                _pendingInitialDx,
+                _pendingInitialDy,
+                0.0,
+              );
+            });
+          }
+        } else if (hasHighlightCoords && !_hasCenteredHighlightPerson) {
+          _hasCenteredHighlightPerson = true;
+          _lastConstraintsSize = constraints.biggest;
+          _lastGridHalfSize = gridHalfSize;
+          final dx = (viewerW / 2.0) - centerPx;
+          final dy = (viewerH / 2.0) - centerPy;
+          frameMatrixOverride = Matrix4.translationValues(dx, dy, 0.0);
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) {
-              final dx = (constraints.maxWidth / 2.0) - centerPx;
-              final dy = (constraints.maxHeight / 2.0) - centerPy;
-              _transformationController.value = Matrix4.translationValues(
-                dx,
-                dy,
-                0.0,
+              _centerOnCoords(
+                centerLat,
+                centerLng,
+                viewportW,
+                viewportH,
+                viewerW: viewerW,
+                viewerH: viewerH,
+                gridHalfSize: gridHalfSize,
               );
             }
           });
-        } else if (hasHighlightCoords &&
-            !_hasCenteredHighlightPerson &&
-            constraints.maxWidth > 0 &&
-            constraints.maxHeight > 0) {
-          _hasCenteredHighlightPerson = true;
+        } else if (_lastConstraintsSize != null &&
+            _lastConstraintsSize != constraints.biggest) {
+          final oldSize = _lastConstraintsSize!;
+          final oldMetrics = _computeMapMetrics(oldSize.width, oldSize.height);
+          final oldGridHalf = _lastGridHalfSize ?? oldMetrics.gridHalfSize;
+          final deltaViewerW = (viewerW - oldMetrics.viewerW) / 2.0;
+          final deltaViewerH = (viewerH - oldMetrics.viewerH) / 2.0;
+          final deltaOriginPx = (oldGridHalf - gridHalfSize) * _tileSize;
+          final deltaOriginPy = (oldGridHalf - gridHalfSize) * _tileSize;
+          _lastConstraintsSize = constraints.biggest;
+          _lastGridHalfSize = gridHalfSize;
+
+          final m = _transformationController.value;
+          final currentScale = m.getMaxScaleOnAxis();
+          final effectiveScale = currentScale > 0.01 ? currentScale : 1.0;
+          final expectedDx =
+              m.storage[12] + deltaViewerW + deltaOriginPx * effectiveScale;
+          final expectedDy =
+              m.storage[13] + deltaViewerH + deltaOriginPy * effectiveScale;
+          frameMatrixOverride = Matrix4.identity()
+            ..translateByDouble(expectedDx, expectedDy, 0, 1)
+            ..scaleByDouble(effectiveScale, effectiveScale, 1, 1);
+
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) {
-              _centerOnCoords(centerLat, centerLng,
-                  constraints.maxWidth, constraints.maxHeight);
+              final liveM = _transformationController.value;
+              final liveScale = liveM.getMaxScaleOnAxis();
+              final effScale = liveScale > 0.01 ? liveScale : 1.0;
+              final nextDx =
+                  liveM.storage[12] + deltaViewerW + deltaOriginPx * effScale;
+              final nextDy =
+                  liveM.storage[13] + deltaViewerH + deltaOriginPy * effScale;
+              _transformationController.value = Matrix4.identity()
+                ..translateByDouble(nextDx, nextDy, 0, 1)
+                ..scaleByDouble(effScale, effScale, 1, 1);
             }
           });
         }
 
-        // Solicita somente blocos próximos à tela, com margem para gestos.
-        final radius = math.sqrt(constraints.maxWidth * constraints.maxWidth +
-            constraints.maxHeight * constraints.maxHeight) /
-            (2 * math.max(0.6, _transformationController.value.getMaxScaleOnAxis())) + _tileSize;
-        final tileCenterX = _lon2pixelX(effectiveCenterLng, _zoom);
-        final tileCenterY = _lat2pixelY(effectiveCenterLat, _zoom);
-        final visibleTiles = <({int x, int y})>[
-          for (int x = minTileX; x <= maxTileX; x++)
-            for (int y = minTileY; y <= maxTileY; y++)
-              if ((x * _tileSize + _tileSize / 2 - tileCenterX).abs() <= radius &&
-                  (y * _tileSize + _tileSize / 2 - tileCenterY).abs() <= radius &&
-                  x >= 0 && y >= 0 && x < (1 << _zoom) && y < (1 << _zoom))
-                (x: x, y: y),
-        ]..sort((a, b) {
-          double distance(({int x, int y}) t) =>
-              math.pow(t.x * _tileSize + _tileSize / 2 - tileCenterX, 2).toDouble() +
-              math.pow(t.y * _tileSize + _tileSize / 2 - tileCenterY, 2).toDouble();
-          return distance(a).compareTo(distance(b));
-        });
         return Stack(
           children: [
-            ClipRect(
-              child: Listener(
-                behavior: HitTestBehavior.translucent,
-                onPointerSignal: (pointerSignal) {
-                  if (pointerSignal is PointerScrollEvent) {
-                    final now = clock.now();
-                    if (_lastZoomChangeTime == null ||
-                        now.difference(_lastZoomChangeTime!).inMilliseconds >=
-                            250) {
-                      if (pointerSignal.scrollDelta.dy < -2 && _zoom < 19) {
-                        _lastZoomChangeTime = now;
-                        _changeZoom(
-                          _zoom + 1,
-                          constraints,
-                          originPx,
-                          originPy,
-                        );
-                      } else if (pointerSignal.scrollDelta.dy > 2 &&
-                          _zoom > 6) {
-                        _lastZoomChangeTime = now;
-                        _changeZoom(
-                          _zoom - 1,
-                          constraints,
-                          originPx,
-                          originPy,
-                        );
-                      }
-                    }
-                  }
-                },
-                child: GestureDetector(
+            RepaintBoundary(
+              child: ClipRect(
+                child: Listener(
                   behavior: HitTestBehavior.translucent,
-                  onDoubleTap: () {
-                    if (_zoom < 19) {
-                      _changeZoom(
-                        _zoom + 1,
-                        constraints,
-                        originPx,
-                        originPy,
-                      );
-                    }
-                  },
-                  onLongPressStart: (details) {
-                    final m = _transformationController.value;
-                    final currentScale = m.getMaxScaleOnAxis();
-                    final effectiveScale = currentScale > 0.01 ? currentScale : 1.0;
-                    final dx = m.storage[12];
-                    final dy = m.storage[13];
-                    // A rotação é aplicada fora do InteractiveViewer: primeiro
-                    // desfazê-la em torno do centro, depois escala/translação.
-                    final offset = details.localPosition -
-                        Offset(constraints.maxWidth / 2, constraints.maxHeight / 2);
-                    final c = math.cos(_rotation);
-                    final sn = math.sin(_rotation);
-                    final localX = offset.dx * c + offset.dy * sn + constraints.maxWidth / 2;
-                    final localY = -offset.dx * sn + offset.dy * c + constraints.maxHeight / 2;
-                    final touchCanvasX = (localX - dx) / effectiveScale;
-                    final touchCanvasY = (localY - dy) / effectiveScale;
-                    final touchWorldPx = originPx + touchCanvasX;
-                    final touchWorldPy = originPy + touchCanvasY;
-                    final touchLng = _pixelX2lon(touchWorldPx, _zoom);
-                    final touchLat = _pixelY2lat(touchWorldPy, _zoom);
-                    _showAddLandmarkModal(context, initialLat: touchLat, initialLng: touchLng);
-                  },
-                  child: Listener(
-                    behavior: HitTestBehavior.translucent,
-                    onPointerDown: (event) {
-                      _touchPointers[event.pointer] = event.position;
-                      if (_touchPointers.length >= 2) {
-                        final pts = _touchPointers.values.take(2).toList();
-                        _twoFingerStartAngle = math.atan2(pts[1].dy - pts[0].dy, pts[1].dx - pts[0].dx);
-                        _rotationAtTouchStart = _rotation;
-                      }
-                    },
-                    onPointerMove: (event) {
-                      if (_touchPointers.containsKey(event.pointer)) {
-                        _touchPointers[event.pointer] = event.position;
-                      }
-                      if (_touchPointers.length >= 2) {
-                        final pts = _touchPointers.values.take(2).toList();
-                        final currentAngle = math.atan2(pts[1].dy - pts[0].dy, pts[1].dx - pts[0].dx);
-                        var diff = currentAngle - _twoFingerStartAngle;
-                        while (diff > math.pi) {
-                          diff -= 2 * math.pi;
-                        }
-                        while (diff < -math.pi) {
-                          diff += 2 * math.pi;
-                        }
-                        _rotationAnimController.stop();
-                        setState(() {
-                          _rotation = _rotationAtTouchStart + diff;
-                        });
-                      }
-                    },
-                    onPointerUp: (event) {
-                      _touchPointers.remove(event.pointer);
-                      _rotationAtTouchStart = _rotation;
-                      if (_touchPointers.length >= 2) {
-                        final pts = _touchPointers.values.take(2).toList();
-                        _twoFingerStartAngle = math.atan2(pts[1].dy - pts[0].dy, pts[1].dx - pts[0].dx);
-                      }
-                    },
-                    onPointerCancel: (event) {
-                      _touchPointers.remove(event.pointer);
-                      _rotationAtTouchStart = _rotation;
-                      if (_touchPointers.length >= 2) {
-                        final pts = _touchPointers.values.take(2).toList();
-                        _twoFingerStartAngle = math.atan2(pts[1].dy - pts[0].dy, pts[1].dx - pts[0].dx);
-                      }
-                    },
-                    child: Transform.rotate(
-                      angle: _rotation,
-                      child: InteractiveViewer(
-                    transformationController: _transformationController,
-                    constrained: false, // Permite que o mapa ocupe 100% da área sem distorção ou cortes pretos
-                    boundaryMargin: const EdgeInsets.all(
-                      250,
-                    ), // Margem segura para zoom fluido sem travamento
-                    panEnabled: true,
-                    scaleEnabled: true, // Habilita zoom fluido por gesto de pinça na tela e trackpad
-                    trackpadScrollCausesScale: true, // Garante que pinça de trackpad aplique ZOOM em vez de deslizar para os lados
-                    minScale: 0.6,
-                    maxScale: 2.0,
-                    // Quase sem inércia: a origem é realinhada ao fim do gesto.
-                    interactionEndFrictionCoefficient: 1e-100,
-                    onInteractionEnd: (details) {
-                      final m = _transformationController.value;
-                      final currentScale = m.getMaxScaleOnAxis();
-                      final effectiveScale =
-                          currentScale > 0.01 ? currentScale : 1.0;
-                      final dx = m.storage[12];
-                      final dy = m.storage[13];
-                      final canvasCenterX =
-                          ((constraints.maxWidth / 2.0) - dx) / effectiveScale;
-                      final canvasCenterY =
-                          ((constraints.maxHeight / 2.0) - dy) / effectiveScale;
-                      final worldPx = originPx + canvasCenterX;
-                      final worldPy = originPy + canvasCenterY;
-                      final focalLng = _pixelX2lon(worldPx, _zoom).clamp(-179.999999, 179.999999);
-                      final focalLat = _pixelY2lat(worldPy, _zoom).clamp(-85.0511, 85.0511);
-
+                  onPointerSignal: (pointerSignal) {
+                    if (pointerSignal is PointerScrollEvent) {
                       final now = clock.now();
                       if (_lastZoomChangeTime == null ||
                           now.difference(_lastZoomChangeTime!).inMilliseconds >=
                               250) {
-                        if (currentScale >= 1.35 && _zoom < 19) {
+                        if (pointerSignal.scrollDelta.dy < -2 && _zoom < 19) {
                           _lastZoomChangeTime = now;
                           _changeZoom(
                             _zoom + 1,
                             constraints,
                             originPx,
                             originPy,
+                            viewerW: viewerW,
+                            viewerH: viewerH,
+                            gridHalfSize: gridHalfSize,
                           );
-                          return;
-                        } else if (currentScale <= 0.75 && _zoom > 6) {
+                        } else if (pointerSignal.scrollDelta.dy > 2 &&
+                            _zoom > 6) {
                           _lastZoomChangeTime = now;
                           _changeZoom(
                             _zoom - 1,
                             constraints,
                             originPx,
                             originPy,
+                            viewerW: viewerW,
+                            viewerH: viewerH,
+                            gridHalfSize: gridHalfSize,
                           );
-                          return;
                         }
                       }
-                      final newOriginX = (_lon2tileX(focalLng, _zoom) - gridHalfSize) * _tileSize;
-                      final newOriginY = (_lat2tileY(focalLat, _zoom) - gridHalfSize) * _tileSize;
-                      setState(() {
-                        _activeCenterLng = focalLng;
-                        _activeCenterLat = focalLat;
-                      });
-                      _transformationController.value = Matrix4.identity()
-                        ..translateByDouble(dx + (newOriginX - originPx) * effectiveScale,
-                            dy + (newOriginY - originPy) * effectiveScale, 0, 1)
-                        ..scaleByDouble(effectiveScale, effectiveScale, 1, 1);
+                    }
+                  },
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onDoubleTap: () {
+                      if (_zoom < 19) {
+                        _changeZoom(
+                          _zoom + 1,
+                          constraints,
+                          originPx,
+                          originPy,
+                          viewerW: viewerW,
+                          viewerH: viewerH,
+                          gridHalfSize: gridHalfSize,
+                        );
+                      }
                     },
-                    child: Container(
-                      width: canvasWidth,
-                      height: canvasHeight,
-                      color: isDark
-                          ? const Color(0xFF0F172A)
-                          : const Color(0xFFF1F5F9),
-                      child: Stack(
-                        children: [
-                          // Camada de Tiles do OpenStreetMap com suporte a cache offline móvel
-                          for (final tile in visibleTiles)
-                              Positioned(
-                                key: ValueKey('tile_pos_${_zoom}_${tile.x}_${tile.y}'),
-                                left: (tile.x - minTileX) * _tileSize,
-                                top: (tile.y - minTileY) * _tileSize,
-                                child: CachedTileWidget(
-                                  key: ValueKey('tile_${TileCacheService.instance.activeStyle.id}_${_zoom}_${tile.x}_${tile.y}'),
-                                  z: _zoom,
-                                  x: tile.x,
-                                  y: tile.y,
-                                  size: _tileSize,
-                                  isDark: isDark,
-                                  layerStyle: TileCacheService.instance.activeStyle,
-                                ),
-                              ),
+                    onLongPressStart: (details) {
+                      final m = _transformationController.value;
+                      final currentScale = m.getMaxScaleOnAxis();
+                      final effectiveScale = currentScale > 0.01 ? currentScale : 1.0;
+                      final dx = m.storage[12];
+                      final dy = m.storage[13];
+                      final offset = details.localPosition -
+                          Offset(viewportW / 2, viewportH / 2);
+                      final rotation = _rotationNotifier.value;
+                      final c = math.cos(rotation);
+                      final sn = math.sin(rotation);
+                      final localX = offset.dx * c + offset.dy * sn + viewerW / 2;
+                      final localY = -offset.dx * sn + offset.dy * c + viewerH / 2;
+                      final touchCanvasX = (localX - dx) / effectiveScale;
+                      final touchCanvasY = (localY - dy) / effectiveScale;
+                      final touchWorldPx = originPx + touchCanvasX;
+                      final touchWorldPy = originPy + touchCanvasY;
+                      final touchLng = _pixelX2lon(touchWorldPx, _zoom);
+                      final touchLat = _pixelY2lat(touchWorldPy, _zoom);
+                      _showAddLandmarkModal(context, initialLat: touchLat, initialLng: touchLng);
+                    },
+                    child: Listener(
+                      behavior: HitTestBehavior.translucent,
+                      onPointerDown: (event) {
+                        _touchPointers[event.pointer] = event.position;
+                        if (_touchPointers.length >= 2) {
+                          final pts = _touchPointers.values.take(2).toList();
+                          _twoFingerStartAngle = math.atan2(pts[1].dy - pts[0].dy, pts[1].dx - pts[0].dx);
+                          _rotationAtTouchStart = _rotationNotifier.value;
+                        }
+                      },
+                      onPointerMove: (event) {
+                        if (_touchPointers.containsKey(event.pointer)) {
+                          _touchPointers[event.pointer] = event.position;
+                        }
+                        if (_touchPointers.length >= 2) {
+                          final pts = _touchPointers.values.take(2).toList();
+                          final currentAngle = math.atan2(pts[1].dy - pts[0].dy, pts[1].dx - pts[0].dx);
+                          var diff = currentAngle - _twoFingerStartAngle;
+                          while (diff > math.pi) {
+                            diff -= 2 * math.pi;
+                          }
+                          while (diff < -math.pi) {
+                            diff += 2 * math.pi;
+                          }
+                          _rotationAnimController.stop();
+                          _rotationNotifier.value = _rotationAtTouchStart + diff;
+                        }
+                      },
+                      onPointerUp: (event) {
+                        _touchPointers.remove(event.pointer);
+                        _rotationAtTouchStart = _rotationNotifier.value;
+                        if (_touchPointers.length >= 2) {
+                          final pts = _touchPointers.values.take(2).toList();
+                          _twoFingerStartAngle = math.atan2(pts[1].dy - pts[0].dy, pts[1].dx - pts[0].dx);
+                        }
+                      },
+                      onPointerCancel: (event) {
+                        _touchPointers.remove(event.pointer);
+                        _rotationAtTouchStart = _rotationNotifier.value;
+                        if (_touchPointers.length >= 2) {
+                          final pts = _touchPointers.values.take(2).toList();
+                          _twoFingerStartAngle = math.atan2(pts[1].dy - pts[0].dy, pts[1].dx - pts[0].dx);
+                        }
+                      },
+                      child: SizedBox(
+                        width: viewportW,
+                        height: viewportH,
+                        child: Center(
+                          child: OverflowBox(
+                            minWidth: viewerW,
+                            maxWidth: viewerW,
+                            minHeight: viewerH,
+                            maxHeight: viewerH,
+                            child: ValueListenableBuilder<double>(
+                              valueListenable: _rotationNotifier,
+                              builder: (context, rotation, child) {
+                                return Transform.rotate(
+                                  angle: rotation,
+                                  child: child,
+                                );
+                              },
+                              child: InteractiveViewer(
+                                transformationController: _transformationController,
+                                constrained: false, // Permite que o mapa ocupe 100% da área sem distorção ou cortes pretos
+                                boundaryMargin: EdgeInsets.zero, // O canvas dinâmico já excede a diagonal em todos os zooms, evitando áreas vazias
+                                panEnabled: true,
+                                scaleEnabled: true, // Habilita zoom fluido por gesto de pinça na tela e trackpad
+                                trackpadScrollCausesScale: true, // Garante que pinça de trackpad aplique ZOOM em vez de deslizar para os lados
+                                minScale: 0.6,
+                                maxScale: 2.0,
+                                // Quase sem inércia: a origem é realinhada ao fim do gesto.
+                                interactionEndFrictionCoefficient: 1e-100,
+                                onInteractionEnd: (details) {
+                                  _hasAppliedInitialMatrix = true;
+                                  final m = _transformationController.value;
+                                  final currentScale = m.getMaxScaleOnAxis();
+                                  final effectiveScale =
+                                      currentScale > 0.01 ? currentScale : 1.0;
+                                  final dx = m.storage[12];
+                                  final dy = m.storage[13];
+                                  final canvasCenterX =
+                                      ((viewerW / 2.0) - dx) / effectiveScale;
+                                  final canvasCenterY =
+                                      ((viewerH / 2.0) - dy) / effectiveScale;
+                                  final worldPx = originPx + canvasCenterX;
+                                  final worldPy = originPy + canvasCenterY;
+                                  final focalLng = _pixelX2lon(worldPx, _zoom).clamp(-179.999999, 179.999999);
+                                  final focalLat = _pixelY2lat(worldPy, _zoom).clamp(-85.0511, 85.0511);
 
-                          // Renderização dos Marcos / Pontos de Referência geolocalizados
-                          if (_showLandmarks)
-                            for (int i = 0; i < geoLandmarks.length; i++)
-                              _buildLandmarkPin(
-                                geoLandmarks[i],
-                                i,
-                                geoLandmarks.length,
-                                originPx: originPx,
-                                originPy: originPy,
-                                canvasWidth: canvasWidth,
-                                canvasHeight: canvasHeight,
-                              ),
-
-                          // Ponto Azul Pulsante de Localização GPS Nativa (Regra 12)
-                          if (_userGpsLocation != null) ...[
-                            () {
-                              final userX = _lon2pixelX(_userGpsLocation!.longitude, _zoom) - originPx;
-                              final userY = _lat2pixelY(_userGpsLocation!.latitude, _zoom) - originPy;
-                              return Positioned(
-                                left: userX - 22,
-                                top: userY - 22,
-                                child: IgnorePointer(
+                                  final now = clock.now();
+                                  if (_lastZoomChangeTime == null ||
+                                      now.difference(_lastZoomChangeTime!).inMilliseconds >=
+                                          250) {
+                                    if (currentScale >= 1.35 && _zoom < 19) {
+                                      _lastZoomChangeTime = now;
+                                      _changeZoom(
+                                        _zoom + 1,
+                                        constraints,
+                                        originPx,
+                                        originPy,
+                                        viewerW: viewerW,
+                                        viewerH: viewerH,
+                                        gridHalfSize: gridHalfSize,
+                                      );
+                                      return;
+                                    } else if (currentScale <= 0.75 && _zoom > 6) {
+                                      _lastZoomChangeTime = now;
+                                      _changeZoom(
+                                        _zoom - 1,
+                                        constraints,
+                                        originPx,
+                                        originPy,
+                                        viewerW: viewerW,
+                                        viewerH: viewerH,
+                                        gridHalfSize: gridHalfSize,
+                                      );
+                                      return;
+                                    }
+                                  }
+                                  final newCenterTileX = _lon2tileX(focalLng, _zoom);
+                                  final newCenterTileY = _lat2tileY(focalLat, _zoom);
+                                  if (newCenterTileX == centerTileX &&
+                                      newCenterTileY == centerTileY) {
+                                    _activeCenterLng = focalLng;
+                                    _activeCenterLat = focalLat;
+                                    return;
+                                  }
+                                  final newMinTileX = newCenterTileX - gridHalfSize;
+                                  final newMinTileY = newCenterTileY - gridHalfSize;
+                                  final newOriginX = newMinTileX * _tileSize;
+                                  final newOriginY = newMinTileY * _tileSize;
+                                  final nextDx = dx + (newOriginX - originPx) * effectiveScale;
+                                  final nextDy = dy + (newOriginY - originPy) * effectiveScale;
+                                  setState(() {
+                                    _activeCenterLng = focalLng;
+                                    _activeCenterLat = focalLat;
+                                  });
+                                  _transformationController.value = Matrix4.identity()
+                                    ..translateByDouble(nextDx, nextDy, 0, 1)
+                                    ..scaleByDouble(effectiveScale, effectiveScale, 1, 1);
+                                },
+                                child: Container(
+                                  width: canvasWidth,
+                                  height: canvasHeight,
+                                  color: isDark
+                                      ? const Color(0xFF0F172A)
+                                      : const Color(0xFFF1F5F9),
                                   child: Stack(
-                                    alignment: Alignment.center,
                                     children: [
-                                      Container(
-                                        width: 44,
-                                        height: 44,
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          color: Colors.blue.withValues(alpha: 0.22),
-                                          border: Border.all(
-                                            color: Colors.blueAccent.withValues(alpha: 0.5),
-                                            width: 1.5,
+                                      // Camada de Tiles dinâmica isolada (sem rebuild da tela inteira durante arraste/zoom/rotação)
+                                      Positioned.fill(
+                                        child: _DynamicTileLayer(
+                                          transformationController: _transformationController,
+                                          rotationListenable: _rotationNotifier,
+                                          zoom: _zoom,
+                                          minTileX: minTileX,
+                                          maxTileX: maxTileX,
+                                          minTileY: minTileY,
+                                          maxTileY: maxTileY,
+                                          originPx: originPx,
+                                          originPy: originPy,
+                                          viewportW: viewportW,
+                                          viewportH: viewportH,
+                                          viewerW: viewerW,
+                                          viewerH: viewerH,
+                                          tileSize: _tileSize,
+                                          isDark: isDark,
+                                          layerStyle: activeLayerStyle,
+                                          initialMatrixOverride: frameMatrixOverride,
+                                        ),
+                                      ),
+
+                                      // Renderização dos Marcos / Pontos de Referência geolocalizados
+                                      if (_showLandmarks)
+                                        for (int i = 0; i < geoLandmarks.length; i++)
+                                          _buildLandmarkPin(
+                                            geoLandmarks[i],
+                                            i,
+                                            geoLandmarks.length,
+                                            originPx: originPx,
+                                            originPy: originPy,
+                                            canvasWidth: canvasWidth,
+                                            canvasHeight: canvasHeight,
                                           ),
-                                        ),
-                                      ),
-                                      Container(
-                                        width: 14,
-                                        height: 14,
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          color: const Color(0xFF2563EB),
-                                          border: Border.all(color: Colors.white, width: 2.5),
-                                          boxShadow: const [
-                                            BoxShadow(
-                                              color: Colors.black38,
-                                              blurRadius: 4,
-                                              offset: Offset(0, 1),
+
+                                      // Ponto Azul Pulsante de Localização GPS Nativa (Regra 12)
+                                      if (_userGpsLocation != null) ...[
+                                        () {
+                                          final userX = _lon2pixelX(_userGpsLocation!.longitude, _zoom) - originPx;
+                                          final userY = _lat2pixelY(_userGpsLocation!.latitude, _zoom) - originPy;
+                                          return Positioned(
+                                            left: userX - 22,
+                                            top: userY - 22,
+                                            child: IgnorePointer(
+                                              child: Stack(
+                                                alignment: Alignment.center,
+                                                children: [
+                                                  Container(
+                                                    width: 44,
+                                                    height: 44,
+                                                    decoration: BoxDecoration(
+                                                      shape: BoxShape.circle,
+                                                      color: Colors.blue.withValues(alpha: 0.22),
+                                                      border: Border.all(
+                                                        color: Colors.blueAccent.withValues(alpha: 0.5),
+                                                        width: 1.5,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  Container(
+                                                    width: 14,
+                                                    height: 14,
+                                                    decoration: BoxDecoration(
+                                                      shape: BoxShape.circle,
+                                                      color: const Color(0xFF2563EB),
+                                                      border: Border.all(color: Colors.white, width: 2.5),
+                                                      boxShadow: const [
+                                                        BoxShadow(
+                                                          color: Colors.black38,
+                                                          blurRadius: 4,
+                                                          offset: Offset(0, 1),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
                                             ),
-                                          ],
+                                          );
+                                        }(),
+                                      ],
+
+                                      // Camada de Sobreposição Translúcida de Zonas Esquecidas (>90 dias sem visita)
+                                      for (final p in orderedContacts) ...[
+                                        () {
+                                          final layer = pinLayers[p.id];
+                                          if (layer != TerritoryPinLayer.forgottenZone) return const SizedBox.shrink();
+
+                                          final hasGeo = p.latitude != null &&
+                                              p.longitude != null &&
+                                              (p.latitude != 0.0 || p.longitude != 0.0) &&
+                                              p.latitude!.abs() <= 90 &&
+                                              p.longitude!.abs() <= 180;
+                                          if (!hasGeo) return const SizedBox.shrink();
+
+                                          final x = _lon2pixelX(p.longitude!, _zoom) - originPx;
+                                          final y = _lat2pixelY(p.latitude!, _zoom) - originPy;
+                                          const double haloRadius = 42.0;
+
+                                          return Positioned(
+                                            left: x - haloRadius,
+                                            top: y - haloRadius,
+                                            child: IgnorePointer(
+                                              child: Container(
+                                                width: haloRadius * 2,
+                                                height: haloRadius * 2,
+                                                decoration: BoxDecoration(
+                                                  shape: BoxShape.circle,
+                                                  color: const Color(0xFFDC2626).withValues(alpha: 0.18),
+                                                  border: Border.all(
+                                                    color: const Color(0xFFDC2626).withValues(alpha: 0.45),
+                                                    width: 1.5,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          );
+                                        }(),
+                                      ],
+
+                                      // Renderização de cada pino de contato com coordenadas válidas (destacado por último)
+                                      for (int i = 0; i < orderedContacts.length; i++)
+                                        _buildMapPin(
+                                          orderedContacts[i],
+                                          i,
+                                          orderedContacts.length,
+                                          originPx: originPx,
+                                          originPy: originPy,
+                                          canvasWidth: canvasWidth,
+                                          canvasHeight: canvasHeight,
+                                          pinLayer: pinLayers[orderedContacts[i].id] ?? TerritoryPinLayer.interested,
                                         ),
-                                      ),
                                     ],
                                   ),
                                 ),
-                              );
-                            }(),
-                          ],
-
-                          // Camada de Sobreposição Translúcida de Zonas Esquecidas (>90 dias sem visita)
-                          for (final p in orderedContacts) ...[
-                            () {
-                              final layer = TerritoryCoverageEngine.classifyPin(
-                                p,
-                                hasActiveStudy: p.status.toLowerCase() == 'estudo',
-                                lastVisitDate: lastVisitMap[p.id],
-                                nextAppointmentDate: nextApptMap[p.id],
-                              );
-                              if (layer != TerritoryPinLayer.forgottenZone) return const SizedBox.shrink();
-
-                              final hasGeo = p.latitude != null &&
-                                  p.longitude != null &&
-                                  (p.latitude != 0.0 || p.longitude != 0.0) &&
-                                  p.latitude!.abs() <= 90 &&
-                                  p.longitude!.abs() <= 180;
-                              if (!hasGeo) return const SizedBox.shrink();
-
-                              final x = _lon2pixelX(p.longitude!, _zoom) - originPx;
-                              final y = _lat2pixelY(p.latitude!, _zoom) - originPy;
-                              const double haloRadius = 42.0;
-
-                              return Positioned(
-                                left: x - haloRadius,
-                                top: y - haloRadius,
-                                child: IgnorePointer(
-                                  child: Container(
-                                    width: haloRadius * 2,
-                                    height: haloRadius * 2,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: const Color(0xFFDC2626).withValues(alpha: 0.18),
-                                      border: Border.all(
-                                        color: const Color(0xFFDC2626).withValues(alpha: 0.45),
-                                        width: 1.5,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }(),
-                          ],
-
-                          // Renderização de cada pino de contato com coordenadas válidas (destacado por último)
-                          for (int i = 0; i < orderedContacts.length; i++)
-                            _buildMapPin(
-                              orderedContacts[i],
-                              i,
-                              orderedContacts.length,
-                              originPx: originPx,
-                              originPy: originPy,
-                              canvasWidth: canvasWidth,
-                              canvasHeight: canvasHeight,
-                              pinLayer: TerritoryCoverageEngine.classifyPin(
-                                orderedContacts[i],
-                                hasActiveStudy: orderedContacts[i].status.toLowerCase() == 'estudo',
-                                lastVisitDate: lastVisitMap[orderedContacts[i].id],
-                                nextAppointmentDate: nextApptMap[orderedContacts[i].id],
                               ),
                             ),
-                        ],
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
-        ),
 
             if (_highlightPersonId != null && highlightPerson != null)
               Positioned(
@@ -2782,24 +2912,28 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                   GestureDetector(
                     onHorizontalDragUpdate: (details) {
                       _rotationAnimController.stop();
-                      setState(() {
-                        _rotation += details.primaryDelta! * 0.02;
-                      });
+                      _rotationNotifier.value +=
+                          (details.primaryDelta ?? 0.0) * 0.02;
                     },
-                    child: FloatingActionButton.small(
-                      heroTag: 'map_compass',
-                      backgroundColor: Colors.white,
-                      foregroundColor: Colors.red.shade700,
-                      tooltip: 'Rotação do mapa (${(_rotation * 180 / math.pi).round()}°). Toque para voltar suavemente ao norte ou arraste para girar.',
-                      onPressed: _animateResetRotationToNorth,
-                      child: Transform.rotate(
-                        angle: _rotation,
-                        child: const Icon(
-                          Icons.navigation_rounded,
-                          size: 20,
-                          color: Colors.red,
-                        ),
-                      ),
+                    child: ValueListenableBuilder<double>(
+                      valueListenable: _rotationNotifier,
+                      builder: (context, rotation, _) {
+                        return FloatingActionButton.small(
+                          heroTag: 'map_compass',
+                          backgroundColor: Colors.white,
+                          foregroundColor: Colors.red.shade700,
+                          tooltip: 'Rotação do mapa (${(rotation * 180 / math.pi).round()}°). Toque para voltar suavemente ao norte ou arraste para girar.',
+                          onPressed: _animateResetRotationToNorth,
+                          child: Transform.rotate(
+                            angle: rotation,
+                            child: const Icon(
+                              Icons.navigation_rounded,
+                              size: 20,
+                              color: Colors.red,
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -2854,14 +2988,11 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                     heroTag: 'map_fullscreen',
                     backgroundColor: Colors.white,
                     foregroundColor: Colors.black87,
-                    tooltip: _isFullscreen ? 'Sair da Tela Cheia' : 'Modo Tela Cheia',
+                    tooltip: isFullscreen ? 'Sair da Tela Cheia' : 'Modo Tela Cheia',
                     onPressed: () {
                       ref.read(isMapFullscreenProvider.notifier).toggle();
-                      setState(() {
-                        _isFullscreen = ref.read(isMapFullscreenProvider);
-                      });
                     },
-                    child: Icon(_isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen),
+                    child: Icon(isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen),
                   ),
                   const SizedBox(height: 6),
 
@@ -2888,8 +3019,11 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                         _centerOnCoords(
                           loc.latitude,
                           loc.longitude,
-                          constraints.maxWidth,
-                          constraints.maxHeight,
+                          viewportW,
+                          viewportH,
+                          viewerW: viewerW,
+                          viewerH: viewerH,
+                          gridHalfSize: gridHalfSize,
                         );
                       } else {
                         setState(() => _isLocatingUser = false);
@@ -2928,6 +3062,9 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                           constraints,
                           originPx,
                           originPy,
+                          viewerW: viewerW,
+                          viewerH: viewerH,
+                          gridHalfSize: gridHalfSize,
                         );
                       }
                     },
@@ -2965,6 +3102,9 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                           constraints,
                           originPx,
                           originPy,
+                          viewerW: viewerW,
+                          viewerH: viewerH,
+                          gridHalfSize: gridHalfSize,
                         );
                       }
                     },
@@ -2979,8 +3119,11 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                     onPressed: () => _centerOnCoords(
                       GeolocationHelper.defaultLat,
                       GeolocationHelper.defaultLng,
-                      constraints.maxWidth,
-                      constraints.maxHeight,
+                      viewportW,
+                      viewportH,
+                      viewerW: viewerW,
+                      viewerH: viewerH,
+                      gridHalfSize: gridHalfSize,
                     ),
                     child: const Icon(Icons.filter_center_focus, size: 18),
                   ),
@@ -3003,10 +3146,15 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                       child: const Text('Pacote SAI: detalhe nativo até Z16',
                           style: TextStyle(fontSize: 10, color: Colors.black87)),
                     ),
-                  _buildMetricScaleBar(
-                    _transformationController.value.getMaxScaleOnAxis(),
-                    effectiveCenterLat,
-                    _zoom,
+                  ValueListenableBuilder<Matrix4>(
+                    valueListenable: _transformationController,
+                    builder: (context, matrix, _) {
+                      return _buildMetricScaleBar(
+                        matrix.getMaxScaleOnAxis(),
+                        effectiveCenterLat,
+                        _zoom,
+                      );
+                    },
                   ),
                   Row(
                     mainAxisSize: MainAxisSize.min,
@@ -3757,6 +3905,211 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
       default:
         return const Color(0xFF2563EB);
     }
+  }
+}
+
+/// Camada isolada de tiles do mapa que escuta transformações e rotação
+/// diretamente, atualizando apenas quando os limites inteiros de tiles visíveis
+/// mudam — eliminando rebuilds da tela inteira durante arraste, zoom e rotação.
+class _DynamicTileLayer extends StatefulWidget {
+  final TransformationController transformationController;
+  final ValueListenable<double> rotationListenable;
+  final int zoom;
+  final int minTileX;
+  final int maxTileX;
+  final int minTileY;
+  final int maxTileY;
+  final double originPx;
+  final double originPy;
+  final double viewportW;
+  final double viewportH;
+  final double viewerW;
+  final double viewerH;
+  final double tileSize;
+  final bool isDark;
+  final MapLayerStyle layerStyle;
+  final Matrix4? initialMatrixOverride;
+
+  const _DynamicTileLayer({
+    required this.transformationController,
+    required this.rotationListenable,
+    required this.zoom,
+    required this.minTileX,
+    required this.maxTileX,
+    required this.minTileY,
+    required this.maxTileY,
+    required this.originPx,
+    required this.originPy,
+    required this.viewportW,
+    required this.viewportH,
+    required this.viewerW,
+    required this.viewerH,
+    required this.tileSize,
+    required this.isDark,
+    required this.layerStyle,
+    this.initialMatrixOverride,
+  });
+
+  @override
+  State<_DynamicTileLayer> createState() => _DynamicTileLayerState();
+}
+
+class _DynamicTileLayerState extends State<_DynamicTileLayer> {
+  late ({
+    int minX,
+    int maxX,
+    int minY,
+    int maxY,
+    double centerWorldX,
+    double centerWorldY,
+  }) _bounds;
+
+  @override
+  void initState() {
+    super.initState();
+    _bounds = _computeBounds(matrixOverride: widget.initialMatrixOverride);
+    widget.transformationController.addListener(_onViewportChanged);
+    widget.rotationListenable.addListener(_onViewportChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant _DynamicTileLayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.transformationController != widget.transformationController) {
+      oldWidget.transformationController.removeListener(_onViewportChanged);
+      widget.transformationController.addListener(_onViewportChanged);
+    }
+    if (oldWidget.rotationListenable != widget.rotationListenable) {
+      oldWidget.rotationListenable.removeListener(_onViewportChanged);
+      widget.rotationListenable.addListener(_onViewportChanged);
+    }
+    _bounds = _computeBounds(matrixOverride: widget.initialMatrixOverride);
+  }
+
+  @override
+  void dispose() {
+    widget.transformationController.removeListener(_onViewportChanged);
+    widget.rotationListenable.removeListener(_onViewportChanged);
+    super.dispose();
+  }
+
+  ({
+    int minX,
+    int maxX,
+    int minY,
+    int maxY,
+    double centerWorldX,
+    double centerWorldY,
+  }) _computeBounds({Matrix4? matrixOverride}) {
+    final m = matrixOverride ?? widget.transformationController.value;
+    final currentScale = m.getMaxScaleOnAxis();
+    final effectiveScale = currentScale > 0.01 ? currentScale : 1.0;
+    final curDx = m.storage[12];
+    final curDy = m.storage[13];
+
+    final canvasCenterX = ((widget.viewerW / 2.0) - curDx) / effectiveScale;
+    final canvasCenterY = ((widget.viewerH / 2.0) - curDy) / effectiveScale;
+    final centerWorldX = widget.originPx + canvasCenterX;
+    final centerWorldY = widget.originPy + canvasCenterY;
+
+    // Bounding box exata da viewport rotacionada dentro do InteractiveViewer
+    final rotation = widget.rotationListenable.value;
+    final absCos = math.cos(rotation).abs();
+    final absSin = math.sin(rotation).abs();
+    final visibleHalfW =
+        (widget.viewportW * absCos + widget.viewportH * absSin) / 2.0;
+    final visibleHalfH =
+        (widget.viewportW * absSin + widget.viewportH * absCos) / 2.0;
+
+    final minVisWorldX = centerWorldX - visibleHalfW / effectiveScale;
+    final maxVisWorldX = centerWorldX + visibleHalfW / effectiveScale;
+    final minVisWorldY = centerWorldY - visibleHalfH / effectiveScale;
+    final maxVisWorldY = centerWorldY + visibleHalfH / effectiveScale;
+
+    final maxTileIndex = (1 << widget.zoom) - 1;
+    // Anel de 1 tile (256px) de pré-carregamento em todas as direções
+    const int tileBuffer = 1;
+    final calcMinX = ((minVisWorldX / widget.tileSize).floor() - tileBuffer)
+        .clamp(0, maxTileIndex);
+    final calcMaxX = ((maxVisWorldX / widget.tileSize).floor() + tileBuffer)
+        .clamp(0, maxTileIndex);
+    final calcMinY = ((minVisWorldY / widget.tileSize).floor() - tileBuffer)
+        .clamp(0, maxTileIndex);
+    final calcMaxY = ((maxVisWorldY / widget.tileSize).floor() + tileBuffer)
+        .clamp(0, maxTileIndex);
+
+    final clampedGridMinX = widget.minTileX.clamp(0, maxTileIndex);
+    final clampedGridMaxX = widget.maxTileX.clamp(0, maxTileIndex);
+    final clampedGridMinY = widget.minTileY.clamp(0, maxTileIndex);
+    final clampedGridMaxY = widget.maxTileY.clamp(0, maxTileIndex);
+
+    final loadMinX = math.max(clampedGridMinX, calcMinX);
+    final loadMaxX = math.min(clampedGridMaxX, calcMaxX);
+    final loadMinY = math.max(clampedGridMinY, calcMinY);
+    final loadMaxY = math.min(clampedGridMaxY, calcMaxY);
+
+    return (
+      minX: loadMinX,
+      maxX: loadMaxX,
+      minY: loadMinY,
+      maxY: loadMaxY,
+      centerWorldX: centerWorldX,
+      centerWorldY: centerWorldY,
+    );
+  }
+
+  void _onViewportChanged() {
+    if (!mounted) return;
+    final next = _computeBounds();
+    if (next.minX != _bounds.minX ||
+        next.maxX != _bounds.maxX ||
+        next.minY != _bounds.minY ||
+        next.maxY != _bounds.maxY) {
+      setState(() {
+        _bounds = next;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final visibleTiles = <({int x, int y})>[
+      for (int x = _bounds.minX; x <= _bounds.maxX; x++)
+        for (int y = _bounds.minY; y <= _bounds.maxY; y++)
+          (x: x, y: y),
+    ]..sort((a, b) {
+      final adx =
+          a.x * widget.tileSize + widget.tileSize / 2 - _bounds.centerWorldX;
+      final ady =
+          a.y * widget.tileSize + widget.tileSize / 2 - _bounds.centerWorldY;
+      final bdx =
+          b.x * widget.tileSize + widget.tileSize / 2 - _bounds.centerWorldX;
+      final bdy =
+          b.y * widget.tileSize + widget.tileSize / 2 - _bounds.centerWorldY;
+      return (adx * adx + ady * ady).compareTo(bdx * bdx + bdy * bdy);
+    });
+
+    return Stack(
+      children: [
+        for (final tile in visibleTiles)
+          Positioned(
+            key: ValueKey('tile_pos_${widget.zoom}_${tile.x}_${tile.y}'),
+            left: (tile.x - widget.minTileX) * widget.tileSize,
+            top: (tile.y - widget.minTileY) * widget.tileSize,
+            child: CachedTileWidget(
+              key: ValueKey(
+                'tile_${widget.layerStyle.id}_${widget.zoom}_${tile.x}_${tile.y}',
+              ),
+              z: widget.zoom,
+              x: tile.x,
+              y: tile.y,
+              size: widget.tileSize,
+              isDark: widget.isDark,
+              layerStyle: widget.layerStyle,
+            ),
+          ),
+      ],
+    );
   }
 }
 
