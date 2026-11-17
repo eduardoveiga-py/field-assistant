@@ -38,7 +38,8 @@ class ContactsMapScreen extends ConsumerStatefulWidget {
   ConsumerState<ContactsMapScreen> createState() => _ContactsMapScreenState();
 }
 
-class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
+class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
+    with SingleTickerProviderStateMixin {
   final TransformationController _transformationController =
       TransformationController();
   bool _hasCenteredInitialView = false;
@@ -62,7 +63,11 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
   static const double _tileSize = 256.0;
   DateTime? _lastZoomChangeTime;
   double _rotation = 0.0; // Rotação manual do mapa, não orientação magnética.
-  double _rotationAtGestureStart = 0.0;
+  late final AnimationController _rotationAnimController;
+  Animation<double>? _rotationAnimation;
+  final Map<int, Offset> _touchPointers = {};
+  double _twoFingerStartAngle = 0.0;
+  double _rotationAtTouchStart = 0.0;
   bool _isFullscreen = false; // Modo Tela Cheia
   ({double latitude, double longitude})? _userGpsLocation; // Localização GPS
   bool _isLocatingUser = false;
@@ -70,6 +75,22 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
   @override
   void initState() {
     super.initState();
+    _rotationAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 350),
+    )..addListener(() {
+        if (_rotationAnimation != null) {
+          setState(() {
+            _rotation = _rotationAnimation!.value;
+          });
+        }
+      })..addStatusListener((status) {
+        if (status == AnimationStatus.completed) {
+          setState(() {
+            _rotation = 0.0;
+          });
+        }
+      });
     _highlightPersonId = widget.highlightPersonId;
     MBTilesService.instance.init().catchError((Object e, StackTrace st) {
       AppLogger.warning('Falha ao inicializar pacotes offline .mbtiles no mapa', e, st);
@@ -275,7 +296,40 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
   void dispose() {
     _peopleSubscription?.close();
     _transformationController.dispose();
+    _rotationAnimController.dispose();
     super.dispose();
+  }
+
+  void _animateResetRotationToNorth() {
+    if (_rotation.abs() < 1e-4) {
+      if (_rotation != 0.0) {
+        setState(() => _rotation = 0.0);
+      }
+      return;
+    }
+    _rotationAnimController.stop();
+
+    // Normaliza a rotação inicial no intervalo (-pi, pi]
+    var start = _rotation % (2 * math.pi);
+    if (start > math.pi) start -= 2 * math.pi;
+    if (start < -math.pi) start += 2 * math.pi;
+
+    _rotation = start;
+    _rotationAnimation = Tween<double>(begin: start, end: 0.0).animate(
+      CurvedAnimation(
+        parent: _rotationAnimController,
+        curve: Curves.easeOutCubic,
+      ),
+    );
+
+    _rotationAnimController.forward(from: 0.0);
+  }
+
+  void _rotateBy(double deltaRadians) {
+    _rotationAnimController.stop();
+    setState(() {
+      _rotation = (_rotation + deltaRadians) % (2 * math.pi);
+    });
   }
 
   double _calculateDistanceKm(
@@ -2395,17 +2449,55 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
                     final touchLat = _pixelY2lat(touchWorldPy, _zoom);
                     _showAddLandmarkModal(context, initialLat: touchLat, initialLng: touchLng);
                   },
-                  onScaleStart: (_) => _rotationAtGestureStart = _rotation,
-                  onScaleUpdate: (details) {
-                    if (details.pointerCount >= 2) {
-                      setState(() {
-                        _rotation = _rotationAtGestureStart + details.rotation;
-                      });
-                    }
-                  },
-                  child: Transform.rotate(
-                    angle: _rotation,
-                    child: InteractiveViewer(
+                  child: Listener(
+                    behavior: HitTestBehavior.translucent,
+                    onPointerDown: (event) {
+                      _touchPointers[event.pointer] = event.position;
+                      if (_touchPointers.length >= 2) {
+                        final pts = _touchPointers.values.take(2).toList();
+                        _twoFingerStartAngle = math.atan2(pts[1].dy - pts[0].dy, pts[1].dx - pts[0].dx);
+                        _rotationAtTouchStart = _rotation;
+                      }
+                    },
+                    onPointerMove: (event) {
+                      if (_touchPointers.containsKey(event.pointer)) {
+                        _touchPointers[event.pointer] = event.position;
+                      }
+                      if (_touchPointers.length >= 2) {
+                        final pts = _touchPointers.values.take(2).toList();
+                        final currentAngle = math.atan2(pts[1].dy - pts[0].dy, pts[1].dx - pts[0].dx);
+                        var diff = currentAngle - _twoFingerStartAngle;
+                        while (diff > math.pi) {
+                          diff -= 2 * math.pi;
+                        }
+                        while (diff < -math.pi) {
+                          diff += 2 * math.pi;
+                        }
+                        _rotationAnimController.stop();
+                        setState(() {
+                          _rotation = _rotationAtTouchStart + diff;
+                        });
+                      }
+                    },
+                    onPointerUp: (event) {
+                      _touchPointers.remove(event.pointer);
+                      _rotationAtTouchStart = _rotation;
+                      if (_touchPointers.length >= 2) {
+                        final pts = _touchPointers.values.take(2).toList();
+                        _twoFingerStartAngle = math.atan2(pts[1].dy - pts[0].dy, pts[1].dx - pts[0].dx);
+                      }
+                    },
+                    onPointerCancel: (event) {
+                      _touchPointers.remove(event.pointer);
+                      _rotationAtTouchStart = _rotation;
+                      if (_touchPointers.length >= 2) {
+                        final pts = _touchPointers.values.take(2).toList();
+                        _twoFingerStartAngle = math.atan2(pts[1].dy - pts[0].dy, pts[1].dx - pts[0].dx);
+                      }
+                    },
+                    child: Transform.rotate(
+                      angle: _rotation,
+                      child: InteractiveViewer(
                     transformationController: _transformationController,
                     constrained: false, // Permite que o mapa ocupe 100% da área sem distorção ou cortes pretos
                     boundaryMargin: const EdgeInsets.all(
@@ -2622,6 +2714,7 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
               ),
             ),
           ),
+        ),
 
             if (_highlightPersonId != null && highlightPerson != null)
               Positioned(
@@ -2685,25 +2778,63 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen> {
               right: 12,
               child: Column(
                 children: [
-                  // Rotação manual; não utiliza sensores de bússola.
-                  FloatingActionButton.small(
-                    heroTag: 'map_compass',
-                    backgroundColor: Colors.white,
-                    foregroundColor: Colors.red.shade700,
-                    tooltip: 'Rotação do mapa (${(_rotation * 180 / math.pi).round()}°). Toque para voltar ao norte.',
-                    onPressed: () {
+                  // Rotação manual com bússola e retorno suave ao norte
+                  GestureDetector(
+                    onHorizontalDragUpdate: (details) {
+                      _rotationAnimController.stop();
                       setState(() {
-                        _rotation = 0.0;
+                        _rotation += details.primaryDelta! * 0.02;
                       });
                     },
-                    child: Transform.rotate(
-                      angle: -_rotation,
-                      child: const Icon(
-                        Icons.navigation_rounded,
-                        size: 20,
-                        color: Colors.red,
+                    child: FloatingActionButton.small(
+                      heroTag: 'map_compass',
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.red.shade700,
+                      tooltip: 'Rotação do mapa (${(_rotation * 180 / math.pi).round()}°). Toque para voltar suavemente ao norte ou arraste para girar.',
+                      onPressed: _animateResetRotationToNorth,
+                      child: Transform.rotate(
+                        angle: _rotation,
+                        child: const Icon(
+                          Icons.navigation_rounded,
+                          size: 20,
+                          color: Colors.red,
+                        ),
                       ),
                     ),
+                  ),
+                  const SizedBox(height: 6),
+                  // Botões de ajuste manual de rumo
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: FloatingActionButton.small(
+                          heroTag: 'map_rotate_left',
+                          backgroundColor: Colors.white,
+                          foregroundColor: Colors.black87,
+                          elevation: 2,
+                          tooltip: 'Girar 45° à esquerda',
+                          onPressed: () => _rotateBy(-math.pi / 4),
+                          child: const Icon(Icons.rotate_left, size: 16),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: FloatingActionButton.small(
+                          heroTag: 'map_rotate_right',
+                          backgroundColor: Colors.white,
+                          foregroundColor: Colors.black87,
+                          elevation: 2,
+                          tooltip: 'Girar 45° à direita',
+                          onPressed: () => _rotateBy(math.pi / 4),
+                          child: const Icon(Icons.rotate_right, size: 16),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 6),
 

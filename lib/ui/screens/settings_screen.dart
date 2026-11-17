@@ -60,6 +60,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _exchangePasswordCtrl = TextEditingController();
   final _exchangeHostCtrl = TextEditingController();
   late Future<DateTime?> _lastSilentBackupFuture;
+  Future<bool>? _e2eeFuture;
+  String? _lastEffectiveUserId;
+
+  Future<bool> _getE2eeFuture(String effectiveUserId) {
+    if (_e2eeFuture == null || _lastEffectiveUserId != effectiveUserId) {
+      _lastEffectiveUserId = effectiveUserId;
+      _e2eeFuture = ref.read(e2eeServiceProvider).isKeyInstalled(effectiveUserId);
+    }
+    return _e2eeFuture!;
+  }
 
   @override
   void initState() {
@@ -1764,145 +1774,177 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             const SizedBox(height: 6),
             Text('E-mail: $userEmail', style: const TextStyle(fontSize: 14)),
-            if (currentUser != null) ...[
-              () {
-                final user = currentUser;
-                if (user == null) return const SizedBox.shrink();
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 10),
-                    FutureBuilder<bool>(
-                      future: ref.read(e2eeServiceProvider).isKeyInstalled(user.id),
-                      builder: (ctx, snapshot) {
-                        final isE2eeConfigured = snapshot.data ?? false;
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          return const LinearProgressIndicator(minHeight: 2);
-                        }
-                        if (isE2eeConfigured) {
-                          return Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: Colors.green.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.green.shade400),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Icon(Icons.lock, color: Colors.green.shade700, size: 18),
-                                    const SizedBox(width: 8),
-                                    const Expanded(
-                                      child: Text(
-                                        'Criptografia de Ponta a Ponta Ativa (E2EE)',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 13,
-                                          color: Colors.green,
-                                        ),
-                                      ),
-                                    ),
-                                    Chip(
-                                      label: const Text('Protegido', style: TextStyle(fontSize: 10, color: Colors.white)),
-                                      backgroundColor: Colors.green.shade700,
-                                      visualDensity: VisualDensity.compact,
-                                      padding: EdgeInsets.zero,
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                const Text(
-                                  'Seus registros e mídias são cifrados no aparelho com chave BIP-39 e AES-256-GCM antes de trafegar na nuvem.',
-                                  style: TextStyle(fontSize: 11),
-                                ),
-                                const SizedBox(height: 8),
-                                OutlinedButton.icon(
-                                  onPressed: () async {
-                                    final hasVault = await ref.read(e2eeServiceProvider).hasRemoteVault(user.id);
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            hasVault
-                                                ? 'Cofre remoto E2EE ativo e sincronizado com este dispositivo.'
-                                                : 'Chave E2EE instalada localmente neste dispositivo.',
-                                          ),
-                                          backgroundColor: Colors.green,
-                                        ),
-                                      );
-                                    }
-                                  },
-                                  icon: const Icon(Icons.verified_user, size: 16),
-                                  label: const Text('Verificar Status do Cofre'),
-                                ),
-                              ],
-                            ),
-                          );
-                        } else {
-                          return Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: Colors.amber.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.amber.shade700),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Icon(Icons.shield_outlined, color: Colors.amber.shade900, size: 20),
-                                    const SizedBox(width: 8),
-                                    const Expanded(
-                                      child: Text(
-                                        'Chave E2EE Necessária',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 13,
-                                          color: Colors.amber,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                const Text(
-                                  'A sincronização está pausada para proteger seus dados. Configure ou restaure sua frase de 24 palavras para ativar.',
-                                  style: TextStyle(fontSize: 11),
-                                ),
-                                const SizedBox(height: 8),
-                                ElevatedButton.icon(
-                                  onPressed: () async {
-                                    final updated = await E2eeSetupDialog.show(context, userId: user.id);
-                                    if (updated == true && mounted) {
-                                      setState(() {});
-                                    }
-                                  },
-                                  icon: const Icon(Icons.security, size: 16),
-                                  label: const Text('Configurar / Restaurar Chave E2EE'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.amber.shade800,
-                                    foregroundColor: Colors.white,
+            const SizedBox(height: 10),
+            () {
+              final effectiveUserId = currentUser?.id ?? 'local_user';
+              return FutureBuilder<bool>(
+                future: _getE2eeFuture(effectiveUserId),
+                builder: (ctx, snapshot) {
+                  final isE2eeConfigured = snapshot.data ?? false;
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const SizedBox(height: 2);
+                  }
+                  if (isE2eeConfigured) {
+                    return Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.green.shade400),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.lock, color: Colors.green.shade700, size: 18),
+                              const SizedBox(width: 8),
+                              const Expanded(
+                                child: Text(
+                                  'Criptografia de Ponta a Ponta Ativa (E2EE)',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                    color: Colors.green,
                                   ),
                                 ),
-                              ],
+                              ),
+                              Chip(
+                                label: const Text('Protegido', style: TextStyle(fontSize: 10, color: Colors.white)),
+                                backgroundColor: Colors.green.shade700,
+                                visualDensity: VisualDensity.compact,
+                                padding: EdgeInsets.zero,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'Seus registros e mídias são cifrados no aparelho com chave BIP-39 e AES-256-GCM antes de trafegar na nuvem.',
+                            style: TextStyle(fontSize: 11),
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              ElevatedButton.icon(
+                                onPressed: () async {
+                                  final updated = await E2eeSetupDialog.show(context, userId: effectiveUserId);
+                                  if (updated == true && mounted) {
+                                    _e2eeFuture = null;
+                                    setState(() {});
+                                  }
+                                },
+                                icon: const Icon(Icons.sync_lock, size: 16),
+                                label: const Text('Configurar / Restaurar Chave (24 Palavras)'),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: () async {
+                                  final isInstalled = await ref.read(e2eeServiceProvider).isKeyInstalled(effectiveUserId);
+                                  final hasVault = currentUser != null
+                                      ? await ref.read(e2eeServiceProvider).hasRemoteVault(currentUser.id)
+                                      : false;
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          hasVault
+                                              ? 'Cofre remoto E2EE ativo e sincronizado com este dispositivo.'
+                                              : (isInstalled
+                                                  ? 'Chave E2EE instalada localmente neste dispositivo.'
+                                                  : 'Chave E2EE não encontrada.'),
+                                        ),
+                                        backgroundColor: isInstalled ? Colors.green : Colors.orange,
+                                      ),
+                                    );
+                                  }
+                                },
+                                icon: const Icon(Icons.verified_user, size: 16),
+                                label: const Text('Verificar Status do Cofre'),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  } else {
+                    return Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.amber.shade700),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.shield_outlined, color: Colors.amber.shade900, size: 20),
+                              const SizedBox(width: 8),
+                              const Expanded(
+                                child: Text(
+                                  'Chave E2EE de 24 Palavras Necessária',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                    color: Colors.amber,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'A sincronização com a nuvem requer criptografia de ponta a ponta (E2EE) com frase de segurança de 24 palavras. Configure uma nova chave ou restaure sua frase existente a qualquer momento.',
+                            style: TextStyle(fontSize: 11),
+                          ),
+                          const SizedBox(height: 8),
+                          ElevatedButton.icon(
+                            onPressed: () async {
+                              final updated = await E2eeSetupDialog.show(context, userId: effectiveUserId);
+                              if (updated == true && mounted) {
+                                _e2eeFuture = null;
+                                setState(() {});
+                              }
+                            },
+                            icon: const Icon(Icons.security, size: 16),
+                            label: const Text('Configurar / Restaurar Chave de 24 Palavras'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.amber.shade800,
+                              foregroundColor: Colors.white,
                             ),
-                          );
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 10),
-                  ],
-                );
-              }(),
-            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                },
+              );
+            }(),
             const SizedBox(height: 6),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
+                if (!isSupabaseReady)
+                  ElevatedButton.icon(
+                    onPressed: () async {
+                      try {
+                        await SupabaseSyncService.initialize();
+                        if (mounted) setState(() {});
+                      } catch (e, st) {
+                        AppLogger.error('Falha ao inicializar Supabase', e, st);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Erro ao conectar Supabase: $e')),
+                          );
+                        }
+                      }
+                    },
+                    icon: const Icon(Icons.refresh, size: 18),
+                    label: const Text('Reconectar / Inicializar Padrão'),
+                  ),
                 ElevatedButton.icon(
                   onPressed: !isSupabaseReady
                       ? null
@@ -2278,8 +2320,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             AppKvStoreCompanion.insert(key: entry.key, value: entry.value, updatedAt: now));
         }
       });
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Conexão Exchange verificada e salva. As mensagens ainda não foram baixadas: abra Inbox & JW Mail e toque em Sincronizar. Leitura experimental.'), backgroundColor: Colors.green, duration: Duration(seconds: 10)));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Conexão Exchange verificada e salva. As mensagens ainda não foram baixadas: abra Inbox & JW Mail e toque em Sincronizar. Leitura experimental.'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 10),
+        ));
+      }
     } catch (e) {
       String message = 'Não foi possível verificar o Exchange. Confira servidor, autenticação e rede.';
       if (e is ExchangeException) message = e.message;

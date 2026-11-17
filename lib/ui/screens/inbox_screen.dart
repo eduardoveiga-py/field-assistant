@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -11,6 +13,7 @@ import '../../inbox/inbox_manager.dart';
 import '../../inbox/exchange_service.dart';
 import '../../inbox/jw_email_service.dart';
 import '../../research/research_manager.dart';
+import '../../sync/supabase_sync_service.dart';
 import '../../voice_notes/audio_recording_service.dart';
 import '../providers.dart';
 import 'settings_screen.dart';
@@ -60,6 +63,17 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
         });
       }
     });
+    if (kIsWeb) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(() async {
+          try {
+            await ref.read(supabaseSyncServiceProvider).sync();
+          } catch (e, st) {
+            AppLogger.warning('Falha na sincronização inicial do Supabase na Web', e, st);
+          }
+        }());
+      });
+    }
   }
 
   @override
@@ -82,6 +96,21 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
   Future<void> _syncEmails() async {
     setState(() => _isSyncingEmails = true);
     try {
+      if (kIsWeb) {
+        // Na Web: navegadores não abrem sockets TCP brutos para IMAP nem EAS direto.
+        // Sincroniza com o Supabase, baixando mensagens e anexos já sincronizados do iOS / iPad.
+        final syncResult = await ref.read(supabaseSyncServiceProvider).sync();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Sincronização em nuvem (Web): ${syncResult.message}'),
+              backgroundColor: syncResult.success ? Colors.green : Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
       final db = ref.read(repositoryProvider).db;
       final protocol = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_mail_protocol'))).getSingleOrNull();
       if (protocol?.value == 'exchange') {
@@ -97,10 +126,23 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
           password: password, deviceId: deviceId);
         final result = await ExchangeReadService(db).sync(session: session, host: host.value,
           account: email.value, deviceId: deviceId, allMailFolders: true);
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('${result.saved} prévia(s) Exchange salva(s) em ${result.foldersRead} pasta(s). '
-            '${result.moreAvailable ? 'Há mais mensagens; sincronize novamente. ' : ''}'
-            'Corpos podem ser parciais; anexos não foram importados.')));
+
+        // Envia imediatamente novas mensagens salvas para o Supabase
+        unawaited(() async {
+          try {
+            await ref.read(supabaseSyncServiceProvider).sync();
+          } catch (e, st) {
+            AppLogger.warning('Falha ao enviar mensagens Exchange ao Supabase', e, st);
+          }
+        }());
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('${result.saved} prévia(s) Exchange salva(s) em ${result.foldersRead} pasta(s) e sincronizada(s) para a nuvem. '
+              '${result.moreAvailable ? 'Há mais mensagens; sincronize novamente. ' : ''}'
+              'Corpos podem ser parciais; anexos não foram importados.'),
+          ));
+        }
         return;
       }
       final emailEntry = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_imap_email'))).getSingleOrNull();
@@ -117,12 +159,17 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
       final port = int.tryParse(portEntry?.value ?? '') ?? 993;
       final username = emailEntry?.value.trim();
 
-      // Se a conta não estiver configurada, orienta o usuário com ação direta
+      // Se a conta não estiver configurada, tenta sincronizar mensagens da nuvem Supabase antes
       if (username == null || username.isEmpty || password == null || password.isEmpty) {
+        final syncResult = await ref.read(supabaseSyncServiceProvider).sync();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: const Text('Configure sua conta de e-mail teocrático em Configurações para sincronizar.'),
+              content: Text(
+                syncResult.success && syncResult.totalProcessed > 0
+                    ? 'Sincronizado da nuvem: ${syncResult.message}'
+                    : 'Configure sua conta de e-mail teocrático em Configurações para sincronizar.',
+              ),
               action: SnackBarAction(
                 label: 'Configurar',
                 onPressed: () {
@@ -145,12 +192,22 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
         username: username,
         password: password,
       );
+
+      // Envia imediatamente novas mensagens importadas para o Supabase
+      unawaited(() async {
+        try {
+          await ref.read(supabaseSyncServiceProvider).sync();
+        } catch (e, st) {
+          AppLogger.warning('Falha ao enviar mensagens IMAP ao Supabase', e, st);
+        }
+      }());
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
               count > 0
-                  ? '$count mensagem(ns) importada(s). O MIME original fica salvo; anexos ainda não abrem individualmente.'
+                  ? '$count mensagem(ns) importada(s) e sincronizada(s) para a nuvem.'
                   : 'Nenhuma mensagem nova na caixa de entrada.',
             ),
           ),
@@ -2346,10 +2403,12 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                       final protocol = await (db.select(db.appKvStore)
                                             ..where((t) => t.key.equals('jw_mail_protocol'))).getSingleOrNull();
                                       if (protocol?.value == 'exchange') {
-                                        if (ctx.mounted) setSheetState(() {
-                                          isSending = false;
-                                          inlineError = 'Envio pelo Exchange ainda não disponível. Salve o rascunho e use o correio oficial.';
-                                        });
+                                        if (ctx.mounted) {
+                                          setSheetState(() {
+                                            isSending = false;
+                                            inlineError = 'Envio pelo Exchange ainda não disponível. Salve o rascunho e use o correio oficial.';
+                                          });
+                                        }
                                         return;
                                       }
                                       final emailEntry = await (db.select(db.appKvStore)

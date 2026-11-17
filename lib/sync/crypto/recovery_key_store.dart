@@ -19,6 +19,12 @@ class RecoveryKeyStore {
   static Future<void> _tail = Future<void>.value();
   static final Map<String, String> _webMemoryKeys = {};
 
+  @visibleForTesting
+  static void resetForTesting() {
+    _tail = Future<void>.value();
+    _webMemoryKeys.clear();
+  }
+
   static Future<T> _serialized<T>(Future<T> Function() op) {
     final result = _tail.then((_) => op());
     _tail = result.then<void>((_) {}, onError: (Object _, StackTrace _) {});
@@ -57,6 +63,20 @@ class RecoveryKeyStore {
     }
     final value = await _storage.read(key: _storageKey(owner));
     return value == null ? null : SecretKey(_decode(value));
+  });
+
+  /// Copia a chave de recuperação entre contas (ex: local_user para usuário autenticado)
+  Future<void> copyOwnerKey({required String fromOwner, required String toOwner}) => _serialized(() async {
+    if (fromOwner == toOwner) return;
+    if (kIsWeb) {
+      final k = _webMemoryKeys[fromOwner];
+      if (k != null) _webMemoryKeys[toOwner] = k;
+      return;
+    }
+    final k = await _storage.read(key: _storageKey(fromOwner));
+    if (k != null) {
+      await _storage.write(key: _storageKey(toOwner), value: k);
+    }
   });
 
   /// Valida a chave e a identidade de um cofre já conhecido antes de guardar a chave.

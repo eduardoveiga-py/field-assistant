@@ -35,11 +35,20 @@ class E2eeService {
     }
   }
 
+  static const String localUserId = 'local_user';
+
   /// Verifica se a chave E2EE está instalada localmente no dispositivo para o usuário
   Future<bool> isKeyInstalled(String ownerId) async {
-    if (ownerId.isEmpty) return false;
+    final effectiveId = ownerId.trim().isNotEmpty ? ownerId.trim() : localUserId;
     try {
-      final key = await keyStore.load(ownerId);
+      var key = await keyStore.load(effectiveId);
+      if (key == null && effectiveId != localUserId) {
+        final localKey = await keyStore.load(localUserId);
+        if (localKey != null) {
+          await keyStore.copyOwnerKey(fromOwner: localUserId, toOwner: effectiveId);
+          return true;
+        }
+      }
       return key != null;
     } catch (e, st) {
       AppLogger.warning('Falha ao verificar chave E2EE local para $ownerId', e, st);
@@ -49,9 +58,17 @@ class E2eeService {
 
   /// Retorna a chave E2EE (SecretKey) em memória se instalada
   Future<SecretKey?> getKey(String ownerId) async {
-    if (ownerId.isEmpty) return null;
+    final effectiveId = ownerId.trim().isNotEmpty ? ownerId.trim() : localUserId;
     try {
-      return await keyStore.load(ownerId);
+      var key = await keyStore.load(effectiveId);
+      if (key == null && effectiveId != localUserId) {
+        final localKey = await keyStore.load(localUserId);
+        if (localKey != null) {
+          await keyStore.copyOwnerKey(fromOwner: localUserId, toOwner: effectiveId);
+          return localKey;
+        }
+      }
+      return key;
     } catch (e, st) {
       AppLogger.warning('Falha ao carregar chave E2EE para $ownerId', e, st);
       return null;
@@ -63,6 +80,9 @@ class E2eeService {
     if (vaultTransportOverride != null) return vaultTransportOverride;
     final c = _client;
     if (c == null) return null;
+    if (c.auth.currentUser == null || c.auth.currentUser!.id != ownerId) {
+      return null;
+    }
     return SupabaseRecoveryVaultTransport(client: c, owner: ownerId);
   }
 
@@ -90,14 +110,15 @@ class E2eeService {
   /// Inicializa um novo cofre E2EE com frase mnemônica de 24 palavras BIP-39,
   /// grava no cofre remoto e instala no armazenamento local seguro.
   Future<String> setupNewVault(String ownerId) async {
+    final effectiveId = ownerId.trim().isNotEmpty ? ownerId.trim() : localUserId;
     final phrase = RecoveryCrypto.createPhrase();
     final key = await RecoveryCrypto.keyFromPhrase(phrase);
-    final marker = await RecoveryVaultVerifier.create(root: key, owner: ownerId);
+    final marker = await RecoveryVaultVerifier.create(root: key, owner: effectiveId);
     final vaultId = marker['vaultId'] as String;
 
-    final transport = getVaultTransport(ownerId);
+    final transport = getVaultTransport(effectiveId);
     if (transport != null) {
-      final setup = RecoveryVaultSetup(owner: ownerId, transport: transport);
+      final setup = RecoveryVaultSetup(owner: effectiveId, transport: transport);
       final created = await setup.createConfirmed(
         key: key,
         marker: marker,
@@ -110,31 +131,38 @@ class E2eeService {
       }
     }
 
-    await keyStore.install(owner: ownerId, phrase: phrase, confirmation: phrase);
-    AppLogger.info('Novo cofre E2EE configurado com sucesso para $ownerId');
+    await keyStore.install(owner: effectiveId, phrase: phrase, confirmation: phrase);
+    if (effectiveId != localUserId) {
+      await keyStore.copyOwnerKey(fromOwner: effectiveId, toOwner: localUserId);
+    }
+    AppLogger.info('Novo cofre E2EE configurado com sucesso para $effectiveId');
     return phrase;
   }
 
   /// Restaura o acesso ao cofre a partir da frase de 24 palavras digitada pelo usuário
   Future<bool> restoreVault(String ownerId, String phrase) async {
+    final effectiveId = ownerId.trim().isNotEmpty ? ownerId.trim() : localUserId;
     final key = await RecoveryCrypto.keyFromPhrase(phrase);
-    final transport = getVaultTransport(ownerId);
+    final transport = getVaultTransport(effectiveId);
     if (transport != null) {
       final remoteMarker = await transport.fetch();
       if (remoteMarker != null) {
         try {
-          await RecoveryVaultVerifier.verify(root: key, owner: ownerId, marker: remoteMarker);
+          await RecoveryVaultVerifier.verify(root: key, owner: effectiveId, marker: remoteMarker);
         } on SecretBoxAuthenticationError catch (e, st) {
-          AppLogger.warning('Frase incorreta ao restaurar cofre E2EE para $ownerId', e, st);
+          AppLogger.warning('Frase incorreta ao restaurar cofre E2EE para $effectiveId', e, st);
           throw const FormatException('A frase fornecida não corresponde ao cofre cadastrado no servidor.');
         }
       } else {
-        final marker = await RecoveryVaultVerifier.create(root: key, owner: ownerId);
+        final marker = await RecoveryVaultVerifier.create(root: key, owner: effectiveId);
         await transport.createIfAbsent(marker);
       }
     }
-    await keyStore.install(owner: ownerId, phrase: phrase, confirmation: phrase);
-    AppLogger.info('Cofre E2EE restaurado com sucesso para $ownerId');
+    await keyStore.install(owner: effectiveId, phrase: phrase, confirmation: phrase);
+    if (effectiveId != localUserId) {
+      await keyStore.copyOwnerKey(fromOwner: effectiveId, toOwner: localUserId);
+    }
+    AppLogger.info('Cofre E2EE restaurado com sucesso para $effectiveId');
     return true;
   }
 

@@ -45,6 +45,8 @@ typedef SyncResult = SyncProcessResult;
 class SupabaseSyncService {
   static const String runtimeUrlStorageKey = 'runtime_supabase_url';
   static const String runtimeAnonKeyStorageKey = 'runtime_supabase_anon_key';
+  static const String defaultUrl = 'https://pchwrcwrvnbiywrdsvum.supabase.co';
+  static const String defaultAnonKey = 'sb_publishable_TUOpxRmQESlufGuNMqrhUA_Bltscqvy';
 
   static bool get isInitialized {
     try {
@@ -112,14 +114,13 @@ class SupabaseSyncService {
 
     if (!SupabaseConfig.isConfigured) {
       final runtimeCfg = await loadRuntimeConfig(storage: storage);
-      if (runtimeCfg == null) {
-        AppLogger.info(
-          'Supabase não configurado via --dart-define nem em runtime; operando exclusivamente offline-first.',
-        );
-        return;
+      if (runtimeCfg != null) {
+        url = runtimeCfg.url;
+        anonKey = runtimeCfg.anonKey;
+      } else {
+        url = defaultUrl;
+        anonKey = defaultAnonKey;
       }
-      url = runtimeCfg.url;
-      anonKey = runtimeCfg.anonKey;
     }
 
     if (!isInitialized) {
@@ -221,11 +222,11 @@ class SupabaseSyncService {
     required this.repository,
     this.supabaseUrl = const String.fromEnvironment(
       'SUPABASE_URL',
-      defaultValue: '',
+      defaultValue: defaultUrl,
     ),
     this.supabaseAnonKey = const String.fromEnvironment(
       'SUPABASE_ANON_KEY',
-      defaultValue: '',
+      defaultValue: defaultAnonKey,
     ),
     this.clientOverride,
     this.documentsDirectoryProvider,
@@ -2019,7 +2020,9 @@ class SupabaseSyncService {
       if (SyncTimestamp.dateFieldKeys.contains(key) && x != null && y != null) {
         final dx = SyncTimestamp.parse(x), dy = SyncTimestamp.parse(y);
         if (dx != null && dy != null &&
-            dx.millisecondsSinceEpoch ~/ 1000 == dy.millisecondsSinceEpoch ~/ 1000) continue;
+            dx.millisecondsSinceEpoch ~/ 1000 == dy.millisecondsSinceEpoch ~/ 1000) {
+          continue;
+        }
       }
       if (!_valuesEqualNormalized(x, y)) return false;
     }
@@ -2079,13 +2082,17 @@ class SupabaseSyncService {
           final local = await _getLocalMap(mapEntityToRemoteTable(last.entityType), last.entityId);
           final latest = normalizeRemotePayload(sanitizePayload(last.entityType, payloads[last.id]!));
           if (!valid || local == null || (local['revision'] as num?)?.toInt() != revision(last) ||
-              !_sameQueuedSnapshot(latest, local)) continue;
+              !_sameQueuedSnapshot(latest, local)) {
+            continue;
+          }
           final combined = Map<String, dynamic>.from(payloads[last.id]!);
           combined.remove('_base');
           combined.remove('baseData');
           final firstPayload = payloads[first.id]!;
           if (first.operation.toUpperCase() == 'UPDATE' &&
-              firstPayload['_base'] is! Map && firstPayload['baseData'] is! Map) continue;
+              firstPayload['_base'] is! Map && firstPayload['baseData'] is! Map) {
+            continue;
+          }
           if (firstPayload['_base'] is Map) combined['_base'] = firstPayload['_base'];
           if (firstPayload['baseData'] is Map) combined['baseData'] = firstPayload['baseData'];
           await (db.update(db.syncQueue)..where((t) => t.id.equals(first.id))).write(

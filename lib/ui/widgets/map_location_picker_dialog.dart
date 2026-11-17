@@ -198,7 +198,9 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
       // A localização escolhida continua válida mesmo se a busca falhar.
     }
     if (!mounted || request != _addressRequest ||
-        lat != _selectedLat || lng != _selectedLng) return;
+        lat != _selectedLat || lng != _selectedLng) {
+      return;
+    }
 
     setState(() {
       _isLoadingAddress = false;

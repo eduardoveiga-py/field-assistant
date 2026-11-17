@@ -33,7 +33,9 @@ class ExchangeAttachmentReader {
       }
       // Status 10 significa arquivo vazio; somente no primeiro pedido.
       if (response.status == 10 && offset == 0 && (response.total == null || response.total == 0) &&
-          (response.data == null || response.data!.isEmpty)) return;
+          (response.data == null || response.data!.isEmpty)) {
+        return;
+      }
       if (response.status != 1 || response.data == null || response.total == null || response.byteRange == null) {
         throw const ExchangeException('Exchange retornou anexo incompleto ou sem intervalo verificável.');
       }

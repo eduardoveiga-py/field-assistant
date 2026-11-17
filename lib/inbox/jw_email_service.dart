@@ -18,6 +18,7 @@ import 'package:uuid/uuid.dart';
 
 import '../core/app_logger.dart';
 import '../core/biometric_auth_service.dart';
+import '../core/sync_timestamp.dart';
 import '../database/app_database.dart';
 import '../reports/web_downloader.dart';
 
@@ -1263,6 +1264,15 @@ class JwEmailService {
             createdAt: now,
             updatedAt: now,
           ));
+          final inserted = await (db.select(db.inboxEntries)..where((t) => t.id.equals(entryId))).getSingle();
+          await db.into(db.syncQueue).insert(SyncQueueCompanion.insert(
+            id: const Uuid().v4(),
+            entityType: 'inbox_entries',
+            entityId: entryId,
+            operation: 'INSERT',
+            payload: jsonEncode(SyncTimestamp.normalizeMapDates(inserted.toJson())),
+            createdAt: now,
+          ));
           savedCount++;
         }
       });
@@ -1374,7 +1384,18 @@ class JwEmailService {
       updatedAt: now,
     );
 
+    final existingDraft = await (db.select(db.inboxEntries)..where((t) => t.id.equals(entryId))).getSingleOrNull();
+    final op = existingDraft != null ? 'UPDATE' : 'INSERT';
     await db.into(db.inboxEntries).insertOnConflictUpdate(companion);
+    final insertedDraft = await (db.select(db.inboxEntries)..where((t) => t.id.equals(entryId))).getSingle();
+    await db.into(db.syncQueue).insert(SyncQueueCompanion.insert(
+      id: const Uuid().v4(),
+      entityType: 'inbox_entries',
+      entityId: entryId,
+      operation: op,
+      payload: jsonEncode(SyncTimestamp.normalizeMapDates(insertedDraft.toJson())),
+      createdAt: now,
+    ));
   }
 
   /// Envia e-mail real via servidor SMTP autenticado e persiste registro local retido.
@@ -1436,7 +1457,18 @@ class JwEmailService {
       updatedAt: now,
     );
 
+    final existingSent = await (db.select(db.inboxEntries)..where((t) => t.id.equals(resolvedEntryId))).getSingleOrNull();
+    final op = existingSent != null ? 'UPDATE' : 'INSERT';
     await db.into(db.inboxEntries).insertOnConflictUpdate(companion);
+    final insertedSent = await (db.select(db.inboxEntries)..where((t) => t.id.equals(resolvedEntryId))).getSingle();
+    await db.into(db.syncQueue).insert(SyncQueueCompanion.insert(
+      id: const Uuid().v4(),
+      entityType: 'inbox_entries',
+      entityId: resolvedEntryId,
+      operation: op,
+      payload: jsonEncode(SyncTimestamp.normalizeMapDates(insertedSent.toJson())),
+      createdAt: now,
+    ));
     return sentMsg;
   }
 

@@ -19,11 +19,12 @@ class E2eeSetupDialog extends ConsumerStatefulWidget {
     this.onCompleted,
   });
 
-  static Future<bool?> show(BuildContext context, {required String userId}) {
+  static Future<bool?> show(BuildContext context, {String? userId}) {
+    final effectiveId = (userId != null && userId.trim().isNotEmpty) ? userId.trim() : 'local_user';
     return showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => E2eeSetupDialog(userId: userId),
+      builder: (ctx) => E2eeSetupDialog(userId: effectiveId),
     );
   }
 
@@ -94,12 +95,19 @@ class _E2eeSetupDialogState extends ConsumerState<E2eeSetupDialog>
         phrase: _generatedPhrase!,
         confirmation: _generatedPhrase!,
       );
+      if (widget.userId != 'local_user') {
+        await e2ee.keyStore.copyOwnerKey(fromOwner: widget.userId, toOwner: 'local_user');
+      }
 
       final key = await RecoveryCrypto.keyFromPhrase(_generatedPhrase!);
       final marker = await RecoveryVaultVerifier.create(root: key, owner: widget.userId);
       final transport = e2ee.getVaultTransport(widget.userId);
       if (transport != null) {
-        await transport.createIfAbsent(marker);
+        try {
+          await transport.createIfAbsent(marker);
+        } catch (e) {
+          AppLogger.warning('Não foi possível gravar marcador remoto imediatamente: $e');
+        }
       }
 
       AppLogger.info('Cofre E2EE configurado com sucesso para ${widget.userId}');
@@ -145,6 +153,9 @@ class _E2eeSetupDialogState extends ConsumerState<E2eeSetupDialog>
     try {
       final e2ee = ref.read(e2eeServiceProvider);
       await e2ee.restoreVault(widget.userId, phrase);
+      if (widget.userId != 'local_user') {
+        await e2ee.keyStore.copyOwnerKey(fromOwner: widget.userId, toOwner: 'local_user');
+      }
 
       if (mounted) {
         // Dispara sincronização após restauração
