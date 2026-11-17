@@ -22,11 +22,48 @@ class TileCacheService {
   static const int _offlineByteLimit = 8 * 1024 * 1024;
   static const int _offlineTileLimit = 256;
   static final Map<String, Uint8List> _memoryCache = {};
+  final Map<String, int> _activeConsumers = {};
+  final Map<String, int> _directRequests = {};
+  final Set<String> _widgetTrackedKeys = {};
+  static VoidCallback? _onStaleTileReleased;
   MapLayerStyle _activeStyle = MapLayerStyle.standard;
 
   TileCacheService._internal();
 
   MapLayerStyle get activeStyle => _activeStyle;
+
+  static void setStaleQueuePruner(VoidCallback? pruner) {
+    _onStaleTileReleased = pruner;
+  }
+
+  String registerTileConsumer(int z, int x, int y, [MapLayerStyle? style]) {
+    final key = _cacheKey(z, x, y, style ?? _activeStyle);
+    _activeConsumers[key] = (_activeConsumers[key] ?? 0) + 1;
+    _widgetTrackedKeys.add(key);
+    return key;
+  }
+
+  void unregisterTileConsumer(String key) {
+    final current = _activeConsumers[key];
+    if (current == null || current <= 1) {
+      _activeConsumers.remove(key);
+      if ((_directRequests[key] ?? 0) == 0 && _widgetTrackedKeys.contains(key)) {
+        _onStaleTileReleased?.call();
+      }
+    } else {
+      _activeConsumers[key] = current - 1;
+    }
+  }
+
+  /// Retorna true apenas quando o pedido partiu exclusivamente de widgets
+  /// de tile que já foram desmontados (ex.: usuário arrastou para longe).
+  /// Chamadas diretas ao backend ou a [getTileBytes] nunca são canceladas.
+  bool isTileRequestStale(int z, int x, int y, [MapLayerStyle? style]) {
+    final key = _cacheKey(z, x, y, style ?? _activeStyle);
+    if ((_directRequests[key] ?? 0) > 0) return false;
+    if (!_widgetTrackedKeys.contains(key)) return false;
+    return (_activeConsumers[key] ?? 0) == 0;
+  }
 
   void setLayerStyle(MapLayerStyle style) {
     if (_activeStyle != style) {
@@ -34,6 +71,8 @@ class TileCacheService {
       _cacheGeneration++;
       _memoryCache.clear();
       _inFlight.clear();
+      _widgetTrackedKeys.clear();
+      _onStaleTileReleased?.call();
     }
   }
 
@@ -57,6 +96,8 @@ class TileCacheService {
     _cacheGeneration++;
     _inFlight.clear();
     _memoryCache.clear();
+    _widgetTrackedKeys.clear();
+    _onStaleTileReleased?.call();
   }
 
   static String _cacheKey(int z, int x, int y, MapLayerStyle style) {
@@ -68,8 +109,11 @@ class TileCacheService {
   static Uint8List? getFromMemory(int z, int x, int y, [MapLayerStyle? style]) {
     final s = style ?? instance.activeStyle;
     final key = _cacheKey(z, x, y, s);
-    final mem = _memoryCache[key];
-    if (mem != null) return mem;
+    final mem = _memoryCache.remove(key);
+    if (mem != null) {
+      _memoryCache[key] = mem; // LRU: preserva os tiles mais recentes
+      return mem;
+    }
     return null;
   }
 
@@ -134,14 +178,38 @@ class TileCacheService {
     return future;
   }
 
-  Future<Uint8List?> getTileBytes(int z, int x, int y, [MapLayerStyle? style]) {
+  Future<Uint8List?> getTileBytes(
+    int z,
+    int x,
+    int y, [
+    MapLayerStyle? style,
+    bool fromWidget = false,
+  ]) {
     final s = style ?? _activeStyle;
     final key = _cacheKey(z, x, y, s);
-    final mem = _memoryCache[key];
-    if (mem != null) return Future.value(mem);
+    final mem = _memoryCache.remove(key);
+    if (mem != null) {
+      _memoryCache[key] = mem; // LRU: mantém tiles ativos no topo do cache
+      return Future.value(mem);
+    }
+
+    if (!fromWidget) {
+      _directRequests[key] = (_directRequests[key] ?? 0) + 1;
+    }
 
     final existing = _inFlight[key];
-    if (existing != null) return existing;
+    if (existing != null) {
+      if (fromWidget) return existing;
+      return existing.whenComplete(() {
+        final rem = (_directRequests[key] ?? 1) - 1;
+        if (rem <= 0) {
+          _directRequests.remove(key);
+        } else {
+          _directRequests[key] = rem;
+        }
+      });
+    }
+
     final generation = _cacheGeneration;
     final backend = _backend;
     late final Future<Uint8List?> request;
@@ -173,7 +241,18 @@ class TileCacheService {
         }
         return res;
       } finally {
+        if (!fromWidget) {
+          final rem = (_directRequests[key] ?? 1) - 1;
+          if (rem <= 0) {
+            _directRequests.remove(key);
+          } else {
+            _directRequests[key] = rem;
+          }
+        }
         if (identical(_inFlight[key], request)) _inFlight.remove(key);
+        if ((_activeConsumers[key] ?? 0) == 0) {
+          _widgetTrackedKeys.remove(key);
+        }
       }
     })();
     _inFlight[key] = request;
@@ -239,9 +318,28 @@ class _CachedTileWidgetState extends State<CachedTileWidget> {
   bool _loading = true;
   int _requestId = 0;
   late final MBTilesService _mapService;
+  String? _registeredConsumerKey;
 
   MapLayerStyle get _effectiveStyle =>
       widget.layerStyle ?? TileCacheService.instance.activeStyle;
+
+  void _releaseConsumer() {
+    final key = _registeredConsumerKey;
+    if (key != null) {
+      _registeredConsumerKey = null;
+      TileCacheService.instance.unregisterTileConsumer(key);
+    }
+  }
+
+  void _acquireConsumer(MapLayerStyle style) {
+    _releaseConsumer();
+    _registeredConsumerKey = TileCacheService.instance.registerTileConsumer(
+      widget.z,
+      widget.x,
+      widget.y,
+      style,
+    );
+  }
 
   @override
   void initState() {
@@ -270,6 +368,7 @@ class _CachedTileWidgetState extends State<CachedTileWidget> {
 
   @override
   void dispose() {
+    _releaseConsumer();
     _mapService.tilesRevision.removeListener(_onPackagesChanged);
     super.dispose();
   }
@@ -284,6 +383,7 @@ class _CachedTileWidgetState extends State<CachedTileWidget> {
         oldWidget.y != widget.y ||
         oldStyle != newStyle) {
       ++_requestId; // invalida qualquer resposta anterior mesmo se houver cache exato
+      _releaseConsumer();
       final exact = TileCacheService.getFromMemory(widget.z, widget.x, widget.y, newStyle);
       _parentLevels = 0;
       if (exact != null) {
@@ -300,43 +400,54 @@ class _CachedTileWidgetState extends State<CachedTileWidget> {
   Future<void> _loadTile() async {
     final requestId = ++_requestId;
     final style = _effectiveStyle;
+    _acquireConsumer(style);
     Uint8List? bytes;
-    // Zooms acima da resolução nativa do pacote usam um recorte do ancestral,
-    // nunca a imagem inteira: ruas e pinos continuam na posição correta.
-    if (style == MapLayerStyle.standard && widget.z > 16) {
-      for (var levels = 1; levels <= 3 && widget.z - levels >= 0; levels++) {
-        try {
-          final parent = await TileCacheService.instance.getOfflineTileBytes(
-              widget.z - levels, widget.x >> levels, widget.y >> levels);
-          if (!mounted || requestId != _requestId) return;
-          if (parent != null && parent.isNotEmpty) {
-            setState(() {
-              _tileBytes = parent;
-              _parentLevels = levels;
-            });
+    try {
+      // Zooms acima da resolução nativa do pacote usam um recorte do ancestral,
+      // nunca a imagem inteira: ruas e pinos continuam na posição correta.
+      if (style == MapLayerStyle.standard && widget.z > 16) {
+        for (var levels = 1; levels <= 3 && widget.z - levels >= 0; levels++) {
+          try {
+            final parent = await TileCacheService.instance.getOfflineTileBytes(
+                widget.z - levels, widget.x >> levels, widget.y >> levels);
+            if (!mounted || requestId != _requestId) return;
+            if (parent != null && parent.isNotEmpty) {
+              setState(() {
+                _tileBytes = parent;
+                _parentLevels = levels;
+              });
+              break;
+            }
+          } catch (e, st) {
+            AppLogger.debug('Falha ao consultar tile ancestral offline.', e, st);
             break;
           }
-        } catch (e, st) {
-          AppLogger.debug('Falha ao consultar tile ancestral offline.', e, st);
-          break;
         }
       }
-    }
-    try {
-      bytes = await TileCacheService.instance.getTileBytes(
-        widget.z, widget.x, widget.y, style,
-      );
-    } catch (e, st) {
-      AppLogger.debug('Falha ao carregar tile.', e, st);
-    }
-    if (mounted && requestId == _requestId) {
-      setState(() {
-        _loading = false;
-        if (bytes != null && bytes.isNotEmpty) {
-          _tileBytes = bytes;
-          _parentLevels = 0;
-        }
-      });
+      try {
+        bytes = await TileCacheService.instance.getTileBytes(
+          widget.z,
+          widget.x,
+          widget.y,
+          style,
+          true,
+        );
+      } catch (e, st) {
+        AppLogger.debug('Falha ao carregar tile.', e, st);
+      }
+      if (mounted && requestId == _requestId) {
+        setState(() {
+          _loading = false;
+          if (bytes != null && bytes.isNotEmpty) {
+            _tileBytes = bytes;
+            _parentLevels = 0;
+          }
+        });
+      }
+    } finally {
+      if (requestId == _requestId) {
+        _releaseConsumer();
+      }
     }
   }
 

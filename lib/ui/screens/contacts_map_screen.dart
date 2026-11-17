@@ -47,6 +47,13 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
   bool _hasScheduledInitialCenter = false;
   double _pendingInitialDx = 0.0;
   double _pendingInitialDy = 0.0;
+  int _matrixSyncGeneration = 0;
+  bool _hasPendingResizeSync = false;
+  double _pendingResizeDeltaViewerW = 0.0;
+  double _pendingResizeDeltaViewerH = 0.0;
+  double _pendingResizeDeltaOriginPx = 0.0;
+  double _pendingResizeDeltaOriginPy = 0.0;
+  bool _suppressTileBoundsListener = false;
   String? _highlightPersonId;
   String _selectedStatusFilter =
       'Todos'; // 'Todos', 'Estudos', 'Revisitas', 'Interessados'
@@ -241,7 +248,10 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
         .sqrt(viewportW * viewportW + viewportH * viewportH)
         .ceilToDouble();
     final minTilesFromCenter = (rotExtent / (2.0 * 0.6 * _tileSize)).ceil();
-    final gridHalfSize = math.max(6, minTilesFromCenter + 4);
+    // Folga extra no canvas lógico (zero tiles adicionais montados, pois
+    // _DynamicTileLayer só monta os tiles visíveis + 1 anel) para permitir
+    // arrastes contínuos longos mesmo em zoom mínimo (0.6x) e telas largas.
+    final gridHalfSize = math.max(10, minTilesFromCenter + 8);
     return (
       viewportW: viewportW,
       viewportH: viewportH,
@@ -249,6 +259,41 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
       viewerH: rotExtent,
       gridHalfSize: gridHalfSize,
     );
+  }
+
+  Matrix4 _applyPendingResizeTo(Matrix4 base) {
+    if (!_hasPendingResizeSync) return base;
+    final s = base.getMaxScaleOnAxis();
+    final effScale = s > 0.01 ? s : 1.0;
+    final nextDx =
+        base.storage[12] +
+        _pendingResizeDeltaViewerW +
+        _pendingResizeDeltaOriginPx * effScale;
+    final nextDy =
+        base.storage[13] +
+        _pendingResizeDeltaViewerH +
+        _pendingResizeDeltaOriginPy * effScale;
+    return Matrix4.identity()
+      ..translateByDouble(nextDx, nextDy, 0, 1)
+      ..scaleByDouble(effScale, effScale, 1, 1);
+  }
+
+  void _cancelPendingResizeSync() {
+    _matrixSyncGeneration++;
+    _hasPendingResizeSync = false;
+    _pendingResizeDeltaViewerW = 0.0;
+    _pendingResizeDeltaViewerH = 0.0;
+    _pendingResizeDeltaOriginPx = 0.0;
+    _pendingResizeDeltaOriginPy = 0.0;
+  }
+
+  void _setMatrixWithRebuildPending(Matrix4 next) {
+    _suppressTileBoundsListener = true;
+    try {
+      _transformationController.value = next;
+    } finally {
+      _suppressTileBoundsListener = false;
+    }
   }
 
   void _changeZoom(
@@ -263,7 +308,7 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
     final targetZoom = newZoom.clamp(6, 19);
     if (targetZoom == _zoom) return;
 
-    final currentMatrix = _transformationController.value;
+    final currentMatrix = _applyPendingResizeTo(_transformationController.value);
     final currentScale = currentMatrix.getMaxScaleOnAxis();
     final effectiveScale = currentScale > 0.01 ? currentScale : 1.0;
     final dx = currentMatrix.storage[12];
@@ -303,16 +348,15 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
     final newDy = (vH / 2.0) - newCanvasY;
 
     _hasAppliedInitialMatrix = true;
+    _cancelPendingResizeSync();
     setState(() {
       _activeCenterLng = focalLng;
       _activeCenterLat = focalLat;
       _zoom = targetZoom;
     });
 
-    _transformationController.value = Matrix4.translationValues(
-      newDx,
-      newDy,
-      0.0,
+    _setMatrixWithRebuildPending(
+      Matrix4.translationValues(newDx, newDy, 0.0),
     );
   }
 
@@ -396,6 +440,7 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
     final targetPy = _lat2pixelY(lat, _zoom) - newOriginPy;
 
     _hasAppliedInitialMatrix = true;
+    _cancelPendingResizeSync();
     setState(() {
       _activeCenterLat = lat;
       _activeCenterLng = lng;
@@ -403,7 +448,7 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
     if (vW > 0 && vH > 0) {
       final dx = (vW / 2.0) - targetPx;
       final dy = (vH / 2.0) - targetPy;
-      _transformationController.value = Matrix4.translationValues(dx, dy, 0.0);
+      _setMatrixWithRebuildPending(Matrix4.translationValues(dx, dy, 0.0));
     }
   }
 
@@ -2420,11 +2465,13 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
           _hasCenteredHighlightPerson = true;
           _lastConstraintsSize = constraints.biggest;
           _lastGridHalfSize = gridHalfSize;
+          _cancelPendingResizeSync();
           final dx = (viewerW / 2.0) - centerPx;
           final dy = (viewerH / 2.0) - centerPy;
           frameMatrixOverride = Matrix4.translationValues(dx, dy, 0.0);
+          final scheduledGen = _matrixSyncGeneration;
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
+            if (mounted && scheduledGen == _matrixSyncGeneration) {
               _centerOnCoords(
                 centerLat,
                 centerLng,
@@ -2448,31 +2495,34 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
           _lastConstraintsSize = constraints.biggest;
           _lastGridHalfSize = gridHalfSize;
 
-          final m = _transformationController.value;
-          final currentScale = m.getMaxScaleOnAxis();
-          final effectiveScale = currentScale > 0.01 ? currentScale : 1.0;
-          final expectedDx =
-              m.storage[12] + deltaViewerW + deltaOriginPx * effectiveScale;
-          final expectedDy =
-              m.storage[13] + deltaViewerH + deltaOriginPy * effectiveScale;
-          frameMatrixOverride = Matrix4.identity()
-            ..translateByDouble(expectedDx, expectedDy, 0, 1)
-            ..scaleByDouble(effectiveScale, effectiveScale, 1, 1);
+          _pendingResizeDeltaViewerW += deltaViewerW;
+          _pendingResizeDeltaViewerH += deltaViewerH;
+          _pendingResizeDeltaOriginPx += deltaOriginPx;
+          _pendingResizeDeltaOriginPy += deltaOriginPy;
 
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              final liveM = _transformationController.value;
-              final liveScale = liveM.getMaxScaleOnAxis();
-              final effScale = liveScale > 0.01 ? liveScale : 1.0;
-              final nextDx =
-                  liveM.storage[12] + deltaViewerW + deltaOriginPx * effScale;
-              final nextDy =
-                  liveM.storage[13] + deltaViewerH + deltaOriginPy * effScale;
-              _transformationController.value = Matrix4.identity()
-                ..translateByDouble(nextDx, nextDy, 0, 1)
-                ..scaleByDouble(effScale, effScale, 1, 1);
-            }
-          });
+          if (!_hasPendingResizeSync) {
+            _hasPendingResizeSync = true;
+            final scheduledGen = ++_matrixSyncGeneration;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted ||
+                  !_hasPendingResizeSync ||
+                  scheduledGen != _matrixSyncGeneration) {
+                return;
+              }
+              final next = _applyPendingResizeTo(
+                _transformationController.value,
+              );
+              _cancelPendingResizeSync();
+              _transformationController.value = next;
+            });
+          }
+          frameMatrixOverride = _applyPendingResizeTo(
+            _transformationController.value,
+          );
+        } else if (_hasPendingResizeSync) {
+          frameMatrixOverride = _applyPendingResizeTo(
+            _transformationController.value,
+          );
         }
 
         return Stack(
@@ -2530,7 +2580,9 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                       }
                     },
                     onLongPressStart: (details) {
-                      final m = _transformationController.value;
+                      final m = _applyPendingResizeTo(
+                        _transformationController.value,
+                      );
                       final currentScale = m.getMaxScaleOnAxis();
                       final effectiveScale = currentScale > 0.01 ? currentScale : 1.0;
                       final dx = m.storage[12];
@@ -2624,7 +2676,9 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                                 interactionEndFrictionCoefficient: 1e-100,
                                 onInteractionEnd: (details) {
                                   _hasAppliedInitialMatrix = true;
-                                  final m = _transformationController.value;
+                                  final m = _applyPendingResizeTo(
+                                    _transformationController.value,
+                                  );
                                   final currentScale = m.getMaxScaleOnAxis();
                                   final effectiveScale =
                                       currentScale > 0.01 ? currentScale : 1.0;
@@ -2683,13 +2737,16 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                                   final newOriginY = newMinTileY * _tileSize;
                                   final nextDx = dx + (newOriginX - originPx) * effectiveScale;
                                   final nextDy = dy + (newOriginY - originPy) * effectiveScale;
+                                  _cancelPendingResizeSync();
                                   setState(() {
                                     _activeCenterLng = focalLng;
                                     _activeCenterLat = focalLat;
                                   });
-                                  _transformationController.value = Matrix4.identity()
-                                    ..translateByDouble(nextDx, nextDy, 0, 1)
-                                    ..scaleByDouble(effectiveScale, effectiveScale, 1, 1);
+                                  _setMatrixWithRebuildPending(
+                                    Matrix4.identity()
+                                      ..translateByDouble(nextDx, nextDy, 0, 1)
+                                      ..scaleByDouble(effectiveScale, effectiveScale, 1, 1),
+                                  );
                                 },
                                 child: Container(
                                   width: canvasWidth,
@@ -2719,6 +2776,8 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                                           isDark: isDark,
                                           layerStyle: activeLayerStyle,
                                           initialMatrixOverride: frameMatrixOverride,
+                                          shouldIgnoreTransformUpdates: () =>
+                                              _suppressTileBoundsListener,
                                         ),
                                       ),
 
@@ -2858,6 +2917,8 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                     borderRadius: BorderRadius.circular(20),
                     onTap: () {
                       setState(() {
+                        _activeCenterLat ??= centerLat;
+                        _activeCenterLng ??= centerLng;
                         _highlightPersonId = null;
                       });
                     },
@@ -3929,6 +3990,7 @@ class _DynamicTileLayer extends StatefulWidget {
   final bool isDark;
   final MapLayerStyle layerStyle;
   final Matrix4? initialMatrixOverride;
+  final bool Function()? shouldIgnoreTransformUpdates;
 
   const _DynamicTileLayer({
     required this.transformationController,
@@ -3948,6 +4010,7 @@ class _DynamicTileLayer extends StatefulWidget {
     required this.isDark,
     required this.layerStyle,
     this.initialMatrixOverride,
+    this.shouldIgnoreTransformUpdates,
   });
 
   @override
@@ -3960,8 +4023,6 @@ class _DynamicTileLayerState extends State<_DynamicTileLayer> {
     int maxX,
     int minY,
     int maxY,
-    double centerWorldX,
-    double centerWorldY,
   }) _bounds;
 
   @override
@@ -3998,8 +4059,6 @@ class _DynamicTileLayerState extends State<_DynamicTileLayer> {
     int maxX,
     int minY,
     int maxY,
-    double centerWorldX,
-    double centerWorldY,
   }) _computeBounds({Matrix4? matrixOverride}) {
     final m = matrixOverride ?? widget.transformationController.value;
     final currentScale = m.getMaxScaleOnAxis();
@@ -4053,13 +4112,11 @@ class _DynamicTileLayerState extends State<_DynamicTileLayer> {
       maxX: loadMaxX,
       minY: loadMinY,
       maxY: loadMaxY,
-      centerWorldX: centerWorldX,
-      centerWorldY: centerWorldY,
     );
   }
 
   void _onViewportChanged() {
-    if (!mounted) return;
+    if (!mounted || widget.shouldIgnoreTransformUpdates?.call() == true) return;
     final next = _computeBounds();
     if (next.minX != _bounds.minX ||
         next.maxX != _bounds.maxX ||
@@ -4073,42 +4130,32 @@ class _DynamicTileLayerState extends State<_DynamicTileLayer> {
 
   @override
   Widget build(BuildContext context) {
-    final visibleTiles = <({int x, int y})>[
-      for (int x = _bounds.minX; x <= _bounds.maxX; x++)
-        for (int y = _bounds.minY; y <= _bounds.maxY; y++)
-          (x: x, y: y),
-    ]..sort((a, b) {
-      final adx =
-          a.x * widget.tileSize + widget.tileSize / 2 - _bounds.centerWorldX;
-      final ady =
-          a.y * widget.tileSize + widget.tileSize / 2 - _bounds.centerWorldY;
-      final bdx =
-          b.x * widget.tileSize + widget.tileSize / 2 - _bounds.centerWorldX;
-      final bdy =
-          b.y * widget.tileSize + widget.tileSize / 2 - _bounds.centerWorldY;
-      return (adx * adx + ady * ady).compareTo(bdx * bdx + bdy * bdy);
-    });
-
-    return Stack(
-      children: [
-        for (final tile in visibleTiles)
-          Positioned(
-            key: ValueKey('tile_pos_${widget.zoom}_${tile.x}_${tile.y}'),
-            left: (tile.x - widget.minTileX) * widget.tileSize,
-            top: (tile.y - widget.minTileY) * widget.tileSize,
-            child: CachedTileWidget(
-              key: ValueKey(
-                'tile_${widget.layerStyle.id}_${widget.zoom}_${tile.x}_${tile.y}',
+    // Ordem estável (x, y) evita embaralhar RenderObjects no Stack a cada tile
+    // atravessado durante o arraste, e RepaintBoundary isola repints de tiles
+    // dos pinos e sombras do mapa.
+    return RepaintBoundary(
+      child: Stack(
+        children: [
+          for (int x = _bounds.minX; x <= _bounds.maxX; x++)
+            for (int y = _bounds.minY; y <= _bounds.maxY; y++)
+              Positioned(
+                key: ValueKey('tile_pos_${widget.zoom}_${x}_$y'),
+                left: (x - widget.minTileX) * widget.tileSize,
+                top: (y - widget.minTileY) * widget.tileSize,
+                child: CachedTileWidget(
+                  key: ValueKey(
+                    'tile_${widget.layerStyle.id}_${widget.zoom}_${x}_$y',
+                  ),
+                  z: widget.zoom,
+                  x: x,
+                  y: y,
+                  size: widget.tileSize,
+                  isDark: widget.isDark,
+                  layerStyle: widget.layerStyle,
+                ),
               ),
-              z: widget.zoom,
-              x: tile.x,
-              y: tile.y,
-              size: widget.tileSize,
-              isDark: widget.isDark,
-              layerStyle: widget.layerStyle,
-            ),
-          ),
-      ],
+        ],
+      ),
     );
   }
 }

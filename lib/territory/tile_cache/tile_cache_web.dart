@@ -9,6 +9,7 @@ TileCacheBackend getTileBackend() => TileCacheWeb();
 
 class TileCacheWeb implements TileCacheBackend {
   static final Map<String, Uint8List> _cache = {};
+  static http.Client? _sharedHttpClient;
   static const int _blockedTileByteLength = 6725;
   static const String _userAgent = AppVersion.userAgent;
 
@@ -16,6 +17,8 @@ class TileCacheWeb implements TileCacheBackend {
   static const int maxCacheEntries = 500;
 
   final http.Client? httpClient;
+
+  static http.Client _getSharedClient() => _sharedHttpClient ??= http.Client();
 
   TileCacheWeb({this.httpClient});
 
@@ -69,8 +72,7 @@ class TileCacheWeb implements TileCacheBackend {
       }
     }
 
-    final client = httpClient ?? http.Client();
-    final shouldCloseClient = httpClient == null;
+    final client = httpClient ?? _getSharedClient();
 
     try {
       // 1ª Tentativa: Provedor de azulejos oficial com estilo selecionado
@@ -134,10 +136,6 @@ class TileCacheWeb implements TileCacheBackend {
       }
     } catch (e, st) {
       AppLogger.warning('Erro inesperado ao obter tile Web ($z/$x/$y)', e, st);
-    } finally {
-      if (shouldCloseClient) {
-        client.close();
-      }
     }
     return null;
   }

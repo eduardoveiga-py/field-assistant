@@ -5,8 +5,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:ministerio_pessoal/territory/tile_cache/tile_cache_interface.dart';
 import 'package:ministerio_pessoal/territory/tile_cache/tile_cache_native.dart';
+import 'package:ministerio_pessoal/territory/tile_cache/tile_cache_service.dart';
 import 'package:ministerio_pessoal/territory/tile_cache/tile_cache_web.dart';
 
 void main() {
@@ -337,6 +337,60 @@ void main() {
         await Future.wait([f1, f2, f3]);
         expect(TileCacheNative.activeDownloads, 0);
         expect(maxConcurrentObserved, 2);
+      } finally {
+        TileCacheNative.resetQueue();
+        await tempDir.delete(recursive: true);
+      }
+    });
+
+    test('TileCacheNative descarta da fila tiles desmontados e prioriza tiles ainda visíveis', () async {
+      TileCacheNative.resetQueue();
+      final completers = [Completer<void>(), Completer<void>()];
+      final downloadedPaths = <String>[];
+
+      final mockClient = MockClient((request) async {
+        downloadedPaths.add(request.url.path);
+        if (request.url.path.contains('/10/0/0.png')) {
+          await completers[0].future;
+        } else if (request.url.path.contains('/10/1/0.png')) {
+          await completers[1].future;
+        }
+        return http.Response.bytes(Uint8List.fromList(List.filled(1200, 7)), 200);
+      });
+
+      final tempDir = await Directory.systemTemp.createTemp('tile_test_prune_');
+      try {
+        final backend = TileCacheNative(customDir: tempDir, httpClient: mockClient);
+
+        // Ocupa os 2 slots ativos
+        final f0 = backend.getTile(10, 0, 0);
+        final f1 = backend.getTile(10, 1, 0);
+        await Future.delayed(const Duration(milliseconds: 30));
+        expect(TileCacheNative.activeDownloads, 2);
+
+        // Registra um tile de widget que sairá da tela (stale) e outro que permanecerá visível
+        final staleConsumerKey = TileCacheService.instance.registerTileConsumer(10, 2, 0);
+        final visibleConsumerKey = TileCacheService.instance.registerTileConsumer(10, 3, 0);
+        final fStale = backend.getTile(10, 2, 0);
+        final fVisible = backend.getTile(10, 3, 0);
+        await Future.delayed(const Duration(milliseconds: 30));
+        expect(TileCacheNative.queuedDownloads, 2);
+
+        // Simula o usuário arrastando para longe: o tile (10,2,0) desmonta da tela
+        TileCacheService.instance.unregisterTileConsumer(staleConsumerKey);
+        expect(await fStale, isNull);
+        expect(TileCacheNative.queuedDownloads, 1);
+
+        // Libera os 2 slots ativos: apenas o tile visível (10,3,0) deve ser baixado
+        completers[0].complete();
+        completers[1].complete();
+        final results = await Future.wait([f0, f1, fVisible]);
+        TileCacheService.instance.unregisterTileConsumer(visibleConsumerKey);
+
+        expect(results[2], isNotNull);
+        expect(downloadedPaths.any((p) => p.contains('/10/2/0.png')), isFalse);
+        expect(downloadedPaths.any((p) => p.contains('/10/3/0.png')), isTrue);
+        expect(TileCacheNative.activeDownloads, 0);
       } finally {
         TileCacheNative.resetQueue();
         await tempDir.delete(recursive: true);

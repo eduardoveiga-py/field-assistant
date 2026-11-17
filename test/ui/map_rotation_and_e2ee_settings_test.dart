@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -362,6 +363,317 @@ void main() {
       await gesture.up();
       await tester.pumpAndSettle();
 
+      expect(tester.takeException(), isNull);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('Pinça de zoom-out e arraste contínuo longo carregam tiles dinamicamente sem corte', (tester) async {
+      tester.view.physicalSize = const Size(1280, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final db = AppDatabase.forTesting(NativeDatabase.memory());
+      addTearDown(db.close);
+      final original = MBTilesService.instance;
+      final mock = MBTilesService.custom(backend: MBTilesWeb());
+      MBTilesService.setMockInstance(mock);
+      addTearDown(() {
+        MBTilesService.setMockInstance(original);
+        mock.dispose();
+      });
+      final tileBackend = _EmptyTiles();
+      TileCacheService.instance.backend = tileBackend;
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [databaseProvider.overrideWithValue(db)],
+          child: const MaterialApp(home: ContactsMapScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      Iterable<CachedTileWidget> tiles() =>
+          tester.widgetList<CachedTileWidget>(find.byType(CachedTileWidget));
+
+      final mapViewportFinder = find.ancestor(
+        of: find.byType(InteractiveViewer).first,
+        matching: find.byType(ClipRect),
+      ).first;
+      final viewportRect = tester.getRect(mapViewportFinder);
+      final center = viewportRect.center;
+
+      final initialSpanX =
+          tiles().map((t) => t.x).reduce(math.max) -
+          tiles().map((t) => t.x).reduce(math.min) +
+          1;
+
+      // Pinça de afastamento (zoom out) com dois dedos sem soltar:
+      // novos tiles externos devem montar dinamicamente durante o gesto.
+      final p1 = await tester.startGesture(center + const Offset(-220, 0), pointer: 1);
+      final p2 = await tester.startGesture(center + const Offset(220, 0), pointer: 2);
+      await tester.pump();
+      for (var i = 0; i < 4; i++) {
+        await p1.moveBy(const Offset(22, 0));
+        await p2.moveBy(const Offset(-22, 0));
+        await tester.pump(const Duration(milliseconds: 30));
+      }
+
+      final midPinchSpanX =
+          tiles().map((t) => t.x).reduce(math.max) -
+          tiles().map((t) => t.x).reduce(math.min) +
+          1;
+      expect(midPinchSpanX, greaterThan(initialSpanX));
+
+      // Cobertura de 100% da viewport durante o pinch-out
+      double minLeft = double.infinity;
+      double maxRight = double.negativeInfinity;
+      double minTop = double.infinity;
+      double maxBottom = double.negativeInfinity;
+      for (final t in tiles()) {
+        final rect = tester.getRect(find.byKey(ValueKey('tile_pos_${t.z}_${t.x}_${t.y}')));
+        if (rect.left < minLeft) minLeft = rect.left;
+        if (rect.right > maxRight) maxRight = rect.right;
+        if (rect.top < minTop) minTop = rect.top;
+        if (rect.bottom > maxBottom) maxBottom = rect.bottom;
+      }
+      expect(minLeft, lessThanOrEqualTo(viewportRect.left + 1.0));
+      expect(maxRight, greaterThanOrEqualTo(viewportRect.right - 1.0));
+      expect(minTop, lessThanOrEqualTo(viewportRect.top + 1.0));
+      expect(maxBottom, greaterThanOrEqualTo(viewportRect.bottom - 1.0));
+
+      await p1.up();
+      await p2.up();
+      await tester.pumpAndSettle();
+
+      // Soltar a pinça com escala <= 0.75 reprojeta para Z: 14
+      expect(find.text('Z: 14'), findsOneWidget);
+
+      // Arraste contínuo longo (>1.100px sem soltar) deve continuar carregando tiles sem bater em parede
+      final beforeDragMaxX = tiles().map((t) => t.x).reduce(math.max);
+      final drag = await tester.startGesture(center);
+      for (var i = 0; i < 8; i++) {
+        await drag.moveBy(const Offset(-150, 0));
+        await tester.pump(const Duration(milliseconds: 30));
+      }
+      final afterDragMaxX = tiles().map((t) => t.x).reduce(math.max);
+      expect(afterDragMaxX - beforeDragMaxX, greaterThanOrEqualTo(4));
+      await drag.up();
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('Arraste contínuo com mapa rotacionado a 135° em paisagem carrega novos tiles sem corte', (tester) async {
+      tester.view.physicalSize = const Size(1280, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final db = AppDatabase.forTesting(NativeDatabase.memory());
+      addTearDown(db.close);
+      final original = MBTilesService.instance;
+      final mock = MBTilesService.custom(backend: MBTilesWeb());
+      MBTilesService.setMockInstance(mock);
+      addTearDown(() {
+        MBTilesService.setMockInstance(original);
+        mock.dispose();
+      });
+      TileCacheService.instance.backend = _EmptyTiles();
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [databaseProvider.overrideWithValue(db)],
+          child: const MaterialApp(home: ContactsMapScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Rotaciona 135° (3 x 45°)
+      final rotateBtn = find.byTooltip('Girar 45° à direita');
+      for (var i = 0; i < 3; i++) {
+        await tester.tap(rotateBtn);
+        await tester.pumpAndSettle();
+      }
+
+      Iterable<CachedTileWidget> tiles() =>
+          tester.widgetList<CachedTileWidget>(find.byType(CachedTileWidget));
+      final beforeKeys = tiles().map((t) => '${t.x}_${t.y}').toSet();
+
+      final mapViewportFinder = find.ancestor(
+        of: find.byType(InteractiveViewer).first,
+        matching: find.byType(ClipRect),
+      ).first;
+      final viewportRect = tester.getRect(mapViewportFinder);
+
+      final gesture = await tester.startGesture(viewportRect.center);
+      for (var i = 0; i < 4; i++) {
+        await gesture.moveBy(const Offset(-160, -120));
+        await tester.pump(const Duration(milliseconds: 30));
+      }
+
+      final midKeys = tiles().map((t) => '${t.x}_${t.y}').toSet();
+      expect(midKeys.difference(beforeKeys), isNotEmpty);
+
+      double minLeft = double.infinity;
+      double maxRight = double.negativeInfinity;
+      double minTop = double.infinity;
+      double maxBottom = double.negativeInfinity;
+      for (final t in tiles()) {
+        final rect = tester.getRect(find.byKey(ValueKey('tile_pos_${t.z}_${t.x}_${t.y}')));
+        if (rect.left < minLeft) minLeft = rect.left;
+        if (rect.right > maxRight) maxRight = rect.right;
+        if (rect.top < minTop) minTop = rect.top;
+        if (rect.bottom > maxBottom) maxBottom = rect.bottom;
+      }
+      expect(minLeft, lessThanOrEqualTo(viewportRect.left + 1.0));
+      expect(maxRight, greaterThanOrEqualTo(viewportRect.right - 1.0));
+      expect(minTop, lessThanOrEqualTo(viewportRect.top + 1.0));
+      expect(maxBottom, greaterThanOrEqualTo(viewportRect.bottom - 1.0));
+
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('Redimensionamentos alternados, troca de modo e zoom imediato preservam centro e cobertura', (tester) async {
+      tester.view.physicalSize = const Size(800, 460);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final db = AppDatabase.forTesting(NativeDatabase.memory());
+      addTearDown(db.close);
+      final original = MBTilesService.instance;
+      final mock = MBTilesService.custom(backend: MBTilesWeb());
+      MBTilesService.setMockInstance(mock);
+      addTearDown(() {
+        MBTilesService.setMockInstance(original);
+        mock.dispose();
+      });
+      TileCacheService.instance.backend = _EmptyTiles();
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [databaseProvider.overrideWithValue(db)],
+          child: const MaterialApp(home: ContactsMapScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Alterna rapidamente entre tamanhos e troca para Lista e de volta para Mapa
+      tester.view.physicalSize = const Size(800, 1450);
+      await tester.pump();
+      tester.view.physicalSize = const Size(1280, 640);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Ver em Lista / Bairros'));
+      await tester.pumpAndSettle();
+      tester.view.physicalSize = const Size(800, 1450);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Ver Mapa Interativo'));
+      await tester.pumpAndSettle();
+
+      // Aplica zoom imediatamente após redimensionamento
+      await tester.tap(find.byTooltip('Aproximar Zoom'));
+      await tester.pumpAndSettle();
+      expect(find.text('Z: 16'), findsOneWidget);
+
+      final mapViewportFinder = find.ancestor(
+        of: find.byType(InteractiveViewer).first,
+        matching: find.byType(ClipRect),
+      ).first;
+      final viewportRect = tester.getRect(mapViewportFinder);
+
+      final cityX16 = ((GeolocationHelper.defaultLng + 180.0) / 360.0 * (1 << 16)).floor();
+      final latRad = GeolocationHelper.defaultLat * math.pi / 180.0;
+      final cityY16 = ((1.0 - math.log(math.tan(latRad) + 1.0 / math.cos(latRad)) / math.pi) / 2.0 * (1 << 16)).floor();
+
+      final centerTileFinder = find.byKey(ValueKey('tile_pos_16_${cityX16}_$cityY16'));
+      expect(centerTileFinder, findsOneWidget);
+      final centerTileRect = tester.getRect(centerTileFinder);
+      expect((centerTileRect.center.dx - viewportRect.center.dx).abs(), lessThan(256.0));
+      expect((centerTileRect.center.dy - viewportRect.center.dy).abs(), lessThan(256.0));
+
+      double tilesTop = double.infinity;
+      double tilesBottom = double.negativeInfinity;
+      for (final t in tester.widgetList<CachedTileWidget>(find.byType(CachedTileWidget))) {
+        final rect = tester.getRect(find.byKey(ValueKey('tile_pos_${t.z}_${t.x}_${t.y}')));
+        if (rect.top < tilesTop) tilesTop = rect.top;
+        if (rect.bottom > tilesBottom) tilesBottom = rect.bottom;
+      }
+      expect(tilesTop, lessThanOrEqualTo(viewportRect.top + 1.0));
+      expect(tilesBottom, greaterThanOrEqualTo(viewportRect.bottom - 1.0));
+      expect(tester.takeException(), isNull);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('Fechar banner de contato destacado preserva a localização sem saltar para a origem padrão', (tester) async {
+      tester.view.physicalSize = const Size(900, 760);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final db = AppDatabase.forTesting(NativeDatabase.memory());
+      addTearDown(db.close);
+      final original = MBTilesService.instance;
+      final mock = MBTilesService.custom(backend: MBTilesWeb());
+      MBTilesService.setMockInstance(mock);
+      addTearDown(() {
+        MBTilesService.setMockInstance(original);
+        mock.dispose();
+      });
+      TileCacheService.instance.backend = _EmptyTiles();
+
+      final now = DateTime.now();
+      const spLat = -23.5505;
+      const spLng = -46.6333;
+      await db.into(db.people).insert(
+        PeopleCompanion.insert(
+          id: 'sp_highlight',
+          name: 'Marcos Paulista',
+          status: const Value('estudo'),
+          address: const Value('Av. Paulista, 1000'),
+          latitude: const Value(spLat),
+          longitude: const Value(spLng),
+          firstContactAt: now,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [databaseProvider.overrideWithValue(db)],
+          child: const MaterialApp(
+            home: ContactsMapScreen(highlightPersonId: 'sp_highlight'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final spX = ((spLng + 180.0) / 360.0 * (1 << 15)).floor();
+      final spRad = spLat * math.pi / 180.0;
+      final spY = ((1.0 - math.log(math.tan(spRad) + 1.0 / math.cos(spRad)) / math.pi) / 2.0 * (1 << 15)).floor();
+
+      expect(find.byKey(ValueKey('tile_pos_15_${spX}_$spY')), findsOneWidget);
+      expect(find.text('Destacado: Marcos'), findsOneWidget);
+
+      await tester.tap(find.text('Destacado: Marcos'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Destacado: Marcos'), findsNothing);
+      // Deve permanecer centrado nos tiles de São Paulo e não saltar para Santo Antônio do Içá
+      expect(find.byKey(ValueKey('tile_pos_15_${spX}_$spY')), findsOneWidget);
       expect(tester.takeException(), isNull);
 
       await tester.pumpWidget(const SizedBox.shrink());

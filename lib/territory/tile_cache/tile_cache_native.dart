@@ -11,54 +11,115 @@ import 'tile_cache_service.dart';
 
 TileCacheBackend getTileBackend() => TileCacheNative();
 
+class _QueuedDownload {
+  final Completer<bool> completer = Completer<bool>();
+  final bool Function()? isStale;
+
+  _QueuedDownload({this.isStale});
+}
+
 class TileCacheNative implements TileCacheBackend {
   Directory? _cacheDir;
   final http.Client? httpClient;
+  static http.Client? _sharedHttpClient;
   static const int _blockedTileByteLength = 6725;
   static const String _userAgent = AppVersion.userAgent;
 
   // Limite de concorrência para downloads online (máx. 2 conexões simultâneas)
   // em total conformidade com a Tile Usage Policy do OpenStreetMap.
   static int _activeDownloads = 0;
-  static final List<Completer<void>> _downloadQueue = [];
+  static final List<_QueuedDownload> _downloadQueue = [];
 
   @visibleForTesting
   static int get activeDownloads => _activeDownloads;
 
   @visibleForTesting
+  static int get queuedDownloads => _downloadQueue.length;
+
+  @visibleForTesting
   static void resetQueue() {
     _activeDownloads = 0;
+    for (final entry in _downloadQueue) {
+      if (!entry.completer.isCompleted) {
+        entry.completer.complete(false);
+      }
+    }
     _downloadQueue.clear();
   }
 
-  static Future<bool> _acquireDownloadSlot() async {
+  /// Remove imediatamente da fila pedidos de tiles cujos widgets já saíram
+  /// da viewport (durante arraste/zoom rápido), liberando prioridade para
+  /// os tiles atualmente visíveis.
+  static void pruneStaleQueue() {
+    if (_downloadQueue.isEmpty) return;
+    _downloadQueue.removeWhere((entry) {
+      if (entry.isStale?.call() == true) {
+        if (!entry.completer.isCompleted) {
+          entry.completer.complete(false);
+        }
+        return true;
+      }
+      return false;
+    });
+  }
+
+  static Future<bool> _acquireDownloadSlot({bool Function()? isStale}) async {
+    pruneStaleQueue();
+    if (isStale?.call() == true) return false;
     if (_activeDownloads < 2) {
       _activeDownloads++;
       return true;
     }
-    final c = Completer<void>();
-    _downloadQueue.add(c);
+    final entry = _QueuedDownload(isStale: isStale);
+    _downloadQueue.add(entry);
     try {
-      await c.future.timeout(const Duration(seconds: 3));
+      final granted = await entry.completer.future.timeout(
+        const Duration(seconds: 12),
+      );
+      if (!granted) return false;
+      if (isStale?.call() == true) {
+        _releaseDownloadSlot();
+        return false;
+      }
       return true;
     } on TimeoutException {
       // A consulta que esperou demais não deve ocupar uma conexão depois.
-      _downloadQueue.remove(c);
+      _downloadQueue.remove(entry);
+      if (entry.completer.isCompleted) {
+        final granted = await entry.completer.future;
+        if (granted) {
+          _releaseDownloadSlot();
+        }
+      }
       return false;
     }
   }
 
   static void _releaseDownloadSlot() {
-    if (_downloadQueue.isNotEmpty) {
+    while (_downloadQueue.isNotEmpty) {
       final next = _downloadQueue.removeAt(0);
-      next.complete();
-    } else if (_activeDownloads > 0) {
+      if (next.isStale?.call() == true) {
+        if (!next.completer.isCompleted) {
+          next.completer.complete(false);
+        }
+        continue;
+      }
+      if (!next.completer.isCompleted) {
+        next.completer.complete(true);
+        return;
+      }
+    }
+    if (_activeDownloads > 0) {
       _activeDownloads--;
     }
   }
 
+  static http.Client _getSharedClient() => _sharedHttpClient ??= http.Client();
+
   TileCacheNative({Directory? customDir, this.httpClient})
-      : _cacheDir = customDir;
+      : _cacheDir = customDir {
+    TileCacheService.setStaleQueuePruner(pruneStaleQueue);
+  }
 
   Future<Directory> _getDir() async {
     if (_cacheDir != null) return _cacheDir!;
@@ -71,19 +132,25 @@ class TileCacheNative implements TileCacheBackend {
     return dir;
   }
 
-  File _getTileFile(Directory dir, int z, int x, int y, [MapLayerStyle? style]) {
+  Future<File?> _findExistingTileFile(
+    Directory dir,
+    int z,
+    int x,
+    int y, [
+    MapLayerStyle? style,
+  ]) async {
     final s = style ?? TileCacheService.instance.activeStyle;
     final primary = File('${dir.path}/${s.id}_${z}_${x}_$y.png');
-    if (primary.existsSync()) return primary;
+    if (await primary.exists()) return primary;
 
     // Fallback para arquivos legados gravados em versões anteriores sem o identificador de estilo
     if (s == MapLayerStyle.standard) {
       final legacy = File('${dir.path}/$z/$x/$y.png');
-      if (legacy.existsSync()) return legacy;
+      if (await legacy.exists()) return legacy;
       final legacyFlat = File('${dir.path}/tile_${z}_${x}_$y.png');
-      if (legacyFlat.existsSync()) return legacyFlat;
+      if (await legacyFlat.exists()) return legacyFlat;
     }
-    return primary;
+    return null;
   }
 
   bool _isBlockedTile(Uint8List bytes) {
@@ -124,8 +191,8 @@ class TileCacheNative implements TileCacheBackend {
     final s = style ?? TileCacheService.instance.activeStyle;
     try {
       final dir = await _getDir();
-      final file = _getTileFile(dir, z, x, y, s);
-      if (await file.exists()) {
+      final file = await _findExistingTileFile(dir, z, x, y, s);
+      if (file != null) {
         final bytes = await file.readAsBytes();
         // Se o arquivo em cache for o bloco de erro/bloqueio 403 ou marca d'água CARTO,
         // remove do armazenamento e tenta baixar novamente uma versão limpa
@@ -144,9 +211,9 @@ class TileCacheNative implements TileCacheBackend {
         return null;
       }
 
-      if (!await _acquireDownloadSlot()) return null;
-      final client = httpClient ?? http.Client();
-      final shouldCloseClient = httpClient == null;
+      bool isStale() => TileCacheService.instance.isTileRequestStale(z, x, y, s);
+      if (!await _acquireDownloadSlot(isStale: isStale)) return null;
+      final client = httpClient ?? _getSharedClient();
       try {
         // 1ª Tentativa: Provedor de azulejos oficial com estilo selecionado e User-Agent plenamente identificado
         final osmUri = Uri.parse(TileCacheService.instance.getTileUrl(z, x, y, s));
@@ -159,7 +226,7 @@ class TileCacheNative implements TileCacheBackend {
                   'Accept': 'image/png,image/*',
                 },
               )
-              .timeout(const Duration(seconds: 3));
+              .timeout(const Duration(seconds: 4));
 
           final etag = res.headers['etag']?.toLowerCase() ?? '';
           final isWatermarked = etag.contains('wm-') ||
@@ -179,6 +246,8 @@ class TileCacheNative implements TileCacheBackend {
           AppLogger.debug('Falha transitória ao baixar tile primário ($z/$x/$y): $e', st);
         }
 
+        if (isStale()) return null;
+
         // 2ª Tentativa (Fallback transparente de alta disponibilidade): OSM France apenas se for standard
         if (s == MapLayerStyle.standard) {
           final fallbackUri = Uri.parse(
@@ -193,7 +262,7 @@ class TileCacheNative implements TileCacheBackend {
                     'Accept': 'image/png,image/*',
                   },
                 )
-                .timeout(const Duration(seconds: 3));
+                .timeout(const Duration(seconds: 4));
 
             final fallbackEtag = resFallback.headers['etag']?.toLowerCase() ?? '';
             final isFallbackWatermarked = fallbackEtag.contains('wm-') ||
@@ -214,9 +283,6 @@ class TileCacheNative implements TileCacheBackend {
           }
         }
       } finally {
-        if (shouldCloseClient) {
-          client.close();
-        }
         _releaseDownloadSlot();
       }
     } catch (e, st) {
@@ -232,8 +298,8 @@ class TileCacheNative implements TileCacheBackend {
     if (_isBlockedTile(bytes)) {
       try {
         final dir = await _getDir();
-        final file = _getTileFile(dir, z, x, y, s);
-        if (await file.exists()) {
+        final file = await _findExistingTileFile(dir, z, x, y, s);
+        if (file != null) {
           await file.delete();
         }
       } catch (e, st) {
@@ -247,7 +313,7 @@ class TileCacheNative implements TileCacheBackend {
       if (!await file.parent.exists()) {
         await file.parent.create(recursive: true);
       }
-      await file.writeAsBytes(bytes, flush: true);
+      await file.writeAsBytes(bytes);
     } catch (e, st) {
       AppLogger.warning('Falha ao gravar tile ($z/$x/$y) em cache', e, st);
     }
@@ -258,8 +324,8 @@ class TileCacheNative implements TileCacheBackend {
     final s = style ?? TileCacheService.instance.activeStyle;
     try {
       final dir = await _getDir();
-      final file = _getTileFile(dir, z, x, y, s);
-      if (await file.exists()) {
+      final file = await _findExistingTileFile(dir, z, x, y, s);
+      if (file != null) {
         final len = await file.length();
         if (len == 0 ||
             len == 2049 ||
