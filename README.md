@@ -4,8 +4,8 @@
 ### *Gestão Eficiente, Discreta e Offline-First do Ministério de Campo*
 
 [![Versão](https://img.shields.io/badge/Versão-2.0.0_(Build_14)-blue?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/eduardoveiga-py/field-assistant/releases/latest)
-[![Flutter](https://img.shields.io/badge/Flutter-3.27+-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
-[![Dart](https://img.shields.io/badge/Dart-3.5+-0175C2?style=for-the-badge&logo=dart&logoColor=white)](https://dart.dev)
+[![Flutter](https://img.shields.io/badge/Flutter-3.47+-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
+[![Dart](https://img.shields.io/badge/Dart-3.13+-0175C2?style=for-the-badge&logo=dart&logoColor=white)](https://dart.dev)
 [![Offline First](https://img.shields.io/badge/Arquitetura-Offline--First-success?style=for-the-badge&logo=sqlite&logoColor=white)](https://drift.simonbinder.eu/)
 [![Testes](https://img.shields.io/badge/Testes-762_Passando_(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](https://github.com/eduardoveiga-py/field-assistant/actions)
 [![Plataformas](https://img.shields.io/badge/Plataformas-Android%20%7C%20iOS%20%7C%20Web%20%7C%20Windows%20%7C%20Linux%20%7C%20macOS-orange?style=for-the-badge)](https://github.com/eduardoveiga-py/field-assistant/releases)
