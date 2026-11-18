@@ -33,7 +33,11 @@ class ContactsMapScreen extends ConsumerStatefulWidget {
   final String? highlightPersonId;
   final Future<ReverseGeocodingResult?> Function(String)? geocodeAddress;
 
-  const ContactsMapScreen({super.key, this.highlightPersonId, this.geocodeAddress});
+  const ContactsMapScreen({
+    super.key,
+    this.highlightPersonId,
+    this.geocodeAddress,
+  });
 
   @override
   ConsumerState<ContactsMapScreen> createState() => _ContactsMapScreenState();
@@ -80,6 +84,9 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
   final Map<int, Offset> _touchPointers = {};
   double _twoFingerStartAngle = 0.0;
   double _rotationAtTouchStart = 0.0;
+  bool _isMouseRotating = false;
+  double _mouseRotateStartAngle = 0.0;
+  double _rotationAtMouseStart = 0.0;
   ({double latitude, double longitude})? _userGpsLocation; // Localização GPS
   bool _isLocatingUser = false;
   Size? _lastConstraintsSize;
@@ -88,21 +95,28 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
   @override
   void initState() {
     super.initState();
-    _rotationAnimController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 350),
-    )..addListener(() {
-        if (_rotationAnimation != null) {
-          _rotationNotifier.value = _rotationAnimation!.value;
-        }
-      })..addStatusListener((status) {
-        if (status == AnimationStatus.completed) {
-          _rotationNotifier.value = 0.0;
-        }
-      });
+    _rotationAnimController =
+        AnimationController(
+            vsync: this,
+            duration: const Duration(milliseconds: 350),
+          )
+          ..addListener(() {
+            if (_rotationAnimation != null) {
+              _rotationNotifier.value = _rotationAnimation!.value;
+            }
+          })
+          ..addStatusListener((status) {
+            if (status == AnimationStatus.completed) {
+              _rotationNotifier.value = 0.0;
+            }
+          });
     _highlightPersonId = widget.highlightPersonId;
     MBTilesService.instance.init().catchError((Object e, StackTrace st) {
-      AppLogger.warning('Falha ao inicializar pacotes offline .mbtiles no mapa', e, st);
+      AppLogger.warning(
+        'Falha ao inicializar pacotes offline .mbtiles no mapa',
+        e,
+        st,
+      );
     });
     _peopleSubscription = ref.listenManual<AsyncValue<List<PersonEntry>>>(
       peopleStreamProvider,
@@ -166,17 +180,26 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
       Future.delayed(const Duration(milliseconds: 250), () async {
         try {
           if (!mounted) return;
-          final geocode = widget.geocodeAddress ?? GeocodingService.geocodeAddress;
+          final geocode =
+              widget.geocodeAddress ?? GeocodingService.geocodeAddress;
           final res = await geocode(personToGeocode.address!);
           if (res == null || !mounted) return;
           final review = await showDialog<bool>(
             context: context,
             builder: (context) => AlertDialog(
               title: const Text('Localização aproximada'),
-              content: const Text('A busca por endereço pode apontar para o lugar errado. Revise e selecione o ponto no mapa antes de salvar.'),
+              content: const Text(
+                'A busca por endereço pode apontar para o lugar errado. Revise e selecione o ponto no mapa antes de salvar.',
+              ),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Agora não')),
-                FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Revisar no mapa')),
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Agora não'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Revisar no mapa'),
+                ),
               ],
             ),
           );
@@ -184,20 +207,27 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
           final selected = await showDialog<ReverseGeocodingResult>(
             context: context,
             builder: (_) => MapLocationPickerDialog(
-              initialLat: res.latitude, initialLng: res.longitude,
+              initialLat: res.latitude,
+              initialLng: res.longitude,
               initialAddress: personToGeocode.address,
             ),
           );
           if (selected != null && mounted) {
-            await ref.read(repositoryProvider).applyGeocodedCoordinates(
-              personId: personToGeocode.id,
-              expectedAddress: personToGeocode.address!,
-              latitude: selected.latitude,
-              longitude: selected.longitude,
-            );
+            await ref
+                .read(repositoryProvider)
+                .applyGeocodedCoordinates(
+                  personId: personToGeocode.id,
+                  expectedAddress: personToGeocode.address!,
+                  latitude: selected.latitude,
+                  longitude: selected.longitude,
+                );
           }
         } catch (e, st) {
-          AppLogger.warning('Não foi possível salvar a localização obtida pelo endereço.', e, st);
+          AppLogger.warning(
+            'Não foi possível salvar a localização obtida pelo endereço.',
+            e,
+            st,
+          );
         } finally {
           _geocodeInFlight = false;
         }
@@ -241,17 +271,18 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
     double viewerW,
     double viewerH,
     int gridHalfSize,
-  }) _computeMapMetrics(double rawWidth, double rawHeight) {
+  })
+  _computeMapMetrics(double rawWidth, double rawHeight) {
     final viewportW = rawWidth > 0 ? rawWidth : 400.0;
     final viewportH = rawHeight > 0 ? rawHeight : 600.0;
     final rotExtent = math
         .sqrt(viewportW * viewportW + viewportH * viewportH)
         .ceilToDouble();
     final minTilesFromCenter = (rotExtent / (2.0 * 0.6 * _tileSize)).ceil();
-    // Folga extra no canvas lógico (zero tiles adicionais montados, pois
-    // _DynamicTileLayer só monta os tiles visíveis + 1 anel) para permitir
-    // arrastes contínuos longos mesmo em zoom mínimo (0.6x) e telas largas.
-    final gridHalfSize = math.max(10, minTilesFromCenter + 8);
+    // Folga ampla no canvas lógico (zero tiles adicionais montados, pois
+    // _DynamicTileLayer só monta os tiles visíveis + anel de borda) para garantir
+    // que mesmo sob rotação máxima e telas largas não ocorram cortes pretos diagonais.
+    final gridHalfSize = math.max(16, minTilesFromCenter + 12);
     return (
       viewportW: viewportW,
       viewportH: viewportH,
@@ -308,7 +339,9 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
     final targetZoom = newZoom.clamp(6, 19);
     if (targetZoom == _zoom) return;
 
-    final currentMatrix = _applyPendingResizeTo(_transformationController.value);
+    final currentMatrix = _applyPendingResizeTo(
+      _transformationController.value,
+    );
     final currentScale = currentMatrix.getMaxScaleOnAxis();
     final effectiveScale = currentScale > 0.01 ? currentScale : 1.0;
     final dx = currentMatrix.storage[12];
@@ -355,9 +388,7 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
       _zoom = targetZoom;
     });
 
-    _setMatrixWithRebuildPending(
-      Matrix4.translationValues(newDx, newDy, 0.0),
-    );
+    _setMatrixWithRebuildPending(Matrix4.translationValues(newDx, newDy, 0.0));
   }
 
   @override
@@ -452,12 +483,30 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
     }
   }
 
-  Widget _buildMetricScaleBar(double effectiveScale, double latitude, int zoom) {
+  Widget _buildMetricScaleBar(
+    double effectiveScale,
+    double latitude,
+    int zoom,
+  ) {
     final latRad = latitude.clamp(-85.0, 85.0) * math.pi / 180.0;
     final scale = effectiveScale > 0.01 ? effectiveScale : 1.0;
-    final metersPerPixel = (156543.03392 * math.cos(latRad) / math.pow(2, zoom)) / scale;
+    final metersPerPixel =
+        (156543.03392 * math.cos(latRad) / math.pow(2, zoom)) / scale;
 
-    const thresholds = [10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000];
+    const thresholds = [
+      10,
+      20,
+      50,
+      100,
+      200,
+      500,
+      1000,
+      2000,
+      5000,
+      10000,
+      20000,
+      50000,
+    ];
     int selectedMeters = 200;
     for (final t in thresholds) {
       final px = t / metersPerPixel;
@@ -467,7 +516,9 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
       }
     }
     final barWidth = (selectedMeters / metersPerPixel).clamp(40.0, 140.0);
-    final label = selectedMeters >= 1000 ? '${selectedMeters ~/ 1000} km' : '$selectedMeters m';
+    final label = selectedMeters >= 1000
+        ? '${selectedMeters ~/ 1000} km'
+        : '$selectedMeters m';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
@@ -778,278 +829,291 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
           final lngController = ctrls[4];
 
           return StatefulBuilder(
-        builder: (ctx, setDialogState) {
-          final dialogIsDark = Theme.of(ctx).brightness == Brightness.dark;
-          return AlertDialog(
-            title: Row(
-              children: [
-                const Icon(Icons.add_location_alt, color: AppTheme.accentTeal),
-                const SizedBox(width: 8),
-                Text(initialLat != null ? 'Nova Marcação no Mapa' : 'Novo Ponto de Referência'),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Crie marcos úteis para localizar endereços com facilidade ou orientar outros publicadores.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: dialogIsDark
-                          ? const Color(0xFFCBD5E1)
-                          : AppTheme.textMuted,
+            builder: (ctx, setDialogState) {
+              final dialogIsDark = Theme.of(ctx).brightness == Brightness.dark;
+              return AlertDialog(
+                title: Row(
+                  children: [
+                    const Icon(
+                      Icons.add_location_alt,
+                      color: AppTheme.accentTeal,
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Nome do Ponto de Referência *',
-                      hintText:
-                          'Ex: Padaria do Porto, Escola Municipal...',
+                    const SizedBox(width: 8),
+                    Text(
+                      initialLat != null
+                          ? 'Nova Marcação no Mapa'
+                          : 'Novo Ponto de Referência',
                     ),
-                    autofocus: true,
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    initialValue: selectedCategory,
-                    decoration: const InputDecoration(
-                      labelText: 'Categoria / Tipo de Marco',
-                    ),
-                    items: const [
-                      DropdownMenuItem(
-                        value: 'padaria',
-                        child: Text('🥖 Padaria / Comércio'),
+                  ],
+                ),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Crie marcos úteis para localizar endereços com facilidade ou orientar outros publicadores.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: dialogIsDark
+                              ? const Color(0xFFCBD5E1)
+                              : AppTheme.textMuted,
+                        ),
                       ),
-                      DropdownMenuItem(
-                        value: 'escola',
-                        child: Text('🏫 Escola / Colégio'),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: nameController,
+                        decoration: const InputDecoration(
+                          labelText: 'Nome do Ponto de Referência *',
+                          hintText: 'Ex: Padaria do Porto, Escola Municipal...',
+                        ),
+                        autofocus: true,
                       ),
-                      DropdownMenuItem(
-                        value: 'saude',
-                        child: Text('🏥 Posto de Saúde / Hospital'),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        initialValue: selectedCategory,
+                        decoration: const InputDecoration(
+                          labelText: 'Categoria / Tipo de Marco',
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'padaria',
+                            child: Text('🥖 Padaria / Comércio'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'escola',
+                            child: Text('🏫 Escola / Colégio'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'saude',
+                            child: Text('🏥 Posto de Saúde / Hospital'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'transporte',
+                            child: Text('🚌 Ponto de Ônibus / Terminal'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'mercado',
+                            child: Text('🛒 Supermercado'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'praca',
+                            child: Text('🌳 Praça / Parque'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'religioso',
+                            child: Text('⛪ Salão do Reino / Igreja'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'combustivel',
+                            child: Text('⛽ Posto de Combustível'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'outro',
+                            child: Text('📍 Outro Marco'),
+                          ),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) {
+                            setDialogState(() => selectedCategory = val);
+                          }
+                        },
                       ),
-                      DropdownMenuItem(
-                        value: 'transporte',
-                        child: Text('🚌 Ponto de Ônibus / Terminal'),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: addressController,
+                        decoration: const InputDecoration(
+                          labelText: 'Endereço ou Localização',
+                          hintText: 'Ex: Av. Beira Rio com Travessa 2 - Centro',
+                        ),
                       ),
-                      DropdownMenuItem(
-                        value: 'mercado',
-                        child: Text('🛒 Supermercado'),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: latController,
+                              decoration: const InputDecoration(
+                                labelText: 'Latitude GPS (opcional)',
+                              ),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                    signed: true,
+                                  ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: TextField(
+                              controller: lngController,
+                              decoration: const InputDecoration(
+                                labelText: 'Longitude GPS (opcional)',
+                              ),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                    signed: true,
+                                  ),
+                            ),
+                          ),
+                        ],
                       ),
-                      DropdownMenuItem(
-                        value: 'praca',
-                        child: Text('🌳 Praça / Parque'),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
+                        children: [
+                          TextButton.icon(
+                            icon: const Icon(Icons.my_location, size: 16),
+                            label: const Text(
+                              'Capturar GPS Atual',
+                              style: TextStyle(fontSize: 12),
+                            ),
+                            onPressed: () async {
+                              final pos =
+                                  await GeolocationHelper.getCurrentLocation();
+                              if (pos != null) {
+                                setDialogState(() {
+                                  latController.text = pos.latitude
+                                      .toStringAsFixed(6);
+                                  lngController.text = pos.longitude
+                                      .toStringAsFixed(6);
+                                });
+                                final geo =
+                                    await GeocodingService.reverseGeocode(
+                                      pos.latitude,
+                                      pos.longitude,
+                                    );
+                                if (geo != null &&
+                                    addressController.text.trim().isEmpty) {
+                                  setDialogState(() {
+                                    addressController.text =
+                                        geo.formattedSummary;
+                                  });
+                                }
+                              } else {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Não foi possível obter sinal GPS. Toque em "🗺️ Escolher no Mapa" para posicionar.',
+                                      ),
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                          ),
+                          OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppTheme.accentTeal,
+                              side: const BorderSide(
+                                color: AppTheme.accentTeal,
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                            ),
+                            icon: const Icon(Icons.map, size: 16),
+                            label: const Text(
+                              '🗺️ Escolher no Mapa',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            onPressed: () async {
+                              final initialLat = double.tryParse(
+                                latController.text.trim(),
+                              );
+                              final initialLng = double.tryParse(
+                                lngController.text.trim(),
+                              );
+                              final res =
+                                  await showDialog<ReverseGeocodingResult>(
+                                    context: context,
+                                    builder: (_) => MapLocationPickerDialog(
+                                      initialLat: initialLat,
+                                      initialLng: initialLng,
+                                      initialAddress: addressController.text
+                                          .trim(),
+                                    ),
+                                  );
+                              if (res != null) {
+                                setDialogState(() {
+                                  latController.text = res.latitude
+                                      .toStringAsFixed(6);
+                                  lngController.text = res.longitude
+                                      .toStringAsFixed(6);
+                                  if (addressController.text.trim().isEmpty &&
+                                      res.streetAndNumber.isNotEmpty) {
+                                    addressController.text =
+                                        res.formattedSummary;
+                                  }
+                                });
+                              }
+                            },
+                          ),
+                        ],
                       ),
-                      DropdownMenuItem(
-                        value: 'religioso',
-                        child: Text('⛪ Salão do Reino / Igreja'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'combustivel',
-                        child: Text('⛽ Posto de Combustível'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'outro',
-                        child: Text('📍 Outro Marco'),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: notesController,
+                        decoration: const InputDecoration(
+                          labelText: 'Observações / Instruções para encontrar',
+                          hintText: 'Ex: Ponto de encontro da saída de campo no sábado às 9:00',
+                        ),
+                        maxLines: 2,
                       ),
                     ],
-                    onChanged: (val) {
-                      if (val != null) {
-                        setDialogState(() => selectedCategory = val);
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Cancelar'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () async {
+                      final name = nameController.text.trim();
+                      if (name.isEmpty) return;
+
+                      final mgr = ref.read(landmarkManagerProvider);
+                      final lat = double.tryParse(latController.text.trim());
+                      final lng = double.tryParse(lngController.text.trim());
+
+                      await mgr.addLandmark(
+                        name: name,
+                        category: selectedCategory,
+                        address: addressController.text.trim().isEmpty
+                            ? null
+                            : addressController.text.trim(),
+                        latitude: lat,
+                        longitude: lng,
+                        notes: notesController.text.trim().isEmpty
+                            ? null
+                            : notesController.text.trim(),
+                      );
+
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Ponto de referência cadastrado no mapa!',
+                            ),
+                          ),
+                        );
                       }
                     },
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: addressController,
-                    decoration: const InputDecoration(
-                      labelText: 'Endereço ou Localização',
-                      hintText: 'Ex: Av. Beira Rio com Travessa 2 - Centro',
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: latController,
-                          decoration: const InputDecoration(
-                            labelText: 'Latitude GPS (opcional)',
-                          ),
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                            signed: true,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextField(
-                          controller: lngController,
-                          decoration: const InputDecoration(
-                            labelText: 'Longitude GPS (opcional)',
-                          ),
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                            signed: true,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 6,
-                    children: [
-                      TextButton.icon(
-                        icon: const Icon(Icons.my_location, size: 16),
-                        label: const Text(
-                          'Capturar GPS Atual',
-                          style: TextStyle(fontSize: 12),
-                        ),
-                        onPressed: () async {
-                          final pos =
-                              await GeolocationHelper.getCurrentLocation();
-                          if (pos != null) {
-                            setDialogState(() {
-                              latController.text = pos.latitude.toStringAsFixed(
-                                6,
-                              );
-                              lngController.text = pos.longitude
-                                  .toStringAsFixed(6);
-                            });
-                            final geo = await GeocodingService.reverseGeocode(
-                              pos.latitude,
-                              pos.longitude,
-                            );
-                            if (geo != null &&
-                                addressController.text.trim().isEmpty) {
-                              setDialogState(() {
-                                addressController.text = geo.formattedSummary;
-                              });
-                            }
-                          } else {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Não foi possível obter sinal GPS. Toque em "🗺️ Escolher no Mapa" para posicionar.',
-                                  ),
-                                ),
-                              );
-                            }
-                          }
-                        },
-                      ),
-                      OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppTheme.accentTeal,
-                          side: const BorderSide(color: AppTheme.accentTeal),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                        ),
-                        icon: const Icon(Icons.map, size: 16),
-                        label: const Text(
-                          '🗺️ Escolher no Mapa',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        onPressed: () async {
-                          final initialLat = double.tryParse(
-                            latController.text.trim(),
-                          );
-                          final initialLng = double.tryParse(
-                            lngController.text.trim(),
-                          );
-                          final res = await showDialog<ReverseGeocodingResult>(
-                            context: context,
-                            builder: (_) => MapLocationPickerDialog(
-                              initialLat: initialLat,
-                              initialLng: initialLng,
-                              initialAddress: addressController.text.trim(),
-                            ),
-                          );
-                          if (res != null) {
-                            setDialogState(() {
-                              latController.text = res.latitude.toStringAsFixed(
-                                6,
-                              );
-                              lngController.text = res.longitude
-                                  .toStringAsFixed(6);
-                              if (addressController.text.trim().isEmpty &&
-                                  res.streetAndNumber.isNotEmpty) {
-                                addressController.text = res.formattedSummary;
-                              }
-                            });
-                          }
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: notesController,
-                    decoration: const InputDecoration(
-                      labelText: 'Observações / Instruções para encontrar',
-                      hintText: 'Ex: Ponto de encontro da saída de campo no sábado às 9:00',
-                    ),
-                    maxLines: 2,
+                    child: const Text('Salvar Marco'),
                   ),
                 ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancelar'),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  final name = nameController.text.trim();
-                  if (name.isEmpty) return;
-
-                  final mgr = ref.read(landmarkManagerProvider);
-                  final lat = double.tryParse(latController.text.trim());
-                  final lng = double.tryParse(lngController.text.trim());
-
-                  await mgr.addLandmark(
-                    name: name,
-                    category: selectedCategory,
-                    address: addressController.text.trim().isEmpty
-                        ? null
-                        : addressController.text.trim(),
-                    latitude: lat,
-                    longitude: lng,
-                    notes: notesController.text.trim().isEmpty
-                        ? null
-                        : notesController.text.trim(),
-                  );
-
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Ponto de referência cadastrado no mapa!',
-                        ),
-                      ),
-                    );
-                  }
-                },
-                child: const Text('Salvar Marco'),
-              ),
-            ],
+              );
+            },
           );
-        },
-      );
         },
       ),
     );
@@ -1078,7 +1142,10 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                   children: [
                     const Text(
                       'Camadas e Estilos do Mapa',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     IconButton(
                       icon: const Icon(Icons.close),
@@ -1094,24 +1161,38 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                       decoration: BoxDecoration(
                         color: currentStyle == style
                             ? AppTheme.accentTeal.withValues(alpha: 0.15)
-                            : (isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05)),
+                            : (isDark
+                                  ? Colors.white10
+                                  : Colors.black.withValues(alpha: 0.05)),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Icon(
                         style.icon,
-                        color: currentStyle == style ? AppTheme.accentTeal : null,
+                        color: currentStyle == style
+                            ? AppTheme.accentTeal
+                            : null,
                       ),
                     ),
                     title: Text(
                       style.label,
                       style: TextStyle(
-                        fontWeight: currentStyle == style ? FontWeight.bold : FontWeight.w600,
-                        color: currentStyle == style ? AppTheme.accentTeal : null,
+                        fontWeight: currentStyle == style
+                            ? FontWeight.bold
+                            : FontWeight.w600,
+                        color: currentStyle == style
+                            ? AppTheme.accentTeal
+                            : null,
                       ),
                     ),
-                    subtitle: Text(style.description, style: const TextStyle(fontSize: 12)),
+                    subtitle: Text(
+                      style.description,
+                      style: const TextStyle(fontSize: 12),
+                    ),
                     trailing: currentStyle == style
-                        ? const Icon(Icons.check_circle, color: AppTheme.accentTeal)
+                        ? const Icon(
+                            Icons.check_circle,
+                            color: AppTheme.accentTeal,
+                          )
                         : null,
                     onTap: () {
                       TileCacheService.instance.setLayerStyle(style);
@@ -1145,9 +1226,15 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
     );
   }
 
-  void _showCoverageAnalysisModal(BuildContext context, List<PersonEntry> people) {
+  void _showCoverageAnalysisModal(
+    BuildContext context,
+    List<PersonEntry> people,
+  ) {
     final visits = ref.read(visitsStreamProvider).value ?? [];
-    final report = TerritoryCoverageEngine.calculateCoverage(people: people, visits: visits);
+    final report = TerritoryCoverageEngine.calculateCoverage(
+      people: people,
+      visits: visits,
+    );
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     showModalBottomSheet(
@@ -1180,12 +1267,19 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
               const SizedBox(height: 16),
               Row(
                 children: [
-                  const Icon(Icons.analytics_outlined, color: AppTheme.primaryBlue, size: 24),
+                  const Icon(
+                    Icons.analytics_outlined,
+                    color: AppTheme.primaryBlue,
+                    size: 24,
+                  ),
                   const SizedBox(width: 10),
                   const Expanded(
                     child: Text(
                       'Índice de Cobertura & Zonas Esquecidas',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                   IconButton(
@@ -1203,11 +1297,15 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                   gradient: LinearGradient(
                     colors: [
                       report.ratingColor.withValues(alpha: isDark ? 0.3 : 0.12),
-                      report.ratingColor.withValues(alpha: isDark ? 0.15 : 0.05),
+                      report.ratingColor.withValues(
+                        alpha: isDark ? 0.15 : 0.05,
+                      ),
                     ],
                   ),
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: report.ratingColor.withValues(alpha: 0.4)),
+                  border: Border.all(
+                    color: report.ratingColor.withValues(alpha: 0.4),
+                  ),
                 ),
                 child: Row(
                   children: [
@@ -1221,7 +1319,9 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                             value: report.coverageIndexPercent / 100.0,
                             strokeWidth: 6,
                             backgroundColor: Colors.grey.shade300,
-                            valueColor: AlwaysStoppedAnimation<Color>(report.ratingColor),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              report.ratingColor,
+                            ),
                           ),
                         ),
                         Text(
@@ -1250,7 +1350,10 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                           const SizedBox(height: 4),
                           Text(
                             '${report.workedRecentlyCount + report.workedStandardCount} de ${report.totalAddresses} endereços trabalhados nos últimos 90 dias.',
-                            style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.textMuted,
+                            ),
                           ),
                         ],
                       ),
@@ -1264,25 +1367,54 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                 children: [
                   Expanded(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 8,
+                        horizontal: 6,
+                      ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF0D9488).withValues(alpha: isDark ? 0.2 : 0.08),
+                        color: const Color(0xFF0D9488)
+                            .withValues(alpha: isDark ? 0.2 : 0.08),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFF0D9488).withValues(alpha: 0.3)),
+                        border: Border.all(
+                          color: const Color(0xFF0D9488).withValues(alpha: 0.3),
+                        ),
                       ),
                       child: Column(
                         children: [
                           const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.home_work_outlined, size: 14, color: Color(0xFF0D9488)),
+                              Icon(
+                                Icons.home_work_outlined,
+                                size: 14,
+                                color: Color(0xFF0D9488),
+                              ),
                               SizedBox(width: 4),
-                              Text('Residências', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                              Text(
+                                'Residências',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ],
                           ),
                           const SizedBox(height: 2),
-                          Text('${report.addressCoveragePercent.toStringAsFixed(0)}%', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0D9488))),
-                          Text('${report.workedUniqueAddresses}/${report.totalUniqueAddresses}', style: const TextStyle(fontSize: 10, color: AppTheme.textMuted)),
+                          Text(
+                            '${report.addressCoveragePercent.toStringAsFixed(0)}%',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: Color(0xFF0D9488),
+                            ),
+                          ),
+                          Text(
+                            '${report.workedUniqueAddresses}/${report.totalUniqueAddresses}',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: AppTheme.textMuted,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -1290,25 +1422,55 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                   const SizedBox(width: 6),
                   Expanded(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 8,
+                        horizontal: 6,
+                      ),
                       decoration: BoxDecoration(
-                        color: AppTheme.primaryBlue.withValues(alpha: isDark ? 0.2 : 0.08),
+                        color: AppTheme.primaryBlue.withValues(
+                          alpha: isDark ? 0.2 : 0.08,
+                        ),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: AppTheme.primaryBlue.withValues(alpha: 0.3)),
+                        border: Border.all(
+                          color: AppTheme.primaryBlue.withValues(alpha: 0.3),
+                        ),
                       ),
                       child: Column(
                         children: [
                           const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.people_outline, size: 14, color: AppTheme.primaryBlue),
+                              Icon(
+                                Icons.people_outline,
+                                size: 14,
+                                color: AppTheme.primaryBlue,
+                              ),
                               SizedBox(width: 4),
-                              Text('Contatos', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                              Text(
+                                'Contatos',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ],
                           ),
                           const SizedBox(height: 2),
-                          Text('${report.peopleCoveragePercent.toStringAsFixed(0)}%', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.primaryBlue)),
-                          Text('${report.visitedPeopleCount}/${report.totalPeople}', style: const TextStyle(fontSize: 10, color: AppTheme.textMuted)),
+                          Text(
+                            '${report.peopleCoveragePercent.toStringAsFixed(0)}%',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: AppTheme.primaryBlue,
+                            ),
+                          ),
+                          Text(
+                            '${report.visitedPeopleCount}/${report.totalPeople}',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: AppTheme.textMuted,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -1316,25 +1478,54 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                   const SizedBox(width: 6),
                   Expanded(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 8,
+                        horizontal: 6,
+                      ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF16A34A).withValues(alpha: isDark ? 0.2 : 0.08),
+                        color: const Color(0xFF16A34A)
+                            .withValues(alpha: isDark ? 0.2 : 0.08),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFF16A34A).withValues(alpha: 0.3)),
+                        border: Border.all(
+                          color: const Color(0xFF16A34A).withValues(alpha: 0.3),
+                        ),
                       ),
                       child: Column(
                         children: [
                           const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.forum_outlined, size: 14, color: Color(0xFF16A34A)),
+                              Icon(
+                                Icons.forum_outlined,
+                                size: 14,
+                                color: Color(0xFF16A34A),
+                              ),
                               SizedBox(width: 4),
-                              Text('Conversas', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                              Text(
+                                'Conversas',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ],
                           ),
                           const SizedBox(height: 2),
-                          Text('${report.conversationCoveragePercent.toStringAsFixed(0)}%', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF16A34A))),
-                          Text('${report.peopleWithEffectiveConversation}/${report.totalPeople}', style: const TextStyle(fontSize: 10, color: AppTheme.textMuted)),
+                          Text(
+                            '${report.conversationCoveragePercent.toStringAsFixed(0)}%',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: Color(0xFF16A34A),
+                            ),
+                          ),
+                          Text(
+                            '${report.peopleWithEffectiveConversation}/${report.totalPeople}',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: AppTheme.textMuted,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -1344,7 +1535,10 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
               const SizedBox(height: 16),
               Text(
                 'Zonas Esquecidas (>90 dias sem visita): ${report.forgottenAddresses.length}',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
               ),
               const SizedBox(height: 8),
               Expanded(
@@ -1363,9 +1557,19 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                           return Card(
                             margin: const EdgeInsets.only(bottom: 8),
                             child: ListTile(
-                              leading: const Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626)),
-                              title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                              subtitle: Text(p.address ?? 'Sem endereço cadastrado'),
+                              leading: const Icon(
+                                Icons.warning_amber_rounded,
+                                color: Color(0xFFDC2626),
+                              ),
+                              title: Text(
+                                p.name,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              subtitle: Text(
+                                p.address ?? 'Sem endereço cadastrado',
+                              ),
                               trailing: TextButton(
                                 child: const Text('Localizar'),
                                 onPressed: () {
@@ -1389,7 +1593,10 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
     );
   }
 
-  void _showDuplicateAnalysisModal(BuildContext context, List<PersonEntry> people) {
+  void _showDuplicateAnalysisModal(
+    BuildContext context,
+    List<PersonEntry> people,
+  ) {
     final duplicates = TerritoryCoverageEngine.findDuplicates(people);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -1423,12 +1630,19 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
               const SizedBox(height: 16),
               Row(
                 children: [
-                  const Icon(Icons.compare_arrows, color: Color(0xFFD97706), size: 24),
+                  const Icon(
+                    Icons.compare_arrows,
+                    color: Color(0xFFD97706),
+                    size: 24,
+                  ),
                   const SizedBox(width: 10),
                   const Expanded(
                     child: Text(
                       'Detecção de Duplicidades no Território',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                   IconButton(
@@ -1440,7 +1654,10 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
               const SizedBox(height: 8),
               Text(
                 'Identifica endereços com distância < 25m e nomes/endereços foneticamente similares.',
-                style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted,
+                ),
               ),
               const SizedBox(height: 12),
               Expanded(
@@ -1448,7 +1665,10 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                     ? const Center(
                         child: Text(
                           'Nenhuma duplicidade detectada no território!',
-                          style: TextStyle(color: AppTheme.successGreen, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            color: AppTheme.successGreen,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       )
                     : ListView.builder(
@@ -1461,7 +1681,9 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10),
                               side: BorderSide(
-                                color: match.isHighConfidence ? Colors.red.shade300 : Colors.amber.shade300,
+                                color: match.isHighConfidence
+                                    ? Colors.red.shade300
+                                    : Colors.amber.shade300,
                               ),
                             ),
                             child: Padding(
@@ -1472,35 +1694,61 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                                   Row(
                                     children: [
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
                                         decoration: BoxDecoration(
                                           color: match.isHighConfidence
-                                              ? Colors.red.withValues(alpha: 0.15)
-                                              : Colors.amber.withValues(alpha: 0.15),
-                                          borderRadius: BorderRadius.circular(4),
+                                              ? Colors.red.withValues(
+                                                  alpha: 0.15,
+                                                )
+                                              : Colors.amber.withValues(
+                                                  alpha: 0.15,
+                                                ),
+                                          borderRadius: BorderRadius.circular(
+                                            4,
+                                          ),
                                         ),
                                         child: Text(
-                                          match.isHighConfidence ? 'Alta Certeza (<25m)' : 'Possível Duplicata',
+                                          match.isHighConfidence
+                                              ? 'Alta Certeza (<25m)'
+                                              : 'Possível Duplicata',
                                           style: TextStyle(
                                             fontSize: 10,
                                             fontWeight: FontWeight.bold,
-                                            color: match.isHighConfidence ? Colors.red : Colors.amber.shade900,
+                                            color: match.isHighConfidence
+                                                ? Colors.red
+                                                : Colors.amber.shade900,
                                           ),
                                         ),
                                       ),
                                       const Spacer(),
                                       Text(
                                         'Distância: ${match.distanceMeters.toStringAsFixed(0)}m',
-                                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
                                     ],
                                   ),
                                   const SizedBox(height: 8),
-                                  Text('1: ${match.personA.name} (${match.personA.address ?? "Sem endereço"})',
-                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                  Text(
+                                    '1: ${match.personA.name} (${match.personA.address ?? "Sem endereço"})',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                                   const SizedBox(height: 4),
-                                  Text('2: ${match.personB.name} (${match.personB.address ?? "Sem endereço"})',
-                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                  Text(
+                                    '2: ${match.personB.name} (${match.personB.address ?? "Sem endereço"})',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -1518,10 +1766,15 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
   void _exportKml(BuildContext context, List<PersonEntry> people) {
     final kml = TerritoryDataPortService.exportToKml(people: people);
     Clipboard.setData(ClipboardData(text: kml));
-    FileDownloader.download('territorio_${DateTime.now().millisecondsSinceEpoch}.kml', kml);
+    FileDownloader.download(
+      'territorio_${DateTime.now().millisecondsSinceEpoch}.kml',
+      kml,
+    );
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Território exportado em KML! Copiado para área de transferência.'),
+        content: Text(
+          'Território exportado em KML! Copiado para área de transferência.',
+        ),
         backgroundColor: AppTheme.successGreen,
       ),
     );
@@ -1530,10 +1783,15 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
   void _exportGeoJson(BuildContext context, List<PersonEntry> people) {
     final geojson = TerritoryDataPortService.exportToGeoJson(people: people);
     Clipboard.setData(ClipboardData(text: geojson));
-    FileDownloader.download('territorio_${DateTime.now().millisecondsSinceEpoch}.geojson', geojson);
+    FileDownloader.download(
+      'territorio_${DateTime.now().millisecondsSinceEpoch}.geojson',
+      geojson,
+    );
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Território exportado em GeoJSON! Copiado para área de transferência.'),
+        content: Text(
+          'Território exportado em GeoJSON! Copiado para área de transferência.',
+        ),
         backgroundColor: AppTheme.successGreen,
       ),
     );
@@ -1542,10 +1800,15 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
   void _exportCsv(BuildContext context, List<PersonEntry> people) {
     final csv = TerritoryDataPortService.exportToCsv(people);
     Clipboard.setData(ClipboardData(text: csv));
-    FileDownloader.download('enderecos_territorio_${DateTime.now().millisecondsSinceEpoch}.csv', csv);
+    FileDownloader.download(
+      'enderecos_territorio_${DateTime.now().millisecondsSinceEpoch}.csv',
+      csv,
+    );
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Endereços exportados em CSV! Copiado para área de transferência.'),
+        content: Text(
+          'Endereços exportados em CSV! Copiado para área de transferência.',
+        ),
         backgroundColor: AppTheme.successGreen,
       ),
     );
@@ -1564,194 +1827,268 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
           final textController = ctrls[0];
 
           return StatefulBuilder(
-        builder: (ctx, setDialogState) {
-          final isDark = Theme.of(ctx).brightness == Brightness.dark;
+            builder: (ctx, setDialogState) {
+              final isDark = Theme.of(ctx).brightness == Brightness.dark;
 
-          void analyzeInput() {
-            final raw = textController.text.trim();
-            if (raw.isEmpty) {
-              setDialogState(() => previewContacts = []);
-              return;
-            }
+              void analyzeInput() {
+                final raw = textController.text.trim();
+                if (raw.isEmpty) {
+                  setDialogState(() => previewContacts = []);
+                  return;
+                }
 
-            List<ImportedTerritoryContact> parsed = [];
-            final format = detectedFormat.toLowerCase();
-            if (format.contains('kml') || raw.contains('<kml') || raw.contains('<Placemark')) {
-              parsed = TerritoryDataPortService.importFromKml(raw);
-            } else if (format.contains('geojson') || raw.startsWith('{') || raw.contains('"FeatureCollection"')) {
-              parsed = TerritoryDataPortService.importFromGeoJson(raw);
-            } else {
-              parsed = TerritoryDataPortService.importFromCsv(raw);
-            }
+                List<ImportedTerritoryContact> parsed = [];
+                final format = detectedFormat.toLowerCase();
+                if (format.contains('kml') ||
+                    raw.contains('<kml') ||
+                    raw.contains('<Placemark')) {
+                  parsed = TerritoryDataPortService.importFromKml(raw);
+                } else if (format.contains('geojson') ||
+                    raw.startsWith('{') ||
+                    raw.contains('"FeatureCollection"')) {
+                  parsed = TerritoryDataPortService.importFromGeoJson(raw);
+                } else {
+                  parsed = TerritoryDataPortService.importFromCsv(raw);
+                }
 
-            setDialogState(() {
-              previewContacts = parsed;
-            });
-          }
+                setDialogState(() {
+                  previewContacts = parsed;
+                });
+              }
 
-          return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: const Row(
-              children: [
-                Icon(Icons.file_upload_outlined, color: Color(0xFF0D9488)),
-                SizedBox(width: 8),
-                Expanded(child: Text('Importar Território', style: TextStyle(fontSize: 18))),
-              ],
-            ),
-            content: SizedBox(
-              width: double.maxFinite,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              return AlertDialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                title: const Row(
                   children: [
-                    Text(
-                      'Cole o conteúdo de um arquivo KML (Google Earth), GeoJSON (RFC 7946) ou CSV (planilha) para importar contatos e endereços diretamente.',
-                      style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted),
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      initialValue: detectedFormat,
-                      decoration: const InputDecoration(
-                        labelText: 'Formato do Arquivo',
-                        contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    Icon(Icons.file_upload_outlined, color: Color(0xFF0D9488)),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Importar Território',
+                        style: TextStyle(fontSize: 18),
                       ),
-                      items: const [
-                        DropdownMenuItem(value: 'Auto-detectar', child: Text('Auto-detectar')),
-                        DropdownMenuItem(value: 'KML (Google Earth)', child: Text('KML (Google Earth)')),
-                        DropdownMenuItem(value: 'GeoJSON', child: Text('GeoJSON')),
-                        DropdownMenuItem(value: 'CSV (Planilha)', child: Text('CSV (Planilha)')),
-                      ],
-                      onChanged: (val) {
-                        if (val != null) {
-                          setDialogState(() => detectedFormat = val);
-                          analyzeInput();
-                        }
-                      },
                     ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: textController,
-                      decoration: InputDecoration(
-                        labelText: 'Conteúdo do Arquivo',
-                        hintText: 'Cole o texto KML, GeoJSON ou CSV aqui...',
-                        suffixIcon: IconButton(
-                          icon: const Icon(Icons.paste_rounded),
-                          tooltip: 'Colar da área de transferência',
-                          onPressed: () async {
-                            final data = await Clipboard.getData(Clipboard.kTextPlain);
-                            if (data?.text != null) {
-                              textController.text = data!.text!;
+                  ],
+                ),
+                content: SizedBox(
+                  width: double.maxFinite,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Cole o conteúdo de um arquivo KML (Google Earth), GeoJSON (RFC 7946) ou CSV (planilha) para importar contatos e endereços diretamente.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDark
+                                ? const Color(0xFFCBD5E1)
+                                : AppTheme.textMuted,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          initialValue: detectedFormat,
+                          decoration: const InputDecoration(
+                            labelText: 'Formato do Arquivo',
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 8,
+                            ),
+                          ),
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'Auto-detectar',
+                              child: Text('Auto-detectar'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'KML (Google Earth)',
+                              child: Text('KML (Google Earth)'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'GeoJSON',
+                              child: Text('GeoJSON'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'CSV (Planilha)',
+                              child: Text('CSV (Planilha)'),
+                            ),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) {
+                              setDialogState(() => detectedFormat = val);
                               analyzeInput();
                             }
                           },
                         ),
-                      ),
-                      maxLines: 5,
-                      onChanged: (_) => analyzeInput(),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: textController,
+                          decoration: InputDecoration(
+                            labelText: 'Conteúdo do Arquivo',
+                            hintText:
+                                'Cole o texto KML, GeoJSON ou CSV aqui...',
+                            suffixIcon: IconButton(
+                              icon: const Icon(Icons.paste_rounded),
+                              tooltip: 'Colar da área de transferência',
+                              onPressed: () async {
+                                final data = await Clipboard.getData(
+                                  Clipboard.kTextPlain,
+                                );
+                                if (data?.text != null) {
+                                  textController.text = data!.text!;
+                                  analyzeInput();
+                                }
+                              },
+                            ),
+                          ),
+                          maxLines: 5,
+                          onChanged: (_) => analyzeInput(),
+                        ),
+                        const SizedBox(height: 12),
+                        if (previewContacts.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF16A34A)
+                                  .withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: const Color(0xFF16A34A)
+                                    .withValues(alpha: 0.3),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.check_circle,
+                                  color: Color(0xFF16A34A),
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    '${previewContacts.length} contato(s) identificado(s) prontos para importação.',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                      color: Color(0xFF16A34A),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else if (textController.text.trim().isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: Colors.amber.withValues(alpha: 0.3),
+                              ),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(
+                                  Icons.info_outline,
+                                  color: Colors.amber,
+                                  size: 18,
+                                ),
+                                SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Nenhum contato detectado no texto colado. Verifique o formato selecionado.',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.amber,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
                     ),
-                    const SizedBox(height: 12),
-                    if (previewContacts.isNotEmpty)
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF16A34A).withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFF16A34A).withValues(alpha: 0.3)),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.check_circle, color: Color(0xFF16A34A), size: 18),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                '${previewContacts.length} contato(s) identificado(s) prontos para importação.',
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF16A34A)),
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    else if (textController.text.trim().isNotEmpty)
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.amber.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
-                        ),
-                        child: const Row(
-                          children: [
-                            Icon(Icons.info_outline, color: Colors.amber, size: 18),
-                            SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'Nenhum contato detectado no texto colado. Verifique o formato selecionado.',
-                                style: TextStyle(fontSize: 11, color: Colors.amber),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: isImporting ? null : () => Navigator.pop(dialogCtx),
-                child: const Text('Cancelar'),
-              ),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0D9488),
-                  foregroundColor: Colors.white,
-                ),
-                icon: isImporting
-                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Icon(Icons.download_done_rounded, size: 16),
-                label: Text(isImporting ? 'Importando...' : 'Confirmar Importação'),
-                onPressed: (isImporting || previewContacts.isEmpty)
-                    ? null
-                    : () async {
-                        setDialogState(() => isImporting = true);
-                        try {
-                          final repo = ref.read(repositoryProvider);
-                          for (final contact in previewContacts) {
-                            await repo.createPerson(
-                              name: contact.name,
-                              phone: contact.phone,
-                              address: contact.address,
-                              status: contact.status,
-                              latitude: contact.latitude,
-                              longitude: contact.longitude,
-                              generalNotes: contact.notes,
-                            );
-                          }
-                          if (dialogCtx.mounted) Navigator.pop(dialogCtx);
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('${previewContacts.length} contatos importados para o território com sucesso!'),
-                                backgroundColor: AppTheme.successGreen,
-                              ),
-                            );
-                          }
-                        } catch (e) {
-                          if (dialogCtx.mounted) {
-                            ScaffoldMessenger.of(dialogCtx).showSnackBar(
-                              SnackBar(content: Text('Erro ao importar contatos: $e'), backgroundColor: Colors.red),
-                            );
-                          }
-                        } finally {
-                          if (dialogCtx.mounted) setDialogState(() => isImporting = false);
-                        }
-                      },
-              ),
-            ],
+                actions: [
+                  TextButton(
+                    onPressed: isImporting
+                        ? null
+                        : () => Navigator.pop(dialogCtx),
+                    child: const Text('Cancelar'),
+                  ),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0D9488),
+                      foregroundColor: Colors.white,
+                    ),
+                    icon: isImporting
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.download_done_rounded, size: 16),
+                    label: Text(
+                      isImporting ? 'Importando...' : 'Confirmar Importação',
+                    ),
+                    onPressed: (isImporting || previewContacts.isEmpty)
+                        ? null
+                        : () async {
+                            setDialogState(() => isImporting = true);
+                            try {
+                              final repo = ref.read(repositoryProvider);
+                              for (final contact in previewContacts) {
+                                await repo.createPerson(
+                                  name: contact.name,
+                                  phone: contact.phone,
+                                  address: contact.address,
+                                  status: contact.status,
+                                  latitude: contact.latitude,
+                                  longitude: contact.longitude,
+                                  generalNotes: contact.notes,
+                                );
+                              }
+                              if (dialogCtx.mounted) Navigator.pop(dialogCtx);
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      '${previewContacts.length} contatos importados para o território com sucesso!',
+                                    ),
+                                    backgroundColor: AppTheme.successGreen,
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              if (dialogCtx.mounted) {
+                                ScaffoldMessenger.of(dialogCtx).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Erro ao importar contatos: $e',
+                                    ),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              }
+                            } finally {
+                              if (dialogCtx.mounted)
+                                setDialogState(() => isImporting = false);
+                            }
+                          },
+                  ),
+                ],
+              );
+            },
           );
-        },
-      );
         },
       ),
     );
@@ -1797,11 +2134,15 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                 ),
                 PopupMenuButton<String>(
                   tooltip: 'Mais Opções do Mapa',
-                  constraints: const BoxConstraints(minWidth: 280, maxWidth: 380),
+                  constraints: const BoxConstraints(
+                    minWidth: 280,
+                    maxWidth: 380,
+                  ),
                   onSelected: (val) {
                     final people = peopleAsync.value ?? [];
                     if (val == 'pdf') {
-                      final sectors = ref.read(sectorsStreamProvider).value ?? [];
+                      final sectors =
+                          ref.read(sectorsStreamProvider).value ?? [];
                       ReportExportService.exportContactsMapPdf(
                         context: context,
                         people: people,
@@ -1811,180 +2152,204 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                     } else if (val == 'offline') {
                       DownloadMapsScreen.show(context);
                     } else if (val == 'google_maps') {
-                _openStandardGoogleMaps(people, landmarks);
-              } else if (val == 'landmark') {
-                _showAddLandmarkModal(context);
-              } else if (val == 'coverage') {
-                _showCoverageAnalysisModal(context, people);
-              } else if (val == 'duplicates') {
-                _showDuplicateAnalysisModal(context, people);
-              } else if (val == 'import') {
-                _showImportTerritoryDialog(context);
-              } else if (val == 'kml') {
-                _exportKml(context, people);
-              } else if (val == 'geojson') {
-                _exportGeoJson(context, people);
-              } else if (val == 'csv') {
-                _exportCsv(context, people);
-              }
-            },
-            itemBuilder: (ctx) => [
-              const PopupMenuItem(
-                value: 'coverage',
-                child: Row(
-                  children: [
-                    Icon(Icons.analytics_outlined, size: 18, color: AppTheme.primaryBlue),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Índice de Cobertura (IC) & Zonas',
-                        overflow: TextOverflow.ellipsis,
+                      _openStandardGoogleMaps(people, landmarks);
+                    } else if (val == 'landmark') {
+                      _showAddLandmarkModal(context);
+                    } else if (val == 'coverage') {
+                      _showCoverageAnalysisModal(context, people);
+                    } else if (val == 'duplicates') {
+                      _showDuplicateAnalysisModal(context, people);
+                    } else if (val == 'import') {
+                      _showImportTerritoryDialog(context);
+                    } else if (val == 'kml') {
+                      _exportKml(context, people);
+                    } else if (val == 'geojson') {
+                      _exportGeoJson(context, people);
+                    } else if (val == 'csv') {
+                      _exportCsv(context, people);
+                    }
+                  },
+                  itemBuilder: (ctx) => [
+                    const PopupMenuItem(
+                      value: 'coverage',
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.analytics_outlined,
+                            size: 18,
+                            color: AppTheme.primaryBlue,
+                          ),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Índice de Cobertura (IC) & Zonas',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'duplicates',
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.compare_arrows,
+                            size: 18,
+                            color: Color(0xFFD97706),
+                          ),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Detectar Duplicidades (<25m)',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuDivider(),
+                    const PopupMenuItem(
+                      value: 'import',
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.file_upload_outlined,
+                            size: 18,
+                            color: Color(0xFF0D9488),
+                          ),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Importar Território (KML/GeoJSON/CSV)',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'kml',
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.share_location,
+                            size: 18,
+                            color: Color(0xFF16A34A),
+                          ),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Exportar KML (Google Earth)',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'geojson',
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.data_object,
+                            size: 18,
+                            color: Color(0xFF7C3AED),
+                          ),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Exportar GeoJSON Padrão',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'csv',
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.table_chart_outlined,
+                            size: 18,
+                            color: Color(0xFF0284C7),
+                          ),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Exportar Planilha (CSV)',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuDivider(),
+                    const PopupMenuItem(
+                      value: 'pdf',
+                      child: Row(
+                        children: [
+                          Icon(Icons.picture_as_pdf, size: 18),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Exportar Mapa Geral (PDF)',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'offline',
+                      child: Row(
+                        children: [
+                          Icon(Icons.download_for_offline_outlined, size: 18),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Baixar Mapa Offline',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'google_maps',
+                      child: Row(
+                        children: [
+                          Icon(Icons.public, size: 18),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Abrir no Google Maps',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'landmark',
+                      child: Row(
+                        children: [
+                          Icon(Icons.add_location_alt_outlined, size: 18),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '+ Ponto de Referência',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
-              ),
-              const PopupMenuItem(
-                value: 'duplicates',
-                child: Row(
-                  children: [
-                    Icon(Icons.compare_arrows, size: 18, color: Color(0xFFD97706)),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Detectar Duplicidades (<25m)',
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const PopupMenuDivider(),
-              const PopupMenuItem(
-                value: 'import',
-                child: Row(
-                  children: [
-                    Icon(Icons.file_upload_outlined, size: 18, color: Color(0xFF0D9488)),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Importar Território (KML/GeoJSON/CSV)',
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'kml',
-                child: Row(
-                  children: [
-                    Icon(Icons.share_location, size: 18, color: Color(0xFF16A34A)),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Exportar KML (Google Earth)',
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'geojson',
-                child: Row(
-                  children: [
-                    Icon(Icons.data_object, size: 18, color: Color(0xFF7C3AED)),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Exportar GeoJSON Padrão',
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'csv',
-                child: Row(
-                  children: [
-                    Icon(Icons.table_chart_outlined, size: 18, color: Color(0xFF0284C7)),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Exportar Planilha (CSV)',
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const PopupMenuDivider(),
-              const PopupMenuItem(
-                value: 'pdf',
-                child: Row(
-                  children: [
-                    Icon(Icons.picture_as_pdf, size: 18),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Exportar Mapa Geral (PDF)',
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'offline',
-                child: Row(
-                  children: [
-                    Icon(Icons.download_for_offline_outlined, size: 18),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Baixar Mapa Offline',
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'google_maps',
-                child: Row(
-                  children: [
-                    Icon(Icons.public, size: 18),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Abrir no Google Maps',
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'landmark',
-                child: Row(
-                  children: [
-                    Icon(Icons.add_location_alt_outlined, size: 18),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        '+ Ponto de Referência',
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+              ],
+            ),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: AppTheme.accentTeal,
         foregroundColor: Colors.white,
@@ -2198,44 +2563,49 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                           child: SingleChildScrollView(
                             scrollDirection: Axis.horizontal,
                             child: Row(
-                          children: [
-                            OutlinedButton.icon(
-                              style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 4,
-                                ),
-                                minimumSize: const Size(36, 36),
-                              ),
-                              icon: const Icon(Icons.public, size: 16),
-                              label: const Text(
-                                'Mapa Padrão',
-                                style: TextStyle(fontSize: 12),
-                              ),
-                              onPressed: () =>
-                                  _openStandardGoogleMaps(filtered, landmarks),
-                            ),
-                            const SizedBox(width: 6),
-                            if (filtered.isNotEmpty)
-                              ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppTheme.accentTeal,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 4,
+                              children: [
+                                OutlinedButton.icon(
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
+                                    minimumSize: const Size(36, 36),
                                   ),
-                                  minimumSize: const Size(36, 36),
+                                  icon: const Icon(Icons.public, size: 16),
+                                  label: const Text(
+                                    'Mapa Padrão',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
+                                  onPressed: () => _openStandardGoogleMaps(
+                                    filtered,
+                                    landmarks,
+                                  ),
                                 ),
-                                icon: const Icon(Icons.directions, size: 16),
-                                label: const Text(
-                                  'Traçar Rota',
-                                  style: TextStyle(fontSize: 12),
-                                ),
-                                onPressed: () =>
-                                    _openMultiContactRoute(filtered),
-                              ),
-                          ],
+                                const SizedBox(width: 6),
+                                if (filtered.isNotEmpty)
+                                  ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppTheme.accentTeal,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 4,
+                                      ),
+                                      minimumSize: const Size(36, 36),
+                                    ),
+                                    icon: const Icon(
+                                      Icons.directions,
+                                      size: 16,
+                                    ),
+                                    label: const Text(
+                                      'Traçar Rota',
+                                      style: TextStyle(fontSize: 12),
+                                    ),
+                                    onPressed: () =>
+                                        _openMultiContactRoute(filtered),
+                                  ),
+                              ],
                             ),
                           ),
                         ),
@@ -2322,7 +2692,8 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
     final Map<String, DateTime> nextApptMap = {};
     final nowTime = DateTime.now();
     for (final a in allAppointments) {
-      if (a.deletedAt != null || a.status == 'cancelado' || a.personId == null) continue;
+      if (a.deletedAt != null || a.status == 'cancelado' || a.personId == null)
+        continue;
       if (a.startTime.isAfter(nowTime)) {
         final existing = nextApptMap[a.personId!];
         if (existing == null || a.startTime.isBefore(existing)) {
@@ -2584,31 +2955,52 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                         _transformationController.value,
                       );
                       final currentScale = m.getMaxScaleOnAxis();
-                      final effectiveScale = currentScale > 0.01 ? currentScale : 1.0;
+                      final effectiveScale = currentScale > 0.01
+                          ? currentScale
+                          : 1.0;
                       final dx = m.storage[12];
                       final dy = m.storage[13];
-                      final offset = details.localPosition -
+                      final offset =
+                          details.localPosition -
                           Offset(viewportW / 2, viewportH / 2);
                       final rotation = _rotationNotifier.value;
                       final c = math.cos(rotation);
                       final sn = math.sin(rotation);
-                      final localX = offset.dx * c + offset.dy * sn + viewerW / 2;
-                      final localY = -offset.dx * sn + offset.dy * c + viewerH / 2;
+                      final localX =
+                          offset.dx * c + offset.dy * sn + viewerW / 2;
+                      final localY =
+                          -offset.dx * sn + offset.dy * c + viewerH / 2;
                       final touchCanvasX = (localX - dx) / effectiveScale;
                       final touchCanvasY = (localY - dy) / effectiveScale;
                       final touchWorldPx = originPx + touchCanvasX;
                       final touchWorldPy = originPy + touchCanvasY;
                       final touchLng = _pixelX2lon(touchWorldPx, _zoom);
                       final touchLat = _pixelY2lat(touchWorldPy, _zoom);
-                      _showAddLandmarkModal(context, initialLat: touchLat, initialLng: touchLng);
+                      _showAddLandmarkModal(
+                        context,
+                        initialLat: touchLat,
+                        initialLng: touchLng,
+                      );
                     },
                     child: Listener(
                       behavior: HitTestBehavior.translucent,
                       onPointerDown: (event) {
                         _touchPointers[event.pointer] = event.position;
-                        if (_touchPointers.length >= 2) {
+                        if (event.kind == PointerDeviceKind.mouse &&
+                            (event.buttons & kSecondaryMouseButton != 0 ||
+                                HardwareKeyboard.instance.isShiftPressed)) {
+                          _isMouseRotating = true;
+                          _mouseRotateStartAngle = math.atan2(
+                            event.localPosition.dy - viewportH / 2,
+                            event.localPosition.dx - viewportW / 2,
+                          );
+                          _rotationAtMouseStart = _rotationNotifier.value;
+                        } else if (_touchPointers.length >= 2) {
                           final pts = _touchPointers.values.take(2).toList();
-                          _twoFingerStartAngle = math.atan2(pts[1].dy - pts[0].dy, pts[1].dx - pts[0].dx);
+                          _twoFingerStartAngle = math.atan2(
+                            pts[1].dy - pts[0].dy,
+                            pts[1].dx - pts[0].dx,
+                          );
                           _rotationAtTouchStart = _rotationNotifier.value;
                         }
                       },
@@ -2616,9 +3008,27 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                         if (_touchPointers.containsKey(event.pointer)) {
                           _touchPointers[event.pointer] = event.position;
                         }
-                        if (_touchPointers.length >= 2) {
+                        if (_isMouseRotating) {
+                          final currentAngle = math.atan2(
+                            event.localPosition.dy - viewportH / 2,
+                            event.localPosition.dx - viewportW / 2,
+                          );
+                          var diff = currentAngle - _mouseRotateStartAngle;
+                          while (diff > math.pi) {
+                            diff -= 2 * math.pi;
+                          }
+                          while (diff < -math.pi) {
+                            diff += 2 * math.pi;
+                          }
+                          _rotationAnimController.stop();
+                          _rotationNotifier.value =
+                              _rotationAtMouseStart + diff;
+                        } else if (_touchPointers.length >= 2) {
                           final pts = _touchPointers.values.take(2).toList();
-                          final currentAngle = math.atan2(pts[1].dy - pts[0].dy, pts[1].dx - pts[0].dx);
+                          final currentAngle = math.atan2(
+                            pts[1].dy - pts[0].dy,
+                            pts[1].dx - pts[0].dx,
+                          );
                           var diff = currentAngle - _twoFingerStartAngle;
                           while (diff > math.pi) {
                             diff -= 2 * math.pi;
@@ -2627,23 +3037,32 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                             diff += 2 * math.pi;
                           }
                           _rotationAnimController.stop();
-                          _rotationNotifier.value = _rotationAtTouchStart + diff;
+                          _rotationNotifier.value =
+                              _rotationAtTouchStart + diff;
                         }
                       },
                       onPointerUp: (event) {
                         _touchPointers.remove(event.pointer);
+                        _isMouseRotating = false;
                         _rotationAtTouchStart = _rotationNotifier.value;
                         if (_touchPointers.length >= 2) {
                           final pts = _touchPointers.values.take(2).toList();
-                          _twoFingerStartAngle = math.atan2(pts[1].dy - pts[0].dy, pts[1].dx - pts[0].dx);
+                          _twoFingerStartAngle = math.atan2(
+                            pts[1].dy - pts[0].dy,
+                            pts[1].dx - pts[0].dx,
+                          );
                         }
                       },
                       onPointerCancel: (event) {
                         _touchPointers.remove(event.pointer);
+                        _isMouseRotating = false;
                         _rotationAtTouchStart = _rotationNotifier.value;
                         if (_touchPointers.length >= 2) {
                           final pts = _touchPointers.values.take(2).toList();
-                          _twoFingerStartAngle = math.atan2(pts[1].dy - pts[0].dy, pts[1].dx - pts[0].dx);
+                          _twoFingerStartAngle = math.atan2(
+                            pts[1].dy - pts[0].dy,
+                            pts[1].dx - pts[0].dx,
+                          );
                         }
                       },
                       child: SizedBox(
@@ -2664,7 +3083,8 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                                 );
                               },
                               child: InteractiveViewer(
-                                transformationController: _transformationController,
+                                transformationController:
+                                    _transformationController,
                                 constrained: false, // Permite que o mapa ocupe 100% da área sem distorção ou cortes pretos
                                 boundaryMargin: EdgeInsets.zero, // O canvas dinâmico já excede a diagonal em todos os zooms, evitando áreas vazias
                                 panEnabled: true,
@@ -2680,8 +3100,9 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                                     _transformationController.value,
                                   );
                                   final currentScale = m.getMaxScaleOnAxis();
-                                  final effectiveScale =
-                                      currentScale > 0.01 ? currentScale : 1.0;
+                                  final effectiveScale = currentScale > 0.01
+                                      ? currentScale
+                                      : 1.0;
                                   final dx = m.storage[12];
                                   final dy = m.storage[13];
                                   final canvasCenterX =
@@ -2690,12 +3111,20 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                                       ((viewerH / 2.0) - dy) / effectiveScale;
                                   final worldPx = originPx + canvasCenterX;
                                   final worldPy = originPy + canvasCenterY;
-                                  final focalLng = _pixelX2lon(worldPx, _zoom).clamp(-179.999999, 179.999999);
-                                  final focalLat = _pixelY2lat(worldPy, _zoom).clamp(-85.0511, 85.0511);
+                                  final focalLng = _pixelX2lon(
+                                    worldPx,
+                                    _zoom,
+                                  ).clamp(-179.999999, 179.999999);
+                                  final focalLat = _pixelY2lat(
+                                    worldPy,
+                                    _zoom,
+                                  ).clamp(-85.0511, 85.0511);
 
                                   final now = clock.now();
                                   if (_lastZoomChangeTime == null ||
-                                      now.difference(_lastZoomChangeTime!).inMilliseconds >=
+                                      now
+                                              .difference(_lastZoomChangeTime!)
+                                              .inMilliseconds >=
                                           250) {
                                     if (currentScale >= 1.35 && _zoom < 19) {
                                       _lastZoomChangeTime = now;
@@ -2709,7 +3138,8 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                                         gridHalfSize: gridHalfSize,
                                       );
                                       return;
-                                    } else if (currentScale <= 0.75 && _zoom > 6) {
+                                    } else if (currentScale <= 0.75 &&
+                                        _zoom > 6) {
                                       _lastZoomChangeTime = now;
                                       _changeZoom(
                                         _zoom - 1,
@@ -2723,20 +3153,32 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                                       return;
                                     }
                                   }
-                                  final newCenterTileX = _lon2tileX(focalLng, _zoom);
-                                  final newCenterTileY = _lat2tileY(focalLat, _zoom);
+                                  final newCenterTileX = _lon2tileX(
+                                    focalLng,
+                                    _zoom,
+                                  );
+                                  final newCenterTileY = _lat2tileY(
+                                    focalLat,
+                                    _zoom,
+                                  );
                                   if (newCenterTileX == centerTileX &&
                                       newCenterTileY == centerTileY) {
                                     _activeCenterLng = focalLng;
                                     _activeCenterLat = focalLat;
                                     return;
                                   }
-                                  final newMinTileX = newCenterTileX - gridHalfSize;
-                                  final newMinTileY = newCenterTileY - gridHalfSize;
+                                  final newMinTileX =
+                                      newCenterTileX - gridHalfSize;
+                                  final newMinTileY =
+                                      newCenterTileY - gridHalfSize;
                                   final newOriginX = newMinTileX * _tileSize;
                                   final newOriginY = newMinTileY * _tileSize;
-                                  final nextDx = dx + (newOriginX - originPx) * effectiveScale;
-                                  final nextDy = dy + (newOriginY - originPy) * effectiveScale;
+                                  final nextDx =
+                                      dx +
+                                      (newOriginX - originPx) * effectiveScale;
+                                  final nextDy =
+                                      dy +
+                                      (newOriginY - originPy) * effectiveScale;
                                   _cancelPendingResizeSync();
                                   setState(() {
                                     _activeCenterLng = focalLng;
@@ -2745,7 +3187,12 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                                   _setMatrixWithRebuildPending(
                                     Matrix4.identity()
                                       ..translateByDouble(nextDx, nextDy, 0, 1)
-                                      ..scaleByDouble(effectiveScale, effectiveScale, 1, 1),
+                                      ..scaleByDouble(
+                                        effectiveScale,
+                                        effectiveScale,
+                                        1,
+                                        1,
+                                      ),
                                   );
                                 },
                                 child: Container(
@@ -2759,7 +3206,8 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                                       // Camada de Tiles dinâmica isolada (sem rebuild da tela inteira durante arraste/zoom/rotação)
                                       Positioned.fill(
                                         child: _DynamicTileLayer(
-                                          transformationController: _transformationController,
+                                          transformationController:
+                                              _transformationController,
                                           rotationListenable: _rotationNotifier,
                                           zoom: _zoom,
                                           minTileX: minTileX,
@@ -2775,7 +3223,8 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                                           tileSize: _tileSize,
                                           isDark: isDark,
                                           layerStyle: activeLayerStyle,
-                                          initialMatrixOverride: frameMatrixOverride,
+                                          initialMatrixOverride:
+                                              frameMatrixOverride,
                                           shouldIgnoreTransformUpdates: () =>
                                               _suppressTileBoundsListener,
                                         ),
@@ -2783,7 +3232,11 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
 
                                       // Renderização dos Marcos / Pontos de Referência geolocalizados
                                       if (_showLandmarks)
-                                        for (int i = 0; i < geoLandmarks.length; i++)
+                                        for (
+                                          int i = 0;
+                                          i < geoLandmarks.length;
+                                          i++
+                                        )
                                           _buildLandmarkPin(
                                             geoLandmarks[i],
                                             i,
@@ -2797,8 +3250,18 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                                       // Ponto Azul Pulsante de Localização GPS Nativa (Regra 12)
                                       if (_userGpsLocation != null) ...[
                                         () {
-                                          final userX = _lon2pixelX(_userGpsLocation!.longitude, _zoom) - originPx;
-                                          final userY = _lat2pixelY(_userGpsLocation!.latitude, _zoom) - originPy;
+                                          final userX =
+                                              _lon2pixelX(
+                                                _userGpsLocation!.longitude,
+                                                _zoom,
+                                              ) -
+                                              originPx;
+                                          final userY =
+                                              _lat2pixelY(
+                                                _userGpsLocation!.latitude,
+                                                _zoom,
+                                              ) -
+                                              originPy;
                                           return Positioned(
                                             left: userX - 22,
                                             top: userY - 22,
@@ -2811,9 +3274,15 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                                                     height: 44,
                                                     decoration: BoxDecoration(
                                                       shape: BoxShape.circle,
-                                                      color: Colors.blue.withValues(alpha: 0.22),
+                                                      color: Colors.blue
+                                                          .withValues(
+                                                            alpha: 0.22,
+                                                          ),
                                                       border: Border.all(
-                                                        color: Colors.blueAccent.withValues(alpha: 0.5),
+                                                        color: Colors.blueAccent
+                                                            .withValues(
+                                                              alpha: 0.5,
+                                                            ),
                                                         width: 1.5,
                                                       ),
                                                     ),
@@ -2823,8 +3292,13 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                                                     height: 14,
                                                     decoration: BoxDecoration(
                                                       shape: BoxShape.circle,
-                                                      color: const Color(0xFF2563EB),
-                                                      border: Border.all(color: Colors.white, width: 2.5),
+                                                      color: const Color(
+                                                        0xFF2563EB,
+                                                      ),
+                                                      border: Border.all(
+                                                        color: Colors.white,
+                                                        width: 2.5,
+                                                      ),
                                                       boxShadow: const [
                                                         BoxShadow(
                                                           color: Colors.black38,
@@ -2845,17 +3319,26 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                                       for (final p in orderedContacts) ...[
                                         () {
                                           final layer = pinLayers[p.id];
-                                          if (layer != TerritoryPinLayer.forgottenZone) return const SizedBox.shrink();
+                                          if (layer !=
+                                              TerritoryPinLayer.forgottenZone)
+                                            return const SizedBox.shrink();
 
-                                          final hasGeo = p.latitude != null &&
+                                          final hasGeo =
+                                              p.latitude != null &&
                                               p.longitude != null &&
-                                              (p.latitude != 0.0 || p.longitude != 0.0) &&
+                                              (p.latitude != 0.0 ||
+                                                  p.longitude != 0.0) &&
                                               p.latitude!.abs() <= 90 &&
                                               p.longitude!.abs() <= 180;
-                                          if (!hasGeo) return const SizedBox.shrink();
+                                          if (!hasGeo)
+                                            return const SizedBox.shrink();
 
-                                          final x = _lon2pixelX(p.longitude!, _zoom) - originPx;
-                                          final y = _lat2pixelY(p.latitude!, _zoom) - originPy;
+                                          final x =
+                                              _lon2pixelX(p.longitude!, _zoom) -
+                                              originPx;
+                                          final y =
+                                              _lat2pixelY(p.latitude!, _zoom) -
+                                              originPy;
                                           const double haloRadius = 42.0;
 
                                           return Positioned(
@@ -2867,9 +3350,12 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                                                 height: haloRadius * 2,
                                                 decoration: BoxDecoration(
                                                   shape: BoxShape.circle,
-                                                  color: const Color(0xFFDC2626).withValues(alpha: 0.18),
+                                                  color: const Color(0xFFDC2626)
+                                                      .withValues(alpha: 0.18),
                                                   border: Border.all(
-                                                    color: const Color(0xFFDC2626).withValues(alpha: 0.45),
+                                                    color: const Color(
+                                                      0xFFDC2626,
+                                                    ).withValues(alpha: 0.45),
                                                     width: 1.5,
                                                   ),
                                                 ),
@@ -2880,7 +3366,11 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                                       ],
 
                                       // Renderização de cada pino de contato com coordenadas válidas (destacado por último)
-                                      for (int i = 0; i < orderedContacts.length; i++)
+                                      for (
+                                        int i = 0;
+                                        i < orderedContacts.length;
+                                        i++
+                                      )
                                         _buildMapPin(
                                           orderedContacts[i],
                                           i,
@@ -2889,7 +3379,10 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                                           originPy: originPy,
                                           canvasWidth: canvasWidth,
                                           canvasHeight: canvasHeight,
-                                          pinLayer: pinLayers[orderedContacts[i].id] ?? TerritoryPinLayer.interested,
+                                          pinLayer:
+                                              pinLayers[orderedContacts[i]
+                                                  .id] ??
+                                              TerritoryPinLayer.interested,
                                         ),
                                     ],
                                   ),
@@ -2983,7 +3476,8 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                           heroTag: 'map_compass',
                           backgroundColor: Colors.white,
                           foregroundColor: Colors.red.shade700,
-                          tooltip: 'Rotação do mapa (${(rotation * 180 / math.pi).round()}°). Toque para voltar suavemente ao norte ou arraste para girar.',
+                          tooltip:
+                              'Rotação do mapa (${(rotation * 180 / math.pi).round()}°). Toque para voltar suavemente ao norte ou arraste para girar.',
                           onPressed: _animateResetRotationToNorth,
                           child: Transform.rotate(
                             angle: rotation,
@@ -3049,19 +3543,27 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                     heroTag: 'map_fullscreen',
                     backgroundColor: Colors.white,
                     foregroundColor: Colors.black87,
-                    tooltip: isFullscreen ? 'Sair da Tela Cheia' : 'Modo Tela Cheia',
+                    tooltip: isFullscreen
+                        ? 'Sair da Tela Cheia'
+                        : 'Modo Tela Cheia',
                     onPressed: () {
                       ref.read(isMapFullscreenProvider.notifier).toggle();
                     },
-                    child: Icon(isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen),
+                    child: Icon(
+                      isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
+                    ),
                   ),
                   const SizedBox(height: 6),
 
                   // Botão Minha Localização GPS
                   FloatingActionButton.small(
                     heroTag: 'map_gps_locate',
-                    backgroundColor: _isLocatingUser ? AppTheme.accentTeal : Colors.white,
-                    foregroundColor: _isLocatingUser ? Colors.white : Colors.blue.shade700,
+                    backgroundColor: _isLocatingUser
+                        ? AppTheme.accentTeal
+                        : Colors.white,
+                    foregroundColor: _isLocatingUser
+                        ? Colors.white
+                        : Colors.blue.shade700,
                     tooltip: 'Minha Localização GPS',
                     onPressed: () async {
                       if (_isLocatingUser) return;
@@ -3105,7 +3607,10 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                         ? const SizedBox(
                             width: 16,
                             height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
                           )
                         : const Icon(Icons.my_location, size: 18),
                   ),
@@ -3200,12 +3705,19 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (_zoom > 16 && TileCacheService.instance.activeStyle == MapLayerStyle.standard)
+                  if (_zoom > 16 &&
+                      TileCacheService.instance.activeStyle ==
+                          MapLayerStyle.standard)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
                       color: Colors.white.withValues(alpha: 0.9),
-                      child: const Text('Pacote SAI: detalhe nativo até Z16',
-                          style: TextStyle(fontSize: 10, color: Colors.black87)),
+                      child: const Text(
+                        'Pacote SAI: detalhe nativo até Z16',
+                        style: TextStyle(fontSize: 10, color: Colors.black87),
+                      ),
                     ),
                   ValueListenableBuilder<Matrix4>(
                     valueListenable: _transformationController,
@@ -3786,7 +4298,11 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
                     const Text('🌐', style: TextStyle(fontSize: 12)),
                     const SizedBox(width: 4),
                   ] else if (pinLayer == TerritoryPinLayer.forgottenZone) ...[
-                    const Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 13),
+                    const Icon(
+                      Icons.warning_amber_rounded,
+                      color: Color(0xFFDC2626),
+                      size: 13,
+                    ),
                     const SizedBox(width: 4),
                   ],
                   Flexible(
@@ -4018,12 +4534,7 @@ class _DynamicTileLayer extends StatefulWidget {
 }
 
 class _DynamicTileLayerState extends State<_DynamicTileLayer> {
-  late ({
-    int minX,
-    int maxX,
-    int minY,
-    int maxY,
-  }) _bounds;
+  late ({int minX, int maxX, int minY, int maxY}) _bounds;
 
   @override
   void initState() {
@@ -4054,12 +4565,9 @@ class _DynamicTileLayerState extends State<_DynamicTileLayer> {
     super.dispose();
   }
 
-  ({
-    int minX,
-    int maxX,
-    int minY,
-    int maxY,
-  }) _computeBounds({Matrix4? matrixOverride}) {
+  ({int minX, int maxX, int minY, int maxY}) _computeBounds({
+    Matrix4? matrixOverride,
+  }) {
     final m = matrixOverride ?? widget.transformationController.value;
     final currentScale = m.getMaxScaleOnAxis();
     final effectiveScale = currentScale > 0.01 ? currentScale : 1.0;
@@ -4086,8 +4594,8 @@ class _DynamicTileLayerState extends State<_DynamicTileLayer> {
     final maxVisWorldY = centerWorldY + visibleHalfH / effectiveScale;
 
     final maxTileIndex = (1 << widget.zoom) - 1;
-    // Anel de 1 tile (256px) de pré-carregamento em todas as direções
-    const int tileBuffer = 1;
+    // Anel de 3 tiles (768px) de pré-carregamento em todas as direções para evitar vazios em rotação
+    const int tileBuffer = 3;
     final calcMinX = ((minVisWorldX / widget.tileSize).floor() - tileBuffer)
         .clamp(0, maxTileIndex);
     final calcMaxX = ((maxVisWorldX / widget.tileSize).floor() + tileBuffer)
@@ -4107,12 +4615,7 @@ class _DynamicTileLayerState extends State<_DynamicTileLayer> {
     final loadMinY = math.max(clampedGridMinY, calcMinY);
     final loadMaxY = math.min(clampedGridMaxY, calcMaxY);
 
-    return (
-      minX: loadMinX,
-      maxX: loadMaxX,
-      minY: loadMinY,
-      maxY: loadMaxY,
-    );
+    return (minX: loadMinX, maxX: loadMaxX, minY: loadMinY, maxY: loadMaxY);
   }
 
   void _onViewportChanged() {
@@ -4159,4 +4662,3 @@ class _DynamicTileLayerState extends State<_DynamicTileLayer> {
     );
   }
 }
-

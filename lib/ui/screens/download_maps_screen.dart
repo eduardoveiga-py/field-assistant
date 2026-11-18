@@ -12,11 +12,8 @@ class DownloadMapsScreen extends StatefulWidget {
   const DownloadMapsScreen({super.key});
 
   static Future<void> show(BuildContext context) {
-    return Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const DownloadMapsScreen(),
-      ),
-    );
+    return Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const DownloadMapsScreen()));
   }
 
   @override
@@ -35,7 +32,9 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
       AppLogger.warning('Falha ao inicializar mapas offline.', e, st);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Não foi possível acessar os mapas offline.')),
+          const SnackBar(
+            content: Text('Não foi possível acessar os mapas offline.'),
+          ),
         );
       }
     });
@@ -62,9 +61,7 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
     }
 
     try {
-      final res = await FilePicker.pickFiles(
-        type: FileType.any,
-      );
+      final res = await FilePicker.pickFiles(type: FileType.any);
       if (res.isEmpty) return;
 
       final picked = res.first;
@@ -72,7 +69,9 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
       if (path == null || path.isEmpty) {
         messenger.showSnackBar(
           const SnackBar(
-            content: Text('Não foi possível acessar o caminho do arquivo selecionado.'),
+            content: Text(
+              'Não foi possível acessar o caminho do arquivo selecionado.',
+            ),
             backgroundColor: AppTheme.alertRed,
           ),
         );
@@ -109,7 +108,9 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
       if (mounted) {
         messenger.showSnackBar(
           SnackBar(
-            content: Text('Arquivo .mbtiles inválido ou erro na importação: $e'),
+            content: Text(
+              'Arquivo .mbtiles inválido ou erro na importação: $e',
+            ),
             backgroundColor: AppTheme.alertRed,
             duration: const Duration(seconds: 5),
           ),
@@ -168,13 +169,17 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
                 ElevatedButton(
                   onPressed: () async {
                     try {
-                      await MBTilesService.instance.setBaseCatalogUrl(urlCtrl.text);
+                      await MBTilesService.instance.setBaseCatalogUrl(
+                        urlCtrl.text,
+                      );
                       if (ctx.mounted) Navigator.pop(ctx);
                       if (mounted) {
                         setState(() {});
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('URL base de mapas offline salva localmente.'),
+                            content: Text(
+                              'URL base de mapas offline salva localmente.',
+                            ),
                             backgroundColor: AppTheme.successGreen,
                           ),
                         );
@@ -237,7 +242,10 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
                 ),
                 TextButton(
                   onPressed: () async {
-                    await MBTilesService.instance.setRegionCustomUrl(region.id, null);
+                    await MBTilesService.instance.setRegionCustomUrl(
+                      region.id,
+                      null,
+                    );
                     if (ctx.mounted) Navigator.pop(ctx);
                     if (mounted) setState(() {});
                   },
@@ -259,7 +267,9 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
                         setState(() {});
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text('URL personalizada salva para "${region.name}".'),
+                            content: Text(
+                              'URL personalizada salva para "${region.name}".',
+                            ),
                             backgroundColor: AppTheme.successGreen,
                           ),
                         );
@@ -286,7 +296,8 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
       stream: MBTilesService.instance.regionsStream,
       initialData: MBTilesService.instance.currentRegions,
       builder: (context, snapshot) {
-        final allRegions = snapshot.data ?? MBTilesService.instance.currentRegions;
+        final allRegions =
+            snapshot.data ?? MBTilesService.instance.currentRegions;
         final query = _searchController.text.trim().toLowerCase();
 
         final filteredRegions = allRegions.where((r) {
@@ -297,8 +308,12 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
               r.description.toLowerCase().contains(query);
         }).toList();
 
-        final installedRegions = filteredRegions.where((r) => r.isInstalled).toList();
-        final availableRegions = filteredRegions.where((r) => !r.isInstalled).toList();
+        final installedRegions = filteredRegions
+            .where((r) => r.isInstalled)
+            .toList();
+        final availableRegions = filteredRegions
+            .where((r) => !r.isInstalled)
+            .toList();
 
         return Scaffold(
           appBar: AppBar(
@@ -324,13 +339,14 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
                       : () async {
                           final messenger = ScaffoldMessenger.of(context);
                           setState(() => _isUpdatingAll = true);
-                          final failed = await MBTilesService.instance.updateAll(
-                            onProgress: (name, p) {
-                              if (mounted) {
-                                setState(() => _updatingRegionName = name);
-                              }
-                            },
-                          );
+                          final failed = await MBTilesService.instance
+                              .updateAll(
+                                onProgress: (name, p) {
+                                  if (mounted) {
+                                    setState(() => _updatingRegionName = name);
+                                  }
+                                },
+                              );
                           if (mounted) {
                             setState(() {
                               _isUpdatingAll = false;
@@ -339,7 +355,9 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
                             if (failed.isEmpty) {
                               messenger.showSnackBar(
                                 const SnackBar(
-                                  content: Text('Todos os mapas foram atualizados com sucesso!'),
+                                  content: Text(
+                                    'Todos os mapas foram atualizados com sucesso!',
+                                  ),
                                   backgroundColor: AppTheme.successGreen,
                                 ),
                               );
@@ -363,9 +381,7 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
                         )
                       : const Icon(Icons.sync_rounded, size: 18),
                   label: Text(
-                    _isUpdatingAll
-                        ? 'Atualizando...'
-                        : 'Atualizar tudo',
+                    _isUpdatingAll ? 'Atualizando...' : 'Atualizar tudo',
                     style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                 ),
@@ -424,12 +440,21 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
                       children: [
                         OutlinedButton.icon(
                           onPressed: () => _importLocalMbtilesFile(),
-                          icon: const Icon(Icons.folder_open_outlined, size: 16),
-                          label: const Text('Importar .mbtiles local', style: TextStyle(fontSize: 12)),
+                          icon: const Icon(
+                            Icons.folder_open_outlined,
+                            size: 16,
+                          ),
+                          label: const Text(
+                            'Importar .mbtiles local',
+                            style: TextStyle(fontSize: 12),
+                          ),
                         ),
                         OutlinedButton.icon(
                           onPressed: _showBaseCatalogUrlDialog,
-                          icon: const Icon(Icons.settings_ethernet_rounded, size: 16),
+                          icon: const Icon(
+                            Icons.settings_ethernet_rounded,
+                            size: 16,
+                          ),
                           label: Text(
                             MBTilesService.instance.customBaseUrl != null
                                 ? 'URL Base Personalizada'
@@ -447,7 +472,10 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
                 Container(
                   width: double.infinity,
                   color: AppTheme.accentTeal.withValues(alpha: 0.15),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   child: Row(
                     children: [
                       const SizedBox(
@@ -458,7 +486,10 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
                       const SizedBox(width: 10),
                       Text(
                         'Atualizando: $_updatingRegionName...',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ],
                   ),
@@ -466,7 +497,10 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
 
               Expanded(
                 child: ListView(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   children: [
                     // Seção: Baixado (X MB) — Estilo Orgânico com contagem de regiões
                     if (installedRegions.isNotEmpty) ...[
@@ -479,7 +513,9 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.bold,
-                                color: isDark ? Colors.grey.shade400 : Colors.grey.shade700,
+                                color: isDark
+                                    ? Colors.grey.shade400
+                                    : Colors.grey.shade700,
                               ),
                             ),
                             const Spacer(),
@@ -495,36 +531,53 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
                       Card(
                         margin: const EdgeInsets.only(bottom: 12),
                         elevation: 0,
-                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                        color: isDark
+                            ? const Color(0xFF1E293B)
+                            : const Color(0xFFF8FAFC),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                           side: BorderSide(
-                            color: isDark ? Colors.white12 : Colors.grey.shade300,
+                            color: isDark
+                                ? Colors.white12
+                                : Colors.grey.shade300,
                           ),
                         ),
                         child: ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 4,
+                          ),
                           leading: Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
                               color: Colors.amber.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: const Icon(Icons.sync_rounded, color: Colors.amber),
+                            child: const Icon(
+                              Icons.sync_rounded,
+                              color: Colors.amber,
+                            ),
                           ),
                           title: const Text(
                             'Brasil',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
                           ),
                           subtitle: Text(
                             'Mapas: ${installedRegions.length} de ${allRegions.length}',
                             style: TextStyle(
                               fontSize: 12,
-                              color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                              color: isDark
+                                  ? Colors.grey.shade400
+                                  : Colors.grey.shade600,
                             ),
                           ),
                           trailing: Text(
-                            MBTilesService.instance.formattedTotalDownloadedSize,
+                            MBTilesService
+                                .instance
+                                .formattedTotalDownloadedSize,
                             style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               color: AppTheme.accentTeal,
@@ -533,7 +586,9 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
                           ),
                         ),
                       ),
-                      ...installedRegions.map((r) => _buildInstalledRegionCard(r, isDark)),
+                      ...installedRegions.map(
+                        (r) => _buildInstalledRegionCard(r, isDark),
+                      ),
                       const SizedBox(height: 16),
                     ],
 
@@ -545,7 +600,9 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
-                          color: isDark ? Colors.grey.shade400 : Colors.grey.shade700,
+                          color: isDark
+                              ? Colors.grey.shade400
+                              : Colors.grey.shade700,
                         ),
                       ),
                     ),
@@ -564,13 +621,17 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
                             'Todos os pacotes regionais catalogados já estão instalados!',
                             style: TextStyle(
                               fontSize: 12,
-                              color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                              color: isDark
+                                  ? Colors.grey.shade400
+                                  : Colors.grey.shade600,
                             ),
                           ),
                         ),
                       )
                     else
-                      ...availableRegions.map((r) => _buildAvailableRegionCard(r, isDark)),
+                      ...availableRegions.map(
+                        (r) => _buildAvailableRegionCard(r, isDark),
+                      ),
                   ],
                 ),
               ),
@@ -578,9 +639,14 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
           ),
           bottomNavigationBar: installedRegions.isNotEmpty
               ? Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                    color: isDark
+                        ? const Color(0xFF0F172A)
+                        : const Color(0xFFF1F5F9),
                     border: Border(
                       top: BorderSide(
                         color: isDark ? Colors.white12 : Colors.grey.shade300,
@@ -590,7 +656,11 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
                   child: SafeArea(
                     child: Row(
                       children: [
-                        const Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 24),
+                        const Icon(
+                          Icons.warning_amber_rounded,
+                          color: Colors.amber,
+                          size: 24,
+                        ),
                         const SizedBox(width: 10),
                         Column(
                           mainAxisSize: MainAxisSize.min,
@@ -598,13 +668,18 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
                           children: [
                             const Text(
                               'Atualizar mapas',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
                             ),
                             Text(
                               '${MBTilesService.instance.formattedTotalDownloadedSize} instalados',
                               style: TextStyle(
                                 fontSize: 11,
-                                color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                                color: isDark
+                                    ? Colors.grey.shade400
+                                    : Colors.grey.shade600,
                               ),
                             ),
                           ],
@@ -614,15 +689,20 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
                           onPressed: _isUpdatingAll
                               ? null
                               : () async {
-                                  final messenger = ScaffoldMessenger.of(context);
-                                  setState(() => _isUpdatingAll = true);
-                                  final failed = await MBTilesService.instance.updateAll(
-                                    onProgress: (name, p) {
-                                      if (mounted) {
-                                        setState(() => _updatingRegionName = name);
-                                      }
-                                    },
+                                  final messenger = ScaffoldMessenger.of(
+                                    context,
                                   );
+                                  setState(() => _isUpdatingAll = true);
+                                  final failed = await MBTilesService.instance
+                                      .updateAll(
+                                        onProgress: (name, p) {
+                                          if (mounted) {
+                                            setState(
+                                              () => _updatingRegionName = name,
+                                            );
+                                          }
+                                        },
+                                      );
                                   if (mounted) {
                                     setState(() {
                                       _isUpdatingAll = false;
@@ -631,8 +711,11 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
                                     if (failed.isEmpty) {
                                       messenger.showSnackBar(
                                         const SnackBar(
-                                          content: Text('Todos os mapas foram atualizados com sucesso!'),
-                                          backgroundColor: AppTheme.successGreen,
+                                          content: Text(
+                                            'Todos os mapas foram atualizados com sucesso!',
+                                          ),
+                                          backgroundColor:
+                                              AppTheme.successGreen,
                                         ),
                                       );
                                     } else {
@@ -651,15 +734,24 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
                               ? const SizedBox(
                                   width: 12,
                                   height: 12,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
                                 )
                               : const Icon(Icons.sync_rounded, size: 16),
-                          label: Text(_isUpdatingAll ? 'Atualizando...' : 'Atualizar tudo'),
+                          label: Text(
+                            _isUpdatingAll
+                                ? 'Atualizando...'
+                                : 'Atualizar tudo',
+                          ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppTheme.accentTeal,
                             foregroundColor: Colors.white,
                             visualDensity: VisualDensity.compact,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                           ),
                         ),
                       ],
@@ -679,9 +771,7 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
       color: isDark ? const Color(0xFF1E293B) : Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: isDark ? Colors.white12 : Colors.grey.shade200,
-        ),
+        side: BorderSide(color: isDark ? Colors.white12 : Colors.grey.shade200),
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -708,7 +798,8 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
                 color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
               ),
             ),
-            if (region.downloadProgress > 0 && region.downloadProgress < 1.0) ...[
+            if (region.downloadProgress > 0 &&
+                region.downloadProgress < 1.0) ...[
               const SizedBox(height: 6),
               LinearProgressIndicator(
                 value: region.downloadProgress,
@@ -740,7 +831,10 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
                   ),
                   TextButton(
                     onPressed: () => Navigator.pop(ctx, true),
-                    child: const Text('Excluir', style: TextStyle(color: Colors.red)),
+                    child: const Text(
+                      'Excluir',
+                      style: TextStyle(color: Colors.red),
+                    ),
                   ),
                 ],
               ),
@@ -755,7 +849,8 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
   }
 
   Widget _buildAvailableRegionCard(MBTileRegion region, bool isDark) {
-    final isDownloading = MBTilesService.instance.isDownloading(region.id) ||
+    final isDownloading =
+        MBTilesService.instance.isDownloading(region.id) ||
         (region.downloadProgress > 0.0 && region.downloadProgress < 1.0);
 
     return Card(
@@ -764,9 +859,7 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
       color: isDark ? const Color(0xFF1E293B) : Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: isDark ? Colors.white12 : Colors.grey.shade200,
-        ),
+        side: BorderSide(color: isDark ? Colors.white12 : Colors.grey.shade200),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -789,10 +882,12 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
                       const SizedBox(height: 2),
                       Text(
                         '${region.country} > ${region.state} • ${region.formattedSize}'
-                        '${MBTilesService.instance.getRegionCustomUrl(region.id) != null ? " • URL personalizada" : ""}',
+                        '${MBTilesService.instance.getRegionCustomUrl(region.id) != null ? " • URL personalizada" : (region.isAvailableForDownload ? " • Disponível" : " • Em preparação")}',
                         style: TextStyle(
                           fontSize: 12,
-                          color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                          color: isDark
+                              ? Colors.grey.shade400
+                              : Colors.grey.shade600,
                         ),
                       ),
                     ],
@@ -854,14 +949,23 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
                       ),
                       const SizedBox(width: 4),
                       IconButton(
-                        icon: const Icon(Icons.close, size: 18, color: AppTheme.alertRed),
+                        icon: const Icon(
+                          Icons.close,
+                          size: 18,
+                          color: AppTheme.alertRed,
+                        ),
                         tooltip: 'Cancelar download',
                         visualDensity: VisualDensity.compact,
-                        onPressed: () => MBTilesService.instance.cancelDownload(region.id),
+                        onPressed: () =>
+                            MBTilesService.instance.cancelDownload(region.id),
                       ),
                     ],
                   )
-                else
+                else if (region.isAvailableForDownload ||
+                    MBTilesService.instance.getRegionCustomUrl(region.id) !=
+                        null ||
+                    (MBTilesService.instance.customBaseUrl != null &&
+                        MBTilesService.instance.customBaseUrl!.isNotEmpty))
                   ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.accentTeal,
@@ -881,7 +985,9 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
                         if (context.mounted) {
                           messenger.showSnackBar(
                             SnackBar(
-                              content: Text('Mapa "${region.name}" instalado com sucesso!'),
+                              content: Text(
+                                'Mapa "${region.name}" instalado com sucesso!',
+                              ),
                               backgroundColor: AppTheme.successGreen,
                             ),
                           );
@@ -890,13 +996,16 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
                         if (context.mounted) {
                           messenger.showSnackBar(
                             SnackBar(
-                              content: Text('Erro ao baixar "${region.name}": $e'),
+                              content: Text(
+                                'Erro ao baixar "${region.name}": $e',
+                              ),
                               backgroundColor: AppTheme.alertRed,
                               duration: const Duration(seconds: 6),
                               action: SnackBarAction(
                                 label: 'URL / Importar',
                                 textColor: Colors.white,
-                                onPressed: () => _showRegionCustomUrlDialog(region),
+                                onPressed: () =>
+                                    _showRegionCustomUrlDialog(region),
                               ),
                             ),
                           );
@@ -905,6 +1014,32 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
                     },
                     icon: const Icon(Icons.download_rounded, size: 16),
                     label: const Text('Baixar', style: TextStyle(fontSize: 12)),
+                  )
+                else
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: isDark
+                          ? Colors.amber.shade300
+                          : Colors.amber.shade800,
+                      side: BorderSide(
+                        color: isDark
+                            ? Colors.amber.shade700
+                            : Colors.amber.shade600,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 8,
+                      ),
+                    ),
+                    onPressed: () => _showRegionCustomUrlDialog(region),
+                    icon: const Icon(Icons.file_upload_outlined, size: 16),
+                    label: const Text(
+                      'Importar / URL',
+                      style: TextStyle(fontSize: 12),
+                    ),
                   ),
               ],
             ),

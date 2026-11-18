@@ -47,10 +47,12 @@ class MBTileRegion {
     this.downloadUrl,
   });
 
-  /// URL canônica para download do pacote .mbtiles
-  String get effectiveDownloadUrl =>
-      downloadUrl ??
-      'https://github.com/${AppVersion.githubRepo}/releases/download/mbtiles-v1/$id.mbtiles';
+  /// URL canônica para download do pacote .mbtiles, ou null se em preparação (FA-MAP-02).
+  String? get effectiveDownloadUrl => downloadUrl;
+
+  /// Indica se a região possui uma URL padrão publicada para download direto.
+  bool get isAvailableForDownload =>
+      downloadUrl != null && downloadUrl!.trim().isNotEmpty;
 
   String get formattedSize {
     final mb = sizeBytes / (1024 * 1024);
@@ -86,7 +88,7 @@ class MBTilesService {
   static MBTilesService instance = MBTilesService._internal();
 
   MBTilesService._internal([MBTilesBackend? backend])
-      : _backend = backend ?? getMBTilesBackend();
+    : _backend = backend ?? getMBTilesBackend();
 
   @visibleForTesting
   static void setMockInstance(MBTilesService service) {
@@ -102,7 +104,6 @@ class MBTilesService {
 
   /// Alterado quando um pacote é instalado, substituído ou removido.
   final ValueNotifier<int> tilesRevision = ValueNotifier<int>(0);
-
 
   final StreamController<List<MBTileRegion>> _regionsController =
       StreamController<List<MBTileRegion>>.broadcast();
@@ -128,13 +129,13 @@ class MBTilesService {
       country: 'Brasil',
       state: 'Amazonas',
       name: 'Santo Antônio do Içá e entorno (experimental)',
-      description:
-          'Retângulo de SAI e entorno; não cobre todo o Alto Solimões. Aldeias, rios e caminhos podem estar incompletos. Não usar para navegação.',
+      description: 'Retângulo de SAI e entorno; não cobre todo o Alto Solimões. Aldeias, rios e caminhos podem estar incompletos. Não usar para navegação.',
       minZoom: 8,
       maxZoom: 16,
       // O pacote foi publicado na pré-release v1.3.4 e não acompanha
       // automaticamente as versões futuras do aplicativo.
-      downloadUrl: 'https://github.com/${AppVersion.githubRepo}/releases/download/v1.3.4/br_am_solimoes.mbtiles',
+      downloadUrl:
+          'https://github.com/${AppVersion.githubRepo}/releases/download/v1.3.4/br_am_solimoes.mbtiles',
       sizeBytes: 264892416,
       isInstalled: false, // Não é mais estaticamente pré-instalado
     ),
@@ -143,8 +144,7 @@ class MBTilesService {
       country: 'Brasil',
       state: 'Amazonas',
       name: 'Manaus, Rio Negro & Baixo Amazonas',
-      description:
-          'Capital amazonense, comunidades ribeirinhas e municípios de Itacoatiara e Parintins.',
+      description: 'Capital amazonense, comunidades ribeirinhas e municípios de Itacoatiara e Parintins.',
       minZoom: 6,
       maxZoom: 17,
       sizeBytes: 52 * 1024 * 1024,
@@ -154,8 +154,7 @@ class MBTilesService {
       country: 'Brasil',
       state: 'Roraima',
       name: 'Terra Indígena Yanomami & Surucucu',
-      description:
-          'Região Norte de Roraima cobrindo postos e comunidades da bacia dos rios Catrimani e Mucajaí.',
+      description: 'Região Norte de Roraima cobrindo postos e comunidades da bacia dos rios Catrimani e Mucajaí.',
       minZoom: 6,
       maxZoom: 17,
       sizeBytes: 28 * 1024 * 1024, // 28 MB
@@ -165,8 +164,7 @@ class MBTilesService {
       country: 'Brasil',
       state: 'Roraima',
       name: 'Boa Vista, Pacaraima & Fronteira Venezuela',
-      description:
-          'Capital e corredor migratório ao longo da BR-174 com alta densidade ministerial multilíngue.',
+      description: 'Capital e corredor migratório ao longo da BR-174 com alta densidade ministerial multilíngue.',
       minZoom: 6,
       maxZoom: 17,
       sizeBytes: 31 * 1024 * 1024,
@@ -176,8 +174,7 @@ class MBTilesService {
       country: 'Brasil',
       state: 'Maranhão',
       name: 'Terra Indígena Arariboia (Guajajara)',
-      description:
-          'Aldeias e municípios adjacentes no centro-sul do Maranhão (Amargosa, Lagoa Comprida).',
+      description: 'Aldeias e municípios adjacentes no centro-sul do Maranhão (Amargosa, Lagoa Comprida).',
       minZoom: 6,
       maxZoom: 17,
       sizeBytes: 35 * 1024 * 1024, // 35 MB
@@ -187,8 +184,7 @@ class MBTilesService {
       country: 'Brasil',
       state: 'Maranhão',
       name: 'São Luís, Imperatriz & Litoral Maranhense',
-      description:
-          'Região metropolitana da ilha de São Luís, Baixada Maranhense e polo de Imperatriz.',
+      description: 'Região metropolitana da ilha de São Luís, Baixada Maranhense e polo de Imperatriz.',
       minZoom: 7,
       maxZoom: 17,
       sizeBytes: 44 * 1024 * 1024,
@@ -198,8 +194,7 @@ class MBTilesService {
       country: 'Brasil',
       state: 'Pará',
       name: 'Belém, Santarém & Arquipélago do Marajó',
-      description:
-          'Metrópole paraense, orla fluvial amazônica e rotas ribeirinhas do Baixo Amazonas.',
+      description: 'Metrópole paraense, orla fluvial amazônica e rotas ribeirinhas do Baixo Amazonas.',
       minZoom: 6,
       maxZoom: 17,
       sizeBytes: 58 * 1024 * 1024,
@@ -209,8 +204,7 @@ class MBTilesService {
       country: 'Brasil',
       state: 'Acre',
       name: 'Rio Branco & Cruzeiro do Sul (Vale do Juruá)',
-      description:
-          'Capital acreana, fronteira com o Peru e comunidades isoladas na floresta amazônica.',
+      description: 'Capital acreana, fronteira com o Peru e comunidades isoladas na floresta amazônica.',
       minZoom: 6,
       maxZoom: 17,
       sizeBytes: 26 * 1024 * 1024,
@@ -220,8 +214,7 @@ class MBTilesService {
       country: 'Brasil',
       state: 'Rondônia',
       name: 'Porto Velho & Ji-Paraná (Corredor BR-364)',
-      description:
-          'Bacia do Rio Madeira, polos agropecuários e congregações ao longo do eixo rodoviário.',
+      description: 'Bacia do Rio Madeira, polos agropecuários e congregações ao longo do eixo rodoviário.',
       minZoom: 6,
       maxZoom: 17,
       sizeBytes: 34 * 1024 * 1024,
@@ -231,8 +224,7 @@ class MBTilesService {
       country: 'Brasil',
       state: 'Amapá',
       name: 'Macapá, Santana & Oiapoque (Fronteira Guiana)',
-      description:
-          'Linha do Equador, foz do Rio Amazonas e território de fronteira franco-brasileira.',
+      description: 'Linha do Equador, foz do Rio Amazonas e território de fronteira franco-brasileira.',
       minZoom: 6,
       maxZoom: 17,
       sizeBytes: 24 * 1024 * 1024,
@@ -242,8 +234,7 @@ class MBTilesService {
       country: 'Brasil',
       state: 'São Paulo',
       name: 'São Paulo — Capital & Grande ABC',
-      description:
-          'Zonas urbanas, bairros metropolitanos e periferias com alta densidade de revisitas.',
+      description: 'Zonas urbanas, bairros metropolitanos e periferias com alta densidade de revisitas.',
       minZoom: 8,
       maxZoom: 18,
       sizeBytes: 85 * 1024 * 1024, // 85 MB
@@ -253,8 +244,7 @@ class MBTilesService {
       country: 'Brasil',
       state: 'São Paulo',
       name: 'Campinas, Sorocaba & Vale do Paraíba',
-      description:
-          'Polo tecnológico paulista, eixo Dutra e cidades do interior com intenso campo teocrático.',
+      description: 'Polo tecnológico paulista, eixo Dutra e cidades do interior com intenso campo teocrático.',
       minZoom: 7,
       maxZoom: 17,
       sizeBytes: 64 * 1024 * 1024,
@@ -264,8 +254,7 @@ class MBTilesService {
       country: 'Brasil',
       state: 'São Paulo',
       name: 'Baixada Santista & Litoral Norte / Sul',
-      description:
-          'Santos, São Vicente, Guarujá, Ubatuba, Caraguatatuba e orla marítima paulista.',
+      description: 'Santos, São Vicente, Guarujá, Ubatuba, Caraguatatuba e orla marítima paulista.',
       minZoom: 7,
       maxZoom: 17,
       sizeBytes: 38 * 1024 * 1024,
@@ -275,8 +264,7 @@ class MBTilesService {
       country: 'Brasil',
       state: 'Rio de Janeiro',
       name: 'Rio de Janeiro — Capital, Niterói & Baixada',
-      description:
-          'Zona Sul, Norte, Oeste, Baixada Fluminense e conurbação leste da Baía de Guanabara.',
+      description: 'Zona Sul, Norte, Oeste, Baixada Fluminense e conurbação leste da Baía de Guanabara.',
       minZoom: 8,
       maxZoom: 18,
       sizeBytes: 76 * 1024 * 1024,
@@ -286,8 +274,7 @@ class MBTilesService {
       country: 'Brasil',
       state: 'Rio de Janeiro',
       name: 'Região Serrana, Região dos Lagos & Norte Fluminense',
-      description:
-          'Petrópolis, Teresópolis, Nova Friburgo, Cabo Frio, Campos dos Goytacazes e Macaé.',
+      description: 'Petrópolis, Teresópolis, Nova Friburgo, Cabo Frio, Campos dos Goytacazes e Macaé.',
       minZoom: 7,
       maxZoom: 17,
       sizeBytes: 42 * 1024 * 1024,
@@ -297,8 +284,7 @@ class MBTilesService {
       country: 'Brasil',
       state: 'Minas Gerais',
       name: 'Belo Horizonte & Região Metropolitana',
-      description:
-          'Capital mineira, Contagem, Betim e cidades históricas vizinhas com vastos territórios.',
+      description: 'Capital mineira, Contagem, Betim e cidades históricas vizinhas com vastos territórios.',
       minZoom: 8,
       maxZoom: 18,
       sizeBytes: 68 * 1024 * 1024,
@@ -308,8 +294,7 @@ class MBTilesService {
       country: 'Brasil',
       state: 'Minas Gerais',
       name: 'Triângulo Mineiro & Alto Paranaíba (Uberlândia/Uberaba)',
-      description:
-          'Pólo agroindustrial e congregações dinâmicas do interior de Minas Gerais.',
+      description: 'Pólo agroindustrial e congregações dinâmicas do interior de Minas Gerais.',
       minZoom: 7,
       maxZoom: 17,
       sizeBytes: 48 * 1024 * 1024,
@@ -319,8 +304,7 @@ class MBTilesService {
       country: 'Brasil',
       state: 'Paraná',
       name: 'Curitiba & Região Metropolitana',
-      description:
-          'Planalto paranaense, bairros planejados e municípios limítrofes da grande Curitiba.',
+      description: 'Planalto paranaense, bairros planejados e municípios limítrofes da grande Curitiba.',
       minZoom: 8,
       maxZoom: 18,
       sizeBytes: 54 * 1024 * 1024,
@@ -330,8 +314,7 @@ class MBTilesService {
       country: 'Brasil',
       state: 'Paraná',
       name: 'Foz do Iguaçu, Cascavel & Fronteira Tríplice',
-      description:
-          'Território internacional fronteiriço com Paraguai e Argentina e oeste do Paraná.',
+      description: 'Território internacional fronteiriço com Paraguai e Argentina e oeste do Paraná.',
       minZoom: 7,
       maxZoom: 17,
       sizeBytes: 39 * 1024 * 1024,
@@ -341,8 +324,7 @@ class MBTilesService {
       country: 'Brasil',
       state: 'Rio Grande do Sul',
       name: 'Porto Alegre, Vale dos Sinos & Serra Gaúcha',
-      description:
-          'Capital gaúcha, Caxias do Sul, Bento Gonçalves e cidades de colonização europeia.',
+      description: 'Capital gaúcha, Caxias do Sul, Bento Gonçalves e cidades de colonização europeia.',
       minZoom: 7,
       maxZoom: 17,
       sizeBytes: 62 * 1024 * 1024,
@@ -352,8 +334,7 @@ class MBTilesService {
       country: 'Brasil',
       state: 'Santa Catarina',
       name: 'Florianópolis, Joinville & Vale do Itajaí (Blumenau)',
-      description:
-          'Ilha e continente catarinense, pólo fabril do norte e vale têxtil europeu.',
+      description: 'Ilha e continente catarinense, pólo fabril do norte e vale têxtil europeu.',
       minZoom: 7,
       maxZoom: 17,
       sizeBytes: 47 * 1024 * 1024,
@@ -363,8 +344,7 @@ class MBTilesService {
       country: 'Brasil',
       state: 'Bahia',
       name: 'Salvador, Recôncavo & Feira de Santana',
-      description:
-          'Primeira capital do Brasil, Baía de Todos os Santos e maior entroncamento do Nordeste.',
+      description: 'Primeira capital do Brasil, Baía de Todos os Santos e maior entroncamento do Nordeste.',
       minZoom: 7,
       maxZoom: 17,
       sizeBytes: 59 * 1024 * 1024,
@@ -374,8 +354,7 @@ class MBTilesService {
       country: 'Brasil',
       state: 'Distrito Federal & Goiás',
       name: 'Brasília (DF), Entorno Metropolitano & Goiânia',
-      description:
-          'Planalto Central, Plano Piloto, Cidades Satélites e conurbação de Goiânia/Aparecida.',
+      description: 'Planalto Central, Plano Piloto, Cidades Satélites e conurbação de Goiânia/Aparecida.',
       minZoom: 7,
       maxZoom: 17,
       sizeBytes: 55 * 1024 * 1024,
@@ -456,7 +435,7 @@ class MBTilesService {
     }
   }
 
-  /// Resolve URL específica -> URL base -> URL do catálogo da região -> fallback legado.
+  /// Resolve URL específica -> URL base -> URL do catálogo da região -> vazio se em preparação.
   String resolveDownloadUrl(MBTileRegion region) {
     final perRegion = _customRegionUrls[region.id];
     if (perRegion != null && perRegion.isNotEmpty) {
@@ -468,7 +447,7 @@ class MBTilesService {
           : _customBaseUrl!;
       return '$cleanBase/${region.id}.mbtiles';
     }
-    return region.effectiveDownloadUrl;
+    return region.effectiveDownloadUrl ?? '';
   }
 
   /// Configura e persiste localmente uma URL base personalizada para o catálogo `.mbtiles`.
@@ -553,7 +532,8 @@ class MBTilesService {
       knownIds.add(baseRegion.id);
       final isInstalled = installedIds.contains(baseRegion.id);
       final realSize = _backend.getRegionFileSize(baseRegion.id);
-      final customUrl = _customRegionUrls[baseRegion.id] ??
+      final customUrl =
+          _customRegionUrls[baseRegion.id] ??
           (_customBaseUrl != null && _customBaseUrl!.isNotEmpty
               ? resolveDownloadUrl(baseRegion)
               : null);
@@ -571,7 +551,8 @@ class MBTilesService {
     for (final id in installedIds) {
       if (knownIds.contains(id)) continue;
       final realSize = _backend.getRegionFileSize(id) ?? 0;
-      final label = _customRegionNames[id] ??
+      final label =
+          _customRegionNames[id] ??
           id.replaceFirst(RegExp(r'^local_'), '').replaceAll('_', ' ');
       updatedList.add(
         MBTileRegion(
@@ -579,7 +560,8 @@ class MBTilesService {
           country: 'Importado Localmente',
           state: 'Pacote .mbtiles',
           name: label,
-          description: 'Pacote .mbtiles local validado (SQLite + tabela tiles).',
+          description:
+              'Pacote .mbtiles local validado (SQLite + tabela tiles).',
           sizeBytes: realSize,
           isInstalled: true,
           downloadProgress: 1.0,
@@ -648,15 +630,25 @@ class MBTilesService {
       _regionsController.add(List.of(_currentRegions));
 
       final resolvedUrl = resolveDownloadUrl(target);
+      if (resolvedUrl.isEmpty) {
+        throw MBTilesDownloadException(
+          'O pacote regional "${target.name}" está em preparação e não possui mirror padrão publicado. '
+          'Para usá-lo agora, configure uma URL personalizada ou importe o arquivo .mbtiles local.',
+          404,
+        );
+      }
       final uri = Uri.parse(resolvedUrl);
       final request = http.Request('GET', uri);
       request.headers['User-Agent'] = AppVersion.userAgent;
 
       final streamedResponse = await client.send(request);
       if (_cancelledRegions.contains(regionId)) {
-        throw const MBTilesDownloadException('Download cancelado pelo usuário.');
+        throw const MBTilesDownloadException(
+          'Download cancelado pelo usuário.',
+        );
       }
-      if (streamedResponse.statusCode < 200 || streamedResponse.statusCode >= 300) {
+      if (streamedResponse.statusCode < 200 ||
+          streamedResponse.statusCode >= 300) {
         if (streamedResponse.statusCode == 404) {
           throw MBTilesDownloadException(
             'Pacote "${target.name}" indisponível no servidor (HTTP 404) em $resolvedUrl. '
@@ -679,9 +671,7 @@ class MBTilesService {
         isCancelled: () => _cancelledRegions.contains(regionId),
         onProgress: (progress, downloadedBytes) {
           if (_cancelledRegions.contains(regionId)) return;
-          _currentRegions[idx] = target.copyWith(
-            downloadProgress: progress,
-          );
+          _currentRegions[idx] = target.copyWith(downloadProgress: progress);
           _regionsController.add(List.of(_currentRegions));
           onProgress?.call(progress, downloadedBytes);
         },
@@ -689,7 +679,9 @@ class MBTilesService {
 
       tilesRevision.value++;
       if (_cancelledRegions.contains(regionId)) {
-        throw const MBTilesDownloadException('Download cancelado pelo usuário.');
+        throw const MBTilesDownloadException(
+          'Download cancelado pelo usuário.',
+        );
       }
 
       final realSize = _backend.getRegionFileSize(regionId) ?? totalBytes;
@@ -717,7 +709,10 @@ class MBTilesService {
         try {
           client.close();
         } catch (e, st) {
-          AppLogger.debug('Falha ao fechar cliente HTTP do download MBTiles ($regionId): $e', st);
+          AppLogger.debug(
+            'Falha ao fechar cliente HTTP do download MBTiles ($regionId): $e',
+            st,
+          );
         }
       }
     }
@@ -747,7 +742,8 @@ class MBTilesService {
     final installed = _currentRegions.where((r) => r.isInstalled).toList();
     final failed = <String>[];
     for (final reg in installed) {
-      final isLocalOnly = reg.id.startsWith('local_') &&
+      final isLocalOnly =
+          reg.id.startsWith('local_') &&
           !_customRegionUrls.containsKey(reg.id) &&
           (_customBaseUrl == null || _customBaseUrl!.isEmpty);
       if (isLocalOnly) {
