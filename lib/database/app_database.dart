@@ -145,7 +145,7 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> _ensurePerformanceIndexes() async {
     final rows = await customSelect(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('people', 'sync_queue')",
+      "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('people', 'sync_queue', 'appointments', 'visits')",
     ).get();
     final existing = rows.map((r) => r.read<String>('name')).toSet();
     if (existing.contains('people')) {
@@ -155,11 +155,41 @@ class AppDatabase extends _$AppDatabase {
       await customStatement(
         'CREATE INDEX IF NOT EXISTS idx_people_deleted_at ON people(deleted_at);',
       );
+      final cols = await customSelect('PRAGMA table_info(people)').get();
+      final colNames = cols.map((c) => c.read<String>('name')).toSet();
+      if (colNames.contains('latitude') && colNames.contains('longitude')) {
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_people_coords ON people(latitude, longitude) WHERE latitude IS NOT NULL AND longitude IS NOT NULL;',
+        );
+      }
     }
     if (existing.contains('sync_queue')) {
       await customStatement(
         'CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON sync_queue(status, created_at);',
       );
+    }
+    if (existing.contains('appointments')) {
+      final cols = await customSelect('PRAGMA table_info(appointments)').get();
+      final colNames = cols.map((c) => c.read<String>('name')).toSet();
+      if (colNames.contains('start_time')) {
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_appointments_start_time ON appointments(start_time);',
+        );
+      }
+      if (colNames.contains('person_id')) {
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_appointments_person_id ON appointments(person_id);',
+        );
+      }
+    }
+    if (existing.contains('visits')) {
+      final cols = await customSelect('PRAGMA table_info(visits)').get();
+      final colNames = cols.map((c) => c.read<String>('name')).toSet();
+      if (colNames.contains('person_id')) {
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_visits_person_id ON visits(person_id);',
+        );
+      }
     }
   }
 
@@ -168,9 +198,8 @@ class AppDatabase extends _$AppDatabase {
       "SELECT count(*) as count FROM sqlite_master WHERE type='table' AND name='person_photos'",
     ).getSingle();
     if (tableCheck.read<int>('count') == 0) return;
-    final columns = await customSelect(
-      "PRAGMA table_info(person_photos)",
-    ).get();
+    final columns = await customSelect("PRAGMA table_info(person_photos)")
+        .get();
     final colNames = columns.map((c) => c.read<String>('name')).toSet();
     if (colNames.isNotEmpty && !colNames.contains('file_path')) {
       await m.addColumn(personPhotos, personPhotos.filePath);
@@ -181,21 +210,18 @@ class AppDatabase extends _$AppDatabase {
     final ticunaColumnsByTable = <String, Map<String, String>>{
       'ticuna_words': {
         'audio_path': 'ALTER TABLE ticuna_words ADD COLUMN audio_path TEXT;',
-        'audio_duration_seconds':
-            'ALTER TABLE ticuna_words ADD COLUMN audio_duration_seconds INTEGER;',
-        'language_id':
-            "ALTER TABLE ticuna_words ADD COLUMN language_id TEXT DEFAULT 'tca';",
+        'audio_duration_seconds': 'ALTER TABLE ticuna_words ADD COLUMN audio_duration_seconds INTEGER;',
+        'language_id': "ALTER TABLE ticuna_words ADD COLUMN language_id TEXT DEFAULT 'tca';",
       },
       'ticuna_phrases': {
         'audio_path': 'ALTER TABLE ticuna_phrases ADD COLUMN audio_path TEXT;',
-        'audio_duration_seconds':
-            'ALTER TABLE ticuna_phrases ADD COLUMN audio_duration_seconds INTEGER;',
-        'language_id':
-            "ALTER TABLE ticuna_phrases ADD COLUMN language_id TEXT DEFAULT 'tca';",
+        'audio_duration_seconds': 'ALTER TABLE ticuna_phrases ADD COLUMN audio_duration_seconds INTEGER;',
+        'language_id': "ALTER TABLE ticuna_phrases ADD COLUMN language_id TEXT DEFAULT 'tca';",
       },
     };
     for (final entry in ticunaColumnsByTable.entries) {
-      final columns = await customSelect('PRAGMA table_info(${entry.key})').get();
+      final columns = await customSelect('PRAGMA table_info(${entry.key})')
+          .get();
       final colNames = columns.map((c) => c.read<String>('name')).toSet();
       if (colNames.isEmpty) continue;
       for (final colEntry in entry.value.entries) {
@@ -209,7 +235,12 @@ class AppDatabase extends _$AppDatabase {
   Future<void> _normalizeLegacyTextTimestamps() async {
     const tableColumns = <String, List<String>>{
       'family_ties': ['created_at', 'updated_at', 'deleted_at'],
-      'ministry_experiences': ['date_time', 'created_at', 'updated_at', 'deleted_at'],
+      'ministry_experiences': [
+        'date_time',
+        'created_at',
+        'updated_at',
+        'deleted_at',
+      ],
       'person_photos': ['created_at', 'updated_at', 'deleted_at'],
       'person_publications': ['created_at', 'updated_at', 'deleted_at'],
       'research_articles': ['created_at', 'updated_at', 'deleted_at'],
@@ -241,22 +272,19 @@ class AppDatabase extends _$AppDatabase {
           final parsed = SyncTimestamp.parse(rawVal);
           final replacement =
               parsed ?? (requiredCols.contains(col) ? DateTime.now() : null);
-          await customStatement(
-            'UPDATE $table SET $col = ? WHERE rowid = ?',
-            [
-              replacement == null ? null : replacement.millisecondsSinceEpoch ~/ 1000,
-              rid,
-            ],
-          );
+          await customStatement('UPDATE $table SET $col = ? WHERE rowid = ?', [
+            replacement == null
+                ? null
+                : replacement.millisecondsSinceEpoch ~/ 1000,
+            rid,
+          ]);
         }
       }
     }
   }
 
   Future<void> _migrateAppKvStoreUpdatedAt(Migrator m) async {
-    final columns = await customSelect(
-      "PRAGMA table_info(app_kv_store)",
-    ).get();
+    final columns = await customSelect("PRAGMA table_info(app_kv_store)").get();
     final colNames = columns.map((c) => c.read<String>('name')).toSet();
     if (colNames.isNotEmpty && !colNames.contains('updated_at')) {
       await m.addColumn(appKvStore, appKvStore.updatedAt);
@@ -269,9 +297,8 @@ class AppDatabase extends _$AppDatabase {
         "SELECT count(*) as count FROM sqlite_master WHERE type='table' AND name='app_kv_store'",
       ).getSingle();
       if (tableCheck.read<int>('count') > 0) {
-        final columns = await customSelect(
-          "PRAGMA table_info(app_kv_store)",
-        ).get();
+        final columns = await customSelect("PRAGMA table_info(app_kv_store)")
+            .get();
         final colNames = columns.map((c) => c.read<String>('name')).toSet();
         if (!colNames.contains('updated_at')) {
           await customStatement(
@@ -286,9 +313,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<void> _migrateAppointmentsTaskId(Migrator m) async {
-    final columns = await customSelect(
-      "PRAGMA table_info(appointments)",
-    ).get();
+    final columns = await customSelect("PRAGMA table_info(appointments)").get();
     final colNames = columns.map((c) => c.read<String>('name')).toSet();
     if (colNames.isNotEmpty && !colNames.contains('task_id')) {
       await m.addColumn(appointments, appointments.taskId);
@@ -296,9 +321,8 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<void> _migrateResearchArticlesContextColumns(Migrator m) async {
-    final columns = await customSelect(
-      "PRAGMA table_info(research_articles)",
-    ).get();
+    final columns = await customSelect("PRAGMA table_info(research_articles)")
+        .get();
     final colNames = columns.map((c) => c.read<String>('name')).toSet();
     if (colNames.isNotEmpty) {
       if (!colNames.contains('objective')) {
@@ -335,9 +359,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<void> _migrateSyncQueueLastAttemptAt(Migrator m) async {
-    final columns = await customSelect(
-      "PRAGMA table_info(sync_queue)",
-    ).get();
+    final columns = await customSelect("PRAGMA table_info(sync_queue)").get();
     final colNames = columns.map((c) => c.read<String>('name')).toSet();
     if (colNames.isNotEmpty && !colNames.contains('last_attempt_at')) {
       await m.addColumn(syncQueue, syncQueue.lastAttemptAt);
@@ -380,9 +402,7 @@ class AppDatabase extends _$AppDatabase {
           name: 'Español',
           code: 'spa',
           symbol: '🇪🇸',
-          diacritics: const Value(
-            '["ñ","á","é","í","ó","ú","ü","¡","¿"]',
-          ),
+          diacritics: const Value('["ñ","á","é","í","ó","ú","ü","¡","¿"]'),
           isDefault: const Value(false),
           createdAt: now,
           updatedAt: now,
@@ -392,9 +412,7 @@ class AppDatabase extends _$AppDatabase {
           name: 'Guajajara (Tenetehara)',
           code: 'gub',
           symbol: '🌿',
-          diacritics: const Value(
-            '["à","è","ì","ò","ù","ỹ","\'"]',
-          ),
+          diacritics: const Value('["à","è","ì","ò","ù","ỹ","\'"]'),
           isDefault: const Value(false),
           createdAt: now,
           updatedAt: now,
@@ -404,9 +422,7 @@ class AppDatabase extends _$AppDatabase {
           name: 'Yanomami (Yanomamõ)',
           code: 'yan',
           symbol: '🌳',
-          diacritics: const Value(
-            '["ë","ɨ","th","rh"]',
-          ),
+          diacritics: const Value('["ë","ɨ","th","rh"]'),
           isDefault: const Value(false),
           createdAt: now,
           updatedAt: now,
@@ -414,15 +430,19 @@ class AppDatabase extends _$AppDatabase {
       ];
 
       for (final item in catalog) {
-        final existing = await (select(appLanguages)
-              ..where((t) => t.id.equals(item.id.value)))
-            .getSingleOrNull();
+        final existing = await (select(
+          appLanguages,
+        )..where((t) => t.id.equals(item.id.value))).getSingleOrNull();
         if (existing == null) {
           await into(appLanguages).insertOnConflictUpdate(item);
         }
       }
     } catch (e, st) {
-      AppLogger.warning('Falha ao semear idiomas padrão em app_languages', e, st);
+      AppLogger.warning(
+        'Falha ao semear idiomas padrão em app_languages',
+        e,
+        st,
+      );
     }
   }
 
@@ -536,7 +556,11 @@ class AppDatabase extends _$AppDatabase {
         await customStatement("DROP TABLE IF EXISTS app_settings_kv");
       }
     } catch (e, st) {
-      AppLogger.error('Erro na migração de app_settings_kv para app_kv_store', e, st);
+      AppLogger.error(
+        'Erro na migração de app_settings_kv para app_kv_store',
+        e,
+        st,
+      );
       rethrow;
     }
   }

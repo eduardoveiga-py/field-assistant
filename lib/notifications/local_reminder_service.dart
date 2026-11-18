@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:drift/drift.dart' as drift;
-import 'package:flutter/foundation.dart';
 
 import '../core/app_logger.dart';
 import '../database/app_database.dart';
