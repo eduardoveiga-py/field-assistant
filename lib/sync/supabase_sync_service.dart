@@ -13,6 +13,7 @@ import '../core/sync_timestamp.dart';
 import '../database/app_database.dart';
 import '../database/repository.dart';
 import '../ui/providers.dart';
+import 'domain_conflict_detector.dart';
 import 'media_bytes.dart';
 import 'native_auth_callback.dart';
 import 'sync_engine.dart';
@@ -93,7 +94,8 @@ class SupabaseSyncService {
     try {
       final secure = storage ?? const FlutterSecureStorage();
       final url = (await secure.read(key: runtimeUrlStorageKey))?.trim() ?? '';
-      final key = (await secure.read(key: runtimeAnonKeyStorageKey))?.trim() ?? '';
+      final key =
+          (await secure.read(key: runtimeAnonKeyStorageKey))?.trim() ?? '';
       if (url.isEmpty || key.isEmpty) return null;
       if (validateSupabaseCredentials(url, key) != null) return null;
       return (url: url, anonKey: key);
@@ -134,7 +136,9 @@ class SupabaseSyncService {
       await Supabase.initialize(
         url: url,
         publishableKey: anonKey,
-        authOptions: FlutterAuthClientOptions(detectSessionInUri: !NativeAuthCallback.enabled),
+        authOptions: FlutterAuthClientOptions(
+          detectSessionInUri: !NativeAuthCallback.enabled,
+        ),
       );
     }
   }
@@ -161,7 +165,9 @@ class SupabaseSyncService {
       await Supabase.initialize(
         url: cleanUrl,
         publishableKey: cleanKey,
-        authOptions: FlutterAuthClientOptions(detectSessionInUri: !NativeAuthCallback.enabled),
+        authOptions: FlutterAuthClientOptions(
+          detectSessionInUri: !NativeAuthCallback.enabled,
+        ),
       );
     }
 
@@ -242,7 +248,8 @@ class SupabaseSyncService {
     this.allowEncryptedSyncForTesting = false,
     this.authenticatedOwnerOverrideForTesting,
     E2eeService? e2eeServiceOverride,
-  }) : e2eeService = e2eeServiceOverride ?? E2eeService(client: clientOverride, db: db);
+  }) : e2eeService =
+           e2eeServiceOverride ?? E2eeService(client: clientOverride, db: db);
 
   /// Serviço de criptografia de ponta a ponta (E2EE)
   final E2eeService e2eeService;
@@ -259,8 +266,10 @@ class SupabaseSyncService {
   @visibleForTesting
   final String? authenticatedOwnerOverrideForTesting;
 
-  bool get _legacyTestMode => kDebugMode && allowLegacySyncForTesting && clientOverride != null;
-  bool get _encryptedTestMode => kDebugMode && allowEncryptedSyncForTesting && clientOverride != null;
+  bool get _legacyTestMode =>
+      kDebugMode && allowLegacySyncForTesting && clientOverride != null;
+  bool get _encryptedTestMode =>
+      kDebugMode && allowEncryptedSyncForTesting && clientOverride != null;
 
   static const _encryptedSyncPending =
       'Sincronização com Supabase pausada: criptografia ponta a ponta requer configuração ou restauração da frase nas Configurações. Dados e fila locais preservados.';
@@ -288,10 +297,11 @@ class SupabaseSyncService {
 
   /// Gate centralizado fail-closed (FA-SEC-01, FA-SEC-04, FA-SEC-05):
   /// Valida política de privacidade, isolamento de conta (`SyncOwnerGuard`) e chave E2EE.
-  Future<({String? ownerId, SyncProcessResult? blockedResult})> _evaluateSyncGate(
-    SupabaseClient? client,
-  ) async {
-    if (!SyncPrivacyPolicy.canRunRemoteSync(allowInTesting: _encryptedTestMode)) {
+  Future<({String? ownerId, SyncProcessResult? blockedResult})>
+  _evaluateSyncGate(SupabaseClient? client) async {
+    if (!SyncPrivacyPolicy.canRunRemoteSync(
+      allowInTesting: _encryptedTestMode,
+    )) {
       final msg = kIsWeb && !SyncPrivacyPolicy.webPersistentSyncAllowed
           ? _webSyncPausedMessage
           : _cloudSyncPausedUntilHomologation;
@@ -338,9 +348,14 @@ class SupabaseSyncService {
 
   SyncProcessResult _blockedUntilEncryption() {
     _setStatus(SyncStatus.savedLocally);
-    return const SyncProcessResult(totalProcessed: 0, successCount: 0,
-        failureCount: 0, conflictCount: 0, errors: [_encryptedSyncPending],
-        message: _encryptedSyncPending);
+    return const SyncProcessResult(
+      totalProcessed: 0,
+      successCount: 0,
+      failureCount: 0,
+      conflictCount: 0,
+      errors: [_encryptedSyncPending],
+      message: _encryptedSyncPending,
+    );
   }
 
   SyncStatus get currentStatus => _currentStatus;
@@ -416,7 +431,9 @@ class SupabaseSyncService {
     );
     final Map<String, dynamic> remote = {};
     normalizedDates.forEach((key, value) {
-      final snakeKey = key == 'dateTimeField' ? 'date_time_field' : camelToSnake(key);
+      final snakeKey = key == 'dateTimeField'
+          ? 'date_time_field'
+          : camelToSnake(key);
       if (_jsonbColumns.contains(snakeKey) && value is String) {
         final trimmed = value.trim();
         if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
@@ -424,7 +441,10 @@ class SupabaseSyncService {
             remote[snakeKey] = jsonDecode(trimmed);
             return;
           } catch (e, st) {
-            AppLogger.debug('Campo JSONB ($snakeKey) inválido mantido como string: $e', st);
+            AppLogger.debug(
+              'Campo JSONB ($snakeKey) inválido mantido como string: $e',
+              st,
+            );
           }
         }
       }
@@ -435,7 +455,9 @@ class SupabaseSyncService {
         entityType == 'ticunaWords' ||
         entityType == 'ticunaPhrases') {
       final audioPath = remote['audio_path']?.toString();
-      if (audioPath != null && audioPath.isNotEmpty && !audioPath.startsWith('http')) {
+      if (audioPath != null &&
+          audioPath.isNotEmpty &&
+          !audioPath.startsWith('http')) {
         final id = remote['id']?.toString() ?? '';
         remote['audio_path'] = '${id}_pronunciation.m4a';
       }
@@ -469,40 +491,66 @@ class SupabaseSyncService {
   }
 
   /// Mapeia o nome da entidade Drift para a tabela remota correspondente no PostgreSQL.
+  /// Cobre todas as 26 tabelas sincronizadas em snake_case, camelCase, PascalCase, singular e plural.
   static String mapEntityToRemoteTable(String entityType) {
-    switch (entityType.toLowerCase()) {
+    final normalized = entityType.trim().toLowerCase();
+    switch (normalized) {
       case 'people':
       case 'person':
+      case 'personentry':
+      case 'person_entry':
         return 'people';
       case 'visits':
       case 'visit':
+      case 'visitentry':
+      case 'visit_entry':
         return 'visits';
+      case 'biblestudy':
       case 'biblestudies':
+      case 'bible_study':
       case 'bible_studies':
         return 'bible_studies';
+      case 'studyparticipant':
       case 'studyparticipants':
+      case 'study_participant':
       case 'study_participants':
+      case 'biblestudyparticipant':
       case 'biblestudyparticipants':
+      case 'bible_study_participant':
       case 'bible_study_participants':
         return 'study_participants';
+      case 'studysession':
       case 'studysessions':
+      case 'study_session':
       case 'study_sessions':
+      case 'biblestudysession':
       case 'biblestudysessions':
+      case 'bible_study_session':
       case 'bible_study_sessions':
         return 'study_sessions';
       case 'appointments':
       case 'appointment':
+      case 'appointmententry':
+      case 'appointment_entry':
         return 'appointments';
+      case 'activityrecord':
       case 'activityrecords':
+      case 'activity_record':
       case 'activity_records':
         return 'activity_records';
+      case 'voicenote':
       case 'voicenotes':
+      case 'voice_note':
       case 'voice_notes':
         return 'voice_notes';
+      case 'phonecontact':
       case 'phonecontacts':
+      case 'phone_contact':
       case 'phone_contacts':
         return 'phone_contacts';
+      case 'territorylandmark':
       case 'territorylandmarks':
+      case 'territory_landmark':
       case 'territory_landmarks':
         return 'territory_landmarks';
       case 'researchtag':
@@ -582,7 +630,7 @@ class SupabaseSyncService {
       case 'ticuna_phrases':
         return 'ticuna_phrases';
       default:
-        return entityType.toLowerCase();
+        return normalized;
     }
   }
 
@@ -734,7 +782,8 @@ class SupabaseSyncService {
       case 'ministry_experiences':
         map['title'] = map['title'] ?? '';
         map['content'] = map['content'] ?? '';
-        map['dateTimeField'] = _isoString(map['dateTimeField']) ??
+        map['dateTimeField'] =
+            _isoString(map['dateTimeField']) ??
             _isoString(map['dateTime']) ??
             _isoString(map['date_time_field']) ??
             _isoString(map['date_time']) ??
@@ -805,25 +854,31 @@ class SupabaseSyncService {
         map['tags'] ??= '[]';
         break;
       case 'inbox_entries':
-        if (map['attachments'] is List) map['attachments'] = jsonEncode(map['attachments']);
+        if (map['attachments'] is List)
+          map['attachments'] = jsonEncode(map['attachments']);
         map['attachments'] ??= '[]';
-        if (map['metadata'] is Map) map['metadata'] = jsonEncode(map['metadata']);
+        if (map['metadata'] is Map)
+          map['metadata'] = jsonEncode(map['metadata']);
         map['metadata'] ??= '{}';
         break;
       case 'projects':
-        if (map['metadata'] is Map) map['metadata'] = jsonEncode(map['metadata']);
+        if (map['metadata'] is Map)
+          map['metadata'] = jsonEncode(map['metadata']);
         map['metadata'] ??= '{}';
         break;
       case 'tasks':
-        if (map['attachments'] is List) map['attachments'] = jsonEncode(map['attachments']);
+        if (map['attachments'] is List)
+          map['attachments'] = jsonEncode(map['attachments']);
         map['attachments'] ??= '[]';
-        if (map['metadata'] is Map) map['metadata'] = jsonEncode(map['metadata']);
+        if (map['metadata'] is Map)
+          map['metadata'] = jsonEncode(map['metadata']);
         map['metadata'] ??= '{}';
         break;
       case 'knowledge_notes':
         if (map['tags'] is List) map['tags'] = jsonEncode(map['tags']);
         map['tags'] ??= '[]';
-        if (map['attachments'] is List) map['attachments'] = jsonEncode(map['attachments']);
+        if (map['attachments'] is List)
+          map['attachments'] = jsonEncode(map['attachments']);
         map['attachments'] ??= '[]';
         if (map['sources'] is List) map['sources'] = jsonEncode(map['sources']);
         map['sources'] ??= '[]';
@@ -920,16 +975,24 @@ class SupabaseSyncService {
         await db.into(db.tasks).insert(TaskEntry.fromJson(map));
         break;
       case 'knowledge_notes':
-        await db.into(db.knowledgeNotes).insert(KnowledgeNoteEntry.fromJson(map));
+        await db
+            .into(db.knowledgeNotes)
+            .insert(KnowledgeNoteEntry.fromJson(map));
         break;
       case 'knowledge_questions':
-        await db.into(db.knowledgeQuestions).insert(KnowledgeQuestionEntry.fromJson(map));
+        await db
+            .into(db.knowledgeQuestions)
+            .insert(KnowledgeQuestionEntry.fromJson(map));
         break;
       case 'knowledge_documents':
-        await db.into(db.knowledgeDocuments).insert(KnowledgeDocumentEntry.fromJson(map));
+        await db
+            .into(db.knowledgeDocuments)
+            .insert(KnowledgeDocumentEntry.fromJson(map));
         break;
       case 'knowledge_resources':
-        await db.into(db.knowledgeResources).insert(KnowledgeResourceEntry.fromJson(map));
+        await db
+            .into(db.knowledgeResources)
+            .insert(KnowledgeResourceEntry.fromJson(map));
         break;
       case 'ticuna_words':
         await db.customInsert(
@@ -939,20 +1002,73 @@ class SupabaseSyncService {
             drift.Variable.withString(map['word']?.toString() ?? ''),
             drift.Variable.withString(map['translation']?.toString() ?? ''),
             drift.Variable.withString(map['phonetics']?.toString() ?? ''),
-            drift.Variable.withString(map['grammatical_class']?.toString() ?? map['grammaticalClass']?.toString() ?? ''),
-            drift.Variable.withString(map['example_sentence']?.toString() ?? map['exampleSentence']?.toString() ?? ''),
-            drift.Variable.withString(map['example_translation']?.toString() ?? map['exampleTranslation']?.toString() ?? ''),
+            drift.Variable.withString(
+              map['grammatical_class']?.toString() ??
+                  map['grammaticalClass']?.toString() ??
+                  '',
+            ),
+            drift.Variable.withString(
+              map['example_sentence']?.toString() ??
+                  map['exampleSentence']?.toString() ??
+                  '',
+            ),
+            drift.Variable.withString(
+              map['example_translation']?.toString() ??
+                  map['exampleTranslation']?.toString() ??
+                  '',
+            ),
             drift.Variable.withString(map['notes']?.toString() ?? ''),
-            drift.Variable.withString(map['tags'] is List ? jsonEncode(map['tags']) : (map['tags']?.toString() ?? '[]')),
-            drift.Variable.withInt((map['is_favorite'] == 1 || map['is_favorite'] == true || map['isFavorite'] == 1 || map['isFavorite'] == true) ? 1 : 0),
-            drift.Variable.withInt((map['review_level'] as num?)?.toInt() ?? (map['reviewLevel'] as num?)?.toInt() ?? 0),
-            drift.Variable.withInt((map['review_count'] as num?)?.toInt() ?? (map['reviewCount'] as num?)?.toInt() ?? 0),
-            drift.Variable.withString(map['last_reviewed_at']?.toString() ?? map['lastReviewedAt']?.toString() ?? ''),
-            drift.Variable.withString(map['audio_path']?.toString() ?? map['audioPath']?.toString() ?? ''),
-            drift.Variable.withInt((map['audio_duration_seconds'] as num?)?.toInt() ?? (map['audioDurationSeconds'] as num?)?.toInt() ?? 0),
-            drift.Variable.withString(map['language_id']?.toString() ?? map['languageId']?.toString() ?? 'tca'),
-            drift.Variable.withString(_isoString(map['created_at'] ?? map['createdAt']) ?? DateTime.now().toIso8601String()),
-            drift.Variable.withString(_isoString(map['updated_at'] ?? map['updatedAt']) ?? DateTime.now().toIso8601String()),
+            drift.Variable.withString(
+              map['tags'] is List
+                  ? jsonEncode(map['tags'])
+                  : (map['tags']?.toString() ?? '[]'),
+            ),
+            drift.Variable.withInt(
+              (map['is_favorite'] == 1 ||
+                      map['is_favorite'] == true ||
+                      map['isFavorite'] == 1 ||
+                      map['isFavorite'] == true)
+                  ? 1
+                  : 0,
+            ),
+            drift.Variable.withInt(
+              (map['review_level'] as num?)?.toInt() ??
+                  (map['reviewLevel'] as num?)?.toInt() ??
+                  0,
+            ),
+            drift.Variable.withInt(
+              (map['review_count'] as num?)?.toInt() ??
+                  (map['reviewCount'] as num?)?.toInt() ??
+                  0,
+            ),
+            drift.Variable.withString(
+              map['last_reviewed_at']?.toString() ??
+                  map['lastReviewedAt']?.toString() ??
+                  '',
+            ),
+            drift.Variable.withString(
+              map['audio_path']?.toString() ??
+                  map['audioPath']?.toString() ??
+                  '',
+            ),
+            drift.Variable.withInt(
+              (map['audio_duration_seconds'] as num?)?.toInt() ??
+                  (map['audioDurationSeconds'] as num?)?.toInt() ??
+                  0,
+            ),
+            drift.Variable.withString(
+              map['language_id']?.toString() ??
+                  map['languageId']?.toString() ??
+                  'tca',
+            ),
+            drift.Variable.withString(
+              _isoString(map['created_at'] ?? map['createdAt']) ??
+                  DateTime.now().toIso8601String(),
+            ),
+            drift.Variable.withString(
+              _isoString(map['updated_at'] ?? map['updatedAt']) ??
+                  DateTime.now().toIso8601String(),
+            ),
           ],
         );
         break;
@@ -966,13 +1082,42 @@ class SupabaseSyncService {
             drift.Variable.withString(map['category']?.toString() ?? ''),
             drift.Variable.withString(map['phonetics']?.toString() ?? ''),
             drift.Variable.withString(map['notes']?.toString() ?? ''),
-            drift.Variable.withString(map['tags'] is List ? jsonEncode(map['tags']) : (map['tags']?.toString() ?? '[]')),
-            drift.Variable.withInt((map['is_favorite'] == 1 || map['is_favorite'] == true || map['isFavorite'] == 1 || map['isFavorite'] == true) ? 1 : 0),
-            drift.Variable.withString(map['audio_path']?.toString() ?? map['audioPath']?.toString() ?? ''),
-            drift.Variable.withInt((map['audio_duration_seconds'] as num?)?.toInt() ?? (map['audioDurationSeconds'] as num?)?.toInt() ?? 0),
-            drift.Variable.withString(map['language_id']?.toString() ?? map['languageId']?.toString() ?? 'tca'),
-            drift.Variable.withString(_isoString(map['created_at'] ?? map['createdAt']) ?? DateTime.now().toIso8601String()),
-            drift.Variable.withString(_isoString(map['updated_at'] ?? map['updatedAt']) ?? DateTime.now().toIso8601String()),
+            drift.Variable.withString(
+              map['tags'] is List
+                  ? jsonEncode(map['tags'])
+                  : (map['tags']?.toString() ?? '[]'),
+            ),
+            drift.Variable.withInt(
+              (map['is_favorite'] == 1 ||
+                      map['is_favorite'] == true ||
+                      map['isFavorite'] == 1 ||
+                      map['isFavorite'] == true)
+                  ? 1
+                  : 0,
+            ),
+            drift.Variable.withString(
+              map['audio_path']?.toString() ??
+                  map['audioPath']?.toString() ??
+                  '',
+            ),
+            drift.Variable.withInt(
+              (map['audio_duration_seconds'] as num?)?.toInt() ??
+                  (map['audioDurationSeconds'] as num?)?.toInt() ??
+                  0,
+            ),
+            drift.Variable.withString(
+              map['language_id']?.toString() ??
+                  map['languageId']?.toString() ??
+                  'tca',
+            ),
+            drift.Variable.withString(
+              _isoString(map['created_at'] ?? map['createdAt']) ??
+                  DateTime.now().toIso8601String(),
+            ),
+            drift.Variable.withString(
+              _isoString(map['updated_at'] ?? map['updatedAt']) ??
+                  DateTime.now().toIso8601String(),
+            ),
           ],
         );
         break;
@@ -1033,7 +1178,9 @@ class SupabaseSyncService {
             .replace(MinistryExperienceEntry.fromJson(map));
         break;
       case 'person_photos':
-        await db.update(db.personPhotos).replace(PersonPhotoEntry.fromJson(map));
+        await db
+            .update(db.personPhotos)
+            .replace(PersonPhotoEntry.fromJson(map));
         break;
       case 'person_publications':
         await db
@@ -1046,7 +1193,9 @@ class SupabaseSyncService {
             .replace(ResearchArticleEntry.fromJson(map));
         break;
       case 'research_tags':
-        await db.update(db.researchTags).replace(ResearchTagEntry.fromJson(map));
+        await db
+            .update(db.researchTags)
+            .replace(ResearchTagEntry.fromJson(map));
         break;
       case 'territory_sectors':
         await db
@@ -1063,16 +1212,24 @@ class SupabaseSyncService {
         await db.update(db.tasks).replace(TaskEntry.fromJson(map));
         break;
       case 'knowledge_notes':
-        await db.update(db.knowledgeNotes).replace(KnowledgeNoteEntry.fromJson(map));
+        await db
+            .update(db.knowledgeNotes)
+            .replace(KnowledgeNoteEntry.fromJson(map));
         break;
       case 'knowledge_questions':
-        await db.update(db.knowledgeQuestions).replace(KnowledgeQuestionEntry.fromJson(map));
+        await db
+            .update(db.knowledgeQuestions)
+            .replace(KnowledgeQuestionEntry.fromJson(map));
         break;
       case 'knowledge_documents':
-        await db.update(db.knowledgeDocuments).replace(KnowledgeDocumentEntry.fromJson(map));
+        await db
+            .update(db.knowledgeDocuments)
+            .replace(KnowledgeDocumentEntry.fromJson(map));
         break;
       case 'knowledge_resources':
-        await db.update(db.knowledgeResources).replace(KnowledgeResourceEntry.fromJson(map));
+        await db
+            .update(db.knowledgeResources)
+            .replace(KnowledgeResourceEntry.fromJson(map));
         break;
       case 'ticuna_words':
         await db.customInsert(
@@ -1082,20 +1239,73 @@ class SupabaseSyncService {
             drift.Variable.withString(map['word']?.toString() ?? ''),
             drift.Variable.withString(map['translation']?.toString() ?? ''),
             drift.Variable.withString(map['phonetics']?.toString() ?? ''),
-            drift.Variable.withString(map['grammatical_class']?.toString() ?? map['grammaticalClass']?.toString() ?? ''),
-            drift.Variable.withString(map['example_sentence']?.toString() ?? map['exampleSentence']?.toString() ?? ''),
-            drift.Variable.withString(map['example_translation']?.toString() ?? map['exampleTranslation']?.toString() ?? ''),
+            drift.Variable.withString(
+              map['grammatical_class']?.toString() ??
+                  map['grammaticalClass']?.toString() ??
+                  '',
+            ),
+            drift.Variable.withString(
+              map['example_sentence']?.toString() ??
+                  map['exampleSentence']?.toString() ??
+                  '',
+            ),
+            drift.Variable.withString(
+              map['example_translation']?.toString() ??
+                  map['exampleTranslation']?.toString() ??
+                  '',
+            ),
             drift.Variable.withString(map['notes']?.toString() ?? ''),
-            drift.Variable.withString(map['tags'] is List ? jsonEncode(map['tags']) : (map['tags']?.toString() ?? '[]')),
-            drift.Variable.withInt((map['is_favorite'] == 1 || map['is_favorite'] == true || map['isFavorite'] == 1 || map['isFavorite'] == true) ? 1 : 0),
-            drift.Variable.withInt((map['review_level'] as num?)?.toInt() ?? (map['reviewLevel'] as num?)?.toInt() ?? 0),
-            drift.Variable.withInt((map['review_count'] as num?)?.toInt() ?? (map['reviewCount'] as num?)?.toInt() ?? 0),
-            drift.Variable.withString(map['last_reviewed_at']?.toString() ?? map['lastReviewedAt']?.toString() ?? ''),
-            drift.Variable.withString(map['audio_path']?.toString() ?? map['audioPath']?.toString() ?? ''),
-            drift.Variable.withInt((map['audio_duration_seconds'] as num?)?.toInt() ?? (map['audioDurationSeconds'] as num?)?.toInt() ?? 0),
-            drift.Variable.withString(map['language_id']?.toString() ?? map['languageId']?.toString() ?? 'tca'),
-            drift.Variable.withString(_isoString(map['created_at'] ?? map['createdAt']) ?? DateTime.now().toIso8601String()),
-            drift.Variable.withString(_isoString(map['updated_at'] ?? map['updatedAt']) ?? DateTime.now().toIso8601String()),
+            drift.Variable.withString(
+              map['tags'] is List
+                  ? jsonEncode(map['tags'])
+                  : (map['tags']?.toString() ?? '[]'),
+            ),
+            drift.Variable.withInt(
+              (map['is_favorite'] == 1 ||
+                      map['is_favorite'] == true ||
+                      map['isFavorite'] == 1 ||
+                      map['isFavorite'] == true)
+                  ? 1
+                  : 0,
+            ),
+            drift.Variable.withInt(
+              (map['review_level'] as num?)?.toInt() ??
+                  (map['reviewLevel'] as num?)?.toInt() ??
+                  0,
+            ),
+            drift.Variable.withInt(
+              (map['review_count'] as num?)?.toInt() ??
+                  (map['reviewCount'] as num?)?.toInt() ??
+                  0,
+            ),
+            drift.Variable.withString(
+              map['last_reviewed_at']?.toString() ??
+                  map['lastReviewedAt']?.toString() ??
+                  '',
+            ),
+            drift.Variable.withString(
+              map['audio_path']?.toString() ??
+                  map['audioPath']?.toString() ??
+                  '',
+            ),
+            drift.Variable.withInt(
+              (map['audio_duration_seconds'] as num?)?.toInt() ??
+                  (map['audioDurationSeconds'] as num?)?.toInt() ??
+                  0,
+            ),
+            drift.Variable.withString(
+              map['language_id']?.toString() ??
+                  map['languageId']?.toString() ??
+                  'tca',
+            ),
+            drift.Variable.withString(
+              _isoString(map['created_at'] ?? map['createdAt']) ??
+                  DateTime.now().toIso8601String(),
+            ),
+            drift.Variable.withString(
+              _isoString(map['updated_at'] ?? map['updatedAt']) ??
+                  DateTime.now().toIso8601String(),
+            ),
           ],
         );
         break;
@@ -1109,13 +1319,42 @@ class SupabaseSyncService {
             drift.Variable.withString(map['category']?.toString() ?? ''),
             drift.Variable.withString(map['phonetics']?.toString() ?? ''),
             drift.Variable.withString(map['notes']?.toString() ?? ''),
-            drift.Variable.withString(map['tags'] is List ? jsonEncode(map['tags']) : (map['tags']?.toString() ?? '[]')),
-            drift.Variable.withInt((map['is_favorite'] == 1 || map['is_favorite'] == true || map['isFavorite'] == 1 || map['isFavorite'] == true) ? 1 : 0),
-            drift.Variable.withString(map['audio_path']?.toString() ?? map['audioPath']?.toString() ?? ''),
-            drift.Variable.withInt((map['audio_duration_seconds'] as num?)?.toInt() ?? (map['audioDurationSeconds'] as num?)?.toInt() ?? 0),
-            drift.Variable.withString(map['language_id']?.toString() ?? map['languageId']?.toString() ?? 'tca'),
-            drift.Variable.withString(_isoString(map['created_at'] ?? map['createdAt']) ?? DateTime.now().toIso8601String()),
-            drift.Variable.withString(_isoString(map['updated_at'] ?? map['updatedAt']) ?? DateTime.now().toIso8601String()),
+            drift.Variable.withString(
+              map['tags'] is List
+                  ? jsonEncode(map['tags'])
+                  : (map['tags']?.toString() ?? '[]'),
+            ),
+            drift.Variable.withInt(
+              (map['is_favorite'] == 1 ||
+                      map['is_favorite'] == true ||
+                      map['isFavorite'] == 1 ||
+                      map['isFavorite'] == true)
+                  ? 1
+                  : 0,
+            ),
+            drift.Variable.withString(
+              map['audio_path']?.toString() ??
+                  map['audioPath']?.toString() ??
+                  '',
+            ),
+            drift.Variable.withInt(
+              (map['audio_duration_seconds'] as num?)?.toInt() ??
+                  (map['audioDurationSeconds'] as num?)?.toInt() ??
+                  0,
+            ),
+            drift.Variable.withString(
+              map['language_id']?.toString() ??
+                  map['languageId']?.toString() ??
+                  'tca',
+            ),
+            drift.Variable.withString(
+              _isoString(map['created_at'] ?? map['createdAt']) ??
+                  DateTime.now().toIso8601String(),
+            ),
+            drift.Variable.withString(
+              _isoString(map['updated_at'] ?? map['updatedAt']) ??
+                  DateTime.now().toIso8601String(),
+            ),
           ],
         );
         break;
@@ -1186,8 +1425,9 @@ class SupabaseSyncService {
         );
         break;
       case 'ministry_experiences':
-        await (db.update(db.ministryExperiences)..where((t) => t.id.equals(id)))
-            .write(
+        await (db.update(
+          db.ministryExperiences,
+        )..where((t) => t.id.equals(id))).write(
           MinistryExperiencesCompanion(deletedAt: drift.Value(deletedAt)),
         );
         break;
@@ -1197,14 +1437,16 @@ class SupabaseSyncService {
         );
         break;
       case 'person_publications':
-        await (db.update(db.personPublications)..where((t) => t.id.equals(id)))
-            .write(
+        await (db.update(
+          db.personPublications,
+        )..where((t) => t.id.equals(id))).write(
           PersonPublicationsCompanion(deletedAt: drift.Value(deletedAt)),
         );
         break;
       case 'research_articles':
-        await (db.update(db.researchArticles)..where((t) => t.id.equals(id)))
-            .write(
+        await (db.update(
+          db.researchArticles,
+        )..where((t) => t.id.equals(id))).write(
           ResearchArticlesCompanion(deletedAt: drift.Value(deletedAt)),
         );
         break;
@@ -1214,8 +1456,9 @@ class SupabaseSyncService {
         );
         break;
       case 'territory_sectors':
-        await (db.update(db.territorySectors)..where((t) => t.id.equals(id)))
-            .write(
+        await (db.update(
+          db.territorySectors,
+        )..where((t) => t.id.equals(id))).write(
           TerritorySectorsCompanion(deletedAt: drift.Value(deletedAt)),
         );
         break;
@@ -1235,22 +1478,27 @@ class SupabaseSyncService {
         );
         break;
       case 'knowledge_notes':
-        await (db.update(db.knowledgeNotes)..where((t) => t.id.equals(id))).write(
-          KnowledgeNotesCompanion(deletedAt: drift.Value(deletedAt)),
-        );
+        await (db.update(db.knowledgeNotes)..where((t) => t.id.equals(id)))
+            .write(KnowledgeNotesCompanion(deletedAt: drift.Value(deletedAt)));
         break;
       case 'knowledge_questions':
-        await (db.update(db.knowledgeQuestions)..where((t) => t.id.equals(id))).write(
+        await (db.update(
+          db.knowledgeQuestions,
+        )..where((t) => t.id.equals(id))).write(
           KnowledgeQuestionsCompanion(deletedAt: drift.Value(deletedAt)),
         );
         break;
       case 'knowledge_documents':
-        await (db.update(db.knowledgeDocuments)..where((t) => t.id.equals(id))).write(
+        await (db.update(
+          db.knowledgeDocuments,
+        )..where((t) => t.id.equals(id))).write(
           KnowledgeDocumentsCompanion(deletedAt: drift.Value(deletedAt)),
         );
         break;
       case 'knowledge_resources':
-        await (db.update(db.knowledgeResources)..where((t) => t.id.equals(id))).write(
+        await (db.update(
+          db.knowledgeResources,
+        )..where((t) => t.id.equals(id))).write(
           KnowledgeResourcesCompanion(deletedAt: drift.Value(deletedAt)),
         );
         break;
@@ -1258,7 +1506,9 @@ class SupabaseSyncService {
         await db.customStatement('DELETE FROM ticuna_words WHERE id = ?', [id]);
         break;
       case 'ticuna_phrases':
-        await db.customStatement('DELETE FROM ticuna_phrases WHERE id = ?', [id]);
+        await db.customStatement('DELETE FROM ticuna_phrases WHERE id = ?', [
+          id,
+        ]);
         break;
     }
   }
@@ -1394,26 +1644,36 @@ class SupabaseSyncService {
         return row?.toJson();
       case 'ticuna_words':
         try {
-          final rows = await db.customSelect(
-            'SELECT * FROM ticuna_words WHERE id = ?',
-            variables: [drift.Variable.withString(id)],
-          ).get();
+          final rows = await db
+              .customSelect(
+                'SELECT * FROM ticuna_words WHERE id = ?',
+                variables: [drift.Variable.withString(id)],
+              )
+              .get();
           if (rows.isEmpty) return null;
           return rows.first.data;
         } catch (e, st) {
-          AppLogger.debug('Falha ao ler ticuna_words ($id) em _getRawLocalMap: $e', st);
+          AppLogger.debug(
+            'Falha ao ler ticuna_words ($id) em _getRawLocalMap: $e',
+            st,
+          );
           return null;
         }
       case 'ticuna_phrases':
         try {
-          final rows = await db.customSelect(
-            'SELECT * FROM ticuna_phrases WHERE id = ?',
-            variables: [drift.Variable.withString(id)],
-          ).get();
+          final rows = await db
+              .customSelect(
+                'SELECT * FROM ticuna_phrases WHERE id = ?',
+                variables: [drift.Variable.withString(id)],
+              )
+              .get();
           if (rows.isEmpty) return null;
           return rows.first.data;
         } catch (e, st) {
-          AppLogger.debug('Falha ao ler ticuna_phrases ($id) em _getRawLocalMap: $e', st);
+          AppLogger.debug(
+            'Falha ao ler ticuna_phrases ($id) em _getRawLocalMap: $e',
+            st,
+          );
           return null;
         }
       default:
@@ -1424,7 +1684,8 @@ class SupabaseSyncService {
   /// Resolve a pasta correspondente ao UUID do usuário autenticado para armazenamento seguro.
   /// Retorna `null` quando não há sessão ativa em produção (evita pasta compartilhada 00000000-...).
   String? _resolveStorageFolder(SupabaseClient client) {
-    final uid = client.auth.currentUser?.id ?? client.auth.currentSession?.user.id;
+    final uid =
+        client.auth.currentUser?.id ?? client.auth.currentSession?.user.id;
     if (uid != null && uid.isNotEmpty) {
       return uid;
     }
@@ -1475,7 +1736,9 @@ class SupabaseSyncService {
           }
           final rawFileName = id.endsWith('.m4a') ? id : '$id.m4a';
           final storagePath = '$userFolder/$rawFileName';
-          await client.storage.from('voice_notes').uploadBinary(
+          await client.storage
+              .from('voice_notes')
+              .uploadBinary(
                 storagePath,
                 bytes,
                 fileOptions: const FileOptions(upsert: true),
@@ -1501,7 +1764,8 @@ class SupabaseSyncService {
   ) async {
     _assertPlaintextMediaAllowedInLegacyTestOnly();
     try {
-      final audioPath = cleanPayload['audio_path']?.toString() ??
+      final audioPath =
+          cleanPayload['audio_path']?.toString() ??
           cleanPayload['audioPath']?.toString();
       if (audioPath != null &&
           audioPath.isNotEmpty &&
@@ -1518,13 +1782,19 @@ class SupabaseSyncService {
           final rawFileName = '${id}_pronunciation.m4a';
           final storagePath = '$userFolder/$rawFileName';
           try {
-            await client.storage.from('ticuna_audio').uploadBinary(
+            await client.storage
+                .from('ticuna_audio')
+                .uploadBinary(
                   storagePath,
                   bytes,
                   fileOptions: const FileOptions(upsert: true),
                 );
           } catch (e1, st1) {
-            AppLogger.error('Erro no upload de áudio Ticuna ($id) para ticuna_audio ($storagePath)', e1, st1);
+            AppLogger.error(
+              'Erro no upload de áudio Ticuna ($id) para ticuna_audio ($storagePath)',
+              e1,
+              st1,
+            );
             errors.add(
               'Erro no upload de áudio Ticuna ($id) no bucket ticuna_audio: $e1',
             );
@@ -1550,7 +1820,9 @@ class SupabaseSyncService {
     try {
       final userFolder = _resolveStorageFolder(client);
       if (userFolder == null) {
-        AppLogger.warning('Download de áudio Ticuna ($id) adiado: usuário não autenticado.');
+        AppLogger.warning(
+          'Download de áudio Ticuna ($id) adiado: usuário não autenticado.',
+        );
         return false;
       }
       final rawFileName = '${id}_pronunciation.m4a';
@@ -1561,7 +1833,9 @@ class SupabaseSyncService {
       } catch (e1) {
         AppLogger.debug('Fallback raiz ticuna_audio ($id): $e1');
         try {
-          bytes = await client.storage.from('ticuna_audio').download(rawFileName);
+          bytes = await client.storage
+              .from('ticuna_audio')
+              .download(rawFileName);
         } catch (e2, st2) {
           AppLogger.debug('Falha no download de ticuna_audio ($id): $e2', st2);
         }
@@ -1597,8 +1871,9 @@ class SupabaseSyncService {
             ],
           );
         }
-        await (db.delete(db.appKvStore)
-              ..where((t) => t.key.equals('pending_ticuna_audio_download_${table}_$id')))
+        await (db.delete(db.appKvStore)..where(
+              (t) => t.key.equals('pending_ticuna_audio_download_${table}_$id'),
+            ))
             .go();
         return true;
       }
@@ -1606,7 +1881,9 @@ class SupabaseSyncService {
     } catch (e, st) {
       AppLogger.warning('Falha no download de áudio Ticuna ($id)', e, st);
       try {
-        await db.into(db.appKvStore).insertOnConflictUpdate(
+        await db
+            .into(db.appKvStore)
+            .insertOnConflictUpdate(
               AppKvStoreCompanion.insert(
                 key: 'pending_ticuna_audio_download_${table}_$id',
                 value: DateTime.now().toUtc().toIso8601String(),
@@ -1614,7 +1891,11 @@ class SupabaseSyncService {
               ),
             );
       } catch (kvErr, kvSt) {
-        AppLogger.warning('Falha ao registrar pending_ticuna_audio_download ($id)', kvErr, kvSt);
+        AppLogger.warning(
+          'Falha ao registrar pending_ticuna_audio_download ($id)',
+          kvErr,
+          kvSt,
+        );
       }
       return false;
     }
@@ -1624,7 +1905,9 @@ class SupabaseSyncService {
     try {
       final userFolder = _resolveStorageFolder(client);
       if (userFolder == null) {
-        AppLogger.warning('Download de áudio voice_note ($id) adiado: usuário não autenticado.');
+        AppLogger.warning(
+          'Download de áudio voice_note ($id) adiado: usuário não autenticado.',
+        );
         return false;
       }
       final rawFileName = id.endsWith('.m4a') ? id : '$id.m4a';
@@ -1635,9 +1918,14 @@ class SupabaseSyncService {
       } catch (e1) {
         AppLogger.debug('Fallback raiz voice_notes ($storagePath): $e1');
         try {
-          bytes = await client.storage.from('voice_notes').download(rawFileName);
+          bytes = await client.storage
+              .from('voice_notes')
+              .download(rawFileName);
         } catch (dlErr, dlSt) {
-          AppLogger.debug('Fallback raiz voice_notes falhou ($rawFileName): $dlErr', dlSt);
+          AppLogger.debug(
+            'Fallback raiz voice_notes falhou ($rawFileName): $dlErr',
+            dlSt,
+          );
         }
       }
 
@@ -1663,11 +1951,15 @@ class SupabaseSyncService {
         )..where((t) => t.key.equals('pending_audio_download_$id'))).go();
         return true;
       }
-      throw Exception('Arquivo de áudio não disponível para download no storage: $id');
+      throw Exception(
+        'Arquivo de áudio não disponível para download no storage: $id',
+      );
     } catch (e, st) {
       AppLogger.warning('Falha no download de áudio voice_notes ($id)', e, st);
       try {
-        await db.into(db.appKvStore).insertOnConflictUpdate(
+        await db
+            .into(db.appKvStore)
+            .insertOnConflictUpdate(
               AppKvStoreCompanion.insert(
                 key: 'pending_audio_download_$id',
                 value: DateTime.now().toUtc().toIso8601String(),
@@ -1675,7 +1967,11 @@ class SupabaseSyncService {
               ),
             );
       } catch (kvErr, kvSt) {
-        AppLogger.warning('Falha ao registrar pending_audio_download ($id)', kvErr, kvSt);
+        AppLogger.warning(
+          'Falha ao registrar pending_audio_download ($id)',
+          kvErr,
+          kvSt,
+        );
       }
       return false;
     }
@@ -1688,7 +1984,10 @@ class SupabaseSyncService {
     try {
       client = clientOverride ?? Supabase.instance.client;
     } catch (e, st) {
-      AppLogger.debug('Supabase client indisponível em deleteVoiceNoteAudio ($id): $e', st);
+      AppLogger.debug(
+        'Supabase client indisponível em deleteVoiceNoteAudio ($id): $e',
+        st,
+      );
       return false;
     }
     if (!_legacyTestMode) {
@@ -1700,7 +1999,10 @@ class SupabaseSyncService {
         await transfer.deleteEncrypted(bucket: 'voice_notes', mediaId: id);
         return true;
       } catch (e, st) {
-        AppLogger.debug('Falha ao excluir áudio E2EE voice_notes ($id): $e', st);
+        AppLogger.debug(
+          'Falha ao excluir áudio E2EE voice_notes ($id): $e',
+          st,
+        );
         return false;
       }
     }
@@ -1730,7 +2032,10 @@ class SupabaseSyncService {
     try {
       client = clientOverride ?? Supabase.instance.client;
     } catch (e, st) {
-      AppLogger.debug('Supabase client indisponível em deleteTicunaAudio ($id): $e', st);
+      AppLogger.debug(
+        'Supabase client indisponível em deleteTicunaAudio ($id): $e',
+        st,
+      );
       return false;
     }
     if (!_legacyTestMode) {
@@ -1739,8 +2044,14 @@ class SupabaseSyncService {
       final transfer = await _getEncryptedMediaTransfer(client, gate.ownerId!);
       if (transfer == null) return false;
       try {
-        await transfer.deleteEncrypted(bucket: 'ticuna_audio', mediaId: 'ticuna_words_$id');
-        await transfer.deleteEncrypted(bucket: 'ticuna_audio', mediaId: 'ticuna_phrases_$id');
+        await transfer.deleteEncrypted(
+          bucket: 'ticuna_audio',
+          mediaId: 'ticuna_words_$id',
+        );
+        await transfer.deleteEncrypted(
+          bucket: 'ticuna_audio',
+          mediaId: 'ticuna_phrases_$id',
+        );
         return true;
       } catch (e, st) {
         AppLogger.debug('Falha ao remover áudio E2EE Ticuna ($id): $e', st);
@@ -1761,7 +2072,10 @@ class SupabaseSyncService {
           rawFileName,
         ]);
       } on TypeError catch (e, st) {
-        AppLogger.debug('Resposta não-lista ao remover ticuna_audio ($rawFileName): $e', st);
+        AppLogger.debug(
+          'Resposta não-lista ao remover ticuna_audio ($rawFileName): $e',
+          st,
+        );
       }
       return true;
     } catch (e, st) {
@@ -1793,11 +2107,16 @@ class SupabaseSyncService {
         try {
           bytes = await readMediaBytes(doc.filePath);
         } catch (e, st) {
-          AppLogger.debug('Falha ao ler documento via filePath (${doc.filePath}): $e', st);
+          AppLogger.debug(
+            'Falha ao ler documento via filePath (${doc.filePath}): $e',
+            st,
+          );
         }
       }
 
-      if ((bytes == null || bytes.isEmpty) && !kIsWeb && doc.fileName.isNotEmpty) {
+      if ((bytes == null || bytes.isEmpty) &&
+          !kIsWeb &&
+          doc.fileName.isNotEmpty) {
         final baseDir = await _resolveBaseDocsDir();
         if (baseDir.isNotEmpty) {
           for (final candidate in [
@@ -1808,7 +2127,10 @@ class SupabaseSyncService {
               bytes = await readMediaBytes(candidate);
               if (bytes != null && bytes.isNotEmpty) break;
             } catch (e, st) {
-              AppLogger.debug('Falha ao ler candidato knowledge_doc ($candidate): $e', st);
+              AppLogger.debug(
+                'Falha ao ler candidato knowledge_doc ($candidate): $e',
+                st,
+              );
             }
           }
         }
@@ -1816,9 +2138,9 @@ class SupabaseSyncService {
 
       // 2. Busca no AppKvStore (cache de bytes Web/portátil)
       if (bytes == null || bytes.isEmpty) {
-        final kv = await (db.select(db.appKvStore)
-              ..where((t) => t.key.equals('doc_bytes_$id')))
-            .getSingleOrNull();
+        final kv = await (db.select(
+          db.appKvStore,
+        )..where((t) => t.key.equals('doc_bytes_$id'))).getSingleOrNull();
         if (kv != null && kv.value.isNotEmpty) {
           try {
             bytes = base64Decode(kv.value);
@@ -1836,18 +2158,24 @@ class SupabaseSyncService {
           );
           return false;
         }
-        final extension = doc.fileType.isNotEmpty ? doc.fileType.replaceAll('.', '') : 'pdf';
+        final extension = doc.fileType.isNotEmpty
+            ? doc.fileType.replaceAll('.', '')
+            : 'pdf';
         final storageFileName = '$id.$extension';
         final storagePath = '$userFolder/$storageFileName';
 
-        await client.storage.from('knowledge_vault').uploadBinary(
+        await client.storage
+            .from('knowledge_vault')
+            .uploadBinary(
               storagePath,
               bytes,
               fileOptions: const FileOptions(upsert: true),
             );
         return true;
       }
-      errors.add('Arquivo do documento ausente ou vazio ($id); metadados não comprovam upload.');
+      errors.add(
+        'Arquivo do documento ausente ou vazio ($id); metadados não comprovam upload.',
+      );
       return false;
     } catch (e) {
       errors.add('Erro no upload de documento para knowledge_vault ($id): $e');
@@ -1868,31 +2196,44 @@ class SupabaseSyncService {
 
       final userFolder = _resolveStorageFolder(client);
       if (userFolder == null) {
-        AppLogger.warning('Download de documento ($id) adiado: usuário não autenticado.');
+        AppLogger.warning(
+          'Download de documento ($id) adiado: usuário não autenticado.',
+        );
         return false;
       }
-      final extension = doc.fileType.isNotEmpty ? doc.fileType.replaceAll('.', '') : 'pdf';
+      final extension = doc.fileType.isNotEmpty
+          ? doc.fileType.replaceAll('.', '')
+          : 'pdf';
       final storageFileName = '$id.$extension';
       final storagePath = '$userFolder/$storageFileName';
 
       Uint8List? bytes;
       try {
-        bytes = await client.storage.from('knowledge_vault').download(storagePath);
+        bytes = await client.storage
+            .from('knowledge_vault')
+            .download(storagePath);
       } catch (e, st) {
         AppLogger.debug(
           'Download em $storagePath falhou; tentando caminho legado $storageFileName: $e',
           st,
         );
         try {
-          bytes = await client.storage.from('knowledge_vault').download(storageFileName);
+          bytes = await client.storage
+              .from('knowledge_vault')
+              .download(storageFileName);
         } catch (dlErr, dlSt) {
-          AppLogger.debug('Fallback raiz knowledge_vault falhou ($storageFileName): $dlErr', dlSt);
+          AppLogger.debug(
+            'Fallback raiz knowledge_vault falhou ($storageFileName): $dlErr',
+            dlSt,
+          );
         }
       }
 
       if (bytes != null && bytes.isNotEmpty) {
         final baseDir = await _resolveBaseDocsDir();
-        final safeName = doc.fileName.isNotEmpty ? doc.fileName : storageFileName;
+        final safeName = doc.fileName.isNotEmpty
+            ? doc.fileName
+            : storageFileName;
         if (!kIsWeb && baseDir.isNotEmpty) {
           final localFilePath = await saveMediaBytes(
             baseDir: baseDir,
@@ -1901,12 +2242,16 @@ class SupabaseSyncService {
             bytes: bytes,
           );
           if (localFilePath != null) {
-            await (db.update(db.knowledgeDocuments)..where((t) => t.id.equals(id))).write(
+            await (db.update(
+              db.knowledgeDocuments,
+            )..where((t) => t.id.equals(id))).write(
               KnowledgeDocumentsCompanion(filePath: drift.Value(localFilePath)),
             );
           }
         } else {
-          await db.into(db.appKvStore).insertOnConflictUpdate(
+          await db
+              .into(db.appKvStore)
+              .insertOnConflictUpdate(
                 AppKvStoreCompanion.insert(
                   key: 'doc_bytes_$id',
                   value: base64Encode(bytes),
@@ -1920,11 +2265,19 @@ class SupabaseSyncService {
         )..where((t) => t.key.equals('pending_doc_download_$id'))).go();
         return true;
       }
-      throw Exception('Arquivo do documento não disponível para download no storage: $id');
+      throw Exception(
+        'Arquivo do documento não disponível para download no storage: $id',
+      );
     } catch (e, st) {
-      AppLogger.warning('Falha no download de documento knowledge_vault ($id)', e, st);
+      AppLogger.warning(
+        'Falha no download de documento knowledge_vault ($id)',
+        e,
+        st,
+      );
       try {
-        await db.into(db.appKvStore).insertOnConflictUpdate(
+        await db
+            .into(db.appKvStore)
+            .insertOnConflictUpdate(
               AppKvStoreCompanion.insert(
                 key: 'pending_doc_download_$id',
                 value: DateTime.now().toUtc().toIso8601String(),
@@ -1932,7 +2285,11 @@ class SupabaseSyncService {
               ),
             );
       } catch (kvErr, kvSt) {
-        AppLogger.warning('Falha ao registrar pending_doc_download ($id)', kvErr, kvSt);
+        AppLogger.warning(
+          'Falha ao registrar pending_doc_download ($id)',
+          kvErr,
+          kvSt,
+        );
       }
       return false;
     }
@@ -1946,9 +2303,9 @@ class SupabaseSyncService {
   ) async {
     _assertPlaintextMediaAllowedInLegacyTestOnly();
     try {
-      final photo = await (db.select(db.personPhotos)
-            ..where((t) => t.id.equals(id)))
-          .getSingleOrNull();
+      final photo = await (db.select(
+        db.personPhotos,
+      )..where((t) => t.id.equals(id))).getSingleOrNull();
       if (photo == null) {
         errors.add('Foto local ausente ($id); upload não confirmado.');
         return false;
@@ -1983,14 +2340,17 @@ class SupabaseSyncService {
 
       // Remove caminhos locais do dispositivo antes de enviar ao PostgREST
       final rawFp = remotePayload['file_path']?.toString() ?? '';
-      if (rawFp.startsWith('/') ||
-          RegExp(r'^[a-zA-Z]:[\\/]').hasMatch(rawFp)) {
+      if (rawFp.startsWith('/') || RegExp(r'^[a-zA-Z]:[\\/]').hasMatch(rawFp)) {
         remotePayload['file_path'] = null;
       }
 
       if (bytes == null || bytes.isEmpty) {
         // Um caminho de Storage já sincronizado não é um arquivo local pendente.
-        if ((localPath == null || localPath.isEmpty || localPath.startsWith('http')) && inlineData.isEmpty) return true;
+        if ((localPath == null ||
+                localPath.isEmpty ||
+                localPath.startsWith('http')) &&
+            inlineData.isEmpty)
+          return true;
         errors.add('Arquivo da foto ausente ou vazio ($id).');
         return false;
       }
@@ -2001,7 +2361,9 @@ class SupabaseSyncService {
         return false;
       }
       final storagePath = '$userFolder/$id.jpg';
-      await client.storage.from('person_photos').uploadBinary(
+      await client.storage
+          .from('person_photos')
+          .uploadBinary(
             storagePath,
             bytes,
             fileOptions: const FileOptions(
@@ -2021,9 +2383,9 @@ class SupabaseSyncService {
 
   Future<bool> _downloadPersonPhoto(String id, SupabaseClient client) async {
     try {
-      final photo = await (db.select(db.personPhotos)
-            ..where((t) => t.id.equals(id)))
-          .getSingleOrNull();
+      final photo = await (db.select(
+        db.personPhotos,
+      )..where((t) => t.id.equals(id))).getSingleOrNull();
       final fp = photo?.filePath;
       if (fp == null || fp.isEmpty || fp.startsWith('http')) {
         return false;
@@ -2048,7 +2410,10 @@ class SupabaseSyncService {
             break;
           }
         } catch (dlErr, dlSt) {
-          AppLogger.debug('Tentativa de download person_photos ($path) falhou: $dlErr', dlSt);
+          AppLogger.debug(
+            'Tentativa de download person_photos ($path) falhou: $dlErr',
+            dlSt,
+          );
         }
       }
 
@@ -2063,8 +2428,9 @@ class SupabaseSyncService {
               bytes: bytes,
             );
             if (localPath != null) {
-              await (db.update(db.personPhotos)..where((t) => t.id.equals(id)))
-                  .write(
+              await (db.update(
+                db.personPhotos,
+              )..where((t) => t.id.equals(id))).write(
                 PersonPhotosCompanion(
                   filePath: drift.Value(localPath),
                   imageData: const drift.Value(''),
@@ -2073,8 +2439,9 @@ class SupabaseSyncService {
             }
           }
         } else {
-          await (db.update(db.personPhotos)..where((t) => t.id.equals(id)))
-              .write(
+          await (db.update(
+            db.personPhotos,
+          )..where((t) => t.id.equals(id))).write(
             PersonPhotosCompanion(
               imageData: drift.Value(
                 'data:image/jpeg;base64,${base64Encode(bytes)}',
@@ -2083,16 +2450,18 @@ class SupabaseSyncService {
           );
         }
 
-        await (db.delete(db.appKvStore)
-              ..where((t) => t.key.equals('pending_photo_download_$id')))
-            .go();
+        await (db.delete(
+          db.appKvStore,
+        )..where((t) => t.key.equals('pending_photo_download_$id'))).go();
         return true;
       }
       throw Exception('Foto não disponível no storage person_photos: $id');
     } catch (e, st) {
       AppLogger.warning('Falha no download de foto person_photos ($id)', e, st);
       try {
-        await db.into(db.appKvStore).insertOnConflictUpdate(
+        await db
+            .into(db.appKvStore)
+            .insertOnConflictUpdate(
               AppKvStoreCompanion.insert(
                 key: 'pending_photo_download_$id',
                 value: DateTime.now().toUtc().toIso8601String(),
@@ -2100,7 +2469,11 @@ class SupabaseSyncService {
               ),
             );
       } catch (e2, st2) {
-        AppLogger.warning('Falha ao registrar pendência de download de foto $id', e2, st2);
+        AppLogger.warning(
+          'Falha ao registrar pendência de download de foto $id',
+          e2,
+          st2,
+        );
       }
       return false;
     }
@@ -2113,7 +2486,10 @@ class SupabaseSyncService {
     try {
       client = clientOverride ?? Supabase.instance.client;
     } catch (e, st) {
-      AppLogger.debug('Cliente Supabase indisponível para retry de mídias: $e', st);
+      AppLogger.debug(
+        'Cliente Supabase indisponível para retry de mídias: $e',
+        st,
+      );
       return 0;
     }
 
@@ -2206,8 +2582,10 @@ class SupabaseSyncService {
       final x = a[key], y = b[key];
       if (SyncTimestamp.dateFieldKeys.contains(key) && x != null && y != null) {
         final dx = SyncTimestamp.parse(x), dy = SyncTimestamp.parse(y);
-        if (dx != null && dy != null &&
-            dx.millisecondsSinceEpoch ~/ 1000 == dy.millisecondsSinceEpoch ~/ 1000) {
+        if (dx != null &&
+            dy != null &&
+            dx.millisecondsSinceEpoch ~/ 1000 ==
+                dy.millisecondsSinceEpoch ~/ 1000) {
           continue;
         }
       }
@@ -2223,13 +2601,23 @@ class SupabaseSyncService {
       final all = await repository.getUnresolvedSyncOperations();
       final groups = <String, List<SyncQueueEntry>>{};
       for (final op in all) {
-        final key = jsonEncode([mapEntityToRemoteTable(op.entityType), op.entityId]);
+        final key = jsonEncode([
+          mapEntityToRemoteTable(op.entityType),
+          op.entityId,
+        ]);
         (groups[key] ??= []).add(op);
       }
       for (final operations in groups.values) {
-        if (operations.length < 2 || operations.any((op) =>
-            op.status != 'pending' || op.attempts != 0 ||
-            !const {'INSERT', 'UPDATE'}.contains(op.operation.toUpperCase()))) {
+        if (operations.length < 2 ||
+            operations.any(
+              (op) =>
+                  op.status != 'pending' ||
+                  op.attempts != 0 ||
+                  !const {
+                    'INSERT',
+                    'UPDATE',
+                  }.contains(op.operation.toUpperCase()),
+            )) {
           continue;
         }
         try {
@@ -2238,14 +2626,19 @@ class SupabaseSyncService {
             final payload = payloads[op.id]!;
             return (payload['revision'] as num?)?.toInt();
           }
+
           for (final op in operations) {
             final decoded = jsonDecode(op.payload);
-            if (decoded is! Map<String, dynamic>) throw const FormatException('payload');
+            if (decoded is! Map<String, dynamic>)
+              throw const FormatException('payload');
             payloads[op.id] = decoded;
           }
           if (operations.any((op) => revision(op) == null)) continue;
           operations.sort((a, b) => revision(a)!.compareTo(revision(b)!));
-          if (operations.skip(1).any((op) => op.operation.toUpperCase() != 'UPDATE')) continue;
+          if (operations
+              .skip(1)
+              .any((op) => op.operation.toUpperCase() != 'UPDATE'))
+            continue;
           var valid = true;
           for (var i = 1; i < operations.length; i++) {
             final previous = operations[i - 1];
@@ -2255,10 +2648,14 @@ class SupabaseSyncService {
               valid = false;
               break;
             }
-            final previousSnapshot = normalizeRemotePayload(sanitizePayload(
-              previous.entityType, payloads[previous.id]!));
-            final currentBase = normalizeRemotePayload(Map<String, dynamic>.from(base));
-            if ((currentBase['revision'] as num?)?.toInt() != revision(previous) ||
+            final previousSnapshot = normalizeRemotePayload(
+              sanitizePayload(previous.entityType, payloads[previous.id]!),
+            );
+            final currentBase = normalizeRemotePayload(
+              Map<String, dynamic>.from(base),
+            );
+            if ((currentBase['revision'] as num?)?.toInt() !=
+                    revision(previous) ||
                 !_sameQueuedSnapshot(previousSnapshot, currentBase)) {
               valid = false;
               break;
@@ -2266,9 +2663,16 @@ class SupabaseSyncService {
           }
           final first = operations.first;
           final last = operations.last;
-          final local = await _getLocalMap(mapEntityToRemoteTable(last.entityType), last.entityId);
-          final latest = normalizeRemotePayload(sanitizePayload(last.entityType, payloads[last.id]!));
-          if (!valid || local == null || (local['revision'] as num?)?.toInt() != revision(last) ||
+          final local = await _getLocalMap(
+            mapEntityToRemoteTable(last.entityType),
+            last.entityId,
+          );
+          final latest = normalizeRemotePayload(
+            sanitizePayload(last.entityType, payloads[last.id]!),
+          );
+          if (!valid ||
+              local == null ||
+              (local['revision'] as num?)?.toInt() != revision(last) ||
               !_sameQueuedSnapshot(latest, local)) {
             continue;
           }
@@ -2277,16 +2681,23 @@ class SupabaseSyncService {
           combined.remove('baseData');
           final firstPayload = payloads[first.id]!;
           if (first.operation.toUpperCase() == 'UPDATE' &&
-              firstPayload['_base'] is! Map && firstPayload['baseData'] is! Map) {
+              firstPayload['_base'] is! Map &&
+              firstPayload['baseData'] is! Map) {
             continue;
           }
-          if (firstPayload['_base'] is Map) combined['_base'] = firstPayload['_base'];
-          if (firstPayload['baseData'] is Map) combined['baseData'] = firstPayload['baseData'];
-          await (db.update(db.syncQueue)..where((t) => t.id.equals(first.id))).write(
+          if (firstPayload['_base'] is Map)
+            combined['_base'] = firstPayload['_base'];
+          if (firstPayload['baseData'] is Map)
+            combined['baseData'] = firstPayload['baseData'];
+          await (db.update(
+            db.syncQueue,
+          )..where((t) => t.id.equals(first.id))).write(
             SyncQueueCompanion(payload: drift.Value(jsonEncode(combined))),
           );
           for (final superseded in operations.skip(1)) {
-            await (db.delete(db.syncQueue)..where((t) => t.id.equals(superseded.id))).go();
+            await (db.delete(
+              db.syncQueue,
+            )..where((t) => t.id.equals(superseded.id))).go();
           }
         } on FormatException {
           // Dados antigos ou incompletos não são consolidados automaticamente.
@@ -2310,182 +2721,205 @@ class SupabaseSyncService {
     try {
       var shouldDownloadMedia = false;
       final applied = await db.transaction(() async {
-      final localMap = await _getLocalMap(table, id);
-      final unresolved = (await (db.select(db.syncQueue)..where(
-        (t) => t.entityId.equals(id) &
-            (t.status.equals('pending') | t.status.equals('in_progress') |
-             t.status.equals('conflict') | t.status.equals('failed')),
-      )).get()).where((op) => mapEntityToRemoteTable(op.entityType) == table).toList()
-        ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+        final localMap = await _getLocalMap(table, id);
+        final unresolved =
+            (await (db.select(db.syncQueue)..where(
+                      (t) =>
+                          t.entityId.equals(id) &
+                          (t.status.equals('pending') |
+                              t.status.equals('in_progress') |
+                              t.status.equals('conflict') |
+                              t.status.equals('failed')),
+                    ))
+                    .get())
+                .where((op) => mapEntityToRemoteTable(op.entityType) == table)
+                .toList()
+              ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
 
-      // Não sobrescreva edições enquanto há divergências não resolvidas.
-      if (unresolved.any((op) => op.status == 'conflict' || op.status == 'failed')) {
-        errors.add('Há operações não resolvidas em $table ($id).');
-        _setStatus(SyncStatus.conflict);
-        return false;
-      }
-      if (unresolved.length > 1) {
-        final message = 'Múltiplas alterações pendentes em $table ($id) exigem resolução.';
-        errors.add(message);
-        // Preserve todas as operações: resolvê-las individualmente como
-        // conflitos poderia substituir alterações locais mais recentes.
-        return false;
-      }
-      final pendingOp = unresolved.isEmpty ? null : unresolved.first;
-
-      // Uma exclusão definitiva local não pode ser desfeita pelo pull.
-      if (localMap == null && pendingOp?.operation.toUpperCase() == 'HARD_DELETE') {
-        return true;
-      }
-      if (localMap == null) {
-        if (pendingOp != null) {
-          errors.add('Registro local ausente com alteração pendente em $table ($id).');
+        // Não sobrescreva edições enquanto há divergências não resolvidas.
+        if (unresolved.any(
+          (op) => op.status == 'conflict' || op.status == 'failed',
+        )) {
+          errors.add('Há operações não resolvidas em $table ($id).');
+          _setStatus(SyncStatus.conflict);
           return false;
         }
-        await _insertLocalEntry(table, normalized);
-        shouldDownloadMedia = true;
-        return true;
-      }
+        if (unresolved.length > 1) {
+          final message =
+              'Múltiplas alterações pendentes em $table ($id) exigem resolução.';
+          errors.add(message);
+          // Preserve todas as operações: resolvê-las individualmente como
+          // conflitos poderia substituir alterações locais mais recentes.
+          return false;
+        }
+        final pendingOp = unresolved.isEmpty ? null : unresolved.first;
 
-      if (pendingOp != null) {
-        final isRemoteTombstone =
-            remoteRecord['_tombstone'] == true ||
-            normalized['deletedAt'] != null ||
-            normalized['deleted_at'] != null;
-        final pendingOpName = pendingOp.operation.toUpperCase();
-        if (isRemoteTombstone) {
-          if (pendingOpName == 'DELETE' || pendingOpName == 'HARD_DELETE') {
+        // Uma exclusão definitiva local não pode ser desfeita pelo pull.
+        if (localMap == null &&
+            pendingOp?.operation.toUpperCase() == 'HARD_DELETE') {
+          return true;
+        }
+        if (localMap == null) {
+          if (pendingOp != null) {
+            errors.add(
+              'Registro local ausente com alteração pendente em $table ($id).',
+            );
+            return false;
+          }
+          await _insertLocalEntry(table, normalized);
+          shouldDownloadMedia = true;
+          return true;
+        }
+
+        if (pendingOp != null) {
+          final isRemoteTombstone =
+              remoteRecord['_tombstone'] == true ||
+              normalized['deletedAt'] != null ||
+              normalized['deleted_at'] != null;
+          final pendingOpName = pendingOp.operation.toUpperCase();
+          if (isRemoteTombstone) {
+            if (pendingOpName == 'DELETE' || pendingOpName == 'HARD_DELETE') {
+              await _softDeleteLocalEntry(
+                table,
+                id,
+                normalized['deletedAt'] ?? normalized['deleted_at'],
+              );
+              return true;
+            }
+            final message =
+                'Conflito delete-vs-update em $table ($id): registro excluído remotamente enquanto possui alteração local pendente.';
+            errors.add(message);
+            await repository.markSyncOperationConflict(
+              pendingOp.id,
+              message,
+              remoteData: normalized,
+            );
+            _setStatus(SyncStatus.conflict);
+            return false;
+          }
+          if (pendingOpName == 'INSERT') {
+            if (_recordsDifferNonAudit(localMap, normalized)) {
+              final message =
+                  'Inserção local coincide com registro remoto diferente em $table ($id).';
+              errors.add(message);
+              await repository.markSyncOperationConflict(
+                pendingOp.id,
+                message,
+                remoteData: normalized,
+              );
+              _setStatus(SyncStatus.conflict);
+              return false;
+            }
+            return true;
+          }
+          final rawPayload =
+              jsonDecode(pendingOp.payload) as Map<String, dynamic>;
+          final Map<String, dynamic> baseData;
+          final Map<String, dynamic> localData;
+
+          if (rawPayload.containsKey('_base') && rawPayload['_base'] is Map) {
+            baseData = normalizeRemotePayload(
+              rawPayload['_base'] as Map<String, dynamic>,
+            );
+            localData = localMap;
+          } else if (rawPayload.containsKey('baseData') &&
+              rawPayload['baseData'] is Map) {
+            baseData = normalizeRemotePayload(
+              rawPayload['baseData'] as Map<String, dynamic>,
+            );
+            localData = localMap;
+          } else {
+            localData = normalizeRemotePayload(rawPayload);
+            baseData = Map<String, dynamic>.from(localMap);
+          }
+
+          final mergeResult = SyncEngine.mergeEntities(
+            entityType: table,
+            entityId: id,
+            localData: localData,
+            remoteData: normalized,
+            baseData: baseData,
+          );
+
+          if (mergeResult.hasConflict) {
+            final conflictFields = mergeResult.conflicts
+                .map((c) => c.fieldName)
+                .join(', ');
+            final errMsg =
+                'Conflito detectado em $table ($id) nos campos: $conflictFields';
+            errors.add(errMsg);
+            await repository.markSyncOperationConflict(
+              pendingOp.id,
+              errMsg,
+              remoteData: normalized,
+              conflicts: mergeResult.conflicts
+                  .map(
+                    (c) => {
+                      'field': c.fieldName,
+                      'local': c.localValue,
+                      'remote': c.remoteValue,
+                    },
+                  )
+                  .toList(),
+            );
+            _setStatus(SyncStatus.conflict);
+            return false;
+          } else {
+            final merged = Map<String, dynamic>.from(mergeResult.mergedData);
+            if (rawPayload['_base'] is Map || rawPayload['baseData'] is Map) {
+              final remoteRev = (normalized['revision'] as num?)?.toInt() ?? 1;
+              final localRev = (localMap['revision'] as num?)?.toInt() ?? 1;
+              merged['revision'] = max(remoteRev, localRev) + 1;
+              merged['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+            }
+            await db.transaction(() async {
+              await _updateLocalEntry(table, merged);
+              final queued = Map<String, dynamic>.from(merged);
+              if (rawPayload['_base'] is Map || rawPayload['baseData'] is Map) {
+                queued['_base'] = normalized;
+              }
+              await (db.update(
+                db.syncQueue,
+              )..where((t) => t.id.equals(pendingOp.id))).write(
+                SyncQueueCompanion(payload: drift.Value(jsonEncode(queued))),
+              );
+            });
+            return true;
+          }
+        } else {
+          final isRemoteDeleted =
+              normalized['deletedAt'] != null ||
+              normalized['deleted_at'] != null;
+          if (isRemoteDeleted) {
             await _softDeleteLocalEntry(
               table,
               id,
               normalized['deletedAt'] ?? normalized['deleted_at'],
             );
             return true;
-          }
-          final message =
-              'Conflito delete-vs-update em $table ($id): registro excluído remotamente enquanto possui alteração local pendente.';
-          errors.add(message);
-          await repository.markSyncOperationConflict(
-            pendingOp.id,
-            message,
-            remoteData: normalized,
-          );
-          _setStatus(SyncStatus.conflict);
-          return false;
-        }
-        if (pendingOpName == 'INSERT') {
-          if (_recordsDifferNonAudit(localMap, normalized)) {
-            final message = 'Inserção local coincide com registro remoto diferente em $table ($id).';
-            errors.add(message);
-            await repository.markSyncOperationConflict(pendingOp.id, message, remoteData: normalized);
-            _setStatus(SyncStatus.conflict);
-            return false;
-          }
-          return true;
-        }
-        final rawPayload =
-            jsonDecode(pendingOp.payload) as Map<String, dynamic>;
-        final Map<String, dynamic> baseData;
-        final Map<String, dynamic> localData;
+          } else {
+            final localUpdatedAtStr = localMap['updatedAt']?.toString();
+            final remoteUpdatedAtStr =
+                normalized['updatedAt']?.toString() ??
+                normalized['updated_at']?.toString();
+            final localRev = localMap['revision'] as int? ?? 1;
+            final remoteRev = normalized['revision'] as int? ?? 1;
 
-        if (rawPayload.containsKey('_base') && rawPayload['_base'] is Map) {
-          baseData = normalizeRemotePayload(
-            rawPayload['_base'] as Map<String, dynamic>,
-          );
-          localData = localMap;
-        } else if (rawPayload.containsKey('baseData') &&
-            rawPayload['baseData'] is Map) {
-          baseData = normalizeRemotePayload(
-            rawPayload['baseData'] as Map<String, dynamic>,
-          );
-          localData = localMap;
-        } else {
-          localData = normalizeRemotePayload(rawPayload);
-          baseData = Map<String, dynamic>.from(localMap);
-        }
+            DateTime? localUpdated = SyncTimestamp.parse(localUpdatedAtStr);
+            DateTime? remoteUpdated = SyncTimestamp.parse(remoteUpdatedAtStr);
 
-        final mergeResult = SyncEngine.mergeEntities(
-          entityType: table,
-          entityId: id,
-          localData: localData,
-          remoteData: normalized,
-          baseData: baseData,
-        );
+            final isRemoteNewer = remoteUpdated != null && localUpdated != null
+                ? (remoteUpdated.isAfter(localUpdated) ||
+                      remoteUpdated.isAtSameMomentAs(localUpdated))
+                : remoteRev >= localRev;
 
-        if (mergeResult.hasConflict) {
-          final conflictFields = mergeResult.conflicts
-              .map((c) => c.fieldName)
-              .join(', ');
-          final errMsg =
-              'Conflito detectado em $table ($id) nos campos: $conflictFields';
-          errors.add(errMsg);
-          await repository.markSyncOperationConflict(
-            pendingOp.id,
-            errMsg,
-            remoteData: normalized,
-            conflicts: mergeResult.conflicts
-                .map((c) => {
-                      'field': c.fieldName,
-                      'local': c.localValue,
-                      'remote': c.remoteValue,
-                    })
-                .toList(),
-          );
-          _setStatus(SyncStatus.conflict);
-          return false;
-        } else {
-          final merged = Map<String, dynamic>.from(mergeResult.mergedData);
-          if (rawPayload['_base'] is Map || rawPayload['baseData'] is Map) {
-            final remoteRev = (normalized['revision'] as num?)?.toInt() ?? 1;
-            final localRev = (localMap['revision'] as num?)?.toInt() ?? 1;
-            merged['revision'] = max(remoteRev, localRev) + 1;
-            merged['updatedAt'] = DateTime.now().toUtc().toIso8601String();
-          }
-          await db.transaction(() async {
-            await _updateLocalEntry(table, merged);
-            final queued = Map<String, dynamic>.from(merged);
-            if (rawPayload['_base'] is Map || rawPayload['baseData'] is Map) {
-              queued['_base'] = normalized;
+            if (isRemoteNewer) {
+              await _updateLocalEntry(table, normalized);
+              shouldDownloadMedia = true;
             }
-            await (db.update(db.syncQueue)..where((t) => t.id.equals(pendingOp.id))).write(
-              SyncQueueCompanion(payload: drift.Value(jsonEncode(queued))),
-            );
-          });
-          return true;
-        }
-      } else {
-        final isRemoteDeleted =
-            normalized['deletedAt'] != null || normalized['deleted_at'] != null;
-        if (isRemoteDeleted) {
-          await _softDeleteLocalEntry(
-            table,
-            id,
-            normalized['deletedAt'] ?? normalized['deleted_at'],
-          );
-          return true;
-        } else {
-          final localUpdatedAtStr = localMap['updatedAt']?.toString();
-          final remoteUpdatedAtStr =
-              normalized['updatedAt']?.toString() ??
-              normalized['updated_at']?.toString();
-          final localRev = localMap['revision'] as int? ?? 1;
-          final remoteRev = normalized['revision'] as int? ?? 1;
-
-          DateTime? localUpdated = SyncTimestamp.parse(localUpdatedAtStr);
-          DateTime? remoteUpdated = SyncTimestamp.parse(remoteUpdatedAtStr);
-
-          final isRemoteNewer = remoteUpdated != null && localUpdated != null
-              ? (remoteUpdated.isAfter(localUpdated) ||
-                    remoteUpdated.isAtSameMomentAs(localUpdated))
-              : remoteRev >= localRev;
-
-          if (isRemoteNewer) {
-            await _updateLocalEntry(table, normalized);
-            shouldDownloadMedia = true;
+            return true;
           }
-          return true;
         }
-      }
       });
       if (applied && shouldDownloadMedia && client != null) {
         if (table == 'voice_notes') {
@@ -2515,7 +2949,10 @@ class SupabaseSyncService {
   // quando acionados diretamente pela interface além do ciclo automático.
   Future<T> _serializeSyncOperation<T>(Future<T> Function() operation) {
     final result = _operationsTail.then((_) => operation());
-    _operationsTail = result.then<void>((_) {}, onError: (Object error, StackTrace stack) {});
+    _operationsTail = result.then<void>(
+      (_) {},
+      onError: (Object error, StackTrace stack) {},
+    );
     return result;
   }
 
@@ -2528,8 +2965,10 @@ class SupabaseSyncService {
     final pullResult = await fetchRemoteChanges();
     // Uma falha no pull impede o push: sem a versão remota não é seguro
     // decidir se uma edição local pode ser enviada.
-    if (!isConfigured || pullResult.failureCount > 0 ||
-        pullResult.conflictCount > 0 || pullResult.errors.isNotEmpty) {
+    if (!isConfigured ||
+        pullResult.failureCount > 0 ||
+        pullResult.conflictCount > 0 ||
+        pullResult.errors.isNotEmpty) {
       return pullResult;
     }
     final pushResult = await processQueue();
@@ -2566,7 +3005,11 @@ class SupabaseSyncService {
     try {
       client = clientOverride ?? Supabase.instance.client;
     } catch (e, st) {
-      AppLogger.warning('Cliente Supabase indisponível durante fetchRemoteChanges', e, st);
+      AppLogger.warning(
+        'Cliente Supabase indisponível durante fetchRemoteChanges',
+        e,
+        st,
+      );
       return const SyncProcessResult(
         totalProcessed: 0,
         successCount: 0,
@@ -2631,10 +3074,14 @@ class SupabaseSyncService {
             final map = rawItem as Map<String, dynamic>;
             final updatedAtRaw = map['updated_at'] ?? map['updatedAt'];
             final dt = SyncTimestamp.parse(updatedAtRaw);
-            if (dt == null || map['id'] == null || map['id'].toString().isEmpty) {
+            if (dt == null ||
+                map['id'] == null ||
+                map['id'].toString().isEmpty) {
               tableHadFailure = true;
               failureCount++;
-              errors.add('Registro remoto em $table sem ID ou updated_at válido.');
+              errors.add(
+                'Registro remoto em $table sem ID ou updated_at válido.',
+              );
               continue;
             }
 
@@ -2647,6 +3094,18 @@ class SupabaseSyncService {
 
             if (applied) {
               successCount++;
+              if (table == 'appointments' && map['id'] != null) {
+                try {
+                  await AppointmentDomainConflictDetector.detectAndRecordOverlaps(
+                    db,
+                    appointmentId: map['id'].toString(),
+                  );
+                } catch (e) {
+                  AppLogger.warning(
+                    'Falha ao verificar conflito de domínio de agenda para ${map['id']}: $e',
+                  );
+                }
+              }
               if (newestUpdatedAt == null || dt.isAfter(newestUpdatedAt)) {
                 newestUpdatedAt = dt;
               }
@@ -2662,7 +3121,9 @@ class SupabaseSyncService {
 
           if (rows.length < pageSize) break;
           final last = rows.last as Map<String, dynamic>;
-          final lastTimestamp = SyncTimestamp.parse(last['updated_at'] ?? last['updatedAt']);
+          final lastTimestamp = SyncTimestamp.parse(
+            last['updated_at'] ?? last['updatedAt'],
+          );
           final lastId = last['id']?.toString();
           if (lastTimestamp == null || lastId == null || lastId.isEmpty) {
             throw StateError('Página de $table sem timestamp ou ID válido.');
@@ -2728,17 +3189,28 @@ class SupabaseSyncService {
       if (gate.blockedResult != null) return false;
       activeOwnerId = gate.ownerId;
     }
-    final op = await (db.select(db.syncQueue)
-          ..where((t) => t.id.equals(syncQueueId)))
-        .getSingleOrNull();
+    final op = await (db.select(
+      db.syncQueue,
+    )..where((t) => t.id.equals(syncQueueId))).getSingleOrNull();
     if (op == null) return false;
 
     final tableName = mapEntityToRemoteTable(op.entityType);
-    final otherOperations = await (db.select(db.syncQueue)..where((t) =>
-      t.entityId.equals(op.entityId) & t.id.isNotValue(op.id) &
-      t.status.isIn(['pending', 'in_progress', 'failed', 'conflict'])
-    )).get();
-    if (otherOperations.any((item) => mapEntityToRemoteTable(item.entityType) == tableName)) {
+    final otherOperations =
+        await (db.select(db.syncQueue)..where(
+              (t) =>
+                  t.entityId.equals(op.entityId) &
+                  t.id.isNotValue(op.id) &
+                  t.status.isIn([
+                    'pending',
+                    'in_progress',
+                    'failed',
+                    'conflict',
+                  ]),
+            ))
+            .get();
+    if (otherOperations.any(
+      (item) => mapEntityToRemoteTable(item.entityType) == tableName,
+    )) {
       return false;
     }
     Map<String, dynamic>? remoteMap;
@@ -2750,7 +3222,10 @@ class SupabaseSyncService {
         );
       }
     } catch (e, st) {
-      AppLogger.debug('Payload sem _remote JSON no conflito (${op.id}): $e', st);
+      AppLogger.debug(
+        'Payload sem _remote JSON no conflito (${op.id}): $e',
+        st,
+      );
     }
 
     EncryptedRemoteRecord? authoritativeE2eeRemote;
@@ -2872,13 +3347,19 @@ class SupabaseSyncService {
       if (pendingOps.isEmpty) {
         final unresolved = await repository.getUnresolvedSyncOperations();
         if (unresolved.isNotEmpty) {
-          final conflicts = unresolved.where((op) => op.status == 'conflict').length;
+          final conflicts = unresolved
+              .where((op) => op.status == 'conflict')
+              .length;
           final failures = unresolved.length - conflicts;
           _setStatus(conflicts > 0 ? SyncStatus.conflict : SyncStatus.error);
           return SyncProcessResult(
-            totalProcessed: 0, successCount: 0, failureCount: failures,
+            totalProcessed: 0,
+            successCount: 0,
+            failureCount: failures,
             conflictCount: conflicts,
-            errors: ['Há ${unresolved.length} operações não resolvidas na fila.'],
+            errors: [
+              'Há ${unresolved.length} operações não resolvidas na fila.',
+            ],
             message: 'Existem alterações locais pendentes de resolução.',
           );
         }
@@ -2897,7 +3378,9 @@ class SupabaseSyncService {
         successCount: 0,
         failureCount: 0,
         conflictCount: 0,
-        errors: const ['Supabase não configurado; alterações ainda não enviadas.'],
+        errors: const [
+          'Supabase não configurado; alterações ainda não enviadas.',
+        ],
         message:
             'Supabase não configurado. ${pendingOps.length} registros mantidos salvos localmente no SQLite.',
       );
@@ -2907,7 +3390,11 @@ class SupabaseSyncService {
     try {
       client = clientOverride ?? Supabase.instance.client;
     } catch (e, st) {
-      AppLogger.warning('Cliente Supabase não inicializado no processQueue', e, st);
+      AppLogger.warning(
+        'Cliente Supabase não inicializado no processQueue',
+        e,
+        st,
+      );
       _setStatus(SyncStatus.waitingConnection);
       final pendingOps = await repository.getPendingSyncOperations();
       return SyncProcessResult(
@@ -2931,11 +3418,15 @@ class SupabaseSyncService {
     if (pendingOps.isEmpty) {
       final unresolved = await repository.getUnresolvedSyncOperations();
       if (unresolved.isNotEmpty) {
-        final conflicts = unresolved.where((op) => op.status == 'conflict').length;
+        final conflicts = unresolved
+            .where((op) => op.status == 'conflict')
+            .length;
         final failures = unresolved.length - conflicts;
         _setStatus(conflicts > 0 ? SyncStatus.conflict : SyncStatus.error);
         return SyncProcessResult(
-          totalProcessed: 0, successCount: 0, failureCount: failures,
+          totalProcessed: 0,
+          successCount: 0,
+          failureCount: failures,
           conflictCount: conflicts,
           errors: ['Há ${unresolved.length} operações não resolvidas na fila.'],
           message: 'Existem alterações locais pendentes de resolução.',
@@ -2984,15 +3475,29 @@ class SupabaseSyncService {
 
       try {
         final tableName = mapEntityToRemoteTable(op.entityType);
-        final related = (await (db.select(db.syncQueue)..where(
-          (t) => t.entityId.equals(op.entityId) &
-              (t.status.equals('pending') | t.status.equals('in_progress') |
-               t.status.equals('conflict') | t.status.equals('failed')),
-        )).get()).where((item) => mapEntityToRemoteTable(item.entityType) == tableName).toList();
-        if (related.length > 1 || related.any((item) =>
-            item.status == 'conflict' || item.status == 'failed')) {
+        final related =
+            (await (db.select(db.syncQueue)..where(
+                      (t) =>
+                          t.entityId.equals(op.entityId) &
+                          (t.status.equals('pending') |
+                              t.status.equals('in_progress') |
+                              t.status.equals('conflict') |
+                              t.status.equals('failed')),
+                    ))
+                    .get())
+                .where(
+                  (item) =>
+                      mapEntityToRemoteTable(item.entityType) == tableName,
+                )
+                .toList();
+        if (related.length > 1 ||
+            related.any(
+              (item) => item.status == 'conflict' || item.status == 'failed',
+            )) {
           failure++;
-          errors.add('Operações não resolvidas para $tableName (${op.entityId}); envio suspenso para preservar os dados.');
+          errors.add(
+            'Operações não resolvidas para $tableName (${op.entityId}); envio suspenso para preservar os dados.',
+          );
           continue;
         }
         final Map<String, dynamic> rawPayload =
@@ -3042,8 +3547,8 @@ class SupabaseSyncService {
               cleanPayload['updatedAt'] ?? cleanPayload['updated_at'],
             );
 
-            final baseData = rawPayload.containsKey('_base') &&
-                    rawPayload['_base'] is Map
+            final baseData =
+                rawPayload.containsKey('_base') && rawPayload['_base'] is Map
                 ? SyncTimestamp.normalizeMapDates(
                     normalizeRemotePayload(
                       rawPayload['_base'] as Map<String, dynamic>,
@@ -3079,26 +3584,37 @@ class SupabaseSyncService {
                   err,
                   remoteData: normalizedRemote,
                   conflicts: mergeResult.conflicts
-                      .map((c) => {
-                            'field': c.fieldName,
-                            'local': c.localValue,
-                            'remote': c.remoteValue,
-                          })
+                      .map(
+                        (c) => {
+                          'field': c.fieldName,
+                          'local': c.localValue,
+                          'remote': c.remoteValue,
+                        },
+                      )
                       .toList(),
                 );
                 continue;
               } else {
                 cleanPayload.addAll(mergeResult.mergedData);
                 cleanPayload['revision'] = remoteRev + 1;
-                cleanPayload['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+                cleanPayload['updatedAt'] = DateTime.now()
+                    .toUtc()
+                    .toIso8601String();
                 await db.transaction(() async {
-                  final currentOp = await (db.select(db.syncQueue)
-                    ..where((t) => t.id.equals(op.id))).getSingleOrNull();
-                  final currentLocal = await _getLocalMap(tableName, op.entityId);
-                  if (currentOp == null || currentOp.status != 'pending' ||
+                  final currentOp = await (db.select(
+                    db.syncQueue,
+                  )..where((t) => t.id.equals(op.id))).getSingleOrNull();
+                  final currentLocal = await _getLocalMap(
+                    tableName,
+                    op.entityId,
+                  );
+                  if (currentOp == null ||
+                      currentOp.status != 'pending' ||
                       currentOp.payload != op.payload ||
                       jsonEncode(currentLocal) != jsonEncode(localRowMap)) {
-                    throw StateError('Registro local mudou durante a sincronização; tente novamente.');
+                    throw StateError(
+                      'Registro local mudou durante a sincronização; tente novamente.',
+                    );
                   }
                   await _updateLocalEntry(tableName, cleanPayload);
                 });
@@ -3110,7 +3626,8 @@ class SupabaseSyncService {
           // Em produção (! _legacyTestMode), _processQueue já delegou a _processQueueE2ee.
           final remotePayload = toRemotePayload(op.entityType, cleanPayload);
           final currentUserId =
-              client.auth.currentUser?.id ?? client.auth.currentSession?.user.id;
+              client.auth.currentUser?.id ??
+              client.auth.currentSession?.user.id;
           if (currentUserId != null && currentUserId.isNotEmpty) {
             remotePayload['owner_id'] = currentUserId;
           }
@@ -3143,21 +3660,33 @@ class SupabaseSyncService {
             },
           );
           if (rpcRes is! Map<String, dynamic>) {
-            throw StateError('Resposta inválida da RPC sync_upsert_if_unchanged.');
+            throw StateError(
+              'Resposta inválida da RPC sync_upsert_if_unchanged.',
+            );
           }
-          if (rpcRes['conflict'] == true || rpcRes['code']?.toString() == '23505') {
+          if (rpcRes['conflict'] == true ||
+              rpcRes['code']?.toString() == '23505') {
             conflicts++;
             _setStatus(SyncStatus.conflict);
             final serverRec = rpcRes['server_record'] is Map<String, dynamic>
-                ? normalizeRemotePayload(rpcRes['server_record'] as Map<String, dynamic>)
+                ? normalizeRemotePayload(
+                    rpcRes['server_record'] as Map<String, dynamic>,
+                  )
                 : null;
-            final err = 'Conflito otimista detectado pelo servidor em ${op.entityType} (${op.entityId})';
+            final err =
+                'Conflito otimista detectado pelo servidor em ${op.entityType} (${op.entityId})';
             errors.add(err);
-            await repository.markSyncOperationConflict(op.id, err, remoteData: serverRec);
+            await repository.markSyncOperationConflict(
+              op.id,
+              err,
+              remoteData: serverRec,
+            );
             continue;
           }
           if (rpcRes['success'] != true) {
-            throw StateError('RPC sync_upsert_if_unchanged não confirmou a gravação.');
+            throw StateError(
+              'RPC sync_upsert_if_unchanged não confirmou a gravação.',
+            );
           }
 
           if (tableName == 'voice_notes') {
@@ -3174,7 +3703,8 @@ class SupabaseSyncService {
               );
               continue;
             }
-          } else if (tableName == 'ticuna_words' || tableName == 'ticuna_phrases') {
+          } else if (tableName == 'ticuna_words' ||
+              tableName == 'ticuna_phrases') {
             final audioOk = await _uploadTicunaAudio(
               op.entityId,
               op.entityType,
@@ -3206,61 +3736,100 @@ class SupabaseSyncService {
             }
           }
 
-          final acknowledged = await (db.update(db.syncQueue)..where((t) =>
-              t.id.equals(op.id) & t.payload.equals(op.payload) &
-              t.status.isIn(['pending', 'in_progress']))).write(
-            const SyncQueueCompanion(status: drift.Value('synced')),
-          );
+          final acknowledged =
+              await (db.update(db.syncQueue)..where(
+                    (t) =>
+                        t.id.equals(op.id) &
+                        t.payload.equals(op.payload) &
+                        t.status.isIn(['pending', 'in_progress']),
+                  ))
+                  .write(
+                    const SyncQueueCompanion(status: drift.Value('synced')),
+                  );
           if (acknowledged == 0) {
             failure++;
-            errors.add('A operação ${op.id} mudou durante o envio e permanece pendente.');
+            errors.add(
+              'A operação ${op.id} mudou durante o envio e permanece pendente.',
+            );
           } else {
             success++;
           }
         } else if (operation == 'DELETE') {
           // Sem base verificável, apagar poderia ocultar alteração feita em outro aparelho.
-          final rows = await client.from(tableName).select().eq('id', op.entityId).limit(1);
+          final rows = await client
+              .from(tableName)
+              .select()
+              .eq('id', op.entityId)
+              .limit(1);
           if (rows.isNotEmpty) {
             final remote = Map<String, dynamic>.from(rows.first);
             final base = rawPayload['_base'];
-            final baseRevision = base is Map ? (base['revision'] as num?)?.toInt() : null;
+            final baseRevision = base is Map
+                ? (base['revision'] as num?)?.toInt()
+                : null;
             final remoteRevision = (remote['revision'] as num?)?.toInt();
-            final baseUpdated = base is Map ? SyncTimestamp.parse(base['updatedAt'] ?? base['updated_at']) : null;
+            final baseUpdated = base is Map
+                ? SyncTimestamp.parse(base['updatedAt'] ?? base['updated_at'])
+                : null;
             final remoteUpdated = SyncTimestamp.parse(remote['updated_at']);
-            if (baseRevision == null || remoteRevision != baseRevision ||
-                baseUpdated == null || remoteUpdated == null ||
-                baseUpdated.millisecondsSinceEpoch ~/ 1000 != remoteUpdated.millisecondsSinceEpoch ~/ 1000) {
+            if (baseRevision == null ||
+                remoteRevision != baseRevision ||
+                baseUpdated == null ||
+                remoteUpdated == null ||
+                baseUpdated.millisecondsSinceEpoch ~/ 1000 !=
+                    remoteUpdated.millisecondsSinceEpoch ~/ 1000) {
               conflicts++;
-              final message = 'Exclusão suspensa: estado remoto não corresponde à base em $tableName (${op.entityId}).';
+              final message =
+                  'Exclusão suspensa: estado remoto não corresponde à base em $tableName (${op.entityId}).';
               errors.add(message);
-              await repository.markSyncOperationConflict(op.id, message,
-                  remoteData: normalizeRemotePayload(remote));
+              await repository.markSyncOperationConflict(
+                op.id,
+                message,
+                remoteData: normalizeRemotePayload(remote),
+              );
               continue;
             }
             final nowIso = DateTime.now().toUtc().toIso8601String();
-            final result = await client.rpc('sync_upsert_if_unchanged', params: {
-              'p_table': tableName,
-              'p_payload': {'id': op.entityId, 'deleted_at': nowIso,
-                'updated_at': nowIso, 'revision': (cleanPayload['revision'] as num?)?.toInt() ?? baseRevision + 1},
-              'p_expected_record': remote,
-            });
+            final result = await client.rpc(
+              'sync_upsert_if_unchanged',
+              params: {
+                'p_table': tableName,
+                'p_payload': {
+                  'id': op.entityId,
+                  'deleted_at': nowIso,
+                  'updated_at': nowIso,
+                  'revision':
+                      (cleanPayload['revision'] as num?)?.toInt() ??
+                      baseRevision + 1,
+                },
+                'p_expected_record': remote,
+              },
+            );
             if (result is! Map || result['success'] != true) {
               conflicts++;
-              final message = 'Exclusão suspensa: registro remoto mudou durante a operação em $tableName (${op.entityId}).';
+              final message =
+                  'Exclusão suspensa: registro remoto mudou durante a operação em $tableName (${op.entityId}).';
               errors.add(message);
               await repository.markSyncOperationConflict(op.id, message);
               continue;
             }
           }
           // A lixeira deve ser restaurável: não remover binários no soft delete.
-          final acknowledged = await (db.update(db.syncQueue)..where((t) =>
-              t.id.equals(op.id) & t.payload.equals(op.payload) &
-              t.status.isIn(['pending', 'in_progress']))).write(
-            const SyncQueueCompanion(status: drift.Value('synced')),
-          );
+          final acknowledged =
+              await (db.update(db.syncQueue)..where(
+                    (t) =>
+                        t.id.equals(op.id) &
+                        t.payload.equals(op.payload) &
+                        t.status.isIn(['pending', 'in_progress']),
+                  ))
+                  .write(
+                    const SyncQueueCompanion(status: drift.Value('synced')),
+                  );
           if (acknowledged == 0) {
             failure++;
-            errors.add('A operação ${op.id} mudou durante o envio e permanece pendente.');
+            errors.add(
+              'A operação ${op.id} mudou durante o envio e permanece pendente.',
+            );
           } else {
             success++;
           }
@@ -3269,14 +3838,19 @@ class SupabaseSyncService {
           // objetos de Storage não é atômico com PostgreSQL. Falhar fechado até
           // existir um protocolo recuperável com base e limpeza idempotente.
           conflicts++;
-          final message = 'Exclusão definitiva remota suspensa para proteger dados; requer revisão (${op.entityType}).';
+          final message =
+              'Exclusão definitiva remota suspensa para proteger dados; requer revisão (${op.entityType}).';
           errors.add(message);
           await repository.markSyncOperationConflict(op.id, message);
         } else {
           failure++;
           final message = 'Operação de sincronização desconhecida: $operation';
           errors.add(message);
-          await repository.markSyncOperationFailed(op.id, message, forceFailed: true);
+          await repository.markSyncOperationFailed(
+            op.id,
+            message,
+            forceFailed: true,
+          );
         }
       } on PostgrestException catch (e) {
         if (e.code == '23505' || e.code == '409') {
@@ -3304,7 +3878,9 @@ class SupabaseSyncService {
     final remaining = await repository.getUnresolvedSyncOperations();
     if (remaining.any((op) => op.status == 'conflict') || conflicts > 0) {
       _setStatus(SyncStatus.conflict);
-    } else if (failure > 0 || errors.isNotEmpty || remaining.any((op) => op.status == 'failed')) {
+    } else if (failure > 0 ||
+        errors.isNotEmpty ||
+        remaining.any((op) => op.status == 'failed')) {
       _setStatus(SyncStatus.error);
     } else if (remaining.isNotEmpty || deferred > 0) {
       _setStatus(SyncStatus.savedLocally);
@@ -3319,7 +3895,10 @@ class SupabaseSyncService {
     try {
       await repository.pruneOldSyncedOperations();
     } catch (e, st) {
-      AppLogger.debug('Falha ao limpar operações sincronizadas antigas: $e', st);
+      AppLogger.debug(
+        'Falha ao limpar operações sincronizadas antigas: $e',
+        st,
+      );
     }
 
     return SyncProcessResult(
@@ -3349,7 +3928,8 @@ class SupabaseSyncService {
         remoteUpdated.isAfter(localUpdated)) {
       return true;
     }
-    if (remoteRev == localRev && _recordsDifferNonAudit(localData, remoteData)) {
+    if (remoteRev == localRev &&
+        _recordsDifferNonAudit(localData, remoteData)) {
       return true;
     }
     return false;
@@ -3404,7 +3984,8 @@ class SupabaseSyncService {
   // Zero chamadas às 26 tabelas plaintext; zero upload/download plaintext.
   // =========================================================================
 
-  static String _e2eeCursorKey(String ownerId) => 'e2ee_last_server_seq_$ownerId';
+  static String _e2eeCursorKey(String ownerId) =>
+      'e2ee_last_server_seq_$ownerId';
 
   Future<EncryptedMediaTransfer?> _getEncryptedMediaTransfer(
     SupabaseClient client,
@@ -3428,7 +4009,9 @@ class SupabaseSyncService {
           db.voiceNotes,
         )..where((t) => t.id.equals(entityId))).getSingleOrNull();
         if (vn == null) {
-          errors.add('Nota de voz local ausente ($entityId); upload E2EE abortado.');
+          errors.add(
+            'Nota de voz local ausente ($entityId); upload E2EE abortado.',
+          );
           return false;
         }
         if (vn.audioFilePath != null && vn.audioFilePath!.isNotEmpty) {
@@ -3449,7 +4032,8 @@ class SupabaseSyncService {
       }
 
       if (tableName == 'ticuna_words' || tableName == 'ticuna_phrases') {
-        final audioPath = cleanPayload['audio_path']?.toString() ??
+        final audioPath =
+            cleanPayload['audio_path']?.toString() ??
             cleanPayload['audioPath']?.toString();
         if (audioPath != null &&
             audioPath.isNotEmpty &&
@@ -3457,7 +4041,9 @@ class SupabaseSyncService {
             !audioPath.startsWith('e2ee://')) {
           final bytes = await readMediaBytes(audioPath);
           if (bytes == null || bytes.isEmpty) {
-            errors.add('Arquivo de áudio Ticuna local ausente ou vazio ($entityId).');
+            errors.add(
+              'Arquivo de áudio Ticuna local ausente ou vazio ($entityId).',
+            );
             return false;
           }
           final mediaId = '${tableName}_$entityId';
@@ -3477,7 +4063,9 @@ class SupabaseSyncService {
           db.knowledgeDocuments,
         )..where((t) => t.id.equals(entityId))).getSingleOrNull();
         if (doc == null) {
-          errors.add('Documento local ausente ($entityId); upload E2EE abortado.');
+          errors.add(
+            'Documento local ausente ($entityId); upload E2EE abortado.',
+          );
           return false;
         }
         Uint8List? bytes;
@@ -3485,15 +4073,18 @@ class SupabaseSyncService {
           bytes = await readMediaBytes(doc.filePath);
         }
         if (bytes == null || bytes.isEmpty) {
-          final kv = await (db.select(
-            db.appKvStore,
-          )..where((t) => t.key.equals('doc_bytes_$entityId'))).getSingleOrNull();
+          final kv =
+              await (db.select(db.appKvStore)
+                    ..where((t) => t.key.equals('doc_bytes_$entityId')))
+                  .getSingleOrNull();
           if (kv != null && kv.value.isNotEmpty) {
             bytes = base64Decode(kv.value);
           }
         }
         if (bytes == null || bytes.isEmpty) {
-          errors.add('Binário do documento ausente ou vazio ($entityId); upload E2EE abortado.');
+          errors.add(
+            'Binário do documento ausente ou vazio ($entityId); upload E2EE abortado.',
+          );
           return false;
         }
         await transfer.uploadEncrypted(
@@ -3617,8 +4208,11 @@ class SupabaseSyncService {
           mimeType: 'audio/m4a',
         );
         if (localPath != null && localPath.isNotEmpty) {
-          await (db.update(db.voiceNotes)..where((t) => t.id.equals(entityId)))
-              .write(VoiceNotesCompanion(audioFilePath: drift.Value(localPath)));
+          await (db.update(
+            db.voiceNotes,
+          )..where((t) => t.id.equals(entityId))).write(
+            VoiceNotesCompanion(audioFilePath: drift.Value(localPath)),
+          );
         }
         await _clearPendingMediaDownload(tableName, entityId);
         return true;
@@ -3661,7 +4255,9 @@ class SupabaseSyncService {
           mediaId: entityId,
         );
         final baseDir = await _resolveBaseDocsDir();
-        final safeName = doc.fileName.isNotEmpty ? doc.fileName : '$entityId.pdf';
+        final safeName = doc.fileName.isNotEmpty
+            ? doc.fileName
+            : '$entityId.pdf';
         if (!kIsWeb && baseDir.isNotEmpty) {
           final localPath = await saveMediaBytes(
             baseDir: baseDir,
@@ -3670,9 +4266,11 @@ class SupabaseSyncService {
             bytes: bytes,
           );
           if (localPath != null && localPath.isNotEmpty) {
-            await (db.update(db.knowledgeDocuments)
-                  ..where((t) => t.id.equals(entityId)))
-                .write(KnowledgeDocumentsCompanion(filePath: drift.Value(localPath)));
+            await (db.update(
+              db.knowledgeDocuments,
+            )..where((t) => t.id.equals(entityId))).write(
+              KnowledgeDocumentsCompanion(filePath: drift.Value(localPath)),
+            );
           }
         }
         await _clearPendingMediaDownload(tableName, entityId);
@@ -3693,8 +4291,9 @@ class SupabaseSyncService {
             bytes: bytes,
           );
           if (localPath != null && localPath.isNotEmpty) {
-            await (db.update(db.personPhotos)..where((t) => t.id.equals(entityId)))
-                .write(
+            await (db.update(
+              db.personPhotos,
+            )..where((t) => t.id.equals(entityId))).write(
               PersonPhotosCompanion(
                 filePath: drift.Value(localPath),
                 imageData: const drift.Value(''),
@@ -3791,8 +4390,7 @@ class SupabaseSyncService {
       }
 
       // 2. Autentica/ordena lote em ordem pai-antes-de-filho (syncTables)
-      final orderedBatch =
-          <({EncryptedRemoteRecord remote, int tableOrder})>[];
+      final orderedBatch = <({EncryptedRemoteRecord remote, int tableOrder})>[];
       var batchHadFailure = fetchHadError;
 
       for (final remote in fetchedBatch) {
@@ -3845,8 +4443,9 @@ class SupabaseSyncService {
               recordMap['id'] ??= entityId;
               recordMap['revision'] = revision;
               if (recordMap['_tombstone'] == true) {
-                recordMap['deletedAt'] ??=
-                    DateTime.now().toUtc().toIso8601String();
+                recordMap['deletedAt'] ??= DateTime.now()
+                    .toUtc()
+                    .toIso8601String();
                 final localExisting = await _getLocalMap(table, entityId);
                 if (localExisting == null) return true;
                 return _applyRemoteRecord(
@@ -3874,6 +4473,18 @@ class SupabaseSyncService {
           );
           if (outcome == EncryptedApplyOutcome.applied) {
             successCount++;
+            if (appliedTable == 'appointments' && appliedId != null) {
+              try {
+                await AppointmentDomainConflictDetector.detectAndRecordOverlaps(
+                  db,
+                  appointmentId: appliedId!,
+                );
+              } catch (e) {
+                AppLogger.warning(
+                  'Falha ao verificar conflito de domínio de agenda para $appliedId: $e',
+                );
+              }
+            }
             if (hasEncryptedMediaRef &&
                 appliedTable != null &&
                 appliedId != null) {
@@ -3903,13 +4514,15 @@ class SupabaseSyncService {
 
       if (!batchHadFailure && highestBatchSeq > currentCursor) {
         currentCursor = highestBatchSeq;
-        await db.into(db.appKvStore).insertOnConflictUpdate(
-          AppKvStoreCompanion.insert(
-            key: cursorKey,
-            value: currentCursor.toString(),
-            updatedAt: drift.Value(DateTime.now()),
-          ),
-        );
+        await db
+            .into(db.appKvStore)
+            .insertOnConflictUpdate(
+              AppKvStoreCompanion.insert(
+                key: cursorKey,
+                value: currentCursor.toString(),
+                updatedAt: drift.Value(DateTime.now()),
+              ),
+            );
       }
     } catch (e) {
       failureCount++;
@@ -3959,7 +4572,9 @@ class SupabaseSyncService {
     if (pendingOps.isEmpty) {
       final unresolved = await repository.getUnresolvedSyncOperations();
       if (unresolved.isNotEmpty) {
-        final conflicts = unresolved.where((op) => op.status == 'conflict').length;
+        final conflicts = unresolved
+            .where((op) => op.status == 'conflict')
+            .length;
         final failures = unresolved.length - conflicts;
         _setStatus(conflicts > 0 ? SyncStatus.conflict : SyncStatus.error);
         return SyncProcessResult(
@@ -4013,18 +4628,21 @@ class SupabaseSyncService {
 
       try {
         final tableName = mapEntityToRemoteTable(op.entityType);
-        final related = (await (db.select(db.syncQueue)
-                  ..where(
-                    (t) =>
-                        t.entityId.equals(op.entityId) &
-                        (t.status.equals('pending') |
-                            t.status.equals('in_progress') |
-                            t.status.equals('conflict') |
-                            t.status.equals('failed')),
-                  ))
-                .get())
-            .where((item) => mapEntityToRemoteTable(item.entityType) == tableName)
-            .toList();
+        final related =
+            (await (db.select(db.syncQueue)..where(
+                      (t) =>
+                          t.entityId.equals(op.entityId) &
+                          (t.status.equals('pending') |
+                              t.status.equals('in_progress') |
+                              t.status.equals('conflict') |
+                              t.status.equals('failed')),
+                    ))
+                    .get())
+                .where(
+                  (item) =>
+                      mapEntityToRemoteTable(item.entityType) == tableName,
+                )
+                .toList();
         if (related.length > 1 ||
             related.any(
               (item) => item.status == 'conflict' || item.status == 'failed',
@@ -4117,14 +4735,16 @@ class SupabaseSyncService {
               revision: sealedWrite.result.revision!,
               envelope: sealedWrite.envelope,
             );
-            final ack = await (db.update(db.syncQueue)
-                  ..where(
-                    (t) =>
-                        t.id.equals(op.id) &
-                        t.payload.equals(op.payload) &
-                        t.status.isIn(['pending', 'in_progress']),
-                  ))
-                .write(const SyncQueueCompanion(status: drift.Value('synced')));
+            final ack =
+                await (db.update(db.syncQueue)..where(
+                      (t) =>
+                          t.id.equals(op.id) &
+                          t.payload.equals(op.payload) &
+                          t.status.isIn(['pending', 'in_progress']),
+                    ))
+                    .write(
+                      const SyncQueueCompanion(status: drift.Value('synced')),
+                    );
             if (ack == 0) {
               throw StateError(
                 'A operação ${op.id} mudou durante o envio E2EE e permanece pendente.',
@@ -4183,14 +4803,16 @@ class SupabaseSyncService {
               revision: sealedWrite.result.revision!,
               envelope: sealedWrite.envelope,
             );
-            final ack = await (db.update(db.syncQueue)
-                  ..where(
-                    (t) =>
-                        t.id.equals(op.id) &
-                        t.payload.equals(op.payload) &
-                        t.status.isIn(['pending', 'in_progress']),
-                  ))
-                .write(const SyncQueueCompanion(status: drift.Value('synced')));
+            final ack =
+                await (db.update(db.syncQueue)..where(
+                      (t) =>
+                          t.id.equals(op.id) &
+                          t.payload.equals(op.payload) &
+                          t.status.isIn(['pending', 'in_progress']),
+                    ))
+                    .write(
+                      const SyncQueueCompanion(status: drift.Value('synced')),
+                    );
             if (ack == 0) {
               throw StateError(
                 'A operação DELETE ${op.id} mudou durante o envio E2EE.',

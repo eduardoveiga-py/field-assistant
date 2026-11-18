@@ -31,6 +31,7 @@ jobs:
           node test/sql/experimental_encrypted_records_test.mjs
           node test/sql/experimental_recovery_vault_test.mjs
           node test/sql/production_e2ee_test.mjs
+          node test/sql/revoke_legacy_sync_upsert_test.mjs
 
   version_consistency:
     name: Check Version Consistency (pubspec / AppVersion / apps.json / Tag)
