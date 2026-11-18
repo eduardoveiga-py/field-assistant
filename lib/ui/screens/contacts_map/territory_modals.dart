@@ -1189,8 +1189,9 @@ extension _ContactsMapTerritoryModals on _ContactsMapScreenState {
                                 );
                               }
                             } finally {
-                              if (dialogCtx.mounted)
+                              if (dialogCtx.mounted) {
                                 setDialogState(() => isImporting = false);
+                              }
                             }
                           },
                   ),

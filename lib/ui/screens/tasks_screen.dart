@@ -120,8 +120,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen>
         final catMatch = p.category.toLowerCase().contains(q);
         final tags = _extractTags(p.metadata);
         final tagMatch = tags.any((tag) => tag.toLowerCase().contains(q));
-        if (!nameMatch && !objMatch && !descMatch && !catMatch && !tagMatch)
+        if (!nameMatch && !objMatch && !descMatch && !catMatch && !tagMatch) {
           return false;
+        }
       }
       if (_selectedCategory != 'todas' && p.category != _selectedCategory) {
         return false;
@@ -1315,8 +1316,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen>
                             const Duration(days: 365),
                           ),
                         );
-                        if (picked != null)
+                        if (picked != null) {
                           setModalState(() => dueDate = picked);
+                        }
                       },
                     ),
                     const SizedBox(height: 16),
@@ -1518,8 +1520,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen>
                             const Duration(days: 365),
                           ),
                         );
-                        if (picked != null)
+                        if (picked != null) {
                           setModalState(() => dueDate = picked);
+                        }
                       },
                     ),
                     const SizedBox(height: 16),
@@ -1694,8 +1697,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen>
                             const Duration(days: 730),
                           ),
                         );
-                        if (picked != null)
+                        if (picked != null) {
                           setModalState(() => targetDate = picked);
+                        }
                       },
                     ),
                     const SizedBox(height: 16),
@@ -1845,8 +1849,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen>
                             const Duration(days: 730),
                           ),
                         );
-                        if (picked != null)
+                        if (picked != null) {
                           setModalState(() => targetDate = picked);
+                        }
                       },
                     ),
                     const SizedBox(height: 16),

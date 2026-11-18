@@ -797,8 +797,9 @@ class _TileReader {
   void dispose() {
     if (isClosed) return;
     isClosed = true;
-    if (!_ready.isCompleted)
+    if (!_ready.isCompleted) {
       _ready.completeError(StateError('Leitor de mapas encerrado.'));
+    }
     for (final c in _pending.values) {
       if (!c.isCompleted) c.complete(null);
     }

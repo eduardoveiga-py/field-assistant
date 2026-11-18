@@ -36,8 +36,9 @@ class _TestJwImapClient extends JwImapClient {
     if (username == null ||
         username.trim().isEmpty ||
         password == null ||
-        password.trim().isEmpty)
+        password.trim().isEmpty) {
       return;
+    }
     yield remoteList;
   }
 }

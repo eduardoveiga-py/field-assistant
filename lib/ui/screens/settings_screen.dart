@@ -235,10 +235,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           if (easPassword != null) _exchangePasswordCtrl.text = easPassword;
           if (email != null) _jwEmailCtrl.text = email.value;
           if (pass != null) _jwPasswordCtrl.text = pass;
-          if (host != null && host.value.isNotEmpty)
+          if (host != null && host.value.isNotEmpty) {
             _jwHostCtrl.text = host.value;
-          if (port != null && port.value.isNotEmpty)
+          }
+          if (port != null && port.value.isNotEmpty) {
             _jwPortCtrl.text = port.value;
+          }
           if (smtpHost != null && smtpHost.value.isNotEmpty) {
             _jwSmtpHostCtrl.text = smtpHost.value;
           } else if (host != null && host.value.isNotEmpty) {
@@ -345,8 +347,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           ),
                         ],
                         onChanged: (val) {
-                          if (val != null)
+                          if (val != null) {
                             setDialogState(() => selectedType = val);
+                          }
                         },
                       ),
                       const SizedBox(height: 12),
@@ -408,8 +411,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                   context: context,
                                   initialTime: startTime,
                                 );
-                                if (t != null)
+                                if (t != null) {
                                   setDialogState(() => startTime = t);
+                                }
                               },
                             ),
                           ),
@@ -442,8 +446,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                     const Duration(days: 730),
                                   ),
                                 );
-                                if (d != null)
+                                if (d != null) {
                                   setDialogState(() => endDate = d);
+                                }
                               },
                             ),
                           ),
@@ -460,8 +465,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                   context: context,
                                   initialTime: endTime,
                                 );
-                                if (t != null)
+                                if (t != null) {
                                   setDialogState(() => endTime = t);
+                                }
                               },
                             ),
                           ),

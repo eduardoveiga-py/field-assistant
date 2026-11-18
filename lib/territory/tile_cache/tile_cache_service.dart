@@ -186,8 +186,9 @@ class TileCacheService {
         }
         return bytes;
       } finally {
-        if (identical(_offlineInFlight[key], future))
+        if (identical(_offlineInFlight[key], future)) {
           _offlineInFlight.remove(key);
+        }
       }
     })();
     _offlineInFlight[key] = future;
@@ -239,8 +240,9 @@ class TileCacheService {
             final mbtile = await MBTilesService.instance.getTile(z, x, y);
             if (mbtile != null && mbtile.isNotEmpty) {
               if (_cacheGeneration == generation) {
-                if (_memoryCache.length >= 600)
+                if (_memoryCache.length >= 600) {
                   _memoryCache.remove(_memoryCache.keys.first);
+                }
                 _memoryCache[key] = mbtile;
               }
               return mbtile;
@@ -257,8 +259,9 @@ class TileCacheService {
         // 2. Cache em disco / rede. Resultados antigos não alimentam cache novo.
         final res = await backend.getTile(z, x, y, s);
         if (res != null && res.isNotEmpty && _cacheGeneration == generation) {
-          if (_memoryCache.length >= 600)
+          if (_memoryCache.length >= 600) {
             _memoryCache.remove(_memoryCache.keys.first);
+          }
           _memoryCache[key] = res;
         }
         return res;

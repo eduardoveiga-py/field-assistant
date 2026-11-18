@@ -66,10 +66,11 @@ class ExchangeProtocolSession implements ExchangeSession {
        );
 
   static String _validateHost(String value) {
-    if (kIsWeb)
+    if (kIsWeb) {
       throw const ExchangeException(
         'Exchange experimental não está disponível no navegador.',
       );
+    }
     final host = value.trim().toLowerCase();
     final uri = Uri.tryParse('https://$host');
     if (uri == null ||
@@ -90,10 +91,11 @@ class ExchangeProtocolSession implements ExchangeSession {
   @override
   Future<List<eas.EasFolder>> mailFolders() async {
     final folders = await eas.FolderSyncCommand(syncKey: '0').execute(_client);
-    if (!folders.isSuccess)
+    if (!folders.isSuccess) {
       throw ExchangeException(
         'Exchange recusou a listagem de pastas (código ${folders.status}).',
       );
+    }
     final result = folders.addedFolders
         .where((f) => f.isMailFolder && f.serverId.isNotEmpty)
         .toList();
@@ -247,10 +249,11 @@ class ExchangeReadService {
                     );
                   }
                   for (final value in decoded['attachments'] as List) {
-                    if (value is! Map)
+                    if (value is! Map) {
                       throw const FormatException(
                         'Índice local de anexos inválido.',
                       );
+                    }
                     savedRefs.add(Map<String, dynamic>.from(value));
                   }
                 }

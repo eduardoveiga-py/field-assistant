@@ -64,8 +64,9 @@ extension _StudiesScreenDialogs on _StudiesScreenState {
                         ),
                       ],
                       onChanged: (val) {
-                        if (val != null)
+                        if (val != null) {
                           setDialogState(() => selectedReason = val);
+                        }
                       },
                     ),
                     const SizedBox(height: 12),

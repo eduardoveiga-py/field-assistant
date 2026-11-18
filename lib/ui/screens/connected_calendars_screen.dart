@@ -705,8 +705,9 @@ class _ConnectedCalendarsScreenState
                                     ))
                                   .go();
                             }
-                            if (mounted)
+                            if (mounted) {
                               setState(() => _readOnlyGoogleCalIds = ids);
+                            }
                           },
                         ),
                     ],

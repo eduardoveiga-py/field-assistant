@@ -46,96 +46,117 @@ extension _AppointmentsCalendarViews on _AppointmentsScreenState {
                   children: [
                     const Expanded(
                       child: Center(
-                        child: Text(
-                          'DOM',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 11,
-                            color: AppTheme.alertRed,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            'DOM',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 11,
+                              color: AppTheme.alertRed,
+                            ),
                           ),
                         ),
                       ),
                     ),
                     Expanded(
                       child: Center(
-                        child: Text(
-                          'SEG',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 11,
-                            color: isDark
-                                ? const Color(0xFFCBD5E1)
-                                : AppTheme.textMuted,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            'SEG',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 11,
+                              color: isDark
+                                  ? const Color(0xFFCBD5E1)
+                                  : AppTheme.textMuted,
+                            ),
                           ),
                         ),
                       ),
                     ),
                     Expanded(
                       child: Center(
-                        child: Text(
-                          'TER',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 11,
-                            color: isDark
-                                ? const Color(0xFFCBD5E1)
-                                : AppTheme.textMuted,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            'TER',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 11,
+                              color: isDark
+                                  ? const Color(0xFFCBD5E1)
+                                  : AppTheme.textMuted,
+                            ),
                           ),
                         ),
                       ),
                     ),
                     Expanded(
                       child: Center(
-                        child: Text(
-                          'QUA',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 11,
-                            color: isDark
-                                ? const Color(0xFFCBD5E1)
-                                : AppTheme.textMuted,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            'QUA',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 11,
+                              color: isDark
+                                  ? const Color(0xFFCBD5E1)
+                                  : AppTheme.textMuted,
+                            ),
                           ),
                         ),
                       ),
                     ),
                     Expanded(
                       child: Center(
-                        child: Text(
-                          'QUI',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 11,
-                            color: isDark
-                                ? const Color(0xFFCBD5E1)
-                                : AppTheme.textMuted,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            'QUI',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 11,
+                              color: isDark
+                                  ? const Color(0xFFCBD5E1)
+                                  : AppTheme.textMuted,
+                            ),
                           ),
                         ),
                       ),
                     ),
                     Expanded(
                       child: Center(
-                        child: Text(
-                          'SEX',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 11,
-                            color: isDark
-                                ? const Color(0xFFCBD5E1)
-                                : AppTheme.textMuted,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            'SEX',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 11,
+                              color: isDark
+                                  ? const Color(0xFFCBD5E1)
+                                  : AppTheme.textMuted,
+                            ),
                           ),
                         ),
                       ),
                     ),
                     Expanded(
                       child: Center(
-                        child: Text(
-                          'SÁB',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 11,
-                            color: isDark
-                                ? const Color(0xFF93C5FD)
-                                : AppTheme.primaryBlue,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            'SÁB',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 11,
+                              color: isDark
+                                  ? const Color(0xFF93C5FD)
+                                  : AppTheme.primaryBlue,
+                            ),
                           ),
                         ),
                       ),
@@ -213,57 +234,64 @@ extension _AppointmentsCalendarViews on _AppointmentsScreenState {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 4,
-                                  vertical: 1,
-                                ),
-                                decoration: isToday
-                                    ? BoxDecoration(
-                                        color: isDark
-                                            ? const Color(0xFF3B82F6)
-                                            : AppTheme.primaryBlue,
-                                        borderRadius: BorderRadius.circular(8),
-                                      )
-                                    : null,
-                                child: Text(
-                                  '$dayNumber',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: isSelected || isToday
-                                        ? FontWeight.bold
-                                        : FontWeight.w600,
-                                    color: isToday
-                                        ? Colors.white
-                                        : (index % 7 == 0
-                                              ? AppTheme.alertRed
-                                              : (isDark
-                                                    ? Colors.white
-                                                    : AppTheme.textDark)),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 4,
+                                    vertical: 1,
+                                  ),
+                                  decoration: isToday
+                                      ? BoxDecoration(
+                                          color: isDark
+                                              ? const Color(0xFF3B82F6)
+                                              : AppTheme.primaryBlue,
+                                          borderRadius: BorderRadius.circular(8),
+                                        )
+                                      : null,
+                                  child: Text(
+                                    '$dayNumber',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: isSelected || isToday
+                                          ? FontWeight.bold
+                                          : FontWeight.w600,
+                                      color: isToday
+                                          ? Colors.white
+                                          : (index % 7 == 0
+                                                ? AppTheme.alertRed
+                                                : (isDark
+                                                      ? Colors.white
+                                                      : AppTheme.textDark)),
+                                    ),
                                   ),
                                 ),
-                              ),
-                              if (isHoliday)
-                                const Icon(
-                                  Icons.celebration_outlined,
-                                  size: 12,
-                                  color: Color(0xFFB45309),
-                                )
-                              else if (dayAppts.length > 2)
-                                Text(
-                                  '+${dayAppts.length - 2}',
-                                  style: TextStyle(
-                                    fontSize: 8.5,
-                                    fontWeight: FontWeight.bold,
-                                    color: isDark
-                                        ? const Color(0xFF94A3B8)
-                                        : const Color(0xFF64748B),
+                                if (isHoliday) ...[
+                                  const SizedBox(width: 4),
+                                  const Icon(
+                                    Icons.celebration_outlined,
+                                    size: 12,
+                                    color: Color(0xFFB45309),
                                   ),
-                                ),
-                            ],
+                                ] else if (dayAppts.length > 2) ...[
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '+${dayAppts.length - 2}',
+                                    style: TextStyle(
+                                      fontSize: 8.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: isDark
+                                          ? const Color(0xFF94A3B8)
+                                          : const Color(0xFF64748B),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
                           ),
                           const SizedBox(height: 2),
                           for (final a in dayAppts.take(2)) ...[
@@ -478,27 +506,30 @@ extension _AppointmentsCalendarViews on _AppointmentsScreenState {
                                   color: color.withValues(alpha: 0.5),
                                 ),
                               ),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    AppDateUtils.formatTime(appt.startTime),
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12,
-                                      color: color,
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      AppDateUtils.formatTime(appt.startTime),
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                        color: color,
+                                      ),
                                     ),
-                                  ),
-                                  Text(
-                                    '${appt.durationMinutes}m',
-                                    style: TextStyle(
-                                      fontSize: 9,
-                                      color: isDark
-                                          ? const Color(0xFFCBD5E1)
-                                          : AppTheme.textMuted,
+                                    Text(
+                                      '${appt.durationMinutes}m',
+                                      style: TextStyle(
+                                        fontSize: 9,
+                                        color: isDark
+                                            ? const Color(0xFFCBD5E1)
+                                            : AppTheme.textMuted,
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
                             title: Text(
@@ -612,25 +643,31 @@ extension _AppointmentsCalendarViews on _AppointmentsScreenState {
                   ),
                 ),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      '${weekdayNames[index]} • ${AppDateUtils.formatDate(day)}',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        color: isToday
-                            ? AppTheme.primaryBlue
-                            : (isDark ? Colors.white : AppTheme.textDark),
+                    Expanded(
+                      child: Text(
+                        '${weekdayNames[index]} • ${AppDateUtils.formatDate(day)}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: isToday
+                              ? AppTheme.primaryBlue
+                              : (isDark ? Colors.white : AppTheme.textDark),
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    Text(
-                      '${dayAppts.length} compromisso(s)',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: isDark
-                            ? const Color(0xFF94A3B8)
-                            : AppTheme.textMuted,
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        '${dayAppts.length} compromisso(s)',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: isDark
+                              ? const Color(0xFF94A3B8)
+                              : AppTheme.textMuted,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
@@ -910,27 +947,30 @@ extension _AppointmentsCalendarViews on _AppointmentsScreenState {
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(color: color.withValues(alpha: 0.5)),
                 ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      AppDateUtils.formatTime(appt.startTime),
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                        color: color,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        AppDateUtils.formatTime(appt.startTime),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                          color: color,
+                        ),
                       ),
-                    ),
-                    Text(
-                      '${appt.durationMinutes}m',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: isDark
-                            ? const Color(0xFF94A3B8)
-                            : AppTheme.textMuted,
+                      Text(
+                        '${appt.durationMinutes}m',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: isDark
+                              ? const Color(0xFF94A3B8)
+                              : AppTheme.textMuted,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               title: Text(
@@ -976,8 +1016,9 @@ extension _AppointmentsCalendarViews on _AppointmentsScreenState {
     for (final task in tasks) {
       if (task.dueDate == null ||
           task.status == 'completed' ||
-          task.status == 'cancelled')
+          task.status == 'cancelled') {
         continue;
+      }
       final due = task.dueDate!;
       final start = (due.hour != 0 || due.minute != 0)
           ? due
@@ -1005,8 +1046,9 @@ extension _AppointmentsCalendarViews on _AppointmentsScreenState {
     for (final project in projects) {
       if (project.targetDate == null ||
           project.status == 'completed' ||
-          project.status == 'archived')
+          project.status == 'archived') {
         continue;
+      }
       final target = project.targetDate!;
       final start = (target.hour != 0 || target.minute != 0)
           ? target
@@ -1031,5 +1073,130 @@ extension _AppointmentsCalendarViews on _AppointmentsScreenState {
     }
 
     return [...appointments, ...taskAppts, ...projectAppts];
+  }
+
+  Widget _buildSplitCalendarView(
+    List<AppointmentEntry> activeAppts,
+    bool isDark,
+  ) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          flex: 3,
+          child: _viewMode == 'Mês'
+              ? _buildMonthCalendarView(activeAppts)
+              : _buildWeekCalendarView(activeAppts),
+        ),
+        VerticalDivider(
+          width: 1,
+          thickness: 1,
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        ),
+        SizedBox(
+          width: 380,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
+                color: isDark
+                    ? const Color(0xFF1E293B)
+                    : const Color(0xFFF1F5F9),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.calendar_view_day,
+                      size: 18,
+                      color: AppTheme.primaryBlue,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Agenda do Dia: ${AppDateUtils.formatDate(_selectedDate)}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(child: _buildDayHourlyGridView(activeAppts)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSplitListView(
+    List<AppointmentEntry> activeAppts,
+    bool isDark,
+  ) {
+    final people = ref.watch(peopleStreamProvider).value ?? [];
+    final selectedAppt = _selectedAppointmentId != null
+        ? activeAppts.where((a) => a.id == _selectedAppointmentId).firstOrNull
+        : null;
+    final selectedPerson = selectedAppt?.personId != null
+        ? people.where((p) => p.id == selectedAppt!.personId).firstOrNull
+        : null;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(
+          width: 420,
+          child: _buildListView(activeAppts, isWide: true),
+        ),
+        VerticalDivider(
+          width: 1,
+          thickness: 1,
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        ),
+        Expanded(
+          child: selectedAppt != null
+              ? AppointmentDetailPane(
+                  appt: selectedAppt,
+                  person: selectedPerson,
+                  onReschedule: () => _showRescheduleModal(
+                    context,
+                    selectedAppt,
+                  ),
+                  onMarkDone: () async {
+                    final repo = ref.read(repositoryProvider);
+                    await repo.updateAppointment(
+                      selectedAppt.copyWith(status: 'realizado'),
+                    );
+                  },
+                  onCancelPlanB: () => _cancelAndShowPlanB(
+                    context,
+                    selectedAppt,
+                  ),
+                  onOpenPersonProfile: selectedAppt.personId != null
+                      ? () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => PersonDetailScreen(
+                                personId: selectedAppt.personId!,
+                              ),
+                            ),
+                          );
+                        }
+                      : null,
+                  onAddToGoogleCalendar: () =>
+                      _exportToGoogleCalendar(selectedAppt),
+                  onDelete: () => _deleteAppointment(selectedAppt),
+                )
+              : AppointmentPlaceholderPane(isDark: isDark),
+        ),
+      ],
+    );
   }
 }

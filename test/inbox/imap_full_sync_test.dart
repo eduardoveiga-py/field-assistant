@@ -55,8 +55,9 @@ class FakeSession implements JwImapSession {
   @override
   Future<List<JwEmailMessage>> fetchUids(List<int> ids) async {
     fetched.add(List.of(ids));
-    if (fetched.length == failPage)
+    if (fetched.length == failPage) {
       throw const JwEmailConnectionException('interrompido');
+    }
     final selected = fetched.length == incompletePage ? ids.skip(1) : ids;
     return selected
         .map(

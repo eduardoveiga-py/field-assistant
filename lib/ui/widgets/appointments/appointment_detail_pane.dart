@@ -162,43 +162,87 @@ class AppointmentDetailPane extends StatelessWidget {
                   ],
                   if (person != null) ...[
                     const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.person_rounded,
-                          size: 18,
-                          color: AppTheme.primaryBlue,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Contato: ${person!.name}',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                        if (onOpenPersonProfile != null)
-                          Semantics(
-                            container: true,
-                            excludeSemantics: true,
-                            button: true,
-                            label: 'Ver perfil de ${person!.name}',
-                            hint: 'Abre a ficha completa do contato',
-                            child: TextButton.icon(
-                              style: TextButton.styleFrom(
-                                minimumSize: const Size(48, 48),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final textScale =
+                            MediaQuery.textScalerOf(context).scale(1);
+                        final isStacked =
+                            constraints.maxWidth < 420 || textScale > 1.2;
+
+                        final semanticsButton = onOpenPersonProfile != null
+                            ? Semantics(
+                                container: true,
+                                excludeSemantics: true,
+                                button: true,
+                                label: 'Ver perfil de ${person!.name}',
+                                hint: 'Abre a ficha completa do contato',
+                                child: TextButton.icon(
+                                  style: TextButton.styleFrom(
+                                    minimumSize: const Size(48, 48),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                    ),
+                                  ),
+                                  onPressed: onOpenPersonProfile,
+                                  icon: const Icon(Icons.open_in_new, size: 16),
+                                  label: const Text('Ver Perfil'),
+                                ),
+                              )
+                            : null;
+
+                        if (isStacked) {
+                          return Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(
+                                Icons.person_rounded,
+                                size: 18,
+                                color: AppTheme.primaryBlue,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Contato: ${person!.name}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                    if (semanticsButton != null) ...[
+                                      const SizedBox(height: 4),
+                                      semanticsButton,
+                                    ],
+                                  ],
                                 ),
                               ),
-                              onPressed: onOpenPersonProfile,
-                              icon: const Icon(Icons.open_in_new, size: 16),
-                              label: const Text('Ver Perfil'),
+                            ],
+                          );
+                        }
+
+                        return Row(
+                          children: [
+                            const Icon(
+                              Icons.person_rounded,
+                              size: 18,
+                              color: AppTheme.primaryBlue,
                             ),
-                          ),
-                      ],
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Contato: ${person!.name}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                            ?semanticsButton,
+                          ],
+                        );
+                      },
                     ),
                   ],
                 ],
@@ -362,6 +406,39 @@ class AppointmentDetailPane extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class AppointmentPlaceholderPane extends StatelessWidget {
+  const AppointmentPlaceholderPane({super.key, required this.isDark});
+
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Semantics(
+        label: 'Selecione um compromisso para visualizar detalhes',
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.calendar_month_outlined,
+              size: 52,
+              color: Colors.grey.shade400,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Selecione um compromisso para visualizar detalhes',
+              style: TextStyle(
+                color: isDark ? const Color(0xFF94A3B8) : AppTheme.textMuted,
+                fontSize: 15,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

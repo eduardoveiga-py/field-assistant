@@ -46,14 +46,16 @@ class RecoveryKeyStore {
   }
 
   static String _storageKey(String owner) {
-    if (owner.isEmpty || owner.trim() != owner)
+    if (owner.isEmpty || owner.trim() != owner) {
       throw ArgumentError('Conta inválida.');
+    }
     return 'e2ee_root_v1_${digest.sha256.convert(utf8.encode(owner))}';
   }
 
   static List<int> _decode(String value) {
-    if (!value.startsWith('v1:'))
+    if (!value.startsWith('v1:')) {
       throw const FormatException('Chave local inválida.');
+    }
     final raw = value.substring(3);
     if (raw.length != 44) throw const FormatException('Chave local inválida.');
     final bytes = base64Decode(raw);
@@ -129,8 +131,9 @@ class RecoveryKeyStore {
         .extractBytes();
     final confirmed = await (await RecoveryCrypto.keyFromPhrase(confirmation))
         .extractBytes();
-    if (!_equal(proposed, confirmed))
+    if (!_equal(proposed, confirmed)) {
       throw const FormatException('A confirmação da frase não confere.');
+    }
 
     if (kIsWeb) {
       final current = _webMemoryKeys[owner];

@@ -183,8 +183,9 @@ class LocalReminderService {
 
     int scheduledCount = 0;
     for (final appt in appointments) {
-      if (appt.status == 'cancelado' || appt.status == 'nao_realizado')
+      if (appt.status == 'cancelado' || appt.status == 'nao_realizado') {
         continue;
+      }
       final leadMinutes = appt.reminderMinutesBefore ?? 15;
       final reminderId = 'appt_${appt.id}';
 

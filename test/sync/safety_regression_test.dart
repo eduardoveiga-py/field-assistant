@@ -58,8 +58,9 @@ void main() {
             'code': 'PGRST202',
           }, status: 404);
         }
-        if (request.method == 'POST' && request.url.path.endsWith('/people'))
+        if (request.method == 'POST' && request.url.path.endsWith('/people')) {
           directWrites++;
+        }
         return jsonResponse(request, []);
       }),
     );
@@ -78,10 +79,12 @@ void main() {
       var directWrites = 0;
       final sync = service(
         MockClient((request) async {
-          if (request.url.path.endsWith('/rpc/sync_upsert_if_unchanged'))
+          if (request.url.path.endsWith('/rpc/sync_upsert_if_unchanged')) {
             return jsonResponse(request, {});
-          if (request.method == 'POST' && request.url.path.endsWith('/people'))
+          }
+          if (request.method == 'POST' && request.url.path.endsWith('/people')) {
             directWrites++;
+          }
           return jsonResponse(request, []);
         }),
       );
@@ -130,8 +133,9 @@ void main() {
           sent = jsonDecode(request.body) as Map<String, dynamic>;
           return jsonResponse(request, {'success': true});
         }
-        if (request.url.path.endsWith('/people'))
+        if (request.url.path.endsWith('/people')) {
           return jsonResponse(request, [remote]);
+        }
         return jsonResponse(request, []);
       }),
     );

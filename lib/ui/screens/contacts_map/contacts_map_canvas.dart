@@ -96,8 +96,9 @@ extension _ContactsMapCanvas on _ContactsMapScreenState {
     final Map<String, DateTime> nextApptMap = {};
     final nowTime = DateTime.now();
     for (final a in allAppointments) {
-      if (a.deletedAt != null || a.status == 'cancelado' || a.personId == null)
+      if (a.deletedAt != null || a.status == 'cancelado' || a.personId == null) {
         continue;
+      }
       if (a.startTime.isAfter(nowTime)) {
         final existing = nextApptMap[a.personId!];
         if (existing == null || a.startTime.isBefore(existing)) {
@@ -821,8 +822,9 @@ extension _ContactsMapCanvas on _ContactsMapScreenState {
                                           () {
                                             final layer = pinLayers[p.id];
                                             if (layer !=
-                                                TerritoryPinLayer.forgottenZone)
+                                                TerritoryPinLayer.forgottenZone) {
                                               return const SizedBox.shrink();
+                                            }
 
                                             final hasGeo =
                                                 p.latitude != null &&
@@ -831,8 +833,9 @@ extension _ContactsMapCanvas on _ContactsMapScreenState {
                                                     p.longitude != 0.0) &&
                                                 p.latitude!.abs() <= 90 &&
                                                 p.longitude!.abs() <= 180;
-                                            if (!hasGeo)
+                                            if (!hasGeo) {
                                               return const SizedBox.shrink();
+                                            }
 
                                             final x =
                                                 _lon2pixelX(

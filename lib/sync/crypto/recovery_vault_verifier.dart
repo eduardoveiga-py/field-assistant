@@ -60,8 +60,9 @@ class RecoveryVaultVerifier {
       throw const FormatException('Marcador do cofre inválido.');
     }
     final id = marker['vaultId'] as String;
-    if (!_idPattern.hasMatch(id))
+    if (!_idPattern.hasMatch(id)) {
       throw const FormatException('Identidade do cofre inválida.');
+    }
     final plaintext = await RecoveryCrypto.open(
       key: await _verifierKey(root),
       owner: owner,

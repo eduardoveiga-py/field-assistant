@@ -100,8 +100,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                 const Duration(days: 30),
                               ),
                             );
-                            if (p != null)
+                            if (p != null) {
                               setDialogState(() => selectedDate = p);
+                            }
                           },
                         ),
                         const SizedBox(width: 8),

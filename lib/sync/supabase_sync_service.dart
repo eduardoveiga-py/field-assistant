@@ -877,31 +877,37 @@ class SupabaseSyncService {
         map['tags'] ??= '[]';
         break;
       case 'inbox_entries':
-        if (map['attachments'] is List)
+        if (map['attachments'] is List) {
           map['attachments'] = jsonEncode(map['attachments']);
+        }
         map['attachments'] ??= '[]';
-        if (map['metadata'] is Map)
+        if (map['metadata'] is Map) {
           map['metadata'] = jsonEncode(map['metadata']);
+        }
         map['metadata'] ??= '{}';
         break;
       case 'projects':
-        if (map['metadata'] is Map)
+        if (map['metadata'] is Map) {
           map['metadata'] = jsonEncode(map['metadata']);
+        }
         map['metadata'] ??= '{}';
         break;
       case 'tasks':
-        if (map['attachments'] is List)
+        if (map['attachments'] is List) {
           map['attachments'] = jsonEncode(map['attachments']);
+        }
         map['attachments'] ??= '[]';
-        if (map['metadata'] is Map)
+        if (map['metadata'] is Map) {
           map['metadata'] = jsonEncode(map['metadata']);
+        }
         map['metadata'] ??= '{}';
         break;
       case 'knowledge_notes':
         if (map['tags'] is List) map['tags'] = jsonEncode(map['tags']);
         map['tags'] ??= '[]';
-        if (map['attachments'] is List)
+        if (map['attachments'] is List) {
           map['attachments'] = jsonEncode(map['attachments']);
+        }
         map['attachments'] ??= '[]';
         if (map['sources'] is List) map['sources'] = jsonEncode(map['sources']);
         map['sources'] ??= '[]';
@@ -2372,8 +2378,9 @@ class SupabaseSyncService {
         if ((localPath == null ||
                 localPath.isEmpty ||
                 localPath.startsWith('http')) &&
-            inlineData.isEmpty)
+            inlineData.isEmpty) {
           return true;
+        }
         errors.add('Arquivo da foto ausente ou vazio ($id).');
         return false;
       }
@@ -2652,16 +2659,18 @@ class SupabaseSyncService {
 
           for (final op in operations) {
             final decoded = jsonDecode(op.payload);
-            if (decoded is! Map<String, dynamic>)
+            if (decoded is! Map<String, dynamic>) {
               throw const FormatException('payload');
+            }
             payloads[op.id] = decoded;
           }
           if (operations.any((op) => revision(op) == null)) continue;
           operations.sort((a, b) => revision(a)!.compareTo(revision(b)!));
           if (operations
               .skip(1)
-              .any((op) => op.operation.toUpperCase() != 'UPDATE'))
+              .any((op) => op.operation.toUpperCase() != 'UPDATE')) {
             continue;
+          }
           var valid = true;
           for (var i = 1; i < operations.length; i++) {
             final previous = operations[i - 1];
@@ -2708,10 +2717,12 @@ class SupabaseSyncService {
               firstPayload['baseData'] is! Map) {
             continue;
           }
-          if (firstPayload['_base'] is Map)
+          if (firstPayload['_base'] is Map) {
             combined['_base'] = firstPayload['_base'];
-          if (firstPayload['baseData'] is Map)
+          }
+          if (firstPayload['baseData'] is Map) {
             combined['baseData'] = firstPayload['baseData'];
+          }
           await (db.update(
             db.syncQueue,
           )..where((t) => t.id.equals(first.id))).write(

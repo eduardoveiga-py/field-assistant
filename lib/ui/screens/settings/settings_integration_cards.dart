@@ -694,8 +694,9 @@ extension _SettingsIntegrationCards on _SettingsScreenState {
                                         );
                                       }
                                     }
-                                    if (!mounted || !authContext.mounted)
+                                    if (!mounted || !authContext.mounted) {
                                       return;
+                                    }
                                     Navigator.of(authContext).pop();
                                     _updateState(() {});
                                   },
@@ -1112,17 +1113,19 @@ extension _SettingsIntegrationCards on _SettingsScreenState {
           'Não foi possível verificar o Exchange. Confira servidor, autenticação e rede.';
       if (e is ExchangeException) message = e.message;
       if (e is eas.EasAuthException) message = 'Autenticação Exchange recusada. O provedor pode exigir OAuth ou outro método.';
-      if (e is eas.EasForbiddenException)
+      if (e is eas.EasForbiddenException) {
         message = 'O servidor negou acesso para este dispositivo ou conta.';
+      }
       if (e is eas.EasCommandException && e.requiresProvisioning) message = 'O servidor exige políticas de segurança que o app ainda não aplica.';
       if (e is eas.EasRemoteWipeException) message = 'O servidor solicita ação de segurança; nada foi apagado ou confirmado pelo aplicativo.';
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(message),
             duration: const Duration(seconds: 8),
           ),
         );
+      }
     } finally {
       if (mounted) _updateState(() => _isTestingExchange = false);
     }

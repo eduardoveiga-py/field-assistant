@@ -502,10 +502,11 @@ class JwImapClient {
     required String password,
     Duration timeout = const Duration(seconds: 60),
   }) async {
-    if (kIsWeb)
+    if (kIsWeb) {
       throw const JwEmailConnectionException(
         'IMAP direto não é suportado no navegador.',
       );
+    }
     if (host.trim().isEmpty ||
         username.trim().isEmpty ||
         password.isEmpty ||
@@ -534,8 +535,9 @@ class JwImapClient {
         session.selectInbox,
         timeout,
       );
-      if (validity <= 0)
+      if (validity <= 0) {
         throw const JwEmailConnectionException('UIDVALIDITY inválido.');
+      }
     } finally {
       try {
         await session.close();
@@ -578,8 +580,9 @@ class JwImapClient {
     if (username == null ||
         username.trim().isEmpty ||
         password == null ||
-        password.isEmpty)
+        password.isEmpty) {
       return;
+    }
     if (kIsWeb) {
       throw const JwEmailConnectionException(
         'IMAP direto não é suportado no navegador.',
@@ -613,8 +616,9 @@ class JwImapClient {
         session.selectInbox,
         timeout,
       );
-      if (validity <= 0)
+      if (validity <= 0) {
         throw const JwEmailConnectionException('UIDVALIDITY inválido.');
+      }
       final uids = await _imapStage(
         'listagem de mensagens',
         session.searchUids,

@@ -748,4 +748,210 @@ extension _AppointmentsSyncAndIcsModals on _AppointmentsScreenState {
       ),
     );
   }
+
+  String _generateIcsFile(List<AppointmentEntry> appts) {
+    final buffer = StringBuffer();
+    buffer.writeln('BEGIN:VCALENDAR');
+    buffer.writeln('VERSION:2.0');
+    buffer.writeln('PRODID:-//Ministerio Pessoal//Agenda//PT-BR');
+    buffer.writeln('CALSCALE:GREGORIAN');
+    buffer.writeln('METHOD:PUBLISH');
+
+    String fmt(DateTime dt) {
+      final u = dt.toUtc();
+      return '${u.year.toString().padLeft(4, "0")}'
+          '${u.month.toString().padLeft(2, "0")}'
+          '${u.day.toString().padLeft(2, "0")}T'
+          '${u.hour.toString().padLeft(2, "0")}'
+          '${u.minute.toString().padLeft(2, "0")}'
+          '${u.second.toString().padLeft(2, "0")}Z';
+    }
+
+    for (final a in appts) {
+      if (a.deletedAt != null || a.status == 'cancelado') continue;
+      buffer.writeln('BEGIN:VEVENT');
+      buffer.writeln('UID:${a.id}@ministeriopessoal.app');
+      buffer.writeln('DTSTAMP:${fmt(a.updatedAt)}');
+      buffer.writeln('DTSTART:${fmt(a.startTime)}');
+      buffer.writeln('DTEND:${fmt(a.endTime)}');
+      buffer.writeln('SUMMARY:${a.title.replaceAll("\n", " ")}');
+      if (a.locationNotes != null && a.locationNotes!.isNotEmpty) {
+        buffer.writeln('LOCATION:${a.locationNotes!.replaceAll("\n", " ")}');
+        buffer.writeln(
+          'DESCRIPTION:${a.locationNotes!.replaceAll("\n", "\\n")}',
+        );
+      }
+      buffer.writeln(
+        'STATUS:${a.status == "realizado" ? "CONFIRMED" : "TENTATIVE"}',
+      );
+      buffer.writeln('END:VEVENT');
+    }
+
+    buffer.writeln('END:VCALENDAR');
+    return buffer.toString();
+  }
+
+  Future<({int created, int updated})> _importIcsContent(String raw) async {
+    int createdCount = 0;
+    int updatedCount = 0;
+    final repo = ref.read(repositoryProvider);
+    final existingAppts = await repo.db.select(repo.db.appointments).get();
+    final events = IcsCalendarHelper.parseIcsEvents(raw);
+
+    for (final ev in events) {
+      AppointmentEntry? existing;
+      if (ev.apptId != null) {
+        existing = existingAppts.where((a) => a.id == ev.apptId).firstOrNull;
+      }
+      existing ??= existingAppts.where((a) {
+        final sameTitle =
+            a.title.trim().toLowerCase() == ev.summary.trim().toLowerCase();
+        final timeDiff = a.startTime.difference(ev.startTime).inMinutes.abs();
+        return sameTitle && timeDiff < 5;
+      }).firstOrNull;
+
+      if (existing != null) {
+        await repo.updateAppointment(
+          existing.copyWith(
+            title: ev.summary,
+            startTime: ev.startTime,
+            endTime: ev.endTime,
+            durationMinutes: ev.durationMinutes,
+            status: ev.status,
+            locationNotes: Value(ev.location ?? existing.locationNotes),
+          ),
+        );
+        updatedCount++;
+      } else {
+        await repo.createAppointment(
+          id: ev.apptId,
+          title: ev.summary,
+          startTime: ev.startTime,
+          endTime: ev.endTime,
+          durationMinutes: ev.durationMinutes,
+          status: ev.status,
+          locationNotes: ev.location,
+        );
+        createdCount++;
+      }
+    }
+    return (created: createdCount, updated: updatedCount);
+  }
+
+  Future<void> _syncConnectedCalendars() async {
+    if (_isCalendarSyncing) return;
+    _updateState(() => _isCalendarSyncing = true);
+    try {
+      final coordinator = ref.read(calendarSyncCoordinatorProvider);
+      final connected = <CalendarProviderType>{};
+      for (final provider in coordinator.allProviders) {
+        if (!await provider.isAuthorized()) continue;
+        if (provider.providerType == CalendarProviderType.appleEventKit &&
+            await provider.getSelectedCalendarId() == null) {
+          continue;
+        }
+        connected.add(provider.providerType);
+      }
+      if (!mounted) return;
+      if (connected.isEmpty) {
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const ConnectedCalendarsScreen()),
+        );
+        return;
+      }
+      final result = await coordinator.syncAll(
+        fullSync: true,
+        providers: connected,
+      );
+      if (!mounted) return;
+      final message = result.success
+          ? 'Sincronização concluída: ${result.eventsDownloaded} recebidos, ${result.eventsUploaded} enviados. ${result.conflictsFound} conflitos.'
+          : 'Falha na sincronização: ${result.errorMessage ?? "erro desconhecido"}';
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Falha na sincronização: $e')));
+      }
+    } finally {
+      if (mounted) _updateState(() => _isCalendarSyncing = false);
+    }
+  }
+
+  Future<({int created, int updated})?> _syncFromWebcalUrl(
+    String rawUrl, {
+    bool silent = false,
+  }) async {
+    var cleanUrl = rawUrl.trim().replaceAll(RegExp(r'^["\x27]|["\x27]$'), '');
+    if (cleanUrl.startsWith('webcal://') || cleanUrl.startsWith('webcals://')) {
+      cleanUrl = cleanUrl.replaceFirst(RegExp(r'^webcals?://'), 'https://');
+    }
+    String? icsBody;
+    try {
+      final uri = Uri.parse(cleanUrl);
+      final resp = await http.get(uri).timeout(const Duration(seconds: 10));
+      if (resp.statusCode == 200 && resp.body.contains('BEGIN:VCALENDAR')) {
+        icsBody = resp.body;
+      }
+    } catch (e) {
+      if (icsBody == null && !silent) {
+        throw Exception(
+          'Não foi possível acessar a URL diretamente por restrições de rede ou CORS.\n\n'
+          'Por favor, utilize a integração oficial em "Calendários Conectados", ou baixe o arquivo .ics e importe usando "Selecionar Arquivo .ics" para manter seus dados 100% privados.',
+        );
+      }
+    }
+
+    if (icsBody != null) {
+      final res = await _importIcsContent(icsBody);
+      await ref
+          .read(appSettingsManagerProvider)
+          .setString('saved_calendar_url', cleanUrl);
+      return res;
+    }
+    return null;
+  }
+
+  Future<void> _checkAutoSyncCalendar() async {
+    try {
+      final settings = ref.read(appSettingsManagerProvider);
+      final savedUrl = await settings.getString('saved_calendar_url');
+      if (savedUrl != null && savedUrl.trim().isNotEmpty) {
+        await _syncFromWebcalUrl(savedUrl.trim(), silent: true);
+      }
+    } catch (e, st) {
+      AppLogger.warning(
+        'Falha no auto-sync silencioso do calendário externo',
+        e,
+        st,
+      );
+    }
+  }
+
+  Future<void> _exportToGoogleCalendar(AppointmentEntry appt) async {
+    String formatCalDate(DateTime dt) {
+      final u = dt.toUtc();
+      return '${u.year.toString().padLeft(4, "0")}'
+          '${u.month.toString().padLeft(2, "0")}'
+          '${u.day.toString().padLeft(2, "0")}T'
+          '${u.hour.toString().padLeft(2, "0")}'
+          '${u.minute.toString().padLeft(2, "0")}00Z';
+    }
+
+    final start = formatCalDate(appt.startTime);
+    final end = formatCalDate(appt.endTime);
+    final text = Uri.encodeComponent(appt.title);
+    final details = Uri.encodeComponent(
+      appt.locationNotes ?? 'Agendado pelo App Ministério Pessoal',
+    );
+
+    final url =
+        'https://calendar.google.com/calendar/render?action=TEMPLATE&text=$text&dates=$start/$end&details=$details';
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
 }

@@ -387,16 +387,21 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                                             size: 20,
                                           ),
                                           onSelected: (val) {
-                                            if (val == 'pin')
+                                            if (val == 'pin') {
                                               km.togglePinNote(note.id);
-                                            if (val == 'edit')
+                                            }
+                                            if (val == 'edit') {
                                               _showEditNoteModal(note);
-                                            if (val == 'research')
+                                            }
+                                            if (val == 'research') {
                                               _transformNoteToResearch(note);
-                                            if (val == 'export')
+                                            }
+                                            if (val == 'export') {
                                               _exportNote(note);
-                                            if (val == 'delete')
+                                            }
+                                            if (val == 'delete') {
                                               km.softDeleteNote(note.id);
+                                            }
                                           },
                                           itemBuilder: (ctx) => [
                                             PopupMenuItem(
@@ -713,8 +718,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                     label: const Text('Em Aberto'),
                     selected: _selectedQuestionStatus == 'unanswered',
                     onSelected: (val) {
-                      if (val)
+                      if (val) {
                         setState(() => _selectedQuestionStatus = 'unanswered');
+                      }
                     },
                   ),
                   const SizedBox(width: 8),
@@ -723,8 +729,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                     label: const Text('Respondidas'),
                     selected: _selectedQuestionStatus == 'answered',
                     onSelected: (val) {
-                      if (val)
+                      if (val) {
                         setState(() => _selectedQuestionStatus = 'answered');
+                      }
                     },
                   ),
                 ],
@@ -816,15 +823,19 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                                         size: 20,
                                       ),
                                       onSelected: (val) {
-                                        if (val == 'answer')
+                                        if (val == 'answer') {
                                           _showAnswerQuestionModal(q);
-                                        if (val == 'edit')
+                                        }
+                                        if (val == 'edit') {
                                           _showEditQuestionModal(q);
-                                        if (val == 'research')
+                                        }
+                                        if (val == 'research') {
                                           _transformQuestionToResearch(q);
+                                        }
                                         if (val == 'export') _exportQuestion(q);
-                                        if (val == 'delete')
+                                        if (val == 'delete') {
                                           km.softDeleteQuestion(q.id);
+                                        }
                                       },
                                       itemBuilder: (ctx) => [
                                         PopupMenuItem(
@@ -1199,12 +1210,15 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                                 icon: const Icon(Icons.more_vert, size: 20),
                                 onSelected: (val) {
                                   if (val == 'open') _openDocument(doc);
-                                  if (val == 'external')
+                                  if (val == 'external') {
                                     _openDocumentExternal(doc);
-                                  if (val == 'edit')
+                                  }
+                                  if (val == 'edit') {
                                     _showEditDocumentModal(doc);
-                                  if (val == 'delete')
+                                  }
+                                  if (val == 'delete') {
                                     km.softDeleteDocument(doc.id);
+                                  }
                                 },
                                 itemBuilder: (ctx) => [
                                   const PopupMenuItem(
@@ -1482,11 +1496,13 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
                                 onSelected: (val) {
                                   if (val == 'open' &&
                                       r.url != null &&
-                                      r.url!.isNotEmpty)
+                                      r.url!.isNotEmpty) {
                                     _openUrl(r.url!);
+                                  }
                                   if (val == 'edit') _showEditResourceModal(r);
-                                  if (val == 'delete')
+                                  if (val == 'delete') {
                                     km.softDeleteResource(r.id);
+                                  }
                                 },
                                 itemBuilder: (ctx) => [
                                   if (r.url != null && r.url!.isNotEmpty)

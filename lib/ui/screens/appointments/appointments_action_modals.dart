@@ -169,8 +169,9 @@ extension _AppointmentsActionModals on _AppointmentsScreenState {
                                 if (val == 'Viagem') {
                                   titleController.text = 'Viagem';
                                 }
-                                if (val == 'Folga')
+                                if (val == 'Folga') {
                                   titleController.text = 'Folga';
+                                }
                                 if (val == 'Ausência') {
                                   titleController.text = 'Ausência';
                                 }
@@ -245,8 +246,9 @@ extension _AppointmentsActionModals on _AppointmentsScreenState {
                                   const Duration(days: 365),
                                 ),
                               );
-                              if (p != null)
+                              if (p != null) {
                                 setDialogState(() => chosenDate = p);
+                              }
                             },
                           ),
                           const SizedBox(width: 8),
@@ -260,8 +262,9 @@ extension _AppointmentsActionModals on _AppointmentsScreenState {
                                 context: context,
                                 initialTime: chosenTime,
                               );
-                              if (t != null)
+                              if (t != null) {
                                 setDialogState(() => chosenTime = t);
+                              }
                             },
                           ),
                         ],
@@ -334,8 +337,9 @@ extension _AppointmentsActionModals on _AppointmentsScreenState {
                           ),
                         ],
                         onChanged: (val) {
-                          if (val != null)
+                          if (val != null) {
                             setDialogState(() => recurrence = val);
+                          }
                         },
                       ),
                       if (recurrence != 'Único') ...[
@@ -1197,8 +1201,9 @@ extension _AppointmentsActionModals on _AppointmentsScreenState {
                                   const Duration(days: 365),
                                 ),
                               );
-                              if (p != null)
+                              if (p != null) {
                                 setDialogState(() => chosenDate = p);
+                              }
                             },
                           ),
                           const SizedBox(width: 8),
@@ -1212,8 +1217,9 @@ extension _AppointmentsActionModals on _AppointmentsScreenState {
                                 context: context,
                                 initialTime: chosenTime,
                               );
-                              if (t != null)
+                              if (t != null) {
                                 setDialogState(() => chosenTime = t);
+                              }
                             },
                           ),
                         ],
@@ -1277,8 +1283,9 @@ extension _AppointmentsActionModals on _AppointmentsScreenState {
                           ),
                         ],
                         onChanged: (val) {
-                          if (val != null)
+                          if (val != null) {
                             setDialogState(() => recurrence = val);
+                          }
                         },
                       ),
                       if (recurrence != 'Único') ...[
@@ -1447,5 +1454,62 @@ extension _AppointmentsActionModals on _AppointmentsScreenState {
         },
       ),
     );
+  }
+
+  Future<void> _cancelAndShowPlanB(
+    BuildContext context,
+    AppointmentEntry appt,
+  ) async {
+    final repo = ref.read(repositoryProvider);
+    await repo.updateAppointment(appt.copyWith(status: 'cancelado'));
+
+    final people = ref.read(peopleStreamProvider).value ?? [];
+    final visits = ref.read(visitsStreamProvider).value ?? [];
+    final cancelledPerson = appt.personId != null
+        ? people.where((p) => p.id == appt.personId).firstOrNull
+        : null;
+
+    final targetPerson =
+        cancelledPerson ??
+        PersonEntry(
+          id: 'temp_appt_${appt.id}',
+          name: appt.title,
+          status: 'potencial',
+          tags: '[]',
+          firstContactAt: DateTime.now(),
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+          revision: 1,
+        );
+
+    final suggestions = PlanBRecommender.getSuggestions(
+      cancelledPerson: targetPerson,
+      allPeople: people,
+      allVisits: visits,
+      currentLat: targetPerson.latitude,
+      currentLng: targetPerson.longitude,
+      targetDateTime: appt.startTime,
+    );
+
+    if (context.mounted) {
+      PlanBDialog.show(
+        context,
+        cancelledPerson: targetPerson,
+        suggestions: suggestions,
+      );
+    }
+  }
+
+  Future<void> _deleteAppointment(AppointmentEntry appt) async {
+    final repo = ref.read(repositoryProvider);
+    await repo.deleteAppointment(appt.id);
+    if (_selectedAppointmentId == appt.id) {
+      _updateState(() => _selectedAppointmentId = null);
+    }
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Compromisso movido para a lixeira.')),
+      );
+    }
   }
 }

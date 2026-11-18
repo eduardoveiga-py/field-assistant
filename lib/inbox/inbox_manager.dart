@@ -329,8 +329,9 @@ class InboxManager {
     DateTime? scheduledAt,
   }) async {
     final inbox = await getEntryById(inboxId);
-    if (inbox == null)
+    if (inbox == null) {
       throw Exception('Entrada de Inbox não encontrada: $inboxId');
+    }
 
     final taskId = _uuid.v4();
     final now = DateTime.now();
@@ -401,8 +402,9 @@ class InboxManager {
     DateTime? targetDate,
   }) async {
     final inbox = await getEntryById(inboxId);
-    if (inbox == null)
+    if (inbox == null) {
       throw Exception('Entrada de Inbox não encontrada: $inboxId');
+    }
 
     final projectId = _uuid.v4();
     final now = DateTime.now();
@@ -474,8 +476,9 @@ class InboxManager {
     List<String> tags = const [],
   }) async {
     final inbox = await getEntryById(inboxId);
-    if (inbox == null)
+    if (inbox == null) {
       throw Exception('Entrada de Inbox não encontrada: $inboxId');
+    }
 
     final noteId = _uuid.v4();
     final now = DateTime.now();
@@ -547,8 +550,9 @@ class InboxManager {
     String? studyId,
   }) async {
     final inbox = await getEntryById(inboxId);
-    if (inbox == null)
+    if (inbox == null) {
       throw Exception('Entrada de Inbox não encontrada: $inboxId');
+    }
 
     final questionId = _uuid.v4();
     final now = DateTime.now();

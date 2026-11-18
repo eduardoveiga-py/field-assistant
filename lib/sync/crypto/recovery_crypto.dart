@@ -19,15 +19,17 @@ class RecoveryCrypto {
   /// Não recebe senha escolhida pelo usuário: usa 256 bits de entropia aleatória.
   static Future<SecretKey> keyFromPhrase(String phrase) async {
     final words = phrase.trim().split(RegExp(r'\s+'));
-    if (words.length != 24)
+    if (words.length != 24) {
       throw const FormatException('Frase de recuperação inválida.');
+    }
     try {
       final mnemonic = Mnemonic.fromWords(
         words: words,
         language: Language.portuguese,
       );
-      if (mnemonic.entropy.length != 32)
+      if (mnemonic.entropy.length != 32) {
         throw const FormatException('Entropia inválida.');
+      }
       // HKDF com domínio específico; a frase codifica uma chave aleatória, não
       // uma senha curta. Nunca substituir por texto escolhido pelo usuário.
       return await Hkdf(hmac: Hmac.sha256(), outputLength: 32).deriveKey(
@@ -55,8 +57,9 @@ class RecoveryCrypto {
     required String id,
     required List<int> plaintext,
   }) async {
-    if (plaintext.length > 1024 * 1024)
+    if (plaintext.length > 1024 * 1024) {
       throw ArgumentError('Bloco excede 1 MiB.');
+    }
     final box = await AesGcm.with256bits().encrypt(
       plaintext,
       secretKey: key,

@@ -1056,8 +1056,9 @@ extension _PersonDetailStudyDialogs on _PersonDetailScreenState {
                         ),
                       ],
                       onChanged: (val) {
-                        if (val != null)
+                        if (val != null) {
                           setDialogState(() => selectedReason = val);
+                        }
                       },
                     ),
                     const SizedBox(height: 12),

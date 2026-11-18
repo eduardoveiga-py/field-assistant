@@ -3,7 +3,7 @@
 # 📖 Ministério Pessoal
 ### *Gestão Eficiente, Discreta e Offline-First do Ministério de Campo*
 
-[![Versão](https://img.shields.io/badge/Versão-2.0.0_(Build_11)-blue?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/eduardoveiga-py/field-assistant/releases/latest)
+[![Versão](https://img.shields.io/badge/Versão-2.0.0_(Build_14)-blue?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/eduardoveiga-py/field-assistant/releases/latest)
 [![Flutter](https://img.shields.io/badge/Flutter-3.27+-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-3.5+-0175C2?style=for-the-badge&logo=dart&logoColor=white)](https://dart.dev)
 [![Offline First](https://img.shields.io/badge/Arquitetura-Offline--First-success?style=for-the-badge&logo=sqlite&logoColor=white)](https://drift.simonbinder.eu/)

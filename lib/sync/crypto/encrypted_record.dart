@@ -115,8 +115,9 @@ class EncryptedRecord {
       entityType: payload['entityType'] as String,
       entityId: payload['entityId'] as String,
     );
-    if (expected != routeId)
+    if (expected != routeId) {
       throw const FormatException('Identidade de registro inconsistente.');
+    }
     return Map<String, dynamic>.from(payload);
   }
 }

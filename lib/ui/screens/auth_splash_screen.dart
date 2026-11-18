@@ -147,13 +147,15 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
             await callbackClient.auth.getSessionFromUrl(uri);
           } catch (_) {
             // Nunca imprimir a URI: ela pode conter códigos ou tokens.
-            if (mounted)
+            if (mounted) {
               setState(() => _gateState = _AuthGateState.callbackError);
+            }
           }
         },
         onError: (Object _, StackTrace _) {
-          if (mounted)
+          if (mounted) {
             setState(() => _gateState = _AuthGateState.callbackError);
+          }
         },
       );
     }
@@ -434,8 +436,9 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
             } catch (_) {
               // Sessão local pode já ter expirado.
             }
-            if (mounted)
+            if (mounted) {
               setState(() => _gateState = _AuthGateState.unauthenticated);
+            }
           },
         );
       case _AuthGateState.recoverySuccess:

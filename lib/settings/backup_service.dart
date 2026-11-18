@@ -2531,8 +2531,9 @@ class BackupService {
           final map = Map<String, dynamic>.from(item as Map<String, dynamic>);
           final id = map['id']?.toString();
           final name = map['name']?.toString();
-          if (id == null || id.isEmpty || name == null || name.isEmpty)
+          if (id == null || id.isEmpty || name == null || name.isEmpty) {
             continue;
+          }
           final existing = await db
               .customSelect(
                 'SELECT id FROM ticuna_tags WHERE id = ? OR name = ?',

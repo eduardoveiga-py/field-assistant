@@ -460,8 +460,9 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                             const Duration(days: 365),
                           ),
                         );
-                        if (picked != null)
+                        if (picked != null) {
                           setModalState(() => dueDate = picked);
+                        }
                       },
                     ),
                     const SizedBox(height: 16),
@@ -637,8 +638,9 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                             const Duration(days: 730),
                           ),
                         );
-                        if (picked != null)
+                        if (picked != null) {
                           setModalState(() => targetDate = picked);
+                        }
                       },
                     ),
                     const SizedBox(height: 16),

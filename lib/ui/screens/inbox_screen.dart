@@ -1183,8 +1183,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                               const Duration(days: 365),
                             ),
                           );
-                          if (picked != null)
+                          if (picked != null) {
                             setModalState(() => dueDate = picked);
+                          }
                         },
                       ),
                       const SizedBox(height: 16),

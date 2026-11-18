@@ -92,8 +92,9 @@ class CalendarSyncCoordinator {
     // 1. Download de alterações externas
     for (final provider in allProviders) {
       if (!provider.isSupportedOnCurrentPlatform) continue;
-      if (providers != null && !providers.contains(provider.providerType))
+      if (providers != null && !providers.contains(provider.providerType)) {
         continue;
+      }
       try {
         final authorized = await provider.isAuthorized();
         if (!authorized) continue;

@@ -240,8 +240,9 @@ class DoorstepProximityEngine {
   ) {
     for (final rec in existingRecs) {
       if (rec.startTime == start) return true;
-      if (start.isBefore(rec.endTime) && end.isAfter(rec.startTime))
+      if (start.isBefore(rec.endTime) && end.isAfter(rec.startTime)) {
         return true;
+      }
     }
     return false;
   }
@@ -355,8 +356,9 @@ class DoorstepProximityEngine {
     for (final ext in externalEvents) {
       if (ext.deletedAt != null ||
           ext.isDeletedExternal ||
-          ext.externalStatus == 'cancelled')
+          ext.externalStatus == 'cancelled') {
         continue;
+      }
       if (ext.startTime.isBefore(end) && ext.endTime.isAfter(start)) {
         return 'Conflito com calendário externo: "${ext.title}"';
       }
