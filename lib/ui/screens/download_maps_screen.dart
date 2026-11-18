@@ -78,26 +78,38 @@ class _DownloadMapsScreenState extends State<DownloadMapsScreen> {
         return;
       }
 
-      if (!picked.name.toLowerCase().endsWith('.mbtiles')) {
+      final lowerName = picked.name.toLowerCase();
+      final isPmtiles = lowerName.endsWith('.pmtiles');
+      final isMbtiles = lowerName.endsWith('.mbtiles');
+      if (!isMbtiles && !isPmtiles) {
         messenger.showSnackBar(
           const SnackBar(
-            content: Text('Selecione um arquivo válido com extensão .mbtiles.'),
+            content: Text(
+              'Selecione um arquivo válido com extensão .pmtiles (vetorial) ou .mbtiles.',
+            ),
             backgroundColor: AppTheme.alertRed,
           ),
         );
         return;
       }
 
-      final installed = await MBTilesService.instance.importLocalMbtiles(
-        regionId: targetRegionId,
-        sourceFilePath: path,
-      );
+      final installed = isPmtiles
+          ? await MBTilesService.instance.importLocalPmtiles(
+              regionId: targetRegionId,
+              sourceFilePath: path,
+            )
+          : await MBTilesService.instance.importLocalMbtiles(
+              regionId: targetRegionId,
+              sourceFilePath: path,
+            );
       if (mounted) {
         setState(() {});
         messenger.showSnackBar(
           SnackBar(
             content: Text(
-              'Pacote "${installed.name}" (${installed.formattedSize}) validado (SQLite + tiles) e instalado!',
+              isPmtiles
+                  ? 'Pacote vetorial PMTiles "${installed.name}" (${installed.formattedSize}) validado e instalado para MapLibre Native!'
+                  : 'Pacote "${installed.name}" (${installed.formattedSize}) validado (SQLite + tiles) e instalado!',
             ),
             backgroundColor: AppTheme.successGreen,
           ),

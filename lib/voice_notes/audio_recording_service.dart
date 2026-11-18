@@ -9,6 +9,28 @@ import 'package:record/record.dart';
 import 'package:audioplayers/audioplayers.dart';
 
 import '../core/app_logger.dart';
+import 'audio_session_bridge.dart';
+
+/// Tipo de evento de interrupção de áudio comunicado à UI.
+enum AudioInterruptionNoticeType {
+  interruptedAndSaved,
+  becomingNoisy,
+  interruptionEnded,
+}
+
+/// Notificação emitida quando o sistema operacional interrompe uma gravação
+/// (ex.: chamada telefônica ou alarme no iOS via AVAudioSession).
+class AudioInterruptionNotice {
+  final AudioInterruptionNoticeType type;
+  final String message;
+  final RecordingResult? savedResult;
+
+  const AudioInterruptionNotice({
+    required this.type,
+    required this.message,
+    this.savedResult,
+  });
+}
 
 /// Exceção lançada quando ocorre falha na reprodução de áudio.
 class AudioPlaybackException implements Exception {
@@ -44,6 +66,7 @@ class RecordingResult {
 abstract class AudioRecordingService {
   bool get isRecording;
   Stream<int> get recordingDurationStream;
+  Stream<AudioInterruptionNotice> get interruptionStream;
 
   Future<bool> hasPermission();
   Future<bool> requestPermission();
@@ -64,20 +87,38 @@ abstract class AudioRecordingService {
   }
 }
 
-/// Implementação real de gravação de áudio usando package:record.
+/// Implementação real de gravação de áudio usando package:record + package:audio_session
+/// para gerenciamento explícito de AVAudioSession / AudioManager e interrupções (P1-08).
 class RealAudioRecordingService implements AudioRecordingService {
-  final AudioRecorder _audioRecorder = AudioRecorder();
+  final AudioRecorder _audioRecorder;
+  final bool _ownsRecorder;
+  final AudioSessionBridge _sessionBridge;
+  final bool _ownsSessionBridge;
+
+  RealAudioRecordingService({
+    AudioRecorder? audioRecorder,
+    AudioSessionBridge? sessionBridge,
+  }) : _audioRecorder = audioRecorder ?? AudioRecorder(),
+       _ownsRecorder = audioRecorder == null,
+       _sessionBridge = sessionBridge ?? PlatformAudioSessionBridge(),
+       _ownsSessionBridge = sessionBridge == null;
+
   int _maxDurationSeconds = 30;
   final Uuid _uuid = const Uuid();
   bool _isRecording = false;
+  bool _isStopping = false;
   Timer? _timer;
   StreamSubscription<RecordState>? _recordStateSub;
+  StreamSubscription<AudioSessionInterruption>? _interruptionSub;
+  StreamSubscription<void>? _becomingNoisySub;
   int _elapsedSeconds = 0;
   DateTime? _startedAt;
   String? _currentFilePath;
 
   final StreamController<int> _durationController =
       StreamController<int>.broadcast();
+  final StreamController<AudioInterruptionNotice> _interruptionController =
+      StreamController<AudioInterruptionNotice>.broadcast();
 
   RecordingResult? _lastResult;
 
@@ -86,6 +127,10 @@ class RealAudioRecordingService implements AudioRecordingService {
 
   @override
   Stream<int> get recordingDurationStream => _durationController.stream;
+
+  @override
+  Stream<AudioInterruptionNotice> get interruptionStream =>
+      _interruptionController.stream;
 
   @override
   Future<bool> hasPermission() async {
@@ -176,17 +221,31 @@ class RealAudioRecordingService implements AudioRecordingService {
       config = const RecordConfig(encoder: AudioEncoder.aacLc);
     }
 
+    // Configura e ativa AVAudioSession (iOS) / AudioManager (Android) antes da captura (P1-08).
+    await _sessionBridge.activate(role: AudioSessionRole.recording);
+
     await _audioRecorder.start(config, path: _currentFilePath!);
     _isRecording = true;
 
-    // Trata interrupção de áudio pelo sistema operacional (ex.: chamada recebida no iOS via AVAudioSession)
+    // Trata interrupção de áudio explícita via AVAudioSession / AudioManager (chamada, alarme, Siri).
+    _interruptionSub?.cancel();
+    _interruptionSub = _sessionBridge.interruptionEvents.listen((event) {
+      unawaited(_handleSessionInterruption(event));
+    });
+
+    _becomingNoisySub?.cancel();
+    _becomingNoisySub = _sessionBridge.becomingNoisyEvents.listen((_) {
+      unawaited(_handleBecomingNoisy());
+    });
+
+    // Fallback adicional via estado do plugin record caso o SO encerre a captura diretamente.
     _recordStateSub?.cancel();
     _recordStateSub = _audioRecorder.onStateChanged().listen((state) {
-      if (state == RecordState.stop && _isRecording) {
+      if (state == RecordState.stop && _isRecording && !_isStopping) {
         AppLogger.info(
-          'Interrupção de áudio detectada pelo sistema operacional. Finalizando gravação com integridade.',
+          'Interrupção de áudio detectada pelo sistema operacional (RecordState.stop). Finalizando gravação com integridade.',
         );
-        unawaited(stopRecording());
+        unawaited(_finalizeDueToInterruption('record_state_stop'));
       }
     });
 
@@ -203,7 +262,7 @@ class RealAudioRecordingService implements AudioRecordingService {
       }
       if (_elapsedSeconds >= _maxDurationSeconds) {
         timer.cancel();
-        // Interrompe o gravador de verdade ao atingir 30 segundos
+        // Interrompe o gravador de verdade ao atingir o limite configurado
         await stopRecording();
       }
     });
@@ -211,14 +270,71 @@ class RealAudioRecordingService implements AudioRecordingService {
     return _currentFilePath!;
   }
 
+  Future<void> _handleSessionInterruption(
+    AudioSessionInterruption event,
+  ) async {
+    if (event.begin) {
+      if (!_isRecording || _isStopping) return;
+      AppLogger.info(
+        'AVAudioSession/AudioManager interruption began (${event.reason}). Salvando gravação com integridade.',
+      );
+      await _finalizeDueToInterruption(event.reason);
+    } else {
+      if (!_interruptionController.isClosed) {
+        _interruptionController.add(
+          const AudioInterruptionNotice(
+            type: AudioInterruptionNoticeType.interruptionEnded,
+            message: 'Interrupção de áudio encerrada. Você pode iniciar uma nova gravação.',
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleBecomingNoisy() async {
+    if (!_isRecording || _isStopping) return;
+    AppLogger.info(
+      'Dispositivo de áudio desconectado (becomingNoisy). Salvando gravação com segurança.',
+    );
+    final saved = await stopRecording();
+    if (!_interruptionController.isClosed) {
+      _interruptionController.add(
+        AudioInterruptionNotice(
+          type: AudioInterruptionNoticeType.becomingNoisy,
+          message: 'Fone/microfone desconectado. O áudio gravado até o momento foi preservado com segurança.',
+          savedResult: saved,
+        ),
+      );
+    }
+  }
+
+  Future<void> _finalizeDueToInterruption(String reason) async {
+    final saved = await stopRecording();
+    if (!_interruptionController.isClosed) {
+      _interruptionController.add(
+        AudioInterruptionNotice(
+          type: AudioInterruptionNoticeType.interruptedAndSaved,
+          message:
+              'Gravação pausada e salva automaticamente devido a uma interrupção do sistema ($reason).',
+          savedResult: saved,
+        ),
+      );
+    }
+  }
+
   @override
   Future<RecordingResult?> stopRecording() async {
-    if (!_isRecording) return _lastResult;
+    if (!_isRecording || _isStopping) return _lastResult;
+    _isStopping = true;
 
     _timer?.cancel();
     _timer = null;
     _recordStateSub?.cancel();
     _recordStateSub = null;
+    _interruptionSub?.cancel();
+    _interruptionSub = null;
+    _becomingNoisySub?.cancel();
+    _becomingNoisySub = null;
     _isRecording = false;
 
     String? path;
@@ -227,6 +343,8 @@ class RealAudioRecordingService implements AudioRecordingService {
     } catch (e, st) {
       AppLogger.warning('Falha ao parar gravação de áudio nativo', e, st);
     }
+
+    await _sessionBridge.deactivate();
 
     path ??= _currentFilePath ?? 'voice_note_${_uuid.v4()}.m4a';
 
@@ -275,6 +393,7 @@ class RealAudioRecordingService implements AudioRecordingService {
       fileSize: size,
       recordedAt: recordedAt,
     );
+    _isStopping = false;
     return _lastResult;
   }
 
@@ -284,7 +403,12 @@ class RealAudioRecordingService implements AudioRecordingService {
     _timer = null;
     _recordStateSub?.cancel();
     _recordStateSub = null;
+    _interruptionSub?.cancel();
+    _interruptionSub = null;
+    _becomingNoisySub?.cancel();
+    _becomingNoisySub = null;
     _isRecording = false;
+    _isStopping = false;
     _elapsedSeconds = 0;
 
     try {
@@ -292,6 +416,8 @@ class RealAudioRecordingService implements AudioRecordingService {
     } catch (e, st) {
       AppLogger.debug('Falha ao cancelar gravação nativa: $e', st);
     }
+
+    await _sessionBridge.deactivate();
 
     if (_currentFilePath != null && !kIsWeb) {
       try {
@@ -316,11 +442,22 @@ class RealAudioRecordingService implements AudioRecordingService {
     _timer = null;
     _recordStateSub?.cancel();
     _recordStateSub = null;
+    _interruptionSub?.cancel();
+    _interruptionSub = null;
+    _becomingNoisySub?.cancel();
+    _becomingNoisySub = null;
     _durationController.close();
-    try {
-      _audioRecorder.dispose();
-    } catch (e, st) {
-      AppLogger.debug('Falha ao descartar _audioRecorder: $e', st);
+    _interruptionController.close();
+    unawaited(_sessionBridge.deactivate());
+    if (_ownsSessionBridge) {
+      _sessionBridge.dispose();
+    }
+    if (_ownsRecorder) {
+      try {
+        _audioRecorder.dispose();
+      } catch (e, st) {
+        AppLogger.debug('Falha ao descartar _audioRecorder: $e', st);
+      }
     }
   }
 }
@@ -352,12 +489,18 @@ class LocalAudioRecordingService implements AudioRecordingService {
 
   final StreamController<int> _durationController =
       StreamController<int>.broadcast();
+  final StreamController<AudioInterruptionNotice> _interruptionController =
+      StreamController<AudioInterruptionNotice>.broadcast();
 
   @override
   bool get isRecording => _isRecording;
 
   @override
   Stream<int> get recordingDurationStream => _durationController.stream;
+
+  @override
+  Stream<AudioInterruptionNotice> get interruptionStream =>
+      _interruptionController.stream;
 
   @override
   Future<bool> hasPermission() async => _hasPermission;
@@ -531,6 +674,7 @@ class LocalAudioRecordingService implements AudioRecordingService {
     _timer?.cancel();
     _timer = null;
     _durationController.close();
+    _interruptionController.close();
   }
 }
 
@@ -554,18 +698,35 @@ abstract class AudioPlayerService {
   }
 }
 
-/// Implementação real do player de áudio usando package:audioplayers.
+/// Implementação real do player de áudio usando package:audioplayers + audio_session.
 class RealAudioPlayerService implements AudioPlayerService {
   AudioPlayer? _player;
+  final AudioSessionBridge _sessionBridge;
+  final bool _ownsSessionBridge;
   final StreamController<Duration> _posController =
       StreamController<Duration>.broadcast();
   final StreamController<bool> _stateController =
       StreamController<bool>.broadcast();
   StreamSubscription<Duration>? _posSub;
   StreamSubscription<PlayerState>? _stateSub;
+  StreamSubscription<AudioSessionInterruption>? _interruptionSub;
+  StreamSubscription<void>? _becomingNoisySub;
   bool _isPlaying = false;
 
-  RealAudioPlayerService();
+  RealAudioPlayerService({AudioSessionBridge? sessionBridge})
+    : _sessionBridge = sessionBridge ?? PlatformAudioSessionBridge(),
+      _ownsSessionBridge = sessionBridge == null {
+    _interruptionSub = _sessionBridge.interruptionEvents.listen((event) {
+      if (event.begin && event.shouldPause && _isPlaying) {
+        unawaited(pause());
+      }
+    });
+    _becomingNoisySub = _sessionBridge.becomingNoisyEvents.listen((_) {
+      if (_isPlaying) {
+        unawaited(pause());
+      }
+    });
+  }
 
   AudioPlayer _ensurePlayer() {
     final existing = _player;
@@ -619,6 +780,7 @@ class RealAudioPlayerService implements AudioPlayerService {
         }
         source = DeviceFileSource(filePath);
       }
+      await _sessionBridge.activate(role: AudioSessionRole.playback);
       await _ensurePlayer().play(source);
     } catch (e) {
       _isPlaying = false;
@@ -660,8 +822,14 @@ class RealAudioPlayerService implements AudioPlayerService {
   void dispose() {
     _posSub?.cancel();
     _stateSub?.cancel();
+    _interruptionSub?.cancel();
+    _becomingNoisySub?.cancel();
     _posController.close();
     _stateController.close();
+    unawaited(_sessionBridge.deactivate());
+    if (_ownsSessionBridge) {
+      _sessionBridge.dispose();
+    }
     final player = _player;
     _player = null;
     if (player != null) {

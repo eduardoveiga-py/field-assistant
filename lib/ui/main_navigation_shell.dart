@@ -432,8 +432,15 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
             : f.icon;
         railDestinations.add(
           NavigationRailDestination(
-            icon: Icon(railIcon),
-            selectedIcon: Icon(selectedRailIcon),
+            icon: Semantics(
+              label: 'Navegar para ${_getFeatureLabel(f, strings)}',
+              child: Icon(railIcon),
+            ),
+            selectedIcon: Semantics(
+              selected: true,
+              label: 'Navegar para ${_getFeatureLabel(f, strings)}',
+              child: Icon(selectedRailIcon),
+            ),
             label: Text(_getFeatureLabel(f, strings)),
           ),
         );
@@ -443,8 +450,15 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
       // Adiciona Ajustes no final do Rail
       railDestinations.add(
         NavigationRailDestination(
-          icon: const Icon(Icons.settings_outlined),
-          selectedIcon: const Icon(Icons.settings),
+          icon: Semantics(
+            label: 'Navegar para Ajustes e Backup',
+            child: const Icon(Icons.settings_outlined),
+          ),
+          selectedIcon: Semantics(
+            selected: true,
+            label: 'Navegar para Ajustes e Backup',
+            child: const Icon(Icons.settings),
+          ),
           label: Text(strings.navSettings.split(' ').first),
         ),
       );
@@ -529,20 +543,32 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
 
     final barDestinations = <NavigationDestination>[];
     for (final f in primaryBarFeatures) {
+      final label = _getFeatureLabel(f, strings);
       barDestinations.add(
         NavigationDestination(
-          icon: Icon(f.icon, size: 22),
-          selectedIcon: Icon(f.icon, size: 22),
-          label: _getFeatureLabel(f, strings),
+          icon: Semantics(label: 'Aba $label', child: Icon(f.icon, size: 22)),
+          selectedIcon: Semantics(
+            selected: true,
+            label: 'Aba $label',
+            child: Icon(f.icon, size: 22),
+          ),
+          label: label,
         ),
       );
     }
 
     // Botão Mais
     barDestinations.add(
-      const NavigationDestination(
-        icon: Icon(Icons.more_horiz, size: 22),
-        selectedIcon: Icon(Icons.more_horiz, size: 22),
+      NavigationDestination(
+        icon: Semantics(
+          label: 'Abrir menu Mais recursos do ministério',
+          child: const Icon(Icons.more_horiz, size: 22),
+        ),
+        selectedIcon: Semantics(
+          selected: true,
+          label: 'Abrir menu Mais recursos do ministério',
+          child: const Icon(Icons.more_horiz, size: 22),
+        ),
         label: 'Mais',
       ),
     );

@@ -49,6 +49,23 @@ class MBTilesWeb implements MBTilesBackend {
   }
 
   @override
+  String? getPackagesDirectoryPath() => null;
+
+  @override
+  List<InstalledOfflineMapPackage> getInstalledPackages() => const [];
+
+  @override
+  Future<void> importPmtilesFile({
+    required String regionId,
+    required String sourceFilePath,
+    void Function(double progress, int copiedBytes)? onProgress,
+  }) async {
+    throw UnsupportedError(
+      'Importação local de arquivo .pmtiles não é suportada no navegador Web.',
+    );
+  }
+
+  @override
   Future<Map<String, dynamic>> loadUrlConfig() async =>
       const <String, dynamic>{};
 

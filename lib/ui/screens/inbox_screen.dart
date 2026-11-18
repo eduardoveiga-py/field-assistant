@@ -40,6 +40,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
     with SingleTickerProviderStateMixin {
   String _selectedFilter =
       'unprocessed'; // unprocessed, in_review, converted, all
+  String? _selectedEntryId;
   late final AudioPlayerService _playerService;
   String? _currentlyPlayingPath;
   bool _isPlaying = false;
@@ -364,9 +365,12 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
               size: 24,
             ),
             SizedBox(width: 8),
-            Text(
-              'Inbox & JW Mail',
-              style: TextStyle(fontWeight: FontWeight.bold),
+            Expanded(
+              child: Text(
+                'Inbox & JW Mail',
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
             ),
           ],
         ),
@@ -493,14 +497,126 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                 return _buildEmptyState(isDark);
               }
 
-              return ListView.separated(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                itemCount: entries.length,
-                separatorBuilder: (ctx, i) => const SizedBox(height: 10),
-                itemBuilder: (ctx, i) => _buildEntryCard(entries[i], isDark),
+              return LayoutBuilder(
+                builder: (context, constraints) {
+                  final isWide = constraints.maxWidth >= 900;
+                  InboxEntry? selectedEntry;
+                  if (_selectedEntryId != null) {
+                    for (final item in entries) {
+                      if (item.id == _selectedEntryId) {
+                        selectedEntry = item;
+                        break;
+                      }
+                    }
+                  }
+
+                  final listWidget = ListView.separated(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    itemCount: entries.length,
+                    separatorBuilder: (ctx, i) => const SizedBox(height: 10),
+                    itemBuilder: (ctx, i) {
+                      final entry = entries[i];
+                      final card = _buildEntryCard(entry, isDark);
+                      if (!isWide) return card;
+                      final isSelected = _selectedEntryId == entry.id;
+                      return Semantics(
+                        selected: isSelected,
+                        label: 'Captura rápida: ${entry.content}',
+                        child: GestureDetector(
+                          onTap: () =>
+                              setState(() => _selectedEntryId = entry.id),
+                          child: Container(
+                            decoration: isSelected
+                                ? BoxDecoration(
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(
+                                      color: AppTheme.primaryBlue,
+                                      width: 2,
+                                    ),
+                                  )
+                                : null,
+                            child: card,
+                          ),
+                        ),
+                      );
+                    },
+                  );
+
+                  if (!isWide) return listWidget;
+
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SizedBox(width: 420, child: listWidget),
+                      const VerticalDivider(width: 1),
+                      Expanded(
+                        child: selectedEntry == null
+                            ? Center(
+                                child: Semantics(
+                                  label: 'Selecione uma captura para visualizar detalhes',
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.inbox_outlined,
+                                        size: 52,
+                                        color: Colors.grey.shade400,
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        'Selecione uma captura para visualizar detalhes',
+                                        style: TextStyle(
+                                          color: isDark
+                                              ? const Color(0xFF94A3B8)
+                                              : AppTheme.textMuted,
+                                          fontSize: 15,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              )
+                            : SingleChildScrollView(
+                                padding: const EdgeInsets.all(24),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Semantics(
+                                      header: true,
+                                      child: Text(
+                                        'Detalhe da Captura (${selectedEntry.status})',
+                                        style: const TextStyle(
+                                          fontSize: 19,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Origem: ${selectedEntry.sourceType}',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: AppTheme.textMuted,
+                                      ),
+                                    ),
+                                    const Divider(height: 24),
+                                    SelectableText(
+                                      selectedEntry.content,
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        height: 1.5,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                      ),
+                    ],
+                  );
+                },
               );
             },
           ),

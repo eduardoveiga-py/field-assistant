@@ -8,6 +8,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:sqlite3/sqlite3.dart' as sql;
 
 import '../../core/app_logger.dart';
+import '../map_engine/pmtiles_reader.dart';
+import '../map_engine_adapter.dart';
 import 'mbtiles_backend.dart';
 
 MBTilesBackend getMBTilesBackend() => MBTilesNative();
@@ -132,10 +134,14 @@ class MBTilesNative implements MBTilesBackend {
   @override
   bool isRegionInstalled(String regionId) {
     if (_mbtilesDir == null) return false;
-    final file = File(
+    final mbtilesFile = File(
       '${_mbtilesDir!.path}${Platform.pathSeparator}$regionId.mbtiles',
     );
-    return file.existsSync() && file.lengthSync() > 0;
+    if (mbtilesFile.existsSync() && mbtilesFile.lengthSync() > 0) return true;
+    final pmtilesFile = File(
+      '${_mbtilesDir!.path}${Platform.pathSeparator}$regionId.pmtiles',
+    );
+    return pmtilesFile.existsSync() && pmtilesFile.lengthSync() > 0;
   }
 
   @override
@@ -148,9 +154,114 @@ class MBTilesNative implements MBTilesBackend {
     return '${_mbtilesDir!.path}${Platform.pathSeparator}$regionId.mbtiles';
   }
 
+  String _getPmtilesFilePath(String regionId) {
+    if (_mbtilesDir == null) {
+      throw StateError(
+        'MBTilesNative não inicializado. Chame init() primeiro.',
+      );
+    }
+    return '${_mbtilesDir!.path}${Platform.pathSeparator}$regionId.pmtiles';
+  }
+
+  @override
+  String? getPackagesDirectoryPath() => _mbtilesDir?.path;
+
+  bool _isVectorMbtilesFile(File file) {
+    sql.Database? db;
+    try {
+      db = sql.sqlite3.open(file.path, mode: sql.OpenMode.readOnly);
+      try {
+        final meta = db.select(
+          "SELECT value FROM metadata WHERE name = 'format' LIMIT 1",
+        );
+        if (meta.isNotEmpty) {
+          final fmt = meta.first['value']?.toString().toLowerCase() ?? '';
+          if (fmt == 'pbf' || fmt == 'mvt' || fmt.contains('vector')) {
+            return true;
+          }
+          if (fmt == 'png' || fmt == 'jpg' || fmt == 'jpeg' || fmt == 'webp') {
+            return false;
+          }
+        }
+      } on sql.SqliteException {
+        // Sem tabela metadata: inspeciona amostra de tile.
+      }
+      final samples = db.select('SELECT tile_data FROM tiles LIMIT 1');
+      if (samples.isEmpty || samples.first['tile_data'] is! Uint8List) {
+        return false;
+      }
+      final bytes = samples.first['tile_data'] as Uint8List;
+      final isPng =
+          bytes.length >= 8 &&
+          bytes[0] == 0x89 &&
+          bytes[1] == 0x50 &&
+          bytes[2] == 0x4e &&
+          bytes[3] == 0x47;
+      final isJpeg =
+          bytes.length >= 3 &&
+          bytes[0] == 0xff &&
+          bytes[1] == 0xd8 &&
+          bytes[2] == 0xff;
+      final isWebp =
+          bytes.length >= 12 &&
+          ascii.decode(bytes.sublist(0, 4), allowInvalid: true) == 'RIFF' &&
+          ascii.decode(bytes.sublist(8, 12), allowInvalid: true) == 'WEBP';
+      return !isPng && !isJpeg && !isWebp;
+    } catch (_) {
+      return false;
+    } finally {
+      db?.close();
+    }
+  }
+
+  @override
+  List<InstalledOfflineMapPackage> getInstalledPackages() {
+    if (_mbtilesDir == null || !_mbtilesDir!.existsSync()) {
+      return const [];
+    }
+    final packages = <InstalledOfflineMapPackage>[];
+    final files = _mbtilesDir!.listSync().whereType<File>().toList()
+      ..sort((a, b) => a.path.compareTo(b.path));
+    for (final f in files) {
+      final size = f.lengthSync();
+      if (size <= 0) continue;
+      final name = f.uri.pathSegments.last;
+      if (name.endsWith('.pmtiles')) {
+        final id = name.substring(0, name.length - '.pmtiles'.length);
+        packages.add(
+          InstalledOfflineMapPackage(
+            id: id,
+            format: OfflineMapFormat.pmtiles,
+            isVector: true,
+            filePath: f.path,
+            sizeBytes: size,
+          ),
+        );
+      } else if (name.endsWith('.mbtiles')) {
+        final id = name.substring(0, name.length - '.mbtiles'.length);
+        packages.add(
+          InstalledOfflineMapPackage(
+            id: id,
+            format: OfflineMapFormat.mbtiles,
+            isVector: _isVectorMbtilesFile(f),
+            filePath: f.path,
+            sizeBytes: size,
+          ),
+        );
+      }
+    }
+    return packages;
+  }
+
   @override
   int? getRegionFileSize(String regionId) {
     if (_mbtilesDir == null) return null;
+    final pmtilesFile = File(
+      '${_mbtilesDir!.path}${Platform.pathSeparator}$regionId.pmtiles',
+    );
+    if (pmtilesFile.existsSync() && pmtilesFile.lengthSync() > 0) {
+      return pmtilesFile.lengthSync();
+    }
     final file = File(
       '${_mbtilesDir!.path}${Platform.pathSeparator}$regionId.mbtiles',
     );
@@ -169,6 +280,9 @@ class MBTilesNative implements MBTilesBackend {
       final name = f.uri.pathSegments.last;
       if (name.endsWith('.mbtiles') && f.lengthSync() > 0) {
         final id = name.substring(0, name.length - '.mbtiles'.length);
+        ids.add(id);
+      } else if (name.endsWith('.pmtiles') && f.lengthSync() > 0) {
+        final id = name.substring(0, name.length - '.pmtiles'.length);
         ids.add(id);
       }
     }
@@ -409,6 +523,71 @@ class MBTilesNative implements MBTilesBackend {
     );
   }
 
+  @override
+  Future<void> importPmtilesFile({
+    required String regionId,
+    required String sourceFilePath,
+    void Function(double progress, int copiedBytes)? onProgress,
+  }) async {
+    if (_mbtilesDir == null) await init();
+    final sourceFile = File(sourceFilePath);
+    if (!sourceFile.existsSync()) {
+      throw FileSystemException(
+        'Arquivo .pmtiles selecionado não foi encontrado no dispositivo.',
+        sourceFilePath,
+      );
+    }
+
+    // Valida cabeçalho oficial PMTiles v3 antes de instalar no diretório gerenciado.
+    final reader = PmtilesReader(sourceFile);
+    await reader.getHeader();
+
+    final finalPath = _getPmtilesFilePath(regionId);
+    final tmpPath = '$finalPath.tmp';
+    final tmpFile = File(tmpPath);
+    if (tmpFile.existsSync()) {
+      tmpFile.deleteSync();
+    }
+
+    final totalBytes = sourceFile.lengthSync();
+    int copied = 0;
+    final sink = tmpFile.openWrite();
+    try {
+      await for (final chunk in sourceFile.openRead()) {
+        sink.add(chunk);
+        copied += chunk.length;
+        final progress = totalBytes > 0
+            ? (copied / totalBytes).clamp(0.0, 1.0)
+            : 0.0;
+        onProgress?.call(progress, copied);
+      }
+      await sink.flush();
+      await sink.close();
+
+      // Revalida o arquivo gravado antes da substituição atômica.
+      await PmtilesReader(tmpFile).getHeader();
+
+      final finalFile = File(finalPath);
+      if (finalFile.existsSync()) {
+        finalFile.deleteSync();
+      }
+      tmpFile.renameSync(finalPath);
+      AppLogger.info(
+        'PMTiles vetorial instalado com sucesso: $finalPath ($copied bytes)',
+      );
+    } catch (e) {
+      try {
+        await sink.close();
+      } catch (_) {}
+      if (tmpFile.existsSync()) {
+        try {
+          tmpFile.deleteSync();
+        } catch (_) {}
+      }
+      rethrow;
+    }
+  }
+
   File get _urlConfigFile =>
       File('${_mbtilesDir!.path}${Platform.pathSeparator}mbtiles_config.json');
 
@@ -455,6 +634,18 @@ class MBTilesNative implements MBTilesBackend {
         AppLogger.info('Arquivo MBTiles excluído do disco: $finalPath');
       } catch (e) {
         AppLogger.error('Erro ao excluir arquivo MBTiles ($finalPath): $e');
+        rethrow;
+      }
+    }
+
+    final pmtilesPath = _getPmtilesFilePath(regionId);
+    final pmtilesFile = File(pmtilesPath);
+    if (pmtilesFile.existsSync()) {
+      try {
+        pmtilesFile.deleteSync();
+        AppLogger.info('Arquivo PMTiles excluído do disco: $pmtilesPath');
+      } catch (e) {
+        AppLogger.error('Erro ao excluir arquivo PMTiles ($pmtilesPath): $e');
         rethrow;
       }
     }

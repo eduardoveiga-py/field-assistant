@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import '../../core/app_logger.dart';
 import '../../core/app_version.dart';
+import '../map_engine_adapter.dart';
 import 'mbtiles_backend.dart';
 import 'mbtiles_web.dart' if (dart.library.io) 'mbtiles_native.dart';
 
@@ -515,6 +516,66 @@ class MBTilesService {
 
     await refreshInstalledStatus();
     return _currentRegions.firstWhere((r) => r.id == targetId);
+  }
+
+  /// Importa um arquivo vetorial `.pmtiles` local via caminho em disco, validando
+  /// o cabeçalho PMTiles v3 antes de disponibilizá-lo para o motor MapLibre Native.
+  Future<MBTileRegion> importLocalPmtiles({
+    String? regionId,
+    required String sourceFilePath,
+    String? displayName,
+    void Function(double progress, int copiedBytes)? onProgress,
+  }) async {
+    await _backend.init();
+    String targetId = (regionId ?? '').trim();
+    final fileName = sourceFilePath.split(RegExp(r'[/\\]')).last;
+    final stem = fileName.toLowerCase().endsWith('.pmtiles')
+        ? fileName.substring(0, fileName.length - '.pmtiles'.length)
+        : fileName;
+
+    if (targetId.isEmpty) {
+      final sanitized = stem
+          .toLowerCase()
+          .replaceAll(RegExp(r'[^a-z0-9_]+'), '_')
+          .replaceAll(RegExp(r'^_+|_+$'), '');
+      targetId = sanitized.isNotEmpty ? 'local_$sanitized' : 'local_pmtiles';
+    }
+
+    await _backend.importPmtilesFile(
+      regionId: targetId,
+      sourceFilePath: sourceFilePath,
+      onProgress: onProgress,
+    );
+
+    tilesRevision.value++;
+    final isDefault = _defaultCatalog.any((r) => r.id == targetId);
+    if (!isDefault) {
+      final label = (displayName != null && displayName.trim().isNotEmpty)
+          ? displayName.trim()
+          : (stem.trim().isNotEmpty ? stem.trim() : targetId);
+      _customRegionNames[targetId] = label;
+      await _persistUrlConfig();
+    }
+
+    await refreshInstalledStatus();
+    return _currentRegions.firstWhere((r) => r.id == targetId);
+  }
+
+  /// Retorna o diretório físico onde pacotes offline (.pmtiles / .mbtiles) residem.
+  String? get packagesDirectoryPath => _backend.getPackagesDirectoryPath();
+
+  /// Lista todos os pacotes offline instalados com formato e indicador vetorial.
+  List<InstalledOfflineMapPackage> get installedPackages =>
+      _backend.getInstalledPackages();
+
+  /// Retorna o pacote vetorial prioritário instalado (prefere `.pmtiles` sobre `.mbtiles` vetorial).
+  InstalledOfflineMapPackage? get primaryVectorPackage {
+    final vectorPkgs = installedPackages.where((p) => p.isVector).toList();
+    if (vectorPkgs.isEmpty) return null;
+    for (final pkg in vectorPkgs) {
+      if (pkg.format == OfflineMapFormat.pmtiles) return pkg;
+    }
+    return vectorPkgs.first;
   }
 
   /// Verifica se uma região está instalada no disco.

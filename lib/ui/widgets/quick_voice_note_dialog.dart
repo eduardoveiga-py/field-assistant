@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_theme.dart';
@@ -76,6 +77,7 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
 
   StreamSubscription<int>? _durationSub;
   StreamSubscription<bool>? _playerStateSub;
+  StreamSubscription<AudioInterruptionNotice>? _interruptionSub;
 
   bool _isRecording = false;
   int _seconds = 0;
@@ -127,6 +129,21 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
       }
     });
 
+    _interruptionSub = _recordingService.interruptionStream.listen((notice) {
+      if (!mounted) return;
+      if (notice.type == AudioInterruptionNoticeType.interruptedAndSaved ||
+          notice.type == AudioInterruptionNoticeType.becomingNoisy) {
+        unawaited(_dictationService.stopListening());
+        setState(() {
+          _isRecording = false;
+          if (notice.savedResult != null) {
+            _recordingResult = notice.savedResult;
+          }
+          _dictationError = notice.message;
+        });
+      }
+    });
+
     if (initial.isNotEmpty) {
       _processTranscription(initial);
     }
@@ -136,6 +153,7 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
   void dispose() {
     _durationSub?.cancel();
     _playerStateSub?.cancel();
+    _interruptionSub?.cancel();
     if (widget.recordingService == null) {
       _recordingService.dispose();
     }
@@ -180,6 +198,7 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
       _seconds = 0;
       _dictationError = null;
     });
+    _announceSemantics('Gravação de áudio iniciada');
 
     final dictationFuture = _dictationService.startListening(
       onResult: (text) {
@@ -205,11 +224,13 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
     await _dictationService.stopListening();
 
     if (mounted) {
+      final elapsed = _seconds;
       setState(() {
         _isRecording = false;
         _recordingResult = result;
       });
       _processTranscription(_transcriptionController.text);
+      _announceSemantics('Gravação concluída. Duração: $elapsed segundos');
     }
   }
 
@@ -232,9 +253,20 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
     });
   }
 
+  void _announceSemantics(String message) {
+    if (!mounted) return;
+    final view = View.maybeOf(context);
+    if (view != null) {
+      unawaited(
+        SemanticsService.sendAnnouncement(view, message, TextDirection.ltr),
+      );
+    }
+  }
+
   Future<void> _toggleAudioPreview() async {
     if (_isPlayingAudio) {
       await _playerService.pause();
+      _announceSemantics('Reprodução de áudio pausada');
     } else {
       final path = _recordingResult?.filePath;
       if (path == null || path.isEmpty) {
@@ -247,6 +279,7 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
       }
       try {
         await _playerService.play(path);
+        _announceSemantics('Reproduzindo áudio gravado');
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -744,14 +777,17 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
               FittedBox(
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerLeft,
-                child: Text(
-                  'Registro Rápido (15s)',
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: isSunMode ? FontWeight.w900 : FontWeight.bold,
-                    color: isSunMode
-                        ? Colors.black
-                        : (isDark ? Colors.white : AppTheme.textDark),
+                child: Semantics(
+                  header: true,
+                  child: Text(
+                    'Registro Rápido (15s)',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: isSunMode ? FontWeight.w900 : FontWeight.bold,
+                      color: isSunMode
+                          ? Colors.black
+                          : (isDark ? Colors.white : AppTheme.textDark),
+                    ),
                   ),
                 ),
               ),
@@ -846,12 +882,16 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
               FittedBox(
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerRight,
-                child: Text(
-                  durationFormatted,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    color: isSunMode ? Colors.black : AppTheme.primaryBlue,
+                child: Semantics(
+                  liveRegion: true,
+                  label: 'Tempo de gravação: $_seconds segundos de 30 segundos',
+                  child: Text(
+                    durationFormatted,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: isSunMode ? Colors.black : AppTheme.primaryBlue,
+                    ),
                   ),
                 ),
               ),
@@ -891,105 +931,141 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
             alignment: WrapAlignment.center,
             children: [
               if (!_isRecording)
-                ConstrainedBox(
-                  constraints: const BoxConstraints(minHeight: 48),
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: isSunMode
-                          ? Colors.black
-                          : const Color(0xFF4F46E5),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        side: isSunMode
-                            ? const BorderSide(color: Colors.black, width: 2)
-                            : BorderSide.none,
-                      ),
+                Semantics(
+                  button: true,
+                  container: true,
+                  excludeSemantics: true,
+                  label: _seconds == 0
+                      ? 'Iniciar gravação de voz (nota de voz)'
+                      : 'Gravar nota de voz novamente',
+                  hint: _seconds == 0
+                      ? 'Ativa o microfone e inicia o reconhecimento de fala'
+                      : 'Descarta gravação atual e inicia uma nova',
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      minHeight: 48,
+                      minWidth: 48,
                     ),
-                    onPressed: _startRecording,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.mic, size: 20),
-                        const SizedBox(width: 8),
-                        Flexible(
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Text(
-                              _seconds == 0
-                                  ? 'Iniciar Gravação'
-                                  : 'Gravar Novamente',
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isSunMode
+                            ? Colors.black
+                            : const Color(0xFF4F46E5),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          side: isSunMode
+                              ? const BorderSide(color: Colors.black, width: 2)
+                              : BorderSide.none,
+                        ),
+                      ),
+                      onPressed: _startRecording,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.mic, size: 20),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                _seconds == 0
+                                    ? 'Iniciar Gravação'
+                                    : 'Gravar Novamente',
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 )
               else
-                ConstrainedBox(
-                  constraints: const BoxConstraints(minHeight: 48),
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red.shade700,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        side: isSunMode
-                            ? const BorderSide(color: Colors.black, width: 2)
-                            : BorderSide.none,
-                      ),
+                Semantics(
+                  button: true,
+                  label: 'Parar gravação de voz',
+                  hint: 'Finaliza a captura de áudio e processa a transcrição',
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      minHeight: 48,
+                      minWidth: 48,
                     ),
-                    onPressed: _stopRecording,
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.stop, size: 20),
-                        SizedBox(width: 8),
-                        Flexible(
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Text('Concluir Gravação'),
-                          ),
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red.shade700,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          side: isSunMode
+                              ? const BorderSide(color: Colors.black, width: 2)
+                              : BorderSide.none,
                         ),
-                      ],
+                      ),
+                      onPressed: _stopRecording,
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.stop, size: 20),
+                          SizedBox(width: 8),
+                          Flexible(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text('Concluir Gravação'),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               if (_seconds > 0 && !_isRecording)
-                ConstrainedBox(
-                  constraints: const BoxConstraints(minHeight: 48),
-                  child: OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: isSunMode
-                          ? Colors.black
-                          : AppTheme.primaryBlue,
-                      side: BorderSide(
-                        color: isSunMode ? Colors.black : AppTheme.primaryBlue,
-                        width: isSunMode ? 2.0 : 1.2,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
+                Semantics(
+                  button: true,
+                  label: _isPlayingAudio
+                      ? 'Pausar reprodução de áudio'
+                      : 'Reproduzir áudio gravado',
+                  hint: _isPlayingAudio
+                      ? 'Pausa o áudio da nota de voz'
+                      : 'Ouvir a gravação da nota de voz',
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      minHeight: 48,
+                      minWidth: 48,
                     ),
-                    onPressed: _toggleAudioPreview,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          _isPlayingAudio ? Icons.pause : Icons.play_arrow,
-                          size: 20,
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: isSunMode
+                            ? Colors.black
+                            : AppTheme.primaryBlue,
+                        side: BorderSide(
+                          color: isSunMode
+                              ? Colors.black
+                              : AppTheme.primaryBlue,
+                          width: isSunMode ? 2.0 : 1.2,
                         ),
-                        const SizedBox(width: 8),
-                        Flexible(
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Text(
-                              _isPlayingAudio ? 'Pausar' : 'Ouvir Áudio',
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      onPressed: _toggleAudioPreview,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _isPlayingAudio ? Icons.pause : Icons.play_arrow,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                _isPlayingAudio ? 'Pausar' : 'Ouvir Áudio',
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),

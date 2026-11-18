@@ -41,6 +41,7 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
   final TextEditingController _searchCtrl = TextEditingController();
   String _searchQuery = '';
   String? _selectedNoteTag;
+  String? _selectedNoteId;
   String? _selectedQuestionStatus = 'all'; // 'all', 'answered', 'unanswered'
   String? _selectedQuestionCategory;
   String? _selectedDocCategory;
@@ -70,19 +71,25 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Row(
-          children: [
-            Icon(
-              Icons.menu_book_rounded,
-              color: AppTheme.primaryBlue,
-              size: 24,
-            ),
-            SizedBox(width: 8),
-            Text(
-              'Base de Conhecimento',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ],
+        title: Semantics(
+          header: true,
+          child: const Row(
+            children: [
+              Icon(
+                Icons.menu_book_rounded,
+                color: AppTheme.primaryBlue,
+                size: 24,
+              ),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Base de Conhecimento',
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
         ),
         actions: [
           IconButton(
@@ -231,288 +238,432 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
           }
         }).toList();
 
-        return Column(
-          children: [
-            // Filtros de Tags
-            if (allTags.isNotEmpty)
-              Container(
-                height: 48,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 6,
-                ),
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  children: [
-                    FilterChip(
-                      label: const Text('Todas as Tags'),
-                      selected: _selectedNoteTag == null,
-                      onSelected: (val) =>
-                          setState(() => _selectedNoteTag = null),
-                      backgroundColor: isDark
-                          ? const Color(0xFF1E293B)
-                          : const Color(0xFFF1F5F9),
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final isWide = constraints.maxWidth >= 900;
+            KnowledgeNoteEntry? selectedNote;
+            if (_selectedNoteId != null) {
+              for (final n in notes) {
+                if (n.id == _selectedNoteId) {
+                  selectedNote = n;
+                  break;
+                }
+              }
+            }
+
+            final listPane = Column(
+              children: [
+                // Filtros de Tags
+                if (allTags.isNotEmpty)
+                  Container(
+                    height: 48,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 6,
                     ),
-                    const SizedBox(width: 8),
-                    ...allTags.map((tag) {
-                      final isSelected = _selectedNoteTag == tag;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: FilterChip(
-                          avatar: Icon(
-                            Icons.tag,
-                            size: 14,
-                            color: isSelected
-                                ? Colors.white
-                                : AppTheme.primaryBlue,
-                          ),
-                          label: Text(tag),
-                          selected: isSelected,
-                          onSelected: (val) => setState(
-                            () => _selectedNoteTag = val ? tag : null,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      children: [
+                        FilterChip(
+                          label: const Text('Todas as Tags'),
+                          selected: _selectedNoteTag == null,
+                          onSelected: (val) =>
+                              setState(() => _selectedNoteTag = null),
+                          backgroundColor: isDark
+                              ? const Color(0xFF1E293B)
+                              : const Color(0xFFF1F5F9),
+                        ),
+                        const SizedBox(width: 8),
+                        ...allTags.map((tag) {
+                          final isSelected = _selectedNoteTag == tag;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: FilterChip(
+                              avatar: Icon(
+                                Icons.tag,
+                                size: 14,
+                                color: isSelected
+                                    ? Colors.white
+                                    : AppTheme.primaryBlue,
+                              ),
+                              label: Text(tag),
+                              selected: isSelected,
+                              onSelected: (val) => setState(
+                                () => _selectedNoteTag = val ? tag : null,
+                              ),
+                            ),
+                          );
+                        }),
+                      ],
+                    ),
+                  ),
+
+                Expanded(
+                  child: ListView.separated(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: notes.length,
+                    separatorBuilder: (ctx, i) => const SizedBox(height: 10),
+                    itemBuilder: (ctx, i) {
+                      final note = notes[i];
+                      List<String> noteTags = [];
+                      try {
+                        noteTags = (jsonDecode(note.tags) as List)
+                            .map((e) => e.toString())
+                            .where((t) => !t.startsWith('research:'))
+                            .toList();
+                      } catch (e, st) {
+                        AppLogger.debug(
+                          'Falha ao exibir tags da nota (${note.id}): $e',
+                          st,
+                        );
+                      }
+
+                      final isSelectedInSplit =
+                          isWide && _selectedNoteId == note.id;
+                      return Semantics(
+                        container: true,
+                        selected: isSelectedInSplit,
+                        label: 'Nota ${note.title}',
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxHeight: 180),
+                          child: Card(
+                            clipBehavior: Clip.antiAlias,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              side: isSelectedInSplit
+                                  ? const BorderSide(
+                                      color: AppTheme.primaryBlue,
+                                      width: 2,
+                                    )
+                                  : BorderSide.none,
+                            ),
+                            child: InkWell(
+                              onTap: () {
+                                if (isWide) {
+                                  setState(() => _selectedNoteId = note.id);
+                                  return;
+                                }
+                                showKnowledgeItemReader(
+                                  context,
+                                  title: note.title,
+                                  content: note.content,
+                                  category: note.category,
+                                  itemType: 'Nota',
+                                  updatedAt: note.updatedAt,
+                                  tags: noteTags,
+                                  onEdit: () => _showEditNoteModal(note),
+                                  onDelete: () => km.softDeleteNote(note.id),
+                                  onExport: () => _exportNote(note),
+                                );
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.all(14),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        if (note.isPinned) ...[
+                                          const Icon(
+                                            Icons.push_pin,
+                                            size: 16,
+                                            color: Colors.amber,
+                                          ),
+                                          const SizedBox(width: 4),
+                                        ],
+                                        Expanded(
+                                          child: Text(
+                                            note.title,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 15,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        PopupMenuButton<String>(
+                                          icon: const Icon(
+                                            Icons.more_vert,
+                                            size: 20,
+                                          ),
+                                          onSelected: (val) {
+                                            if (val == 'pin')
+                                              km.togglePinNote(note.id);
+                                            if (val == 'edit')
+                                              _showEditNoteModal(note);
+                                            if (val == 'research')
+                                              _transformNoteToResearch(note);
+                                            if (val == 'export')
+                                              _exportNote(note);
+                                            if (val == 'delete')
+                                              km.softDeleteNote(note.id);
+                                          },
+                                          itemBuilder: (ctx) => [
+                                            PopupMenuItem(
+                                              value: 'pin',
+                                              child: Text(
+                                                note.isPinned
+                                                    ? 'Desafixar'
+                                                    : 'Fixar no Topo',
+                                              ),
+                                            ),
+                                            const PopupMenuItem(
+                                              value: 'edit',
+                                              child: Text('Editar Nota'),
+                                            ),
+                                            const PopupMenuItem(
+                                              value: 'research',
+                                              child: Text(
+                                                'Transformar em Pesquisa',
+                                              ),
+                                            ),
+                                            const PopupMenuItem(
+                                              value: 'export',
+                                              child: Text('Exportar Nota'),
+                                            ),
+                                            const PopupMenuItem(
+                                              value: 'delete',
+                                              child: Text(
+                                                'Excluir Nota',
+                                                style: TextStyle(
+                                                  color: Colors.redAccent,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Expanded(
+                                      child: MarkdownPreviewText(
+                                        text: note.content,
+                                        maxLines: 3,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: isDark
+                                              ? const Color(0xFFCBD5E1)
+                                              : const Color(0xFF475569),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Wrap(
+                                          spacing: 6,
+                                          children: [
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 8,
+                                                    vertical: 2,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: AppTheme.primaryBlue
+                                                    .withValues(alpha: 0.12),
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
+                                              ),
+                                              child: Text(
+                                                note.category,
+                                                style: const TextStyle(
+                                                  fontSize: 11,
+                                                  color: AppTheme.primaryBlue,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
+                                            if (noteTags.isNotEmpty)
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 6,
+                                                      vertical: 2,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.teal.withValues(
+                                                    alpha: 0.12,
+                                                  ),
+                                                  borderRadius:
+                                                      BorderRadius.circular(6),
+                                                ),
+                                                child: Text(
+                                                  '#${noteTags.first}',
+                                                  style: const TextStyle(
+                                                    fontSize: 10,
+                                                    color: Colors.teal,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ),
+                                            if (note.tags.contains('research:'))
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 6,
+                                                      vertical: 2,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.purple
+                                                      .withValues(alpha: 0.12),
+                                                  borderRadius:
+                                                      BorderRadius.circular(6),
+                                                ),
+                                                child: const Row(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    Icon(
+                                                      Icons.auto_stories,
+                                                      size: 10,
+                                                      color: Colors.purple,
+                                                    ),
+                                                    SizedBox(width: 3),
+                                                    Text(
+                                                      'Pesquisa',
+                                                      style: TextStyle(
+                                                        fontSize: 10,
+                                                        color: Colors.purple,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                        Text(
+                                          _formatDate(note.updatedAt),
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                       );
-                    }),
-                  ],
+                    },
+                  ),
                 ),
-              ),
+              ],
+            );
 
-            Expanded(
-              child: ListView.separated(
-                padding: const EdgeInsets.all(16),
-                itemCount: notes.length,
-                separatorBuilder: (ctx, i) => const SizedBox(height: 10),
-                itemBuilder: (ctx, i) {
-                  final note = notes[i];
-                  List<String> noteTags = [];
-                  try {
-                    noteTags = (jsonDecode(note.tags) as List)
-                        .map((e) => e.toString())
-                        .where((t) => !t.startsWith('research:'))
-                        .toList();
-                  } catch (e, st) {
-                    AppLogger.debug(
-                      'Falha ao exibir tags da nota (${note.id}): $e',
-                      st,
-                    );
-                  }
+            if (!isWide) {
+              return listPane;
+            }
 
-                  return ConstrainedBox(
-                    constraints: const BoxConstraints(maxHeight: 180),
-                    child: Card(
-                      clipBehavior: Clip.antiAlias,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: InkWell(
-                        onTap: () {
-                          showKnowledgeItemReader(
-                            context,
-                            title: note.title,
-                            content: note.content,
-                            category: note.category,
-                            itemType: 'Nota',
-                            updatedAt: note.updatedAt,
-                            tags: noteTags,
-                            onEdit: () => _showEditNoteModal(note),
-                            onDelete: () => km.softDeleteNote(note.id),
-                            onExport: () => _exportNote(note),
-                          );
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.all(14),
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(width: 400, child: listPane),
+                const VerticalDivider(width: 1),
+                Expanded(
+                  child: selectedNote == null
+                      ? Center(
+                          child: Semantics(
+                            label: 'Selecione uma nota para leitura completa',
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.description_outlined,
+                                  size: 52,
+                                  color: Colors.grey.shade400,
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'Selecione uma nota para leitura completa',
+                                  style: TextStyle(
+                                    color: isDark
+                                        ? const Color(0xFF94A3B8)
+                                        : AppTheme.textMuted,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : SingleChildScrollView(
+                          padding: const EdgeInsets.all(24),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
                                 children: [
-                                  if (note.isPinned) ...[
-                                    const Icon(
-                                      Icons.push_pin,
-                                      size: 16,
-                                      color: Colors.amber,
-                                    ),
-                                    const SizedBox(width: 4),
-                                  ],
                                   Expanded(
-                                    child: Text(
-                                      note.title,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 15,
+                                    child: Semantics(
+                                      header: true,
+                                      child: Text(
+                                        selectedNote.title,
+                                        style: const TextStyle(
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
-                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
-                                  PopupMenuButton<String>(
-                                    icon: const Icon(Icons.more_vert, size: 20),
-                                    onSelected: (val) {
-                                      if (val == 'pin')
-                                        km.togglePinNote(note.id);
-                                      if (val == 'edit')
-                                        _showEditNoteModal(note);
-                                      if (val == 'research')
-                                        _transformNoteToResearch(note);
-                                      if (val == 'export') _exportNote(note);
-                                      if (val == 'delete')
-                                        km.softDeleteNote(note.id);
-                                    },
-                                    itemBuilder: (ctx) => [
-                                      PopupMenuItem(
-                                        value: 'pin',
-                                        child: Text(
-                                          note.isPinned
-                                              ? 'Desafixar'
-                                              : 'Fixar no Topo',
-                                        ),
+                                  Semantics(
+                                    button: true,
+                                    label: 'Editar nota ${selectedNote.title}',
+                                    child: OutlinedButton.icon(
+                                      onPressed: () =>
+                                          _showEditNoteModal(selectedNote!),
+                                      icon: const Icon(
+                                        Icons.edit_outlined,
+                                        size: 16,
                                       ),
-                                      const PopupMenuItem(
-                                        value: 'edit',
-                                        child: Text('Editar Nota'),
-                                      ),
-                                      const PopupMenuItem(
-                                        value: 'research',
-                                        child: Text('Transformar em Pesquisa'),
-                                      ),
-                                      const PopupMenuItem(
-                                        value: 'export',
-                                        child: Text('Exportar Nota'),
-                                      ),
-                                      const PopupMenuItem(
-                                        value: 'delete',
-                                        child: Text(
-                                          'Excluir Nota',
-                                          style: TextStyle(
-                                            color: Colors.redAccent,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
+                                      label: const Text('Editar'),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Semantics(
+                                    button: true,
+                                    label:
+                                        'Exportar nota ${selectedNote.title}',
+                                    child: IconButton(
+                                      tooltip: 'Exportar Nota',
+                                      icon: const Icon(Icons.share_outlined),
+                                      onPressed: () =>
+                                          _exportNote(selectedNote!),
+                                    ),
                                   ),
                                 ],
-                              ),
-                              const SizedBox(height: 6),
-                              Expanded(
-                                child: MarkdownPreviewText(
-                                  text: note.content,
-                                  maxLines: 3,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: isDark
-                                        ? const Color(0xFFCBD5E1)
-                                        : const Color(0xFF475569),
-                                  ),
-                                ),
                               ),
                               const SizedBox(height: 8),
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Wrap(
-                                    spacing: 6,
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 2,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: AppTheme.primaryBlue
-                                              .withValues(alpha: 0.12),
-                                          borderRadius: BorderRadius.circular(
-                                            6,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          note.category,
-                                          style: const TextStyle(
-                                            fontSize: 11,
-                                            color: AppTheme.primaryBlue,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                      if (noteTags.isNotEmpty)
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 6,
-                                            vertical: 2,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: Colors.teal.withValues(
-                                              alpha: 0.12,
-                                            ),
-                                            borderRadius: BorderRadius.circular(
-                                              6,
-                                            ),
-                                          ),
-                                          child: Text(
-                                            '#${noteTags.first}',
-                                            style: const TextStyle(
-                                              fontSize: 10,
-                                              color: Colors.teal,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ),
-                                      if (note.tags.contains('research:'))
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 6,
-                                            vertical: 2,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: Colors.purple.withValues(
-                                              alpha: 0.12,
-                                            ),
-                                            borderRadius: BorderRadius.circular(
-                                              6,
-                                            ),
-                                          ),
-                                          child: const Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(
-                                                Icons.auto_stories,
-                                                size: 10,
-                                                color: Colors.purple,
-                                              ),
-                                              SizedBox(width: 3),
-                                              Text(
-                                                'Pesquisa',
-                                                style: TextStyle(
-                                                  fontSize: 10,
-                                                  color: Colors.purple,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                  Text(
-                                    _formatDate(note.updatedAt),
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                ],
+                              Text(
+                                '${selectedNote.category} • Atualizado em ${_formatDate(selectedNote.updatedAt)}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppTheme.textMuted,
+                                ),
+                              ),
+                              const Divider(height: 24),
+                              MarkdownPreviewText(
+                                text: selectedNote.content,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  height: 1.5,
+                                ),
                               ),
                             ],
                           ),
                         ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
+                ),
+              ],
+            );
+          },
         );
       },
     );
