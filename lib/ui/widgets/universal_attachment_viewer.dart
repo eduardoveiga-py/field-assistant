@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -86,17 +87,17 @@ class _UniversalAttachmentViewerDialogState
       ['m4a', 'mp3', 'wav', 'aac', 'ogg', 'opus'].contains(_effectiveFileType);
 
   bool get _isText => [
-        'txt',
-        'md',
-        'markdown',
-        'json',
-        'csv',
-        'log',
-        'xml',
-        'html',
-        'yaml',
-        'yml',
-      ].contains(_effectiveFileType);
+    'txt',
+    'md',
+    'markdown',
+    'json',
+    'csv',
+    'log',
+    'xml',
+    'html',
+    'yaml',
+    'yml',
+  ].contains(_effectiveFileType);
 
   @override
   void initState() {
@@ -122,12 +123,14 @@ class _UniversalAttachmentViewerDialogState
       if (_isPdf) {
         if (widget.bytes != null && widget.bytes!.isNotEmpty) {
           _pdfBytes = widget.bytes;
-        } else if (widget.filePath.startsWith('http://') || widget.filePath.startsWith('https://')) {
+        } else if (widget.filePath.startsWith('http://') ||
+            widget.filePath.startsWith('https://')) {
           final resp = await http.get(Uri.parse(widget.filePath));
           if (resp.statusCode == 200) {
             _pdfBytes = resp.bodyBytes;
           } else {
-            _errorMessage = 'Falha ao baixar arquivo remoto (HTTP ${resp.statusCode}).';
+            _errorMessage =
+                'Falha ao baixar arquivo remoto (HTTP ${resp.statusCode}).';
           }
         } else if (!kIsWeb) {
           final existing = await _findExistingLocalFile(widget.filePath);
@@ -181,12 +184,14 @@ class _UniversalAttachmentViewerDialogState
       } else if (_isText) {
         if (widget.bytes != null) {
           _textContent = String.fromCharCodes(widget.bytes!);
-        } else if (widget.filePath.startsWith('http://') || widget.filePath.startsWith('https://')) {
+        } else if (widget.filePath.startsWith('http://') ||
+            widget.filePath.startsWith('https://')) {
           final resp = await http.get(Uri.parse(widget.filePath));
           if (resp.statusCode == 200) {
             _textContent = resp.body;
           } else {
-            _errorMessage = 'Falha ao baixar arquivo de texto (HTTP ${resp.statusCode}).';
+            _errorMessage =
+                'Falha ao baixar arquivo de texto (HTTP ${resp.statusCode}).';
           }
         } else if (!kIsWeb) {
           final existingFile = await _findExistingLocalFile(widget.filePath);
@@ -224,7 +229,10 @@ class _UniversalAttachmentViewerDialogState
       final direct = File(rawPath);
       if (await direct.exists()) return direct;
     } catch (e, st) {
-      AppLogger.debug('Erro ao verificar caminho direto do anexo ($rawPath): $e', st);
+      AppLogger.debug(
+        'Erro ao verificar caminho direto do anexo ($rawPath): $e',
+        st,
+      );
     }
 
     String decoded = rawPath;
@@ -233,12 +241,18 @@ class _UniversalAttachmentViewerDialogState
       final directDecoded = File(decoded);
       if (await directDecoded.exists()) return directDecoded;
     } catch (e, st) {
-      AppLogger.debug('Erro ao decodificar/verificar URI do anexo ($rawPath): $e', st);
+      AppLogger.debug(
+        'Erro ao decodificar/verificar URI do anexo ($rawPath): $e',
+        st,
+      );
     }
 
     final rawName = rawPath.split(RegExp(r'[\\/]')).last;
     final decodedName = decoded.split(RegExp(r'[\\/]')).last;
-    final fileNames = {rawName, decodedName}.where((n) => n.trim().isNotEmpty).toList();
+    final fileNames = {
+      rawName,
+      decodedName,
+    }.where((n) => n.trim().isNotEmpty).toList();
     if (fileNames.isEmpty) return null;
 
     try {
@@ -255,7 +269,10 @@ class _UniversalAttachmentViewerDialogState
           candidates.add(File('${supportDir.path}/$n'));
         }
       } catch (e, st) {
-        AppLogger.debug('ApplicationSupport indisponível na busca de anexo: $e', st);
+        AppLogger.debug(
+          'ApplicationSupport indisponível na busca de anexo: $e',
+          st,
+        );
       }
       try {
         final tempDir = await getTemporaryDirectory();
@@ -276,7 +293,10 @@ class _UniversalAttachmentViewerDialogState
           }
         }
       } catch (e, st) {
-        AppLogger.debug('ExternalStorage indisponível na busca de anexo: $e', st);
+        AppLogger.debug(
+          'ExternalStorage indisponível na busca de anexo: $e',
+          st,
+        );
       }
       try {
         final dlDir = await getDownloadsDirectory();
@@ -286,7 +306,10 @@ class _UniversalAttachmentViewerDialogState
           }
         }
       } catch (e, st) {
-        AppLogger.debug('DownloadsDirectory indisponível na busca de anexo: $e', st);
+        AppLogger.debug(
+          'DownloadsDirectory indisponível na busca de anexo: $e',
+          st,
+        );
       }
 
       for (final f in candidates) {
@@ -313,12 +336,17 @@ class _UniversalAttachmentViewerDialogState
       try {
         return await existing.readAsBytes();
       } catch (e, st) {
-        AppLogger.warning('Falha ao ler bytes do PDF local (${existing.path})', e, st);
+        AppLogger.warning(
+          'Falha ao ler bytes do PDF local (${existing.path})',
+          e,
+          st,
+        );
       }
     }
 
     // Fallback caso caminho comece com http
-    if (widget.filePath.startsWith('http://') || widget.filePath.startsWith('https://')) {
+    if (widget.filePath.startsWith('http://') ||
+        widget.filePath.startsWith('https://')) {
       final resp = await http.get(Uri.parse(widget.filePath));
       if (resp.statusCode == 200) {
         return resp.bodyBytes;
@@ -351,7 +379,9 @@ class _UniversalAttachmentViewerDialogState
           final pdfBytes = await _resolvePdfBytes();
           await Printing.layoutPdf(
             onLayout: (format) async => pdfBytes,
-            name: widget.title != null ? '${widget.title}.pdf' : 'documento.pdf',
+            name: widget.title != null
+                ? '${widget.title}.pdf'
+                : 'documento.pdf',
           );
           return;
         }
@@ -365,8 +395,12 @@ class _UniversalAttachmentViewerDialogState
         return;
       }
 
-      if (widget.filePath.startsWith('http://') || widget.filePath.startsWith('https://')) {
-        await launchUrl(Uri.parse(widget.filePath), mode: LaunchMode.externalApplication);
+      if (widget.filePath.startsWith('http://') ||
+          widget.filePath.startsWith('https://')) {
+        await launchUrl(
+          Uri.parse(widget.filePath),
+          mode: LaunchMode.externalApplication,
+        );
         return;
       }
 
@@ -393,7 +427,11 @@ class _UniversalAttachmentViewerDialogState
             await tempFile.writeAsBytes(availableBytes, flush: true);
             targetPath = tempFile.path;
           } catch (e, st) {
-            AppLogger.warning('Falha ao gravar arquivo temporário para abrir externamente (${widget.filePath})', e, st);
+            AppLogger.warning(
+              'Falha ao gravar arquivo temporário para abrir externamente (${widget.filePath})',
+              e,
+              st,
+            );
           }
         } else {
           if (mounted) {
@@ -420,9 +458,9 @@ class _UniversalAttachmentViewerDialogState
           final msg = res.message.isNotEmpty
               ? res.message
               : 'Nenhum leitor compatível encontrado para este formato.';
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Aplicativo externo: $msg')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Aplicativo externo: $msg')));
         }
       }
     } catch (e) {
@@ -437,7 +475,8 @@ class _UniversalAttachmentViewerDialogState
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final displayName = widget.title ?? widget.filePath.split(RegExp(r'[\\/]')).last;
+    final displayName =
+        widget.title ?? widget.filePath.split(RegExp(r'[\\/]')).last;
 
     return Dialog(
       backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
@@ -453,8 +492,13 @@ class _UniversalAttachmentViewerDialogState
             children: [
               // Cabeçalho da Janela de Leitura
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                color: isDark
+                    ? const Color(0xFF1E293B)
+                    : const Color(0xFFF1F5F9),
                 child: Row(
                   children: [
                     _buildTypeIcon(),
@@ -465,14 +509,19 @@ class _UniversalAttachmentViewerDialogState
                         children: [
                           Text(
                             displayName,
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
                             overflow: TextOverflow.ellipsis,
                           ),
                           Text(
                             'Formato: ${_effectiveFileType.toUpperCase()} • ${widget.filePath}',
                             style: TextStyle(
                               fontSize: 11,
-                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                              color: isDark
+                                  ? const Color(0xFF94A3B8)
+                                  : const Color(0xFF64748B),
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -519,7 +568,11 @@ class _UniversalAttachmentViewerDialogState
 
   Widget _buildTypeIcon() {
     if (_isPdf) {
-      return const Icon(Icons.picture_as_pdf, color: Colors.redAccent, size: 24);
+      return const Icon(
+        Icons.picture_as_pdf,
+        color: Colors.redAccent,
+        size: 24,
+      );
     }
     if (_isImage) {
       return const Icon(Icons.image, color: Colors.blueAccent, size: 24);
@@ -530,7 +583,11 @@ class _UniversalAttachmentViewerDialogState
     if (_isText) {
       return const Icon(Icons.article_outlined, color: Colors.teal, size: 24);
     }
-    return const Icon(Icons.insert_drive_file_outlined, color: Colors.grey, size: 24);
+    return const Icon(
+      Icons.insert_drive_file_outlined,
+      color: Colors.grey,
+      size: 24,
+    );
   }
 
   Widget _buildViewerBody(bool isDark) {
@@ -538,7 +595,8 @@ class _UniversalAttachmentViewerDialogState
       return _buildFileNotFoundView(isDark);
     }
 
-    final displayName = widget.title ?? widget.filePath.split(RegExp(r'[\\/]')).last;
+    final displayName =
+        widget.title ?? widget.filePath.split(RegExp(r'[\\/]')).last;
 
     if (_errorMessage != null) {
       return Center(
@@ -547,7 +605,11 @@ class _UniversalAttachmentViewerDialogState
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
+              const Icon(
+                Icons.error_outline,
+                size: 48,
+                color: Colors.redAccent,
+              ),
               const SizedBox(height: 12),
               Text(
                 'Falha ao carregar arquivo:\n$_errorMessage',
@@ -585,7 +647,11 @@ class _UniversalAttachmentViewerDialogState
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.broken_image_outlined, size: 48, color: Colors.redAccent),
+                  const Icon(
+                    Icons.broken_image_outlined,
+                    size: 48,
+                    color: Colors.redAccent,
+                  ),
                   const SizedBox(height: 12),
                   Text(
                     'Não foi possível renderizar a prévia do PDF.\nErro: $error',
@@ -616,17 +682,23 @@ class _UniversalAttachmentViewerDialogState
             child: widget.bytes != null
                 ? Image.memory(widget.bytes!, fit: BoxFit.contain)
                 : widget.filePath.startsWith('http')
-                    ? Image.network(widget.filePath, fit: BoxFit.contain)
-                    : _imageBytes != null
-                        ? Image.memory(_imageBytes!, fit: BoxFit.contain)
-                        : Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.broken_image, size: 64, color: Colors.grey),
-                              const SizedBox(height: 8),
-                              Text('Arquivo de imagem não encontrado: ${widget.filePath}'),
-                            ],
-                          ),
+                ? Image.network(widget.filePath, fit: BoxFit.contain)
+                : _imageBytes != null
+                ? Image.memory(_imageBytes!, fit: BoxFit.contain)
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.broken_image,
+                        size: 64,
+                        color: Colors.grey,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Arquivo de imagem não encontrado: ${widget.filePath}',
+                      ),
+                    ],
+                  ),
           ),
         ),
       );
@@ -645,21 +717,32 @@ class _UniversalAttachmentViewerDialogState
                   color: Colors.amber.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.music_note_rounded, size: 56, color: Colors.amber),
+                child: const Icon(
+                  Icons.music_note_rounded,
+                  size: 56,
+                  color: Colors.amber,
+                ),
               ),
               const SizedBox(height: 24),
               Text(
                 widget.title ?? widget.filePath.split(RegExp(r'[\\/]')).last,
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
               Slider(
                 value: _position.inSeconds.toDouble().clamp(
-                      0.0,
-                      _duration.inSeconds.toDouble() > 0 ? _duration.inSeconds.toDouble() : 1.0,
-                    ),
-                max: _duration.inSeconds.toDouble() > 0 ? _duration.inSeconds.toDouble() : 1.0,
+                  0.0,
+                  _duration.inSeconds.toDouble() > 0
+                      ? _duration.inSeconds.toDouble()
+                      : 1.0,
+                ),
+                max: _duration.inSeconds.toDouble() > 0
+                    ? _duration.inSeconds.toDouble()
+                    : 1.0,
                 onChanged: (val) {
                   _audioPlayer?.seek(Duration(seconds: val.toInt()));
                 },
@@ -669,15 +752,25 @@ class _UniversalAttachmentViewerDialogState
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(_formatDuration(_position), style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                    Text(_formatDuration(_duration), style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                    Text(
+                      _formatDuration(_position),
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                    Text(
+                      _formatDuration(_duration),
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
                   ],
                 ),
               ),
               const SizedBox(height: 20),
               IconButton.filled(
                 iconSize: 42,
-                icon: Icon(_isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled),
+                icon: Icon(
+                  _isPlaying
+                      ? Icons.pause_circle_filled
+                      : Icons.play_circle_filled,
+                ),
                 onPressed: () async {
                   if (_audioPlayer == null) return;
                   if (_isPlaying) {
@@ -686,7 +779,9 @@ class _UniversalAttachmentViewerDialogState
                     if (widget.filePath.startsWith('http')) {
                       await _audioPlayer!.play(UrlSource(widget.filePath));
                     } else {
-                      await _audioPlayer!.play(DeviceFileSource(widget.filePath));
+                      await _audioPlayer!.play(
+                        DeviceFileSource(widget.filePath),
+                      );
                     }
                   }
                 },
@@ -703,7 +798,11 @@ class _UniversalAttachmentViewerDialogState
         child: SingleChildScrollView(
           child: SelectableText(
             _textContent ?? '',
-            style: const TextStyle(fontFamily: 'monospace', fontSize: 13, height: 1.5),
+            style: const TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 13,
+              height: 1.5,
+            ),
           ),
         ),
       );
@@ -716,7 +815,11 @@ class _UniversalAttachmentViewerDialogState
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.file_present_rounded, size: 64, color: AppTheme.primaryBlue),
+            const Icon(
+              Icons.file_present_rounded,
+              size: 64,
+              color: AppTheme.primaryBlue,
+            ),
             const SizedBox(height: 16),
             Text(
               displayName,
@@ -734,7 +837,10 @@ class _UniversalAttachmentViewerDialogState
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primaryBlue,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
               ),
               icon: const Icon(Icons.open_in_new, size: 18),
               label: const Text('Abrir com Aplicativo do Sistema'),
@@ -747,7 +853,8 @@ class _UniversalAttachmentViewerDialogState
   }
 
   Widget _buildFileNotFoundView(bool isDark) {
-    final displayName = widget.title ?? widget.filePath.split(RegExp(r'[\\/]')).last;
+    final displayName =
+        widget.title ?? widget.filePath.split(RegExp(r'[\\/]')).last;
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
@@ -769,20 +876,21 @@ class _UniversalAttachmentViewerDialogState
             const SizedBox(height: 20),
             Text(
               displayName,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                color: isDark
+                    ? const Color(0xFF1E293B)
+                    : const Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                  color: isDark
+                      ? const Color(0xFF334155)
+                      : const Color(0xFFE2E8F0),
                 ),
               ),
               child: Column(
@@ -793,7 +901,9 @@ class _UniversalAttachmentViewerDialogState
                     style: TextStyle(
                       fontSize: 13,
                       height: 1.4,
-                      color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                      color: isDark
+                          ? const Color(0xFFCBD5E1)
+                          : const Color(0xFF475569),
                     ),
                   ),
                   if (widget.filePath.isNotEmpty) ...[
@@ -803,7 +913,9 @@ class _UniversalAttachmentViewerDialogState
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 11,
-                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                        color: isDark
+                            ? const Color(0xFF94A3B8)
+                            : const Color(0xFF64748B),
                         fontFamily: 'monospace',
                       ),
                     ),

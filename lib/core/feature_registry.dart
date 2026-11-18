@@ -98,7 +98,8 @@ enum AppFeature {
   inbox(
     id: 'inbox',
     title: 'Inbox & E-mail',
-    description: 'Captura universal, e-mail JW e sincronização experimental Exchange',
+    description:
+        'Captura universal, e-mail JW e sincronização experimental Exchange',
     icon: Icons.inbox_outlined,
     category: FeatureCategory.organization,
     isEssential: false,

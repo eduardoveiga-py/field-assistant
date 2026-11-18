@@ -39,7 +39,10 @@ void main() {
       // 3. Consulta sync_queue
       final queueItems = await db.select(db.syncQueue).get();
       final studyInserts = queueItems.where(
-        (q) => q.entityType == 'bible_studies' && q.entityId == study.id && q.operation == 'INSERT',
+        (q) =>
+            q.entityType == 'bible_studies' &&
+            q.entityId == study.id &&
+            q.operation == 'INSERT',
       );
       final participantInserts = queueItems.where(
         (q) => q.entityType == 'study_participants' && q.operation == 'INSERT',
@@ -70,13 +73,19 @@ void main() {
 
       final queueItems = await db.select(db.syncQueue).get();
       final studyDeletes = queueItems.where(
-        (q) => q.entityType == 'bible_studies' && q.entityId == study.id && q.operation == 'DELETE',
+        (q) =>
+            q.entityType == 'bible_studies' &&
+            q.entityId == study.id &&
+            q.operation == 'DELETE',
       );
       final participantDeletes = queueItems.where(
         (q) => q.entityType == 'study_participants' && q.operation == 'DELETE',
       );
       final sessionDeletes = queueItems.where(
-        (q) => q.entityType == 'study_sessions' && q.entityId == session.id && q.operation == 'DELETE',
+        (q) =>
+            q.entityType == 'study_sessions' &&
+            q.entityId == session.id &&
+            q.operation == 'DELETE',
       );
 
       expect(studyDeletes.length, equals(1));
@@ -98,7 +107,10 @@ void main() {
 
       final queueItems = await db.select(db.syncQueue).get();
       final personDeletes = queueItems.where(
-        (q) => q.entityType == 'people' && q.entityId == person.id && q.operation == 'DELETE',
+        (q) =>
+            q.entityType == 'people' &&
+            q.entityId == person.id &&
+            q.operation == 'DELETE',
       );
       final participantDeletes = queueItems.where(
         (q) => q.entityType == 'study_participants' && q.operation == 'DELETE',
@@ -123,7 +135,12 @@ void main() {
       // 1. Criação
       var queue = await db.select(db.syncQueue).get();
       expect(
-        queue.any((q) => q.entityType == 'appointments' && q.entityId == appt.id && q.operation == 'INSERT'),
+        queue.any(
+          (q) =>
+              q.entityType == 'appointments' &&
+              q.entityId == appt.id &&
+              q.operation == 'INSERT',
+        ),
         isTrue,
       );
 
@@ -131,7 +148,12 @@ void main() {
       await repo.updateAppointment(appt.copyWith(status: 'confirmado'));
       queue = await db.select(db.syncQueue).get();
       expect(
-        queue.any((q) => q.entityType == 'appointments' && q.entityId == appt.id && q.operation == 'UPDATE'),
+        queue.any(
+          (q) =>
+              q.entityType == 'appointments' &&
+              q.entityId == appt.id &&
+              q.operation == 'UPDATE',
+        ),
         isTrue,
       );
 
@@ -139,7 +161,12 @@ void main() {
       await repo.deleteAppointment(appt.id);
       queue = await db.select(db.syncQueue).get();
       expect(
-        queue.any((q) => q.entityType == 'appointments' && q.entityId == appt.id && q.operation == 'DELETE'),
+        queue.any(
+          (q) =>
+              q.entityType == 'appointments' &&
+              q.entityId == appt.id &&
+              q.operation == 'DELETE',
+        ),
         isTrue,
       );
     });
@@ -150,15 +177,39 @@ void main() {
       // 1. Tag
       final tag = await mgr.addTag('Profecia');
       var queue = await db.select(db.syncQueue).get();
-      expect(queue.any((q) => q.entityType == 'research_tags' && q.entityId == tag.id && q.operation == 'INSERT'), isTrue);
+      expect(
+        queue.any(
+          (q) =>
+              q.entityType == 'research_tags' &&
+              q.entityId == tag.id &&
+              q.operation == 'INSERT',
+        ),
+        isTrue,
+      );
 
       await mgr.updateTag(tag.id, 'Profecias Messiânicas');
       queue = await db.select(db.syncQueue).get();
-      expect(queue.any((q) => q.entityType == 'research_tags' && q.entityId == tag.id && q.operation == 'UPDATE'), isTrue);
+      expect(
+        queue.any(
+          (q) =>
+              q.entityType == 'research_tags' &&
+              q.entityId == tag.id &&
+              q.operation == 'UPDATE',
+        ),
+        isTrue,
+      );
 
       await mgr.deleteTag(tag.id);
       queue = await db.select(db.syncQueue).get();
-      expect(queue.any((q) => q.entityType == 'research_tags' && q.entityId == tag.id && q.operation == 'DELETE'), isTrue);
+      expect(
+        queue.any(
+          (q) =>
+              q.entityType == 'research_tags' &&
+              q.entityId == tag.id &&
+              q.operation == 'DELETE',
+        ),
+        isTrue,
+      );
 
       // 2. Artigo
       final article = await mgr.addArticle(
@@ -167,24 +218,50 @@ void main() {
         content: 'Conteúdo teocrático',
       );
       queue = await db.select(db.syncQueue).get();
-      expect(queue.any((q) => q.entityType == 'research_articles' && q.entityId == article.id && q.operation == 'INSERT'), isTrue);
+      expect(
+        queue.any(
+          (q) =>
+              q.entityType == 'research_articles' &&
+              q.entityId == article.id &&
+              q.operation == 'INSERT',
+        ),
+        isTrue,
+      );
 
-      await mgr.updateArticle(ResearchArticleItem(
-        id: article.id,
-        title: 'Origem dos Escritos',
-        summary: article.summary,
-        content: article.content,
-        tags: article.tags,
-        attachments: article.attachments,
-        createdAt: article.createdAt,
-        updatedAt: DateTime.now(),
-      ));
+      await mgr.updateArticle(
+        ResearchArticleItem(
+          id: article.id,
+          title: 'Origem dos Escritos',
+          summary: article.summary,
+          content: article.content,
+          tags: article.tags,
+          attachments: article.attachments,
+          createdAt: article.createdAt,
+          updatedAt: DateTime.now(),
+        ),
+      );
       queue = await db.select(db.syncQueue).get();
-      expect(queue.any((q) => q.entityType == 'research_articles' && q.entityId == article.id && q.operation == 'UPDATE'), isTrue);
+      expect(
+        queue.any(
+          (q) =>
+              q.entityType == 'research_articles' &&
+              q.entityId == article.id &&
+              q.operation == 'UPDATE',
+        ),
+        isTrue,
+      );
 
       await mgr.deleteArticle(article.id);
       queue = await db.select(db.syncQueue).get();
-      expect(queue.any((q) => q.entityType == 'research_articles' && q.entityId == article.id && q.operation == 'DELETE'), isTrue);
+      expect(
+        queue.any(
+          (q) =>
+              q.entityType == 'research_articles' &&
+              q.entityId == article.id &&
+              q.operation == 'DELETE',
+        ),
+        isTrue,
+      );
     });
 
     test('SectorManager, FamilyTies, Experiences e Publications enfileiram na sync_queue', () async {
@@ -192,15 +269,39 @@ void main() {
       final sectorMgr = SectorManager(db);
       final sector = await sectorMgr.addSector('Setor Norte');
       var queue = await db.select(db.syncQueue).get();
-      expect(queue.any((q) => q.entityType == 'territory_sectors' && q.entityId == sector.id && q.operation == 'INSERT'), isTrue);
+      expect(
+        queue.any(
+          (q) =>
+              q.entityType == 'territory_sectors' &&
+              q.entityId == sector.id &&
+              q.operation == 'INSERT',
+        ),
+        isTrue,
+      );
 
       await sectorMgr.updateSector(sector.id, 'Setor Norte Expandido');
       queue = await db.select(db.syncQueue).get();
-      expect(queue.any((q) => q.entityType == 'territory_sectors' && q.entityId == sector.id && q.operation == 'UPDATE'), isTrue);
+      expect(
+        queue.any(
+          (q) =>
+              q.entityType == 'territory_sectors' &&
+              q.entityId == sector.id &&
+              q.operation == 'UPDATE',
+        ),
+        isTrue,
+      );
 
       await sectorMgr.deleteSector(sector.id);
       queue = await db.select(db.syncQueue).get();
-      expect(queue.any((q) => q.entityType == 'territory_sectors' && q.entityId == sector.id && q.operation == 'DELETE'), isTrue);
+      expect(
+        queue.any(
+          (q) =>
+              q.entityType == 'territory_sectors' &&
+              q.entityId == sector.id &&
+              q.operation == 'DELETE',
+        ),
+        isTrue,
+      );
 
       // 2. Family Ties
       final tiesMgr = FamilyTiesManager(db);
@@ -212,7 +313,15 @@ void main() {
         relationshipType: 'irmão',
       );
       queue = await db.select(db.syncQueue).get();
-      expect(queue.any((q) => q.entityType == 'family_ties' && q.entityId == tie.id && q.operation == 'INSERT'), isTrue);
+      expect(
+        queue.any(
+          (q) =>
+              q.entityType == 'family_ties' &&
+              q.entityId == tie.id &&
+              q.operation == 'INSERT',
+        ),
+        isTrue,
+      );
 
       // 3. Experiences
       final expMgr = ExperienceManager(db);
@@ -221,7 +330,15 @@ void main() {
         content: 'Boa acolhida',
       );
       queue = await db.select(db.syncQueue).get();
-      expect(queue.any((q) => q.entityType == 'ministry_experiences' && q.entityId == exp.id && q.operation == 'INSERT'), isTrue);
+      expect(
+        queue.any(
+          (q) =>
+              q.entityType == 'ministry_experiences' &&
+              q.entityId == exp.id &&
+              q.operation == 'INSERT',
+        ),
+        isTrue,
+      );
 
       // 4. Publications
       final pubMgr = PersonPublicationsManager(db);
@@ -230,7 +347,15 @@ void main() {
         title: 'Revista A Sentinela',
       );
       queue = await db.select(db.syncQueue).get();
-      expect(queue.any((q) => q.entityType == 'person_publications' && q.entityId == pub.id && q.operation == 'INSERT'), isTrue);
+      expect(
+        queue.any(
+          (q) =>
+              q.entityType == 'person_publications' &&
+              q.entityId == pub.id &&
+              q.operation == 'INSERT',
+        ),
+        isTrue,
+      );
 
       // 5. Photos
       final photoMgr = PersonPhotosManager(db);
@@ -240,7 +365,15 @@ void main() {
         imageData: 'base64_data',
       );
       queue = await db.select(db.syncQueue).get();
-      expect(queue.any((q) => q.entityType == 'person_photos' && q.entityId == photo.id && q.operation == 'INSERT'), isTrue);
+      expect(
+        queue.any(
+          (q) =>
+              q.entityType == 'person_photos' &&
+              q.entityId == photo.id &&
+              q.operation == 'INSERT',
+        ),
+        isTrue,
+      );
     });
 
     test('SupabaseSyncService.syncTables cobre todas as 17 entidades do app para pull completo no segundo dispositivo', () {
@@ -265,9 +398,15 @@ void main() {
       ];
 
       for (final table in expectedTables) {
-        expect(SupabaseSyncService.syncTables.contains(table), isTrue,
-            reason: 'Tabela $table deve estar em SupabaseSyncService.syncTables');
-        expect(SupabaseSyncService.mapEntityToRemoteTable(table), equals(table));
+        expect(
+          SupabaseSyncService.syncTables.contains(table),
+          isTrue,
+          reason: 'Tabela $table deve estar em SupabaseSyncService.syncTables',
+        );
+        expect(
+          SupabaseSyncService.mapEntityToRemoteTable(table),
+          equals(table),
+        );
       }
     });
   });

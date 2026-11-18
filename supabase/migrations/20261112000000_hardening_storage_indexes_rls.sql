@@ -127,7 +127,36 @@ END $$;
 
 -- 4. Endurecimento de search_path nas funções trigger e privilégios de sync_upsert
 ALTER FUNCTION public.handle_update_audit() SET search_path = public;
-ALTER FUNCTION public.handle_soft_delete_and_resurrection_guard() SET search_path = public;
+
+-- Criação formal da função de trigger para proteção de soft delete e ressurreição acidental
+CREATE OR REPLACE FUNCTION public.handle_soft_delete_and_resurrection_guard()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+    -- Se o registro já estava soft-deleted e a nova atualização não fornece um tombstone válido ou
+    -- tenta ressuscitar o registro sem resetar explicitamente deleted_at, protege a integridade do tombstone.
+    IF OLD.deleted_at IS NOT NULL AND NEW.deleted_at IS NULL THEN
+        NEW.updated_at = NOW();
+    ELSIF NEW.deleted_at IS NOT NULL AND OLD.deleted_at IS NULL THEN
+        NEW.updated_at = NOW();
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM pg_proc p
+        JOIN pg_namespace n ON p.pronamespace = n.oid
+        WHERE n.nspname = 'public' AND p.proname = 'handle_soft_delete_and_resurrection_guard'
+    ) THEN
+        EXECUTE 'ALTER FUNCTION public.handle_soft_delete_and_resurrection_guard() SET search_path = public';
+    END IF;
+END $$;
 
 REVOKE ALL ON FUNCTION public.sync_upsert(TEXT, JSONB) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_upsert(TEXT, JSONB) FROM anon;

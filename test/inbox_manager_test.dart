@@ -24,7 +24,10 @@ void main() {
       );
 
       expect(entry.id, isNotEmpty);
-      expect(entry.content, equals('Falar com irmão Marcos sobre a revisita na rua 5'));
+      expect(
+        entry.content,
+        equals('Falar com irmão Marcos sobre a revisita na rua 5'),
+      );
       expect(entry.sourceType, equals('text'));
       expect(entry.suggestedCategory, equals('ministry'));
       expect(entry.status, equals('unprocessed'));
@@ -61,23 +64,28 @@ void main() {
       expect(entry.attachments, contains('pioneiro.pdf'));
     });
 
-    test('TC-INB-04: Transição de status (in_review, archive, softDelete)', () async {
-      final entry = await inboxMgr.captureText(content: 'Ideia para revisar mais tarde');
-      expect(entry.status, equals('unprocessed'));
+    test(
+      'TC-INB-04: Transição de status (in_review, archive, softDelete)',
+      () async {
+        final entry = await inboxMgr.captureText(
+          content: 'Ideia para revisar mais tarde',
+        );
+        expect(entry.status, equals('unprocessed'));
 
-      await inboxMgr.markInReview(entry.id);
-      var updated = await inboxMgr.getEntryById(entry.id);
-      expect(updated?.status, equals('in_review'));
+        await inboxMgr.markInReview(entry.id);
+        var updated = await inboxMgr.getEntryById(entry.id);
+        expect(updated?.status, equals('in_review'));
 
-      await inboxMgr.archiveEntry(entry.id);
-      updated = await inboxMgr.getEntryById(entry.id);
-      expect(updated?.status, equals('archived'));
-      expect(updated?.processedAt, isNotNull);
+        await inboxMgr.archiveEntry(entry.id);
+        updated = await inboxMgr.getEntryById(entry.id);
+        expect(updated?.status, equals('archived'));
+        expect(updated?.processedAt, isNotNull);
 
-      await inboxMgr.softDeleteEntry(entry.id);
-      updated = await inboxMgr.getEntryById(entry.id);
-      expect(updated?.deletedAt, isNotNull);
-    });
+        await inboxMgr.softDeleteEntry(entry.id);
+        updated = await inboxMgr.getEntryById(entry.id);
+        expect(updated?.deletedAt, isNotNull);
+      },
+    );
 
     test('TC-INB-05: Conversão não-destrutiva em Tarefa', () async {
       final entry = await inboxMgr.captureText(
@@ -136,7 +144,10 @@ void main() {
         question: 'Quais lições podemos tirar da vida de Josias?',
       );
 
-      expect(question.question, equals('Quais lições podemos tirar da vida de Josias?'));
+      expect(
+        question.question,
+        equals('Quais lições podemos tirar da vida de Josias?'),
+      );
       expect(question.originInboxId, equals(entry.id));
 
       final inboxAfter = await inboxMgr.getEntryById(entry.id);

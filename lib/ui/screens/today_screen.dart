@@ -41,7 +41,10 @@ class TodayScreen extends ConsumerWidget {
     try {
       return Supabase.instance.client.auth.currentUser;
     } catch (e, st) {
-      AppLogger.debug('Supabase não inicializado ao consultar usuário na Home: $e', st);
+      AppLogger.debug(
+        'Supabase não inicializado ao consultar usuário na Home: $e',
+        st,
+      );
       return null;
     }
   }
@@ -227,7 +230,11 @@ class TodayScreen extends ConsumerWidget {
                       try {
                         await Supabase.instance.client.auth.signOut();
                       } catch (e, st) {
-                        AppLogger.warning('Falha ao encerrar sessão Supabase na tela Hoje', e, st);
+                        AppLogger.warning(
+                          'Falha ao encerrar sessão Supabase na tela Hoje',
+                          e,
+                          st,
+                        );
                       }
                     },
                   ),
@@ -254,161 +261,161 @@ class TodayScreen extends ConsumerWidget {
           final descController = ctrls[1];
 
           return Consumer(
-        builder: (ctx, innerRef, _) {
-          final sectors = innerRef.watch(sectorsStreamProvider).value ?? [];
-          final mgr = innerRef.read(sectorManagerProvider);
+            builder: (ctx, innerRef, _) {
+              final sectors = innerRef.watch(sectorsStreamProvider).value ?? [];
+              final mgr = innerRef.read(sectorManagerProvider);
 
-          return SafeArea(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(ctx).size.height * 0.85,
-              ),
-              child: SingleChildScrollView(
-                padding: EdgeInsets.only(
-                  top: 20,
-                  left: 16,
-                  right: 16,
-                  bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              return SafeArea(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(ctx).size.height * 0.85,
+                  ),
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.only(
+                      top: 20,
+                      left: 16,
+                      right: 16,
+                      bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Row(
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Icon(
-                              Icons.holiday_village,
-                              color: AppTheme.accentTeal,
+                            const Row(
+                              children: [
+                                Icon(
+                                  Icons.holiday_village,
+                                  color: AppTheme.accentTeal,
+                                ),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Gerenciar Bairros / Setores',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
                             ),
-                            SizedBox(width: 8),
-                            Text(
-                              'Gerenciar Bairros / Setores',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
+                            IconButton(
+                              icon: const Icon(Icons.close),
+                              onPressed: () => Navigator.pop(ctx),
                             ),
                           ],
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.close),
-                          onPressed: () => Navigator.pop(ctx),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Adicionar Novo Bairro / Setor:',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            TextField(
-                              controller: nameController,
-                              decoration: const InputDecoration(
-                                labelText: 'Nome do Bairro',
-                                hintText: 'Ex: Centro, São Francisco, Beira-Rio...',
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            TextField(
-                              controller: descController,
-                              decoration: const InputDecoration(
-                                labelText: 'Descrição / Limites (opcional)',
-                                hintText: 'Ex: Da avenida até o rio',
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton.icon(
-                                icon: const Icon(Icons.add),
-                                label: const Text('Cadastrar Bairro'),
-                                onPressed: () async {
-                                  final name = nameController.text.trim();
-                                  if (name.isEmpty) return;
-                                  await mgr.addSector(
-                                    name,
-                                    description: descController.text.trim(),
-                                  );
-                                  nameController.clear();
-                                  descController.clear();
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Bairros Cadastrados no Território:',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    if (sectors.isEmpty)
-                      Text(
-                        'Nenhum bairro cadastrado.',
-                        style: TextStyle(
-                          color: Theme.of(ctx).brightness == Brightness.dark
-                              ? const Color(0xFFCBD5E1)
-                              : AppTheme.textMuted,
-                        ),
-                      )
-                    else
-                      for (final s in sectors)
+                        const SizedBox(height: 12),
                         Card(
-                          margin: const EdgeInsets.only(bottom: 6),
-                          child: ListTile(
-                            leading: const Icon(
-                              Icons.location_city,
-                              color: AppTheme.primaryBlue,
-                            ),
-                            title: Text(
-                              s.name,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            subtitle: Text(
-                              s.description?.isNotEmpty == true
-                                  ? s.description!
-                                  : 'Setor do território',
-                            ),
-                            trailing: IconButton(
-                              icon: const Icon(
-                                Icons.delete_outline,
-                                color: AppTheme.alertRed,
-                                size: 20,
-                              ),
-                              tooltip: 'Excluir setor',
-                              onPressed: () async {
-                                await mgr.deleteSector(s.id);
-                              },
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Adicionar Novo Bairro / Setor:',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                TextField(
+                                  controller: nameController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Nome do Bairro',
+                                    hintText: 'Ex: Centro, São Francisco, Beira-Rio...',
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                TextField(
+                                  controller: descController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Descrição / Limites (opcional)',
+                                    hintText: 'Ex: Da avenida até o rio',
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton.icon(
+                                    icon: const Icon(Icons.add),
+                                    label: const Text('Cadastrar Bairro'),
+                                    onPressed: () async {
+                                      final name = nameController.text.trim();
+                                      if (name.isEmpty) return;
+                                      await mgr.addSector(
+                                        name,
+                                        description: descController.text.trim(),
+                                      );
+                                      nameController.clear();
+                                      descController.clear();
+                                    },
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
-                  ],
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Bairros Cadastrados no Território:',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        if (sectors.isEmpty)
+                          Text(
+                            'Nenhum bairro cadastrado.',
+                            style: TextStyle(
+                              color: Theme.of(ctx).brightness == Brightness.dark
+                                  ? const Color(0xFFCBD5E1)
+                                  : AppTheme.textMuted,
+                            ),
+                          )
+                        else
+                          for (final s in sectors)
+                            Card(
+                              margin: const EdgeInsets.only(bottom: 6),
+                              child: ListTile(
+                                leading: const Icon(
+                                  Icons.location_city,
+                                  color: AppTheme.primaryBlue,
+                                ),
+                                title: Text(
+                                  s.name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  s.description?.isNotEmpty == true
+                                      ? s.description!
+                                      : 'Setor do território',
+                                ),
+                                trailing: IconButton(
+                                  icon: const Icon(
+                                    Icons.delete_outline,
+                                    color: AppTheme.alertRed,
+                                    size: 20,
+                                  ),
+                                  tooltip: 'Excluir setor',
+                                  onPressed: () async {
+                                    await mgr.deleteSector(s.id);
+                                  },
+                                ),
+                              ),
+                            ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           );
-        },
-      );
         },
       ),
     );
@@ -432,227 +439,232 @@ class TodayScreen extends ConsumerWidget {
           final scheduleController = ctrls[7];
 
           return StatefulBuilder(
-        builder: (ctx, setDialogState) {
-          return AlertDialog(
-            title: const Row(
-              children: [
-                Icon(Icons.public, color: AppTheme.primaryBlue),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    '🌍 Novo Contato Estrangeiro',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TextField(
-                    controller: nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Nome da Pessoa *',
-                      prefixIcon: Icon(Icons.person_outline),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: langController,
-                    decoration: const InputDecoration(
-                      labelText: 'Idioma / Língua Falada *',
-                      hintText:
-                          'Ex: Espanhol, Inglês, Francês, Mandarim, Crioulo...',
-                      prefixIcon: Icon(Icons.translate),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: phoneController,
-                    decoration: const InputDecoration(
-                      labelText: 'Telefone / WhatsApp',
-                      prefixIcon: Icon(Icons.phone_outlined),
-                    ),
-                    keyboardType: TextInputType.phone,
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: addressController,
-                    decoration: const InputDecoration(
-                      labelText: 'Endereço / Referência',
-                      prefixIcon: Icon(Icons.location_on_outlined),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppTheme.accentTeal,
-                            side: const BorderSide(color: AppTheme.accentTeal),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 8,
-                            ),
-                          ),
-                          icon: const Icon(Icons.map, size: 16),
-                          label: const Text(
-                            '🗺️ Pinar Localização',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          onPressed: () async {
-                            final initialLat = double.tryParse(
-                              latController.text.trim(),
-                            );
-                            final initialLng = double.tryParse(
-                              lngController.text.trim(),
-                            );
-                            final res =
-                                await showDialog<ReverseGeocodingResult>(
-                                  context: context,
-                                  builder: (_) => MapLocationPickerDialog(
-                                    initialLat: initialLat,
-                                    initialLng: initialLng,
-                                    initialAddress: addressController.text
-                                        .trim(),
-                                  ),
-                                );
-                            if (res != null) {
-                              setDialogState(() {
-                                latController.text = res.latitude
-                                    .toStringAsFixed(6);
-                                lngController.text = res.longitude
-                                    .toStringAsFixed(6);
-                                if (addressController.text.trim().isEmpty &&
-                                    res.streetAndNumber.isNotEmpty) {
-                                  addressController.text = res.formattedSummary;
-                                }
-                              });
-                            }
-                          },
+            builder: (ctx, setDialogState) {
+              return AlertDialog(
+                title: const Row(
+                  children: [
+                    Icon(Icons.public, color: AppTheme.primaryBlue),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '🌍 Novo Contato Estrangeiro',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
                         ),
-                      ),
-                    ],
-                  ),
-                  if (latController.text.isNotEmpty &&
-                      lngController.text.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      '📍 GPS: ${latController.text}, ${lngController.text}',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: AppTheme.accentTeal,
-                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ],
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: scheduleController,
-                    decoration: const InputDecoration(
-                      labelText: 'Melhor Horário para Encontrar',
-                      hintText: 'Ex: Sábado de manhã, Terça após 18h',
-                      prefixIcon: Icon(Icons.access_time),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: notesController,
-                    decoration: const InputDecoration(
-                      labelText: 'Observações / Publicação Deixada',
-                      hintText:
-                          'Ex: Ficou com folheto em espanhol, aceitou visita',
-                      prefixIcon: Icon(Icons.note_alt_outlined),
-                    ),
-                    maxLines: 2,
-                  ),
-                  const SizedBox(height: 12),
-                  CheckboxListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text(
-                      'Encaminhar para Irmão Responsável via WhatsApp',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    value: sendViaWhatsApp,
-                    onChanged: (val) =>
-                        setDialogState(() => sendViaWhatsApp = val ?? true),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogCtx),
-                child: const Text('Cancelar'),
-              ),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.check),
-                label: const Text('Salvar Contato'),
-                onPressed: () async {
-                  final name = nameController.text.trim();
-                  if (name.isEmpty) return;
-                  final lang = langController.text.trim();
-                  final lat = double.tryParse(latController.text.trim());
-                  final lng = double.tryParse(lngController.text.trim());
-
-                  final repo = ref.read(repositoryProvider);
-                  final person = await repo.createPerson(
-                    name: name,
-                    status: 'interessado',
-                    phone: phoneController.text.trim().isEmpty
-                        ? null
-                        : phoneController.text.trim(),
-                    address: addressController.text.trim().isEmpty
-                        ? null
-                        : addressController.text.trim(),
-                    latitude: lat,
-                    longitude: lng,
-                    preferredSchedule: scheduleController.text.trim().isEmpty
-                        ? null
-                        : scheduleController.text.trim(),
-                    generalNotes: notesController.text.trim().isEmpty
-                        ? (lang.isNotEmpty ? 'Idioma falado: $lang' : null)
-                        : '${notesController.text.trim()}${lang.isNotEmpty ? "\nIdioma: $lang" : ""}',
-                    tags: ['estrangeiro', if (lang.isNotEmpty) lang],
-                  );
-
-                  final additionalNotes = notesController.text.trim();
-                  if (dialogCtx.mounted) Navigator.pop(dialogCtx);
-
-                  if (sendViaWhatsApp) {
-                    await PersonHandOffHelper.sendViaWhatsApp(
-                      person: person,
-                      language: lang.isNotEmpty ? lang : null,
-                      additionalNotes: additionalNotes.isEmpty
-                          ? null
-                          : additionalNotes,
-                    );
-                  }
-
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'Contato estrangeiro ($name) registrado com sucesso!',
+                ),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextField(
+                        controller: nameController,
+                        decoration: const InputDecoration(
+                          labelText: 'Nome da Pessoa *',
+                          prefixIcon: Icon(Icons.person_outline),
                         ),
                       ),
-                    );
-                  }
-                },
-              ),
-            ],
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: langController,
+                        decoration: const InputDecoration(
+                          labelText: 'Idioma / Língua Falada *',
+                          hintText: 'Ex: Espanhol, Inglês, Francês, Mandarim, Crioulo...',
+                          prefixIcon: Icon(Icons.translate),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: phoneController,
+                        decoration: const InputDecoration(
+                          labelText: 'Telefone / WhatsApp',
+                          prefixIcon: Icon(Icons.phone_outlined),
+                        ),
+                        keyboardType: TextInputType.phone,
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: addressController,
+                        decoration: const InputDecoration(
+                          labelText: 'Endereço / Referência',
+                          prefixIcon: Icon(Icons.location_on_outlined),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppTheme.accentTeal,
+                                side: const BorderSide(
+                                  color: AppTheme.accentTeal,
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 8,
+                                ),
+                              ),
+                              icon: const Icon(Icons.map, size: 16),
+                              label: const Text(
+                                '🗺️ Pinar Localização',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              onPressed: () async {
+                                final initialLat = double.tryParse(
+                                  latController.text.trim(),
+                                );
+                                final initialLng = double.tryParse(
+                                  lngController.text.trim(),
+                                );
+                                final res =
+                                    await showDialog<ReverseGeocodingResult>(
+                                      context: context,
+                                      builder: (_) => MapLocationPickerDialog(
+                                        initialLat: initialLat,
+                                        initialLng: initialLng,
+                                        initialAddress: addressController.text
+                                            .trim(),
+                                      ),
+                                    );
+                                if (res != null) {
+                                  setDialogState(() {
+                                    latController.text = res.latitude
+                                        .toStringAsFixed(6);
+                                    lngController.text = res.longitude
+                                        .toStringAsFixed(6);
+                                    if (addressController.text.trim().isEmpty &&
+                                        res.streetAndNumber.isNotEmpty) {
+                                      addressController.text =
+                                          res.formattedSummary;
+                                    }
+                                  });
+                                }
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (latController.text.isNotEmpty &&
+                          lngController.text.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          '📍 GPS: ${latController.text}, ${lngController.text}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppTheme.accentTeal,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: scheduleController,
+                        decoration: const InputDecoration(
+                          labelText: 'Melhor Horário para Encontrar',
+                          hintText: 'Ex: Sábado de manhã, Terça após 18h',
+                          prefixIcon: Icon(Icons.access_time),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: notesController,
+                        decoration: const InputDecoration(
+                          labelText: 'Observações / Publicação Deixada',
+                          hintText: 'Ex: Ficou com folheto em espanhol, aceitou visita',
+                          prefixIcon: Icon(Icons.note_alt_outlined),
+                        ),
+                        maxLines: 2,
+                      ),
+                      const SizedBox(height: 12),
+                      CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text(
+                          'Encaminhar para Irmão Responsável via WhatsApp',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        value: sendViaWhatsApp,
+                        onChanged: (val) =>
+                            setDialogState(() => sendViaWhatsApp = val ?? true),
+                      ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogCtx),
+                    child: const Text('Cancelar'),
+                  ),
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.check),
+                    label: const Text('Salvar Contato'),
+                    onPressed: () async {
+                      final name = nameController.text.trim();
+                      if (name.isEmpty) return;
+                      final lang = langController.text.trim();
+                      final lat = double.tryParse(latController.text.trim());
+                      final lng = double.tryParse(lngController.text.trim());
+
+                      final repo = ref.read(repositoryProvider);
+                      final person = await repo.createPerson(
+                        name: name,
+                        status: 'interessado',
+                        phone: phoneController.text.trim().isEmpty
+                            ? null
+                            : phoneController.text.trim(),
+                        address: addressController.text.trim().isEmpty
+                            ? null
+                            : addressController.text.trim(),
+                        latitude: lat,
+                        longitude: lng,
+                        preferredSchedule:
+                            scheduleController.text.trim().isEmpty
+                            ? null
+                            : scheduleController.text.trim(),
+                        generalNotes: notesController.text.trim().isEmpty
+                            ? (lang.isNotEmpty ? 'Idioma falado: $lang' : null)
+                            : '${notesController.text.trim()}${lang.isNotEmpty ? "\nIdioma: $lang" : ""}',
+                        tags: ['estrangeiro', if (lang.isNotEmpty) lang],
+                      );
+
+                      final additionalNotes = notesController.text.trim();
+                      if (dialogCtx.mounted) Navigator.pop(dialogCtx);
+
+                      if (sendViaWhatsApp) {
+                        await PersonHandOffHelper.sendViaWhatsApp(
+                          person: person,
+                          language: lang.isNotEmpty ? lang : null,
+                          additionalNotes: additionalNotes.isEmpty
+                              ? null
+                              : additionalNotes,
+                        );
+                      }
+
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Contato estrangeiro ($name) registrado com sucesso!',
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                ],
+              );
+            },
           );
-        },
-      );
         },
       ),
     );
@@ -738,7 +750,11 @@ class TodayScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(MediaQuery.sizeOf(context).width < 600 ? 'Hoje' : 'Hoje no Ministério'),
+        title: Text(
+          MediaQuery.sizeOf(context).width < 600
+              ? 'Hoje'
+              : 'Hoje no Ministério',
+        ),
         actions: [
           IconButton(
             visualDensity: VisualDensity.compact,
@@ -775,50 +791,54 @@ class TodayScreen extends ConsumerWidget {
             },
           ),
           Tooltip(
-            message: supabaseUser != null ? 'Supabase Online' : 'Salvo Localmente',
+            message: supabaseUser != null
+                ? 'Supabase Online'
+                : 'Salvo Localmente',
             child: InkWell(
-            onTap: () => _showSyncStatusModal(context, ref),
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 2),
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-              decoration: BoxDecoration(
-                color: supabaseUser != null
-                    ? AppTheme.successGreen.withValues(alpha: 0.22)
-                    : Colors.white.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
+              onTap: () => _showSyncStatusModal(context, ref),
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                decoration: BoxDecoration(
                   color: supabaseUser != null
-                      ? AppTheme.successGreen.withValues(alpha: 0.55)
-                      : Colors.white.withValues(alpha: 0.25),
+                      ? AppTheme.successGreen.withValues(alpha: 0.22)
+                      : Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: supabaseUser != null
+                        ? AppTheme.successGreen.withValues(alpha: 0.55)
+                        : Colors.white.withValues(alpha: 0.25),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      supabaseUser != null
+                          ? Icons.cloud_done_rounded
+                          : Icons.offline_pin,
+                      size: 14,
+                      color: supabaseUser != null
+                          ? const Color(0xFF4ADE80)
+                          : Colors.white,
+                    ),
+                    if (MediaQuery.sizeOf(context).width >= 600)
+                      const SizedBox(width: 4),
+                    if (MediaQuery.sizeOf(context).width >= 600)
+                      Text(
+                        supabaseUser != null
+                            ? 'Supabase Online'
+                            : 'Salvo Localmente',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                  ],
                 ),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    supabaseUser != null
-                        ? Icons.cloud_done_rounded
-                        : Icons.offline_pin,
-                    size: 14,
-                    color: supabaseUser != null
-                        ? const Color(0xFF4ADE80)
-                        : Colors.white,
-                  ),
-                  if (MediaQuery.sizeOf(context).width >= 600) const SizedBox(width: 4),
-                  if (MediaQuery.sizeOf(context).width >= 600) Text(
-                    supabaseUser != null
-                        ? 'Supabase Online'
-                        : 'Salvo Localmente',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
             ),
           ),
           Consumer(
@@ -893,14 +913,18 @@ class TodayScreen extends ConsumerWidget {
                 final String greetingSubtitle = hour < 12
                     ? 'Que Jeová abençoe seu ministério nesta manhã.'
                     : (hour < 18
-                        ? 'Renove suas forças para as revisitas da tarde.'
-                        : 'Hora de revisar as conversas e bênçãos do dia.');
+                          ? 'Renove suas forças para as revisitas da tarde.'
+                          : 'Hora de revisar as conversas e bênçãos do dia.');
                 final IconData greetingIcon = hour < 12
                     ? Icons.wb_sunny_rounded
-                    : (hour < 18 ? Icons.wb_twilight_rounded : Icons.nights_stay_rounded);
+                    : (hour < 18
+                          ? Icons.wb_twilight_rounded
+                          : Icons.nights_stay_rounded);
                 final Color greetingColor = hour < 12
                     ? const Color(0xFFF59E0B)
-                    : (hour < 18 ? const Color(0xFFEA580C) : const Color(0xFF6366F1));
+                    : (hour < 18
+                          ? const Color(0xFFEA580C)
+                          : const Color(0xFF6366F1));
 
                 final updateInfo = ref.watch(updateCheckStateProvider).value;
 
@@ -910,22 +934,32 @@ class TodayScreen extends ConsumerWidget {
                     if (updateInfo != null && updateInfo.hasUpdate)
                       Container(
                         margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
-                              const Color(0xFF2563EB).withValues(alpha: isDark ? 0.35 : 0.15),
-                              const Color(0xFF7C3AED).withValues(alpha: isDark ? 0.30 : 0.10),
+                              const Color(0xFF2563EB)
+                                  .withValues(alpha: isDark ? 0.35 : 0.15),
+                              const Color(0xFF7C3AED)
+                                  .withValues(alpha: isDark ? 0.30 : 0.10),
                             ],
                           ),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: const Color(0xFF3B82F6).withValues(alpha: 0.5),
+                            color: const Color(0xFF3B82F6)
+                                .withValues(alpha: 0.5),
                           ),
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.system_update_rounded, color: Color(0xFF2563EB), size: 22),
+                            const Icon(
+                              Icons.system_update_rounded,
+                              color: Color(0xFF2563EB),
+                              size: 22,
+                            ),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Column(
@@ -933,11 +967,17 @@ class TodayScreen extends ConsumerWidget {
                                 children: [
                                   Text(
                                     'Atualização Disponível: v${updateInfo.latestVersion}',
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                    ),
                                   ),
                                   const Text(
                                     'Toque para instalar a nova versão.',
-                                    style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: AppTheme.textMuted,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -946,26 +986,39 @@ class TodayScreen extends ConsumerWidget {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF2563EB),
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
                                 minimumSize: Size.zero,
                               ),
                               onPressed: () {
-                                ref.read(updateCheckerServiceProvider).launchUpdate(updateInfo);
+                                ref
+                                    .read(updateCheckerServiceProvider)
+                                    .launchUpdate(updateInfo);
                               },
-                              child: const Text('Atualizar', style: TextStyle(fontSize: 12)),
+                              child: const Text(
+                                'Atualizar',
+                                style: TextStyle(fontSize: 12),
+                              ),
                             ),
                           ],
                         ),
                       ),
                     Container(
                       margin: const EdgeInsets.only(bottom: 12),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: isDark
                               ? [
-                                  const Color(0xFF1E293B).withValues(alpha: 0.7),
-                                  const Color(0xFF0F172A).withValues(alpha: 0.5),
+                                  const Color(0xFF1E293B)
+                                      .withValues(alpha: 0.7),
+                                  const Color(0xFF0F172A)
+                                      .withValues(alpha: 0.5),
                                 ]
                               : [
                                   greetingColor.withValues(alpha: 0.08),
@@ -974,7 +1027,9 @@ class TodayScreen extends ConsumerWidget {
                         ),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: greetingColor.withValues(alpha: isDark ? 0.25 : 0.2),
+                          color: greetingColor.withValues(
+                            alpha: isDark ? 0.25 : 0.2,
+                          ),
                         ),
                       ),
                       child: Row(
@@ -1331,13 +1386,41 @@ class TodayScreen extends ConsumerWidget {
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  _buildShortcutPill(context, ref, 'principais', '⭐ Principais', Icons.star_rounded, isDark),
+                  _buildShortcutPill(
+                    context,
+                    ref,
+                    'principais',
+                    '⭐ Principais',
+                    Icons.star_rounded,
+                    isDark,
+                  ),
                   const SizedBox(width: 8),
-                  _buildShortcutPill(context, ref, 'ministerio', '🏛️ Ministério', Icons.menu_book_rounded, isDark),
+                  _buildShortcutPill(
+                    context,
+                    ref,
+                    'ministerio',
+                    '🏛️ Ministério',
+                    Icons.menu_book_rounded,
+                    isDark,
+                  ),
                   const SizedBox(width: 8),
-                  _buildShortcutPill(context, ref, 'produtividade', '⚡ Produtividade', Icons.bolt_rounded, isDark),
+                  _buildShortcutPill(
+                    context,
+                    ref,
+                    'produtividade',
+                    '⚡ Produtividade',
+                    Icons.bolt_rounded,
+                    isDark,
+                  ),
                   const SizedBox(width: 8),
-                  _buildShortcutPill(context, ref, 'todos', '📋 Todos (13)', Icons.grid_view_rounded, isDark),
+                  _buildShortcutPill(
+                    context,
+                    ref,
+                    'todos',
+                    '📋 Todos (13)',
+                    Icons.grid_view_rounded,
+                    isDark,
+                  ),
                 ],
               ),
             ),
@@ -1735,7 +1818,9 @@ class TodayScreen extends ConsumerWidget {
       selected: isSelected,
       selectedColor: AppTheme.primaryBlue,
       labelStyle: TextStyle(
-        color: isSelected ? Colors.white : (isDark ? const Color(0xFFCBD5E1) : AppTheme.textDark),
+        color: isSelected
+            ? Colors.white
+            : (isDark ? const Color(0xFFCBD5E1) : AppTheme.textDark),
         fontSize: 12,
         fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
       ),
@@ -1745,7 +1830,11 @@ class TodayScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildCompactShortcutsGrid(BuildContext context, WidgetRef ref, bool isDark) {
+  Widget _buildCompactShortcutsGrid(
+    BuildContext context,
+    WidgetRef ref,
+    bool isDark,
+  ) {
     final category = ref.watch(todayShortcutsCategoryProvider);
 
     final btnNovaPessoa = _QuickActionButton(
@@ -1868,21 +1957,40 @@ class TodayScreen extends ConsumerWidget {
       onTap: () => _showAddForeignContactDialog(context, ref),
     );
 
-    final studiesEnabled = ref.watch(isFeatureEnabledProvider(AppFeature.studies));
-    final mapsEnabled = ref.watch(isFeatureEnabledProvider(AppFeature.territoryMaps));
+    final studiesEnabled = ref.watch(
+      isFeatureEnabledProvider(AppFeature.studies),
+    );
+    final mapsEnabled = ref.watch(
+      isFeatureEnabledProvider(AppFeature.territoryMaps),
+    );
     final inboxEnabled = ref.watch(isFeatureEnabledProvider(AppFeature.inbox));
-    final tasksEnabled = ref.watch(isFeatureEnabledProvider(AppFeature.tasksProjects));
-    final knowledgeEnabled = ref.watch(isFeatureEnabledProvider(AppFeature.knowledge));
-    final phonesEnabled = ref.watch(isFeatureEnabledProvider(AppFeature.phones));
-    final experiencesEnabled = ref.watch(isFeatureEnabledProvider(AppFeature.experiences));
-    final notesEnabled = ref.watch(isFeatureEnabledProvider(AppFeature.notesResearch));
-    final dashboardEnabled = ref.watch(isFeatureEnabledProvider(AppFeature.dashboard));
+    final tasksEnabled = ref.watch(
+      isFeatureEnabledProvider(AppFeature.tasksProjects),
+    );
+    final knowledgeEnabled = ref.watch(
+      isFeatureEnabledProvider(AppFeature.knowledge),
+    );
+    final phonesEnabled = ref.watch(
+      isFeatureEnabledProvider(AppFeature.phones),
+    );
+    final experiencesEnabled = ref.watch(
+      isFeatureEnabledProvider(AppFeature.experiences),
+    );
+    final notesEnabled = ref.watch(
+      isFeatureEnabledProvider(AppFeature.notesResearch),
+    );
+    final dashboardEnabled = ref.watch(
+      isFeatureEnabledProvider(AppFeature.dashboard),
+    );
 
     Widget buildGridRows(List<Widget> items) {
       if (items.isEmpty) return const SizedBox.shrink();
       final rows = <Widget>[];
       for (var i = 0; i < items.length; i += 4) {
-        final slice = items.sublist(i, i + 4 > items.length ? items.length : i + 4);
+        final slice = items.sublist(
+          i,
+          i + 4 > items.length ? items.length : i + 4,
+        );
         if (rows.isNotEmpty) rows.add(const SizedBox(height: 8));
         rows.add(
           Row(

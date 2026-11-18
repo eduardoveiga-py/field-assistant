@@ -1,0 +1,98 @@
+{
+  "version": 8,
+  "name": "Field Assistant Offline Dark",
+  "metadata": {
+    "maputnik:renderer": "mbgljs"
+  },
+  "sources": {
+    "openmaptiles": {
+      "type": "vector",
+      "tiles": [
+        "http://127.0.0.1:8080/tiles/mbtiles/{z}/{x}/{y}.pbf"
+      ],
+      "minzoom": 0,
+      "maxzoom": 18
+    }
+  },
+  "sprite": "{assets_dir}/sprites/sprite",
+  "glyphs": "{assets_dir}/fonts/{fontstack}/{range}.pbf",
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "#1a1a1a"
+      }
+    },
+    {
+      "id": "water",
+      "type": "fill",
+      "source": "openmaptiles",
+      "source-layer": "water",
+      "paint": {
+        "fill-color": "#142d4c"
+      }
+    },
+    {
+      "id": "landuse-residential",
+      "type": "fill",
+      "source": "openmaptiles",
+      "source-layer": "landuse",
+      "filter": ["==", "class", "residential"],
+      "paint": {
+        "fill-color": "#242424",
+        "fill-opacity": 0.6
+      }
+    },
+    {
+      "id": "building",
+      "type": "fill",
+      "source": "openmaptiles",
+      "source-layer": "building",
+      "paint": {
+        "fill-color": "#2b2b2b",
+        "fill-outline-color": "#383838"
+      }
+    },
+    {
+      "id": "transportation",
+      "type": "line",
+      "source": "openmaptiles",
+      "source-layer": "transportation",
+      "layout": {
+        "line-cap": "round",
+        "line-join": "round"
+      },
+      "paint": {
+        "line-color": "#3a3a3a",
+        "line-width": {
+          "base": 1.2,
+          "stops": [
+            [4, 0.5],
+            [8, 1.0],
+            [12, 3.0],
+            [16, 8.0]
+          ]
+        }
+      }
+    },
+    {
+      "id": "place-city",
+      "type": "symbol",
+      "source": "openmaptiles",
+      "source-layer": "place",
+      "filter": ["==", "class", "city"],
+      "layout": {
+        "text-field": "{name}",
+        "text-font": ["Noto Sans Regular"],
+        "text-size": 14,
+        "text-max-width": 8
+      },
+      "paint": {
+        "text-color": "#e0e0e0",
+        "text-halo-color": "#1a1a1a",
+        "text-halo-width": 1.5
+      }
+    }
+  ]
+}

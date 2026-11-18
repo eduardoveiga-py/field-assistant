@@ -39,7 +39,11 @@ Future<String?> pickIcsFileFromBrowser() async {
 
     uploadInput.click();
   } catch (e, st) {
-    AppLogger.warning('Falha ao abrir seletor de arquivo .ics no navegador', e, st);
+    AppLogger.warning(
+      'Falha ao abrir seletor de arquivo .ics no navegador',
+      e,
+      st,
+    );
     completer.complete(null);
   }
 

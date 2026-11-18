@@ -50,7 +50,9 @@ String? resolveCalendarSelection(
 
 /// Remove itens com ID vazio e duplicados (mantém a primeira ocorrência),
 /// preservando a ordem original — usado para montar o seletor de calendários.
-List<ExternalCalendarItem> uniqueCalendarItems(List<ExternalCalendarItem> items) {
+List<ExternalCalendarItem> uniqueCalendarItems(
+  List<ExternalCalendarItem> items,
+) {
   final seen = <String>{};
   final result = <ExternalCalendarItem>[];
   for (final item in items) {

@@ -17,9 +17,7 @@ Future<GeolocationResult> getPlatformCoordinates() async {
 
     final serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      return const GeolocationResult(
-        status: GeolocationStatus.serviceDisabled,
-      );
+      return const GeolocationResult(status: GeolocationStatus.serviceDisabled);
     }
 
     var permission = await Geolocator.checkPermission();

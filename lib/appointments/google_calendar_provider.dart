@@ -47,7 +47,8 @@ class GoogleCalendarProvider implements CalendarProvider {
       'https://www.googleapis.com/auth/userinfo.email';
   static const String _keySelectedCalendarId = 'google_calendar_selected_id';
   static const String _keyConnectedEmail = 'google_calendar_connected_email';
-  static const String _keyUserExplicitlyConnected = 'google_calendar_explicitly_connected';
+  static const String _keyUserExplicitlyConnected =
+      'google_calendar_explicitly_connected';
   static const String _keySyncTokenPrefix = 'google_calendar_synctoken_';
   static const String _keyReadOnlyCalendarIds = 'google_readonly_calendar_ids';
 
@@ -62,7 +63,11 @@ class GoogleCalendarProvider implements CalendarProvider {
       }
       return {};
     } catch (e, st) {
-      AppLogger.warning('Falha ao ler IDs de calendários somente leitura', e, st);
+      AppLogger.warning(
+        'Falha ao ler IDs de calendários somente leitura',
+        e,
+        st,
+      );
       return {};
     }
   }
@@ -95,8 +100,7 @@ class GoogleCalendarProvider implements CalendarProvider {
     try {
       if (kIsWeb) {
         if (defaultWebClientId.trim().isEmpty) {
-          lastError =
-              'Google Calendar na Web requer GOOGLE_WEB_CLIENT_ID configurado via --dart-define.';
+          lastError = 'Google Calendar na Web requer GOOGLE_WEB_CLIENT_ID configurado via --dart-define.';
           _initialized = true;
           return;
         }
@@ -143,7 +147,9 @@ class GoogleCalendarProvider implements CalendarProvider {
   @override
   Future<bool> isAuthorized() async {
     try {
-      final explicitlyConnected = await _secureStorage.read(key: _keyUserExplicitlyConnected);
+      final explicitlyConnected = await _secureStorage.read(
+        key: _keyUserExplicitlyConnected,
+      );
       if (explicitlyConnected != 'true') {
         return false;
       }
@@ -173,7 +179,11 @@ class GoogleCalendarProvider implements CalendarProvider {
       final savedEmail = await _secureStorage.read(key: _keyConnectedEmail);
       return savedEmail != null && savedEmail.isNotEmpty;
     } catch (e, st) {
-      AppLogger.warning('Falha ao verificar autorização do Google Calendar', e, st);
+      AppLogger.warning(
+        'Falha ao verificar autorização do Google Calendar',
+        e,
+        st,
+      );
       return false;
     }
   }
@@ -193,7 +203,10 @@ class GoogleCalendarProvider implements CalendarProvider {
         if (headers != null && headers.isNotEmpty) {
           _webAuthHeaders = headers;
           await _fetchAndSaveWebUserEmail(headers);
-          await _secureStorage.write(key: _keyUserExplicitlyConnected, value: 'true');
+          await _secureStorage.write(
+            key: _keyUserExplicitlyConnected,
+            value: 'true',
+          );
           return true;
         }
         if (_googleSignIn.supportsAuthenticate()) {
@@ -208,9 +221,15 @@ class GoogleCalendarProvider implements CalendarProvider {
                 ], promptIfNecessary: true);
             _webUserEmail = _currentUser!.email;
             if (_webUserEmail != null && _webUserEmail!.isNotEmpty) {
-              await _secureStorage.write(key: _keyConnectedEmail, value: _webUserEmail!);
+              await _secureStorage.write(
+                key: _keyConnectedEmail,
+                value: _webUserEmail!,
+              );
             }
-            await _secureStorage.write(key: _keyUserExplicitlyConnected, value: 'true');
+            await _secureStorage.write(
+              key: _keyUserExplicitlyConnected,
+              value: 'true',
+            );
             return _webAuthHeaders != null;
           }
         }
@@ -224,9 +243,15 @@ class GoogleCalendarProvider implements CalendarProvider {
       );
       if (_currentUser != null) {
         if (_currentUser!.email.isNotEmpty) {
-          await _secureStorage.write(key: _keyConnectedEmail, value: _currentUser!.email);
+          await _secureStorage.write(
+            key: _keyConnectedEmail,
+            value: _currentUser!.email,
+          );
         }
-        await _secureStorage.write(key: _keyUserExplicitlyConnected, value: 'true');
+        await _secureStorage.write(
+          key: _keyUserExplicitlyConnected,
+          value: 'true',
+        );
         return true;
       }
       return false;
@@ -314,7 +339,11 @@ class GoogleCalendarProvider implements CalendarProvider {
         );
       }).toList();
     } catch (e, st) {
-      AppLogger.warning('Falha ao listar agendas do Google Calendar; usando primária', e, st);
+      AppLogger.warning(
+        'Falha ao listar agendas do Google Calendar; usando primária',
+        e,
+        st,
+      );
       return [
         ExternalCalendarItem(
           id: 'primary',
@@ -343,7 +372,9 @@ class GoogleCalendarProvider implements CalendarProvider {
       return selected;
     }
     final calendars = await getAvailableCalendars();
-    final primary = calendars.where((c) => c.isPrimary && c.id.isNotEmpty).toList();
+    final primary = calendars
+        .where((c) => c.isPrimary && c.id.isNotEmpty)
+        .toList();
     if (primary.isNotEmpty) {
       final canonicalId = primary.first.id;
       await setSelectedCalendarId(canonicalId);
@@ -387,8 +418,13 @@ class GoogleCalendarProvider implements CalendarProvider {
 
     final primaryId = await _getEffectiveCalendarId();
     final calendars = await getAvailableCalendars();
-    final matches = calendars.where((calendar) => calendar.id == primaryId ||
-        (primaryId == 'primary' && calendar.isPrimary)).toList();
+    final matches = calendars
+        .where(
+          (calendar) =>
+              calendar.id == primaryId ||
+              (primaryId == 'primary' && calendar.isPrimary),
+        )
+        .toList();
     if (matches.isNotEmpty && matches.first.isReadOnly) {
       return CalendarSyncResult(
         success: false,
@@ -550,7 +586,8 @@ class GoogleCalendarProvider implements CalendarProvider {
           }
           return CalendarSyncResult(
             success: false,
-            errorMessage: lastError ?? 'Erro da API Google (${e.status}): ${e.message}',
+            errorMessage:
+                lastError ?? 'Erro da API Google (${e.status}): ${e.message}',
             eventsDownloaded: downloaded,
           );
         }
@@ -570,10 +607,7 @@ class GoogleCalendarProvider implements CalendarProvider {
       );
     }
 
-    return CalendarSyncResult(
-      success: true,
-      eventsDownloaded: downloaded,
-    );
+    return CalendarSyncResult(success: true, eventsDownloaded: downloaded);
   }
 
   @override
@@ -658,7 +692,11 @@ class GoogleCalendarProvider implements CalendarProvider {
         return created.id;
       }
     } catch (e, st) {
-      AppLogger.warning('Falha ao criar/atualizar evento no Google Calendar', e, st);
+      AppLogger.warning(
+        'Falha ao criar/atualizar evento no Google Calendar',
+        e,
+        st,
+      );
       return null;
     }
   }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+
 import '../../core/app_theme.dart';
 import 'managed_text_controllers.dart';
 
@@ -46,7 +47,8 @@ class RichMarkdownToolbar extends StatelessWidget {
         end,
         '$prefix$selectedText$suffix',
       );
-      final newCursorPos = start + prefix.length + selectedText.length + suffix.length;
+      final newCursorPos =
+          start + prefix.length + selectedText.length + suffix.length;
       controller.value = TextEditingValue(
         text: newText,
         selection: TextSelection.collapsed(offset: newCursorPos),
@@ -63,7 +65,9 @@ class RichMarkdownToolbar extends StatelessWidget {
 
     // Acha o início da linha atual
     final lastNewline = text.lastIndexOf('\n', cursor > 0 ? cursor - 1 : 0);
-    final lineStart = lastNewline == -1 ? 0 : (lastNewline + 1).clamp(0, text.length);
+    final lineStart = lastNewline == -1
+        ? 0
+        : (lastNewline + 1).clamp(0, text.length);
 
     final newText = text.replaceRange(lineStart, lineStart, linePrefix);
     controller.value = TextEditingValue(
@@ -100,7 +104,11 @@ class RichMarkdownToolbar extends StatelessWidget {
                     color: Colors.amber,
                     onTap: () {
                       Navigator.pop(ctx);
-                      _wrapSelection(prefix: '<mark style="background:#fef08a">', suffix: '</mark>', defaultText: 'destaque');
+                      _wrapSelection(
+                        prefix: '<mark style="background:#fef08a">',
+                        suffix: '</mark>',
+                        defaultText: 'destaque',
+                      );
                     },
                   ),
                   _colorOption(
@@ -108,7 +116,11 @@ class RichMarkdownToolbar extends StatelessWidget {
                     color: Colors.lightBlue,
                     onTap: () {
                       Navigator.pop(ctx);
-                      _wrapSelection(prefix: '<mark style="background:#bae6fd">', suffix: '</mark>', defaultText: 'destaque');
+                      _wrapSelection(
+                        prefix: '<mark style="background:#bae6fd">',
+                        suffix: '</mark>',
+                        defaultText: 'destaque',
+                      );
                     },
                   ),
                   _colorOption(
@@ -116,7 +128,11 @@ class RichMarkdownToolbar extends StatelessWidget {
                     color: Colors.lightGreen,
                     onTap: () {
                       Navigator.pop(ctx);
-                      _wrapSelection(prefix: '<mark style="background:#bbf7d0">', suffix: '</mark>', defaultText: 'destaque');
+                      _wrapSelection(
+                        prefix: '<mark style="background:#bbf7d0">',
+                        suffix: '</mark>',
+                        defaultText: 'destaque',
+                      );
                     },
                   ),
                   _colorOption(
@@ -124,7 +140,11 @@ class RichMarkdownToolbar extends StatelessWidget {
                     color: Colors.purpleAccent,
                     onTap: () {
                       Navigator.pop(ctx);
-                      _wrapSelection(prefix: '<mark style="background:#fbcfe8">', suffix: '</mark>', defaultText: 'destaque');
+                      _wrapSelection(
+                        prefix: '<mark style="background:#fbcfe8">',
+                        suffix: '</mark>',
+                        defaultText: 'destaque',
+                      );
                     },
                   ),
                   _colorOption(
@@ -132,7 +152,11 @@ class RichMarkdownToolbar extends StatelessWidget {
                     color: Colors.orangeAccent,
                     onTap: () {
                       Navigator.pop(ctx);
-                      _wrapSelection(prefix: '<mark style="background:#fed7aa">', suffix: '</mark>', defaultText: 'destaque');
+                      _wrapSelection(
+                        prefix: '<mark style="background:#fed7aa">',
+                        suffix: '</mark>',
+                        defaultText: 'destaque',
+                      );
                     },
                   ),
                 ],
@@ -164,7 +188,10 @@ class RichMarkdownToolbar extends StatelessWidget {
           children: [
             CircleAvatar(radius: 6, backgroundColor: color),
             const SizedBox(width: 8),
-            Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            ),
           ],
         ),
       ),
@@ -183,7 +210,9 @@ class RichMarkdownToolbar extends StatelessWidget {
         color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.06),
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.black.withValues(alpha: 0.06),
         ),
       ),
       child: SingleChildScrollView(
@@ -193,12 +222,20 @@ class RichMarkdownToolbar extends StatelessWidget {
             _toolbarButton(
               icon: Icons.format_bold,
               tooltip: 'Negrito (**texto**)',
-              onTap: () => _wrapSelection(prefix: '**', suffix: '**', defaultText: 'texto'),
+              onTap: () => _wrapSelection(
+                prefix: '**',
+                suffix: '**',
+                defaultText: 'texto',
+              ),
             ),
             _toolbarButton(
               icon: Icons.format_italic,
               tooltip: 'Itálico (*texto*)',
-              onTap: () => _wrapSelection(prefix: '*', suffix: '*', defaultText: 'texto'),
+              onTap: () => _wrapSelection(
+                prefix: '*',
+                suffix: '*',
+                defaultText: 'texto',
+              ),
             ),
             _toolbarButton(
               icon: Icons.title,
@@ -230,7 +267,11 @@ class RichMarkdownToolbar extends StatelessWidget {
             _toolbarButton(
               icon: Icons.menu_book_outlined,
               tooltip: 'Texto Bíblico (📖 Romanos 12:12)',
-              onTap: () => _wrapSelection(prefix: '📖 ', suffix: '', defaultText: 'Texto bíblico'),
+              onTap: () => _wrapSelection(
+                prefix: '📖 ',
+                suffix: '',
+                defaultText: 'Texto bíblico',
+              ),
             ),
             _toolbarButton(
               icon: Icons.palette_outlined,
@@ -251,7 +292,11 @@ class RichMarkdownToolbar extends StatelessWidget {
             _toolbarButton(
               icon: Icons.code,
               tooltip: 'Código / Bloco (`texto`)',
-              onTap: () => _wrapSelection(prefix: '`', suffix: '`', defaultText: 'código'),
+              onTap: () => _wrapSelection(
+                prefix: '`',
+                suffix: '`',
+                defaultText: 'código',
+              ),
             ),
           ],
         ),
@@ -275,18 +320,27 @@ class RichMarkdownToolbar extends StatelessWidget {
                 padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: Row(
                   children: [
-                    Icon(Icons.add_photo_alternate, color: AppTheme.primaryBlue),
+                    Icon(
+                      Icons.add_photo_alternate,
+                      color: AppTheme.primaryBlue,
+                    ),
                     SizedBox(width: 8),
                     Text(
                       'Inserir Imagem no Texto',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
                   ],
                 ),
               ),
               const Divider(),
               ListTile(
-                leading: const Icon(Icons.photo_library_outlined, color: AppTheme.primaryBlue),
+                leading: const Icon(
+                  Icons.photo_library_outlined,
+                  color: AppTheme.primaryBlue,
+                ),
                 title: const Text('Escolher da Galeria'),
                 subtitle: const Text('Selecionar foto salva no dispositivo'),
                 onTap: () async {
@@ -311,9 +365,14 @@ class RichMarkdownToolbar extends StatelessWidget {
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.camera_alt_outlined, color: AppTheme.accentTeal),
+                leading: const Icon(
+                  Icons.camera_alt_outlined,
+                  color: AppTheme.accentTeal,
+                ),
                 title: const Text('Tirar com a Câmera'),
-                subtitle: const Text('Fotografar anotação, publicação ou lugar'),
+                subtitle: const Text(
+                  'Fotografar anotação, publicação ou lugar',
+                ),
                 onTap: () async {
                   Navigator.pop(ctx);
                   try {
@@ -338,7 +397,9 @@ class RichMarkdownToolbar extends StatelessWidget {
               ListTile(
                 leading: const Icon(Icons.link, color: Colors.purple),
                 title: const Text('Inserir Link / URL de Imagem'),
-                subtitle: const Text('Usar endereço web (https://...) ou caminho local'),
+                subtitle: const Text(
+                  'Usar endereço web (https://...) ou caminho local',
+                ),
                 onTap: () {
                   Navigator.pop(ctx);
                   _showManualImageDialog(context);
@@ -393,7 +454,9 @@ class RichMarkdownToolbar extends StatelessWidget {
                 onPressed: () {
                   final path = urlCtrl.text.trim();
                   if (path.isNotEmpty) {
-                    final caption = captionCtrl.text.trim().isEmpty ? 'imagem' : captionCtrl.text.trim();
+                    final caption = captionCtrl.text.trim().isEmpty
+                        ? 'imagem'
+                        : captionCtrl.text.trim();
                     _wrapSelection(prefix: '![$caption]($path)', suffix: '');
                   }
                   Navigator.pop(ctx);
@@ -423,11 +486,17 @@ class RichMarkdownToolbar extends StatelessWidget {
                 padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: Row(
                   children: [
-                    Icon(Icons.bookmark_added_outlined, color: AppTheme.primaryBlue),
+                    Icon(
+                      Icons.bookmark_added_outlined,
+                      color: AppTheme.primaryBlue,
+                    ),
                     SizedBox(width: 8),
                     Text(
                       'Inserir Link ou Publicação',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
                   ],
                 ),
@@ -439,7 +508,9 @@ class RichMarkdownToolbar extends StatelessWidget {
                   child: Icon(Icons.menu_book, color: Colors.white, size: 20),
                 ),
                 title: const Text('Publicação do JW.org'),
-                subtitle: const Text('Livro, brochura, revista ou artigo teocrático'),
+                subtitle: const Text(
+                  'Livro, brochura, revista ou artigo teocrático',
+                ),
                 onTap: () {
                   Navigator.pop(ctx);
                   _showLinkInputModal(
@@ -453,10 +524,16 @@ class RichMarkdownToolbar extends StatelessWidget {
               ListTile(
                 leading: const CircleAvatar(
                   backgroundColor: Color(0xFFDC2626),
-                  child: Icon(Icons.play_circle_fill, color: Colors.white, size: 20),
+                  child: Icon(
+                    Icons.play_circle_fill,
+                    color: Colors.white,
+                    size: 20,
+                  ),
                 ),
                 title: const Text('Vídeo do JW.org / Broadcasting'),
-                subtitle: const Text('Vídeo de lição, animação bíblica ou música'),
+                subtitle: const Text(
+                  'Vídeo de lição, animação bíblica ou música',
+                ),
                 onTap: () {
                   Navigator.pop(ctx);
                   _showLinkInputModal(
@@ -506,7 +583,9 @@ class RichMarkdownToolbar extends StatelessWidget {
           final urlCtrl = ctrls[1];
 
           return AlertDialog(
-            title: Text('${defaultPrefix.isNotEmpty ? defaultPrefix : "🔗 "}Inserir Link'),
+            title: Text(
+              '${defaultPrefix.isNotEmpty ? defaultPrefix : "🔗 "}Inserir Link',
+            ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -539,8 +618,13 @@ class RichMarkdownToolbar extends StatelessWidget {
                 onPressed: () {
                   final url = urlCtrl.text.trim();
                   if (url.isNotEmpty) {
-                    final title = titleCtrl.text.trim().isEmpty ? 'Link' : titleCtrl.text.trim();
-                    _wrapSelection(prefix: '[$defaultPrefix$title]($url)', suffix: '');
+                    final title = titleCtrl.text.trim().isEmpty
+                        ? 'Link'
+                        : titleCtrl.text.trim();
+                    _wrapSelection(
+                      prefix: '[$defaultPrefix$title]($url)',
+                      suffix: '',
+                    );
                   }
                   Navigator.pop(ctx);
                 },

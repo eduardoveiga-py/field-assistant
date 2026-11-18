@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -204,7 +205,7 @@ class _TicunaAudioPlayerWidgetState
                     ),
                   ],
                 ),
-              ) ,
+              ),
             )
           : OutlinedButton.icon(
               onPressed: _openRecordingSheet,
@@ -246,7 +247,9 @@ class _TicunaAudioPlayerWidgetState
           // Botão Play / Pause
           IconButton(
             icon: Icon(
-              _isPlayingThis ? Icons.pause_circle_filled : Icons.play_circle_filled,
+              _isPlayingThis
+                  ? Icons.pause_circle_filled
+                  : Icons.play_circle_filled,
               color: const Color(0xFF0D9488),
               size: widget.compact ? 24 : 28,
             ),
@@ -494,7 +497,8 @@ class _TicunaRecordingBottomSheetState
       final audioService = ref.read(ticunaAudioServiceProvider);
 
       // Salva no banco local Drift apenas se o registro já existir (edição de palavra/frase já salva)
-      final isTemporaryDraft = widget.id.startsWith('word_') || widget.id.startsWith('phrase_');
+      final isTemporaryDraft =
+          widget.id.startsWith('word_') || widget.id.startsWith('phrase_');
       if (!isTemporaryDraft) {
         if (widget.isPhrase) {
           await repo.updatePhraseAudio(
@@ -535,9 +539,8 @@ class _TicunaRecordingBottomSheetState
     } catch (e) {
       if (mounted) {
         setState(() => _isSaving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao salvar áudio: $e')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Erro ao salvar áudio: $e')));
       }
     }
   }
@@ -570,8 +573,14 @@ class _TicunaRecordingBottomSheetState
 
             // Título e Termo Ticuna
             Text(
-              widget.isPhrase ? 'Pronúncia da Frase Ticuna' : 'Pronúncia da Palavra Ticuna',
-              style: const TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.w500),
+              widget.isPhrase
+                  ? 'Pronúncia da Frase Ticuna'
+                  : 'Pronúncia da Palavra Ticuna',
+              style: const TextStyle(
+                fontSize: 14,
+                color: Colors.grey,
+                fontWeight: FontWeight.w500,
+              ),
             ),
             const SizedBox(height: 6),
             Text(
@@ -610,8 +619,9 @@ class _TicunaRecordingBottomSheetState
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: (_recording ? Colors.red : const Color(0xFF0D9488))
-                            .withValues(alpha: 0.35),
+                        color:
+                            (_recording ? Colors.red : const Color(0xFF0D9488))
+                                .withValues(alpha: 0.35),
                         blurRadius: _recording ? 16 : 8,
                         spreadRadius: _recording ? 4 : 1,
                       ),
@@ -632,9 +642,14 @@ class _TicunaRecordingBottomSheetState
             ] else ...[
               // Preview do Áudio Gravado
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF0FDFA),
+                  color: isDark
+                      ? const Color(0xFF0F172A)
+                      : const Color(0xFFF0FDFA),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: const Color(0xFF0D9488).withValues(alpha: 0.3),
@@ -644,7 +659,9 @@ class _TicunaRecordingBottomSheetState
                   children: [
                     IconButton(
                       icon: Icon(
-                        _isPlayingPreview ? Icons.pause_circle_filled : Icons.play_circle_filled,
+                        _isPlayingPreview
+                            ? Icons.pause_circle_filled
+                            : Icons.play_circle_filled,
                         color: const Color(0xFF0D9488),
                         size: 32,
                       ),
@@ -663,7 +680,10 @@ class _TicunaRecordingBottomSheetState
                         ),
                         Text(
                           '${(_result!.fileSizeBytes / 1024).toStringAsFixed(1)} KB (AAC Mono 32 kbps)',
-                          style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey.shade500,
+                          ),
                         ),
                       ],
                     ),
@@ -672,9 +692,13 @@ class _TicunaRecordingBottomSheetState
                       onTap: _cyclePreviewSpeed,
                       borderRadius: BorderRadius.circular(6),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF0D9488).withValues(alpha: 0.15),
+                          color: const Color(0xFF0D9488)
+                              .withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(

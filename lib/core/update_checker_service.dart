@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
@@ -118,10 +119,7 @@ class AppUpdateInfo {
     );
   }
 
-  factory AppUpdateInfo.checkFailed({
-    String? currentVersion,
-    String? message,
-  }) {
+  factory AppUpdateInfo.checkFailed({String? currentVersion, String? message}) {
     final cur = currentVersion ?? AppVersion.version;
     return AppUpdateInfo(
       status: UpdateCheckStatus.checkFailed,
@@ -147,7 +145,8 @@ class AppUpdateInfo {
       currentVersion: cur,
       latestVersion: cur,
       releaseDate: AppVersion.releaseDate,
-      releaseNotes: message ?? 'Fontes de atualização indisponíveis no momento.',
+      releaseNotes:
+          message ?? 'Fontes de atualização indisponíveis no momento.',
       downloadUrl: AppVersion.latestIpaDownloadUrl,
       sourceCatalogUrl: AppVersion.appsJsonUrl,
       errorMessage: message,
@@ -186,7 +185,8 @@ class UpdateCheckerService {
   final http.Client _client;
   String? lastInstallError;
 
-  UpdateCheckerService({http.Client? client}) : _client = client ?? http.Client();
+  UpdateCheckerService({http.Client? client})
+    : _client = client ?? http.Client();
 
   String? _extractAssetSha256(Map<String, dynamic>? asset) {
     final digest = asset?['digest']?.toString().trim() ?? '';
@@ -246,13 +246,19 @@ class UpdateCheckerService {
 
     // 1. Tenta consulta ao GitHub Releases API
     try {
-      final githubInfo = await _checkGitHubReleases(cur, timeout, platform: platform);
+      final githubInfo = await _checkGitHubReleases(
+        cur,
+        timeout,
+        platform: platform,
+      );
       if (githubInfo != null) return githubInfo;
       githubErrorMsg = 'GitHub Releases retornou resposta sem versão válida';
     } catch (e) {
       githubNetworkError = true;
       githubErrorMsg = e.toString();
-      AppLogger.warning('Consulta ao GitHub Releases falhou ($e). Tentando fallback apps.json...');
+      AppLogger.warning(
+        'Consulta ao GitHub Releases falhou ($e). Tentando fallback apps.json...',
+      );
     }
 
     // 2. Fallback: consulta ao apps.json no jsDelivr CDN
@@ -260,7 +266,11 @@ class UpdateCheckerService {
     String? appsJsonErrorMsg;
 
     try {
-      final appsJsonInfo = await _checkAppsJson(cur, timeout, platform: platform);
+      final appsJsonInfo = await _checkAppsJson(
+        cur,
+        timeout,
+        platform: platform,
+      );
       if (appsJsonInfo != null) return appsJsonInfo;
       appsJsonErrorMsg = 'apps.json retornou dados inválidos';
     } catch (e) {
@@ -291,19 +301,22 @@ class UpdateCheckerService {
   }) async {
     final targetPlatform = platform ?? defaultTargetPlatform;
     final uri = Uri.parse(AppVersion.latestReleaseApiUrl);
-    final response = await _client.get(
-      uri,
-      headers: {
-        'Accept': 'application/vnd.github.v3+json',
-        'User-Agent': AppVersion.userAgent,
-      },
-    ).timeout(timeout);
+    final response = await _client
+        .get(
+          uri,
+          headers: {
+            'Accept': 'application/vnd.github.v3+json',
+            'User-Agent': AppVersion.userAgent,
+          },
+        )
+        .timeout(timeout);
 
     if (response.statusCode != 200) return null;
 
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     final tagName = data['tag_name'] as String? ?? '';
-    final body = data['body'] as String? ?? 'Melhorias de desempenho e estabilidade.';
+    final body =
+        data['body'] as String? ?? 'Melhorias de desempenho e estabilidade.';
     final publishedAt = data['published_at'] as String? ?? '';
 
     // Extrai versão limpa (ex: 'v1.2.0' -> '1.2.0')
@@ -331,7 +344,8 @@ class UpdateCheckerService {
     }
 
     if (targetPlatform == TargetPlatform.android) {
-      downloadUrl = 'https://github.com/${AppVersion.githubRepo}/releases/latest/download/app-arm64-v8a-release.apk';
+      downloadUrl =
+          'https://github.com/${AppVersion.githubRepo}/releases/latest/download/app-arm64-v8a-release.apk';
       assetFileName = 'app-arm64-v8a-release.apk';
       Map<String, dynamic>? selectedApk;
       // Preferência 1: app-arm64-v8a-release.apk
@@ -358,7 +372,8 @@ class UpdateCheckerService {
       }
       // Se nenhum APK específico foi encontrado nos assets, mantém a URL padrão canônica do APK
       if (selectedApk != null) {
-        downloadUrl = selectedApk['browser_download_url'] as String? ?? downloadUrl;
+        downloadUrl =
+            selectedApk['browser_download_url'] as String? ?? downloadUrl;
         assetFileName = selectedApk['name'] as String? ?? assetFileName;
         sizeBytes = selectedApk['size'] as int?;
         assetSha256 = _extractAssetSha256(selectedApk);
@@ -379,15 +394,15 @@ class UpdateCheckerService {
       }
       // Se nenhum IPA foi encontrado nos assets, mantém a URL padrão canônica do IPA
       if (selectedIpa != null) {
-        downloadUrl = selectedIpa['browser_download_url'] as String? ?? downloadUrl;
+        downloadUrl =
+            selectedIpa['browser_download_url'] as String? ?? downloadUrl;
         assetFileName = selectedIpa['name'] as String? ?? assetFileName;
         sizeBytes = selectedIpa['size'] as int?;
         assetSha256 = _extractAssetSha256(selectedIpa);
       }
     }
 
-    if ((assetSha256 == null || assetSha256.isEmpty) &&
-        sumsAssetUrl != null) {
+    if ((assetSha256 == null || assetSha256.isEmpty) && sumsAssetUrl != null) {
       assetSha256 = await _fetchChecksumFromManifest(
         sumsAssetUrl,
         assetFileName,
@@ -470,20 +485,25 @@ class UpdateCheckerService {
     if (remoteVersion.isEmpty) return null;
 
     final isNewer = AppVersion.compare(remoteVersion, currentVersion) > 0;
-    final releaseDate = appData['versionDate'] as String? ?? AppVersion.releaseDate;
-    final notes = appData['versionDescription'] as String? ?? 'Atualização disponível.';
+    final releaseDate =
+        appData['versionDate'] as String? ?? AppVersion.releaseDate;
+    final notes =
+        appData['versionDescription'] as String? ?? 'Atualização disponível.';
 
     final targetPlatform = platform ?? defaultTargetPlatform;
     String downloadUrl;
     String? sha256Value;
     if (targetPlatform == TargetPlatform.android) {
-      downloadUrl = appData['downloadURL_apk'] as String? ??
+      downloadUrl =
+          appData['downloadURL_apk'] as String? ??
           appData['downloadUrlApk'] as String? ??
           appData['downloadURL'] as String? ??
           'https://github.com/${AppVersion.githubRepo}/releases/latest/download/app-arm64-v8a-release.apk';
-      sha256Value = appData['sha256_apk'] as String? ?? appData['sha256'] as String?;
+      sha256Value =
+          appData['sha256_apk'] as String? ?? appData['sha256'] as String?;
     } else {
-      downloadUrl = appData['downloadURL'] as String? ?? AppVersion.latestIpaDownloadUrl;
+      downloadUrl =
+          appData['downloadURL'] as String? ?? AppVersion.latestIpaDownloadUrl;
       sha256Value = appData['sha256'] as String?;
     }
     final sizeBytes = appData['size'] as int?;
@@ -601,15 +621,23 @@ class UpdateCheckerService {
   }
 
   /// Aciona o fluxo de instalação ou atualização da aplicação de acordo com a plataforma.
-  Future<bool> launchUpdate(AppUpdateInfo info, {TargetPlatform? platformOverride}) async {
+  Future<bool> launchUpdate(
+    AppUpdateInfo info, {
+    TargetPlatform? platformOverride,
+  }) async {
     final platform = platformOverride ?? defaultTargetPlatform;
     lastInstallError = null;
     try {
       // 1. No iOS/iPadOS, tenta abrir fonte do LiveContainer via URL scheme customizado
       if (platform == TargetPlatform.iOS) {
-        final liveContainerScheme = Uri.parse('livecontainer://sources?url=${Uri.encodeComponent(info.sourceCatalogUrl)}');
+        final liveContainerScheme = Uri.parse(
+          'livecontainer://sources?url=${Uri.encodeComponent(info.sourceCatalogUrl)}',
+        );
         if (await canLaunchUrl(liveContainerScheme)) {
-          return await launchUrl(liveContainerScheme, mode: LaunchMode.externalApplication);
+          return await launchUrl(
+            liveContainerScheme,
+            mode: LaunchMode.externalApplication,
+          );
         }
       }
 
@@ -624,11 +652,16 @@ class UpdateCheckerService {
       // 3. Demais plataformas / URL web
       final downloadUri = Uri.parse(info.downloadUrl);
       if (await canLaunchUrl(downloadUri)) {
-        return await launchUrl(downloadUri, mode: LaunchMode.externalApplication);
+        return await launchUrl(
+          downloadUri,
+          mode: LaunchMode.externalApplication,
+        );
       }
 
       // 4. Fallback genérico: abre a página do repositório
-      final repoUri = Uri.parse('https://github.com/${AppVersion.githubRepo}/releases/latest');
+      final repoUri = Uri.parse(
+        'https://github.com/${AppVersion.githubRepo}/releases/latest',
+      );
       return await launchUrl(repoUri, mode: LaunchMode.externalApplication);
     } catch (e, st) {
       AppLogger.error('Erro ao abrir link de atualização: $e', e, st);
@@ -657,8 +690,8 @@ final updateCheckerServiceProvider = Provider<UpdateCheckerService>((ref) {
 /// Provider de estado que armazena o status da última verificação de atualização
 final updateCheckStateProvider =
     AsyncNotifierProvider<UpdateCheckNotifier, AppUpdateInfo?>(
-  UpdateCheckNotifier.new,
-);
+      UpdateCheckNotifier.new,
+    );
 
 class UpdateCheckNotifier extends AsyncNotifier<AppUpdateInfo?> {
   @override

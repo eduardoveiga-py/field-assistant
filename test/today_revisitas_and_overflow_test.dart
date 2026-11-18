@@ -121,26 +121,30 @@ void main() {
         addTearDown(testDb.close);
 
         // Insere uma pessoa 'revisita' e uma 'estudo'
-        await testDb.into(testDb.people).insert(
-          PeopleCompanion.insert(
-            id: 'rev_1',
-            name: 'Maria Revisita',
-            status: const Value('revisita'),
-            firstContactAt: DateTime.now(),
-            createdAt: DateTime.now(),
-            updatedAt: DateTime.now(),
-          ),
-        );
-        await testDb.into(testDb.people).insert(
-          PeopleCompanion.insert(
-            id: 'est_1',
-            name: 'Carlos Estudo',
-            status: const Value('estudo'),
-            firstContactAt: DateTime.now(),
-            createdAt: DateTime.now(),
-            updatedAt: DateTime.now(),
-          ),
-        );
+        await testDb
+            .into(testDb.people)
+            .insert(
+              PeopleCompanion.insert(
+                id: 'rev_1',
+                name: 'Maria Revisita',
+                status: const Value('revisita'),
+                firstContactAt: DateTime.now(),
+                createdAt: DateTime.now(),
+                updatedAt: DateTime.now(),
+              ),
+            );
+        await testDb
+            .into(testDb.people)
+            .insert(
+              PeopleCompanion.insert(
+                id: 'est_1',
+                name: 'Carlos Estudo',
+                status: const Value('estudo'),
+                firstContactAt: DateTime.now(),
+                createdAt: DateTime.now(),
+                updatedAt: DateTime.now(),
+              ),
+            );
 
         final container = ProviderContainer(
           overrides: [databaseProvider.overrideWithValue(testDb)],

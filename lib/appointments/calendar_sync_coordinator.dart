@@ -73,8 +73,10 @@ class CalendarSyncCoordinator {
     bool fullSync = false,
     Set<CalendarProviderType>? providers,
   }) {
-    return _activeSync ??= _runSyncAll(fullSync: fullSync, providers: providers)
-        .whenComplete(() => _activeSync = null);
+    return _activeSync ??= _runSyncAll(
+      fullSync: fullSync,
+      providers: providers,
+    ).whenComplete(() => _activeSync = null);
   }
 
   Future<CalendarSyncResult> _runSyncAll({
@@ -90,7 +92,8 @@ class CalendarSyncCoordinator {
     // 1. Download de alterações externas
     for (final provider in allProviders) {
       if (!provider.isSupportedOnCurrentPlatform) continue;
-      if (providers != null && !providers.contains(provider.providerType)) continue;
+      if (providers != null && !providers.contains(provider.providerType))
+        continue;
       try {
         final authorized = await provider.isAuthorized();
         if (!authorized) continue;
@@ -99,7 +102,9 @@ class CalendarSyncCoordinator {
         totalDownloaded += res.eventsDownloaded;
         totalUploaded += res.eventsUploaded;
         if (!res.success) {
-          errors.add('${provider.providerType.displayName}: ${res.errorMessage ?? "falha ao receber eventos"}');
+          errors.add(
+            '${provider.providerType.displayName}: ${res.errorMessage ?? "falha ao receber eventos"}',
+          );
         } else {
           readyProviders.add(provider);
         }
@@ -384,7 +389,11 @@ class CalendarSyncCoordinator {
           await provider.pushAppointmentToExternal(db, appointment);
         }
       } catch (e, st) {
-        AppLogger.warning('Falha ao propagar compromisso (${appointment.id}) para ${provider.providerType.name}', e, st);
+        AppLogger.warning(
+          'Falha ao propagar compromisso (${appointment.id}) para ${provider.providerType.name}',
+          e,
+          st,
+        );
       }
     }
   }
@@ -406,7 +415,11 @@ class CalendarSyncCoordinator {
             await provider.deleteExternalEvent(db, link.externalEventId);
           }
         } catch (e, st) {
-          AppLogger.warning('Falha ao excluir evento externo (${link.externalEventId})', e, st);
+          AppLogger.warning(
+            'Falha ao excluir evento externo (${link.externalEventId})',
+            e,
+            st,
+          );
         }
       }
       await (db.update(

@@ -32,7 +32,9 @@ void main() {
       expect(webBackend.isBlockedTile(Uint8List(6725)), isTrue);
 
       // OSM HTML block message
-      final htmlBlock = Uint8List.fromList('Access blocked due to tile usage policy osm.wiki/Blocked'.codeUnits);
+      final htmlBlock = Uint8List.fromList(
+        'Access blocked due to tile usage policy osm.wiki/Blocked'.codeUnits,
+      );
       expect(nativeBackend.isBlockedTile(htmlBlock), isTrue);
       expect(webBackend.isBlockedTile(htmlBlock), isTrue);
 
@@ -58,7 +60,9 @@ void main() {
         expect(await backend.isTileCached(10, 1, 2), isFalse);
 
         // Salvar tile legítimo
-        final cleanBytes = Uint8List.fromList(List.generate(1200, (i) => i % 256));
+        final cleanBytes = Uint8List.fromList(
+          List.generate(1200, (i) => i % 256),
+        );
         await backend.saveTile(10, 1, 3, cleanBytes);
         expect(await backend.isTileCached(10, 1, 3), isTrue);
         expect(await backend.getCachedTileCount(), 1);
@@ -67,68 +71,85 @@ void main() {
       }
     });
 
-    test('getTile auto-deletes existing cached watermarked tiles from disk', () async {
-      final tempDir = await Directory.systemTemp.createTemp('tile_test_autodel_');
-      try {
-        final backend = TileCacheNative(customDir: tempDir);
-        final file2049 = File('${tempDir.path}/15/10/20.png');
-        await file2049.parent.create(recursive: true);
-        await file2049.writeAsBytes(Uint8List(2049), flush: true);
-        expect(await file2049.exists(), isTrue);
+    test(
+      'getTile auto-deletes existing cached watermarked tiles from disk',
+      () async {
+        final tempDir = await Directory.systemTemp.createTemp(
+          'tile_test_autodel_',
+        );
+        try {
+          final backend = TileCacheNative(customDir: tempDir);
+          final file2049 = File('${tempDir.path}/15/10/20.png');
+          await file2049.parent.create(recursive: true);
+          await file2049.writeAsBytes(Uint8List(2049), flush: true);
+          expect(await file2049.exists(), isTrue);
 
-        // Ao ler tile corrompido em cache, deve expurgar o arquivo localmente
-        final res2049 = await backend.getTile(15, 10, 20);
-        expect(res2049, isNull);
-        expect(await file2049.exists(), isFalse);
+          // Ao ler tile corrompido em cache, deve expurgar o arquivo localmente
+          final res2049 = await backend.getTile(15, 10, 20);
+          expect(res2049, isNull);
+          expect(await file2049.exists(), isFalse);
 
-        // Repete o teste para marca d'água de 2513 bytes
-        final file2513 = File('${tempDir.path}/15/10/21.png');
-        await file2513.writeAsBytes(Uint8List(2513), flush: true);
-        expect(await file2513.exists(), isTrue);
+          // Repete o teste para marca d'água de 2513 bytes
+          final file2513 = File('${tempDir.path}/15/10/21.png');
+          await file2513.writeAsBytes(Uint8List(2513), flush: true);
+          expect(await file2513.exists(), isTrue);
 
-        final res2513 = await backend.getTile(15, 10, 21);
-        expect(res2513, isNull);
-        expect(await file2513.exists(), isFalse);
-      } finally {
-        await tempDir.delete(recursive: true);
-      }
-    });
+          final res2513 = await backend.getTile(15, 10, 21);
+          expect(res2513, isNull);
+          expect(await file2513.exists(), isFalse);
+        } finally {
+          await tempDir.delete(recursive: true);
+        }
+      },
+    );
 
-    test('getTile returns clean cached tile immediately without network call', () async {
-      final tempDir = await Directory.systemTemp.createTemp('tile_test_hit_');
-      try {
-        final backend = TileCacheNative(customDir: tempDir);
-        final cleanBytes = Uint8List.fromList(List.generate(2000, (i) => (i * 3) % 256));
-        await backend.saveTile(12, 5, 8, cleanBytes);
+    test(
+      'getTile returns clean cached tile immediately without network call',
+      () async {
+        final tempDir = await Directory.systemTemp.createTemp('tile_test_hit_');
+        try {
+          final backend = TileCacheNative(customDir: tempDir);
+          final cleanBytes = Uint8List.fromList(
+            List.generate(2000, (i) => (i * 3) % 256),
+          );
+          await backend.saveTile(12, 5, 8, cleanBytes);
 
-        final cached = await backend.getTile(12, 5, 8);
-        expect(cached, isNotNull);
-        expect(cached, cleanBytes);
-      } finally {
-        await tempDir.delete(recursive: true);
-      }
-    });
+          final cached = await backend.getTile(12, 5, 8);
+          expect(cached, isNotNull);
+          expect(cached, cleanBytes);
+        } finally {
+          await tempDir.delete(recursive: true);
+        }
+      },
+    );
 
     test('isTileCached returns false and auto-deletes watermarked, blocked and 0-byte tiles', () async {
-      final tempDir = await Directory.systemTemp.createTemp('tile_test_istilecached_');
+      final tempDir = await Directory.systemTemp.createTemp(
+        'tile_test_istilecached_',
+      );
       try {
         final backend = TileCacheNative(customDir: tempDir);
 
         // Cria tiles corrompidos no disco
-        final f0 = File('${tempDir.path}/10/1/0.png')..createSync(recursive: true);
+        final f0 = File('${tempDir.path}/10/1/0.png')
+          ..createSync(recursive: true);
         f0.writeAsBytesSync(Uint8List(0));
 
-        final f2049 = File('${tempDir.path}/10/1/1.png')..createSync(recursive: true);
+        final f2049 = File('${tempDir.path}/10/1/1.png')
+          ..createSync(recursive: true);
         f2049.writeAsBytesSync(Uint8List(2049));
 
-        final f2513 = File('${tempDir.path}/10/1/2.png')..createSync(recursive: true);
+        final f2513 = File('${tempDir.path}/10/1/2.png')
+          ..createSync(recursive: true);
         f2513.writeAsBytesSync(Uint8List(2513));
 
-        final f6725 = File('${tempDir.path}/10/1/3.png')..createSync(recursive: true);
+        final f6725 = File('${tempDir.path}/10/1/3.png')
+          ..createSync(recursive: true);
         f6725.writeAsBytesSync(Uint8List(6725));
 
         // Tile legítimo
-        final fClean = File('${tempDir.path}/10/1/4.png')..createSync(recursive: true);
+        final fClean = File('${tempDir.path}/10/1/4.png')
+          ..createSync(recursive: true);
         fClean.writeAsBytesSync(Uint8List.fromList([1, 2, 3, 4]));
 
         // isTileCached deve retornar false para os corrompidos e apagá-los
@@ -152,69 +173,90 @@ void main() {
       }
     });
 
-    test('getCachedTileCount filters out and cleans up corrupt/watermarked tiles', () async {
-      final tempDir = await Directory.systemTemp.createTemp('tile_test_count_');
-      try {
-        final backend = TileCacheNative(customDir: tempDir);
+    test(
+      'getCachedTileCount filters out and cleans up corrupt/watermarked tiles',
+      () async {
+        final tempDir = await Directory.systemTemp.createTemp(
+          'tile_test_count_',
+        );
+        try {
+          final backend = TileCacheNative(customDir: tempDir);
 
-        // 3 tiles com marcas d'água / corrompidos
-        final wm1 = File('${tempDir.path}/1/0/0.png')..createSync(recursive: true);
-        wm1.writeAsBytesSync(Uint8List(2049));
-        final wm2 = File('${tempDir.path}/1/0/1.png')..createSync(recursive: true);
-        wm2.writeAsBytesSync(Uint8List(2513));
-        final emptyFile = File('${tempDir.path}/1/0/2.png')..createSync(recursive: true);
-        emptyFile.writeAsBytesSync(Uint8List(0));
+          // 3 tiles com marcas d'água / corrompidos
+          final wm1 = File('${tempDir.path}/1/0/0.png')
+            ..createSync(recursive: true);
+          wm1.writeAsBytesSync(Uint8List(2049));
+          final wm2 = File('${tempDir.path}/1/0/1.png')
+            ..createSync(recursive: true);
+          wm2.writeAsBytesSync(Uint8List(2513));
+          final emptyFile = File('${tempDir.path}/1/0/2.png')
+            ..createSync(recursive: true);
+          emptyFile.writeAsBytesSync(Uint8List(0));
 
-        // 2 tiles válidos
-        final clean1 = File('${tempDir.path}/1/1/0.png')..createSync(recursive: true);
-        clean1.writeAsBytesSync(Uint8List.fromList([10, 20, 30]));
-        final clean2 = File('${tempDir.path}/1/1/1.png')..createSync(recursive: true);
-        clean2.writeAsBytesSync(Uint8List.fromList([40, 50, 60]));
+          // 2 tiles válidos
+          final clean1 = File('${tempDir.path}/1/1/0.png')
+            ..createSync(recursive: true);
+          clean1.writeAsBytesSync(Uint8List.fromList([10, 20, 30]));
+          final clean2 = File('${tempDir.path}/1/1/1.png')
+            ..createSync(recursive: true);
+          clean2.writeAsBytesSync(Uint8List.fromList([40, 50, 60]));
 
-        // Contagem deve considerar apenas os 2 válidos e expurgar os outros 3
-        final count = await backend.getCachedTileCount();
-        expect(count, equals(2));
+          // Contagem deve considerar apenas os 2 válidos e expurgar os outros 3
+          final count = await backend.getCachedTileCount();
+          expect(count, equals(2));
 
-        expect(wm1.existsSync(), isFalse);
-        expect(wm2.existsSync(), isFalse);
-        expect(emptyFile.existsSync(), isFalse);
-        expect(clean1.existsSync(), isTrue);
-        expect(clean2.existsSync(), isTrue);
-      } finally {
-        await tempDir.delete(recursive: true);
-      }
-    });
+          expect(wm1.existsSync(), isFalse);
+          expect(wm2.existsSync(), isFalse);
+          expect(emptyFile.existsSync(), isFalse);
+          expect(clean1.existsSync(), isTrue);
+          expect(clean2.existsSync(), isTrue);
+        } finally {
+          await tempDir.delete(recursive: true);
+        }
+      },
+    );
   });
 
   group('TileCacheNative - HTTP Provedores e Fallback', () {
-    test('getTile utiliza OpenStreetMap oficial como provedor primário', () async {
-      final tempDir = await Directory.systemTemp.createTemp('tile_test_osm_');
-      try {
-        final requestedUrls = <String>[];
-        final mockClient = MockClient((request) async {
-          requestedUrls.add(request.url.toString());
-          expect(request.headers['User-Agent'], contains('MinisterioPessoal'));
-          if (request.url.host == 'tile.openstreetmap.org') {
-            return http.Response.bytes(
-              Uint8List.fromList(List.generate(1500, (i) => 42)),
-              200,
-              headers: {'content-type': 'image/png'},
+    test(
+      'getTile utiliza OpenStreetMap oficial como provedor primário',
+      () async {
+        final tempDir = await Directory.systemTemp.createTemp('tile_test_osm_');
+        try {
+          final requestedUrls = <String>[];
+          final mockClient = MockClient((request) async {
+            requestedUrls.add(request.url.toString());
+            expect(
+              request.headers['User-Agent'],
+              contains('MinisterioPessoal'),
             );
-          }
-          return http.Response('Not Found', 404);
-        });
+            if (request.url.host == 'tile.openstreetmap.org') {
+              return http.Response.bytes(
+                Uint8List.fromList(List.generate(1500, (i) => 42)),
+                200,
+                headers: {'content-type': 'image/png'},
+              );
+            }
+            return http.Response('Not Found', 404);
+          });
 
-        final backend = TileCacheNative(customDir: tempDir, httpClient: mockClient);
-        final bytes = await backend.getTile(12, 50, 60);
+          final backend = TileCacheNative(
+            customDir: tempDir,
+            httpClient: mockClient,
+          );
+          final bytes = await backend.getTile(12, 50, 60);
 
-        expect(bytes, isNotNull);
-        expect(bytes!.length, 1500);
-        expect(requestedUrls, ['https://tile.openstreetmap.org/12/50/60.png']);
-        expect(await backend.isTileCached(12, 50, 60), isTrue);
-      } finally {
-        await tempDir.delete(recursive: true);
-      }
-    });
+          expect(bytes, isNotNull);
+          expect(bytes!.length, 1500);
+          expect(requestedUrls, [
+            'https://tile.openstreetmap.org/12/50/60.png',
+          ]);
+          expect(await backend.isTileCached(12, 50, 60), isTrue);
+        } finally {
+          await tempDir.delete(recursive: true);
+        }
+      },
+    );
 
     test('getTile realiza fallback transparente para OpenStreetMap France quando primário falha', () async {
       final tempDir = await Directory.systemTemp.createTemp('tile_test_fb_');
@@ -235,7 +277,10 @@ void main() {
           return http.Response('Not Found', 404);
         });
 
-        final backend = TileCacheNative(customDir: tempDir, httpClient: mockClient);
+        final backend = TileCacheNative(
+          customDir: tempDir,
+          httpClient: mockClient,
+        );
         final bytes = await backend.getTile(14, 25, 30);
 
         expect(bytes, isNotNull);
@@ -274,7 +319,10 @@ void main() {
           return http.Response('Not Found', 404);
         });
 
-        final backend = TileCacheNative(customDir: tempDir, httpClient: mockClient);
+        final backend = TileCacheNative(
+          customDir: tempDir,
+          httpClient: mockClient,
+        );
         final bytes = await backend.getTile(16, 12, 14);
 
         expect(bytes, isNotNull);
@@ -292,7 +340,11 @@ void main() {
       TileCacheNative.resetQueue();
       expect(TileCacheNative.activeDownloads, 0);
 
-      final completers = [Completer<void>(), Completer<void>(), Completer<void>()];
+      final completers = [
+        Completer<void>(),
+        Completer<void>(),
+        Completer<void>(),
+      ];
       int concurrentCalls = 0;
       int maxConcurrentObserved = 0;
 
@@ -309,12 +361,18 @@ void main() {
           await completers[2].future;
         }
         concurrentCalls--;
-        return http.Response.bytes(Uint8List.fromList(List.filled(1200, 1)), 200);
+        return http.Response.bytes(
+          Uint8List.fromList(List.filled(1200, 1)),
+          200,
+        );
       });
 
       final tempDir = await Directory.systemTemp.createTemp('tile_test_conc_');
       try {
-        final backend = TileCacheNative(customDir: tempDir, httpClient: mockClient);
+        final backend = TileCacheNative(
+          customDir: tempDir,
+          httpClient: mockClient,
+        );
 
         final f1 = backend.getTile(8, 0, 0);
         final f2 = backend.getTile(8, 1, 0);
@@ -355,12 +413,18 @@ void main() {
         } else if (request.url.path.contains('/10/1/0.png')) {
           await completers[1].future;
         }
-        return http.Response.bytes(Uint8List.fromList(List.filled(1200, 7)), 200);
+        return http.Response.bytes(
+          Uint8List.fromList(List.filled(1200, 7)),
+          200,
+        );
       });
 
       final tempDir = await Directory.systemTemp.createTemp('tile_test_prune_');
       try {
-        final backend = TileCacheNative(customDir: tempDir, httpClient: mockClient);
+        final backend = TileCacheNative(
+          customDir: tempDir,
+          httpClient: mockClient,
+        );
 
         // Ocupa os 2 slots ativos
         final f0 = backend.getTile(10, 0, 0);
@@ -369,8 +433,13 @@ void main() {
         expect(TileCacheNative.activeDownloads, 2);
 
         // Registra um tile de widget que sairá da tela (stale) e outro que permanecerá visível
-        final staleConsumerKey = TileCacheService.instance.registerTileConsumer(10, 2, 0);
-        final visibleConsumerKey = TileCacheService.instance.registerTileConsumer(10, 3, 0);
+        final staleConsumerKey = TileCacheService.instance.registerTileConsumer(
+          10,
+          2,
+          0,
+        );
+        final visibleConsumerKey = TileCacheService.instance
+            .registerTileConsumer(10, 3, 0);
         final fStale = backend.getTile(10, 2, 0);
         final fVisible = backend.getTile(10, 3, 0);
         await Future.delayed(const Duration(milliseconds: 30));
@@ -399,40 +468,43 @@ void main() {
   });
 
   group('TileCacheWeb - Testes da Camada Web', () {
-    test('TileCacheWeb detecta marca d água, rejeita salvamento e efetua fallback', () async {
-      TileCacheWeb.clearCache();
-      final web = TileCacheWeb();
+    test(
+      'TileCacheWeb detecta marca d água, rejeita salvamento e efetua fallback',
+      () async {
+        TileCacheWeb.clearCache();
+        final web = TileCacheWeb();
 
-      await web.saveTile(5, 5, 5, Uint8List(2049));
-      expect(await web.isTileCached(5, 5, 5), isFalse);
+        await web.saveTile(5, 5, 5, Uint8List(2049));
+        expect(await web.isTileCached(5, 5, 5), isFalse);
 
-      await web.saveTile(5, 5, 6, Uint8List(2513));
-      expect(await web.isTileCached(5, 5, 6), isFalse);
+        await web.saveTile(5, 5, 6, Uint8List(2513));
+        expect(await web.isTileCached(5, 5, 6), isFalse);
 
-      final requestedUrls = <String>[];
-      final mockClient = MockClient((request) async {
-        requestedUrls.add(request.url.toString());
-        if (request.url.host == 'tile.openstreetmap.org') {
-          return http.Response('OSM Busy', 500);
-        }
-        return http.Response.bytes(
-          Uint8List.fromList(List.generate(1400, (i) => 5)),
-          200,
-          headers: {'content-type': 'image/png'},
-        );
-      });
+        final requestedUrls = <String>[];
+        final mockClient = MockClient((request) async {
+          requestedUrls.add(request.url.toString());
+          if (request.url.host == 'tile.openstreetmap.org') {
+            return http.Response('OSM Busy', 500);
+          }
+          return http.Response.bytes(
+            Uint8List.fromList(List.generate(1400, (i) => 5)),
+            200,
+            headers: {'content-type': 'image/png'},
+          );
+        });
 
-      final webWithClient = TileCacheWeb(httpClient: mockClient);
-      final bytes = await webWithClient.getTile(7, 3, 4);
+        final webWithClient = TileCacheWeb(httpClient: mockClient);
+        final bytes = await webWithClient.getTile(7, 3, 4);
 
-      expect(bytes, isNotNull);
-      expect(bytes!.length, 1400);
-      expect(requestedUrls, [
-        'https://tile.openstreetmap.org/7/3/4.png',
-        'https://a.tile.openstreetmap.fr/osmfr/7/3/4.png',
-      ]);
-      expect(await webWithClient.isTileCached(7, 3, 4), isTrue);
-    });
+        expect(bytes, isNotNull);
+        expect(bytes!.length, 1400);
+        expect(requestedUrls, [
+          'https://tile.openstreetmap.org/7/3/4.png',
+          'https://a.tile.openstreetmap.fr/osmfr/7/3/4.png',
+        ]);
+        expect(await webWithClient.isTileCached(7, 3, 4), isTrue);
+      },
+    );
 
     test('TileCacheWeb isTileCached and getCachedTileCount filter out invalid/empty/watermarked tiles', () async {
       TileCacheWeb.clearCache();
@@ -462,42 +534,69 @@ void main() {
       expect(TileCacheNative.activeDownloads, 0);
     });
 
-    test('TileCacheNative and TileCacheWeb isolate cache entries by MapLayerStyle', () async {
-      final tempDir = await Directory.systemTemp.createTemp('tile_test_style_iso_');
-      try {
-        final native = TileCacheNative(customDir: tempDir);
-        final osmBytes = Uint8List.fromList([1, 1, 1]);
-        final satBytes = Uint8List.fromList([2, 2, 2]);
+    test(
+      'TileCacheNative and TileCacheWeb isolate cache entries by MapLayerStyle',
+      () async {
+        final tempDir = await Directory.systemTemp.createTemp(
+          'tile_test_style_iso_',
+        );
+        try {
+          final native = TileCacheNative(customDir: tempDir);
+          final osmBytes = Uint8List.fromList([1, 1, 1]);
+          final satBytes = Uint8List.fromList([2, 2, 2]);
 
-        await native.saveTile(10, 5, 5, osmBytes, MapLayerStyle.standard);
-        await native.saveTile(10, 5, 5, satBytes, MapLayerStyle.satellite);
+          await native.saveTile(10, 5, 5, osmBytes, MapLayerStyle.standard);
+          await native.saveTile(10, 5, 5, satBytes, MapLayerStyle.satellite);
 
-        final readOsm = await native.getTile(10, 5, 5, MapLayerStyle.standard);
-        final readSat = await native.getTile(10, 5, 5, MapLayerStyle.satellite);
+          final readOsm = await native.getTile(
+            10,
+            5,
+            5,
+            MapLayerStyle.standard,
+          );
+          final readSat = await native.getTile(
+            10,
+            5,
+            5,
+            MapLayerStyle.satellite,
+          );
 
-        expect(readOsm, equals(osmBytes));
-        expect(readSat, equals(satBytes));
-        expect(await native.getCachedTileCount(MapLayerStyle.standard), equals(1));
-        expect(await native.getCachedTileCount(MapLayerStyle.satellite), equals(1));
-        expect(await native.getCachedTileCount(), equals(2));
+          expect(readOsm, equals(osmBytes));
+          expect(readSat, equals(satBytes));
+          expect(
+            await native.getCachedTileCount(MapLayerStyle.standard),
+            equals(1),
+          );
+          expect(
+            await native.getCachedTileCount(MapLayerStyle.satellite),
+            equals(1),
+          );
+          expect(await native.getCachedTileCount(), equals(2));
 
-        // Web isolation
-        TileCacheWeb.clearCache();
-        final web = TileCacheWeb();
-        await web.saveTile(10, 5, 5, osmBytes, MapLayerStyle.standard);
-        await web.saveTile(10, 5, 5, satBytes, MapLayerStyle.satellite);
+          // Web isolation
+          TileCacheWeb.clearCache();
+          final web = TileCacheWeb();
+          await web.saveTile(10, 5, 5, osmBytes, MapLayerStyle.standard);
+          await web.saveTile(10, 5, 5, satBytes, MapLayerStyle.satellite);
 
-        final webOsm = await web.getTile(10, 5, 5, MapLayerStyle.standard);
-        final webSat = await web.getTile(10, 5, 5, MapLayerStyle.satellite);
+          final webOsm = await web.getTile(10, 5, 5, MapLayerStyle.standard);
+          final webSat = await web.getTile(10, 5, 5, MapLayerStyle.satellite);
 
-        expect(webOsm, equals(osmBytes));
-        expect(webSat, equals(satBytes));
-        expect(await web.getCachedTileCount(MapLayerStyle.standard), equals(1));
-        expect(await web.getCachedTileCount(MapLayerStyle.satellite), equals(1));
-        expect(await web.getCachedTileCount(), equals(2));
-      } finally {
-        await tempDir.delete(recursive: true);
-      }
-    });
+          expect(webOsm, equals(osmBytes));
+          expect(webSat, equals(satBytes));
+          expect(
+            await web.getCachedTileCount(MapLayerStyle.standard),
+            equals(1),
+          );
+          expect(
+            await web.getCachedTileCount(MapLayerStyle.satellite),
+            equals(1),
+          );
+          expect(await web.getCachedTileCount(), equals(2));
+        } finally {
+          await tempDir.delete(recursive: true);
+        }
+      },
+    );
   });
 }

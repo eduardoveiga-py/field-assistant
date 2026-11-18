@@ -72,12 +72,11 @@ class AppointmentsScreen extends ConsumerStatefulWidget {
     List<AppointmentEntry> appointments,
     List<TaskEntry> tasks,
     List<ProjectEntry> projects,
-  ) =>
-      _AppointmentsScreenState._appointmentsWithTasksAndProjects(
-        appointments,
-        tasks,
-        projects,
-      );
+  ) => _AppointmentsScreenState._appointmentsWithTasksAndProjects(
+    appointments,
+    tasks,
+    projects,
+  );
 
   @override
   ConsumerState<AppointmentsScreen> createState() => _AppointmentsScreenState();
@@ -191,17 +190,21 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
         );
         return;
       }
-      final result = await coordinator.syncAll(fullSync: true, providers: connected);
+      final result = await coordinator.syncAll(
+        fullSync: true,
+        providers: connected,
+      );
       if (!mounted) return;
       final message = result.success
           ? 'Sincronização concluída: ${result.eventsDownloaded} recebidos, ${result.eventsUploaded} enviados. ${result.conflictsFound} conflitos.'
           : 'Falha na sincronização: ${result.errorMessage ?? "erro desconhecido"}';
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Falha na sincronização: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Falha na sincronização: $e')));
       }
     } finally {
       if (mounted) setState(() => _isCalendarSyncing = false);
@@ -250,7 +253,11 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
         await _syncFromWebcalUrl(savedUrl.trim(), silent: true);
       }
     } catch (e, st) {
-      AppLogger.warning('Falha no auto-sync silencioso do calendário externo', e, st);
+      AppLogger.warning(
+        'Falha no auto-sync silencioso do calendário externo',
+        e,
+        st,
+      );
     }
   }
 
@@ -480,7 +487,8 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                     controller: textController,
                     maxLines: 8,
                     decoration: const InputDecoration(
-                      hintText: 'BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\n...',
+                      hintText:
+                          'BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\n...',
                       border: OutlineInputBorder(),
                     ),
                   ),
@@ -573,152 +581,541 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
           final googleUrlController = ctrls[0];
           if (!didScheduleUrlLoad) {
             didScheduleUrlLoad = true;
-            ref.read(appSettingsManagerProvider).getString('saved_calendar_url').then((
-              val,
-            ) {
-              if (ctx.mounted &&
-                  val != null &&
-                  val.isNotEmpty &&
-                  googleUrlController.text.isEmpty) {
-                googleUrlController.text = val;
-              }
-            });
+            ref
+                .read(appSettingsManagerProvider)
+                .getString('saved_calendar_url')
+                .then((val) {
+                  if (ctx.mounted &&
+                      val != null &&
+                      val.isNotEmpty &&
+                      googleUrlController.text.isEmpty) {
+                    googleUrlController.text = val;
+                  }
+                });
           }
 
           return StatefulBuilder(
-        builder: (ctx, setSheetState) {
-          final isDark = Theme.of(ctx).brightness == Brightness.dark;
+            builder: (ctx, setSheetState) {
+              final isDark = Theme.of(ctx).brightness == Brightness.dark;
 
-          return SafeArea(
-            child: Padding(
-              padding: EdgeInsets.only(
-                top: 20,
-                left: 16,
-                right: 16,
-                bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              return SafeArea(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    top: 20,
+                    left: 16,
+                    right: 16,
+                    bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+                  ),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Row(
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Icon(
-                              Icons.sync_alt,
-                              color: AppTheme.primaryBlue,
-                              size: 24,
+                            const Row(
+                              children: [
+                                Icon(
+                                  Icons.sync_alt,
+                                  color: AppTheme.primaryBlue,
+                                  size: 24,
+                                ),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Sincronização de Calendários',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
                             ),
-                            SizedBox(width: 8),
-                            Text(
-                              'Sincronização de Calendários',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
+                            IconButton(
+                              icon: const Icon(Icons.close),
+                              onPressed: () => Navigator.pop(ctx),
                             ),
                           ],
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.close),
-                          onPressed: () => Navigator.pop(ctx),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Integração oficial bidirecional com Google Agenda e Apple Calendar (iPhone/iPad).',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppTheme.textMuted,
+                          ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'Integração oficial bidirecional com Google Agenda e Apple Calendar (iPhone/iPad).',
-                      style: TextStyle(fontSize: 13, color: AppTheme.textMuted),
-                    ),
-                    const SizedBox(height: 16),
+                        const SizedBox(height: 16),
 
-                    Card(
-                      elevation: 1,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(
-                          color: isDark
-                              ? const Color(0xFF334155)
-                              : const Color(0xFFE2E8F0),
-                        ),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(14),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
+                        Card(
+                          elevation: 1,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(
+                              color: isDark
+                                  ? const Color(0xFF334155)
+                                  : const Color(0xFFE2E8F0),
+                            ),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(14),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF4285F4)
-                                        .withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: const Icon(
-                                    Icons.calendar_month,
-                                    color: Color(0xFF4285F4),
-                                    size: 22,
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF4285F4)
+                                            .withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Icon(
+                                        Icons.calendar_month,
+                                        color: Color(0xFF4285F4),
+                                        size: 22,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    const Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Google Agenda (Google Calendar)',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 15,
+                                            ),
+                                          ),
+                                          Text(
+                                            'calendar.google.com',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: AppTheme.textMuted,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: [
+                                    OutlinedButton.icon(
+                                      icon: const Icon(
+                                        Icons.open_in_browser,
+                                        size: 16,
+                                      ),
+                                      label: const Text(
+                                        'Abrir Google Agenda no Navegador',
+                                        style: TextStyle(fontSize: 12),
+                                      ),
+                                      onPressed: () async {
+                                        final uri = Uri.parse(
+                                          'https://calendar.google.com',
+                                        );
+                                        if (await canLaunchUrl(uri)) {
+                                          await launchUrl(
+                                            uri,
+                                            mode:
+                                                LaunchMode.externalApplication,
+                                          );
+                                        }
+                                      },
+                                    ),
+                                    ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(
+                                          0xFF1E40AF,
+                                        ),
+                                        foregroundColor: Colors.white,
+                                      ),
+                                      icon: const Icon(
+                                        Icons.file_download,
+                                        size: 16,
+                                      ),
+                                      label: const Text(
+                                        'Exportar todos para Google Agenda (.ics)',
+                                        style: TextStyle(fontSize: 12),
+                                      ),
+                                      onPressed: () {
+                                        final icsData = _generateIcsFile(
+                                          allAppts,
+                                        );
+                                        FileDownloader.download(
+                                          'ministerio_pessoal_agenda.ics',
+                                          icsData,
+                                        );
+                                        _showIcsExportResultDialog(
+                                          context,
+                                          icsData,
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                ),
+                                const Divider(height: 24),
+                                const Text(
+                                  'Importar / Puxar do Google Agenda:',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                    color: Color(0xFF1E40AF),
                                   ),
                                 ),
-                                const SizedBox(width: 10),
-                                const Expanded(
-                                  child: Column(
+                                const SizedBox(height: 6),
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: isDark
+                                        ? const Color(0xFF0F172A)
+                                        : const Color(0xFFF8FAFC),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: isDark
+                                          ? const Color(0xFF334155)
+                                          : const Color(0xFFE2E8F0),
+                                    ),
+                                  ),
+                                  child: const Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        'Google Agenda (Google Calendar)',
+                                        'Instruções passo a passo:',
                                         style: TextStyle(
                                           fontWeight: FontWeight.bold,
-                                          fontSize: 15,
+                                          fontSize: 12,
                                         ),
                                       ),
+                                      SizedBox(height: 4),
                                       Text(
-                                        'calendar.google.com',
+                                        '1. Abra o Google Agenda no navegador (calendar.google.com).\n'
+                                        '2. Clique em Configurações > Configurações das minhas agendas > Selecione sua agenda.\n'
+                                        '3. Role até "Integrar agenda" e copie o "Endereço secreto no formato iCal".\n'
+                                        '4. Cole o link abaixo ou baixe o arquivo .ics e importe aqui.',
                                         style: TextStyle(
                                           fontSize: 11,
-                                          color: AppTheme.textMuted,
+                                          height: 1.4,
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
+                                if (kIsWeb) ...[
+                                  const SizedBox(height: 8),
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.amber.withValues(
+                                        alpha: 0.15,
+                                      ),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(
+                                        color: Colors.amber.shade700,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.info_outline,
+                                          size: 16,
+                                          color: Colors.amber.shade800,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        const Expanded(
+                                          child: Text(
+                                            'Dica Web: No navegador, use "Selecionar Arquivo .ics" ou "Baixar no Navegador" para importar com 1 clique sem restrições de CORS.',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                                const SizedBox(height: 10),
+                                TextField(
+                                  controller: googleUrlController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Endereço iCal / Webcal do Google Agenda',
+                                    hintText: 'https://calendar.google.com/calendar/ical/.../basic.ics',
+                                    isDense: true,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: [
+                                    ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(
+                                          0xFF1E40AF,
+                                        ),
+                                        foregroundColor: Colors.white,
+                                      ),
+                                      icon: const Icon(
+                                        Icons.file_open,
+                                        size: 16,
+                                      ),
+                                      label: const Text(
+                                        'Selecionar Arquivo .ics',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      onPressed: () async {
+                                        final picked =
+                                            await IcsPickerHelper.pickIcsFile();
+                                        if (picked != null &&
+                                            picked.isNotEmpty) {
+                                          final res = await _importIcsContent(
+                                            picked,
+                                          );
+                                          if (ctx.mounted) Navigator.pop(ctx);
+                                          if (context.mounted) {
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  'Google Agenda importado com sucesso! ${res.created} novo(s), ${res.updated} atualizado(s).',
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                        }
+                                      },
+                                    ),
+                                    OutlinedButton.icon(
+                                      icon: const Icon(
+                                        Icons.download,
+                                        size: 16,
+                                      ),
+                                      label: const Text(
+                                        'Baixar no Navegador',
+                                        style: TextStyle(fontSize: 12),
+                                      ),
+                                      onPressed: () async {
+                                        final rawUrl = googleUrlController.text
+                                            .trim();
+                                        if (rawUrl.isEmpty) {
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                    'Cole a URL do Google Agenda acima para baixar no navegador.',
+                                                  ),
+                                                ),
+                                              );
+                                          return;
+                                        }
+                                        var cleanUrl = rawUrl;
+                                        if (cleanUrl.startsWith('webcal://')) {
+                                          cleanUrl = cleanUrl.replaceFirst(
+                                            'webcal://',
+                                            'https://',
+                                          );
+                                        }
+                                        final uri = Uri.parse(cleanUrl);
+                                        if (await canLaunchUrl(uri)) {
+                                          await launchUrl(
+                                            uri,
+                                            mode:
+                                                LaunchMode.externalApplication,
+                                          );
+                                        }
+                                      },
+                                    ),
+                                    OutlinedButton.icon(
+                                      icon: isSyncingGoogle
+                                          ? const SizedBox(
+                                              width: 14,
+                                              height: 14,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                              ),
+                                            )
+                                          : const Icon(Icons.sync, size: 16),
+                                      label: Text(
+                                        isSyncingGoogle
+                                            ? 'Sincronizando...'
+                                            : 'Sincronizar via Webcal',
+                                        style: const TextStyle(fontSize: 12),
+                                      ),
+                                      onPressed: isSyncingGoogle
+                                          ? null
+                                          : () async {
+                                              final rawUrl = googleUrlController
+                                                  .text
+                                                  .trim();
+                                              if (rawUrl.isEmpty) {
+                                                ScaffoldMessenger.of(context)
+                                                    .showSnackBar(
+                                                      const SnackBar(
+                                                        content: Text(
+                                                          'Informe uma URL de calendário válida.',
+                                                        ),
+                                                      ),
+                                                    );
+                                                return;
+                                              }
+                                              setSheetState(
+                                                () => isSyncingGoogle = true,
+                                              );
+                                              try {
+                                                final res =
+                                                    await _syncFromWebcalUrl(
+                                                      rawUrl,
+                                                    );
+                                                if (res != null) {
+                                                  if (ctx.mounted) {
+                                                    Navigator.pop(ctx);
+                                                  }
+                                                  if (context.mounted) {
+                                                    ScaffoldMessenger.of(
+                                                      context,
+                                                    ).showSnackBar(
+                                                      SnackBar(
+                                                        content: Text(
+                                                          'Google Agenda sincronizado com sucesso! ${res.created} novo(s), ${res.updated} atualizado(s).',
+                                                        ),
+                                                      ),
+                                                    );
+                                                  }
+                                                } else {
+                                                  if (context.mounted) {
+                                                    ScaffoldMessenger.of(
+                                                      context,
+                                                    ).showSnackBar(
+                                                      const SnackBar(
+                                                        content: Text(
+                                                          'Não foi possível obter calendário válido via Webcal.',
+                                                        ),
+                                                      ),
+                                                    );
+                                                  }
+                                                }
+                                              } catch (e) {
+                                                if (context.mounted) {
+                                                  ScaffoldMessenger.of(
+                                                    context,
+                                                  ).showSnackBar(
+                                                    SnackBar(
+                                                      content: Text(
+                                                        'Erro na sincronização: $e',
+                                                      ),
+                                                    ),
+                                                  );
+                                                }
+                                              } finally {
+                                                if (ctx.mounted) {
+                                                  setSheetState(
+                                                    () =>
+                                                        isSyncingGoogle = false,
+                                                  );
+                                                }
+                                              }
+                                            },
+                                    ),
+                                    OutlinedButton.icon(
+                                      icon: const Icon(
+                                        Icons.content_paste,
+                                        size: 16,
+                                      ),
+                                      label: const Text(
+                                        'Colar Texto .ics',
+                                        style: TextStyle(fontSize: 12),
+                                      ),
+                                      onPressed: () =>
+                                          _showPasteIcsDialog(context),
+                                    ),
+                                    OutlinedButton.icon(
+                                      icon: const Icon(Icons.paste, size: 16),
+                                      label: const Text(
+                                        'Colar da Área de Transferência',
+                                        style: TextStyle(fontSize: 12),
+                                      ),
+                                      onPressed: () =>
+                                          _pasteFromClipboard(context),
+                                    ),
+                                  ],
+                                ),
                               ],
                             ),
-                            const SizedBox(height: 12),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
+                          ),
+                        ),
+
+                        const SizedBox(height: 16),
+                        Card(
+                          elevation: 1,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(
+                              color: isDark
+                                  ? const Color(0xFF334155)
+                                  : const Color(0xFFE2E8F0),
+                            ),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(14),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                OutlinedButton.icon(
-                                  icon: const Icon(
-                                    Icons.open_in_browser,
-                                    size: 16,
-                                  ),
-                                  label: const Text(
-                                    'Abrir Google Agenda no Navegador',
-                                    style: TextStyle(fontSize: 12),
-                                  ),
-                                  onPressed: () async {
-                                    final uri = Uri.parse(
-                                      'https://calendar.google.com',
-                                    );
-                                    if (await canLaunchUrl(uri)) {
-                                      await launchUrl(
-                                        uri,
-                                        mode: LaunchMode.externalApplication,
-                                      );
-                                    }
-                                  },
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF10B981)
+                                            .withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Icon(
+                                        Icons.apple,
+                                        color: Color(0xFF10B981),
+                                        size: 22,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    const Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Apple Calendar / iCloud (iPhone / iPad)',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 15,
+                                            ),
+                                          ),
+                                          Text(
+                                            'Calendário nativo iOS / iPadOS',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: AppTheme.textMuted,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ),
+                                const SizedBox(height: 12),
                                 ElevatedButton.icon(
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF1E40AF),
+                                    backgroundColor: const Color(0xFF047857),
                                     foregroundColor: Colors.white,
                                   ),
                                   icon: const Icon(
@@ -726,13 +1123,13 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                                     size: 16,
                                   ),
                                   label: const Text(
-                                    'Exportar todos para Google Agenda (.ics)',
+                                    'Exportar para Apple Calendar (.ics)',
                                     style: TextStyle(fontSize: 12),
                                   ),
                                   onPressed: () {
                                     final icsData = _generateIcsFile(allAppts);
                                     FileDownloader.download(
-                                      'ministerio_pessoal_agenda.ics',
+                                      'ministerio_pessoal_agenda_apple.ics',
                                       icsData,
                                     );
                                     _showIcsExportResultDialog(
@@ -743,370 +1140,15 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                                 ),
                               ],
                             ),
-                            const Divider(height: 24),
-                            const Text(
-                              'Importar / Puxar do Google Agenda:',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                                color: Color(0xFF1E40AF),
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: isDark
-                                    ? const Color(0xFF0F172A)
-                                    : const Color(0xFFF8FAFC),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: isDark
-                                      ? const Color(0xFF334155)
-                                      : const Color(0xFFE2E8F0),
-                                ),
-                              ),
-                              child: const Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Instruções passo a passo:',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                  SizedBox(height: 4),
-                                  Text(
-                                    '1. Abra o Google Agenda no navegador (calendar.google.com).\n'
-                                    '2. Clique em Configurações > Configurações das minhas agendas > Selecione sua agenda.\n'
-                                    '3. Role até "Integrar agenda" e copie o "Endereço secreto no formato iCal".\n'
-                                    '4. Cole o link abaixo ou baixe o arquivo .ics e importe aqui.',
-                                    style: TextStyle(fontSize: 11, height: 1.4),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            if (kIsWeb) ...[
-                              const SizedBox(height: 8),
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: Colors.amber.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(
-                                    color: Colors.amber.shade700,
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.info_outline,
-                                      size: 16,
-                                      color: Colors.amber.shade800,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    const Expanded(
-                                      child: Text(
-                                        'Dica Web: No navegador, use "Selecionar Arquivo .ics" ou "Baixar no Navegador" para importar com 1 clique sem restrições de CORS.',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                            const SizedBox(height: 10),
-                            TextField(
-                              controller: googleUrlController,
-                              decoration: const InputDecoration(
-                                labelText:
-                                    'Endereço iCal / Webcal do Google Agenda',
-                                hintText: 'https://calendar.google.com/calendar/ical/.../basic.ics',
-                                isDense: true,
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                ElevatedButton.icon(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF1E40AF),
-                                    foregroundColor: Colors.white,
-                                  ),
-                                  icon: const Icon(Icons.file_open, size: 16),
-                                  label: const Text(
-                                    'Selecionar Arquivo .ics',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  onPressed: () async {
-                                    final picked =
-                                        await IcsPickerHelper.pickIcsFile();
-                                    if (picked != null && picked.isNotEmpty) {
-                                      final res = await _importIcsContent(
-                                        picked,
-                                      );
-                                      if (ctx.mounted) Navigator.pop(ctx);
-                                      if (context.mounted) {
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              'Google Agenda importado com sucesso! ${res.created} novo(s), ${res.updated} atualizado(s).',
-                                            ),
-                                          ),
-                                        );
-                                      }
-                                    }
-                                  },
-                                ),
-                                OutlinedButton.icon(
-                                  icon: const Icon(Icons.download, size: 16),
-                                  label: const Text(
-                                    'Baixar no Navegador',
-                                    style: TextStyle(fontSize: 12),
-                                  ),
-                                  onPressed: () async {
-                                    final rawUrl = googleUrlController.text
-                                        .trim();
-                                    if (rawUrl.isEmpty) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                            const SnackBar(
-                                              content: Text(
-                                                'Cole a URL do Google Agenda acima para baixar no navegador.',
-                                              ),
-                                            ),
-                                          );
-                                      return;
-                                    }
-                                    var cleanUrl = rawUrl;
-                                    if (cleanUrl.startsWith('webcal://')) {
-                                      cleanUrl = cleanUrl.replaceFirst(
-                                        'webcal://',
-                                        'https://',
-                                      );
-                                    }
-                                    final uri = Uri.parse(cleanUrl);
-                                    if (await canLaunchUrl(uri)) {
-                                      await launchUrl(
-                                        uri,
-                                        mode: LaunchMode.externalApplication,
-                                      );
-                                    }
-                                  },
-                                ),
-                                OutlinedButton.icon(
-                                  icon: isSyncingGoogle
-                                      ? const SizedBox(
-                                          width: 14,
-                                          height: 14,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                          ),
-                                        )
-                                      : const Icon(Icons.sync, size: 16),
-                                  label: Text(
-                                    isSyncingGoogle
-                                        ? 'Sincronizando...'
-                                        : 'Sincronizar via Webcal',
-                                    style: const TextStyle(fontSize: 12),
-                                  ),
-                                  onPressed: isSyncingGoogle
-                                      ? null
-                                      : () async {
-                                          final rawUrl = googleUrlController
-                                              .text
-                                              .trim();
-                                          if (rawUrl.isEmpty) {
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(
-                                                  const SnackBar(
-                                                    content: Text(
-                                                      'Informe uma URL de calendário válida.',
-                                                    ),
-                                                  ),
-                                                );
-                                            return;
-                                          }
-                                          setSheetState(
-                                            () => isSyncingGoogle = true,
-                                          );
-                                          try {
-                                            final res =
-                                                await _syncFromWebcalUrl(
-                                                  rawUrl,
-                                                );
-                                            if (res != null) {
-                                              if (ctx.mounted) {
-                                                Navigator.pop(ctx);
-                                              }
-                                              if (context.mounted) {
-                                                ScaffoldMessenger.of(
-                                                  context,
-                                                ).showSnackBar(
-                                                  SnackBar(
-                                                    content: Text(
-                                                      'Google Agenda sincronizado com sucesso! ${res.created} novo(s), ${res.updated} atualizado(s).',
-                                                    ),
-                                                  ),
-                                                );
-                                              }
-                                            } else {
-                                              if (context.mounted) {
-                                                ScaffoldMessenger.of(context)
-                                                    .showSnackBar(
-                                                      const SnackBar(
-                                                        content: Text(
-                                                          'Não foi possível obter calendário válido via Webcal.',
-                                                        ),
-                                                      ),
-                                                    );
-                                              }
-                                            }
-                                          } catch (e) {
-                                            if (context.mounted) {
-                                              ScaffoldMessenger.of(
-                                                context,
-                                              ).showSnackBar(
-                                                SnackBar(
-                                                  content: Text(
-                                                    'Erro na sincronização: $e',
-                                                  ),
-                                                ),
-                                              );
-                                            }
-                                          } finally {
-                                            if (ctx.mounted) {
-                                              setSheetState(
-                                                () => isSyncingGoogle = false,
-                                              );
-                                            }
-                                          }
-                                        },
-                                ),
-                                OutlinedButton.icon(
-                                  icon: const Icon(
-                                    Icons.content_paste,
-                                    size: 16,
-                                  ),
-                                  label: const Text(
-                                    'Colar Texto .ics',
-                                    style: TextStyle(fontSize: 12),
-                                  ),
-                                  onPressed: () => _showPasteIcsDialog(context),
-                                ),
-                                OutlinedButton.icon(
-                                  icon: const Icon(Icons.paste, size: 16),
-                                  label: const Text(
-                                    'Colar da Área de Transferência',
-                                    style: TextStyle(fontSize: 12),
-                                  ),
-                                  onPressed: () => _pasteFromClipboard(context),
-                                ),
-                              ],
-                            ),
-                          ],
+                          ),
                         ),
-                      ),
+                      ],
                     ),
-
-                    const SizedBox(height: 16),
-                    Card(
-                      elevation: 1,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(
-                          color: isDark
-                              ? const Color(0xFF334155)
-                              : const Color(0xFFE2E8F0),
-                        ),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(14),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF10B981)
-                                        .withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: const Icon(
-                                    Icons.apple,
-                                    color: Color(0xFF10B981),
-                                    size: 22,
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                const Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Apple Calendar / iCloud (iPhone / iPad)',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 15,
-                                        ),
-                                      ),
-                                      Text(
-                                        'Calendário nativo iOS / iPadOS',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: AppTheme.textMuted,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF047857),
-                                foregroundColor: Colors.white,
-                              ),
-                              icon: const Icon(Icons.file_download, size: 16),
-                              label: const Text(
-                                'Exportar para Apple Calendar (.ics)',
-                                style: TextStyle(fontSize: 12),
-                              ),
-                              onPressed: () {
-                                final icsData = _generateIcsFile(allAppts);
-                                FileDownloader.download(
-                                  'ministerio_pessoal_agenda_apple.ics',
-                                  icsData,
-                                );
-                                _showIcsExportResultDialog(context, icsData);
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           );
-        },
-      );
         },
       ),
     );
@@ -1136,538 +1178,548 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
           final locationController = ctrls[1];
 
           return StatefulBuilder(
-        builder: (ctx, setDialogState) {
-          final start = DateTime(
-            chosenDate.year,
-            chosenDate.month,
-            chosenDate.day,
-            chosenTime.hour,
-            chosenTime.minute,
-          );
-          final existingAppts =
-              ref.read(appointmentsStreamProvider).value ?? [];
-          final availability = AvailabilityEngine.checkAvailability(
-            startTime: start,
-            durationMinutes: durationMinutes,
-            existingAppointments: existingAppts,
-          );
-
-          final people = ref.read(peopleStreamProvider).value ?? [];
-
-          final occurrences = <DateTime>[start];
-          if (recurrence != 'Único') {
-            for (int i = 1; i < recurrenceCount; i++) {
-              if (recurrence == 'Semanal' || recurrence == 'Toda semana') {
-                occurrences.add(start.add(Duration(days: i * 7)));
-              } else if (recurrence == 'Quinzenal' ||
-                  recurrence == 'A cada 15 dias') {
-                occurrences.add(start.add(Duration(days: i * 14)));
-              } else if (recurrence == '2x por semana') {
-                final daysOffset = (i ~/ 2) * 7 + (i % 2 == 1 ? 3 : 0);
-                occurrences.add(start.add(Duration(days: daysOffset)));
-              } else if (recurrence == 'Mensal') {
-                final targetMonth = start.month + i;
-                final yearOffset = (targetMonth - 1) ~/ 12;
-                final month = ((targetMonth - 1) % 12) + 1;
-                final year = start.year + yearOffset;
-                final daysInMonth = DateTime(year, month + 1, 0).day;
-                final day = start.day.clamp(1, daysInMonth);
-                occurrences.add(
-                  DateTime(year, month, day, start.hour, start.minute),
-                );
-              } else if (recurrence == 'A cada 2 meses') {
-                final targetMonth = start.month + (i * 2);
-                final yearOffset = (targetMonth - 1) ~/ 12;
-                final month = ((targetMonth - 1) % 12) + 1;
-                final year = start.year + yearOffset;
-                final daysInMonth = DateTime(year, month + 1, 0).day;
-                final day = start.day.clamp(1, daysInMonth);
-                occurrences.add(
-                  DateTime(year, month, day, start.hour, start.minute),
-                );
-              }
-            }
-          }
-
-          int recurrenceConflicts = 0;
-          if (recurrence != 'Único') {
-            for (final occ in occurrences) {
-              if (AvailabilityEngine.hasCollision(
-                start: occ,
-                end: occ.add(Duration(minutes: durationMinutes)),
+            builder: (ctx, setDialogState) {
+              final start = DateTime(
+                chosenDate.year,
+                chosenDate.month,
+                chosenDate.day,
+                chosenTime.hour,
+                chosenTime.minute,
+              );
+              final existingAppts =
+                  ref.read(appointmentsStreamProvider).value ?? [];
+              final availability = AvailabilityEngine.checkAvailability(
+                startTime: start,
+                durationMinutes: durationMinutes,
                 existingAppointments: existingAppts,
-              )) {
-                recurrenceConflicts++;
-              }
-            }
-          }
+              );
 
-          return AlertDialog(
-            title: const Row(
-              children: [
-                Icon(Icons.event, color: AppTheme.primaryBlue),
-                SizedBox(width: 8),
-                Text('Novo Compromisso'),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  DropdownButtonFormField<String>(
-                    initialValue: appointmentCategory,
-                    decoration: const InputDecoration(
-                      labelText: 'Tipo de Compromisso',
-                    ),
-                    items: const [
-                      DropdownMenuItem(
-                        value: 'Serviço de Campo',
-                        child: Text('🚶 Saída de Campo / Testemunho'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'Revisita',
-                        child: Text('🔄 Revisita'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'Estudo Bíblico',
-                        child: Text('📖 Estudo Bíblico'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'Reunião',
-                        child: Text('🏛️ Reunião Congregacional'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'Viagem',
-                        child: Text('✈️ Viagem (Bloqueio de Agenda)'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'Folga',
-                        child: Text(
-                          '🏖️ Folga / Descanso (Bloqueio de Agenda)',
+              final people = ref.read(peopleStreamProvider).value ?? [];
+
+              final occurrences = <DateTime>[start];
+              if (recurrence != 'Único') {
+                for (int i = 1; i < recurrenceCount; i++) {
+                  if (recurrence == 'Semanal' || recurrence == 'Toda semana') {
+                    occurrences.add(start.add(Duration(days: i * 7)));
+                  } else if (recurrence == 'Quinzenal' ||
+                      recurrence == 'A cada 15 dias') {
+                    occurrences.add(start.add(Duration(days: i * 14)));
+                  } else if (recurrence == '2x por semana') {
+                    final daysOffset = (i ~/ 2) * 7 + (i % 2 == 1 ? 3 : 0);
+                    occurrences.add(start.add(Duration(days: daysOffset)));
+                  } else if (recurrence == 'Mensal') {
+                    final targetMonth = start.month + i;
+                    final yearOffset = (targetMonth - 1) ~/ 12;
+                    final month = ((targetMonth - 1) % 12) + 1;
+                    final year = start.year + yearOffset;
+                    final daysInMonth = DateTime(year, month + 1, 0).day;
+                    final day = start.day.clamp(1, daysInMonth);
+                    occurrences.add(
+                      DateTime(year, month, day, start.hour, start.minute),
+                    );
+                  } else if (recurrence == 'A cada 2 meses') {
+                    final targetMonth = start.month + (i * 2);
+                    final yearOffset = (targetMonth - 1) ~/ 12;
+                    final month = ((targetMonth - 1) % 12) + 1;
+                    final year = start.year + yearOffset;
+                    final daysInMonth = DateTime(year, month + 1, 0).day;
+                    final day = start.day.clamp(1, daysInMonth);
+                    occurrences.add(
+                      DateTime(year, month, day, start.hour, start.minute),
+                    );
+                  }
+                }
+              }
+
+              int recurrenceConflicts = 0;
+              if (recurrence != 'Único') {
+                for (final occ in occurrences) {
+                  if (AvailabilityEngine.hasCollision(
+                    start: occ,
+                    end: occ.add(Duration(minutes: durationMinutes)),
+                    existingAppointments: existingAppts,
+                  )) {
+                    recurrenceConflicts++;
+                  }
+                }
+              }
+
+              return AlertDialog(
+                title: const Row(
+                  children: [
+                    Icon(Icons.event, color: AppTheme.primaryBlue),
+                    SizedBox(width: 8),
+                    Text('Novo Compromisso'),
+                  ],
+                ),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      DropdownButtonFormField<String>(
+                        initialValue: appointmentCategory,
+                        decoration: const InputDecoration(
+                          labelText: 'Tipo de Compromisso',
                         ),
-                      ),
-                      DropdownMenuItem(
-                        value: 'Ausência',
-                        child: Text('🚫 Ausência / Indisponível'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'Pessoal',
-                        child: Text('👤 Pessoal (Médico, Família, Trabalho)'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'Outro',
-                        child: Text('📌 Outro Compromisso'),
-                      ),
-                    ],
-                    onChanged: (val) {
-                      if (val != null) {
-                        setDialogState(() {
-                          appointmentCategory = val;
-                          if (titleController.text.isEmpty) {
-                            if (val == 'Pessoal') {
-                              titleController.text = 'Compromisso Pessoal';
-                            }
-                            if (val == 'Reunião') {
-                              titleController.text = 'Reunião Congregacional';
-                            }
-                            if (val == 'Serviço de Campo') {
-                              titleController.text = 'Saída de Campo';
-                            }
-                            if (val == 'Viagem') {
-                              titleController.text = 'Viagem';
-                            }
-                            if (val == 'Folga') titleController.text = 'Folga';
-                            if (val == 'Ausência') {
-                              titleController.text = 'Ausência';
-                            }
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'Serviço de Campo',
+                            child: Text('🚶 Saída de Campo / Testemunho'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Revisita',
+                            child: Text('🔄 Revisita'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Estudo Bíblico',
+                            child: Text('📖 Estudo Bíblico'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Reunião',
+                            child: Text('🏛️ Reunião Congregacional'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Viagem',
+                            child: Text('✈️ Viagem (Bloqueio de Agenda)'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Folga',
+                            child: Text(
+                              '🏖️ Folga / Descanso (Bloqueio de Agenda)',
+                            ),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Ausência',
+                            child: Text('🚫 Ausência / Indisponível'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Pessoal',
+                            child: Text(
+                              '👤 Pessoal (Médico, Família, Trabalho)',
+                            ),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Outro',
+                            child: Text('📌 Outro Compromisso'),
+                          ),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) {
+                            setDialogState(() {
+                              appointmentCategory = val;
+                              if (titleController.text.isEmpty) {
+                                if (val == 'Pessoal') {
+                                  titleController.text = 'Compromisso Pessoal';
+                                }
+                                if (val == 'Reunião') {
+                                  titleController.text =
+                                      'Reunião Congregacional';
+                                }
+                                if (val == 'Serviço de Campo') {
+                                  titleController.text = 'Saída de Campo';
+                                }
+                                if (val == 'Viagem') {
+                                  titleController.text = 'Viagem';
+                                }
+                                if (val == 'Folga')
+                                  titleController.text = 'Folga';
+                                if (val == 'Ausência') {
+                                  titleController.text = 'Ausência';
+                                }
+                              }
+                            });
                           }
-                        });
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: titleController,
-                    decoration: InputDecoration(
-                      labelText: 'Título do compromisso *',
-                      hintText: appointmentCategory == 'Pessoal'
-                          ? 'Ex: Consulta médica ou Banco'
-                          : 'Ex: Revisita ou Estudo Bíblico',
-                    ),
-                    autofocus: true,
-                  ),
-                  const SizedBox(height: 12),
-                  if (people.isNotEmpty) ...[
-                    DropdownButtonFormField<String?>(
-                      initialValue: selectedPersonId,
-                      decoration: const InputDecoration(
-                        labelText: 'Contato Cadastrado (opcional)',
-                        prefixIcon: Icon(Icons.person_outline, size: 20),
+                        },
                       ),
-                      items: [
-                        const DropdownMenuItem<String?>(
-                          value: null,
-                          child: Text('Nenhum vínculo'),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: titleController,
+                        decoration: InputDecoration(
+                          labelText: 'Título do compromisso *',
+                          hintText: appointmentCategory == 'Pessoal'
+                              ? 'Ex: Consulta médica ou Banco'
+                              : 'Ex: Revisita ou Estudo Bíblico',
                         ),
-                        ...people.map(
-                          (p) => DropdownMenuItem<String?>(
-                            value: p.id,
-                            child: Text(p.name),
+                        autofocus: true,
+                      ),
+                      const SizedBox(height: 12),
+                      if (people.isNotEmpty) ...[
+                        DropdownButtonFormField<String?>(
+                          initialValue: selectedPersonId,
+                          decoration: const InputDecoration(
+                            labelText: 'Contato Cadastrado (opcional)',
+                            prefixIcon: Icon(Icons.person_outline, size: 20),
+                          ),
+                          items: [
+                            const DropdownMenuItem<String?>(
+                              value: null,
+                              child: Text('Nenhum vínculo'),
+                            ),
+                            ...people.map(
+                              (p) => DropdownMenuItem<String?>(
+                                value: p.id,
+                                child: Text(p.name),
+                              ),
+                            ),
+                          ],
+                          onChanged: (val) {
+                            setDialogState(() {
+                              selectedPersonId = val;
+                              if (val != null) {
+                                final p = people.firstWhere(
+                                  (element) => element.id == val,
+                                );
+                                if (titleController.text.isEmpty ||
+                                    titleController.text == 'Revisita' ||
+                                    titleController.text == 'Estudo Bíblico') {
+                                  titleController.text =
+                                      '${appointmentCategory == "Estudo Bíblico" ? "Estudo" : "Revisita"}: ${p.name}';
+                                }
+                              }
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      Row(
+                        children: [
+                          OutlinedButton.icon(
+                            icon: const Icon(Icons.date_range, size: 16),
+                            label: Text(AppDateUtils.formatDate(chosenDate)),
+                            onPressed: () async {
+                              final p = await showDatePicker(
+                                context: context,
+                                initialDate: chosenDate,
+                                firstDate: DateTime.now().subtract(
+                                  const Duration(days: 30),
+                                ),
+                                lastDate: DateTime.now().add(
+                                  const Duration(days: 365),
+                                ),
+                              );
+                              if (p != null)
+                                setDialogState(() => chosenDate = p);
+                            },
+                          ),
+                          const SizedBox(width: 8),
+                          OutlinedButton.icon(
+                            icon: const Icon(Icons.access_time, size: 16),
+                            label: Text(
+                              '${chosenTime.hour.toString().padLeft(2, '0')}:${chosenTime.minute.toString().padLeft(2, '0')}',
+                            ),
+                            onPressed: () async {
+                              final t = await showTimePicker(
+                                context: context,
+                                initialTime: chosenTime,
+                              );
+                              if (t != null)
+                                setDialogState(() => chosenTime = t);
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<int>(
+                        initialValue: durationMinutes,
+                        decoration: const InputDecoration(
+                          labelText: 'Duração estimada',
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 15,
+                            child: Text('15 min (Rápida)'),
+                          ),
+                          DropdownMenuItem(
+                            value: 30,
+                            child: Text('30 min (Padrão)'),
+                          ),
+                          DropdownMenuItem(value: 45, child: Text('45 min')),
+                          DropdownMenuItem(
+                            value: 60,
+                            child: Text('60 min (1 hora)'),
+                          ),
+                          DropdownMenuItem(
+                            value: 90,
+                            child: Text('90 min (1h 30m)'),
+                          ),
+                          DropdownMenuItem(
+                            value: 120,
+                            child: Text('120 min (2 horas)'),
+                          ),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) {
+                            setDialogState(() => durationMinutes = val);
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        initialValue: recurrence,
+                        decoration: const InputDecoration(
+                          labelText: 'Repetição / Recorrência',
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'Único',
+                            child: Text('Apenas esta data (Único)'),
+                          ),
+                          DropdownMenuItem(
+                            value: '2x por semana',
+                            child: Text('2x por semana'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Semanal',
+                            child: Text('Semanal (Toda semana)'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Quinzenal',
+                            child: Text('Quinzenal (A cada 15 dias)'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Mensal',
+                            child: Text('Mensal (a cada mês)'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'A cada 2 meses',
+                            child: Text('A cada 2 meses (Bimestral)'),
+                          ),
+                        ],
+                        onChanged: (val) {
+                          if (val != null)
+                            setDialogState(() => recurrence = val);
+                        },
+                      ),
+                      if (recurrence != 'Único') ...[
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<int>(
+                          initialValue: recurrenceCount,
+                          decoration: const InputDecoration(
+                            labelText: 'Quantidade de ocorrências',
+                          ),
+                          items: const [
+                            DropdownMenuItem(
+                              value: 4,
+                              child: Text('4 ocorrências'),
+                            ),
+                            DropdownMenuItem(
+                              value: 8,
+                              child: Text('8 ocorrências'),
+                            ),
+                            DropdownMenuItem(
+                              value: 12,
+                              child: Text('12 ocorrências'),
+                            ),
+                            DropdownMenuItem(
+                              value: 16,
+                              child: Text('16 ocorrências'),
+                            ),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) {
+                              setDialogState(() => recurrenceCount = val);
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text(
+                            'Respeitar disponibilidade da agenda',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          subtitle: const Text(
+                            'Pula automaticamente horários conflitantes via AvailabilityEngine',
+                            style: TextStyle(fontSize: 11),
+                          ),
+                          value: respectAvailability,
+                          onChanged: (val) =>
+                              setDialogState(() => respectAvailability = val),
+                        ),
+                      ],
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: locationController,
+                        decoration: const InputDecoration(
+                          labelText: 'Local ou observação',
+                          hintText: 'Ex: Salão do Reino / Casa do estudante / Pessoal',
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color:
+                              (recurrence == 'Único'
+                                  ? availability.isAvailable
+                                  : recurrenceConflicts == 0)
+                              ? AppTheme.successGreen.withValues(alpha: 0.1)
+                              : AppTheme.alertAmber.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color:
+                                (recurrence == 'Único'
+                                    ? availability.isAvailable
+                                    : recurrenceConflicts == 0)
+                                ? AppTheme.successGreen
+                                : AppTheme.alertAmber,
                           ),
                         ),
-                      ],
-                      onChanged: (val) {
-                        setDialogState(() {
-                          selectedPersonId = val;
-                          if (val != null) {
-                            final p = people.firstWhere(
-                              (element) => element.id == val,
-                            );
-                            if (titleController.text.isEmpty ||
-                                titleController.text == 'Revisita' ||
-                                titleController.text == 'Estudo Bíblico') {
-                              titleController.text =
-                                  '${appointmentCategory == "Estudo Bíblico" ? "Estudo" : "Revisita"}: ${p.name}';
-                            }
-                          }
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-                  Row(
-                    children: [
-                      OutlinedButton.icon(
-                        icon: const Icon(Icons.date_range, size: 16),
-                        label: Text(AppDateUtils.formatDate(chosenDate)),
-                        onPressed: () async {
-                          final p = await showDatePicker(
-                            context: context,
-                            initialDate: chosenDate,
-                            firstDate: DateTime.now().subtract(
-                              const Duration(days: 30),
-                            ),
-                            lastDate: DateTime.now().add(
-                              const Duration(days: 365),
-                            ),
-                          );
-                          if (p != null) setDialogState(() => chosenDate = p);
-                        },
-                      ),
-                      const SizedBox(width: 8),
-                      OutlinedButton.icon(
-                        icon: const Icon(Icons.access_time, size: 16),
-                        label: Text(
-                          '${chosenTime.hour.toString().padLeft(2, '0')}:${chosenTime.minute.toString().padLeft(2, '0')}',
-                        ),
-                        onPressed: () async {
-                          final t = await showTimePicker(
-                            context: context,
-                            initialTime: chosenTime,
-                          );
-                          if (t != null) setDialogState(() => chosenTime = t);
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<int>(
-                    initialValue: durationMinutes,
-                    decoration: const InputDecoration(
-                      labelText: 'Duração estimada',
-                    ),
-                    items: const [
-                      DropdownMenuItem(
-                        value: 15,
-                        child: Text('15 min (Rápida)'),
-                      ),
-                      DropdownMenuItem(
-                        value: 30,
-                        child: Text('30 min (Padrão)'),
-                      ),
-                      DropdownMenuItem(value: 45, child: Text('45 min')),
-                      DropdownMenuItem(
-                        value: 60,
-                        child: Text('60 min (1 hora)'),
-                      ),
-                      DropdownMenuItem(
-                        value: 90,
-                        child: Text('90 min (1h 30m)'),
-                      ),
-                      DropdownMenuItem(
-                        value: 120,
-                        child: Text('120 min (2 horas)'),
-                      ),
-                    ],
-                    onChanged: (val) {
-                      if (val != null) {
-                        setDialogState(() => durationMinutes = val);
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    initialValue: recurrence,
-                    decoration: const InputDecoration(
-                      labelText: 'Repetição / Recorrência',
-                    ),
-                    items: const [
-                      DropdownMenuItem(
-                        value: 'Único',
-                        child: Text('Apenas esta data (Único)'),
-                      ),
-                      DropdownMenuItem(
-                        value: '2x por semana',
-                        child: Text('2x por semana'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'Semanal',
-                        child: Text('Semanal (Toda semana)'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'Quinzenal',
-                        child: Text('Quinzenal (A cada 15 dias)'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'Mensal',
-                        child: Text('Mensal (a cada mês)'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'A cada 2 meses',
-                        child: Text('A cada 2 meses (Bimestral)'),
-                      ),
-                    ],
-                    onChanged: (val) {
-                      if (val != null) setDialogState(() => recurrence = val);
-                    },
-                  ),
-                  if (recurrence != 'Único') ...[
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<int>(
-                      initialValue: recurrenceCount,
-                      decoration: const InputDecoration(
-                        labelText: 'Quantidade de ocorrências',
-                      ),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 4,
-                          child: Text('4 ocorrências'),
-                        ),
-                        DropdownMenuItem(
-                          value: 8,
-                          child: Text('8 ocorrências'),
-                        ),
-                        DropdownMenuItem(
-                          value: 12,
-                          child: Text('12 ocorrências'),
-                        ),
-                        DropdownMenuItem(
-                          value: 16,
-                          child: Text('16 ocorrências'),
-                        ),
-                      ],
-                      onChanged: (val) {
-                        if (val != null) {
-                          setDialogState(() => recurrenceCount = val);
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text(
-                        'Respeitar disponibilidade da agenda',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      subtitle: const Text(
-                        'Pula automaticamente horários conflitantes via AvailabilityEngine',
-                        style: TextStyle(fontSize: 11),
-                      ),
-                      value: respectAvailability,
-                      onChanged: (val) =>
-                          setDialogState(() => respectAvailability = val),
-                    ),
-                  ],
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: locationController,
-                    decoration: const InputDecoration(
-                      labelText: 'Local ou observação',
-                      hintText:
-                          'Ex: Salão do Reino / Casa do estudante / Pessoal',
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color:
-                          (recurrence == 'Único'
-                              ? availability.isAvailable
-                              : recurrenceConflicts == 0)
-                          ? AppTheme.successGreen.withValues(alpha: 0.1)
-                          : AppTheme.alertAmber.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color:
-                            (recurrence == 'Único'
-                                ? availability.isAvailable
-                                : recurrenceConflicts == 0)
-                            ? AppTheme.successGreen
-                            : AppTheme.alertAmber,
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(
-                              (recurrence == 'Único'
-                                      ? availability.isAvailable
-                                      : recurrenceConflicts == 0)
-                                  ? Icons.check_circle
-                                  : Icons.warning_amber,
-                              color:
+                            Row(
+                              children: [
+                                Icon(
                                   (recurrence == 'Único'
-                                      ? availability.isAvailable
-                                      : recurrenceConflicts == 0)
-                                  ? AppTheme.successGreen
-                                  : AppTheme.alertAmber,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                recurrence == 'Único'
-                                    ? availability.message
-                                    : recurrenceConflicts == 0
-                                    ? 'Todas as ${occurrences.length} datas estão 100% livres!'
-                                    : 'Atenção: $recurrenceConflicts de ${occurrences.length} datas possuem sobreposição!',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
+                                          ? availability.isAvailable
+                                          : recurrenceConflicts == 0)
+                                      ? Icons.check_circle
+                                      : Icons.warning_amber,
                                   color:
                                       (recurrence == 'Único'
                                           ? availability.isAvailable
                                           : recurrenceConflicts == 0)
                                       ? AppTheme.successGreen
-                                      : const Color(0xFF92400E),
+                                      : AppTheme.alertAmber,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    recurrence == 'Único'
+                                        ? availability.message
+                                        : recurrenceConflicts == 0
+                                        ? 'Todas as ${occurrences.length} datas estão 100% livres!'
+                                        : 'Atenção: $recurrenceConflicts de ${occurrences.length} datas possuem sobreposição!',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                      color:
+                                          (recurrence == 'Único'
+                                              ? availability.isAvailable
+                                              : recurrenceConflicts == 0)
+                                          ? AppTheme.successGreen
+                                          : const Color(0xFF92400E),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (recurrence == 'Único' &&
+                                !availability.isAvailable &&
+                                availability
+                                    .suggestedAlternativeSlots
+                                    .isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              const Text(
+                                'Sugestões livres:',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
-                            ),
+                              Wrap(
+                                spacing: 6,
+                                children: availability.suggestedAlternativeSlots
+                                    .map((s) {
+                                      return ActionChip(
+                                        label: Text(AppDateUtils.formatTime(s)),
+                                        onPressed: () {
+                                          setDialogState(() {
+                                            chosenDate = s;
+                                            chosenTime = TimeOfDay.fromDateTime(
+                                              s,
+                                            );
+                                          });
+                                        },
+                                      );
+                                    })
+                                    .toList(),
+                              ),
+                            ],
                           ],
                         ),
-                        if (recurrence == 'Único' &&
-                            !availability.isAvailable &&
-                            availability
-                                .suggestedAlternativeSlots
-                                .isNotEmpty) ...[
-                          const SizedBox(height: 6),
-                          const Text(
-                            'Sugestões livres:',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
+                      ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Cancelar'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () async {
+                      final title = titleController.text.trim();
+                      if (title.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Informe o título do compromisso.'),
                           ),
-                          Wrap(
-                            spacing: 6,
-                            children: availability.suggestedAlternativeSlots
-                                .map((s) {
-                                  return ActionChip(
-                                    label: Text(AppDateUtils.formatTime(s)),
-                                    onPressed: () {
-                                      setDialogState(() {
-                                        chosenDate = s;
-                                        chosenTime = TimeOfDay.fromDateTime(s);
-                                      });
-                                    },
-                                  );
-                                })
-                                .toList(),
-                          ),
-                        ],
-                      ],
-                    ),
+                        );
+                        return;
+                      }
+
+                      final repo = ref.read(repositoryProvider);
+                      int createdCount = 0;
+                      int skippedCount = 0;
+                      final runningAppts = List<AppointmentEntry>.from(
+                        existingAppts,
+                      );
+
+                      for (final occ in occurrences) {
+                        final occEnd = occ.add(
+                          Duration(minutes: durationMinutes),
+                        );
+                        final hasConflict = AvailabilityEngine.hasCollision(
+                          start: occ,
+                          end: occEnd,
+                          existingAppointments: runningAppts,
+                        );
+
+                        if (hasConflict &&
+                            respectAvailability &&
+                            occurrences.length > 1) {
+                          skippedCount++;
+                          continue;
+                        }
+
+                        final newEntry = await repo.createAppointment(
+                          personId: selectedPersonId,
+                          title: title,
+                          startTime: occ,
+                          endTime: occEnd,
+                          durationMinutes: durationMinutes,
+                          status: 'confirmado',
+                          locationNotes: locationController.text.trim().isEmpty
+                              ? null
+                              : locationController.text.trim(),
+                        );
+                        runningAppts.add(newEntry);
+                        createdCount++;
+                      }
+
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      if (context.mounted) {
+                        final message = occurrences.length == 1
+                            ? 'Compromisso agendado no calendário com sucesso!'
+                            : '$createdCount compromisso(s) recorrente(s) agendado(s)!${skippedCount > 0 ? " ($skippedCount pulado(s) por conflito)" : ""}';
+                        ScaffoldMessenger.of(context)
+                            .showSnackBar(SnackBar(content: Text(message)));
+                      }
+                    },
+                    child: const Text('Salvar no Calendário'),
                   ),
                 ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancelar'),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  final title = titleController.text.trim();
-                  if (title.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Informe o título do compromisso.'),
-                      ),
-                    );
-                    return;
-                  }
-
-                  final repo = ref.read(repositoryProvider);
-                  int createdCount = 0;
-                  int skippedCount = 0;
-                  final runningAppts = List<AppointmentEntry>.from(
-                    existingAppts,
-                  );
-
-                  for (final occ in occurrences) {
-                    final occEnd = occ.add(Duration(minutes: durationMinutes));
-                    final hasConflict = AvailabilityEngine.hasCollision(
-                      start: occ,
-                      end: occEnd,
-                      existingAppointments: runningAppts,
-                    );
-
-                    if (hasConflict &&
-                        respectAvailability &&
-                        occurrences.length > 1) {
-                      skippedCount++;
-                      continue;
-                    }
-
-                    final newEntry = await repo.createAppointment(
-                      personId: selectedPersonId,
-                      title: title,
-                      startTime: occ,
-                      endTime: occEnd,
-                      durationMinutes: durationMinutes,
-                      status: 'confirmado',
-                      locationNotes: locationController.text.trim().isEmpty
-                          ? null
-                          : locationController.text.trim(),
-                    );
-                    runningAppts.add(newEntry);
-                    createdCount++;
-                  }
-
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  if (context.mounted) {
-                    final message = occurrences.length == 1
-                        ? 'Compromisso agendado no calendário com sucesso!'
-                        : '$createdCount compromisso(s) recorrente(s) agendado(s)!${skippedCount > 0 ? " ($skippedCount pulado(s) por conflito)" : ""}';
-                    ScaffoldMessenger.of(context)
-                        .showSnackBar(SnackBar(content: Text(message)));
-                  }
-                },
-                child: const Text('Salvar no Calendário'),
-              ),
-            ],
+              );
+            },
           );
-        },
-      );
         },
       ),
     );
@@ -1704,10 +1756,14 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
               label: const Text('Concluir'),
               onPressed: () async {
                 Navigator.pop(ctx);
-                await ref.read(taskManagerProvider).toggleTaskComplete(taskId, completed: true);
+                await ref
+                    .read(taskManagerProvider)
+                    .toggleTaskComplete(taskId, completed: true);
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Tarefa marcada como concluída!')),
+                    const SnackBar(
+                      content: Text('Tarefa marcada como concluída!'),
+                    ),
                   );
                 }
               },
@@ -1758,10 +1814,14 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
               label: const Text('Concluir'),
               onPressed: () async {
                 Navigator.pop(ctx);
-                await ref.read(projectManagerProvider).updateProjectStatus(projectId, 'completed');
+                await ref
+                    .read(projectManagerProvider)
+                    .updateProjectStatus(projectId, 'completed');
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Projeto marcado como concluído!')),
+                    const SnackBar(
+                      content: Text('Projeto marcado como concluído!'),
+                    ),
                   );
                 }
               },
@@ -1789,11 +1849,18 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
         context: context,
         builder: (ctx) => AlertDialog(
           title: Text(appt.title),
-          content: Text('Evento de calendário conectado (somente leitura).\n'
-              '${AppDateUtils.formatDateTime(appt.startTime)} — '
-              '${AppDateUtils.formatDateTime(appt.endTime)}'
-              '${appt.locationNotes == null ? "" : "\n${appt.locationNotes}"}'),
-          actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Fechar'))],
+          content: Text(
+            'Evento de calendário conectado (somente leitura).\n'
+            '${AppDateUtils.formatDateTime(appt.startTime)} — '
+            '${AppDateUtils.formatDateTime(appt.endTime)}'
+            '${appt.locationNotes == null ? "" : "\n${appt.locationNotes}"}',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Fechar'),
+            ),
+          ],
         ),
       );
       return;
@@ -3135,342 +3202,351 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
           final locationController = ctrls[0];
 
           return StatefulBuilder(
-        builder: (ctx, setDialogState) {
-          final start = DateTime(
-            chosenDate.year,
-            chosenDate.month,
-            chosenDate.day,
-            chosenTime.hour,
-            chosenTime.minute,
-          );
-          final existingAppts =
-              ref.read(appointmentsStreamProvider).value ?? [];
-          final availability = AvailabilityEngine.checkAvailability(
-            startTime: start,
-            durationMinutes: durationMinutes,
-            existingAppointments: existingAppts,
-          );
+            builder: (ctx, setDialogState) {
+              final start = DateTime(
+                chosenDate.year,
+                chosenDate.month,
+                chosenDate.day,
+                chosenTime.hour,
+                chosenTime.minute,
+              );
+              final existingAppts =
+                  ref.read(appointmentsStreamProvider).value ?? [];
+              final availability = AvailabilityEngine.checkAvailability(
+                startTime: start,
+                durationMinutes: durationMinutes,
+                existingAppointments: existingAppts,
+              );
 
-          final occurrences = <DateTime>[start];
-          if (recurrence != 'Único') {
-            for (int i = 1; i < recurrenceCount; i++) {
-              if (recurrence == 'Toda semana') {
-                occurrences.add(start.add(Duration(days: i * 7)));
-              } else if (recurrence == 'A cada 15 dias') {
-                occurrences.add(start.add(Duration(days: i * 14)));
-              } else if (recurrence == 'Mensal') {
-                final targetMonth = start.month + i;
-                final yearOffset = (targetMonth - 1) ~/ 12;
-                final month = ((targetMonth - 1) % 12) + 1;
-                final year = start.year + yearOffset;
-                final daysInMonth = DateTime(year, month + 1, 0).day;
-                final day = start.day.clamp(1, daysInMonth);
-                occurrences.add(
-                  DateTime(year, month, day, start.hour, start.minute),
-                );
+              final occurrences = <DateTime>[start];
+              if (recurrence != 'Único') {
+                for (int i = 1; i < recurrenceCount; i++) {
+                  if (recurrence == 'Toda semana') {
+                    occurrences.add(start.add(Duration(days: i * 7)));
+                  } else if (recurrence == 'A cada 15 dias') {
+                    occurrences.add(start.add(Duration(days: i * 14)));
+                  } else if (recurrence == 'Mensal') {
+                    final targetMonth = start.month + i;
+                    final yearOffset = (targetMonth - 1) ~/ 12;
+                    final month = ((targetMonth - 1) % 12) + 1;
+                    final year = start.year + yearOffset;
+                    final daysInMonth = DateTime(year, month + 1, 0).day;
+                    final day = start.day.clamp(1, daysInMonth);
+                    occurrences.add(
+                      DateTime(year, month, day, start.hour, start.minute),
+                    );
+                  }
+                }
               }
-            }
-          }
 
-          return AlertDialog(
-            title: const Row(
-              children: [
-                Icon(Icons.alarm_add, color: AppTheme.primaryBlue),
-                SizedBox(width: 8),
-                Text('Programar Serviço de Campo'),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  DropdownButtonFormField<String>(
-                    initialValue: modality,
-                    decoration: const InputDecoration(
-                      labelText: 'Modalidade de Testemunho',
-                    ),
-                    items: const [
-                      DropdownMenuItem(
-                        value: 'De Casa em Casa',
-                        child: Text('🏠 De Casa em Casa'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'Testemunho Público (Carrinho)',
-                        child: Text('🛒 Testemunho Público (Carrinho)'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'Testemunho Informal',
-                        child: Text('💬 Testemunho Informal'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'Cartas e Telefone',
-                        child: Text('✉️ Cartas e Telefone'),
-                      ),
-                      DropdownMenuItem(value: 'Outro', child: Text('📌 Outro')),
-                    ],
-                    onChanged: (val) {
-                      if (val != null) setDialogState(() => modality = val);
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      OutlinedButton.icon(
-                        icon: const Icon(Icons.date_range, size: 16),
-                        label: Text(AppDateUtils.formatDate(chosenDate)),
-                        onPressed: () async {
-                          final p = await showDatePicker(
-                            context: context,
-                            initialDate: chosenDate,
-                            firstDate: DateTime.now().subtract(
-                              const Duration(days: 30),
-                            ),
-                            lastDate: DateTime.now().add(
-                              const Duration(days: 365),
-                            ),
-                          );
-                          if (p != null) setDialogState(() => chosenDate = p);
-                        },
-                      ),
-                      const SizedBox(width: 8),
-                      OutlinedButton.icon(
-                        icon: const Icon(Icons.access_time, size: 16),
-                        label: Text(
-                          '${chosenTime.hour.toString().padLeft(2, '0')}:${chosenTime.minute.toString().padLeft(2, '0')}',
-                        ),
-                        onPressed: () async {
-                          final t = await showTimePicker(
-                            context: context,
-                            initialTime: chosenTime,
-                          );
-                          if (t != null) setDialogState(() => chosenTime = t);
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<int>(
-                    initialValue: durationMinutes,
-                    decoration: const InputDecoration(
-                      labelText: 'Duração Prevista',
-                    ),
-                    items: const [
-                      DropdownMenuItem(
-                        value: 60,
-                        child: Text('1 hora (60 min)'),
-                      ),
-                      DropdownMenuItem(
-                        value: 90,
-                        child: Text('1h 30m (90 min)'),
-                      ),
-                      DropdownMenuItem(
-                        value: 120,
-                        child: Text('2 horas (120 min)'),
-                      ),
-                      DropdownMenuItem(
-                        value: 150,
-                        child: Text('2h 30m (150 min)'),
-                      ),
-                      DropdownMenuItem(
-                        value: 180,
-                        child: Text('3 horas (180 min)'),
-                      ),
-                    ],
-                    onChanged: (val) {
-                      if (val != null) {
-                        setDialogState(() => durationMinutes = val);
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    initialValue: recurrence,
-                    decoration: const InputDecoration(
-                      labelText: 'Repetição / Recorrência',
-                    ),
-                    items: const [
-                      DropdownMenuItem(
-                        value: 'Único',
-                        child: Text('Apenas esta data (Único)'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'Toda semana',
-                        child: Text('Toda semana (Semanal)'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'A cada 15 dias',
-                        child: Text('A cada 15 dias (Quinzenal)'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'Mensal',
-                        child: Text('Mensal (a cada 4 semanas)'),
-                      ),
-                    ],
-                    onChanged: (val) {
-                      if (val != null) setDialogState(() => recurrence = val);
-                    },
-                  ),
-                  if (recurrence != 'Único') ...[
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<int>(
-                      initialValue: recurrenceCount,
-                      decoration: const InputDecoration(
-                        labelText: 'Quantidade de ocorrências',
-                      ),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 4,
-                          child: Text('4 semanas (1 mês)'),
-                        ),
-                        DropdownMenuItem(
-                          value: 8,
-                          child: Text('8 semanas (2 meses)'),
-                        ),
-                        DropdownMenuItem(
-                          value: 12,
-                          child: Text('12 semanas (3 meses)'),
-                        ),
-                        DropdownMenuItem(
-                          value: 16,
-                          child: Text('16 semanas (4 meses)'),
-                        ),
-                      ],
-                      onChanged: (val) {
-                        if (val != null) {
-                          setDialogState(() => recurrenceCount = val);
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text(
-                        'Respeitar disponibilidade da agenda',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      subtitle: const Text(
-                        'Pula automaticamente horários conflitantes via AvailabilityEngine',
-                        style: TextStyle(fontSize: 11),
-                      ),
-                      value: respectAvailability,
-                      onChanged: (val) =>
-                          setDialogState(() => respectAvailability = val),
-                    ),
+              return AlertDialog(
+                title: const Row(
+                  children: [
+                    Icon(Icons.alarm_add, color: AppTheme.primaryBlue),
+                    SizedBox(width: 8),
+                    Text('Programar Serviço de Campo'),
                   ],
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: locationController,
-                    decoration: const InputDecoration(
-                      labelText: 'Ponto de Encontro / Território',
-                      hintText: 'Ex: Salão do Reino / Praça Central / Setor 03',
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: availability.isAvailable
-                          ? AppTheme.successGreen.withValues(alpha: 0.1)
-                          : AppTheme.alertAmber.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: availability.isAvailable
-                            ? AppTheme.successGreen
-                            : AppTheme.alertAmber,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          availability.isAvailable
-                              ? Icons.check_circle
-                              : Icons.warning_amber,
-                          color: availability.isAvailable
-                              ? AppTheme.successGreen
-                              : AppTheme.alertAmber,
-                          size: 20,
+                ),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      DropdownButtonFormField<String>(
+                        initialValue: modality,
+                        decoration: const InputDecoration(
+                          labelText: 'Modalidade de Testemunho',
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            availability.message,
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'De Casa em Casa',
+                            child: Text('🏠 De Casa em Casa'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Testemunho Público (Carrinho)',
+                            child: Text('🛒 Testemunho Público (Carrinho)'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Testemunho Informal',
+                            child: Text('💬 Testemunho Informal'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Cartas e Telefone',
+                            child: Text('✉️ Cartas e Telefone'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Outro',
+                            child: Text('📌 Outro'),
+                          ),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) setDialogState(() => modality = val);
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          OutlinedButton.icon(
+                            icon: const Icon(Icons.date_range, size: 16),
+                            label: Text(AppDateUtils.formatDate(chosenDate)),
+                            onPressed: () async {
+                              final p = await showDatePicker(
+                                context: context,
+                                initialDate: chosenDate,
+                                firstDate: DateTime.now().subtract(
+                                  const Duration(days: 30),
+                                ),
+                                lastDate: DateTime.now().add(
+                                  const Duration(days: 365),
+                                ),
+                              );
+                              if (p != null)
+                                setDialogState(() => chosenDate = p);
+                            },
+                          ),
+                          const SizedBox(width: 8),
+                          OutlinedButton.icon(
+                            icon: const Icon(Icons.access_time, size: 16),
+                            label: Text(
+                              '${chosenTime.hour.toString().padLeft(2, '0')}:${chosenTime.minute.toString().padLeft(2, '0')}',
+                            ),
+                            onPressed: () async {
+                              final t = await showTimePicker(
+                                context: context,
+                                initialTime: chosenTime,
+                              );
+                              if (t != null)
+                                setDialogState(() => chosenTime = t);
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<int>(
+                        initialValue: durationMinutes,
+                        decoration: const InputDecoration(
+                          labelText: 'Duração Prevista',
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 60,
+                            child: Text('1 hora (60 min)'),
+                          ),
+                          DropdownMenuItem(
+                            value: 90,
+                            child: Text('1h 30m (90 min)'),
+                          ),
+                          DropdownMenuItem(
+                            value: 120,
+                            child: Text('2 horas (120 min)'),
+                          ),
+                          DropdownMenuItem(
+                            value: 150,
+                            child: Text('2h 30m (150 min)'),
+                          ),
+                          DropdownMenuItem(
+                            value: 180,
+                            child: Text('3 horas (180 min)'),
+                          ),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) {
+                            setDialogState(() => durationMinutes = val);
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        initialValue: recurrence,
+                        decoration: const InputDecoration(
+                          labelText: 'Repetição / Recorrência',
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'Único',
+                            child: Text('Apenas esta data (Único)'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Toda semana',
+                            child: Text('Toda semana (Semanal)'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'A cada 15 dias',
+                            child: Text('A cada 15 dias (Quinzenal)'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Mensal',
+                            child: Text('Mensal (a cada 4 semanas)'),
+                          ),
+                        ],
+                        onChanged: (val) {
+                          if (val != null)
+                            setDialogState(() => recurrence = val);
+                        },
+                      ),
+                      if (recurrence != 'Único') ...[
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<int>(
+                          initialValue: recurrenceCount,
+                          decoration: const InputDecoration(
+                            labelText: 'Quantidade de ocorrências',
+                          ),
+                          items: const [
+                            DropdownMenuItem(
+                              value: 4,
+                              child: Text('4 semanas (1 mês)'),
+                            ),
+                            DropdownMenuItem(
+                              value: 8,
+                              child: Text('8 semanas (2 meses)'),
+                            ),
+                            DropdownMenuItem(
+                              value: 12,
+                              child: Text('12 semanas (3 meses)'),
+                            ),
+                            DropdownMenuItem(
+                              value: 16,
+                              child: Text('16 semanas (4 meses)'),
+                            ),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) {
+                              setDialogState(() => recurrenceCount = val);
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text(
+                            'Respeitar disponibilidade da agenda',
                             style: TextStyle(
-                              fontWeight: FontWeight.bold,
                               fontSize: 13,
-                              color: availability.isAvailable
-                                  ? AppTheme.successGreen
-                                  : const Color(0xFF92400E),
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
+                          subtitle: const Text(
+                            'Pula automaticamente horários conflitantes via AvailabilityEngine',
+                            style: TextStyle(fontSize: 11),
+                          ),
+                          value: respectAvailability,
+                          onChanged: (val) =>
+                              setDialogState(() => respectAvailability = val),
                         ),
                       ],
-                    ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: locationController,
+                        decoration: const InputDecoration(
+                          labelText: 'Ponto de Encontro / Território',
+                          hintText:
+                              'Ex: Salão do Reino / Praça Central / Setor 03',
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: availability.isAvailable
+                              ? AppTheme.successGreen.withValues(alpha: 0.1)
+                              : AppTheme.alertAmber.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: availability.isAvailable
+                                ? AppTheme.successGreen
+                                : AppTheme.alertAmber,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              availability.isAvailable
+                                  ? Icons.check_circle
+                                  : Icons.warning_amber,
+                              color: availability.isAvailable
+                                  ? AppTheme.successGreen
+                                  : AppTheme.alertAmber,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                availability.message,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                  color: availability.isAvailable
+                                      ? AppTheme.successGreen
+                                      : const Color(0xFF92400E),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Cancelar'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () async {
+                      final repo = ref.read(repositoryProvider);
+                      int createdCount = 0;
+                      int skippedCount = 0;
+                      final runningAppts = List<AppointmentEntry>.from(
+                        existingAppts,
+                      );
+
+                      for (final occ in occurrences) {
+                        final occEnd = occ.add(
+                          Duration(minutes: durationMinutes),
+                        );
+                        final hasConflict = AvailabilityEngine.hasCollision(
+                          start: occ,
+                          end: occEnd,
+                          existingAppointments: runningAppts,
+                        );
+
+                        if (hasConflict &&
+                            respectAvailability &&
+                            occurrences.length > 1) {
+                          skippedCount++;
+                          continue;
+                        }
+
+                        final newEntry = await repo.createAppointment(
+                          title: 'Saída de Campo ($modality)',
+                          startTime: occ,
+                          endTime: occEnd,
+                          durationMinutes: durationMinutes,
+                          status: 'confirmado',
+                          locationNotes: locationController.text.trim().isEmpty
+                              ? null
+                              : locationController.text.trim(),
+                        );
+                        runningAppts.add(newEntry);
+                        createdCount++;
+                      }
+
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      if (context.mounted) {
+                        final message = occurrences.length == 1
+                            ? 'Saída de campo programada com sucesso!'
+                            : '$createdCount saídas de campo programadas!${skippedCount > 0 ? " ($skippedCount puladas por conflito)" : ""}';
+                        ScaffoldMessenger.of(context)
+                            .showSnackBar(SnackBar(content: Text(message)));
+                      }
+                    },
+                    child: const Text('Programar Saída'),
                   ),
                 ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancelar'),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  final repo = ref.read(repositoryProvider);
-                  int createdCount = 0;
-                  int skippedCount = 0;
-                  final runningAppts = List<AppointmentEntry>.from(
-                    existingAppts,
-                  );
-
-                  for (final occ in occurrences) {
-                    final occEnd = occ.add(Duration(minutes: durationMinutes));
-                    final hasConflict = AvailabilityEngine.hasCollision(
-                      start: occ,
-                      end: occEnd,
-                      existingAppointments: runningAppts,
-                    );
-
-                    if (hasConflict &&
-                        respectAvailability &&
-                        occurrences.length > 1) {
-                      skippedCount++;
-                      continue;
-                    }
-
-                    final newEntry = await repo.createAppointment(
-                      title: 'Saída de Campo ($modality)',
-                      startTime: occ,
-                      endTime: occEnd,
-                      durationMinutes: durationMinutes,
-                      status: 'confirmado',
-                      locationNotes: locationController.text.trim().isEmpty
-                          ? null
-                          : locationController.text.trim(),
-                    );
-                    runningAppts.add(newEntry);
-                    createdCount++;
-                  }
-
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  if (context.mounted) {
-                    final message = occurrences.length == 1
-                        ? 'Saída de campo programada com sucesso!'
-                        : '$createdCount saídas de campo programadas!${skippedCount > 0 ? " ($skippedCount puladas por conflito)" : ""}';
-                    ScaffoldMessenger.of(context)
-                        .showSnackBar(SnackBar(content: Text(message)));
-                  }
-                },
-                child: const Text('Programar Saída'),
-              ),
-            ],
+              );
+            },
           );
-        },
-      );
         },
       ),
     );
@@ -4400,7 +4476,10 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
   ) {
     final taskAppts = <AppointmentEntry>[];
     for (final task in tasks) {
-      if (task.dueDate == null || task.status == 'completed' || task.status == 'cancelled') continue;
+      if (task.dueDate == null ||
+          task.status == 'completed' ||
+          task.status == 'cancelled')
+        continue;
       final due = task.dueDate!;
       final start = (due.hour != 0 || due.minute != 0)
           ? due
@@ -4414,7 +4493,8 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
           endTime: end,
           durationMinutes: 60,
           status: 'planejado',
-          locationNotes: 'Prazo de Tarefa • Prioridade: ${task.priority}${task.description != null ? "\n${task.description}" : ""}',
+          locationNotes:
+              'Prazo de Tarefa • Prioridade: ${task.priority}${task.description != null ? "\n${task.description}" : ""}',
           isProvisional: false,
           createdAt: task.createdAt,
           updatedAt: task.updatedAt,
@@ -4425,7 +4505,10 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
 
     final projectAppts = <AppointmentEntry>[];
     for (final project in projects) {
-      if (project.targetDate == null || project.status == 'completed' || project.status == 'archived') continue;
+      if (project.targetDate == null ||
+          project.status == 'completed' ||
+          project.status == 'archived')
+        continue;
       final target = project.targetDate!;
       final start = (target.hour != 0 || target.minute != 0)
           ? target
@@ -4439,7 +4522,8 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
           endTime: end,
           durationMinutes: 60,
           status: 'planejado',
-          locationNotes: 'Prazo do Projeto${project.description != null ? "\n${project.description}" : ""}',
+          locationNotes:
+              'Prazo do Projeto${project.description != null ? "\n${project.description}" : ""}',
           isProvisional: false,
           createdAt: project.createdAt,
           updatedAt: project.updatedAt,
@@ -4448,11 +4532,7 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
       );
     }
 
-    return [
-      ...appointments,
-      ...taskAppts,
-      ...projectAppts,
-    ];
+    return [...appointments, ...taskAppts, ...projectAppts];
   }
 
   @override
@@ -4470,15 +4550,20 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
           (a) => a.personId == null || !passedPersonIds.contains(a.personId),
         )
         .toList();
-    final externalEvents = ref.watch(externalCalendarEventsProvider).value ?? [];
+    final externalEvents =
+        ref.watch(externalCalendarEventsProvider).value ?? [];
     final links = ref.watch(calendarEventLinksProvider).value ?? [];
     final pendingTasks = ref.watch(pendingTasksStreamProvider).value ?? [];
     final activeProjects = ref.watch(activeProjectsStreamProvider).value ?? [];
     final withExternal = appointmentsWithExternalEvents(
-      allAppts, externalEvents, links,
+      allAppts,
+      externalEvents,
+      links,
     );
     final calendarAppts = _appointmentsWithTasksAndProjects(
-      withExternal, pendingTasks, activeProjects,
+      withExternal,
+      pendingTasks,
+      activeProjects,
     );
     final allActivities = activitiesAsync.value ?? [];
 
@@ -4532,7 +4617,9 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                 ? IconButton(
                     icon: const Icon(Icons.sync_alt),
                     tooltip: 'Sincronizar Calendários',
-                    onPressed: _isCalendarSyncing ? null : _syncConnectedCalendars,
+                    onPressed: _isCalendarSyncing
+                        ? null
+                        : _syncConnectedCalendars,
                   )
                 : FilledButton.tonalIcon(
                     style: FilledButton.styleFrom(
@@ -4547,7 +4634,9 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                       'Sincronizar Calendários',
                       style: TextStyle(fontSize: 12),
                     ),
-                    onPressed: _isCalendarSyncing ? null : _syncConnectedCalendars,
+                    onPressed: _isCalendarSyncing
+                        ? null
+                        : _syncConnectedCalendars,
                   ),
           ),
           IconButton(
@@ -4789,15 +4878,82 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
             child: appointmentsAsync.when(
               data: (_) {
                 final activeAppts = calendarAppts;
-                if (_viewMode == 'Mês') {
-                  return _buildMonthCalendarView(activeAppts);
-                } else if (_viewMode == 'Semana') {
-                  return _buildWeekCalendarView(activeAppts);
-                } else if (_viewMode == 'Dia') {
-                  return _buildDayHourlyGridView(activeAppts);
-                } else {
-                  return _buildListView(activeAppts);
-                }
+                return LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isWide = constraints.maxWidth >= 900;
+                    if (isWide &&
+                        (_viewMode == 'Mês' || _viewMode == 'Semana')) {
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: _viewMode == 'Mês'
+                                ? _buildMonthCalendarView(activeAppts)
+                                : _buildWeekCalendarView(activeAppts),
+                          ),
+                          VerticalDivider(
+                            width: 1,
+                            thickness: 1,
+                            color: isDark
+                                ? const Color(0xFF334155)
+                                : const Color(0xFFE2E8F0),
+                          ),
+                          SizedBox(
+                            width: 380,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 10,
+                                  ),
+                                  color: isDark
+                                      ? const Color(0xFF1E293B)
+                                      : const Color(0xFFF1F5F9),
+                                  child: Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.calendar_view_day,
+                                        size: 18,
+                                        color: AppTheme.primaryBlue,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          'Agenda do Dia: ${AppDateUtils.formatDate(_selectedDate)}',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const Divider(height: 1),
+                                Expanded(
+                                  child: _buildDayHourlyGridView(activeAppts),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      );
+                    }
+
+                    if (_viewMode == 'Mês') {
+                      return _buildMonthCalendarView(activeAppts);
+                    } else if (_viewMode == 'Semana') {
+                      return _buildWeekCalendarView(activeAppts);
+                    } else if (_viewMode == 'Dia') {
+                      return _buildDayHourlyGridView(activeAppts);
+                    } else {
+                      return _buildListView(activeAppts);
+                    }
+                  },
+                );
               },
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (err, _) => Center(child: Text('Erro: $err')),

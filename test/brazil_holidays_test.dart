@@ -15,9 +15,8 @@ void main() {
 
     test('feriados fixos nacionais estão presentes', () {
       final holidays = BrazilHolidays.forYear(2026);
-      bool has(String name, DateTime date) => holidays.any(
-        (h) => h.name == name && h.date == date,
-      );
+      bool has(String name, DateTime date) =>
+          holidays.any((h) => h.name == name && h.date == date);
       expect(has('Confraternização Universal', DateTime(2026, 1, 1)), isTrue);
       expect(has('Tiradentes', DateTime(2026, 4, 21)), isTrue);
       expect(has('Dia do Trabalho', DateTime(2026, 5, 1)), isTrue);
@@ -31,14 +30,22 @@ void main() {
     test('feriados móveis são derivados da Páscoa', () {
       final holidays = BrazilHolidays.forYear(2026);
       final easter = DateTime(2026, 4, 5);
-      bool has(String name, DateTime date) => holidays.any(
-        (h) => h.name == name && h.date == date,
-      );
-      expect(has('Sexta-feira Santa', easter.subtract(const Duration(days: 2))), isTrue);
-      expect(has('Páscoa', easter), isTrue);
-      expect(has('Corpus Christi', easter.add(const Duration(days: 60))), isTrue);
+      bool has(String name, DateTime date) =>
+          holidays.any((h) => h.name == name && h.date == date);
       expect(
-        has('Terça-feira de Carnaval', easter.subtract(const Duration(days: 47))),
+        has('Sexta-feira Santa', easter.subtract(const Duration(days: 2))),
+        isTrue,
+      );
+      expect(has('Páscoa', easter), isTrue);
+      expect(
+        has('Corpus Christi', easter.add(const Duration(days: 60))),
+        isTrue,
+      );
+      expect(
+        has(
+          'Terça-feira de Carnaval',
+          easter.subtract(const Duration(days: 47)),
+        ),
         isTrue,
       );
     });

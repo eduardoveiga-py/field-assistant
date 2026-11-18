@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -774,36 +775,47 @@ void main() {
       expect(result!.duration.inSeconds, equals(30));
     });
 
-    test('2. Não inventa tamanho de arquivo e valida integridade no disco', () async {
-      final recorder = LocalAudioRecordingService();
-      // Cria arquivo temporário real
-      final tempDir = Directory.systemTemp.createTempSync('audio_test_');
-      final tempFile = File('${tempDir.path}/test_audio.m4a');
-      tempFile.writeAsBytesSync(List.filled(2048, 65)); // 2 KB reais
+    test(
+      '2. Não inventa tamanho de arquivo e valida integridade no disco',
+      () async {
+        final recorder = LocalAudioRecordingService();
+        // Cria arquivo temporário real
+        final tempDir = Directory.systemTemp.createTempSync('audio_test_');
+        final tempFile = File('${tempDir.path}/test_audio.m4a');
+        tempFile.writeAsBytesSync(List.filled(2048, 65)); // 2 KB reais
 
-      await recorder.startRecording(customPath: tempFile.path);
-      await recorder.simulateElapsedSeconds(5);
-      final result = await recorder.stopRecording();
+        await recorder.startRecording(customPath: tempFile.path);
+        await recorder.simulateElapsedSeconds(5);
+        final result = await recorder.stopRecording();
 
-      expect(result, isNotNull);
-      expect(result!.fileSize, equals(2048));
-      expect(result.fileIntegrityValid, isTrue);
-      expect(result.fileSize, isNot(equals(1024 * 5))); // Não inventa 1024 * elapsed
+        expect(result, isNotNull);
+        expect(result!.fileSize, equals(2048));
+        expect(result.fileIntegrityValid, isTrue);
+        expect(
+          result.fileSize,
+          isNot(equals(1024 * 5)),
+        ); // Não inventa 1024 * elapsed
 
-      // Limpa arquivo
-      tempDir.deleteSync(recursive: true);
-    });
+        // Limpa arquivo
+        tempDir.deleteSync(recursive: true);
+      },
+    );
 
     test('3. Retorna tamanho zero e integridade inválida quando arquivo não existe no disco', () async {
       final recorder = LocalAudioRecordingService();
-      await recorder.startRecording(customPath: '/caminho/inexistente/sem_audio.m4a');
+      await recorder.startRecording(
+        customPath: '/caminho/inexistente/sem_audio.m4a',
+      );
       await recorder.simulateElapsedSeconds(10);
       final result = await recorder.stopRecording();
 
       expect(result, isNotNull);
       expect(result!.fileSize, equals(0));
       expect(result.fileIntegrityValid, isFalse);
-      expect(result.fileSize, isNot(equals(1024 * 10))); // Nunca inventa 1024 * elapsed
+      expect(
+        result.fileSize,
+        isNot(equals(1024 * 10)),
+      ); // Nunca inventa 1024 * elapsed
     });
 
     test('4. Solicita permissão quando hasPermission é false e lança exceção se negada', () async {
@@ -813,7 +825,13 @@ void main() {
 
       await expectLater(
         recorder.startRecording(),
-        throwsA(isA<Exception>().having((e) => e.toString(), 'msg', contains('negada'))),
+        throwsA(
+          isA<Exception>().having(
+            (e) => e.toString(),
+            'msg',
+            contains('negada'),
+          ),
+        ),
       );
 
       // Concede permissão e tenta novamente
@@ -872,11 +890,14 @@ void main() {
       expect(VoiceDictationService.isPlatformSupported, isTrue);
     });
 
-    test('platform() factory returns UnsupportedVoiceDictationService on Linux', () {
-      debugDefaultTargetPlatformOverride = TargetPlatform.linux;
-      final service = VoiceDictationService.platform();
-      expect(service, isA<UnsupportedVoiceDictationService>());
-    });
+    test(
+      'platform() factory returns UnsupportedVoiceDictationService on Linux',
+      () {
+        debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+        final service = VoiceDictationService.platform();
+        expect(service, isA<UnsupportedVoiceDictationService>());
+      },
+    );
 
     test('platform() factory returns RealVoiceDictationService on Windows', () {
       debugDefaultTargetPlatformOverride = TargetPlatform.windows;
@@ -887,7 +908,9 @@ void main() {
     test('platform() factory respects overrideService when provided', () {
       final overrideMock = LocalVoiceDictationService();
       debugDefaultTargetPlatformOverride = TargetPlatform.linux;
-      final service = VoiceDictationService.platform(overrideService: overrideMock);
+      final service = VoiceDictationService.platform(
+        overrideService: overrideMock,
+      );
       expect(service, same(overrideMock));
     });
 
@@ -905,90 +928,105 @@ void main() {
         onError: (err) => errorMessage = err,
       );
       expect(errorMessage, isNotNull);
-      expect(errorMessage, contains('Ditado por voz indisponível nesta plataforma'));
+      expect(
+        errorMessage,
+        contains('Ditado por voz indisponível nesta plataforma'),
+      );
       expect(errorMessage, contains('Digite o resumo manualmente'));
     });
 
-    testWidgets('QuickVoiceNoteDialog on Linux displays informative fallback notice and preserves audio recording', (tester) async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.linux;
-      try {
-        final db = AppDatabase.forTesting(NativeDatabase.memory());
-        final repo = AppRepository(db);
-        final mockRecordService = LocalAudioRecordingService();
-        final person = await repo.createPerson(
-          name: 'Carlos Oliveira',
-          status: 'revisita',
-        );
+    testWidgets(
+      'QuickVoiceNoteDialog on Linux displays informative fallback notice and preserves audio recording',
+      (tester) async {
+        debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+        try {
+          final db = AppDatabase.forTesting(NativeDatabase.memory());
+          final repo = AppRepository(db);
+          final mockRecordService = LocalAudioRecordingService();
+          final person = await repo.createPerson(
+            name: 'Carlos Oliveira',
+            status: 'revisita',
+          );
 
-        await tester.pumpWidget(
-          ProviderScope(
-            overrides: [
-              databaseProvider.overrideWithValue(db),
-              repositoryProvider.overrideWithValue(repo),
-            ],
-            child: MaterialApp(
-              home: Scaffold(
-                body: Builder(
-                  builder: (context) => ElevatedButton(
-                    onPressed: () {
-                      QuickVoiceNoteDialog.show(
-                        context: context,
-                        person: person,
-                        recordingService: mockRecordService,
-                      );
-                    },
-                    child: const Text('Abrir Modal'),
+          await tester.pumpWidget(
+            ProviderScope(
+              overrides: [
+                databaseProvider.overrideWithValue(db),
+                repositoryProvider.overrideWithValue(repo),
+              ],
+              child: MaterialApp(
+                home: Scaffold(
+                  body: Builder(
+                    builder: (context) => ElevatedButton(
+                      onPressed: () {
+                        QuickVoiceNoteDialog.show(
+                          context: context,
+                          person: person,
+                          recordingService: mockRecordService,
+                        );
+                      },
+                      child: const Text('Abrir Modal'),
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
+          );
+
+          await tester.tap(find.text('Abrir Modal'));
+          await tester.pumpAndSettle();
+
+          // Verify the unsupported platform notice is visible
+          expect(
+            find.textContaining(
+              'Ditado de voz indisponível nesta plataforma (Linux/Desktop)',
+            ),
+            findsOneWidget,
+          );
+          expect(find.text('Carlos Oliveira'), findsOneWidget);
+
+          // Verify audio recording still works
+          expect(find.text('Iniciar Gravação'), findsOneWidget);
+          await tester.tap(find.text('Iniciar Gravação'));
+          await tester.pump(const Duration(milliseconds: 100));
+          expect(mockRecordService.isRecording, isTrue);
+
+          await tester.tap(find.text('Concluir Gravação'));
+          await tester.pumpAndSettle();
+          expect(mockRecordService.isRecording, isFalse);
+
+          await db.close();
+        } finally {
+          debugDefaultTargetPlatformOverride = null;
+        }
+      },
+    );
+  });
+
+  group(
+    'Audio Real Services - Regressão Zero-Byte & Erro de Reprodução (T-AUD)',
+    () {
+      test('T-AUD-01/02: RealAudioPlayerService rejeita arquivo inexistente e arquivo de 0 bytes com AudioPlaybackException', () async {
+        final player = RealAudioPlayerService();
+        addTearDown(player.dispose);
+
+        await expectLater(
+          player.play('/caminho/que/nao/existe/audio.m4a'),
+          throwsA(isA<AudioPlaybackException>()),
         );
+        expect(player.isPlaying, isFalse);
 
-        await tester.tap(find.text('Abrir Modal'));
-        await tester.pumpAndSettle();
+        final tempDir = Directory.systemTemp.createTempSync('audio_zero_test_');
+        addTearDown(() => tempDir.deleteSync(recursive: true));
+        final emptyFile = File('${tempDir.path}/empty.m4a')
+          ..writeAsBytesSync([]);
 
-        // Verify the unsupported platform notice is visible
-        expect(find.textContaining('Ditado de voz indisponível nesta plataforma (Linux/Desktop)'), findsOneWidget);
-        expect(find.text('Carlos Oliveira'), findsOneWidget);
-
-        // Verify audio recording still works
-        expect(find.text('Iniciar Gravação'), findsOneWidget);
-        await tester.tap(find.text('Iniciar Gravação'));
-        await tester.pump(const Duration(milliseconds: 100));
-        expect(mockRecordService.isRecording, isTrue);
-
-        await tester.tap(find.text('Concluir Gravação'));
-        await tester.pumpAndSettle();
-        expect(mockRecordService.isRecording, isFalse);
-
-        await db.close();
-      } finally {
-        debugDefaultTargetPlatformOverride = null;
-      }
-    });
-  });
-
-  group('Audio Real Services - Regressão Zero-Byte & Erro de Reprodução (T-AUD)', () {
-    test('T-AUD-01/02: RealAudioPlayerService rejeita arquivo inexistente e arquivo de 0 bytes com AudioPlaybackException', () async {
-      final player = RealAudioPlayerService();
-      addTearDown(player.dispose);
-
-      await expectLater(
-        player.play('/caminho/que/nao/existe/audio.m4a'),
-        throwsA(isA<AudioPlaybackException>()),
-      );
-      expect(player.isPlaying, isFalse);
-
-      final tempDir = Directory.systemTemp.createTempSync('audio_zero_test_');
-      addTearDown(() => tempDir.deleteSync(recursive: true));
-      final emptyFile = File('${tempDir.path}/empty.m4a')..writeAsBytesSync([]);
-
-      await expectLater(
-        player.play(emptyFile.path),
-        throwsA(isA<AudioPlaybackException>()),
-      );
-      expect(player.isPlaying, isFalse);
-    });
-  });
+        await expectLater(
+          player.play(emptyFile.path),
+          throwsA(isA<AudioPlaybackException>()),
+        );
+        expect(player.isPlaying, isFalse);
+      });
+    },
+  );
 }

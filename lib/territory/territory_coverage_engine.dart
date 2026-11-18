@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../database/app_database.dart';
@@ -7,10 +8,22 @@ import '../database/app_database.dart';
 enum TerritoryPinLayer {
   activeStudy('Estudo Bíblico Ativo', Color(0xFF7C3AED), Icons.school),
   needsRevisit('Revisita Agendada / Pendente', Color(0xFFD97706), Icons.repeat),
-  recentlyVisited('Visitado Recentemente (<30 dias)', Color(0xFF16A34A), Icons.check_circle),
+  recentlyVisited(
+    'Visitado Recentemente (<30 dias)',
+    Color(0xFF16A34A),
+    Icons.check_circle,
+  ),
   interested('Pessoa Interessada', Color(0xFF06B6D4), Icons.eco),
-  notAtHome('Ausente / Não Atendeu', Color(0xFFEA580C), Icons.door_front_door_outlined),
-  forgottenZone('Zona Esquecida (>90 dias)', Color(0xFFDC2626), Icons.warning_amber_rounded),
+  notAtHome(
+    'Ausente / Não Atendeu',
+    Color(0xFFEA580C),
+    Icons.door_front_door_outlined,
+  ),
+  forgottenZone(
+    'Zona Esquecida (>90 dias)',
+    Color(0xFFDC2626),
+    Icons.warning_amber_rounded,
+  ),
   landmark('Ponto de Referência / Marco', Color(0xFF1E3A8A), Icons.place);
 
   final String label;
@@ -98,7 +111,8 @@ class DuplicateAddressMatch {
   });
 
   bool get isHighConfidence =>
-      distanceMeters <= 25.0 || (addressSimilarity >= 0.85 && distanceMeters <= 50.0);
+      distanceMeters <= 25.0 ||
+      (addressSimilarity >= 0.85 && distanceMeters <= 50.0);
 }
 
 /// Motor de inteligência territorial: Cobertura, Zonas Esquecidas e Detecção de Duplicidades
@@ -143,7 +157,8 @@ class TerritoryCoverageEngine {
     final dLat = _deg2rad(lat2 - lat1);
     final dLon = _deg2rad(lon2 - lon1);
 
-    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+    final a =
+        math.sin(dLat / 2) * math.sin(dLat / 2) +
         math.cos(_deg2rad(lat1)) *
             math.cos(_deg2rad(lat2)) *
             math.sin(dLon / 2) *
@@ -260,24 +275,32 @@ class TerritoryCoverageEngine {
     final totalUniqueAddresses = allResidenceKeys.length;
     final workedUniqueAddresses = workedResidenceKeys.length;
     final double addressCoveragePercent = totalUniqueAddresses > 0
-        ? double.parse(((workedUniqueAddresses / totalUniqueAddresses) * 100.0).toStringAsFixed(1))
+        ? double.parse(
+            ((workedUniqueAddresses / totalUniqueAddresses) * 100.0)
+                .toStringAsFixed(1),
+          )
         : 0.0;
 
     // 2. Cobertura de Contatos Cadastrados
     final totalPeople = validPeople.length;
     final visitedPeopleCount = workedRecently + workedStandard;
     final double peopleCoveragePercent = totalPeople > 0
-        ? double.parse(((visitedPeopleCount / totalPeople) * 100.0).toStringAsFixed(1))
+        ? double.parse(
+            ((visitedPeopleCount / totalPeople) * 100.0).toStringAsFixed(1),
+          )
         : 0.0;
 
     // 3. Cobertura de Conversas Efetivas
     final peopleWithEff = peopleWithEffectiveInPeriod.length;
     final double conversationCoveragePercent = totalPeople > 0
-        ? double.parse(((peopleWithEff / totalPeople) * 100.0).toStringAsFixed(1))
+        ? double.parse(
+            ((peopleWithEff / totalPeople) * 100.0).toStringAsFixed(1),
+          )
         : 0.0;
 
     // IC canônico ponderado
-    final double ic = ((workedRecently + workedStandard) / validPeople.length) * 100.0;
+    final double ic =
+        ((workedRecently + workedStandard) / validPeople.length) * 100.0;
 
     return TerritoryCoverageReport(
       totalAddresses: validPeople.length,
@@ -336,9 +359,16 @@ class TerritoryCoverageEngine {
         // A) Raio de 25 metros COM similaridade de nome >= 0.60 ou endereço equivalente
         // B) Mesmo endereço textual (addrSim >= 0.85) e raio de até 50 metros
         // C) Nomes muito semelhantes (nameSim >= 0.85) e proximidade < 100 metros
-        final isCloseDuplicate = (distance <= 25.0 && (nameSim >= 0.60 || (addrSim >= 0.80 && addr1.isNotEmpty)));
-        final isAddressDuplicate = (distance <= 50.0 && addrSim >= 0.85 && addr1.isNotEmpty);
-        final isNameDuplicate = (distance <= 100.0 && nameSim >= 0.85 && addrSim >= 0.60 && addr1.isNotEmpty);
+        final isCloseDuplicate =
+            (distance <= 25.0 &&
+            (nameSim >= 0.60 || (addrSim >= 0.80 && addr1.isNotEmpty)));
+        final isAddressDuplicate =
+            (distance <= 50.0 && addrSim >= 0.85 && addr1.isNotEmpty);
+        final isNameDuplicate =
+            (distance <= 100.0 &&
+            nameSim >= 0.85 &&
+            addrSim >= 0.60 &&
+            addr1.isNotEmpty);
 
         if (isCloseDuplicate || isAddressDuplicate || isNameDuplicate) {
           results.add(

@@ -21,32 +21,35 @@ class CountingMap extends MBTilesWeb {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('ancestrais são compartilhados e invalidados ao trocar pacote', () async {
-    final original = MBTilesService.instance;
-    final backend = CountingMap();
-    final service = MBTilesService.custom(backend: backend);
-    MBTilesService.setMockInstance(service);
-    addTearDown(() {
-      MBTilesService.setMockInstance(original);
-      service.dispose();
-    });
-    backend.pending = Completer<Uint8List?>();
-    final cache = TileCacheService.instance;
-    final first = cache.getOfflineTileBytes(16, 100, 150);
-    final second = cache.getOfflineTileBytes(16, 100, 150);
-    expect(backend.calls, 1);
-    backend.pending!.complete(backend.bytes);
-    expect(await first, [1, 2, 3]);
-    expect(await second, [1, 2, 3]);
-    expect(await cache.getOfflineTileBytes(16, 100, 150), [1, 2, 3]);
-    expect(backend.calls, 1);
+  test(
+    'ancestrais são compartilhados e invalidados ao trocar pacote',
+    () async {
+      final original = MBTilesService.instance;
+      final backend = CountingMap();
+      final service = MBTilesService.custom(backend: backend);
+      MBTilesService.setMockInstance(service);
+      addTearDown(() {
+        MBTilesService.setMockInstance(original);
+        service.dispose();
+      });
+      backend.pending = Completer<Uint8List?>();
+      final cache = TileCacheService.instance;
+      final first = cache.getOfflineTileBytes(16, 100, 150);
+      final second = cache.getOfflineTileBytes(16, 100, 150);
+      expect(backend.calls, 1);
+      backend.pending!.complete(backend.bytes);
+      expect(await first, [1, 2, 3]);
+      expect(await second, [1, 2, 3]);
+      expect(await cache.getOfflineTileBytes(16, 100, 150), [1, 2, 3]);
+      expect(backend.calls, 1);
 
-    backend.pending = null;
-    backend.bytes = Uint8List.fromList([4, 5]);
-    service.tilesRevision.value++;
-    expect(await cache.getOfflineTileBytes(16, 100, 150), [4, 5]);
-    expect(backend.calls, 2);
-  });
+      backend.pending = null;
+      backend.bytes = Uint8List.fromList([4, 5]);
+      service.tilesRevision.value++;
+      expect(await cache.getOfflineTileBytes(16, 100, 150), [4, 5]);
+      expect(backend.calls, 2);
+    },
+  );
 
   test('resultado de leitura antiga não contamina cache após troca', () async {
     final original = MBTilesService.instance;

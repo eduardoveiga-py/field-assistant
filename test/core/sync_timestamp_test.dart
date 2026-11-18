@@ -6,7 +6,10 @@ void main() {
     test('Interpreta instâncias DateTime mantendo UTC', () {
       final now = DateTime.utc(2026, 11, 8, 20, 30, 0);
       expect(SyncTimestamp.parse(now), equals(now));
-      expect(SyncTimestamp.toIso8601String(now), equals('2026-11-08T20:30:00.000Z'));
+      expect(
+        SyncTimestamp.toIso8601String(now),
+        equals('2026-11-08T20:30:00.000Z'),
+      );
     });
 
     test('Interpreta inteiros em milissegundos da época', () {

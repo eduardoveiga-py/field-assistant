@@ -69,7 +69,11 @@ class AppleEventKitProvider implements CalendarProvider {
       final permissions = await _deviceCalendarPlugin.hasPermissions();
       return permissions.isSuccess && (permissions.data ?? false);
     } catch (e, st) {
-      AppLogger.warning('Falha ao verificar permissões do Apple EventKit', e, st);
+      AppLogger.warning(
+        'Falha ao verificar permissões do Apple EventKit',
+        e,
+        st,
+      );
       return false;
     }
   }
@@ -81,7 +85,11 @@ class AppleEventKitProvider implements CalendarProvider {
       final res = await _deviceCalendarPlugin.requestPermissions();
       return res.isSuccess && (res.data ?? false);
     } catch (e, st) {
-      AppLogger.warning('Falha ao solicitar autorização do Apple EventKit', e, st);
+      AppLogger.warning(
+        'Falha ao solicitar autorização do Apple EventKit',
+        e,
+        st,
+      );
       return false;
     }
   }
@@ -150,7 +158,8 @@ class AppleEventKitProvider implements CalendarProvider {
     if (!isSupportedOnCurrentPlatform) {
       return CalendarSyncResult(
         success: false,
-        errorMessage: 'Apple Calendar / EventKit não suportado nesta plataforma.',
+        errorMessage:
+            'Apple Calendar / EventKit não suportado nesta plataforma.',
       );
     }
     try {
@@ -457,7 +466,11 @@ class AppleEventKitProvider implements CalendarProvider {
       }
       return null;
     } catch (e, st) {
-      AppLogger.warning('Falha ao criar/atualizar evento no Apple EventKit', e, st);
+      AppLogger.warning(
+        'Falha ao criar/atualizar evento no Apple EventKit',
+        e,
+        st,
+      );
       return null;
     }
   }

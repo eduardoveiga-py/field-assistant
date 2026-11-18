@@ -49,9 +49,8 @@ Future<GeolocationResult> getPlatformCoordinates() async {
   }
   return completer.future.timeout(
     const Duration(seconds: 8),
-    onTimeout: () => const GeolocationResult(
-      status: GeolocationStatus.unavailableOrTimeout,
-    ),
+    onTimeout: () =>
+        const GeolocationResult(status: GeolocationStatus.unavailableOrTimeout),
   );
 }
 

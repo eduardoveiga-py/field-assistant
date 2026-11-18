@@ -23,8 +23,8 @@ class DismissedConflictNotifier extends Notifier<Set<String>> {
 
 final dismissedConflictsProvider =
     NotifierProvider<DismissedConflictNotifier, Set<String>>(
-  DismissedConflictNotifier.new,
-);
+      DismissedConflictNotifier.new,
+    );
 
 /// Banner visual de aviso e resolução de conflitos de agendamento pós-sincronização
 class ScheduleConflictResolutionBanner extends ConsumerWidget {
@@ -47,8 +47,12 @@ class ScheduleConflictResolutionBanner extends ConsumerWidget {
     final firstPair = visibleConflicts.first;
     final totalCount = visibleConflicts.length;
 
-    final dateFmt = DateFormat('dd/MM', 'pt_BR').format(firstPair.collisionDate);
-    final timeFmt = DateFormat('HH:mm').format(firstPair.appointmentA.startTime);
+    final dateFmt = DateFormat(
+      'dd/MM',
+      'pt_BR',
+    ).format(firstPair.collisionDate);
+    final timeFmt = DateFormat('HH:mm')
+        .format(firstPair.appointmentA.startTime);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -56,10 +60,7 @@ class ScheduleConflictResolutionBanner extends ConsumerWidget {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF451A03) : const Color(0xFFFFFBEB),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: const Color(0xFFF59E0B),
-          width: 1.5,
-        ),
+        border: Border.all(color: const Color(0xFFF59E0B), width: 1.5),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05),
@@ -97,12 +98,17 @@ class ScheduleConflictResolutionBanner extends ConsumerWidget {
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 13,
-                        color: isDark ? const Color(0xFFFDE68A) : const Color(0xFF92400E),
+                        color: isDark
+                            ? const Color(0xFFFDE68A)
+                            : const Color(0xFF92400E),
                       ),
                     ),
                     const SizedBox(width: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF59E0B),
                         borderRadius: BorderRadius.circular(8),
@@ -123,7 +129,9 @@ class ScheduleConflictResolutionBanner extends ConsumerWidget {
                   '${firstPair.appointmentA.title} e ${firstPair.appointmentB.title} no mesmo horário.',
                   style: TextStyle(
                     fontSize: 12,
-                    color: isDark ? const Color(0xFFF3F4F6) : const Color(0xFF78350F),
+                    color: isDark
+                        ? const Color(0xFFF3F4F6)
+                        : const Color(0xFF78350F),
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -139,8 +147,12 @@ class ScheduleConflictResolutionBanner extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               visualDensity: VisualDensity.compact,
             ),
-            onPressed: () => _openConflictResolutionModal(context, ref, visibleConflicts),
-            child: const Text('Resolver', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            onPressed: () =>
+                _openConflictResolutionModal(context, ref, visibleConflicts),
+            child: const Text(
+              'Resolver',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+            ),
           ),
           IconButton(
             icon: const Icon(Icons.close, size: 18),
@@ -149,7 +161,9 @@ class ScheduleConflictResolutionBanner extends ConsumerWidget {
             color: isDark ? Colors.white60 : Colors.black54,
             onPressed: () {
               for (final pair in visibleConflicts) {
-                ref.read(dismissedConflictsProvider.notifier).dismiss(pair.conflictKey);
+                ref
+                    .read(dismissedConflictsProvider.notifier)
+                    .dismiss(pair.conflictKey);
               }
             },
           ),
@@ -166,7 +180,10 @@ class ScheduleConflictResolutionBanner extends ConsumerWidget {
     showAdaptiveMinistrySheet(
       context: context,
       title: 'Resolver Conflitos de Horário',
-      titleLeading: const Icon(Icons.alt_route_rounded, color: Color(0xFFD97706)),
+      titleLeading: const Icon(
+        Icons.alt_route_rounded,
+        color: Color(0xFFD97706),
+      ),
       builder: (ctx, scroll) {
         return _ConflictResolutionSheetContent(conflictPairs: conflictPairs);
       },
@@ -189,7 +206,9 @@ class _ConflictResolutionSheetContentState
   @override
   Widget build(BuildContext context) {
     final allAppointments = ref.watch(appointmentsStreamProvider).value ?? [];
-    final activeConflicts = AvailabilityEngine.findActiveConflicts(allAppointments);
+    final activeConflicts = AvailabilityEngine.findActiveConflicts(
+      allAppointments,
+    );
     final repo = ref.read(repositoryProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -199,7 +218,11 @@ class _ConflictResolutionSheetContentState
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.check_circle_outline, size: 56, color: Colors.green),
+            const Icon(
+              Icons.check_circle_outline,
+              size: 56,
+              color: Colors.green,
+            ),
             const SizedBox(height: 16),
             const Text(
               'Todos os conflitos foram resolvidos!',
@@ -227,9 +250,14 @@ class _ConflictResolutionSheetContentState
         final a = pair.appointmentA;
         final b = pair.appointmentB;
 
-        final timeFmtA = '${DateFormat('HH:mm').format(a.startTime)} - ${DateFormat('HH:mm').format(a.endTime)}';
-        final timeFmtB = '${DateFormat('HH:mm').format(b.startTime)} - ${DateFormat('HH:mm').format(b.endTime)}';
-        final dateStr = DateFormat('EEEE, dd/MM/yyyy', 'pt_BR').format(pair.collisionDate);
+        final timeFmtA =
+            '${DateFormat('HH:mm').format(a.startTime)} - ${DateFormat('HH:mm').format(a.endTime)}';
+        final timeFmtB =
+            '${DateFormat('HH:mm').format(b.startTime)} - ${DateFormat('HH:mm').format(b.endTime)}';
+        final dateStr = DateFormat(
+          'EEEE, dd/MM/yyyy',
+          'pt_BR',
+        ).format(pair.collisionDate);
 
         // Calcula horários alternativos livres no mesmo dia para o compromisso B
         final durationB = b.endTime.difference(b.startTime).inMinutes;
@@ -246,11 +274,18 @@ class _ConflictResolutionSheetContentState
           children: [
             Row(
               children: [
-                const Icon(Icons.event_busy_rounded, color: Color(0xFFD97706), size: 20),
+                const Icon(
+                  Icons.event_busy_rounded,
+                  color: Color(0xFFD97706),
+                  size: 20,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   dateStr,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
                 ),
               ],
             ),
@@ -284,7 +319,10 @@ class _ConflictResolutionSheetContentState
             if (alternativeSlots.isNotEmpty) ...[
               Text(
                 'Mover "${b.title}" para horário vago (Plano B):',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 8),
               Wrap(
@@ -304,7 +342,11 @@ class _ConflictResolutionSheetContentState
                       await repo.updateAppointment(updated);
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Reagendado para as $slotStr com sucesso!')),
+                          SnackBar(
+                            content: Text(
+                              'Reagendado para as $slotStr com sucesso!',
+                            ),
+                          ),
                         );
                       }
                     },
@@ -320,9 +362,13 @@ class _ConflictResolutionSheetContentState
                 icon: const Icon(Icons.people_outline, size: 16),
                 label: const Text('Manter Ambos (Visita Conjunta)'),
                 onPressed: () {
-                  ref.read(dismissedConflictsProvider.notifier).dismiss(pair.conflictKey);
+                  ref
+                      .read(dismissedConflictsProvider.notifier)
+                      .dismiss(pair.conflictKey);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Conflito dispensado para esta sessão.')),
+                    const SnackBar(
+                      content: Text('Conflito dispensado para esta sessão.'),
+                    ),
                   );
                 },
               ),
@@ -363,7 +409,10 @@ class _ConflictResolutionSheetContentState
               children: [
                 Text(
                   title,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(

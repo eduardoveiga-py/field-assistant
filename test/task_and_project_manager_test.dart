@@ -32,9 +32,15 @@ void main() {
       expect(task.priority, equals('high'));
       expect(task.status, equals('todo'));
 
-      await taskMgr.updateTask(task.id, title: 'Comprar revistas e folhetos atualizados');
+      await taskMgr.updateTask(
+        task.id,
+        title: 'Comprar revistas e folhetos atualizados',
+      );
       final tasks = await taskMgr.watchPendingTasks().first;
-      expect(tasks.first.title, equals('Comprar revistas e folhetos atualizados'));
+      expect(
+        tasks.first.title,
+        equals('Comprar revistas e folhetos atualizados'),
+      );
     });
 
     test('TC-TSK-02: Alternância de conclusão e contagem pendente', () async {
@@ -69,41 +75,56 @@ void main() {
       expect(nextTask.dueDate, equals(baseDue.add(const Duration(days: 7))));
     });
 
-    test('TC-PRJ-01: Criação de projeto e cálculo reativo de progresso', () async {
-      final project = await projectMgr.createProject(
-        name: 'Campanha de Território Rural',
-        objective: 'Trabalhar os 5 setores ribeirinhos',
-        category: 'ministry',
-      );
+    test(
+      'TC-PRJ-01: Criação de projeto e cálculo reativo de progresso',
+      () async {
+        final project = await projectMgr.createProject(
+          name: 'Campanha de Território Rural',
+          objective: 'Trabalhar os 5 setores ribeirinhos',
+          category: 'ministry',
+        );
 
-      expect(project.name, equals('Campanha de Território Rural'));
-      expect(project.status, equals('planning'));
+        expect(project.name, equals('Campanha de Território Rural'));
+        expect(project.status, equals('planning'));
 
-      // Cria 4 tarefas vinculadas ao projeto
-      final t1 = await taskMgr.createTask(title: 'Mapear barco', projectId: project.id);
-      final t2 = await taskMgr.createTask(title: 'Organizar pioneiros', projectId: project.id);
-      final t3 = await taskMgr.createTask(title: 'Imprimir mapas', projectId: project.id);
-      await taskMgr.createTask(title: 'Revisar combustível', projectId: project.id);
+        // Cria 4 tarefas vinculadas ao projeto
+        final t1 = await taskMgr.createTask(
+          title: 'Mapear barco',
+          projectId: project.id,
+        );
+        final t2 = await taskMgr.createTask(
+          title: 'Organizar pioneiros',
+          projectId: project.id,
+        );
+        final t3 = await taskMgr.createTask(
+          title: 'Imprimir mapas',
+          projectId: project.id,
+        );
+        await taskMgr.createTask(
+          title: 'Revisar combustível',
+          projectId: project.id,
+        );
 
-      var progress = await projectMgr.watchProjectProgress(project.id).first;
-      expect(progress.totalTasks, equals(4));
-      expect(progress.completedTasks, equals(0));
-      expect(progress.progressPercent, equals(0.0));
+        var progress = await projectMgr.watchProjectProgress(project.id).first;
+        expect(progress.totalTasks, equals(4));
+        expect(progress.completedTasks, equals(0));
+        expect(progress.progressPercent, equals(0.0));
 
-      // Conclui 2 tarefas
-      await taskMgr.toggleTaskComplete(t1.id, completed: true);
-      await taskMgr.toggleTaskComplete(t2.id, completed: true);
+        // Conclui 2 tarefas
+        await taskMgr.toggleTaskComplete(t1.id, completed: true);
+        await taskMgr.toggleTaskComplete(t2.id, completed: true);
 
-      progress = await projectMgr.watchProjectProgress(project.id).first;
-      expect(progress.totalTasks, equals(4));
-      expect(progress.completedTasks, equals(2));
-      expect(progress.progressPercent, equals(50.0));
+        progress = await projectMgr.watchProjectProgress(project.id).first;
+        expect(progress.totalTasks, equals(4));
+        expect(progress.completedTasks, equals(2));
+        expect(progress.progressPercent, equals(50.0));
 
-      // Conclui a terceira tarefa
-      await taskMgr.toggleTaskComplete(t3.id, completed: true);
-      progress = await projectMgr.watchProjectProgress(project.id).first;
-      expect(progress.completedTasks, equals(3));
-      expect(progress.progressPercent, equals(75.0));
-    });
+        // Conclui a terceira tarefa
+        await taskMgr.toggleTaskComplete(t3.id, completed: true);
+        progress = await projectMgr.watchProjectProgress(project.id).first;
+        expect(progress.completedTasks, equals(3));
+        expect(progress.progressPercent, equals(75.0));
+      },
+    );
   });
 }

@@ -776,7 +776,10 @@ void main() {
       docsDir = await Directory.systemTemp.createTemp('silent_backup_test_');
       db = AppDatabase.forTesting(NativeDatabase.memory());
       repo = AppRepository(db);
-      backupService = BackupService(repo, documentsDirectoryProvider: () async => docsDir);
+      backupService = BackupService(
+        repo,
+        documentsDirectoryProvider: () async => docsDir,
+      );
     });
 
     tearDown(() async {

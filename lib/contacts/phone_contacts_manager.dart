@@ -75,7 +75,11 @@ class PhoneContactItem {
         }
       }
     } catch (e, st) {
-      AppLogger.warning('Falha ao decodificar tags JSON de PhoneContactItem', e, st);
+      AppLogger.warning(
+        'Falha ao decodificar tags JSON de PhoneContactItem',
+        e,
+        st,
+      );
     }
 
     return PhoneContactItem(
@@ -159,7 +163,11 @@ class PhoneContactsManager {
           )
           .toList();
     } catch (e, st) {
-      AppLogger.warning('Falha ao consultar contatos telefônicos locais', e, st);
+      AppLogger.warning(
+        'Falha ao consultar contatos telefônicos locais',
+        e,
+        st,
+      );
       return [];
     }
   }
@@ -284,7 +292,11 @@ class PhoneContactsManager {
             ),
           );
     } catch (e, st) {
-      AppLogger.error('Falha ao enfileirar UPDATE de phone_contact ${contact.id}', e, st);
+      AppLogger.error(
+        'Falha ao enfileirar UPDATE de phone_contact ${contact.id}',
+        e,
+        st,
+      );
     }
 
     await _refresh();

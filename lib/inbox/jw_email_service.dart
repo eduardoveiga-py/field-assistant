@@ -8,6 +8,7 @@ import 'dart:io'
         SocketException,
         TlsException,
         X509Certificate;
+
 import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:drift/drift.dart' as drift;
@@ -34,6 +35,7 @@ class JwEmailMessage {
   final DateTime date;
   final String bodyText;
   final String? bodyHtml;
+
   /// MIME original em Base64, incluindo anexos, quando obtido via IMAP.
   final String? rawEmlBase64;
   final List<Map<String, dynamic>> attachments;
@@ -66,52 +68,54 @@ class JwEmailMessage {
   });
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'remoteUid': remoteUid,
-        'folderId': folderId,
-        'folderName': folderName,
-        'subject': subject,
-        'from': from,
-        'to': to,
-        'date': date.toIso8601String(),
-        'bodyText': bodyText,
-        'bodyHtml': bodyHtml,
-        'rawEmlBase64': rawEmlBase64,
-        'attachments': attachments,
-        'isRead': isRead,
-        'isDraft': isDraft,
-        'isPermanentRetained': isPermanentRetained,
-        'tags': tags,
-        'isHubCommunication': isHubCommunication,
-        'hubType': hubType,
-      };
+    'id': id,
+    'remoteUid': remoteUid,
+    'folderId': folderId,
+    'folderName': folderName,
+    'subject': subject,
+    'from': from,
+    'to': to,
+    'date': date.toIso8601String(),
+    'bodyText': bodyText,
+    'bodyHtml': bodyHtml,
+    'rawEmlBase64': rawEmlBase64,
+    'attachments': attachments,
+    'isRead': isRead,
+    'isDraft': isDraft,
+    'isPermanentRetained': isPermanentRetained,
+    'tags': tags,
+    'isHubCommunication': isHubCommunication,
+    'hubType': hubType,
+  };
 
   factory JwEmailMessage.fromJson(Map<String, dynamic> json) => JwEmailMessage(
-        id: json['id'] as String? ?? const Uuid().v4(),
-        remoteUid: json['remoteUid'] as int?,
-        folderId: json['folderId'] as String?,
-        folderName: json['folderName'] as String?,
-        subject: json['subject'] as String? ?? '(Sem Assunto)',
-        from: json['from'] as String? ?? 'jw@jw.org',
-        to: json['to'] as String? ?? '',
-        date: json['date'] != null
-            ? DateTime.tryParse(json['date'] as String) ?? DateTime.now()
-            : DateTime.now(),
-        bodyText: json['bodyText'] as String? ?? '',
-        bodyHtml: json['bodyHtml'] as String?,
-        rawEmlBase64: json['rawEmlBase64'] as String?,
-        attachments: (json['attachments'] as List<dynamic>?)
-                ?.map((e) => Map<String, dynamic>.from(e as Map))
-                .toList() ??
-            const [],
-        isRead: json['isRead'] as bool? ?? false,
-        isDraft: json['isDraft'] as bool? ?? false,
-        isPermanentRetained: json['isPermanentRetained'] as bool? ?? true,
-        tags: (json['tags'] as List<dynamic>?)?.map((e) => e.toString()).toList() ??
-            const [],
-        isHubCommunication: json['isHubCommunication'] as bool? ?? false,
-        hubType: json['hubType'] as String?,
-      );
+    id: json['id'] as String? ?? const Uuid().v4(),
+    remoteUid: json['remoteUid'] as int?,
+    folderId: json['folderId'] as String?,
+    folderName: json['folderName'] as String?,
+    subject: json['subject'] as String? ?? '(Sem Assunto)',
+    from: json['from'] as String? ?? 'jw@jw.org',
+    to: json['to'] as String? ?? '',
+    date: json['date'] != null
+        ? DateTime.tryParse(json['date'] as String) ?? DateTime.now()
+        : DateTime.now(),
+    bodyText: json['bodyText'] as String? ?? '',
+    bodyHtml: json['bodyHtml'] as String?,
+    rawEmlBase64: json['rawEmlBase64'] as String?,
+    attachments:
+        (json['attachments'] as List<dynamic>?)
+            ?.map((e) => Map<String, dynamic>.from(e as Map))
+            .toList() ??
+        const [],
+    isRead: json['isRead'] as bool? ?? false,
+    isDraft: json['isDraft'] as bool? ?? false,
+    isPermanentRetained: json['isPermanentRetained'] as bool? ?? true,
+    tags:
+        (json['tags'] as List<dynamic>?)?.map((e) => e.toString()).toList() ??
+        const [],
+    isHubCommunication: json['isHubCommunication'] as bool? ?? false,
+    hubType: json['hubType'] as String?,
+  );
 
   JwEmailMessage copyWith({
     String? id,
@@ -164,12 +168,16 @@ class JwEmailMessage {
     buffer.writeln('| :--- | :--- |');
     buffer.writeln('| **De** | `$from` |');
     buffer.writeln('| **Para** | `$to` |');
-    buffer.writeln('| **Data** | ${DateFormat('dd/MM/yyyy HH:mm').format(date)} |');
+    buffer.writeln(
+      '| **Data** | ${DateFormat('dd/MM/yyyy HH:mm').format(date)} |',
+    );
     if (tags.isNotEmpty) {
       buffer.writeln('| **Tags** | ${tags.map((t) => '`#$t`').join(' ')} |');
     }
     if (isHubCommunication) {
-      buffer.writeln('| **Origem** | Hub Restrito JW (${hubType ?? "Comunicação"}) |');
+      buffer.writeln(
+        '| **Origem** | Hub Restrito JW (${hubType ?? "Comunicação"}) |',
+      );
     }
     buffer.writeln();
     buffer.writeln('---');
@@ -189,7 +197,8 @@ class JwEmailMessage {
 
   /// Converte para formato padrão RFC822 / .eml
   String toEml() {
-    final rfcDate = DateFormat('EEE, dd MMM yyyy HH:mm:ss +0000').format(date.toUtc());
+    final rfcDate = DateFormat('EEE, dd MMM yyyy HH:mm:ss +0000')
+        .format(date.toUtc());
     final buffer = StringBuffer();
     buffer.writeln('From: $from');
     buffer.writeln('To: $to');
@@ -243,7 +252,13 @@ class JwEmailAuthException extends JwEmailException {
 
 /// Interface para permitir testes com sessões IMAP determinísticas.
 abstract class JwImapSession {
-  Future<void> connect(String host, int port, String username, String password, Duration timeout);
+  Future<void> connect(
+    String host,
+    int port,
+    String username,
+    String password,
+    Duration timeout,
+  );
   Future<int> selectInbox();
   Future<List<int>> searchUids();
   Future<List<JwEmailMessage>> fetchUids(List<int> uids);
@@ -251,7 +266,10 @@ abstract class JwImapSession {
 }
 
 typedef JwImapSessionFactory = JwImapSession Function(Duration timeout);
-typedef JwMissingUids = Future<Set<int>> Function(int uidValidity, List<int> uids);
+typedef JwMissingUids = Future<Set<int>> Function(
+  int uidValidity,
+  List<int> uids,
+);
 
 /// Converte a mensagem MIME já analisada pela biblioteca sem perder os bytes.
 @visibleForTesting
@@ -259,50 +277,78 @@ JwEmailMessage jwEmailFromMime(mail.MimeMessage message) {
   final uid = message.uid;
   final data = message.mimeData;
   if (uid == null || data == null || !data.containsHeader) {
-    throw const JwEmailConnectionException('Resposta IMAP incompleta: UID ou corpo ausente.');
+    throw const JwEmailConnectionException(
+      'Resposta IMAP incompleta: UID ou corpo ausente.',
+    );
   }
   // Não reconstruir bytes de um texto já decodificado: isso poderia alterar
   // silenciosamente o MIME ou anexos com codificação diferente de UTF-8.
   if (data is! mail.BinaryMimeData) {
-    throw const JwEmailConnectionException('Servidor IMAP não retornou o MIME em bytes.');
+    throw const JwEmailConnectionException(
+      'Servidor IMAP não retornou o MIME em bytes.',
+    );
   }
   final raw = data.data;
   if (message.size != null && message.size != raw.length) {
-    throw const JwEmailConnectionException('Tamanho do MIME IMAP não confere; sincronize novamente.');
+    throw const JwEmailConnectionException(
+      'Tamanho do MIME IMAP não confere; sincronize novamente.',
+    );
   }
   final from = message.decodeHeaderValue('from') ?? 'desconhecido';
   final subject = message.decodeSubject() ?? '(Sem Assunto)';
   final isHub = from.toLowerCase().contains('hub.jw.org');
   return JwEmailMessage(
-    id: 'imap_$uid', remoteUid: uid, subject: subject, from: from,
+    id: 'imap_$uid',
+    remoteUid: uid,
+    subject: subject,
+    from: from,
     to: message.decodeHeaderValue('to') ?? '',
     date: message.decodeDate() ?? DateTime.now(),
     bodyText: message.decodeTextPlainPart() ?? '',
-    bodyHtml: message.decodeTextHtmlPart(), rawEmlBase64: base64Encode(raw),
+    bodyHtml: message.decodeTextHtmlPart(),
+    rawEmlBase64: base64Encode(raw),
     isHubCommunication: isHub,
-    hubType: isHub ? (subject.toLowerCase().contains('formulário') ? 'form' : 'letter') : null,
+    hubType: isHub
+        ? (subject.toLowerCase().contains('formulário') ? 'form' : 'letter')
+        : null,
   );
 }
 
 class _EnoughMailSession implements JwImapSession {
   final mail.ImapClient client;
-  _EnoughMailSession(Duration timeout) : client = mail.ImapClient(
-    defaultWriteTimeout: timeout, defaultResponseTimeout: timeout);
+  _EnoughMailSession(Duration timeout)
+    : client = mail.ImapClient(
+        defaultWriteTimeout: timeout,
+        defaultResponseTimeout: timeout,
+      );
 
   @override
-  Future<void> connect(String host, int port, String username, String password, Duration timeout) async {
+  Future<void> connect(
+    String host,
+    int port,
+    String username,
+    String password,
+    Duration timeout,
+  ) async {
     // LOGIN da biblioteca envolve os argumentos em aspas, portanto precisamos
     // escapar esses caracteres e rejeitar controles para evitar injeção IMAP.
     if (RegExp(r'[\x00-\x1f\x7f]').hasMatch(username) ||
         RegExp(r'[\x00-\x1f\x7f]').hasMatch(password)) {
-      throw const JwEmailAuthException('Credenciais IMAP contêm caracteres de controle inválidos.');
+      throw const JwEmailAuthException(
+        'Credenciais IMAP contêm caracteres de controle inválidos.',
+      );
     }
-    String quoted(String value) => value.replaceAll(r'\', r'\\').replaceAll('"', r'\"');
-    await client.connectToServer(host, port, isSecure: true, timeout: timeout).timeout(timeout);
+    String quoted(String value) =>
+        value.replaceAll(r'\', r'\\').replaceAll('"', r'\"');
+    await client
+        .connectToServer(host, port, isSecure: true, timeout: timeout)
+        .timeout(timeout);
     try {
       await client.login(quoted(username), quoted(password)).timeout(timeout);
     } on mail.ImapException {
-      throw const JwEmailAuthException('Falha de autenticação IMAP. Verifique usuário e senha.');
+      throw const JwEmailAuthException(
+        'Falha de autenticação IMAP. Verifique usuário e senha.',
+      );
     }
   }
 
@@ -311,7 +357,9 @@ class _EnoughMailSession implements JwImapSession {
     final box = await client.selectInbox();
     final validity = box.uidValidity;
     if (validity == null || validity <= 0) {
-      throw const JwEmailConnectionException('Servidor IMAP não informou UIDVALIDITY.');
+      throw const JwEmailConnectionException(
+        'Servidor IMAP não informou UIDVALIDITY.',
+      );
     }
     return validity;
   }
@@ -319,10 +367,14 @@ class _EnoughMailSession implements JwImapSession {
   @override
   Future<List<int>> searchUids() async {
     final result = await client.uidSearchMessages(
-      searchCriteria: 'ALL', responseTimeout: client.defaultResponseTimeout);
+      searchCriteria: 'ALL',
+      responseTimeout: client.defaultResponseTimeout,
+    );
     final sequence = result.matchingSequence;
     if (sequence == null) {
-      throw const JwEmailConnectionException('Servidor IMAP não retornou lista de UIDs.');
+      throw const JwEmailConnectionException(
+        'Servidor IMAP não retornou lista de UIDs.',
+      );
     }
     return sequence.toList();
   }
@@ -330,10 +382,14 @@ class _EnoughMailSession implements JwImapSession {
   @override
   Future<List<JwEmailMessage>> fetchUids(List<int> uids) async {
     final result = await client.uidFetchMessages(
-      mail.MessageSequence.fromIds(uids, isUid: true), '(UID RFC822.SIZE BODY.PEEK[])',
-      responseTimeout: client.defaultResponseTimeout);
+      mail.MessageSequence.fromIds(uids, isUid: true),
+      '(UID RFC822.SIZE BODY.PEEK[])',
+      responseTimeout: client.defaultResponseTimeout,
+    );
     if (result.messages.any((message) => message.size == null)) {
-      throw const JwEmailConnectionException('Servidor IMAP não informou o tamanho da mensagem.');
+      throw const JwEmailConnectionException(
+        'Servidor IMAP não informou o tamanho da mensagem.',
+      );
     }
     return result.messages.map(jwEmailFromMime).toList();
   }
@@ -341,26 +397,40 @@ class _EnoughMailSession implements JwImapSession {
   @override
   Future<void> close() async {
     if (client.isConnected) {
-      try { await client.logout().timeout(const Duration(seconds: 3)); } catch (_) {}
+      try {
+        await client.logout().timeout(const Duration(seconds: 3));
+      } catch (_) {}
       await client.disconnect().timeout(const Duration(seconds: 3));
     }
   }
 }
 
 // Nunca exibir resposta bruta do servidor: pode conter credenciais ou mensagens.
-Future<T> _imapStage<T>(String stage, Future<T> Function() action, Duration timeout) async {
+Future<T> _imapStage<T>(
+  String stage,
+  Future<T> Function() action,
+  Duration timeout,
+) async {
   try {
     return await action().timeout(timeout);
   } on JwEmailException {
     rethrow;
   } on TimeoutException {
-    throw JwEmailConnectionException('Tempo esgotado na etapa IMAP: $stage. Confira servidor, porta e rede.');
+    throw JwEmailConnectionException(
+      'Tempo esgotado na etapa IMAP: $stage. Confira servidor, porta e rede.',
+    );
   } on TlsException {
-    throw JwEmailConnectionException('Falha TLS na etapa IMAP: $stage. Confira servidor, porta e certificado.');
+    throw JwEmailConnectionException(
+      'Falha TLS na etapa IMAP: $stage. Confira servidor, porta e certificado.',
+    );
   } on SocketException {
-    throw JwEmailConnectionException('Não foi possível conectar ou manter a conexão IMAP na etapa: $stage. Confira servidor, porta e rede.');
+    throw JwEmailConnectionException(
+      'Não foi possível conectar ou manter a conexão IMAP na etapa: $stage. Confira servidor, porta e rede.',
+    );
   } catch (_) {
-    throw JwEmailConnectionException('Falha na etapa IMAP: $stage. Confira se o servidor suporta IMAP e a configuração da conta.');
+    throw JwEmailConnectionException(
+      'Falha na etapa IMAP: $stage. Confira se o servidor suporta IMAP e a configuração da conta.',
+    );
   }
 }
 
@@ -379,7 +449,10 @@ class JwImapClient {
 
   /// Decodifica cabeçalhos MIME RFC 2047 (=?UTF-8?B?...?= ou =?UTF-8?Q?...?=)
   static String decodeMimeHeader(String raw) {
-    final pattern = RegExp(r'=\?([^?]+)\?([bBqQ])\?([^?]+)\?=', caseSensitive: false);
+    final pattern = RegExp(
+      r'=\?([^?]+)\?([bBqQ])\?([^?]+)\?=',
+      caseSensitive: false,
+    );
     return raw.replaceAllMapped(pattern, (match) {
       final encoding = match.group(2)!.toUpperCase();
       final text = match.group(3)!;
@@ -387,12 +460,13 @@ class JwImapClient {
         if (encoding == 'B') {
           return utf8.decode(base64.decode(text));
         } else if (encoding == 'Q') {
-          return text
-              .replaceAll('_', ' ')
-              .replaceAllMapped(RegExp(r'=([A-Fa-f0-9]{2})'), (m) {
-            final byte = int.parse(m.group(1)!, radix: 16);
-            return String.fromCharCode(byte);
-          });
+          return text.replaceAll('_', ' ').replaceAllMapped(
+            RegExp(r'=([A-Fa-f0-9]{2})'),
+            (m) {
+              final byte = int.parse(m.group(1)!, radix: 16);
+              return String.fromCharCode(byte);
+            },
+          );
         }
       } catch (e, st) {
         AppLogger.debug('Falha ao decodificar cabeçalho RFC 2047: $e', st);
@@ -403,41 +477,88 @@ class JwImapClient {
 
   /// UID só é único dentro de uma conta, caixa e geração de UIDVALIDITY.
   @visibleForTesting
-  static String scopedMessageId({required String host, required int port,
-      required String username, required int uidValidity, required int uid}) {
-    final scope = jsonEncode([host.trim().toLowerCase(), port, username.trim(), 'INBOX', uidValidity]);
+  static String scopedMessageId({
+    required String host,
+    required int port,
+    required String username,
+    required int uidValidity,
+    required int uid,
+  }) {
+    final scope = jsonEncode([
+      host.trim().toLowerCase(),
+      port,
+      username.trim(),
+      'INBOX',
+      uidValidity,
+    ]);
     return 'imap_${crypto.sha256.convert(utf8.encode(scope))}_$uid';
   }
 
   /// Verifica login e acesso à INBOX sem baixar nem ler mensagens da caixa.
   Future<void> verifyConnection({
-    required String host, required int port, required String username,
-    required String password, Duration timeout = const Duration(seconds: 60),
+    required String host,
+    required int port,
+    required String username,
+    required String password,
+    Duration timeout = const Duration(seconds: 60),
   }) async {
-    if (kIsWeb) throw const JwEmailConnectionException('IMAP direto não é suportado no navegador.');
-    if (host.trim().isEmpty || username.trim().isEmpty || password.isEmpty || port <= 0 || port > 65535) {
-      throw const JwEmailConnectionException('Informe servidor, porta e credenciais IMAP válidos.');
+    if (kIsWeb)
+      throw const JwEmailConnectionException(
+        'IMAP direto não é suportado no navegador.',
+      );
+    if (host.trim().isEmpty ||
+        username.trim().isEmpty ||
+        password.isEmpty ||
+        port <= 0 ||
+        port > 65535) {
+      throw const JwEmailConnectionException(
+        'Informe servidor, porta e credenciais IMAP válidos.',
+      );
     }
-    final session = sessionFactory?.call(timeout) ?? _EnoughMailSession(timeout);
+    final session =
+        sessionFactory?.call(timeout) ?? _EnoughMailSession(timeout);
     try {
-      await _imapStage('conexão e autenticação',
-          () => session.connect(host.trim(), port, username.trim(), password, timeout), timeout);
-      final validity = await _imapStage('abertura da INBOX', session.selectInbox, timeout);
-      if (validity <= 0) throw const JwEmailConnectionException('UIDVALIDITY inválido.');
+      await _imapStage(
+        'conexão e autenticação',
+        () => session.connect(
+          host.trim(),
+          port,
+          username.trim(),
+          password,
+          timeout,
+        ),
+        timeout,
+      );
+      final validity = await _imapStage(
+        'abertura da INBOX',
+        session.selectInbox,
+        timeout,
+      );
+      if (validity <= 0)
+        throw const JwEmailConnectionException('UIDVALIDITY inválido.');
     } finally {
-      try { await session.close(); } catch (_) {}
+      try {
+        await session.close();
+      } catch (_) {}
     }
   }
 
   /// Compatibilidade para consumidores que precisam de uma lista completa.
   /// A sincronização da Inbox usa a API em páginas para persistir progresso.
   Future<List<JwEmailMessage>> fetchRemoteEmails({
-    String? host, int? port, String? username, String? password,
+    String? host,
+    int? port,
+    String? username,
+    String? password,
     Duration timeout = const Duration(seconds: 60),
   }) async {
     final result = <JwEmailMessage>[];
     await for (final page in fetchRemoteEmailPages(
-      host: host, port: port, username: username, password: password, timeout: timeout,
+      host: host,
+      port: port,
+      username: username,
+      password: password,
+      timeout: timeout,
     )) {
       result.addAll(page);
     }
@@ -447,58 +568,116 @@ class JwImapClient {
   /// Varre todos os UIDs presentes na INBOX; cada página é entregue antes de
   /// buscar a próxima, permitindo gravação incremental e retomada após falhas.
   Stream<List<JwEmailMessage>> fetchRemoteEmailPages({
-    String? host, int? port, String? username, String? password,
+    String? host,
+    int? port,
+    String? username,
+    String? password,
     Duration timeout = const Duration(seconds: 60),
     JwMissingUids? missingUids,
   }) async* {
-    if (username == null || username.trim().isEmpty || password == null || password.isEmpty) return;
+    if (username == null ||
+        username.trim().isEmpty ||
+        password == null ||
+        password.isEmpty)
+      return;
     if (kIsWeb) {
-      throw const JwEmailConnectionException('IMAP direto não é suportado no navegador.');
+      throw const JwEmailConnectionException(
+        'IMAP direto não é suportado no navegador.',
+      );
     }
-    final targetHost = host?.trim().isNotEmpty == true ? host!.trim() : defaultHost;
+    final targetHost = host?.trim().isNotEmpty == true
+        ? host!.trim()
+        : defaultHost;
     final targetPort = port ?? defaultPort;
     if (targetPort <= 0 || targetPort > 65535) {
-      throw JwEmailConnectionException('Porta IMAP inválida ($targetPort). Informe um valor entre 1 e 65535.');
+      throw JwEmailConnectionException(
+        'Porta IMAP inválida ($targetPort). Informe um valor entre 1 e 65535.',
+      );
     }
-    final session = sessionFactory?.call(timeout) ?? _EnoughMailSession(timeout);
+    final session =
+        sessionFactory?.call(timeout) ?? _EnoughMailSession(timeout);
     try {
-      await _imapStage('conexão e autenticação',
-          () => session.connect(targetHost, targetPort, username.trim(), password, timeout), timeout);
-      final validity = await _imapStage('abertura da INBOX', session.selectInbox, timeout);
-      if (validity <= 0) throw const JwEmailConnectionException('UIDVALIDITY inválido.');
-      final uids = await _imapStage('listagem de mensagens', session.searchUids, timeout);
+      await _imapStage(
+        'conexão e autenticação',
+        () => session.connect(
+          targetHost,
+          targetPort,
+          username.trim(),
+          password,
+          timeout,
+        ),
+        timeout,
+      );
+      final validity = await _imapStage(
+        'abertura da INBOX',
+        session.selectInbox,
+        timeout,
+      );
+      if (validity <= 0)
+        throw const JwEmailConnectionException('UIDVALIDITY inválido.');
+      final uids = await _imapStage(
+        'listagem de mensagens',
+        session.searchUids,
+        timeout,
+      );
       if (uids.any((uid) => uid <= 0) || uids.toSet().length != uids.length) {
         throw const JwEmailConnectionException('Lista de UIDs IMAP inválida.');
       }
       uids.sort();
       const pageSize = 10; // Tamanho de lote, não limite da caixa.
       for (var start = 0; start < uids.length; start += pageSize) {
-        final end = start + pageSize < uids.length ? start + pageSize : uids.length;
+        final end = start + pageSize < uids.length
+            ? start + pageSize
+            : uids.length;
         final page = uids.sublist(start, end);
-        final wanted = missingUids == null ? page.toSet() : await missingUids(validity, page);
+        final wanted = missingUids == null
+            ? page.toSet()
+            : await missingUids(validity, page);
         if (!page.toSet().containsAll(wanted)) {
-          throw const JwEmailConnectionException('Filtro de mensagens IMAP inválido.');
+          throw const JwEmailConnectionException(
+            'Filtro de mensagens IMAP inválido.',
+          );
         }
         if (wanted.isEmpty) continue;
-        final fetched = await _imapStage('leitura de mensagens',
-            () => session.fetchUids(page.where(wanted.contains).toList()), timeout);
+        final fetched = await _imapStage(
+          'leitura de mensagens',
+          () => session.fetchUids(page.where(wanted.contains).toList()),
+          timeout,
+        );
         final received = fetched.map((item) => item.remoteUid).toSet();
-        if (fetched.length != wanted.length || received.contains(null) ||
-            received.length != wanted.length || !received.containsAll(wanted)) {
-          throw const JwEmailConnectionException('Página IMAP incompleta; sincronize novamente para retomar.');
+        if (fetched.length != wanted.length ||
+            received.contains(null) ||
+            received.length != wanted.length ||
+            !received.containsAll(wanted)) {
+          throw const JwEmailConnectionException(
+            'Página IMAP incompleta; sincronize novamente para retomar.',
+          );
         }
-        yield fetched.map((item) => item.copyWith(id: scopedMessageId(
-          host: targetHost, port: targetPort, username: username.trim(),
-          uidValidity: validity, uid: item.remoteUid!,
-        ))).toList();
+        yield fetched
+            .map(
+              (item) => item.copyWith(
+                id: scopedMessageId(
+                  host: targetHost,
+                  port: targetPort,
+                  username: username.trim(),
+                  uidValidity: validity,
+                  uid: item.remoteUid!,
+                ),
+              ),
+            )
+            .toList();
       }
     } on JwEmailException {
       rethrow;
     } catch (_) {
       // Não incluir respostas brutas: podem conter credenciais ou mensagens.
-      throw const JwEmailConnectionException('Falha na conexão ou na leitura IMAP. Tente novamente.');
+      throw const JwEmailConnectionException(
+        'Falha na conexão ou na leitura IMAP. Tente novamente.',
+      );
     } finally {
-      try { await session.close(); } catch (_) {}
+      try {
+        await session.close();
+      } catch (_) {}
     }
   }
 
@@ -535,7 +714,11 @@ class JwImapClient {
     final hour = int.tryParse(match.group(4)!);
     final minute = int.tryParse(match.group(5)!);
     final second = int.tryParse(match.group(6) ?? '0') ?? 0;
-    if (day == null || month == null || year == null || hour == null || minute == null) {
+    if (day == null ||
+        month == null ||
+        year == null ||
+        hour == null ||
+        minute == null) {
       return null;
     }
 
@@ -548,7 +731,14 @@ class JwImapClient {
     final tzHours = int.tryParse(digits.substring(0, 2)) ?? 0;
     final tzMins = int.tryParse(digits.substring(2, 4)) ?? 0;
     final offset = Duration(hours: tzHours, minutes: tzMins) * sign;
-    return DateTime.utc(year, month, day, hour, minute, second).subtract(offset);
+    return DateTime.utc(
+      year,
+      month,
+      day,
+      hour,
+      minute,
+      second,
+    ).subtract(offset);
   }
 
   /// Parser estruturado das respostas FETCH do IMAP (exposto para testes).
@@ -568,11 +758,15 @@ class JwImapClient {
     bool inBody = false;
 
     void flushCurrent() {
-      if (currentSubject != null || currentFrom != null || currentBodyBuffer.isNotEmpty) {
+      if (currentSubject != null ||
+          currentFrom != null ||
+          currentBodyBuffer.isNotEmpty) {
         final fromStr = currentFrom ?? 'desconhecido@jw.org';
         final isHub = fromStr.contains('hub.jw.org');
         final subjectStr = currentSubject ?? '(Sem Assunto)';
-        final isForm = subjectStr.toLowerCase().contains('formulário') || subjectStr.toLowerCase().contains('s-');
+        final isForm =
+            subjectStr.toLowerCase().contains('formulário') ||
+            subjectStr.toLowerCase().contains('s-');
         final bodyLines = currentBodyBuffer.toString().split('\n');
         while (bodyLines.isNotEmpty && bodyLines.last.trim().isEmpty) {
           bodyLines.removeLast();
@@ -624,12 +818,18 @@ class JwImapClient {
         continue;
       }
 
-      if (RegExp(r'^BODY\[HEADER[^\]]*\]\s*\{\d+\}\s*$', caseSensitive: false).hasMatch(line.trim())) {
+      if (RegExp(
+        r'^BODY\[HEADER[^\]]*\]\s*\{\d+\}\s*$',
+        caseSensitive: false,
+      ).hasMatch(line.trim())) {
         inBody = false;
         continue;
       }
 
-      if (RegExp(r'^BODY\[TEXT\]\s*\{\d+\}\s*$', caseSensitive: false).hasMatch(line.trim())) {
+      if (RegExp(
+        r'^BODY\[TEXT\]\s*\{\d+\}\s*$',
+        caseSensitive: false,
+      ).hasMatch(line.trim())) {
         inBody = true;
         continue;
       }
@@ -644,7 +844,8 @@ class JwImapClient {
           currentTo = decodeMimeHeader(line.substring(3).trim());
         } else if (lower.startsWith('date:')) {
           currentDate = parseEmailDate(line.substring(5).trim());
-        } else if (line.isEmpty && (currentSubject != null || currentFrom != null)) {
+        } else if (line.isEmpty &&
+            (currentSubject != null || currentFrom != null)) {
           inBody = true;
         }
       } else {
@@ -667,7 +868,7 @@ class _SmtpLineReader {
   bool _detached = false;
 
   _SmtpLineReader(Stream<String> lineStream)
-      : _subscription = lineStream.listen(null) {
+    : _subscription = lineStream.listen(null) {
     _subscription.onData((line) {
       if (_detached) return;
       if (_waiters.isNotEmpty) {
@@ -782,7 +983,9 @@ class JwSmtpClient {
       return null;
     }
     final angleMatch = RegExp(r'<([^<>\s]+@[^<>\s]+)>').firstMatch(trimmed);
-    final candidate = angleMatch != null ? angleMatch.group(1)!.trim() : trimmed;
+    final candidate = angleMatch != null
+        ? angleMatch.group(1)!.trim()
+        : trimmed;
     final emailRegex = RegExp(r'^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$');
     if (!emailRegex.hasMatch(candidate)) {
       return null;
@@ -819,11 +1022,15 @@ class JwSmtpClient {
     while (true) {
       final line = await reader.readLine(timeout: timeout);
       if (line.length < 3) {
-        throw JwEmailConnectionException('Resposta SMTP inválida recebida: $line');
+        throw JwEmailConnectionException(
+          'Resposta SMTP inválida recebida: $line',
+        );
       }
       final code = int.tryParse(line.substring(0, 3));
       if (code == null) {
-        throw JwEmailConnectionException('Código SMTP inesperado recebido: $line');
+        throw JwEmailConnectionException(
+          'Código SMTP inesperado recebido: $line',
+        );
       }
       lines.add(line.length > 4 ? line.substring(4).trim() : '');
       final isContinuation = line.length > 3 && line[3] == '-';
@@ -843,7 +1050,9 @@ class JwSmtpClient {
   static String _wrapBase64Lines(String input, {int lineLength = 76}) {
     final buffer = StringBuffer();
     for (int i = 0; i < input.length; i += lineLength) {
-      final end = (i + lineLength < input.length) ? i + lineLength : input.length;
+      final end = (i + lineLength < input.length)
+          ? i + lineLength
+          : input.length;
       buffer.write(input.substring(i, end));
       buffer.write('\r\n');
     }
@@ -854,8 +1063,18 @@ class JwSmtpClient {
     final utc = dateTime.toUtc();
     const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     String two(int n) => n.toString().padLeft(2, '0');
     return '${weekdays[utc.weekday - 1]}, ${two(utc.day)} ${months[utc.month - 1]} '
@@ -959,9 +1178,9 @@ class JwSmtpClient {
       }
 
       reader = _SmtpLineReader(
-        utf8.decoder.bind(activeSocket as Stream<List<int>>).transform(
-          const LineSplitter(),
-        ),
+        utf8.decoder
+            .bind(activeSocket as Stream<List<int>>)
+            .transform(const LineSplitter()),
       );
 
       final greeting = await _readResponse(reader!, timeout);
@@ -1030,7 +1249,9 @@ class JwSmtpClient {
       final supportsPlain = authCaps.contains('PLAIN') || !supportsLogin;
 
       if (supportsPlain) {
-        final token = base64.encode(utf8.encode('\u0000$cleanUser\u0000$password'));
+        final token = base64.encode(
+          utf8.encode('\u0000$cleanUser\u0000$password'),
+        );
         await _sendCommand(activeSocket, 'AUTH PLAIN $token');
         final authResp = await _readResponse(reader!, timeout);
         if (authResp.code == 334) {
@@ -1132,7 +1353,10 @@ class JwSmtpClient {
         await _sendCommand(activeSocket, 'QUIT');
         await activeSocket.flush();
       } catch (e, st) {
-        AppLogger.debug('Falha não crítica ao encerrar sessão SMTP QUIT: $e', st);
+        AppLogger.debug(
+          'Falha não crítica ao encerrar sessão SMTP QUIT: $e',
+          st,
+        );
       }
     }
 
@@ -1219,22 +1443,32 @@ class JwEmailService {
     String? username,
     String? password,
   }) async {
-    final targetHost = host?.trim().isNotEmpty == true ? host!.trim() : imapClient.defaultHost;
+    final targetHost = host?.trim().isNotEmpty == true
+        ? host!.trim()
+        : imapClient.defaultHost;
     final targetPort = port ?? imapClient.defaultPort;
     final account = username?.trim() ?? '';
     int savedCount = 0;
 
     await for (final page in imapClient.fetchRemoteEmailPages(
-      host: host, port: port, username: username, password: password,
+      host: host,
+      port: port,
+      username: username,
+      password: password,
       missingUids: (validity, uids) async {
-        final ids = {for (final uid in uids) uid: 'email_${JwImapClient.scopedMessageId(
-          host: targetHost, port: targetPort, username: account,
-          uidValidity: validity, uid: uid)}'};
-        final existing = await (db.select(db.inboxEntries)
-          ..where((t) => t.id.isIn(ids.values.toList()))).get();
+        final ids = {
+          for (final uid in uids)
+            uid:
+                'email_${JwImapClient.scopedMessageId(host: targetHost, port: targetPort, username: account, uidValidity: validity, uid: uid)}',
+        };
+        final existing = await (db.select(
+          db.inboxEntries,
+        )..where((t) => t.id.isIn(ids.values.toList()))).get();
         final retained = existing.map((item) => item.id).toSet();
-        return ids.entries.where((item) => !retained.contains(item.value))
-            .map((item) => item.key).toSet();
+        return ids.entries
+            .where((item) => !retained.contains(item.value))
+            .map((item) => item.key)
+            .toSet();
       },
     )) {
       // Cada lote é confirmado antes de solicitar o próximo. Em interrupção,
@@ -1243,37 +1477,53 @@ class JwEmailService {
         final now = DateTime.now().toUtc();
         for (final msg in page) {
           final entryId = 'email_${msg.id}';
-          final existing = await (db.select(db.inboxEntries)
-                ..where((t) => t.id.equals(entryId))).getSingleOrNull();
+          final existing = await (db.select(
+            db.inboxEntries,
+          )..where((t) => t.id.equals(entryId))).getSingleOrNull();
           if (existing != null) continue;
           final sourceType = msg.isHubCommunication
-              ? (msg.hubType == 'form' ? 'hub_form' : 'hub_letter') : 'email';
+              ? (msg.hubType == 'form' ? 'hub_form' : 'hub_letter')
+              : 'email';
           final metadata = {
             'permanentRetention': true,
             'retentionDate': now.toIso8601String(),
             'email': msg.toJson(),
           };
-          await db.into(db.inboxEntries).insert(InboxEntriesCompanion.insert(
-            id: entryId,
-            content: '${msg.subject}\n\n${msg.bodyText}',
-            sourceType: drift.Value(sourceType),
-            suggestedCategory: drift.Value(msg.isHubCommunication ? 'hub_comms' : 'email_jw'),
-            attachments: drift.Value(jsonEncode(msg.attachments)),
-            capturedAt: msg.date.toUtc(),
-            metadata: drift.Value(jsonEncode(metadata)),
-            createdAt: now,
-            updatedAt: now,
-            revision: const drift.Value(1),
-          ));
-          final inserted = await (db.select(db.inboxEntries)..where((t) => t.id.equals(entryId))).getSingle();
-          await db.into(db.syncQueue).insert(SyncQueueCompanion.insert(
-            id: const Uuid().v4(),
-            entityType: 'inbox_entries',
-            entityId: entryId,
-            operation: 'INSERT',
-            payload: jsonEncode(SyncTimestamp.normalizeMapDates(inserted.toJson())),
-            createdAt: now,
-          ));
+          await db
+              .into(db.inboxEntries)
+              .insert(
+                InboxEntriesCompanion.insert(
+                  id: entryId,
+                  content: '${msg.subject}\n\n${msg.bodyText}',
+                  sourceType: drift.Value(sourceType),
+                  suggestedCategory: drift.Value(
+                    msg.isHubCommunication ? 'hub_comms' : 'email_jw',
+                  ),
+                  attachments: drift.Value(jsonEncode(msg.attachments)),
+                  capturedAt: msg.date.toUtc(),
+                  metadata: drift.Value(jsonEncode(metadata)),
+                  createdAt: now,
+                  updatedAt: now,
+                  revision: const drift.Value(1),
+                ),
+              );
+          final inserted = await (db.select(
+            db.inboxEntries,
+          )..where((t) => t.id.equals(entryId))).getSingle();
+          await db
+              .into(db.syncQueue)
+              .insert(
+                SyncQueueCompanion.insert(
+                  id: const Uuid().v4(),
+                  entityType: 'inbox_entries',
+                  entityId: entryId,
+                  operation: 'INSERT',
+                  payload: jsonEncode(
+                    SyncTimestamp.normalizeMapDates(inserted.toJson()),
+                  ),
+                  createdAt: now,
+                ),
+              );
           savedCount++;
         }
       });
@@ -1293,7 +1543,8 @@ class JwEmailService {
 
     if (hubOnly) {
       query.where(
-        (t) => t.sourceType.equals('hub_letter') | t.sourceType.equals('hub_form'),
+        (t) =>
+            t.sourceType.equals('hub_letter') | t.sourceType.equals('hub_form'),
       );
     } else {
       query.where(
@@ -1324,7 +1575,8 @@ class JwEmailService {
               }
               if (searchQuery != null && searchQuery.trim().isNotEmpty) {
                 final q = searchQuery.toLowerCase();
-                final match = msg.subject.toLowerCase().contains(q) ||
+                final match =
+                    msg.subject.toLowerCase().contains(q) ||
                     msg.bodyText.toLowerCase().contains(q) ||
                     msg.from.toLowerCase().contains(q) ||
                     msg.tags.any((t) => t.toLowerCase().contains(q));
@@ -1335,11 +1587,15 @@ class JwEmailService {
             }
           }
         } catch (e, st) {
-          AppLogger.debug('Fallback para InboxEntry bruto em ${entry.id}: $e', st);
+          AppLogger.debug(
+            'Fallback para InboxEntry bruto em ${entry.id}: $e',
+            st,
+          );
         }
 
         // Fallback construído a partir do InboxEntry bruto
-        final isHub = entry.sourceType == 'hub_letter' ||
+        final isHub =
+            entry.sourceType == 'hub_letter' ||
             entry.sourceType == 'hub_form' ||
             entry.suggestedCategory == 'hub_comms';
         final split = entry.content.split('\n\n');
@@ -1406,16 +1662,18 @@ class JwEmailService {
         );
       }
 
-      await db.into(db.syncQueue).insert(
-        SyncQueueCompanion.insert(
-          id: const Uuid().v4(),
-          entityType: 'inbox_entries',
-          entityId: entryId,
-          operation: isUpdate ? 'UPDATE' : 'INSERT',
-          payload: jsonEncode(payload),
-          createdAt: now,
-        ),
-      );
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: const Uuid().v4(),
+              entityType: 'inbox_entries',
+              entityId: entryId,
+              operation: isUpdate ? 'UPDATE' : 'INSERT',
+              payload: jsonEncode(payload),
+              createdAt: now,
+            ),
+          );
     });
   }
 
@@ -1442,7 +1700,8 @@ class JwEmailService {
 
     final now = DateTime.now().toUtc();
     final sentMsg = message.copyWith(
-      from: message.from.trim().isNotEmpty && message.from != 'local@dispositivo'
+      from:
+          message.from.trim().isNotEmpty && message.from != 'local@dispositivo'
           ? message.from
           : username.trim(),
       date: now,
@@ -1451,8 +1710,9 @@ class JwEmailService {
       isPermanentRetained: true,
     );
 
-    final targetId =
-        draftId != null ? 'email_draft_$draftId' : 'email_${sentMsg.id}';
+    final targetId = draftId != null
+        ? 'email_draft_$draftId'
+        : 'email_${sentMsg.id}';
 
     final metadata = {
       'permanentRetention': true,
@@ -1466,11 +1726,12 @@ class JwEmailService {
     await db.transaction(() async {
       final existingDraft = draftId == null
           ? await (db.select(db.inboxEntries)
-                ..where((t) => t.id.equals('email_draft_${sentMsg.id}')))
-              .getSingleOrNull()
+                  ..where((t) => t.id.equals('email_draft_${sentMsg.id}')))
+                .getSingleOrNull()
           : null;
-      final resolvedEntryId =
-          draftId != null ? targetId : (existingDraft?.id ?? targetId);
+      final resolvedEntryId = draftId != null
+          ? targetId
+          : (existingDraft?.id ?? targetId);
 
       final existingSent = await (db.select(
         db.inboxEntries,
@@ -1503,16 +1764,18 @@ class JwEmailService {
         );
       }
 
-      await db.into(db.syncQueue).insert(
-        SyncQueueCompanion.insert(
-          id: const Uuid().v4(),
-          entityType: 'inbox_entries',
-          entityId: resolvedEntryId,
-          operation: isUpdate ? 'UPDATE' : 'INSERT',
-          payload: jsonEncode(payload),
-          createdAt: now,
-        ),
-      );
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: const Uuid().v4(),
+              entityType: 'inbox_entries',
+              entityId: resolvedEntryId,
+              operation: isUpdate ? 'UPDATE' : 'INSERT',
+              payload: jsonEncode(payload),
+              createdAt: now,
+            ),
+          );
     });
     return sentMsg;
   }
@@ -1552,7 +1815,8 @@ class JwEmailService {
         .replaceAll(RegExp(r'[^\w\s\-]'), '')
         .trim()
         .replaceAll(RegExp(r'\s+'), '_');
-    final filename = '${sanitizedSubject.isEmpty ? "email_retido" : sanitizedSubject}.$extension';
+    final filename =
+        '${sanitizedSubject.isEmpty ? "email_retido" : sanitizedSubject}.$extension';
     FileDownloader.download(filename, content);
 
     return content;
@@ -1593,7 +1857,8 @@ class JwEmailService {
     final content = buffer.toString();
     await Clipboard.setData(ClipboardData(text: content));
 
-    final filename = 'inbox_nota_${entry.id.substring(0, 8)}.${format == "text" ? "txt" : "md"}';
+    final filename =
+        'inbox_nota_${entry.id.substring(0, 8)}.${format == "text" ? "txt" : "md"}';
     FileDownloader.download(filename, content);
 
     return content;

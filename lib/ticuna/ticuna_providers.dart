@@ -51,13 +51,15 @@ class ActiveLanguageNotifier extends Notifier<AppLanguageEntry?> {
   Future<void> _loadPersisted() async {
     try {
       final db = ref.read(databaseProvider);
-      final row = await (db.select(db.appKvStore)
-            ..where((t) => t.key.equals('active_language_code')))
-          .getSingleOrNull();
+      final row = await (db.select(
+        db.appKvStore,
+      )..where((t) => t.key.equals('active_language_code'))).getSingleOrNull();
       if (row != null && row.value.isNotEmpty) {
-        final lang = await (db.select(db.appLanguages)
-              ..where((t) => t.id.equals(row.value) | t.code.equals(row.value)))
-            .getSingleOrNull();
+        final lang =
+            await (db.select(db.appLanguages)..where(
+                  (t) => t.id.equals(row.value) | t.code.equals(row.value),
+                ))
+                .getSingleOrNull();
         if (lang != null) {
           state = lang;
         }
@@ -71,7 +73,9 @@ class ActiveLanguageNotifier extends Notifier<AppLanguageEntry?> {
     state = lang;
     try {
       final db = ref.read(databaseProvider);
-      await db.into(db.appKvStore).insertOnConflictUpdate(
+      await db
+          .into(db.appKvStore)
+          .insertOnConflictUpdate(
             AppKvStoreCompanion.insert(
               key: 'active_language_code',
               value: lang.id,
@@ -91,8 +95,8 @@ class ActiveLanguageNotifier extends Notifier<AppLanguageEntry?> {
 
 final activeLanguageProvider =
     NotifierProvider<ActiveLanguageNotifier, AppLanguageEntry?>(
-  ActiveLanguageNotifier.new,
-);
+      ActiveLanguageNotifier.new,
+    );
 
 final currentActiveLanguageProvider = Provider<AppLanguageEntry>((ref) {
   final explicit = ref.watch(activeLanguageProvider);
@@ -102,7 +106,10 @@ final currentActiveLanguageProvider = Provider<AppLanguageEntry>((ref) {
     try {
       return languages.firstWhere((l) => l.isDefault);
     } catch (e, st) {
-      AppLogger.debug('Idioma padrão não marcado na lista; usando o primeiro: $e', st);
+      AppLogger.debug(
+        'Idioma padrão não marcado na lista; usando o primeiro: $e',
+        st,
+      );
       return languages.first;
     }
   }
@@ -135,4 +142,3 @@ List<String> parseLanguageDiacritics(String? raw) {
       .where((s) => s.isNotEmpty)
       .toList();
 }
-

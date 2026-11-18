@@ -7,17 +7,33 @@ import 'package:sqlite3/sqlite3.dart' as sql;
 
 import '../../core/app_logger.dart';
 import '../../core/ios_storage_security.dart';
+import 'local_db_encryption_state.dart';
+
+/// Exceção lançada quando ocorre violação de integridade ou indisponibilidade da criptografia local.
+class SecurityException implements Exception {
+  final String message;
+  final Object? cause;
+
+  const SecurityException(this.message, [this.cause]);
+
+  @override
+  String toString() => cause == null
+      ? 'SecurityException: $message'
+      : 'SecurityException: $message (Caused by: $cause)';
+}
 
 /// Resultado da preparação/migração criptográfica do banco SQLite local (FA-SEC-06).
 class LocalDatabaseEncryptionResult {
   final bool encryptionActive;
   final bool migratedFromPlaintext;
   final String? cipherName;
+  final LocalDatabaseEncryptionState state;
 
   const LocalDatabaseEncryptionResult({
     required this.encryptionActive,
     required this.migratedFromPlaintext,
     this.cipherName,
+    this.state = LocalDatabaseEncryptionState.encrypted,
   });
 }
 
@@ -49,6 +65,32 @@ class LocalDatabaseEncryption {
 
   static final RegExp _hex64Pattern = RegExp(r'^[0-9a-fA-F]{64}$');
 
+  static const IOSOptions _defaultIosOptions = IOSOptions(
+    accessibility: KeychainAccessibility.first_unlock_this_device,
+    synchronizable: false,
+  );
+
+  static const AndroidOptions _defaultAndroidOptions = AndroidOptions(
+    resetOnError: false,
+  );
+
+  @visibleForTesting
+  static bool simulateMissingCipherForTest = false;
+
+  @visibleForTesting
+  static bool simulateKeyStorageFailureForTest = false;
+
+  @visibleForTesting
+  static bool simulateMigrationFailureForTest = false;
+
+  /// Reseta todas as flags de simulação de falha para testes.
+  @visibleForTesting
+  static void resetSimulationFlags() {
+    simulateMissingCipherForTest = false;
+    simulateKeyStorageFailureForTest = false;
+    simulateMigrationFailureForTest = false;
+  }
+
   /// Gera uma chave aleatória de 256 bits (64 caracteres hexadecimais).
   static String generateHexKey() {
     final rnd = Random.secure();
@@ -79,6 +121,9 @@ class LocalDatabaseEncryption {
 
   /// Verifica em runtime se a biblioteca nativa carregada suporta SQLite3MultipleCiphers.
   static bool isSqlite3McAvailable() {
+    if (simulateMissingCipherForTest) {
+      return false;
+    }
     final probe = sql.sqlite3.openInMemory();
     try {
       final rows = probe.select('PRAGMA cipher;');
@@ -91,17 +136,47 @@ class LocalDatabaseEncryption {
     }
   }
 
+  /// Verifica se existe um arquivo de backup de migração pendente (.pre_enc.bak).
+  static bool hasPendingRecovery(File dbFile) {
+    return File('${dbFile.path}.pre_enc.bak').existsSync();
+  }
+
   /// Obtém ou cria a chave de 256 bits no `FlutterSecureStorage` (Keychain/Keystore).
   static Future<String> getOrCreateHexKey({
     FlutterSecureStorage? storage,
   }) async {
-    final secure = storage ?? const FlutterSecureStorage();
-    final existing = (await secure.read(key: secureKeyName))?.trim();
+    if (simulateKeyStorageFailureForTest) {
+      LocalDbEncryptionStatus.set(
+        LocalDatabaseEncryptionState.encryptionUnavailable,
+      );
+      throw const SecurityException(
+        'Falha simulada de acesso ao armazenamento seguro da chave SQLite.',
+      );
+    }
+
+    final secure =
+        storage ??
+        const FlutterSecureStorage(
+          iOptions: _defaultIosOptions,
+          aOptions: _defaultAndroidOptions,
+        );
+
+    final existing = (await secure.read(
+      key: secureKeyName,
+      iOptions: _defaultIosOptions,
+      aOptions: _defaultAndroidOptions,
+    ))?.trim();
+
     if (existing != null && _hex64Pattern.hasMatch(existing)) {
       return existing.toLowerCase();
     }
     final fresh = generateHexKey();
-    await secure.write(key: secureKeyName, value: fresh);
+    await secure.write(
+      key: secureKeyName,
+      value: fresh,
+      iOptions: _defaultIosOptions,
+      aOptions: _defaultAndroidOptions,
+    );
     return fresh;
   }
 
@@ -162,15 +237,22 @@ class LocalDatabaseEncryption {
       );
     }
 
+    if (hasPendingRecovery(dbFile)) {
+      LocalDbEncryptionStatus.set(
+        LocalDatabaseEncryptionState.recoveryRequired,
+      );
+    }
     recoverInterruptedMigration(dbFile);
 
     if (!isSqlite3McAvailable()) {
-      AppLogger.warning(
-        'SQLite3MultipleCiphers indisponível no binário SQLite atual; mantendo abertura padrão.',
+      LocalDbEncryptionStatus.set(
+        LocalDatabaseEncryptionState.encryptionUnavailable,
       );
-      return const LocalDatabaseEncryptionResult(
-        encryptionActive: false,
-        migratedFromPlaintext: false,
+      AppLogger.error(
+        'SQLite3MultipleCiphers indisponível no binário SQLite atual; operação fail-closed ativada.',
+      );
+      throw const SecurityException(
+        'SQLite3MultipleCiphers is not available on this platform binary. Plaintext fallback is prohibited.',
       );
     }
 
@@ -187,10 +269,12 @@ class LocalDatabaseEncryption {
 
     // Banco novo ou vazio: será criado já cifrado pelo setup do Drift.
     if (!dbFile.existsSync() || dbFile.lengthSync() == 0) {
+      LocalDbEncryptionStatus.set(LocalDatabaseEncryptionState.encrypted);
       return LocalDatabaseEncryptionResult(
         encryptionActive: true,
         migratedFromPlaintext: false,
         cipherName: cipherName,
+        state: LocalDatabaseEncryptionState.encrypted,
       );
     }
 
@@ -203,14 +287,18 @@ class LocalDatabaseEncryption {
       } finally {
         verify.close();
       }
+      LocalDbEncryptionStatus.set(LocalDatabaseEncryptionState.encrypted);
       return LocalDatabaseEncryptionResult(
         encryptionActive: true,
         migratedFromPlaintext: false,
         cipherName: cipherName,
+        state: LocalDatabaseEncryptionState.encrypted,
       );
     }
 
     // Migração não-destrutiva de banco plaintext existente (preservando WAL/SHM e rollback).
+    LocalDbEncryptionStatus.set(LocalDatabaseEncryptionState.migrationRequired);
+
     final backupFile = File('${dbFile.path}.pre_enc.bak');
     final tmpEncFile = File('${dbFile.path}.enc.tmp');
     final walFile = File('${dbFile.path}-wal');
@@ -277,7 +365,8 @@ class LocalDatabaseEncryption {
       }
       dbFile.renameSync(backupFile.path);
       try {
-        if (simulateFailureAfterBackupForTest) {
+        if (simulateFailureAfterBackupForTest ||
+            simulateMigrationFailureForTest) {
           throw const FileSystemException(
             'Falha simulada após mover banco para backup.',
           );
@@ -309,6 +398,9 @@ class LocalDatabaseEncryption {
         if (backupFile.existsSync() && !dbFile.existsSync()) {
           backupFile.renameSync(dbFile.path);
         }
+        LocalDbEncryptionStatus.set(
+          LocalDatabaseEncryptionState.migrationFailed,
+        );
         rethrow;
       }
 
@@ -325,8 +417,10 @@ class LocalDatabaseEncryption {
         }
       }
 
-      // 7. Reaplica NSFileProtectionComplete + isExcludedFromBackup no iOS.
+      // 7. Reaplica NSFileProtectionCompleteUntilFirstUserAuthentication + isExcludedFromBackup no iOS.
       await IosStorageSecurity.protectSensitiveStorage();
+
+      LocalDbEncryptionStatus.set(LocalDatabaseEncryptionState.encrypted);
 
       AppLogger.info(
         'Banco SQLite local migrado com sucesso para SQLite3MultipleCiphers ($cipherName).',
@@ -335,6 +429,7 @@ class LocalDatabaseEncryption {
         encryptionActive: true,
         migratedFromPlaintext: true,
         cipherName: cipherName,
+        state: LocalDatabaseEncryptionState.encrypted,
       );
     } finally {
       for (final residual in [

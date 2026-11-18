@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -35,8 +36,13 @@ class QuickCaptureSheet extends ConsumerStatefulWidget {
     return showAdaptiveMinistrySheet(
       context: context,
       title: 'Captura Rápida • Inbox',
-      titleLeading: const Icon(Icons.all_inbox_rounded, color: AppTheme.primaryBlue, size: 22),
-      subtitle: 'Guarde ideias, tarefas, áudios ou documentos para organizar depois.',
+      titleLeading: const Icon(
+        Icons.all_inbox_rounded,
+        color: AppTheme.primaryBlue,
+        size: 22,
+      ),
+      subtitle:
+          'Guarde ideias, tarefas, áudios ou documentos para organizar depois.',
       builder: (ctx, scrollCtrl) => QuickCaptureSheet(
         recordingService: recordingService,
         playerService: playerService,
@@ -48,7 +54,8 @@ class QuickCaptureSheet extends ConsumerStatefulWidget {
   ConsumerState<QuickCaptureSheet> createState() => _QuickCaptureSheetState();
 }
 
-class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> with SingleTickerProviderStateMixin {
+class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet>
+    with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   final TextEditingController _textController = TextEditingController();
   final TextEditingController _noteController = TextEditingController();
@@ -76,7 +83,8 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> with Sing
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    _recordingService = widget.recordingService ?? AudioRecordingService.platform();
+    _recordingService =
+        widget.recordingService ?? AudioRecordingService.platform();
     _playerService = widget.playerService ?? AudioPlayerService.platform();
 
     _durationSub = _recordingService.recordingDurationStream.listen((sec) {
@@ -122,7 +130,9 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> with Sing
             _recordDurationSeconds = 0;
             if (res != null && !res.fileIntegrityValid) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Gravação não capturou áudio válido.')),
+                const SnackBar(
+                  content: Text('Gravação não capturou áudio válido.'),
+                ),
               );
             }
           }
@@ -135,7 +145,11 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> with Sing
         if (!granted) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Permissão de microfone necessária para gravar áudio.')),
+              const SnackBar(
+                content: Text(
+                  'Permissão de microfone necessária para gravar áudio.',
+                ),
+              ),
             );
           }
           return;
@@ -197,15 +211,23 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> with Sing
             try {
               bytes = await f.readAsBytes();
             } catch (e, st) {
-              AppLogger.debug('Falha ao ler bytes diretos em quick capture (${f.name}): $e', st);
+              AppLogger.debug(
+                'Falha ao ler bytes diretos em quick capture (${f.name}): $e',
+                st,
+              );
             }
-            if ((bytes == null || bytes.isEmpty) && f.path != null && f.path!.isNotEmpty) {
+            if ((bytes == null || bytes.isEmpty) &&
+                f.path != null &&
+                f.path!.isNotEmpty) {
               final sf = File(f.path!);
               if (await sf.exists()) {
                 try {
                   bytes = await sf.readAsBytes();
                 } catch (e, st) {
-                  AppLogger.debug('Falha ao ler arquivo local em quick capture (${f.path}): $e', st);
+                  AppLogger.debug(
+                    'Falha ao ler arquivo local em quick capture (${f.path}): $e',
+                    st,
+                  );
                 }
               }
             }
@@ -266,7 +288,11 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> with Sing
             await targetFile.writeAsBytes(bytes, flush: true);
             finalPath = targetFile.path;
           } catch (e, st) {
-            AppLogger.warning('Falha ao persistir imagem em quick capture', e, st);
+            AppLogger.warning(
+              'Falha ao persistir imagem em quick capture',
+              e,
+              st,
+            );
           }
         }
 
@@ -331,7 +357,9 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> with Sing
         // Anexo
         if (_attachedFilePath == null) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Selecione um arquivo ou imagem antes de salvar.')),
+            const SnackBar(
+              content: Text('Selecione um arquivo ou imagem antes de salvar.'),
+            ),
           );
           setState(() => _isSaving = false);
           return;
@@ -364,9 +392,9 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> with Sing
     } catch (e) {
       if (mounted) {
         setState(() => _isSaving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao salvar na Inbox: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Erro ao salvar na Inbox: $e')));
       }
     }
   }
@@ -396,12 +424,23 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> with Sing
                 borderRadius: BorderRadius.circular(10),
               ),
               labelColor: Colors.white,
-              unselectedLabelColor: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-              labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              unselectedLabelColor: isDark
+                  ? const Color(0xFF94A3B8)
+                  : const Color(0xFF64748B),
+              labelStyle: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+              ),
               tabs: const [
-                Tab(icon: Icon(Icons.edit_note, size: 18), text: 'Ideia / Texto'),
+                Tab(
+                  icon: Icon(Icons.edit_note, size: 18),
+                  text: 'Ideia / Texto',
+                ),
                 Tab(icon: Icon(Icons.mic, size: 18), text: 'Voz / Ditado'),
-                Tab(icon: Icon(Icons.attach_file, size: 18), text: 'Anexo / Foto'),
+                Tab(
+                  icon: Icon(Icons.attach_file, size: 18),
+                  text: 'Anexo / Foto',
+                ),
               ],
             ),
           ),
@@ -447,14 +486,19 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> with Sing
               backgroundColor: AppTheme.primaryBlue,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
               elevation: 2,
             ),
             icon: _isSaving
                 ? const SizedBox(
                     width: 18,
                     height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
                   )
                 : const Icon(Icons.save_alt_rounded, size: 20),
             label: Text(
@@ -471,7 +515,11 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> with Sing
   Widget _buildCategoryChip(String key, String label, IconData icon) {
     final isSelected = _selectedCategory == key;
     return ChoiceChip(
-      avatar: Icon(icon, size: 14, color: isSelected ? Colors.white : AppTheme.primaryBlue),
+      avatar: Icon(
+        icon,
+        size: 14,
+        color: isSelected ? Colors.white : AppTheme.primaryBlue,
+      ),
       label: Text(label),
       selected: isSelected,
       onSelected: (val) {
@@ -499,10 +547,19 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> with Sing
             expands: true,
             decoration: InputDecoration(
               hintText: 'O que você está pensando ou precisa registrar sem perder o foco?...',
-              hintStyle: TextStyle(color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8), fontSize: 14),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              hintStyle: TextStyle(
+                color: isDark
+                    ? const Color(0xFF64748B)
+                    : const Color(0xFF94A3B8),
+                fontSize: 14,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               filled: true,
-              fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+              fillColor: isDark
+                  ? const Color(0xFF0F172A)
+                  : const Color(0xFFF8FAFC),
               contentPadding: const EdgeInsets.all(14),
             ),
           ),
@@ -521,10 +578,16 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> with Sing
         if (_recordedAudioPath == null) ...[
           // Gravando ou pronto para gravar
           Text(
-            _isRecording ? 'Gravando: $mins:$secs (máx: 05:00)' : 'Toque no microfone para gravar uma nota rápida',
+            _isRecording
+                ? 'Gravando: $mins:$secs (máx: 05:00)'
+                : 'Toque no microfone para gravar uma nota rápida',
             style: TextStyle(
               fontSize: 13,
-              color: _isRecording ? Colors.redAccent : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+              color: _isRecording
+                  ? Colors.redAccent
+                  : (isDark
+                        ? const Color(0xFF94A3B8)
+                        : const Color(0xFF64748B)),
               fontWeight: _isRecording ? FontWeight.bold : FontWeight.normal,
             ),
           ),
@@ -540,7 +603,9 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> with Sing
                 color: _isRecording ? Colors.redAccent : AppTheme.primaryBlue,
                 boxShadow: [
                   BoxShadow(
-                    color: (_isRecording ? Colors.redAccent : AppTheme.primaryBlue).withValues(alpha: 0.35),
+                    color:
+                        (_isRecording ? Colors.redAccent : AppTheme.primaryBlue)
+                            .withValues(alpha: 0.35),
                     blurRadius: 16,
                     spreadRadius: _isRecording ? 4 : 2,
                   ),
@@ -560,14 +625,18 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> with Sing
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.greenAccent.withValues(alpha: 0.5)),
+              border: Border.all(
+                color: Colors.greenAccent.withValues(alpha: 0.5),
+              ),
             ),
             child: Row(
               children: [
                 IconButton(
                   onPressed: _toggleAudioPlayback,
                   icon: Icon(
-                    _isPlayingAudio ? Icons.pause_circle_filled : Icons.play_circle_fill,
+                    _isPlayingAudio
+                        ? Icons.pause_circle_filled
+                        : Icons.play_circle_fill,
                     color: AppTheme.primaryBlue,
                     size: 36,
                   ),
@@ -577,8 +646,20 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> with Sing
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Áudio Gravado', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                      Text('Duração: $mins:$secs', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                      const Text(
+                        'Áudio Gravado',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                      Text(
+                        'Duração: $mins:$secs',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -590,7 +671,11 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> with Sing
                     });
                   },
                   tooltip: 'Regravar',
-                  icon: const Icon(Icons.refresh_rounded, color: Colors.redAccent, size: 22),
+                  icon: const Icon(
+                    Icons.refresh_rounded,
+                    color: Colors.redAccent,
+                    size: 22,
+                  ),
                 ),
               ],
             ),
@@ -600,9 +685,14 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> with Sing
             controller: _noteController,
             decoration: InputDecoration(
               hintText: 'Título ou anotação complementar do áudio...',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
               isDense: true,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 10,
+              ),
             ),
           ),
         ],
@@ -621,12 +711,16 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> with Sing
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppTheme.primaryBlue.withValues(alpha: 0.5)),
+              border: Border.all(
+                color: AppTheme.primaryBlue.withValues(alpha: 0.5),
+              ),
             ),
             child: Row(
               children: [
                 Icon(
-                  _attachedFileType == 'image' ? Icons.image_rounded : Icons.description_rounded,
+                  _attachedFileType == 'image'
+                      ? Icons.image_rounded
+                      : Icons.description_rounded,
                   color: AppTheme.primaryBlue,
                   size: 32,
                 ),
@@ -637,10 +731,19 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> with Sing
                     children: [
                       Text(
                         _attachedFileName ?? 'Arquivo',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
-                      Text('$sizeKb KB', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                      Text(
+                        '$sizeKb KB',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -653,7 +756,11 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> with Sing
                     });
                   },
                   tooltip: 'Remover',
-                  icon: const Icon(Icons.close_rounded, color: Colors.redAccent, size: 20),
+                  icon: const Icon(
+                    Icons.close_rounded,
+                    color: Colors.redAccent,
+                    size: 20,
+                  ),
                 ),
               ],
             ),
@@ -663,9 +770,14 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> with Sing
             controller: _noteController,
             decoration: InputDecoration(
               hintText: 'Anotação sobre este anexo...',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
               isDense: true,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 10,
+              ),
             ),
           ),
         ],
@@ -682,7 +794,9 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> with Sing
             label: const Text('Documento'),
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -692,7 +806,9 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> with Sing
             label: const Text('Galeria / Foto'),
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           ),
         ],

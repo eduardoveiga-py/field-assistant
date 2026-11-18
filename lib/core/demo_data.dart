@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+
 import '../database/app_database.dart';
 import '../database/repository.dart';
 
@@ -7,7 +8,9 @@ class DemoDataGenerator {
 
   /// Popula a base com dados 100% fictícios para teste e demonstração isolada.
   static Future<void> populateDemoData(AppRepository repository) async {
-    await repository.db.into(repository.db.appKvStore).insertOnConflictUpdate(
+    await repository.db
+        .into(repository.db.appKvStore)
+        .insertOnConflictUpdate(
           AppKvStoreCompanion.insert(
             key: demoModeKvKey,
             value: 'true',
@@ -207,9 +210,9 @@ class DemoDataGenerator {
   /// Verifica se há registros de demonstração no banco.
   static Future<bool> hasDemoData(AppRepository repository) async {
     final db = repository.db;
-    final people = await (db.select(db.people)
-          ..where((t) => t.name.like('%(Demo%')))
-        .get();
+    final people = await (db.select(
+      db.people,
+    )..where((t) => t.name.like('%(Demo%'))).get();
     return people.isNotEmpty;
   }
 
@@ -222,116 +225,116 @@ class DemoDataGenerator {
       final clearedEntityIds = <String>{};
 
       // 1. Identifica e exclui pessoas demo e registros dependentes
-      final demoPeople = await (db.select(db.people)
-            ..where((t) => t.name.like('%(Demo%')))
-          .get();
+      final demoPeople = await (db.select(
+        db.people,
+      )..where((t) => t.name.like('%(Demo%'))).get();
       final demoPersonIds = demoPeople.map((p) => p.id).toSet();
       clearedEntityIds.addAll(demoPersonIds);
 
       if (demoPersonIds.isNotEmpty) {
         removedCount += demoPeople.length;
-        final demoVisits = await (db.select(db.visits)
-              ..where((t) => t.personId.isIn(demoPersonIds)))
-            .get();
+        final demoVisits = await (db.select(
+          db.visits,
+        )..where((t) => t.personId.isIn(demoPersonIds))).get();
         clearedEntityIds.addAll(demoVisits.map((v) => v.id));
-        await (db.delete(db.visits)
-              ..where((t) => t.personId.isIn(demoPersonIds)))
-            .go();
+        await (db.delete(
+          db.visits,
+        )..where((t) => t.personId.isIn(demoPersonIds))).go();
 
-        final demoPersonAppts = await (db.select(db.appointments)
-              ..where((t) => t.personId.isIn(demoPersonIds)))
-            .get();
+        final demoPersonAppts = await (db.select(
+          db.appointments,
+        )..where((t) => t.personId.isIn(demoPersonIds))).get();
         clearedEntityIds.addAll(demoPersonAppts.map((a) => a.id));
-        await (db.delete(db.appointments)
-              ..where((t) => t.personId.isIn(demoPersonIds)))
-            .go();
+        await (db.delete(
+          db.appointments,
+        )..where((t) => t.personId.isIn(demoPersonIds))).go();
 
-        final demoPersonParts = await (db.select(db.studyParticipants)
-              ..where((t) => t.personId.isIn(demoPersonIds)))
-            .get();
+        final demoPersonParts = await (db.select(
+          db.studyParticipants,
+        )..where((t) => t.personId.isIn(demoPersonIds))).get();
         clearedEntityIds.addAll(demoPersonParts.map((sp) => sp.id));
-        await (db.delete(db.studyParticipants)
-              ..where((t) => t.personId.isIn(demoPersonIds)))
-            .go();
+        await (db.delete(
+          db.studyParticipants,
+        )..where((t) => t.personId.isIn(demoPersonIds))).go();
 
-        final demoPhotos = await (db.select(db.personPhotos)
-              ..where((t) => t.personId.isIn(demoPersonIds)))
-            .get();
+        final demoPhotos = await (db.select(
+          db.personPhotos,
+        )..where((t) => t.personId.isIn(demoPersonIds))).get();
         clearedEntityIds.addAll(demoPhotos.map((ph) => ph.id));
-        await (db.delete(db.personPhotos)
-              ..where((t) => t.personId.isIn(demoPersonIds)))
-            .go();
+        await (db.delete(
+          db.personPhotos,
+        )..where((t) => t.personId.isIn(demoPersonIds))).go();
 
-        final demoPubs = await (db.select(db.personPublications)
-              ..where((t) => t.personId.isIn(demoPersonIds)))
-            .get();
+        final demoPubs = await (db.select(
+          db.personPublications,
+        )..where((t) => t.personId.isIn(demoPersonIds))).get();
         clearedEntityIds.addAll(demoPubs.map((pb) => pb.id));
-        await (db.delete(db.personPublications)
-              ..where((t) => t.personId.isIn(demoPersonIds)))
-            .go();
+        await (db.delete(
+          db.personPublications,
+        )..where((t) => t.personId.isIn(demoPersonIds))).go();
 
-        await (db.delete(db.people)
-              ..where((t) => t.id.isIn(demoPersonIds)))
-            .go();
+        await (db.delete(
+          db.people,
+        )..where((t) => t.id.isIn(demoPersonIds))).go();
       }
 
       // 2. Identifica e exclui estudos demo
-      final demoStudies = await (db.select(db.bibleStudies)
-            ..where((t) => t.title.isIn(demoStudyTitles)))
-          .get();
+      final demoStudies = await (db.select(
+        db.bibleStudies,
+      )..where((t) => t.title.isIn(demoStudyTitles))).get();
       final demoStudyIds = demoStudies.map((s) => s.id).toSet();
       clearedEntityIds.addAll(demoStudyIds);
       if (demoStudyIds.isNotEmpty) {
-        final demoSessions = await (db.select(db.studySessions)
-              ..where((t) => t.studyId.isIn(demoStudyIds)))
-            .get();
+        final demoSessions = await (db.select(
+          db.studySessions,
+        )..where((t) => t.studyId.isIn(demoStudyIds))).get();
         clearedEntityIds.addAll(demoSessions.map((ss) => ss.id));
-        await (db.delete(db.studySessions)
-              ..where((t) => t.studyId.isIn(demoStudyIds)))
-            .go();
+        await (db.delete(
+          db.studySessions,
+        )..where((t) => t.studyId.isIn(demoStudyIds))).go();
 
-        final demoStudyParts = await (db.select(db.studyParticipants)
-              ..where((t) => t.studyId.isIn(demoStudyIds)))
-            .get();
+        final demoStudyParts = await (db.select(
+          db.studyParticipants,
+        )..where((t) => t.studyId.isIn(demoStudyIds))).get();
         clearedEntityIds.addAll(demoStudyParts.map((sp) => sp.id));
-        await (db.delete(db.studyParticipants)
-              ..where((t) => t.studyId.isIn(demoStudyIds)))
-            .go();
+        await (db.delete(
+          db.studyParticipants,
+        )..where((t) => t.studyId.isIn(demoStudyIds))).go();
 
-        await (db.delete(db.bibleStudies)
-              ..where((t) => t.id.isIn(demoStudyIds)))
-            .go();
+        await (db.delete(
+          db.bibleStudies,
+        )..where((t) => t.id.isIn(demoStudyIds))).go();
       }
 
       // 3. Exclui compromissos demo restantes
-      final demoTitleAppts = await (db.select(db.appointments)
-            ..where((t) => t.title.isIn(demoAppointmentTitles)))
-          .get();
+      final demoTitleAppts = await (db.select(
+        db.appointments,
+      )..where((t) => t.title.isIn(demoAppointmentTitles))).get();
       clearedEntityIds.addAll(demoTitleAppts.map((a) => a.id));
-      await (db.delete(db.appointments)
-            ..where((t) => t.title.isIn(demoAppointmentTitles)))
-          .go();
+      await (db.delete(
+        db.appointments,
+      )..where((t) => t.title.isIn(demoAppointmentTitles))).go();
 
       // 4. Exclui apenas relatórios de atividade exatos de demonstração
-      final demoActivities = await (db.select(db.activityRecords)
-            ..where((t) => t.notes.isIn(demoActivityNotes)))
-          .get();
+      final demoActivities = await (db.select(
+        db.activityRecords,
+      )..where((t) => t.notes.isIn(demoActivityNotes))).get();
       clearedEntityIds.addAll(demoActivities.map((a) => a.id));
-      await (db.delete(db.activityRecords)
-            ..where((t) => t.notes.isIn(demoActivityNotes)))
-          .go();
+      await (db.delete(
+        db.activityRecords,
+      )..where((t) => t.notes.isIn(demoActivityNotes))).go();
 
       // 5. Remove operações órfãs da sync_queue referentes aos dados demo
       if (clearedEntityIds.isNotEmpty) {
-        await (db.delete(db.syncQueue)
-              ..where((t) => t.entityId.isIn(clearedEntityIds)))
-            .go();
+        await (db.delete(
+          db.syncQueue,
+        )..where((t) => t.entityId.isIn(clearedEntityIds))).go();
       }
 
       // 6. Remove flag explícita demo_mode
-      await (db.delete(db.appKvStore)
-            ..where((t) => t.key.equals(demoModeKvKey)))
-          .go();
+      await (db.delete(
+        db.appKvStore,
+      )..where((t) => t.key.equals(demoModeKvKey))).go();
     });
 
     return removedCount;

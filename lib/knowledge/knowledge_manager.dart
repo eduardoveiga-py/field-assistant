@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:drift/drift.dart' as drift;
 import 'package:uuid/uuid.dart';
 
@@ -64,7 +65,9 @@ class KnowledgeManager {
       originInboxId: drift.Value(originInboxId),
       isPinned: drift.Value(isPinned),
       tags: drift.Value(jsonEncode(tags)),
-      attachments: drift.Value(attachments != null ? jsonEncode(attachments) : '[]'),
+      attachments: drift.Value(
+        attachments != null ? jsonEncode(attachments) : '[]',
+      ),
       createdAt: now,
       updatedAt: now,
     );
@@ -72,7 +75,9 @@ class KnowledgeManager {
     await db.into(db.knowledgeNotes).insert(companion);
     await _recordSyncQueue(id, 'knowledge_notes', 'INSERT');
 
-    return (await (db.select(db.knowledgeNotes)..where((t) => t.id.equals(id))).getSingle());
+    return (await (db.select(
+      db.knowledgeNotes,
+    )..where((t) => t.id.equals(id))).getSingle());
   }
 
   Future<void> updateNote(
@@ -87,26 +92,46 @@ class KnowledgeManager {
   }) async {
     final now = DateTime.now();
     final companion = KnowledgeNotesCompanion(
-      title: title != null ? drift.Value(title.trim()) : const drift.Value.absent(),
-      content: content != null ? drift.Value(content.trim()) : const drift.Value.absent(),
-      category: category != null ? drift.Value(category) : const drift.Value.absent(),
-      projectId: projectId != null ? drift.Value(projectId) : const drift.Value.absent(),
-      personId: personId != null ? drift.Value(personId) : const drift.Value.absent(),
-      studyId: studyId != null ? drift.Value(studyId) : const drift.Value.absent(),
-      tags: tags != null ? drift.Value(jsonEncode(tags)) : const drift.Value.absent(),
+      title: title != null
+          ? drift.Value(title.trim())
+          : const drift.Value.absent(),
+      content: content != null
+          ? drift.Value(content.trim())
+          : const drift.Value.absent(),
+      category: category != null
+          ? drift.Value(category)
+          : const drift.Value.absent(),
+      projectId: projectId != null
+          ? drift.Value(projectId)
+          : const drift.Value.absent(),
+      personId: personId != null
+          ? drift.Value(personId)
+          : const drift.Value.absent(),
+      studyId: studyId != null
+          ? drift.Value(studyId)
+          : const drift.Value.absent(),
+      tags: tags != null
+          ? drift.Value(jsonEncode(tags))
+          : const drift.Value.absent(),
       updatedAt: drift.Value(now),
     );
 
-    await (db.update(db.knowledgeNotes)..where((t) => t.id.equals(id))).write(companion);
+    await (db.update(
+      db.knowledgeNotes,
+    )..where((t) => t.id.equals(id))).write(companion);
     await _recordSyncQueue(id, 'knowledge_notes', 'UPDATE');
   }
 
   Future<KnowledgeNoteEntry?> getNoteById(String id) async {
-    return (db.select(db.knowledgeNotes)..where((t) => t.id.equals(id))).getSingleOrNull();
+    return (db.select(
+      db.knowledgeNotes,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
   }
 
   Future<void> togglePinNote(String id) async {
-    final current = await (db.select(db.knowledgeNotes)..where((t) => t.id.equals(id))).getSingleOrNull();
+    final current = await (db.select(
+      db.knowledgeNotes,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
     if (current == null) return;
     final now = DateTime.now();
 
@@ -138,8 +163,7 @@ class KnowledgeManager {
     String? personId,
     String? studyId,
   }) {
-    final q = db.select(db.knowledgeNotes)
-      ..where((t) => t.deletedAt.isNull());
+    final q = db.select(db.knowledgeNotes)..where((t) => t.deletedAt.isNull());
 
     if (category != null && category.isNotEmpty && category != 'all') {
       q.where((t) => t.category.equals(category));
@@ -159,8 +183,14 @@ class KnowledgeManager {
     }
 
     q.orderBy([
-      (t) => drift.OrderingTerm(expression: t.isPinned, mode: drift.OrderingMode.desc),
-      (t) => drift.OrderingTerm(expression: t.updatedAt, mode: drift.OrderingMode.desc),
+      (t) => drift.OrderingTerm(
+        expression: t.isPinned,
+        mode: drift.OrderingMode.desc,
+      ),
+      (t) => drift.OrderingTerm(
+        expression: t.updatedAt,
+        mode: drift.OrderingMode.desc,
+      ),
     ]);
 
     return q.watch();
@@ -195,7 +225,9 @@ class KnowledgeManager {
       personId: drift.Value(personId),
       studyId: drift.Value(studyId),
       originInboxId: drift.Value(originInboxId),
-      answeredAt: drift.Value(answer != null && answer.trim().isNotEmpty ? now : null),
+      answeredAt: drift.Value(
+        answer != null && answer.trim().isNotEmpty ? now : null,
+      ),
       createdAt: now,
       updatedAt: now,
     );
@@ -203,13 +235,12 @@ class KnowledgeManager {
     await db.into(db.knowledgeQuestions).insert(companion);
     await _recordSyncQueue(id, 'knowledge_questions', 'INSERT');
 
-    return (await (db.select(db.knowledgeQuestions)..where((t) => t.id.equals(id))).getSingle());
+    return (await (db.select(
+      db.knowledgeQuestions,
+    )..where((t) => t.id.equals(id))).getSingle());
   }
 
-  Future<void> answerQuestion(
-    String id, {
-    required String answer,
-  }) async {
+  Future<void> answerQuestion(String id, {required String answer}) async {
     final now = DateTime.now();
     final companion = KnowledgeQuestionsCompanion(
       answer: drift.Value(answer.trim()),
@@ -218,7 +249,9 @@ class KnowledgeManager {
       updatedAt: drift.Value(now),
     );
 
-    await (db.update(db.knowledgeQuestions)..where((t) => t.id.equals(id))).write(companion);
+    await (db.update(
+      db.knowledgeQuestions,
+    )..where((t) => t.id.equals(id))).write(companion);
     await _recordSyncQueue(id, 'knowledge_questions', 'UPDATE');
   }
 
@@ -232,22 +265,36 @@ class KnowledgeManager {
   }) async {
     final now = DateTime.now();
     final companion = KnowledgeQuestionsCompanion(
-      question: question != null ? drift.Value(question.trim()) : const drift.Value.absent(),
-      context: context != null ? drift.Value(context.trim()) : const drift.Value.absent(),
-      answer: answer != null ? drift.Value(answer.trim()) : const drift.Value.absent(),
+      question: question != null
+          ? drift.Value(question.trim())
+          : const drift.Value.absent(),
+      context: context != null
+          ? drift.Value(context.trim())
+          : const drift.Value.absent(),
+      answer: answer != null
+          ? drift.Value(answer.trim())
+          : const drift.Value.absent(),
       status: status != null ? drift.Value(status) : const drift.Value.absent(),
-      category: category != null ? drift.Value(category) : const drift.Value.absent(),
-      answeredAt: answer != null && answer.trim().isNotEmpty ? drift.Value(now) : const drift.Value.absent(),
+      category: category != null
+          ? drift.Value(category)
+          : const drift.Value.absent(),
+      answeredAt: answer != null && answer.trim().isNotEmpty
+          ? drift.Value(now)
+          : const drift.Value.absent(),
       updatedAt: drift.Value(now),
     );
 
-    await (db.update(db.knowledgeQuestions)..where((t) => t.id.equals(id))).write(companion);
+    await (db.update(
+      db.knowledgeQuestions,
+    )..where((t) => t.id.equals(id))).write(companion);
     await _recordSyncQueue(id, 'knowledge_questions', 'UPDATE');
   }
 
   Future<void> softDeleteQuestion(String id) async {
     final now = DateTime.now();
-    await (db.update(db.knowledgeQuestions)..where((t) => t.id.equals(id))).write(
+    await (db.update(
+      db.knowledgeQuestions,
+    )..where((t) => t.id.equals(id))).write(
       KnowledgeQuestionsCompanion(
         deletedAt: drift.Value(now),
         updatedAt: drift.Value(now),
@@ -280,13 +327,20 @@ class KnowledgeManager {
     }
     if (query != null && query.trim().isNotEmpty) {
       final pattern = '%${query.trim()}%';
-      q.where((t) =>
-          t.question.like(pattern) |
-          t.context.like(pattern) |
-          t.answer.like(pattern));
+      q.where(
+        (t) =>
+            t.question.like(pattern) |
+            t.context.like(pattern) |
+            t.answer.like(pattern),
+      );
     }
 
-    q.orderBy([(t) => drift.OrderingTerm(expression: t.updatedAt, mode: drift.OrderingMode.desc)]);
+    q.orderBy([
+      (t) => drift.OrderingTerm(
+        expression: t.updatedAt,
+        mode: drift.OrderingMode.desc,
+      ),
+    ]);
     return q.watch();
   }
 
@@ -334,12 +388,16 @@ class KnowledgeManager {
     await db.into(db.knowledgeDocuments).insert(companion);
     await _recordSyncQueue(id, 'knowledge_documents', 'INSERT');
 
-    return (await (db.select(db.knowledgeDocuments)..where((t) => t.id.equals(id))).getSingle());
+    return (await (db.select(
+      db.knowledgeDocuments,
+    )..where((t) => t.id.equals(id))).getSingle());
   }
 
   Future<void> softDeleteDocument(String id) async {
     final now = DateTime.now();
-    await (db.update(db.knowledgeDocuments)..where((t) => t.id.equals(id))).write(
+    await (db.update(
+      db.knowledgeDocuments,
+    )..where((t) => t.id.equals(id))).write(
       KnowledgeDocumentsCompanion(
         deletedAt: drift.Value(now),
         updatedAt: drift.Value(now),
@@ -357,14 +415,24 @@ class KnowledgeManager {
   }) async {
     final now = DateTime.now();
     final companion = KnowledgeDocumentsCompanion(
-      title: title != null ? drift.Value(title.trim()) : const drift.Value.absent(),
-      description: description != null ? drift.Value(description.trim()) : const drift.Value.absent(),
-      category: category != null ? drift.Value(category) : const drift.Value.absent(),
-      tags: tags != null ? drift.Value(jsonEncode(tags)) : const drift.Value.absent(),
+      title: title != null
+          ? drift.Value(title.trim())
+          : const drift.Value.absent(),
+      description: description != null
+          ? drift.Value(description.trim())
+          : const drift.Value.absent(),
+      category: category != null
+          ? drift.Value(category)
+          : const drift.Value.absent(),
+      tags: tags != null
+          ? drift.Value(jsonEncode(tags))
+          : const drift.Value.absent(),
       updatedAt: drift.Value(now),
     );
 
-    await (db.update(db.knowledgeDocuments)..where((t) => t.id.equals(id))).write(companion);
+    await (db.update(
+      db.knowledgeDocuments,
+    )..where((t) => t.id.equals(id))).write(companion);
     await _recordSyncQueue(id, 'knowledge_documents', 'UPDATE');
   }
 
@@ -387,7 +455,12 @@ class KnowledgeManager {
       q.where((t) => t.title.like(pattern) | t.fileName.like(pattern));
     }
 
-    q.orderBy([(t) => drift.OrderingTerm(expression: t.createdAt, mode: drift.OrderingMode.desc)]);
+    q.orderBy([
+      (t) => drift.OrderingTerm(
+        expression: t.createdAt,
+        mode: drift.OrderingMode.desc,
+      ),
+    ]);
     return q.watch();
   }
 
@@ -425,12 +498,16 @@ class KnowledgeManager {
     await db.into(db.knowledgeResources).insert(companion);
     await _recordSyncQueue(id, 'knowledge_resources', 'INSERT');
 
-    return (await (db.select(db.knowledgeResources)..where((t) => t.id.equals(id))).getSingle());
+    return (await (db.select(
+      db.knowledgeResources,
+    )..where((t) => t.id.equals(id))).getSingle());
   }
 
   Future<void> softDeleteResource(String id) async {
     final now = DateTime.now();
-    await (db.update(db.knowledgeResources)..where((t) => t.id.equals(id))).write(
+    await (db.update(
+      db.knowledgeResources,
+    )..where((t) => t.id.equals(id))).write(
       KnowledgeResourcesCompanion(
         deletedAt: drift.Value(now),
         updatedAt: drift.Value(now),
@@ -450,16 +527,28 @@ class KnowledgeManager {
   }) async {
     final now = DateTime.now();
     final companion = KnowledgeResourcesCompanion(
-      title: title != null ? drift.Value(title.trim()) : const drift.Value.absent(),
-      resourceType: resourceType != null ? drift.Value(resourceType) : const drift.Value.absent(),
+      title: title != null
+          ? drift.Value(title.trim())
+          : const drift.Value.absent(),
+      resourceType: resourceType != null
+          ? drift.Value(resourceType)
+          : const drift.Value.absent(),
       url: url != null ? drift.Value(url.trim()) : const drift.Value.absent(),
-      description: description != null ? drift.Value(description.trim()) : const drift.Value.absent(),
-      category: category != null ? drift.Value(category) : const drift.Value.absent(),
-      tags: tags != null ? drift.Value(jsonEncode(tags)) : const drift.Value.absent(),
+      description: description != null
+          ? drift.Value(description.trim())
+          : const drift.Value.absent(),
+      category: category != null
+          ? drift.Value(category)
+          : const drift.Value.absent(),
+      tags: tags != null
+          ? drift.Value(jsonEncode(tags))
+          : const drift.Value.absent(),
       updatedAt: drift.Value(now),
     );
 
-    await (db.update(db.knowledgeResources)..where((t) => t.id.equals(id))).write(companion);
+    await (db.update(
+      db.knowledgeResources,
+    )..where((t) => t.id.equals(id))).write(companion);
     await _recordSyncQueue(id, 'knowledge_resources', 'UPDATE');
   }
 
@@ -471,7 +560,9 @@ class KnowledgeManager {
     final q = db.select(db.knowledgeResources)
       ..where((t) => t.deletedAt.isNull());
 
-    if (resourceType != null && resourceType.isNotEmpty && resourceType != 'all') {
+    if (resourceType != null &&
+        resourceType.isNotEmpty &&
+        resourceType != 'all') {
       q.where((t) => t.resourceType.equals(resourceType));
     }
     if (category != null && category.isNotEmpty && category != 'all') {
@@ -482,7 +573,12 @@ class KnowledgeManager {
       q.where((t) => t.title.like(pattern) | t.description.like(pattern));
     }
 
-    q.orderBy([(t) => drift.OrderingTerm(expression: t.createdAt, mode: drift.OrderingMode.desc)]);
+    q.orderBy([
+      (t) => drift.OrderingTerm(
+        expression: t.createdAt,
+        mode: drift.OrderingMode.desc,
+      ),
+    ]);
     return q.watch();
   }
 
@@ -497,73 +593,104 @@ class KnowledgeManager {
     final results = <KnowledgeSearchResult>[];
 
     // Notas
-    final notes = await (db.select(db.knowledgeNotes)
-          ..where((t) => (t.title.like(pattern) | t.content.like(pattern)) & t.deletedAt.isNull())
-          ..limit(15))
-        .get();
+    final notes =
+        await (db.select(db.knowledgeNotes)
+              ..where(
+                (t) =>
+                    (t.title.like(pattern) | t.content.like(pattern)) &
+                    t.deletedAt.isNull(),
+              )
+              ..limit(15))
+            .get();
     for (final n in notes) {
-      results.add(KnowledgeSearchResult(
-        id: n.id,
-        title: n.title,
-        snippet: n.content.length > 120 ? '${n.content.substring(0, 120)}...' : n.content,
-        entityType: 'note',
-        category: n.category,
-        updatedAt: n.updatedAt,
-      ));
+      results.add(
+        KnowledgeSearchResult(
+          id: n.id,
+          title: n.title,
+          snippet: n.content.length > 120
+              ? '${n.content.substring(0, 120)}...'
+              : n.content,
+          entityType: 'note',
+          category: n.category,
+          updatedAt: n.updatedAt,
+        ),
+      );
     }
 
     // Perguntas / Dúvidas
-    final questions = await (db.select(db.knowledgeQuestions)
-          ..where((t) =>
-              (t.question.like(pattern) |
-                  t.context.like(pattern) |
-                  t.answer.like(pattern)) &
-              t.deletedAt.isNull())
-          ..limit(15))
-        .get();
+    final questions =
+        await (db.select(db.knowledgeQuestions)
+              ..where(
+                (t) =>
+                    (t.question.like(pattern) |
+                        t.context.like(pattern) |
+                        t.answer.like(pattern)) &
+                    t.deletedAt.isNull(),
+              )
+              ..limit(15))
+            .get();
     for (final q in questions) {
-      results.add(KnowledgeSearchResult(
-        id: q.id,
-        title: q.question,
-        snippet: q.answer != null && q.answer!.isNotEmpty
-            ? (q.answer!.length > 120 ? '${q.answer!.substring(0, 120)}...' : q.answer!)
-            : (q.context ?? 'Dúvida em aberto'),
-        entityType: 'question',
-        category: q.category,
-        updatedAt: q.updatedAt,
-      ));
+      results.add(
+        KnowledgeSearchResult(
+          id: q.id,
+          title: q.question,
+          snippet: q.answer != null && q.answer!.isNotEmpty
+              ? (q.answer!.length > 120
+                    ? '${q.answer!.substring(0, 120)}...'
+                    : q.answer!)
+              : (q.context ?? 'Dúvida em aberto'),
+          entityType: 'question',
+          category: q.category,
+          updatedAt: q.updatedAt,
+        ),
+      );
     }
 
     // Documentos
-    final docs = await (db.select(db.knowledgeDocuments)
-          ..where((t) => (t.title.like(pattern) | t.fileName.like(pattern)) & t.deletedAt.isNull())
-          ..limit(10))
-        .get();
+    final docs =
+        await (db.select(db.knowledgeDocuments)
+              ..where(
+                (t) =>
+                    (t.title.like(pattern) | t.fileName.like(pattern)) &
+                    t.deletedAt.isNull(),
+              )
+              ..limit(10))
+            .get();
     for (final d in docs) {
-      results.add(KnowledgeSearchResult(
-        id: d.id,
-        title: d.title,
-        snippet: 'Arquivo: ${d.fileName} (${(d.fileSize / 1024).toStringAsFixed(1)} KB)',
-        entityType: 'document',
-        category: d.category,
-        updatedAt: d.updatedAt,
-      ));
+      results.add(
+        KnowledgeSearchResult(
+          id: d.id,
+          title: d.title,
+          snippet:
+              'Arquivo: ${d.fileName} (${(d.fileSize / 1024).toStringAsFixed(1)} KB)',
+          entityType: 'document',
+          category: d.category,
+          updatedAt: d.updatedAt,
+        ),
+      );
     }
 
     // Recursos
-    final res = await (db.select(db.knowledgeResources)
-          ..where((t) => (t.title.like(pattern) | t.description.like(pattern)) & t.deletedAt.isNull())
-          ..limit(10))
-        .get();
+    final res =
+        await (db.select(db.knowledgeResources)
+              ..where(
+                (t) =>
+                    (t.title.like(pattern) | t.description.like(pattern)) &
+                    t.deletedAt.isNull(),
+              )
+              ..limit(10))
+            .get();
     for (final r in res) {
-      results.add(KnowledgeSearchResult(
-        id: r.id,
-        title: r.title,
-        snippet: r.url ?? r.description ?? r.resourceType,
-        entityType: 'resource',
-        category: r.category,
-        updatedAt: r.updatedAt,
-      ));
+      results.add(
+        KnowledgeSearchResult(
+          id: r.id,
+          title: r.title,
+          snippet: r.url ?? r.description ?? r.resourceType,
+          entityType: 'resource',
+          category: r.category,
+          updatedAt: r.updatedAt,
+        ),
+      );
     }
 
     results.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
@@ -581,19 +708,27 @@ class KnowledgeManager {
       Map<String, dynamic>? rowJson;
       switch (entityType) {
         case 'knowledge_notes':
-          final row = await (db.select(db.knowledgeNotes)..where((t) => t.id.equals(entityId))).getSingleOrNull();
+          final row = await (db.select(
+            db.knowledgeNotes,
+          )..where((t) => t.id.equals(entityId))).getSingleOrNull();
           rowJson = row?.toJson();
           break;
         case 'knowledge_questions':
-          final row = await (db.select(db.knowledgeQuestions)..where((t) => t.id.equals(entityId))).getSingleOrNull();
+          final row = await (db.select(
+            db.knowledgeQuestions,
+          )..where((t) => t.id.equals(entityId))).getSingleOrNull();
           rowJson = row?.toJson();
           break;
         case 'knowledge_documents':
-          final row = await (db.select(db.knowledgeDocuments)..where((t) => t.id.equals(entityId))).getSingleOrNull();
+          final row = await (db.select(
+            db.knowledgeDocuments,
+          )..where((t) => t.id.equals(entityId))).getSingleOrNull();
           rowJson = row?.toJson();
           break;
         case 'knowledge_resources':
-          final row = await (db.select(db.knowledgeResources)..where((t) => t.id.equals(entityId))).getSingleOrNull();
+          final row = await (db.select(
+            db.knowledgeResources,
+          )..where((t) => t.id.equals(entityId))).getSingleOrNull();
           rowJson = row?.toJson();
           break;
       }
@@ -608,18 +743,24 @@ class KnowledgeManager {
         payloadMap['_base'] = SyncTimestamp.normalizeMapDates(baseData);
       }
 
-      await db.into(db.syncQueue).insert(
-        SyncQueueCompanion.insert(
-          id: _uuid.v4(),
-          entityType: entityType,
-          entityId: entityId,
-          operation: operation,
-          payload: jsonEncode(payloadMap),
-          createdAt: now,
-        ),
-      );
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: _uuid.v4(),
+              entityType: entityType,
+              entityId: entityId,
+              operation: operation,
+              payload: jsonEncode(payloadMap),
+              createdAt: now,
+            ),
+          );
     } catch (e, st) {
-      AppLogger.error('Erro ao enfileirar mutação de Conhecimento ($entityType/$entityId)', e, st);
+      AppLogger.error(
+        'Erro ao enfileirar mutação de Conhecimento ($entityType/$entityId)',
+        e,
+        st,
+      );
     }
   }
 }

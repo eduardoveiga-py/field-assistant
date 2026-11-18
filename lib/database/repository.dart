@@ -81,8 +81,9 @@ class AppRepository {
     // Caminho SQL indexado (A7) para queries ASCII: evita carregar estudos e fazer O(P*S) em memória.
     if (!RegExp(r'[^\x00-\x7F]').hasMatch(lower)) {
       final like = '%$lower%';
-      return db.customSelect(
-        '''
+      return db
+          .customSelect(
+            '''
         SELECT p.* FROM people p
         WHERE p.deleted_at IS NULL AND (
           lower(p.name) LIKE ?1 OR
@@ -104,9 +105,11 @@ class AppRepository {
         )
         ORDER BY p.name COLLATE NOCASE ASC
         ''',
-        variables: [Variable.withString(like)],
-        readsFrom: {db.people, db.studyParticipants, db.bibleStudies},
-      ).asyncMap(db.people.mapFromRow).get();
+            variables: [Variable.withString(like)],
+            readsFrom: {db.people, db.studyParticipants, db.bibleStudies},
+          )
+          .asyncMap(db.people.mapFromRow)
+          .get();
     }
 
     // Fallback com suporte completo a diacríticos/acentos em O(P + S)
@@ -246,26 +249,36 @@ class AppRepository {
     required double latitude,
     required double longitude,
   }) async {
-    if (!latitude.isFinite || !longitude.isFinite || latitude.abs() > 90 ||
-        longitude.abs() > 180 || (latitude == 0 && longitude == 0)) {
+    if (!latitude.isFinite ||
+        !longitude.isFinite ||
+        latitude.abs() > 90 ||
+        longitude.abs() > 180 ||
+        (latitude == 0 && longitude == 0)) {
       return false;
     }
     return db.transaction(() async {
       final current = await getPersonById(personId);
-      if (current == null || current.deletedAt != null ||
+      if (current == null ||
+          current.deletedAt != null ||
           current.address != expectedAddress ||
-          (current.latitude != null && current.longitude != null &&
+          (current.latitude != null &&
+              current.longitude != null &&
               (current.latitude != 0 || current.longitude != 0))) {
         return false;
       }
       final updated = current.copyWith(
-        latitude: Value(latitude), longitude: Value(longitude),
-        updatedAt: DateTime.now(), revision: current.revision + 1,
+        latitude: Value(latitude),
+        longitude: Value(longitude),
+        updatedAt: DateTime.now(),
+        revision: current.revision + 1,
       );
       await db.update(db.people).replace(updated);
       await _recordSyncOperation(
-        entityType: 'people', entityId: personId, operation: 'UPDATE',
-        payload: updated.toJson(), baseData: current.toJson(),
+        entityType: 'people',
+        entityId: personId,
+        operation: 'UPDATE',
+        payload: updated.toJson(),
+        baseData: current.toJson(),
       );
       return true;
     });
@@ -1318,7 +1331,8 @@ class AppRepository {
         entityType: entityType,
         entityId: id,
         operation: 'UPDATE',
-        payload: restoredJson ??
+        payload:
+            restoredJson ??
             {
               'id': id,
               'deletedAt': null,
@@ -1334,39 +1348,79 @@ class AppRepository {
       if (entityType == 'people') {
         // Uma nota pode referenciar uma visita desta pessoa mesmo quando seu
         // personId é outro; remova-a antes da visita para respeitar a FK.
-        final visits = await (db.select(db.visits)..where((t) => t.personId.equals(id))).get();
+        final visits = await (db.select(
+          db.visits,
+        )..where((t) => t.personId.equals(id))).get();
         final visitIds = visits.map((v) => v.id).toList();
-        final appointments = await (db.select(db.appointments)..where((t) => t.personId.equals(id))).get();
+        final appointments = await (db.select(
+          db.appointments,
+        )..where((t) => t.personId.equals(id))).get();
         final appointmentIds = appointments.map((a) => a.id).toList();
-        await (db.delete(db.calendarEventLinks)..where((t) => t.appointmentId.isIn(appointmentIds))).go();
-        await (db.delete(db.voiceNotes)..where((t) => t.personId.equals(id) | t.visitId.isIn(visitIds))).go();
-        await (db.update(db.phoneContacts)..where((t) => t.convertedPersonId.equals(id)))
-            .write(const PhoneContactsCompanion(convertedPersonId: Value(null)));
+        await (db.delete(
+          db.calendarEventLinks,
+        )..where((t) => t.appointmentId.isIn(appointmentIds))).go();
+        await (db.delete(
+          db.voiceNotes,
+        )..where((t) => t.personId.equals(id) | t.visitId.isIn(visitIds))).go();
+        await (db.update(
+          db.phoneContacts,
+        )..where((t) => t.convertedPersonId.equals(id))).write(
+          const PhoneContactsCompanion(convertedPersonId: Value(null)),
+        );
         await (db.delete(db.visits)..where((t) => t.personId.equals(id))).go();
-        await (db.delete(db.studyParticipants)..where((t) => t.personId.equals(id))).go();
-        await (db.delete(db.appointments)..where((t) => t.personId.equals(id))).go();
-        await (db.delete(db.familyTies)..where((t) => t.personId.equals(id) | t.relatedPersonId.equals(id))).go();
-        await (db.delete(db.personPhotos)..where((t) => t.personId.equals(id))).go();
-        await (db.delete(db.personPublications)..where((t) => t.personId.equals(id))).go();
+        await (db.delete(
+          db.studyParticipants,
+        )..where((t) => t.personId.equals(id))).go();
+        await (db.delete(
+          db.appointments,
+        )..where((t) => t.personId.equals(id))).go();
+        await (db.delete(db.familyTies)..where(
+              (t) => t.personId.equals(id) | t.relatedPersonId.equals(id),
+            ))
+            .go();
+        await (db.delete(
+          db.personPhotos,
+        )..where((t) => t.personId.equals(id))).go();
+        await (db.delete(
+          db.personPublications,
+        )..where((t) => t.personId.equals(id))).go();
         await (db.delete(db.people)..where((t) => t.id.equals(id))).go();
       } else if (entityType == 'visits') {
-        await (db.delete(db.voiceNotes)..where((t) => t.visitId.equals(id))).go();
+        await (db.delete(
+          db.voiceNotes,
+        )..where((t) => t.visitId.equals(id))).go();
         await (db.delete(db.visits)..where((t) => t.id.equals(id))).go();
       } else if (entityType == 'bible_studies') {
-        await (db.delete(db.voiceNotes)..where((t) => t.studyId.equals(id))).go();
-        await (db.delete(db.studyParticipants)..where((t) => t.studyId.equals(id))).go();
-        await (db.delete(db.studySessions)..where((t) => t.studyId.equals(id))).go();
-        final appointments = await (db.select(db.appointments)..where((t) => t.studyId.equals(id))).get();
+        await (db.delete(
+          db.voiceNotes,
+        )..where((t) => t.studyId.equals(id))).go();
+        await (db.delete(
+          db.studyParticipants,
+        )..where((t) => t.studyId.equals(id))).go();
+        await (db.delete(
+          db.studySessions,
+        )..where((t) => t.studyId.equals(id))).go();
+        final appointments = await (db.select(
+          db.appointments,
+        )..where((t) => t.studyId.equals(id))).get();
         await (db.delete(db.calendarEventLinks)..where(
-          (t) => t.appointmentId.isIn(appointments.map((a) => a.id).toList()),
-        )).go();
-        await (db.delete(db.appointments)..where((t) => t.studyId.equals(id))).go();
+              (t) =>
+                  t.appointmentId.isIn(appointments.map((a) => a.id).toList()),
+            ))
+            .go();
+        await (db.delete(
+          db.appointments,
+        )..where((t) => t.studyId.equals(id))).go();
         await (db.delete(db.bibleStudies)..where((t) => t.id.equals(id))).go();
       } else if (entityType == 'appointments') {
-        await (db.delete(db.calendarEventLinks)..where((t) => t.appointmentId.equals(id))).go();
+        await (db.delete(
+          db.calendarEventLinks,
+        )..where((t) => t.appointmentId.equals(id))).go();
         await (db.delete(db.appointments)..where((t) => t.id.equals(id))).go();
       } else if (entityType == 'activity_records') {
-        await (db.delete(db.activityRecords)..where((t) => t.id.equals(id))).go();
+        await (db.delete(
+          db.activityRecords,
+        )..where((t) => t.id.equals(id))).go();
       }
       await _recordSyncOperation(
         entityType: entityType,
@@ -1390,16 +1444,20 @@ class AppRepository {
   Future<List<SyncQueueEntry>> getPendingSyncOperations({
     bool respectBackoff = false,
   }) async {
-    final rows = await (db.select(db.syncQueue)
-          ..where(
-            (tbl) =>
-                tbl.status.equals('pending') | tbl.status.equals('in_progress'),
-          )
-          ..orderBy([
-            (t) =>
-                OrderingTerm(expression: t.createdAt, mode: OrderingMode.asc),
-          ]))
-        .get();
+    final rows =
+        await (db.select(db.syncQueue)
+              ..where(
+                (tbl) =>
+                    tbl.status.equals('pending') |
+                    tbl.status.equals('in_progress'),
+              )
+              ..orderBy([
+                (t) => OrderingTerm(
+                  expression: t.createdAt,
+                  mode: OrderingMode.asc,
+                ),
+              ]))
+            .get();
     if (!respectBackoff) return rows;
     final now = DateTime.now();
     return rows.where((op) {
@@ -1431,7 +1489,14 @@ class AppRepository {
 
   Future<List<SyncQueueEntry>> getUnresolvedSyncOperations() {
     return (db.select(db.syncQueue)
-          ..where((tbl) => tbl.status.isIn(['pending', 'in_progress', 'failed', 'conflict']))
+          ..where(
+            (tbl) => tbl.status.isIn([
+              'pending',
+              'in_progress',
+              'failed',
+              'conflict',
+            ]),
+          )
           ..orderBy([
             (t) =>
                 OrderingTerm(expression: t.createdAt, mode: OrderingMode.desc),
@@ -1440,24 +1505,26 @@ class AppRepository {
   }
 
   Stream<({int pending, int failed, int conflict})> watchSyncQueueCounts() {
-    return (db.select(db.syncQueue)
-          ..where((tbl) => tbl.status.isIn(['pending', 'in_progress', 'failed', 'conflict'])))
+    return (db.select(db.syncQueue)..where(
+          (tbl) =>
+              tbl.status.isIn(['pending', 'in_progress', 'failed', 'conflict']),
+        ))
         .watch()
         .map((rows) {
-      int pending = 0;
-      int failed = 0;
-      int conflict = 0;
-      for (final row in rows) {
-        if (row.status == 'failed') {
-          failed++;
-        } else if (row.status == 'conflict') {
-          conflict++;
-        } else {
-          pending++;
-        }
-      }
-      return (pending: pending, failed: failed, conflict: conflict);
-    });
+          int pending = 0;
+          int failed = 0;
+          int conflict = 0;
+          for (final row in rows) {
+            if (row.status == 'failed') {
+              failed++;
+            } else if (row.status == 'conflict') {
+              conflict++;
+            } else {
+              pending++;
+            }
+          }
+          return (pending: pending, failed: failed, conflict: conflict);
+        });
   }
 
   /// Expulga operações antigas já sincronizadas para prevenir inchaço do SQLite e backup
@@ -1465,9 +1532,11 @@ class AppRepository {
     Duration maxAge = const Duration(days: 30),
   }) async {
     final cutoff = DateTime.now().subtract(maxAge);
-    return (db.delete(db.syncQueue)
-          ..where((tbl) =>
-              tbl.status.equals('synced') & tbl.createdAt.isSmallerThanValue(cutoff)))
+    return (db.delete(db.syncQueue)..where(
+          (tbl) =>
+              tbl.status.equals('synced') &
+              tbl.createdAt.isSmallerThanValue(cutoff),
+        ))
         .go();
   }
 
@@ -1490,7 +1559,9 @@ class AppRepository {
       await (db.update(db.syncQueue)..where((tbl) => tbl.id.equals(id))).write(
         SyncQueueCompanion(
           status: Value(
-            (forceFailed || nextAttempts >= maxSyncAttempts) ? 'failed' : 'pending',
+            (forceFailed || nextAttempts >= maxSyncAttempts)
+                ? 'failed'
+                : 'pending',
           ),
           attempts: Value(nextAttempts),
           lastError: Value(error),
@@ -1552,7 +1623,9 @@ class AppRepository {
   }
 
   Future<void> resolveSyncConflictKeepLocal(String id) async {
-    final op = await (db.select(db.syncQueue)..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
+    final op = await (db.select(
+      db.syncQueue,
+    )..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
     if (op == null) return;
     Map<String, dynamic> decoded = {};
     try {
@@ -1642,8 +1715,14 @@ class AppRepository {
       'person' => 'people',
       'visit' => 'visits',
       'biblestudy' || 'biblestudies' => 'bible_studies',
-      'studyparticipant' || 'studyparticipants' || 'biblestudyparticipants' || 'bible_study_participants' => 'study_participants',
-      'studysession' || 'studysessions' || 'biblestudysessions' || 'bible_study_sessions' => 'study_sessions',
+      'studyparticipant' ||
+      'studyparticipants' ||
+      'biblestudyparticipants' ||
+      'bible_study_participants' => 'study_participants',
+      'studysession' ||
+      'studysessions' ||
+      'biblestudysessions' ||
+      'bible_study_sessions' => 'study_sessions',
       'appointment' => 'appointments',
       'activityrecord' || 'activityrecords' => 'activity_records',
       'voicenote' || 'voicenotes' => 'voice_notes',
@@ -1672,7 +1751,9 @@ class AppRepository {
 
   /// Reinicia todas as operações com falha definitiva ('failed' - dead letter) para nova tentativa
   Future<int> retryAllFailedOperations() async {
-    return (db.update(db.syncQueue)..where((tbl) => tbl.status.equals('failed'))).write(
+    return (db.update(
+      db.syncQueue,
+    )..where((tbl) => tbl.status.equals('failed'))).write(
       const SyncQueueCompanion(
         status: Value('pending'),
         attempts: Value(0),
@@ -1726,26 +1807,25 @@ class AppRepository {
   // MÓDULO: IDIOMAS (FASE 2 / REGRA 11)
   // --------------------------------------------------------------------------
   Future<List<AppLanguageEntry>> getAllLanguages() {
-    return (db.select(db.appLanguages)
-          ..orderBy([
-            (t) => OrderingTerm(expression: t.isDefault, mode: OrderingMode.desc),
-            (t) => OrderingTerm(expression: t.name, mode: OrderingMode.asc),
-          ]))
+    return (db.select(db.appLanguages)..orderBy([
+          (t) => OrderingTerm(expression: t.isDefault, mode: OrderingMode.desc),
+          (t) => OrderingTerm(expression: t.name, mode: OrderingMode.asc),
+        ]))
         .get();
   }
 
   Stream<List<AppLanguageEntry>> watchAllLanguages() {
-    return (db.select(db.appLanguages)
-          ..orderBy([
-            (t) => OrderingTerm(expression: t.isDefault, mode: OrderingMode.desc),
-            (t) => OrderingTerm(expression: t.name, mode: OrderingMode.asc),
-          ]))
+    return (db.select(db.appLanguages)..orderBy([
+          (t) => OrderingTerm(expression: t.isDefault, mode: OrderingMode.desc),
+          (t) => OrderingTerm(expression: t.name, mode: OrderingMode.asc),
+        ]))
         .watch();
   }
 
   Future<AppLanguageEntry?> getLanguageById(String id) {
-    return (db.select(db.appLanguages)..where((tbl) => tbl.id.equals(id)))
-        .getSingleOrNull();
+    return (db.select(
+      db.appLanguages,
+    )..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
   }
 
   Future<void> createLanguage({
@@ -1757,18 +1837,22 @@ class AppRepository {
     bool isDefault = false,
   }) {
     final now = DateTime.now();
-    return db.into(db.appLanguages).insert(
-      AppLanguagesCompanion.insert(
-        id: id,
-        name: name,
-        code: code,
-        symbol: symbol,
-        diacritics: diacritics != null ? Value(diacritics) : const Value.absent(),
-        isDefault: Value(isDefault),
-        createdAt: now,
-        updatedAt: now,
-      ),
-    );
+    return db
+        .into(db.appLanguages)
+        .insert(
+          AppLanguagesCompanion.insert(
+            id: id,
+            name: name,
+            code: code,
+            symbol: symbol,
+            diacritics: diacritics != null
+                ? Value(diacritics)
+                : const Value.absent(),
+            isDefault: Value(isDefault),
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
   }
 
   Future<void> createLanguageCompanion(AppLanguagesCompanion companion) {

@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 
 import 'package:clock/clock.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -29,15 +28,19 @@ import '../widgets/screen_hero_accent_band.dart';
 import 'person_detail_screen.dart';
 import 'download_maps_screen.dart';
 import '../widgets/map/dynamic_tile_layer.dart';
+import '../../territory/map_engine_adapter.dart';
+import '../../territory/map_engine/raster_fallback_adapter.dart';
 
 class ContactsMapScreen extends ConsumerStatefulWidget {
   final String? highlightPersonId;
   final Future<ReverseGeocodingResult?> Function(String)? geocodeAddress;
+  final MapEngineAdapter? mapEngineAdapter;
 
   const ContactsMapScreen({
     super.key,
     this.highlightPersonId,
     this.geocodeAddress,
+    this.mapEngineAdapter,
   });
 
   @override
@@ -92,10 +95,30 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
   bool _isLocatingUser = false;
   Size? _lastConstraintsSize;
   int? _lastGridHalfSize;
+  late final MapEngineAdapter _mapEngineAdapter;
+  bool _ownsMapEngineAdapter = false;
 
   @override
   void initState() {
     super.initState();
+    if (widget.mapEngineAdapter != null) {
+      _mapEngineAdapter = widget.mapEngineAdapter!;
+    } else {
+      _mapEngineAdapter = RasterFallbackAdapter();
+      _ownsMapEngineAdapter = true;
+    }
+    _mapEngineAdapter.initialize().then((_) {
+      if (mounted) {
+        _mapEngineAdapter.moveCamera(
+          MapViewportState(
+            latitude: _activeCenterLat ?? GeolocationHelper.defaultLat,
+            longitude: _activeCenterLng ?? GeolocationHelper.defaultLng,
+            zoom: _zoom.toDouble(),
+            bearingDegrees: _rotationNotifier.value,
+          ),
+        );
+      }
+    });
     _rotationAnimController =
         AnimationController(
             vsync: this,
@@ -398,6 +421,9 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
     _transformationController.dispose();
     _rotationAnimController.dispose();
     _rotationNotifier.dispose();
+    if (_ownsMapEngineAdapter) {
+      _mapEngineAdapter.dispose();
+    }
     super.dispose();
   }
 
@@ -4126,58 +4152,69 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
             _selectedPinPerson = null;
           });
         },
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              constraints: const BoxConstraints(maxWidth: 120),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? landmark.color
-                    : (isDark ? const Color(0xFF1E293B) : Colors.white),
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Colors.black26,
-                    blurRadius: 4,
-                    offset: Offset(0, 2),
-                  ),
-                ],
-                border: Border.all(color: landmark.color, width: 2),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    landmark.icon,
-                    size: 14,
-                    color: isSelected ? Colors.white : landmark.color,
-                  ),
-                  const SizedBox(width: 4),
-                  Flexible(
-                    child: Text(
-                      landmark.name.split(' ').first,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: isSelected
-                            ? Colors.white
-                            : (isDark ? Colors.white : AppTheme.textDark),
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
+        child: ValueListenableBuilder<double>(
+          valueListenable: _rotationNotifier,
+          builder: (context, rotation, childWidget) {
+            if (rotation == 0.0) return childWidget!;
+            return Transform.rotate(
+              angle: -rotation,
+              alignment: Alignment.bottomCenter,
+              child: childWidget,
+            );
+          },
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                constraints: const BoxConstraints(maxWidth: 120),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? landmark.color
+                      : (isDark ? const Color(0xFF1E293B) : Colors.white),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black26,
+                      blurRadius: 4,
+                      offset: Offset(0, 2),
                     ),
-                  ),
-                ],
+                  ],
+                  border: Border.all(color: landmark.color, width: 2),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      landmark.icon,
+                      size: 14,
+                      color: isSelected ? Colors.white : landmark.color,
+                    ),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        landmark.name.split(' ').first,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: isSelected
+                              ? Colors.white
+                              : (isDark ? Colors.white : AppTheme.textDark),
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            Icon(
-              landmark.icon,
-              color: landmark.color,
-              size: isSelected ? 34 : 26,
-            ),
-          ],
+              Icon(
+                landmark.icon,
+                color: landmark.color,
+                size: isSelected ? 34 : 26,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -4254,84 +4291,103 @@ class _ContactsMapScreenState extends ConsumerState<ContactsMapScreen>
             _selectedPinLandmark = null;
           });
         },
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              constraints: BoxConstraints(maxWidth: isHighlighted ? 140 : 110),
-              padding: EdgeInsets.symmetric(
-                horizontal: isHighlighted ? 10 : 8,
-                vertical: isHighlighted ? 5 : 4,
-              ),
-              decoration: BoxDecoration(
-                color: isHighlighted
-                    ? const Color(0xFFD97706)
-                    : (isSelected
-                          ? Colors.black87
-                          : (isDark ? const Color(0xFF1E293B) : Colors.white)),
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  if (isHighlighted)
-                    BoxShadow(
-                      color: const Color(0xFFF59E0B).withValues(alpha: 0.65),
-                      blurRadius: 14,
-                      spreadRadius: 3,
-                    )
-                  else
-                    const BoxShadow(
-                      color: Colors.black26,
-                      blurRadius: 4,
-                      offset: Offset(0, 2),
+        child: ValueListenableBuilder<double>(
+          valueListenable: _rotationNotifier,
+          builder: (context, rotation, childWidget) {
+            if (rotation == 0.0) return childWidget!;
+            return Transform.rotate(
+              angle: -rotation,
+              alignment: Alignment.bottomCenter,
+              child: childWidget,
+            );
+          },
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                constraints: BoxConstraints(
+                  maxWidth: isHighlighted ? 140 : 110,
+                ),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isHighlighted ? 10 : 8,
+                  vertical: isHighlighted ? 5 : 4,
+                ),
+                decoration: BoxDecoration(
+                  color: isHighlighted
+                      ? const Color(0xFFD97706)
+                      : (isSelected
+                            ? Colors.black87
+                            : (isDark
+                                  ? const Color(0xFF1E293B)
+                                  : Colors.white)),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    if (isHighlighted)
+                      BoxShadow(
+                        color: const Color(0xFFF59E0B).withValues(alpha: 0.65),
+                        blurRadius: 14,
+                        spreadRadius: 3,
+                      )
+                    else
+                      const BoxShadow(
+                        color: Colors.black26,
+                        blurRadius: 4,
+                        offset: Offset(0, 2),
+                      ),
+                  ],
+                  border: Border.all(
+                    color: isHighlighted ? Colors.white : pinColor,
+                    width: isHighlighted ? 2.5 : 2,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isHighlighted) ...[
+                      const Icon(
+                        Icons.star,
+                        color: Colors.amberAccent,
+                        size: 13,
+                      ),
+                      const SizedBox(width: 4),
+                    ] else if (isForeign) ...[
+                      const Text('🌐', style: TextStyle(fontSize: 12)),
+                      const SizedBox(width: 4),
+                    ] else if (pinLayer == TerritoryPinLayer.forgottenZone) ...[
+                      const Icon(
+                        Icons.warning_amber_rounded,
+                        color: Color(0xFFDC2626),
+                        size: 13,
+                      ),
+                      const SizedBox(width: 4),
+                    ],
+                    Flexible(
+                      child: Text(
+                        person.name.split(' ').first,
+                        style: TextStyle(
+                          fontSize: isHighlighted ? 12 : 11,
+                          fontWeight: FontWeight.bold,
+                          color: (isHighlighted || isSelected)
+                              ? Colors.white
+                              : (isDark ? Colors.white : AppTheme.textDark),
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
                     ),
-                ],
-                border: Border.all(
-                  color: isHighlighted ? Colors.white : pinColor,
-                  width: isHighlighted ? 2.5 : 2,
+                  ],
                 ),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (isHighlighted) ...[
-                    const Icon(Icons.star, color: Colors.amberAccent, size: 13),
-                    const SizedBox(width: 4),
-                  ] else if (isForeign) ...[
-                    const Text('🌐', style: TextStyle(fontSize: 12)),
-                    const SizedBox(width: 4),
-                  ] else if (pinLayer == TerritoryPinLayer.forgottenZone) ...[
-                    const Icon(
-                      Icons.warning_amber_rounded,
-                      color: Color(0xFFDC2626),
-                      size: 13,
-                    ),
-                    const SizedBox(width: 4),
-                  ],
-                  Flexible(
-                    child: Text(
-                      person.name.split(' ').first,
-                      style: TextStyle(
-                        fontSize: isHighlighted ? 12 : 11,
-                        fontWeight: FontWeight.bold,
-                        color: (isHighlighted || isSelected)
-                            ? Colors.white
-                            : (isDark ? Colors.white : AppTheme.textDark),
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                    ),
-                  ),
-                ],
+              Icon(
+                pinIcon,
+                color: isHighlighted ? const Color(0xFFD97706) : pinColor,
+                size: isHighlighted ? 44 : (isSelected ? 38 : 30),
+                shadows: isHighlighted
+                    ? [Shadow(color: Colors.amber.shade300, blurRadius: 12)]
+                    : null,
               ),
-            ),
-            Icon(
-              pinIcon,
-              color: isHighlighted ? const Color(0xFFD97706) : pinColor,
-              size: isHighlighted ? 44 : (isSelected ? 38 : 30),
-              shadows: isHighlighted
-                  ? [Shadow(color: Colors.amber.shade300, blurRadius: 12)]
-                  : null,
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

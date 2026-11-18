@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -25,7 +26,8 @@ class TasksScreen extends ConsumerStatefulWidget {
   ConsumerState<TasksScreen> createState() => _TasksScreenState();
 }
 
-class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProviderStateMixin {
+class _TasksScreenState extends ConsumerState<TasksScreen>
+    with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -118,7 +120,8 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
         final catMatch = p.category.toLowerCase().contains(q);
         final tags = _extractTags(p.metadata);
         final tagMatch = tags.any((tag) => tag.toLowerCase().contains(q));
-        if (!nameMatch && !objMatch && !descMatch && !catMatch && !tagMatch) return false;
+        if (!nameMatch && !objMatch && !descMatch && !catMatch && !tagMatch)
+          return false;
       }
       if (_selectedCategory != 'todas' && p.category != _selectedCategory) {
         return false;
@@ -150,7 +153,11 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
             decoration: InputDecoration(
               isDense: true,
               hintText: 'Pesquisar tarefas, projetos, tags...',
-              prefixIcon: const Icon(Icons.search, size: 20, color: AppTheme.primaryBlue),
+              prefixIcon: const Icon(
+                Icons.search,
+                size: 20,
+                color: AppTheme.primaryBlue,
+              ),
               suffixIcon: _searchQuery.isNotEmpty
                   ? IconButton(
                       icon: const Icon(Icons.clear, size: 18),
@@ -162,10 +169,15 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: BorderSide(
-                  color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                  color: isDark
+                      ? const Color(0xFF334155)
+                      : const Color(0xFFCBD5E1),
                 ),
               ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 8,
+              ),
             ),
           ),
           const SizedBox(height: 8),
@@ -175,7 +187,11 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
               children: [
                 // Filtro Categoria
                 FilterChip(
-                  label: Text(_selectedCategory == 'todas' ? 'Todas Categorias' : _categoryLabel(_selectedCategory)),
+                  label: Text(
+                    _selectedCategory == 'todas'
+                        ? 'Todas Categorias'
+                        : _categoryLabel(_selectedCategory),
+                  ),
                   selected: _selectedCategory != 'todas',
                   onSelected: (_) {
                     _showCategoryFilterMenu();
@@ -184,7 +200,11 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
                 const SizedBox(width: 8),
                 // Filtro Prioridade
                 FilterChip(
-                  label: Text(_selectedPriority == 'todas' ? 'Todas Prioridades' : _priorityLabel(_selectedPriority)),
+                  label: Text(
+                    _selectedPriority == 'todas'
+                        ? 'Todas Prioridades'
+                        : _priorityLabel(_selectedPriority),
+                  ),
                   selected: _selectedPriority != 'todas',
                   onSelected: (_) {
                     _showPriorityFilterMenu();
@@ -198,10 +218,14 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
                     onDeleted: () => setState(() => _selectedTag = null),
                   ),
                 ],
-                if (_selectedCategory != 'todas' || _selectedPriority != 'todas' || _selectedTag != null) ...[
+                if (_selectedCategory != 'todas' ||
+                    _selectedPriority != 'todas' ||
+                    _selectedTag != null) ...[
                   const SizedBox(width: 8),
                   TextButton.icon(
-                    style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                    style: TextButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                    ),
                     icon: const Icon(Icons.filter_alt_off, size: 16),
                     label: const Text('Limpar', style: TextStyle(fontSize: 12)),
                     onPressed: () {
@@ -228,11 +252,18 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const ListTile(title: Text('Filtrar por Categoria', style: TextStyle(fontWeight: FontWeight.bold))),
+            const ListTile(
+              title: Text(
+                'Filtrar por Categoria',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
             const Divider(height: 1),
             ListTile(
               title: const Text('Todas as categorias'),
-              trailing: _selectedCategory == 'todas' ? const Icon(Icons.check, color: AppTheme.primaryBlue) : null,
+              trailing: _selectedCategory == 'todas'
+                  ? const Icon(Icons.check, color: AppTheme.primaryBlue)
+                  : null,
               onTap: () {
                 setState(() => _selectedCategory = 'todas');
                 Navigator.pop(ctx);
@@ -240,7 +271,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
             ),
             ListTile(
               title: const Text('Ministério'),
-              trailing: _selectedCategory == 'ministry' ? const Icon(Icons.check, color: AppTheme.primaryBlue) : null,
+              trailing: _selectedCategory == 'ministry'
+                  ? const Icon(Icons.check, color: AppTheme.primaryBlue)
+                  : null,
               onTap: () {
                 setState(() => _selectedCategory = 'ministry');
                 Navigator.pop(ctx);
@@ -248,7 +281,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
             ),
             ListTile(
               title: const Text('Pessoal'),
-              trailing: _selectedCategory == 'personal' ? const Icon(Icons.check, color: AppTheme.primaryBlue) : null,
+              trailing: _selectedCategory == 'personal'
+                  ? const Icon(Icons.check, color: AppTheme.primaryBlue)
+                  : null,
               onTap: () {
                 setState(() => _selectedCategory = 'personal');
                 Navigator.pop(ctx);
@@ -256,7 +291,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
             ),
             ListTile(
               title: const Text('Estudo'),
-              trailing: _selectedCategory == 'study' ? const Icon(Icons.check, color: AppTheme.primaryBlue) : null,
+              trailing: _selectedCategory == 'study'
+                  ? const Icon(Icons.check, color: AppTheme.primaryBlue)
+                  : null,
               onTap: () {
                 setState(() => _selectedCategory = 'study');
                 Navigator.pop(ctx);
@@ -264,7 +301,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
             ),
             ListTile(
               title: const Text('Tecnologia'),
-              trailing: _selectedCategory == 'tech' ? const Icon(Icons.check, color: AppTheme.primaryBlue) : null,
+              trailing: _selectedCategory == 'tech'
+                  ? const Icon(Icons.check, color: AppTheme.primaryBlue)
+                  : null,
               onTap: () {
                 setState(() => _selectedCategory = 'tech');
                 Navigator.pop(ctx);
@@ -283,11 +322,18 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const ListTile(title: Text('Filtrar por Prioridade', style: TextStyle(fontWeight: FontWeight.bold))),
+            const ListTile(
+              title: Text(
+                'Filtrar por Prioridade',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
             const Divider(height: 1),
             ListTile(
               title: const Text('Todas as prioridades'),
-              trailing: _selectedPriority == 'todas' ? const Icon(Icons.check, color: AppTheme.primaryBlue) : null,
+              trailing: _selectedPriority == 'todas'
+                  ? const Icon(Icons.check, color: AppTheme.primaryBlue)
+                  : null,
               onTap: () {
                 setState(() => _selectedPriority = 'todas');
                 Navigator.pop(ctx);
@@ -296,7 +342,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
             ListTile(
               title: const Text('Urgente'),
               leading: const Icon(Icons.error_outline, color: Colors.redAccent),
-              trailing: _selectedPriority == 'urgent' ? const Icon(Icons.check, color: AppTheme.primaryBlue) : null,
+              trailing: _selectedPriority == 'urgent'
+                  ? const Icon(Icons.check, color: AppTheme.primaryBlue)
+                  : null,
               onTap: () {
                 setState(() => _selectedPriority = 'urgent');
                 Navigator.pop(ctx);
@@ -305,7 +353,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
             ListTile(
               title: const Text('Alta'),
               leading: const Icon(Icons.arrow_upward, color: Colors.orange),
-              trailing: _selectedPriority == 'high' ? const Icon(Icons.check, color: AppTheme.primaryBlue) : null,
+              trailing: _selectedPriority == 'high'
+                  ? const Icon(Icons.check, color: AppTheme.primaryBlue)
+                  : null,
               onTap: () {
                 setState(() => _selectedPriority = 'high');
                 Navigator.pop(ctx);
@@ -314,7 +364,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
             ListTile(
               title: const Text('Normal'),
               leading: const Icon(Icons.remove, color: AppTheme.primaryBlue),
-              trailing: _selectedPriority == 'normal' ? const Icon(Icons.check, color: AppTheme.primaryBlue) : null,
+              trailing: _selectedPriority == 'normal'
+                  ? const Icon(Icons.check, color: AppTheme.primaryBlue)
+                  : null,
               onTap: () {
                 setState(() => _selectedPriority = 'normal');
                 Navigator.pop(ctx);
@@ -323,7 +375,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
             ListTile(
               title: const Text('Baixa'),
               leading: const Icon(Icons.arrow_downward, color: Colors.grey),
-              trailing: _selectedPriority == 'low' ? const Icon(Icons.check, color: AppTheme.primaryBlue) : null,
+              trailing: _selectedPriority == 'low'
+                  ? const Icon(Icons.check, color: AppTheme.primaryBlue)
+                  : null,
               onTap: () {
                 setState(() => _selectedPriority = 'low');
                 Navigator.pop(ctx);
@@ -337,11 +391,16 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
 
   String _priorityLabel(String prio) {
     switch (prio) {
-      case 'urgent': return 'Urgente';
-      case 'high': return 'Alta';
-      case 'normal': return 'Normal';
-      case 'low': return 'Baixa';
-      default: return prio;
+      case 'urgent':
+        return 'Urgente';
+      case 'high':
+        return 'Alta';
+      case 'normal':
+        return 'Normal';
+      case 'low':
+        return 'Baixa';
+      default:
+        return prio;
     }
   }
 
@@ -355,14 +414,19 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
           children: [
             Icon(Icons.task_alt_rounded, color: AppTheme.primaryBlue, size: 24),
             SizedBox(width: 8),
-            Text('Tarefas & Projetos', style: TextStyle(fontWeight: FontWeight.bold)),
+            Text(
+              'Tarefas & Projetos',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
           ],
         ),
         bottom: TabBar(
           controller: _tabController,
           isScrollable: true,
           labelColor: AppTheme.primaryBlue,
-          unselectedLabelColor: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+          unselectedLabelColor: isDark
+              ? const Color(0xFF94A3B8)
+              : const Color(0xFF64748B),
           indicatorColor: AppTheme.primaryBlue,
           indicatorWeight: 3,
           tabs: const [
@@ -414,7 +478,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
         if (tasks.isEmpty) {
           return _buildEmptyState(
             icon: Icons.done_all_rounded,
-            title: rawTasks.isEmpty ? 'Tudo em dia para hoje!' : 'Nenhuma tarefa corresponde aos filtros',
+            title: rawTasks.isEmpty
+                ? 'Tudo em dia para hoje!'
+                : 'Nenhuma tarefa corresponde aos filtros',
             subtitle: rawTasks.isEmpty
                 ? 'Nenhuma tarefa pendente ou atrasada no momento.'
                 : 'Ajuste os filtros ou a pesquisa para ver mais itens.',
@@ -451,7 +517,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
         if (tasks.isEmpty) {
           return _buildEmptyState(
             icon: Icons.checklist_rounded,
-            title: rawTasks.isEmpty ? 'Nenhuma tarefa pendente' : 'Nenhuma tarefa corresponde aos filtros',
+            title: rawTasks.isEmpty
+                ? 'Nenhuma tarefa pendente'
+                : 'Nenhuma tarefa corresponde aos filtros',
             subtitle: rawTasks.isEmpty
                 ? 'Toque no botão Adicionar para criar uma nova tarefa ou converta a partir da Inbox.'
                 : 'Ajuste os filtros ou a pesquisa para ver mais itens.',
@@ -488,7 +556,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
         if (projects.isEmpty) {
           return _buildEmptyState(
             icon: Icons.folder_open_rounded,
-            title: rawProjects.isEmpty ? 'Nenhum projeto ativo' : 'Nenhum projeto corresponde aos filtros',
+            title: rawProjects.isEmpty
+                ? 'Nenhum projeto ativo'
+                : 'Nenhum projeto corresponde aos filtros',
             subtitle: rawProjects.isEmpty
                 ? 'Crie projetos para agrupar tarefas maiores, metas pessoais ou alvos teocráticos.'
                 : 'Ajuste os filtros ou a pesquisa para ver mais itens.',
@@ -500,17 +570,24 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
           padding: const EdgeInsets.all(16),
           itemCount: projects.length,
           separatorBuilder: (ctx, i) => const SizedBox(height: 12),
-          itemBuilder: (ctx, i) => _buildProjectCard(projects[i], projectMgr, isDark),
+          itemBuilder: (ctx, i) =>
+              _buildProjectCard(projects[i], projectMgr, isDark),
         );
       },
     );
   }
 
-  Widget _buildProjectCard(ProjectEntry project, ProjectManager projectMgr, bool isDark) {
+  Widget _buildProjectCard(
+    ProjectEntry project,
+    ProjectManager projectMgr,
+    bool isDark,
+  ) {
     return InkWell(
       onTap: () {
         Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => ProjectDetailScreen(projectId: project.id)),
+          MaterialPageRoute(
+            builder: (_) => ProjectDetailScreen(projectId: project.id),
+          ),
         );
       },
       borderRadius: BorderRadius.circular(16),
@@ -535,24 +612,38 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
           children: [
             Row(
               children: [
-                const Icon(Icons.folder_special, color: AppTheme.primaryBlue, size: 22),
+                const Icon(
+                  Icons.folder_special,
+                  color: AppTheme.primaryBlue,
+                  size: 22,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     project.name,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: AppTheme.primaryBlue.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
                     _categoryLabel(project.category),
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primaryBlue),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.primaryBlue,
+                    ),
                   ),
                 ),
                 PopupMenuButton<String>(
@@ -562,8 +653,17 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
                     if (val == 'delete') _confirmDeleteProject(project);
                   },
                   itemBuilder: (ctx) => [
-                    const PopupMenuItem(value: 'edit', child: Text('Editar Projeto')),
-                    const PopupMenuItem(value: 'delete', child: Text('Excluir Projeto', style: TextStyle(color: Colors.redAccent))),
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Text('Editar Projeto'),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Text(
+                        'Excluir Projeto',
+                        style: TextStyle(color: Colors.redAccent),
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -572,11 +672,19 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
               const SizedBox(height: 6),
               Row(
                 children: [
-                  const Icon(Icons.flag_outlined, size: 13, color: AppTheme.primaryBlue),
+                  const Icon(
+                    Icons.flag_outlined,
+                    size: 13,
+                    color: AppTheme.primaryBlue,
+                  ),
                   const SizedBox(width: 4),
                   Text(
                     'Prazo / Meta: ${_formatDate(project.targetDate!)}',
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primaryBlue),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.primaryBlue,
+                    ),
                   ),
                 ],
               ),
@@ -587,7 +695,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
                 project.objective!,
                 style: TextStyle(
                   fontSize: 13,
-                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                  color: isDark
+                      ? const Color(0xFF94A3B8)
+                      : const Color(0xFF64748B),
                 ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
@@ -603,20 +713,33 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
                   child: Wrap(
                     spacing: 6,
                     runSpacing: 4,
-                    children: pTags.map((t) => InkWell(
-                      onTap: () => setState(() => _selectedTag = t),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryBlue.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          '#$t',
-                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primaryBlue),
-                        ),
-                      ),
-                    )).toList(),
+                    children: pTags
+                        .map(
+                          (t) => InkWell(
+                            onTap: () => setState(() => _selectedTag = t),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppTheme.primaryBlue.withValues(
+                                  alpha: 0.1,
+                                ),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                '#$t',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.primaryBlue,
+                                ),
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(),
                   ),
                 );
               },
@@ -635,19 +758,32 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
                       children: [
                         Text(
                           '${prog.completedTasks} de ${prog.totalTasks} tarefas',
-                          style: const TextStyle(fontSize: 12, color: Colors.grey),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
                         ),
                         Text(
                           '${prog.progressPercent.toStringAsFixed(0)}%',
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primaryBlue),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.primaryBlue,
+                          ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 6),
                     LinearProgressIndicator(
-                      value: prog.totalTasks > 0 ? prog.completedTasks / prog.totalTasks : 0.0,
-                      backgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                      valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primaryBlue),
+                      value: prog.totalTasks > 0
+                          ? prog.completedTasks / prog.totalTasks
+                          : 0.0,
+                      backgroundColor: isDark
+                          ? const Color(0xFF334155)
+                          : const Color(0xFFE2E8F0),
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        AppTheme.primaryBlue,
+                      ),
                       minHeight: 6,
                       borderRadius: BorderRadius.circular(3),
                     ),
@@ -675,12 +811,16 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
         final actions = <_ContactActionRow>[];
 
         for (final p in people) {
-          if (p.nextActionAt != null && p.nextActionNote != null && p.nextActionNote!.isNotEmpty) {
-            actions.add(_ContactActionRow(
-              person: p,
-              note: p.nextActionNote!,
-              date: p.nextActionAt!,
-            ));
+          if (p.nextActionAt != null &&
+              p.nextActionNote != null &&
+              p.nextActionNote!.isNotEmpty) {
+            actions.add(
+              _ContactActionRow(
+                person: p,
+                note: p.nextActionNote!,
+                date: p.nextActionAt!,
+              ),
+            );
           }
         }
 
@@ -702,22 +842,35 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
           itemBuilder: (ctx, i) {
             final item = actions[i];
             return Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               child: ListTile(
                 leading: CircleAvatar(
                   backgroundColor: AppTheme.primaryBlue.withValues(alpha: 0.15),
                   child: Text(
-                    item.person.name.isNotEmpty ? item.person.name[0].toUpperCase() : '?',
-                    style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryBlue),
+                    item.person.name.isNotEmpty
+                        ? item.person.name[0].toUpperCase()
+                        : '?',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.primaryBlue,
+                    ),
                   ),
                 ),
-                title: Text(item.person.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                title: Text(
+                  item.person.name,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
                 subtitle: Text('${item.note}\nData: ${_formatDate(item.date)}'),
                 isThreeLine: true,
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
                   Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => PersonDetailScreen(personId: item.person.id)),
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          PersonDetailScreen(personId: item.person.id),
+                    ),
                   );
                 },
               ),
@@ -747,7 +900,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
         if (tasks.isEmpty) {
           return _buildEmptyState(
             icon: Icons.check_circle_outline,
-            title: rawTasks.isEmpty ? 'Nenhuma tarefa concluída recentemente' : 'Nenhuma tarefa corresponde aos filtros',
+            title: rawTasks.isEmpty
+                ? 'Nenhuma tarefa concluída recentemente'
+                : 'Nenhuma tarefa corresponde aos filtros',
             subtitle: rawTasks.isEmpty
                 ? 'Conclua tarefas ativas para visualizar o histórico aqui.'
                 : 'Ajuste os filtros ou a pesquisa para ver mais itens.',
@@ -770,8 +925,11 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
   // ==========================================
 
   Widget _buildTaskTile(TaskEntry task, TaskManager taskMgr, bool isDark) {
-    final isOverdue = task.dueDate != null &&
-        task.dueDate!.isBefore(DateTime.now().subtract(const Duration(hours: 1))) &&
+    final isOverdue =
+        task.dueDate != null &&
+        task.dueDate!.isBefore(
+          DateTime.now().subtract(const Duration(hours: 1)),
+        ) &&
         !task.isCompleted;
     final tags = _extractTags(task.metadata);
     final attachments = _extractAttachments(task.attachments);
@@ -791,7 +949,8 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
         leading: Checkbox(
           value: task.isCompleted,
           activeColor: AppTheme.primaryBlue,
-          onChanged: (val) => taskMgr.toggleTaskComplete(task.id, completed: val),
+          onChanged: (val) =>
+              taskMgr.toggleTaskComplete(task.id, completed: val),
         ),
         title: Text(
           task.title,
@@ -813,8 +972,12 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 13,
-                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                  decoration: task.isCompleted ? TextDecoration.lineThrough : null,
+                  color: isDark
+                      ? const Color(0xFF94A3B8)
+                      : const Color(0xFF64748B),
+                  decoration: task.isCompleted
+                      ? TextDecoration.lineThrough
+                      : null,
                 ),
               ),
             ],
@@ -835,7 +998,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
                     style: TextStyle(
                       fontSize: 11,
                       color: isOverdue ? Colors.redAccent : Colors.grey,
-                      fontWeight: isOverdue ? FontWeight.bold : FontWeight.normal,
+                      fontWeight: isOverdue
+                          ? FontWeight.bold
+                          : FontWeight.normal,
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -843,11 +1008,18 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
                 if (task.recurrenceRule != null &&
                     task.recurrenceRule != 'none' &&
                     task.recurrenceRule!.isNotEmpty) ...[
-                  const Icon(Icons.repeat, size: 12, color: AppTheme.primaryBlue),
+                  const Icon(
+                    Icons.repeat,
+                    size: 12,
+                    color: AppTheme.primaryBlue,
+                  ),
                   const SizedBox(width: 2),
                   Text(
                     task.recurrenceRule!,
-                    style: const TextStyle(fontSize: 11, color: AppTheme.primaryBlue),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppTheme.primaryBlue,
+                    ),
                   ),
                 ],
               ],
@@ -862,14 +1034,21 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
                     InkWell(
                       onTap: () => setState(() => _selectedTag = t),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: AppTheme.primaryBlue.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           '#$t',
-                          style: const TextStyle(fontSize: 11, color: AppTheme.primaryBlue, fontWeight: FontWeight.w600),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppTheme.primaryBlue,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ),
@@ -879,23 +1058,40 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
                         final path = att['path'] as String? ?? '';
                         final name = att['name'] as String? ?? 'Anexo';
                         final type = att['type'] as String? ?? 'file';
-                        showUniversalAttachmentViewer(context, filePath: path, title: name, fileType: type);
+                        showUniversalAttachmentViewer(
+                          context,
+                          filePath: path,
+                          title: name,
+                          fileType: type,
+                        );
                       },
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.purple.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: Colors.purple.withValues(alpha: 0.3)),
+                          border: Border.all(
+                            color: Colors.purple.withValues(alpha: 0.3),
+                          ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.attach_file, size: 12, color: Colors.purple),
+                            const Icon(
+                              Icons.attach_file,
+                              size: 12,
+                              color: Colors.purple,
+                            ),
                             const SizedBox(width: 2),
                             Text(
                               att['name'] ?? 'Anexo',
-                              style: const TextStyle(fontSize: 11, color: Colors.purple),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Colors.purple,
+                              ),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ],
@@ -915,7 +1111,13 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
           },
           itemBuilder: (ctx) => [
             const PopupMenuItem(value: 'edit', child: Text('Editar Tarefa')),
-            const PopupMenuItem(value: 'delete', child: Text('Excluir Tarefa', style: TextStyle(color: Colors.redAccent))),
+            const PopupMenuItem(
+              value: 'delete',
+              child: Text(
+                'Excluir Tarefa',
+                style: TextStyle(color: Colors.redAccent),
+              ),
+            ),
           ],
         ),
       ),
@@ -934,21 +1136,32 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 56, color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
+            Icon(
+              icon,
+              size: 56,
+              color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
+            ),
             const SizedBox(height: 16),
             Text(
               title,
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                color: isDark
+                    ? const Color(0xFF94A3B8)
+                    : const Color(0xFF64748B),
               ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
               subtitle,
-              style: TextStyle(fontSize: 13, color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
+              style: TextStyle(
+                fontSize: 13,
+                color: isDark
+                    ? const Color(0xFF64748B)
+                    : const Color(0xFF94A3B8),
+              ),
               textAlign: TextAlign.center,
             ),
           ],
@@ -956,8 +1169,6 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
       ),
     );
   }
-
-
 
   void _showCreateTaskModal() {
     String priority = 'normal';
@@ -989,7 +1200,10 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
                     TextField(
                       controller: titleCtrl,
                       autofocus: true,
-                      decoration: const InputDecoration(labelText: 'O que precisa ser feito?', border: OutlineInputBorder()),
+                      decoration: const InputDecoration(
+                        labelText: 'O que precisa ser feito?',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     RichMarkdownToolbar(controller: descCtrl),
@@ -1018,49 +1232,91 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
                         Expanded(
                           child: DropdownButtonFormField<String>(
                             initialValue: priority,
-                            decoration: const InputDecoration(labelText: 'Prioridade', border: OutlineInputBorder()),
+                            decoration: const InputDecoration(
+                              labelText: 'Prioridade',
+                              border: OutlineInputBorder(),
+                            ),
                             items: const [
-                              DropdownMenuItem(value: 'low', child: Text('Baixa')),
-                              DropdownMenuItem(value: 'normal', child: Text('Normal')),
-                              DropdownMenuItem(value: 'high', child: Text('Alta')),
-                              DropdownMenuItem(value: 'urgent', child: Text('Urgente')),
+                              DropdownMenuItem(
+                                value: 'low',
+                                child: Text('Baixa'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'normal',
+                                child: Text('Normal'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'high',
+                                child: Text('Alta'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'urgent',
+                                child: Text('Urgente'),
+                              ),
                             ],
-                            onChanged: (v) => setModalState(() => priority = v ?? 'normal'),
+                            onChanged: (v) =>
+                                setModalState(() => priority = v ?? 'normal'),
                           ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: DropdownButtonFormField<String>(
                             initialValue: recurrence,
-                            decoration: const InputDecoration(labelText: 'Recorrência', border: OutlineInputBorder()),
+                            decoration: const InputDecoration(
+                              labelText: 'Recorrência',
+                              border: OutlineInputBorder(),
+                            ),
                             items: const [
-                              DropdownMenuItem(value: 'none', child: Text('Nenhuma')),
-                              DropdownMenuItem(value: 'daily', child: Text('Diária')),
-                              DropdownMenuItem(value: 'weekly', child: Text('Semanal')),
-                              DropdownMenuItem(value: 'monthly', child: Text('Mensal')),
+                              DropdownMenuItem(
+                                value: 'none',
+                                child: Text('Nenhuma'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'daily',
+                                child: Text('Diária'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'weekly',
+                                child: Text('Semanal'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'monthly',
+                                child: Text('Mensal'),
+                              ),
                             ],
-                            onChanged: (v) => setModalState(() => recurrence = v ?? 'none'),
+                            onChanged: (v) =>
+                                setModalState(() => recurrence = v ?? 'none'),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 12),
                     ListTile(
-                      title: Text(dueDate == null ? 'Definir Prazo / Vencimento (Opcional)' : 'Vencimento: ${_formatDate(dueDate!)}'),
+                      title: Text(
+                        dueDate == null
+                            ? 'Definir Prazo / Vencimento (Opcional)'
+                            : 'Vencimento: ${_formatDate(dueDate!)}',
+                      ),
                       trailing: dueDate != null
                           ? IconButton(
                               icon: const Icon(Icons.clear, size: 18),
-                              onPressed: () => setModalState(() => dueDate = null),
+                              onPressed: () =>
+                                  setModalState(() => dueDate = null),
                             )
                           : const Icon(Icons.calendar_today),
                       onTap: () async {
                         final picked = await showDatePicker(
                           context: context,
                           initialDate: dueDate ?? DateTime.now(),
-                          firstDate: DateTime.now().subtract(const Duration(days: 30)),
-                          lastDate: DateTime.now().add(const Duration(days: 365)),
+                          firstDate: DateTime.now().subtract(
+                            const Duration(days: 30),
+                          ),
+                          lastDate: DateTime.now().add(
+                            const Duration(days: 365),
+                          ),
                         );
-                        if (picked != null) setModalState(() => dueDate = picked);
+                        if (picked != null)
+                          setModalState(() => dueDate = picked);
                       },
                     ),
                     const SizedBox(height: 16),
@@ -1091,7 +1347,10 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
                         );
                         if (ctx.mounted) Navigator.of(ctx).pop();
                       },
-                      child: const Text('Criar Tarefa', style: TextStyle(fontWeight: FontWeight.bold)),
+                      child: const Text(
+                        'Criar Tarefa',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ],
                 ),
@@ -1137,7 +1396,10 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
                   children: [
                     TextField(
                       controller: titleCtrl,
-                      decoration: const InputDecoration(labelText: 'O que precisa ser feito?', border: OutlineInputBorder()),
+                      decoration: const InputDecoration(
+                        labelText: 'O que precisa ser feito?',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     RichMarkdownToolbar(controller: descCtrl),
@@ -1165,49 +1427,99 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
                         Expanded(
                           child: DropdownButtonFormField<String>(
                             initialValue: priority,
-                            decoration: const InputDecoration(labelText: 'Prioridade', border: OutlineInputBorder()),
+                            decoration: const InputDecoration(
+                              labelText: 'Prioridade',
+                              border: OutlineInputBorder(),
+                            ),
                             items: const [
-                              DropdownMenuItem(value: 'low', child: Text('Baixa')),
-                              DropdownMenuItem(value: 'normal', child: Text('Normal')),
-                              DropdownMenuItem(value: 'high', child: Text('Alta')),
-                              DropdownMenuItem(value: 'urgent', child: Text('Urgente')),
+                              DropdownMenuItem(
+                                value: 'low',
+                                child: Text('Baixa'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'normal',
+                                child: Text('Normal'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'high',
+                                child: Text('Alta'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'urgent',
+                                child: Text('Urgente'),
+                              ),
                             ],
-                            onChanged: (v) => setModalState(() => priority = v ?? 'normal'),
+                            onChanged: (v) =>
+                                setModalState(() => priority = v ?? 'normal'),
                           ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: DropdownButtonFormField<String>(
-                            initialValue: ['none', 'daily', 'weekly', 'monthly'].contains(recurrence) ? recurrence : 'none',
-                            decoration: const InputDecoration(labelText: 'Recorrência', border: OutlineInputBorder()),
+                            initialValue:
+                                [
+                                  'none',
+                                  'daily',
+                                  'weekly',
+                                  'monthly',
+                                ].contains(recurrence)
+                                ? recurrence
+                                : 'none',
+                            decoration: const InputDecoration(
+                              labelText: 'Recorrência',
+                              border: OutlineInputBorder(),
+                            ),
                             items: const [
-                              DropdownMenuItem(value: 'none', child: Text('Nenhuma')),
-                              DropdownMenuItem(value: 'daily', child: Text('Diária')),
-                              DropdownMenuItem(value: 'weekly', child: Text('Semanal')),
-                              DropdownMenuItem(value: 'monthly', child: Text('Mensal')),
+                              DropdownMenuItem(
+                                value: 'none',
+                                child: Text('Nenhuma'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'daily',
+                                child: Text('Diária'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'weekly',
+                                child: Text('Semanal'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'monthly',
+                                child: Text('Mensal'),
+                              ),
                             ],
-                            onChanged: (v) => setModalState(() => recurrence = v ?? 'none'),
+                            onChanged: (v) =>
+                                setModalState(() => recurrence = v ?? 'none'),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 12),
                     ListTile(
-                      title: Text(dueDate == null ? 'Definir Prazo / Vencimento (Opcional)' : 'Vencimento: ${_formatDate(dueDate!)}'),
+                      title: Text(
+                        dueDate == null
+                            ? 'Definir Prazo / Vencimento (Opcional)'
+                            : 'Vencimento: ${_formatDate(dueDate!)}',
+                      ),
                       trailing: dueDate != null
                           ? IconButton(
                               icon: const Icon(Icons.clear, size: 18),
-                              onPressed: () => setModalState(() => dueDate = null),
+                              onPressed: () =>
+                                  setModalState(() => dueDate = null),
                             )
                           : const Icon(Icons.calendar_today),
                       onTap: () async {
                         final picked = await showDatePicker(
                           context: context,
                           initialDate: dueDate ?? DateTime.now(),
-                          firstDate: DateTime.now().subtract(const Duration(days: 30)),
-                          lastDate: DateTime.now().add(const Duration(days: 365)),
+                          firstDate: DateTime.now().subtract(
+                            const Duration(days: 30),
+                          ),
+                          lastDate: DateTime.now().add(
+                            const Duration(days: 365),
+                          ),
                         );
-                        if (picked != null) setModalState(() => dueDate = picked);
+                        if (picked != null)
+                          setModalState(() => dueDate = picked);
                       },
                     ),
                     const SizedBox(height: 16),
@@ -1239,7 +1551,10 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
                         );
                         if (ctx.mounted) Navigator.of(ctx).pop();
                       },
-                      child: const Text('Salvar Alterações', style: TextStyle(fontWeight: FontWeight.bold)),
+                      child: const Text(
+                        'Salvar Alterações',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ],
                 ),
@@ -1263,7 +1578,10 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
             child: const Text('Cancelar'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+            ),
             onPressed: () async {
               final taskMgr = ref.read(taskManagerProvider);
               await taskMgr.softDeleteTask(task.id);
@@ -1304,7 +1622,10 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
                     TextField(
                       controller: nameCtrl,
                       autofocus: true,
-                      decoration: const InputDecoration(labelText: 'Nome do Projeto', border: OutlineInputBorder()),
+                      decoration: const InputDecoration(
+                        labelText: 'Nome do Projeto',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     RichMarkdownToolbar(controller: objCtrl),
@@ -1312,7 +1633,10 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
                     TextField(
                       controller: objCtrl,
                       maxLines: 3,
-                      decoration: const InputDecoration(labelText: 'Objetivo Principal (Markdown e imagens)', border: OutlineInputBorder()),
+                      decoration: const InputDecoration(
+                        labelText: 'Objetivo Principal (Markdown e imagens)',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     TextField(
@@ -1327,31 +1651,51 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       initialValue: category,
-                      decoration: const InputDecoration(labelText: 'Categoria', border: OutlineInputBorder()),
+                      decoration: const InputDecoration(
+                        labelText: 'Categoria',
+                        border: OutlineInputBorder(),
+                      ),
                       items: const [
-                        DropdownMenuItem(value: 'ministry', child: Text('Ministério')),
-                        DropdownMenuItem(value: 'personal', child: Text('Pessoal')),
+                        DropdownMenuItem(
+                          value: 'ministry',
+                          child: Text('Ministério'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'personal',
+                          child: Text('Pessoal'),
+                        ),
                         DropdownMenuItem(value: 'study', child: Text('Estudo')),
                       ],
-                      onChanged: (v) => setModalState(() => category = v ?? 'ministry'),
+                      onChanged: (v) =>
+                          setModalState(() => category = v ?? 'ministry'),
                     ),
                     const SizedBox(height: 12),
                     ListTile(
-                      title: Text(targetDate == null ? 'Definir Prazo / Meta (Opcional)' : 'Meta: ${_formatDate(targetDate!)}'),
+                      title: Text(
+                        targetDate == null
+                            ? 'Definir Prazo / Meta (Opcional)'
+                            : 'Meta: ${_formatDate(targetDate!)}',
+                      ),
                       trailing: targetDate != null
                           ? IconButton(
                               icon: const Icon(Icons.clear, size: 18),
-                              onPressed: () => setModalState(() => targetDate = null),
+                              onPressed: () =>
+                                  setModalState(() => targetDate = null),
                             )
                           : const Icon(Icons.flag_outlined),
                       onTap: () async {
                         final picked = await showDatePicker(
                           context: context,
-                          initialDate: targetDate ?? DateTime.now().add(const Duration(days: 30)),
+                          initialDate:
+                              targetDate ??
+                              DateTime.now().add(const Duration(days: 30)),
                           firstDate: DateTime.now(),
-                          lastDate: DateTime.now().add(const Duration(days: 730)),
+                          lastDate: DateTime.now().add(
+                            const Duration(days: 730),
+                          ),
                         );
-                        if (picked != null) setModalState(() => targetDate = picked);
+                        if (picked != null)
+                          setModalState(() => targetDate = picked);
                       },
                     ),
                     const SizedBox(height: 16),
@@ -1380,7 +1724,10 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
                         );
                         if (ctx.mounted) Navigator.of(ctx).pop();
                       },
-                      child: const Text('Criar Projeto', style: TextStyle(fontWeight: FontWeight.bold)),
+                      child: const Text(
+                        'Criar Projeto',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ],
                 ),
@@ -1424,7 +1771,10 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
                   children: [
                     TextField(
                       controller: nameCtrl,
-                      decoration: const InputDecoration(labelText: 'Nome do Projeto', border: OutlineInputBorder()),
+                      decoration: const InputDecoration(
+                        labelText: 'Nome do Projeto',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     RichMarkdownToolbar(controller: objCtrl),
@@ -1432,7 +1782,10 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
                     TextField(
                       controller: objCtrl,
                       maxLines: 3,
-                      decoration: const InputDecoration(labelText: 'Objetivo Principal (Markdown e imagens)', border: OutlineInputBorder()),
+                      decoration: const InputDecoration(
+                        labelText: 'Objetivo Principal (Markdown e imagens)',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     TextField(
@@ -1445,32 +1798,55 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      initialValue: ['ministry', 'personal', 'study'].contains(category) ? category : 'ministry',
-                      decoration: const InputDecoration(labelText: 'Categoria', border: OutlineInputBorder()),
+                      initialValue:
+                          ['ministry', 'personal', 'study'].contains(category)
+                          ? category
+                          : 'ministry',
+                      decoration: const InputDecoration(
+                        labelText: 'Categoria',
+                        border: OutlineInputBorder(),
+                      ),
                       items: const [
-                        DropdownMenuItem(value: 'ministry', child: Text('Ministério')),
-                        DropdownMenuItem(value: 'personal', child: Text('Pessoal')),
+                        DropdownMenuItem(
+                          value: 'ministry',
+                          child: Text('Ministério'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'personal',
+                          child: Text('Pessoal'),
+                        ),
                         DropdownMenuItem(value: 'study', child: Text('Estudo')),
                       ],
-                      onChanged: (v) => setModalState(() => category = v ?? 'ministry'),
+                      onChanged: (v) =>
+                          setModalState(() => category = v ?? 'ministry'),
                     ),
                     const SizedBox(height: 12),
                     ListTile(
-                      title: Text(targetDate == null ? 'Definir Prazo / Meta (Opcional)' : 'Meta: ${_formatDate(targetDate!)}'),
+                      title: Text(
+                        targetDate == null
+                            ? 'Definir Prazo / Meta (Opcional)'
+                            : 'Meta: ${_formatDate(targetDate!)}',
+                      ),
                       trailing: targetDate != null
                           ? IconButton(
                               icon: const Icon(Icons.clear, size: 18),
-                              onPressed: () => setModalState(() => targetDate = null),
+                              onPressed: () =>
+                                  setModalState(() => targetDate = null),
                             )
                           : const Icon(Icons.flag_outlined),
                       onTap: () async {
                         final picked = await showDatePicker(
                           context: context,
-                          initialDate: targetDate ?? DateTime.now().add(const Duration(days: 30)),
+                          initialDate:
+                              targetDate ??
+                              DateTime.now().add(const Duration(days: 30)),
                           firstDate: DateTime.now(),
-                          lastDate: DateTime.now().add(const Duration(days: 730)),
+                          lastDate: DateTime.now().add(
+                            const Duration(days: 730),
+                          ),
                         );
-                        if (picked != null) setModalState(() => targetDate = picked);
+                        if (picked != null)
+                          setModalState(() => targetDate = picked);
                       },
                     ),
                     const SizedBox(height: 16),
@@ -1500,7 +1876,10 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
                         );
                         if (ctx.mounted) Navigator.of(ctx).pop();
                       },
-                      child: const Text('Salvar Alterações', style: TextStyle(fontWeight: FontWeight.bold)),
+                      child: const Text(
+                        'Salvar Alterações',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ],
                 ),
@@ -1517,14 +1896,19 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Excluir Projeto'),
-        content: Text('Tem certeza que deseja excluir "${project.name}"? As tarefas vinculadas serão preservadas.'),
+        content: Text(
+          'Tem certeza que deseja excluir "${project.name}"? As tarefas vinculadas serão preservadas.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Cancelar'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+            ),
             onPressed: () async {
               final projMgr = ref.read(projectManagerProvider);
               await projMgr.softDeleteProject(project.id);
@@ -1545,7 +1929,10 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
         backgroundColor: const Color(0xFF3B82F6),
         foregroundColor: Colors.white,
         icon: const Icon(Icons.create_new_folder),
-        label: const Text('Novo Projeto', style: TextStyle(fontWeight: FontWeight.bold)),
+        label: const Text(
+          'Novo Projeto',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
       );
     }
     return FloatingActionButton.extended(
@@ -1554,14 +1941,21 @@ class _TasksScreenState extends ConsumerState<TasksScreen> with SingleTickerProv
       backgroundColor: AppTheme.primaryBlue,
       foregroundColor: Colors.white,
       icon: const Icon(Icons.add_task),
-      label: const Text('Nova Tarefa', style: TextStyle(fontWeight: FontWeight.bold)),
+      label: const Text(
+        'Nova Tarefa',
+        style: TextStyle(fontWeight: FontWeight.bold),
+      ),
     );
   }
 
   Widget _priorityIcon(String priority) {
     switch (priority) {
       case 'urgent':
-        return const Icon(Icons.priority_high, color: Colors.redAccent, size: 20);
+        return const Icon(
+          Icons.priority_high,
+          color: Colors.redAccent,
+          size: 20,
+        );
       case 'high':
         return const Icon(Icons.arrow_upward, color: Colors.amber, size: 20);
       case 'low':
@@ -1594,5 +1988,9 @@ class _ContactActionRow {
   final String note;
   final DateTime date;
 
-  _ContactActionRow({required this.person, required this.note, required this.date});
+  _ContactActionRow({
+    required this.person,
+    required this.note,
+    required this.date,
+  });
 }

@@ -20,15 +20,25 @@ class FakeExchange implements ExchangeSession {
   @override
   Future<String> inboxId() async => 'inbox';
   @override
-  Future<List<eas.EasFolder>> mailFolders() async => const [eas.EasFolder(serverId: 'inbox', parentId: '0', displayName: 'Inbox', type: eas.EasFolderType.defaultInbox)];
+  Future<List<eas.EasFolder>> mailFolders() async => const [
+    eas.EasFolder(
+      serverId: 'inbox',
+      parentId: '0',
+      displayName: 'Inbox',
+      type: eas.EasFolderType.defaultInbox,
+    ),
+  ];
   @override
   Future<eas.SyncResult> readPage(String folder, String key) async {
     keys.add(key);
     if (failureAt == keys.length) throw StateError('sensitive secret');
     return pages[keys.length - 1];
   }
+
   @override
-  void close() { closed = true; }
+  void close() {
+    closed = true;
+  }
 }
 
 class MultiFolderExchange implements ExchangeSession {
@@ -37,67 +47,147 @@ class MultiFolderExchange implements ExchangeSession {
   Future<String> inboxId() async => 'inbox';
   @override
   Future<List<eas.EasFolder>> mailFolders() async => const [
-    eas.EasFolder(serverId: 'inbox', parentId: '0', displayName: 'Entrada', type: eas.EasFolderType.defaultInbox),
-    eas.EasFolder(serverId: 'sent', parentId: '0', displayName: 'Enviados', type: eas.EasFolderType.defaultSentItems),
+    eas.EasFolder(
+      serverId: 'inbox',
+      parentId: '0',
+      displayName: 'Entrada',
+      type: eas.EasFolderType.defaultInbox,
+    ),
+    eas.EasFolder(
+      serverId: 'sent',
+      parentId: '0',
+      displayName: 'Enviados',
+      type: eas.EasFolderType.defaultSentItems,
+    ),
   ];
   @override
   Future<eas.SyncResult> readPage(String folder, String key) async {
     calls.add('$folder:$key');
-    return eas.SyncResult(status: 1, syncKey: key == '0' ? '${folder}_1' : '${folder}_2',
-      collectionId: folder, addedEmails: key == '0' ? [] : [
-        eas.EasEmail(serverId: 'same-id', subject: 'Mensagem $folder', body: 'Corpo $folder'),
-      ]);
+    return eas.SyncResult(
+      status: 1,
+      syncKey: key == '0' ? '${folder}_1' : '${folder}_2',
+      collectionId: folder,
+      addedEmails: key == '0'
+          ? []
+          : [
+              eas.EasEmail(
+                serverId: 'same-id',
+                subject: 'Mensagem $folder',
+                body: 'Corpo $folder',
+              ),
+            ],
+    );
   }
+
   @override
   void close() {}
 }
 
-eas.SyncResult page(String key, {int status = 1, bool more = false, List<eas.EasEmail> emails = const [], List<String> deleted = const []}) =>
-  eas.SyncResult(status: status, syncKey: key, collectionId: 'inbox', addedEmails: emails, deletedIds: deleted, moreAvailable: more);
+eas.SyncResult page(
+  String key, {
+  int status = 1,
+  bool more = false,
+  List<eas.EasEmail> emails = const [],
+  List<String> deleted = const [],
+}) => eas.SyncResult(
+  status: status,
+  syncKey: key,
+  collectionId: 'inbox',
+  addedEmails: emails,
+  deletedIds: deleted,
+  moreAvailable: more,
+);
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late AppDatabase db;
   setUp(() => db = AppDatabase.forTesting(NativeDatabase.memory()));
   tearDown(() async => db.close());
-  Future<ExchangeReadResult> sync(FakeExchange fake, {int maxPages = 50}) => ExchangeReadService(db).sync(
-      session: fake, host: 'mail.example.org', account: 'user@example.org', deviceId: 'device1', maxPages: maxPages);
+  Future<ExchangeReadResult> sync(FakeExchange fake, {int maxPages = 50}) =>
+      ExchangeReadService(db).sync(
+        session: fake,
+        host: 'mail.example.org',
+        account: 'user@example.org',
+        deviceId: 'device1',
+        maxPages: maxPages,
+      );
 
-  test('páginas são salvas com chave e exclusões remotas não apagam prévias', () async {
-    const mail = eas.EasEmail(serverId: 'm1', subject: 'Teste', from: 'from@example.org', body: 'Mensagem');
-    final first = FakeExchange([page('k1'), page('k2', more: true, emails: [mail]), page('k3', deleted: ['m1'])]);
-    final result = await sync(first);
-    expect(result.saved, 1);
-    expect(result.moreAvailable, isFalse);
-    expect(first.keys, ['0', 'k1', 'k2']);
-    expect(first.closed, isTrue);
-    final items = await db.select(db.inboxEntries).get();
-    expect(items.length, 1);
-    expect((jsonDecode(items.single.metadata) as Map)['exchangePreview'], isTrue);
-    expect(items.single.deletedAt, isNull);
-    final queue = await db.select(db.syncQueue).get();
-    expect(queue.single.entityType, 'inbox_entries');
-    expect(queue.single.entityId, items.single.id);
-    expect(queue.single.operation, 'INSERT');
-    final second = FakeExchange([page('k4', emails: [mail])]);
-    expect((await sync(second)).saved, 0);
-    expect(second.keys, ['k3']);
-  });
+  test(
+    'páginas são salvas com chave e exclusões remotas não apagam prévias',
+    () async {
+      const mail = eas.EasEmail(
+        serverId: 'm1',
+        subject: 'Teste',
+        from: 'from@example.org',
+        body: 'Mensagem',
+      );
+      final first = FakeExchange([
+        page('k1'),
+        page('k2', more: true, emails: [mail]),
+        page('k3', deleted: ['m1']),
+      ]);
+      final result = await sync(first);
+      expect(result.saved, 1);
+      expect(result.moreAvailable, isFalse);
+      expect(first.keys, ['0', 'k1', 'k2']);
+      expect(first.closed, isTrue);
+      final items = await db.select(db.inboxEntries).get();
+      expect(items.length, 1);
+      expect(
+        (jsonDecode(items.single.metadata) as Map)['exchangePreview'],
+        isTrue,
+      );
+      expect(items.single.deletedAt, isNull);
+      final queue = await db.select(db.syncQueue).get();
+      expect(queue.single.entityType, 'inbox_entries');
+      expect(queue.single.entityId, items.single.id);
+      expect(queue.single.operation, 'INSERT');
+      final second = FakeExchange([
+        page('k4', emails: [mail]),
+      ]);
+      expect((await sync(second)).saved, 0);
+      expect(second.keys, ['k3']);
+    },
+  );
 
-  test('falha interrompe sem avançar chave do lote e nova execução retoma', () async {
-    const mail = eas.EasEmail(serverId: 'm1', subject: 'Teste', body: 'Texto');
-    final first = FakeExchange([page('k1'), page('k2', more: true, emails: [mail])], failureAt: 3);
-    await expectLater(sync(first), throwsA(isA<ExchangeException>()
-        .having((e) => e.message, 'no secret', isNot(contains('secret')))));
-    expect(first.closed, isTrue);
-    expect((await db.select(db.inboxEntries).get()).length, 1);
-    final retry = FakeExchange([page('k3')]);
-    await sync(retry);
-    expect(retry.keys, ['k2']);
-  });
+  test(
+    'falha interrompe sem avançar chave do lote e nova execução retoma',
+    () async {
+      const mail = eas.EasEmail(
+        serverId: 'm1',
+        subject: 'Teste',
+        body: 'Texto',
+      );
+      final first = FakeExchange([
+        page('k1'),
+        page('k2', more: true, emails: [mail]),
+      ], failureAt: 3);
+      await expectLater(
+        sync(first),
+        throwsA(
+          isA<ExchangeException>().having(
+            (e) => e.message,
+            'no secret',
+            isNot(contains('secret')),
+          ),
+        ),
+      );
+      expect(first.closed, isTrue);
+      expect((await db.select(db.inboxEntries).get()).length, 1);
+      final retry = FakeExchange([page('k3')]);
+      await sync(retry);
+      expect(retry.keys, ['k2']);
+    },
+  );
 
   test('chave expirada reinicia sem excluir mensagens locais', () async {
-    final first = FakeExchange([page('k1'), page('k2', emails: [const eas.EasEmail(serverId: 'm', body: 'x')])]);
+    final first = FakeExchange([
+      page('k1'),
+      page(
+        'k2',
+        emails: [const eas.EasEmail(serverId: 'm', body: 'x')],
+      ),
+    ]);
     await sync(first);
     final retry = FakeExchange([page('k2', status: 3), page('j1'), page('j2')]);
     await sync(retry);
@@ -113,169 +203,386 @@ void main() {
 
   test('pastas recebem chaves independentes e prévias enfileiradas', () async {
     final session = MultiFolderExchange();
-    final result = await ExchangeReadService(db).sync(session: session,
-      host: 'mail.example.org', account: 'user', deviceId: 'device1', allMailFolders: true);
+    final result = await ExchangeReadService(db).sync(
+      session: session,
+      host: 'mail.example.org',
+      account: 'user',
+      deviceId: 'device1',
+      allMailFolders: true,
+    );
     expect(result.foldersRead, 2);
     expect(result.saved, 2);
     expect(result.moreAvailable, isFalse);
-    expect(session.calls, ['inbox:0', 'inbox:inbox_1', 'sent:0', 'sent:sent_1']);
+    expect(session.calls, [
+      'inbox:0',
+      'inbox:inbox_1',
+      'sent:0',
+      'sent:sent_1',
+    ]);
     final rows = await db.select(db.inboxEntries).get();
-    final names = rows.map((row) => (jsonDecode(row.metadata)['email'] as Map)['folderName']).toSet();
+    final names = rows
+        .map((row) => (jsonDecode(row.metadata)['email'] as Map)['folderName'])
+        .toSet();
     expect(names, {'Entrada', 'Enviados'});
     expect((await db.select(db.syncQueue).get()).length, 2);
     final second = MultiFolderExchange();
-    await ExchangeReadService(db).sync(session: second, host: 'mail.example.org',
-        account: 'user', deviceId: 'device1', allMailFolders: true);
+    await ExchangeReadService(db).sync(
+      session: second,
+      host: 'mail.example.org',
+      account: 'user',
+      deviceId: 'device1',
+      allMailFolders: true,
+    );
     expect(second.calls, ['inbox:inbox_2', 'sent:sent_2']);
     expect((await db.select(db.inboxEntries).get()).length, 2);
     expect((await db.select(db.syncQueue).get()).length, 2);
   });
 
   test('falha ao enfileirar prévia reverte página e chave Exchange', () async {
-    await db.customStatement("CREATE TRIGGER reject_queue BEFORE INSERT ON sync_queue BEGIN SELECT RAISE(ABORT, 'queue failed'); END");
-    const mail = eas.EasEmail(serverId: 'x', body: 'x', attachments: [
-      eas.EasAttachment(displayName: 'doc', fileReference: 'ref')]);
-    final fake = FakeExchange([page('k1'), page('k2', emails: [mail])]);
+    await db.customStatement(
+      "CREATE TRIGGER reject_queue BEFORE INSERT ON sync_queue BEGIN SELECT RAISE(ABORT, 'queue failed'); END",
+    );
+    const mail = eas.EasEmail(
+      serverId: 'x',
+      body: 'x',
+      attachments: [
+        eas.EasAttachment(displayName: 'doc', fileReference: 'ref'),
+      ],
+    );
+    final fake = FakeExchange([
+      page('k1'),
+      page('k2', emails: [mail]),
+    ]);
     await expectLater(sync(fake), throwsA(isA<ExchangeException>()));
     expect(await db.select(db.inboxEntries).get(), isEmpty);
     expect(await db.select(db.syncQueue).get(), isEmpty);
-    expect((await db.select(db.appKvStore).get()).where((row) => row.key.startsWith('eas_attachment_refs_')).toList(), isEmpty);
+    expect(
+      (await db.select(db.appKvStore).get())
+          .where((row) => row.key.startsWith('eas_attachment_refs_'))
+          .toList(),
+      isEmpty,
+    );
     await db.customStatement('DROP TRIGGER reject_queue');
-    final retry = FakeExchange([page('k2', emails: [mail])]);
+    final retry = FakeExchange([
+      page('k2', emails: [mail]),
+    ]);
     expect((await sync(retry)).saved, 1);
     expect(retry.keys, ['k1']);
-    expect((await db.select(db.appKvStore).get()).where((row) => row.key.startsWith('eas_attachment_refs_')).toList(), hasLength(1));
+    expect(
+      (await db.select(db.appKvStore).get())
+          .where((row) => row.key.startsWith('eas_attachment_refs_'))
+          .toList(),
+      hasLength(1),
+    );
   });
 
-  test('prévia enfileirada atravessa push e pull simulados para outro dispositivo', () async {
-    const mail = eas.EasEmail(serverId: 'm1', subject: 'Teste', from: 'from@example.org', body: 'Texto');
-    await sync(FakeExchange([page('k1'), page('k2', emails: [mail])]));
-    Map<String, dynamic>? stored;
-    final httpClient = MockClient((request) async {
-      Object body = <dynamic>[];
-      if (request.method == 'POST' && request.url.path.endsWith('/rpc/sync_upsert_if_unchanged')) {
-        final payload = jsonDecode(request.body) as Map<String, dynamic>;
-        expect(payload['p_table'], 'inbox_entries');
-        stored = Map<String, dynamic>.from(payload['p_payload'] as Map);
-        body = {'success': true};
-      } else if (request.method == 'GET' && request.url.path.endsWith('/inbox_entries') && stored != null) {
-        body = [stored!];
-      }
-      return http.Response(jsonEncode(body), 200, request: request,
-          headers: {'content-type': 'application/json', 'content-range': '*/0'});
-    });
-    final client = SupabaseClient('https://mock.supabase.co', 'dummy-key', httpClient: httpClient);
-    final sender = SupabaseSyncService(allowLegacySyncForTesting: true, db: db, repository: AppRepository(db), clientOverride: client);
-    addTearDown(sender.dispose);
-    final pushed = await sender.processQueue();
-    expect(pushed.success, isTrue, reason: pushed.errors.toString());
-    expect((await db.select(db.syncQueue).get()).single.status, 'synced');
-    expect(stored, isNotNull);
-    final other = AppDatabase.forTesting(NativeDatabase.memory());
-    addTearDown(other.close);
-    final receiver = SupabaseSyncService(allowLegacySyncForTesting: true, db: other, repository: AppRepository(other), clientOverride: client);
-    addTearDown(receiver.dispose);
-    final pulled = await receiver.fetchRemoteChanges();
-    expect(pulled.success, isTrue, reason: pulled.errors.toString());
-    final copied = (await other.select(other.inboxEntries).get()).single;
-    final email = (jsonDecode(copied.metadata) as Map)['email'] as Map;
-    expect(email['subject'], 'Teste');
-    expect(email['bodyText'], contains('Texto'));
-    expect(email['isPermanentRetained'], isFalse);
-  });
+  test(
+    'prévia enfileirada atravessa push e pull simulados para outro dispositivo',
+    () async {
+      const mail = eas.EasEmail(
+        serverId: 'm1',
+        subject: 'Teste',
+        from: 'from@example.org',
+        body: 'Texto',
+      );
+      await sync(
+        FakeExchange([
+          page('k1'),
+          page('k2', emails: [mail]),
+        ]),
+      );
+      Map<String, dynamic>? stored;
+      final httpClient = MockClient((request) async {
+        Object body = <dynamic>[];
+        if (request.method == 'POST' &&
+            request.url.path.endsWith('/rpc/sync_upsert_if_unchanged')) {
+          final payload = jsonDecode(request.body) as Map<String, dynamic>;
+          expect(payload['p_table'], 'inbox_entries');
+          stored = Map<String, dynamic>.from(payload['p_payload'] as Map);
+          body = {'success': true};
+        } else if (request.method == 'GET' &&
+            request.url.path.endsWith('/inbox_entries') &&
+            stored != null) {
+          body = [stored!];
+        }
+        return http.Response(
+          jsonEncode(body),
+          200,
+          request: request,
+          headers: {'content-type': 'application/json', 'content-range': '*/0'},
+        );
+      });
+      final client = SupabaseClient(
+        'https://mock.supabase.co',
+        'dummy-key',
+        httpClient: httpClient,
+      );
+      final sender = SupabaseSyncService(
+        allowLegacySyncForTesting: true,
+        db: db,
+        repository: AppRepository(db),
+        clientOverride: client,
+      );
+      addTearDown(sender.dispose);
+      final pushed = await sender.processQueue();
+      expect(pushed.success, isTrue, reason: pushed.errors.toString());
+      expect((await db.select(db.syncQueue).get()).single.status, 'synced');
+      expect(stored, isNotNull);
+      final other = AppDatabase.forTesting(NativeDatabase.memory());
+      addTearDown(other.close);
+      final receiver = SupabaseSyncService(
+        allowLegacySyncForTesting: true,
+        db: other,
+        repository: AppRepository(other),
+        clientOverride: client,
+      );
+      addTearDown(receiver.dispose);
+      final pulled = await receiver.fetchRemoteChanges();
+      expect(pulled.success, isTrue, reason: pulled.errors.toString());
+      final copied = (await other.select(other.inboxEntries).get()).single;
+      final email = (jsonDecode(copied.metadata) as Map)['email'] as Map;
+      expect(email['subject'], 'Teste');
+      expect(email['bodyText'], contains('Texto'));
+      expect(email['isPermanentRetained'], isFalse);
+    },
+  );
 
-  test('FolderSync usa HTTPS, sem redirecionamento e decodifica INBOX', () async {
-    eas.WbxmlElement node(String tag, {String? text, List<eas.WbxmlElement>? children}) =>
-        eas.WbxmlElement(namespace: 'FolderHierarchy', tag: tag, text: text, children: children, codePageIndex: 7);
-    final response = eas.WbxmlEncoder().encode(eas.WbxmlDocument(root: node('FolderSync', children: [
-      node('Status', text: '1'), node('SyncKey', text: '1'), node('Changes', children: [
-        node('Count', text: '1'), node('Add', children: [node('ServerId', text: 'inbox'),
-          node('ParentId', text: '0'), node('DisplayName', text: 'Inbox'), node('Type', text: '2')])])])));
-    final client = MockClient((request) async {
-      expect(request.url.scheme, 'https');
-      expect(request.url.host, 'mail.example.org');
-      expect(request.url.path, '/Microsoft-Server-ActiveSync');
-      expect(request.url.queryParameters['Cmd'], 'FolderSync');
-      expect(request.followRedirects, isFalse);
-      return http.Response.bytes(response, 200);
-    });
-    final session = ExchangeProtocolSession(host: 'mail.example.org', username: 'user',
-        password: 'secret', deviceId: 'device1', httpClient: client);
-    expect(await session.inboxId(), 'inbox');
-    session.close();
-  });
+  test(
+    'FolderSync usa HTTPS, sem redirecionamento e decodifica INBOX',
+    () async {
+      eas.WbxmlElement node(
+        String tag, {
+        String? text,
+        List<eas.WbxmlElement>? children,
+      }) => eas.WbxmlElement(
+        namespace: 'FolderHierarchy',
+        tag: tag,
+        text: text,
+        children: children,
+        codePageIndex: 7,
+      );
+      final response = eas.WbxmlEncoder().encode(
+        eas.WbxmlDocument(
+          root: node(
+            'FolderSync',
+            children: [
+              node('Status', text: '1'),
+              node('SyncKey', text: '1'),
+              node(
+                'Changes',
+                children: [
+                  node('Count', text: '1'),
+                  node(
+                    'Add',
+                    children: [
+                      node('ServerId', text: 'inbox'),
+                      node('ParentId', text: '0'),
+                      node('DisplayName', text: 'Inbox'),
+                      node('Type', text: '2'),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+      final client = MockClient((request) async {
+        expect(request.url.scheme, 'https');
+        expect(request.url.host, 'mail.example.org');
+        expect(request.url.path, '/Microsoft-Server-ActiveSync');
+        expect(request.url.queryParameters['Cmd'], 'FolderSync');
+        expect(request.followRedirects, isFalse);
+        return http.Response.bytes(response, 200);
+      });
+      final session = ExchangeProtocolSession(
+        host: 'mail.example.org',
+        username: 'user',
+        password: 'secret',
+        deviceId: 'device1',
+        httpClient: client,
+      );
+      expect(await session.inboxId(), 'inbox');
+      session.close();
+    },
+  );
 
-  test('pedido de política é recusado sem confirmação de conformidade', () async {
-    final client = MockClient((request) async {
-      expect(request.url.queryParameters['Cmd'], 'FolderSync');
-      return http.Response('', 449);
-    });
-    final session = ExchangeProtocolSession(host: 'mail.example.org', username: 'user',
-        password: 'secret', deviceId: 'device1', httpClient: client);
-    await expectLater(ExchangeReadService(db).sync(session: session, host: 'mail.example.org',
-      account: 'user', deviceId: 'device1'),
-      throwsA(isA<ExchangeException>().having((e) => e.message, 'políticas', contains('políticas'))));
-    expect(await db.select(db.inboxEntries).get(), isEmpty);
-  });
+  test(
+    'pedido de política é recusado sem confirmação de conformidade',
+    () async {
+      final client = MockClient((request) async {
+        expect(request.url.queryParameters['Cmd'], 'FolderSync');
+        return http.Response('', 449);
+      });
+      final session = ExchangeProtocolSession(
+        host: 'mail.example.org',
+        username: 'user',
+        password: 'secret',
+        deviceId: 'device1',
+        httpClient: client,
+      );
+      await expectLater(
+        ExchangeReadService(db).sync(
+          session: session,
+          host: 'mail.example.org',
+          account: 'user',
+          deviceId: 'device1',
+        ),
+        throwsA(
+          isA<ExchangeException>().having(
+            (e) => e.message,
+            'políticas',
+            contains('políticas'),
+          ),
+        ),
+      );
+      expect(await db.select(db.inboxEntries).get(), isEmpty);
+    },
+  );
 
   test('rejeita URL em vez de hostname antes de enviar credenciais', () {
-    expect(() => ExchangeProtocolSession(host: 'https://mail.example.org', username: 'u', password: 'p', deviceId: 'd'),
-      throwsA(isA<ExchangeException>()));
+    expect(
+      () => ExchangeProtocolSession(
+        host: 'https://mail.example.org',
+        username: 'u',
+        password: 'p',
+        deviceId: 'd',
+      ),
+      throwsA(isA<ExchangeException>()),
+    );
   });
-  test('Sync de leitura pede todas as idades sem comandos de escrita', () async {
-    eas.WbxmlElement node(String tag, {String? text, List<eas.WbxmlElement>? children}) =>
-        eas.WbxmlElement(namespace: 'AirSync', tag: tag, text: text, children: children);
-    final response = eas.WbxmlEncoder().encode(eas.WbxmlDocument(root: node('Sync', children: [
-      node('Collections', children: [node('Collection', children: [
-        node('SyncKey', text: '124'), node('CollectionId', text: 'inbox'), node('Status', text: '1'),
-      ])]),
-    ])));
-    final client = MockClient((request) async {
-      expect(request.url.queryParameters['Cmd'], 'Sync');
-      final root = eas.WbxmlDecoder().decode(request.bodyBytes).root;
-      Iterable<eas.WbxmlElement> descendants(eas.WbxmlElement node) sync* {
-        yield node;
-        for (final child in node.children) { yield* descendants(child); }
-      }
-      final nodes = descendants(root).toList();
-      expect(nodes.where((n) => n.namespace == 'AirSync' && n.tag == 'FilterType'), isEmpty,
-          reason: 'sem filtro de tempo, o protocolo solicita todos os itens disponíveis');
-      expect(nodes.where((n) => n.namespace == 'AirSync' && n.tag == 'Commands'), isEmpty);
-      expect(nodes.singleWhere((n) => n.tag == 'CollectionId').text, 'inbox');
-      expect(nodes.singleWhere((n) => n.tag == 'TruncationSize').text, '262144',
-          reason: 'o corpo continua sendo apenas prévia, não MIME completo');
-      return http.Response.bytes(response, 200);
-    });
-    final session = ExchangeProtocolSession(host: 'mail.example.org', username: 'user',
-      password: 'secret', deviceId: 'device1', httpClient: client);
-    final result = await session.readPage('inbox', '123');
-    expect(result.syncKey, '124');
-    expect(result.status, 1);
-    session.close();
-  });
+  test(
+    'Sync de leitura pede todas as idades sem comandos de escrita',
+    () async {
+      eas.WbxmlElement node(
+        String tag, {
+        String? text,
+        List<eas.WbxmlElement>? children,
+      }) => eas.WbxmlElement(
+        namespace: 'AirSync',
+        tag: tag,
+        text: text,
+        children: children,
+      );
+      final response = eas.WbxmlEncoder().encode(
+        eas.WbxmlDocument(
+          root: node(
+            'Sync',
+            children: [
+              node(
+                'Collections',
+                children: [
+                  node(
+                    'Collection',
+                    children: [
+                      node('SyncKey', text: '124'),
+                      node('CollectionId', text: 'inbox'),
+                      node('Status', text: '1'),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+      final client = MockClient((request) async {
+        expect(request.url.queryParameters['Cmd'], 'Sync');
+        final root = eas.WbxmlDecoder().decode(request.bodyBytes).root;
+        Iterable<eas.WbxmlElement> descendants(eas.WbxmlElement node) sync* {
+          yield node;
+          for (final child in node.children) {
+            yield* descendants(child);
+          }
+        }
 
-  test('referências de anexos persistem e mudança parcial não as apaga', () async {
-    final first = FakeExchange([
-      page('1'),
-      page('2', emails: [const eas.EasEmail(serverId: 'm1', subject: 'Com anexo',
-        attachments: [eas.EasAttachment(displayName: 'documento.pdf', fileReference: 'ref-1', estimatedSize: 42)])]),
-    ]);
-    await ExchangeReadService(db).sync(session: first, host: 'mail.example.org', account: 'user', deviceId: 'd');
-    var refs = (await db.select(db.appKvStore).get()).where((row) => row.key.startsWith('eas_attachment_refs_')).toList();
-    expect(refs, hasLength(1));
-    final saved = jsonDecode(refs.single.value) as Map;
-    expect(saved['serverId'], 'm1');
-    expect((saved['attachments'] as List).single['fileReference'], 'ref-1');
-    expect((saved['attachments'] as List).single['estimatedSize'], 42);
+        final nodes = descendants(root).toList();
+        expect(
+          nodes.where((n) => n.namespace == 'AirSync' && n.tag == 'FilterType'),
+          isEmpty,
+          reason: 'sem filtro de tempo, o protocolo solicita todos os itens disponíveis',
+        );
+        expect(
+          nodes.where((n) => n.namespace == 'AirSync' && n.tag == 'Commands'),
+          isEmpty,
+        );
+        expect(nodes.singleWhere((n) => n.tag == 'CollectionId').text, 'inbox');
+        expect(
+          nodes.singleWhere((n) => n.tag == 'TruncationSize').text,
+          '262144',
+          reason: 'o corpo continua sendo apenas prévia, não MIME completo',
+        );
+        return http.Response.bytes(response, 200);
+      });
+      final session = ExchangeProtocolSession(
+        host: 'mail.example.org',
+        username: 'user',
+        password: 'secret',
+        deviceId: 'device1',
+        httpClient: client,
+      );
+      final result = await session.readPage('inbox', '123');
+      expect(result.syncKey, '124');
+      expect(result.status, 1);
+      session.close();
+    },
+  );
 
-    final second = FakeExchange([
-      eas.SyncResult(status: 1, syncKey: '3', collectionId: 'inbox', changedEmails: [
-        const eas.EasEmail(serverId: 'm1', read: true),
-      ]),
-    ]);
-    await ExchangeReadService(db).sync(session: second, host: 'mail.example.org', account: 'user', deviceId: 'd');
-    refs = (await db.select(db.appKvStore).get()).where((row) => row.key.startsWith('eas_attachment_refs_')).toList();
-    expect(refs.single.value, jsonEncode(saved));
-  });
+  test(
+    'referências de anexos persistem e mudança parcial não as apaga',
+    () async {
+      final first = FakeExchange([
+        page('1'),
+        page(
+          '2',
+          emails: [
+            const eas.EasEmail(
+              serverId: 'm1',
+              subject: 'Com anexo',
+              attachments: [
+                eas.EasAttachment(
+                  displayName: 'documento.pdf',
+                  fileReference: 'ref-1',
+                  estimatedSize: 42,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ]);
+      await ExchangeReadService(db).sync(
+        session: first,
+        host: 'mail.example.org',
+        account: 'user',
+        deviceId: 'd',
+      );
+      var refs = (await db.select(db.appKvStore).get())
+          .where((row) => row.key.startsWith('eas_attachment_refs_'))
+          .toList();
+      expect(refs, hasLength(1));
+      final saved = jsonDecode(refs.single.value) as Map;
+      expect(saved['serverId'], 'm1');
+      expect((saved['attachments'] as List).single['fileReference'], 'ref-1');
+      expect((saved['attachments'] as List).single['estimatedSize'], 42);
 
+      final second = FakeExchange([
+        eas.SyncResult(
+          status: 1,
+          syncKey: '3',
+          collectionId: 'inbox',
+          changedEmails: [const eas.EasEmail(serverId: 'm1', read: true)],
+        ),
+      ]);
+      await ExchangeReadService(db).sync(
+        session: second,
+        host: 'mail.example.org',
+        account: 'user',
+        deviceId: 'd',
+      );
+      refs = (await db.select(db.appKvStore).get())
+          .where((row) => row.key.startsWith('eas_attachment_refs_'))
+          .toList();
+      expect(refs.single.value, jsonEncode(saved));
+    },
+  );
 }

@@ -24,7 +24,11 @@ void main() {
     final sync = SupabaseSyncService(
       db: db,
       repository: repo,
-      clientOverride: SupabaseClient('https://mock.supabase.co', 'key', httpClient: httpClient),
+      clientOverride: SupabaseClient(
+        'https://mock.supabase.co',
+        'key',
+        httpClient: httpClient,
+      ),
     );
     addTearDown(() async {
       sync.dispose();
@@ -34,7 +38,11 @@ void main() {
     final person = await repo.createPerson(name: 'Dado privado');
     final before = await db.select(db.syncQueue).get();
     expect(before, isNotEmpty);
-    final results = [await sync.sync(), await sync.processQueue(), await sync.fetchRemoteChanges()];
+    final results = [
+      await sync.sync(),
+      await sync.processQueue(),
+      await sync.fetchRemoteChanges(),
+    ];
     for (final result in results) {
       expect(result.success, isFalse);
       expect(result.message, contains('pausada'));

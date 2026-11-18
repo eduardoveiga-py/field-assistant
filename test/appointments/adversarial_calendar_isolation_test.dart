@@ -23,7 +23,9 @@ class ExplodingDeviceCalendarPlugin implements dev_cal.DeviceCalendarPlugin {
   void _recordAndExplode(String methodName) {
     invocationCount++;
     recordedCalls.add(methodName);
-    throw StateError('ADVERSARIAL FAILURE: DeviceCalendarPlugin.$methodName was invoked on an unsupported platform!');
+    throw StateError(
+      'ADVERSARIAL FAILURE: DeviceCalendarPlugin.$methodName was invoked on an unsupported platform!',
+    );
   }
 
   @override
@@ -46,7 +48,8 @@ class ExplodingDeviceCalendarPlugin implements dev_cal.DeviceCalendarPlugin {
   }
 
   @override
-  Future<dev_cal.Result<UnmodifiableListView<dev_cal.Calendar>>> retrieveCalendars() async {
+  Future<dev_cal.Result<UnmodifiableListView<dev_cal.Calendar>>>
+  retrieveCalendars() async {
     _recordAndExplode('retrieveCalendars');
     return dev_cal.Result<UnmodifiableListView<dev_cal.Calendar>>();
   }
@@ -61,13 +64,18 @@ class ExplodingDeviceCalendarPlugin implements dev_cal.DeviceCalendarPlugin {
   }
 
   @override
-  Future<dev_cal.Result<String>?> createOrUpdateEvent(dev_cal.Event? event) async {
+  Future<dev_cal.Result<String>?> createOrUpdateEvent(
+    dev_cal.Event? event,
+  ) async {
     _recordAndExplode('createOrUpdateEvent');
     return null;
   }
 
   @override
-  Future<dev_cal.Result<bool>> deleteEvent(String? calendarId, String? eventId) async {
+  Future<dev_cal.Result<bool>> deleteEvent(
+    String? calendarId,
+    String? eventId,
+  ) async {
     _recordAndExplode('deleteEvent');
     return dev_cal.Result<bool>();
   }
@@ -118,7 +126,10 @@ class ControllableGoogleCalendarProvider extends GoogleCalendarProvider {
   }
 
   @override
-  Future<bool> deleteExternalEvent(AppDatabase db, String externalEventId) async {
+  Future<bool> deleteExternalEvent(
+    AppDatabase db,
+    String externalEventId,
+  ) async {
     deleteCount++;
     return true;
   }
@@ -141,7 +152,9 @@ void main() {
         'apple_eventkit_selected_id': 'pre_existing_id',
       });
       explodingPlugin = ExplodingDeviceCalendarPlugin();
-      appleProvider = AppleEventKitProvider(deviceCalendarPlugin: explodingPlugin);
+      appleProvider = AppleEventKitProvider(
+        deviceCalendarPlugin: explodingPlugin,
+      );
     });
 
     tearDown(() async {
@@ -158,70 +171,97 @@ void main() {
     ];
 
     for (final platform in unsupportedPlatforms) {
-      test('AppleEventKitProvider strictly never invokes DeviceCalendarPlugin on $platform', () async {
-        debugDefaultTargetPlatformOverride = platform;
+      test(
+        'AppleEventKitProvider strictly never invokes DeviceCalendarPlugin on $platform',
+        () async {
+          debugDefaultTargetPlatformOverride = platform;
 
-        // 1. Capability check
-        expect(appleProvider.isSupportedOnCurrentPlatform, isFalse,
-            reason: '$platform should not be reported as supported for Apple EventKit');
+          // 1. Capability check
+          expect(
+            appleProvider.isSupportedOnCurrentPlatform,
+            isFalse,
+            reason:
+                '$platform should not be reported as supported for Apple EventKit',
+          );
 
-        // 2. isAuthorized
-        final isAuth = await appleProvider.isAuthorized();
-        expect(isAuth, isFalse);
+          // 2. isAuthorized
+          final isAuth = await appleProvider.isAuthorized();
+          expect(isAuth, isFalse);
 
-        // 3. requestAuthorization
-        final reqAuth = await appleProvider.requestAuthorization();
-        expect(reqAuth, isFalse);
+          // 3. requestAuthorization
+          final reqAuth = await appleProvider.requestAuthorization();
+          expect(reqAuth, isFalse);
 
-        // 4. getConnectedAccountName
-        final accName = await appleProvider.getConnectedAccountName();
-        expect(accName, isNull);
+          // 4. getConnectedAccountName
+          final accName = await appleProvider.getConnectedAccountName();
+          expect(accName, isNull);
 
-        // 5. getAvailableCalendars
-        final cals = await appleProvider.getAvailableCalendars();
-        expect(cals, isEmpty);
+          // 5. getAvailableCalendars
+          final cals = await appleProvider.getAvailableCalendars();
+          expect(cals, isEmpty);
 
-        // 6. getSelectedCalendarId
-        final selId = await appleProvider.getSelectedCalendarId();
-        expect(selId, isNull);
+          // 6. getSelectedCalendarId
+          final selId = await appleProvider.getSelectedCalendarId();
+          expect(selId, isNull);
 
-        // 7. setSelectedCalendarId
-        await appleProvider.setSelectedCalendarId('test_cal');
+          // 7. setSelectedCalendarId
+          await appleProvider.setSelectedCalendarId('test_cal');
 
-        // 8. disconnect
-        await appleProvider.disconnect();
+          // 8. disconnect
+          await appleProvider.disconnect();
 
-        // 9. syncEvents (incremental)
-        final syncResultInc = await appleProvider.syncEvents(db: db, fullSync: false);
-        expect(syncResultInc.success, isFalse);
-        expect(syncResultInc.errorMessage, contains('não suportado'));
+          // 9. syncEvents (incremental)
+          final syncResultInc = await appleProvider.syncEvents(
+            db: db,
+            fullSync: false,
+          );
+          expect(syncResultInc.success, isFalse);
+          expect(syncResultInc.errorMessage, contains('não suportado'));
 
-        // 10. syncEvents (full)
-        final syncResultFull = await appleProvider.syncEvents(db: db, fullSync: true);
-        expect(syncResultFull.success, isFalse);
-        expect(syncResultFull.errorMessage, contains('não suportado'));
+          // 10. syncEvents (full)
+          final syncResultFull = await appleProvider.syncEvents(
+            db: db,
+            fullSync: true,
+          );
+          expect(syncResultFull.success, isFalse);
+          expect(syncResultFull.errorMessage, contains('não suportado'));
 
-        // 11. pushAppointmentToExternal
-        final appt = await repo.createAppointment(
-          title: 'Adversarial Test Appt',
-          startTime: DateTime(2026, 11, 10, 14, 0),
-          endTime: DateTime(2026, 11, 10, 15, 0),
-        );
-        final pushResult = await appleProvider.pushAppointmentToExternal(db, appt);
-        expect(pushResult, isNull);
+          // 11. pushAppointmentToExternal
+          final appt = await repo.createAppointment(
+            title: 'Adversarial Test Appt',
+            startTime: DateTime(2026, 11, 10, 14, 0),
+            endTime: DateTime(2026, 11, 10, 15, 0),
+          );
+          final pushResult = await appleProvider.pushAppointmentToExternal(
+            db,
+            appt,
+          );
+          expect(pushResult, isNull);
 
-        // 12. deleteExternalEvent
-        final deleteResult = await appleProvider.deleteExternalEvent(db, 'ext_test_id');
-        expect(deleteResult, isFalse);
+          // 12. deleteExternalEvent
+          final deleteResult = await appleProvider.deleteExternalEvent(
+            db,
+            'ext_test_id',
+          );
+          expect(deleteResult, isFalse);
 
-        // CRITICAL ASSERTION: The plugin was NEVER invoked!
-        expect(explodingPlugin.invocationCount, equals(0),
-            reason: 'DeviceCalendarPlugin was invoked ${explodingPlugin.invocationCount} time(s) on $platform: ${explodingPlugin.recordedCalls}');
-      });
+          // CRITICAL ASSERTION: The plugin was NEVER invoked!
+          expect(
+            explodingPlugin.invocationCount,
+            equals(0),
+            reason:
+                'DeviceCalendarPlugin was invoked ${explodingPlugin.invocationCount} time(s) on $platform: ${explodingPlugin.recordedCalls}',
+          );
+        },
+      );
     }
 
     test('CalendarSyncCoordinator.syncAll() across simulated desktop platforms cleanly skips unsupported Apple provider', () async {
-      for (final desktopPlatform in [TargetPlatform.windows, TargetPlatform.linux, TargetPlatform.macOS]) {
+      for (final desktopPlatform in [
+        TargetPlatform.windows,
+        TargetPlatform.linux,
+        TargetPlatform.macOS,
+      ]) {
         debugDefaultTargetPlatformOverride = desktopPlatform;
 
         final googleMock = ControllableGoogleCalendarProvider(authorized: true);
@@ -236,15 +276,23 @@ void main() {
 
         final result = await coordinator.syncAll();
 
-        expect(result.success, isTrue, reason: 'Sync failed on $desktopPlatform');
+        expect(
+          result.success,
+          isTrue,
+          reason: 'Sync failed on $desktopPlatform',
+        );
         expect(result.errorMessage, isNull);
         expect(result.eventsDownloaded, equals(2));
         expect(result.eventsUploaded, equals(1));
         expect(googleMock.syncEventsCallCount, equals(1));
 
         // Exploding plugin must have received zero calls
-        expect(exploding.invocationCount, equals(0),
-            reason: 'Plugin was touched during coordinator.syncAll on $desktopPlatform');
+        expect(
+          exploding.invocationCount,
+          equals(0),
+          reason:
+              'Plugin was touched during coordinator.syncAll on $desktopPlatform',
+        );
       }
     });
 
@@ -297,18 +345,20 @@ void main() {
       expect(exploding.invocationCount, equals(0));
 
       // Insert pre-existing apple link to test handleLocalAppointmentDeleted
-      await db.into(db.calendarEventLinks).insert(
-        CalendarEventLinksCompanion.insert(
-          id: 'apple_link_1',
-          appointmentId: appt.id,
-          externalEventId: 'apple_ext_ev_1',
-          provider: 'apple_eventkit',
-          syncStatus: const drift.Value('synced'),
-          localRevisionAtSync: const drift.Value(1),
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        ),
-      );
+      await db
+          .into(db.calendarEventLinks)
+          .insert(
+            CalendarEventLinksCompanion.insert(
+              id: 'apple_link_1',
+              appointmentId: appt.id,
+              externalEventId: 'apple_ext_ev_1',
+              provider: 'apple_eventkit',
+              syncStatus: const drift.Value('synced'),
+              localRevisionAtSync: const drift.Value(1),
+              createdAt: DateTime.now(),
+              updatedAt: DateTime.now(),
+            ),
+          );
 
       // 2. handleLocalAppointmentDeleted
       await coordinator.handleLocalAppointmentDeleted(appt.id);
@@ -354,8 +404,11 @@ void main() {
       for (final res in results) {
         expect(res.success, isTrue);
       }
-      expect(googleMock.syncEventsCallCount, equals(1),
-          reason: 'Concurrent syncAll should share active future');
+      expect(
+        googleMock.syncEventsCallCount,
+        equals(1),
+        reason: 'Concurrent syncAll should share active future',
+      );
       expect(exploding.invocationCount, equals(0));
     });
 
@@ -378,8 +431,11 @@ void main() {
 
       for (final p in allPlatforms) {
         debugDefaultTargetPlatformOverride = p;
-        expect(googleProvider.isSupportedOnCurrentPlatform, isTrue,
-            reason: 'GoogleCalendarProvider must support $p');
+        expect(
+          googleProvider.isSupportedOnCurrentPlatform,
+          isTrue,
+          reason: 'GoogleCalendarProvider must support $p',
+        );
       }
     });
   });

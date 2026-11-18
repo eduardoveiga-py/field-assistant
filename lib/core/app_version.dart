@@ -72,7 +72,9 @@ class AppVersion {
     final partsA = cleanA.split('.').map((p) => int.tryParse(p) ?? 0).toList();
     final partsB = cleanB.split('.').map((p) => int.tryParse(p) ?? 0).toList();
 
-    final maxLen = partsA.length > partsB.length ? partsA.length : partsB.length;
+    final maxLen = partsA.length > partsB.length
+        ? partsA.length
+        : partsB.length;
     for (int i = 0; i < maxLen; i++) {
       final valA = i < partsA.length ? partsA[i] : 0;
       final valB = i < partsB.length ? partsB[i] : 0;

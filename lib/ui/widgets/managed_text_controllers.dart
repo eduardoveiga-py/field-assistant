@@ -8,7 +8,8 @@ class ManagedTextControllers extends StatefulWidget {
   final Widget Function(
     BuildContext context,
     List<TextEditingController> controllers,
-  ) builder;
+  )
+  builder;
 
   const ManagedTextControllers({
     super.key,

@@ -48,7 +48,7 @@ import UIKit
     }
   }
 
-  /// Aplica NSFileProtectionComplete e isExcludedFromBackup = true no banco SQLite
+  /// Aplica NSFileProtectionCompleteUntilFirstUserAuthentication e isExcludedFromBackup = true no banco SQLite
   /// (incluindo WAL/SHM), diretórios de anexos, mídias e backups locais do dispositivo
   /// para evitar vazamento em iCloud Backup / iTunes não criptografado (FA-SEC-06).
   @discardableResult
@@ -109,7 +109,7 @@ import UIKit
     }
     do {
       try FileManager.default.setAttributes(
-        [.protectionKey: FileProtectionType.complete],
+        [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
         ofItemAtPath: target.path
       )
     } catch {

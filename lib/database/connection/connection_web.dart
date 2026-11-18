@@ -18,7 +18,10 @@ Uri _resolveAssetUri(String relativePath) {
       return Uri.parse(base).resolve(relativePath);
     }
   } catch (e, st) {
-    AppLogger.debug('Fallback Uri.base em _resolveAssetUri ($relativePath): $e', st);
+    AppLogger.debug(
+      'Fallback Uri.base em _resolveAssetUri ($relativePath): $e',
+      st,
+    );
   }
   return Uri.base.resolve(relativePath);
 }

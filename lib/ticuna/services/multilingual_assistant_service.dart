@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../database/app_database.dart';
@@ -38,7 +39,8 @@ class MultilingualAssistantService {
     double previousEasinessFactor = 2.5,
   }) {
     final q = quality.clamp(0, 5);
-    double ef = previousEasinessFactor + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02));
+    double ef =
+        previousEasinessFactor + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02));
     if (ef < 1.3) ef = 1.3;
 
     int newReps;
@@ -69,14 +71,16 @@ class MultilingualAssistantService {
   /// Recupera o histórico de termos pesquisados recentemente
   Future<List<String>> getSearchHistory() async {
     try {
-      final row = await (_db.select(_db.appKvStore)
-            ..where((t) => t.key.equals(searchHistoryKey)))
-          .getSingleOrNull();
+      final row = await (_db.select(
+        _db.appKvStore,
+      )..where((t) => t.key.equals(searchHistoryKey))).getSingleOrNull();
       if (row == null || row.value.isEmpty) return [];
       final decoded = jsonDecode(row.value) as List<dynamic>;
       return decoded.map((e) => e.toString()).toList();
     } catch (e) {
-      AppLogger.warning('Erro ao carregar histórico de buscas linguísticas: $e');
+      AppLogger.warning(
+        'Erro ao carregar histórico de buscas linguísticas: $e',
+      );
       return [];
     }
   }
@@ -88,17 +92,22 @@ class MultilingualAssistantService {
 
     try {
       final current = await getSearchHistory();
-      final updated = [clean, ...current.where((t) => t.toLowerCase() != clean.toLowerCase())];
+      final updated = [
+        clean,
+        ...current.where((t) => t.toLowerCase() != clean.toLowerCase()),
+      ];
       if (updated.length > maxSearchHistoryItems) {
         updated.removeRange(maxSearchHistoryItems, updated.length);
       }
 
-      await _db.into(_db.appKvStore).insertOnConflictUpdate(
-        AppKvStoreCompanion.insert(
-          key: searchHistoryKey,
-          value: jsonEncode(updated),
-        ),
-      );
+      await _db
+          .into(_db.appKvStore)
+          .insertOnConflictUpdate(
+            AppKvStoreCompanion.insert(
+              key: searchHistoryKey,
+              value: jsonEncode(updated),
+            ),
+          );
     } catch (e) {
       AppLogger.warning('Erro ao salvar termo no histórico: $e');
     }
@@ -107,11 +116,15 @@ class MultilingualAssistantService {
   /// Limpa todo o histórico de pesquisas
   Future<void> clearSearchHistory() async {
     try {
-      await (_db.delete(_db.appKvStore)
-            ..where((t) => t.key.equals(searchHistoryKey)))
-          .go();
+      await (_db.delete(
+        _db.appKvStore,
+      )..where((t) => t.key.equals(searchHistoryKey))).go();
     } catch (e, st) {
-      AppLogger.warning('Falha ao limpar histórico de pesquisas linguísticas', e, st);
+      AppLogger.warning(
+        'Falha ao limpar histórico de pesquisas linguísticas',
+        e,
+        st,
+      );
     }
   }
 }
@@ -119,6 +132,6 @@ class MultilingualAssistantService {
 /// Provider do serviço de assistência linguística
 final multilingualAssistantServiceProvider =
     Provider<MultilingualAssistantService>((ref) {
-  final db = ref.watch(global_providers.databaseProvider);
-  return MultilingualAssistantService(db);
-});
+      final db = ref.watch(global_providers.databaseProvider);
+      return MultilingualAssistantService(db);
+    });

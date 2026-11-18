@@ -57,7 +57,8 @@ class _PersonPublicationsTabState extends ConsumerState<PersonPublicationsTab> {
                   controller: titleController,
                   decoration: const InputDecoration(
                     labelText: 'Nome da Publicação *',
-                    hintText: 'Ex: Brochura Quem Está Fazendo a Vontade de Jeová?',
+                    hintText:
+                        'Ex: Brochura Quem Está Fazendo a Vontade de Jeová?',
                   ),
                   autofocus: true,
                 ),
@@ -405,109 +406,112 @@ class _PersonPublicationsTabState extends ConsumerState<PersonPublicationsTab> {
     showDialog(
       context: context,
       builder: (ctx) => ManagedTextControllers(
-        initialTexts: const ['', 'Pedir no balcão de publicações no Salão do Reino'],
+        initialTexts: const [
+          '',
+          'Pedir no balcão de publicações no Salão do Reino',
+        ],
         builder: (ctx, ctrls) {
           final titleController = ctrls[0];
           final reminderNotesController = ctrls[1];
 
           return StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: const Row(
-            children: [
-              Icon(Icons.bookmark_add, color: AppTheme.accentTeal),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Pedido de Publicação do Estudante',
-                  style: TextStyle(fontSize: 16),
-                ),
+            builder: (ctx, setDialogState) => AlertDialog(
+              title: const Row(
+                children: [
+                  Icon(Icons.bookmark_add, color: AppTheme.accentTeal),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Pedido de Publicação do Estudante',
+                      style: TextStyle(fontSize: 16),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Registre pedidos do estudante e configure lembretes para você não esquecer de pedir no balcão e trazer na visita.',
-                  style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: titleController,
-                  decoration: const InputDecoration(
-                    labelText: 'Publicação Pedida *',
-                    hintText:
-                        'Ex: Bíblia de Letra Grande, Livro em Espanhol...',
-                  ),
-                  autofocus: true,
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: reminderNotesController,
-                  decoration: const InputDecoration(
-                    labelText: 'Lembrete para mim *',
-                    hintText: 'Ex: Lembrar de pedir no balcão no domingo',
-                  ),
-                  maxLines: 2,
-                ),
-                const SizedBox(height: 10),
-                Row(
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Trazer até:',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      'Registre pedidos do estudante e configure lembretes para você não esquecer de pedir no balcão e trazer na visita.',
+                      style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
                     ),
-                    const SizedBox(width: 8),
-                    OutlinedButton.icon(
-                      icon: const Icon(Icons.calendar_today, size: 14),
-                      label: Text(
-                        '${chosenDate.day}/${chosenDate.month}/${chosenDate.year}',
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: titleController,
+                      decoration: const InputDecoration(
+                        labelText: 'Publicação Pedida *',
+                        hintText:
+                            'Ex: Bíblia de Letra Grande, Livro em Espanhol...',
                       ),
-                      onPressed: () async {
-                        final p = await showDatePicker(
-                          context: context,
-                          initialDate: chosenDate,
-                          firstDate: DateTime.now(),
-                          lastDate: DateTime.now().add(
-                            const Duration(days: 180),
+                      autofocus: true,
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: reminderNotesController,
+                      decoration: const InputDecoration(
+                        labelText: 'Lembrete para mim *',
+                        hintText: 'Ex: Lembrar de pedir no balcão no domingo',
+                      ),
+                      maxLines: 2,
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        const Text(
+                          'Trazer até:',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
                           ),
-                        );
-                        if (p != null) setDialogState(() => chosenDate = p);
-                      },
+                        ),
+                        const SizedBox(width: 8),
+                        OutlinedButton.icon(
+                          icon: const Icon(Icons.calendar_today, size: 14),
+                          label: Text(
+                            '${chosenDate.day}/${chosenDate.month}/${chosenDate.year}',
+                          ),
+                          onPressed: () async {
+                            final p = await showDatePicker(
+                              context: context,
+                              initialDate: chosenDate,
+                              firstDate: DateTime.now(),
+                              lastDate: DateTime.now().add(
+                                const Duration(days: 180),
+                              ),
+                            );
+                            if (p != null) setDialogState(() => chosenDate = p);
+                          },
+                        ),
+                      ],
                     ),
                   ],
                 ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final t = titleController.text.trim();
+                    if (t.isEmpty) return;
+                    final mgr = ref.read(personPublicationsManagerProvider);
+                    await mgr.addStudentRequest(
+                      personId: widget.person.id,
+                      title: t,
+                      notes: reminderNotesController.text.trim(),
+                      targetDate: chosenDate,
+                    );
+                    if (ctx.mounted) Navigator.pop(ctx);
+                  },
+                  child: const Text('Salvar Pedido'),
+                ),
               ],
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final t = titleController.text.trim();
-                if (t.isEmpty) return;
-                final mgr = ref.read(personPublicationsManagerProvider);
-                await mgr.addStudentRequest(
-                  personId: widget.person.id,
-                  title: t,
-                  notes: reminderNotesController.text.trim(),
-                  targetDate: chosenDate,
-                );
-                if (ctx.mounted) Navigator.pop(ctx);
-              },
-              child: const Text('Salvar Pedido'),
-            ),
-          ],
-        ),
-      );
+          );
         },
       ),
     );

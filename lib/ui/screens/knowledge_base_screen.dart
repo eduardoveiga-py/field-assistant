@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:drift/drift.dart' as drift;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
@@ -30,10 +31,12 @@ class KnowledgeBaseScreen extends ConsumerStatefulWidget {
   const KnowledgeBaseScreen({super.key});
 
   @override
-  ConsumerState<KnowledgeBaseScreen> createState() => _KnowledgeBaseScreenState();
+  ConsumerState<KnowledgeBaseScreen> createState() =>
+      _KnowledgeBaseScreenState();
 }
 
-class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with SingleTickerProviderStateMixin {
+class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen>
+    with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   final TextEditingController _searchCtrl = TextEditingController();
   String _searchQuery = '';
@@ -69,9 +72,16 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
       appBar: AppBar(
         title: const Row(
           children: [
-            Icon(Icons.menu_book_rounded, color: AppTheme.primaryBlue, size: 24),
+            Icon(
+              Icons.menu_book_rounded,
+              color: AppTheme.primaryBlue,
+              size: 24,
+            ),
             SizedBox(width: 8),
-            Text('Base de Conhecimento', style: TextStyle(fontWeight: FontWeight.bold)),
+            Text(
+              'Base de Conhecimento',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
           ],
         ),
         actions: [
@@ -79,13 +89,16 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
             icon: const Icon(Icons.auto_stories_outlined),
             tooltip: 'Pesquisas e Apresentações do Ministério',
             onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const ResearchScreen()),
-              );
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const ResearchScreen()));
             },
           ),
           IconButton(
-            icon: const Icon(Icons.add_circle_outline, color: AppTheme.primaryBlue),
+            icon: const Icon(
+              Icons.add_circle_outline,
+              color: AppTheme.primaryBlue,
+            ),
             tooltip: 'Adicionar à Base',
             onPressed: _handleTabAwareAdd,
           ),
@@ -94,7 +107,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
           controller: _tabController,
           isScrollable: true,
           labelColor: AppTheme.primaryBlue,
-          unselectedLabelColor: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+          unselectedLabelColor: isDark
+              ? const Color(0xFF94A3B8)
+              : const Color(0xFF64748B),
           indicatorColor: AppTheme.primaryBlue,
           indicatorWeight: 3,
           tabs: const [
@@ -128,12 +143,17 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                     : null,
                 isDense: true,
                 filled: true,
-                fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                fillColor: isDark
+                    ? const Color(0xFF1E293B)
+                    : const Color(0xFFF1F5F9),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
                 ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
               ),
             ),
           ),
@@ -164,7 +184,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
     final km = ref.watch(knowledgeManagerProvider);
 
     return StreamBuilder<List<KnowledgeNoteEntry>>(
-      stream: km.watchNotes(query: _searchQuery.isNotEmpty ? _searchQuery : null),
+      stream: km.watchNotes(
+        query: _searchQuery.isNotEmpty ? _searchQuery : null,
+      ),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -199,7 +221,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
         final notes = allNotes.where((n) {
           if (_selectedNoteTag == null) return true;
           try {
-            final list = (jsonDecode(n.tags) as List).map((e) => e.toString()).toList();
+            final list = (jsonDecode(n.tags) as List)
+                .map((e) => e.toString())
+                .toList();
             return list.contains(_selectedNoteTag);
           } catch (e, st) {
             AppLogger.debug('Falha ao filtrar tags da nota (${n.id}): $e', st);
@@ -213,15 +237,21 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
             if (allTags.isNotEmpty)
               Container(
                 height: 48,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 6,
+                ),
                 child: ListView(
                   scrollDirection: Axis.horizontal,
                   children: [
                     FilterChip(
                       label: const Text('Todas as Tags'),
                       selected: _selectedNoteTag == null,
-                      onSelected: (val) => setState(() => _selectedNoteTag = null),
-                      backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                      onSelected: (val) =>
+                          setState(() => _selectedNoteTag = null),
+                      backgroundColor: isDark
+                          ? const Color(0xFF1E293B)
+                          : const Color(0xFFF1F5F9),
                     ),
                     const SizedBox(width: 8),
                     ...allTags.map((tag) {
@@ -229,10 +259,18 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                       return Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: FilterChip(
-                          avatar: Icon(Icons.tag, size: 14, color: isSelected ? Colors.white : AppTheme.primaryBlue),
+                          avatar: Icon(
+                            Icons.tag,
+                            size: 14,
+                            color: isSelected
+                                ? Colors.white
+                                : AppTheme.primaryBlue,
+                          ),
                           label: Text(tag),
                           selected: isSelected,
-                          onSelected: (val) => setState(() => _selectedNoteTag = val ? tag : null),
+                          onSelected: (val) => setState(
+                            () => _selectedNoteTag = val ? tag : null,
+                          ),
                         ),
                       );
                     }),
@@ -254,14 +292,19 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                         .where((t) => !t.startsWith('research:'))
                         .toList();
                   } catch (e, st) {
-                    AppLogger.debug('Falha ao exibir tags da nota (${note.id}): $e', st);
+                    AppLogger.debug(
+                      'Falha ao exibir tags da nota (${note.id}): $e',
+                      st,
+                    );
                   }
 
                   return ConstrainedBox(
                     constraints: const BoxConstraints(maxHeight: 180),
                     child: Card(
                       clipBehavior: Clip.antiAlias,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
                       child: InkWell(
                         onTap: () {
                           showKnowledgeItemReader(
@@ -285,29 +328,44 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                               Row(
                                 children: [
                                   if (note.isPinned) ...[
-                                    const Icon(Icons.push_pin, size: 16, color: Colors.amber),
+                                    const Icon(
+                                      Icons.push_pin,
+                                      size: 16,
+                                      color: Colors.amber,
+                                    ),
                                     const SizedBox(width: 4),
                                   ],
                                   Expanded(
                                     child: Text(
                                       note.title,
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15,
+                                      ),
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                   PopupMenuButton<String>(
                                     icon: const Icon(Icons.more_vert, size: 20),
                                     onSelected: (val) {
-                                      if (val == 'pin') km.togglePinNote(note.id);
-                                      if (val == 'edit') _showEditNoteModal(note);
-                                      if (val == 'research') _transformNoteToResearch(note);
+                                      if (val == 'pin')
+                                        km.togglePinNote(note.id);
+                                      if (val == 'edit')
+                                        _showEditNoteModal(note);
+                                      if (val == 'research')
+                                        _transformNoteToResearch(note);
                                       if (val == 'export') _exportNote(note);
-                                      if (val == 'delete') km.softDeleteNote(note.id);
+                                      if (val == 'delete')
+                                        km.softDeleteNote(note.id);
                                     },
                                     itemBuilder: (ctx) => [
                                       PopupMenuItem(
                                         value: 'pin',
-                                        child: Text(note.isPinned ? 'Desafixar' : 'Fixar no Topo'),
+                                        child: Text(
+                                          note.isPinned
+                                              ? 'Desafixar'
+                                              : 'Fixar no Topo',
+                                        ),
                                       ),
                                       const PopupMenuItem(
                                         value: 'edit',
@@ -323,7 +381,12 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                                       ),
                                       const PopupMenuItem(
                                         value: 'delete',
-                                        child: Text('Excluir Nota', style: TextStyle(color: Colors.redAccent)),
+                                        child: Text(
+                                          'Excluir Nota',
+                                          style: TextStyle(
+                                            color: Colors.redAccent,
+                                          ),
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -337,53 +400,95 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
                                     fontSize: 13,
-                                    color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                                    color: isDark
+                                        ? const Color(0xFFCBD5E1)
+                                        : const Color(0xFF475569),
                                   ),
                                 ),
                               ),
                               const SizedBox(height: 8),
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Wrap(
                                     spacing: 6,
                                     children: [
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 2,
+                                        ),
                                         decoration: BoxDecoration(
-                                          color: AppTheme.primaryBlue.withValues(alpha: 0.12),
-                                          borderRadius: BorderRadius.circular(6),
+                                          color: AppTheme.primaryBlue
+                                              .withValues(alpha: 0.12),
+                                          borderRadius: BorderRadius.circular(
+                                            6,
+                                          ),
                                         ),
                                         child: Text(
                                           note.category,
-                                          style: const TextStyle(fontSize: 11, color: AppTheme.primaryBlue, fontWeight: FontWeight.bold),
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            color: AppTheme.primaryBlue,
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
                                       ),
                                       if (noteTags.isNotEmpty)
                                         Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 6,
+                                            vertical: 2,
+                                          ),
                                           decoration: BoxDecoration(
-                                            color: Colors.teal.withValues(alpha: 0.12),
-                                            borderRadius: BorderRadius.circular(6),
+                                            color: Colors.teal.withValues(
+                                              alpha: 0.12,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              6,
+                                            ),
                                           ),
                                           child: Text(
                                             '#${noteTags.first}',
-                                            style: const TextStyle(fontSize: 10, color: Colors.teal, fontWeight: FontWeight.bold),
+                                            style: const TextStyle(
+                                              fontSize: 10,
+                                              color: Colors.teal,
+                                              fontWeight: FontWeight.bold,
+                                            ),
                                           ),
                                         ),
                                       if (note.tags.contains('research:'))
                                         Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 6,
+                                            vertical: 2,
+                                          ),
                                           decoration: BoxDecoration(
-                                            color: Colors.purple.withValues(alpha: 0.12),
-                                            borderRadius: BorderRadius.circular(6),
+                                            color: Colors.purple.withValues(
+                                              alpha: 0.12,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              6,
+                                            ),
                                           ),
                                           child: const Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
-                                              Icon(Icons.auto_stories, size: 10, color: Colors.purple),
+                                              Icon(
+                                                Icons.auto_stories,
+                                                size: 10,
+                                                color: Colors.purple,
+                                              ),
                                               SizedBox(width: 3),
-                                              Text('Pesquisa', style: TextStyle(fontSize: 10, color: Colors.purple, fontWeight: FontWeight.bold)),
+                                              Text(
+                                                'Pesquisa',
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  color: Colors.purple,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
                                             ],
                                           ),
                                         ),
@@ -391,7 +496,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                                   ),
                                   Text(
                                     _formatDate(note.updatedAt),
-                                    style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -419,7 +527,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
 
     return StreamBuilder<List<KnowledgeQuestionEntry>>(
       stream: km.watchQuestions(
-        status: _selectedQuestionStatus == 'all' ? null : _selectedQuestionStatus,
+        status: _selectedQuestionStatus == 'all'
+            ? null
+            : _selectedQuestionStatus,
         category: _selectedQuestionCategory,
         query: _searchQuery.isNotEmpty ? _searchQuery : null,
       ),
@@ -452,7 +562,8 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                     label: const Text('Em Aberto'),
                     selected: _selectedQuestionStatus == 'unanswered',
                     onSelected: (val) {
-                      if (val) setState(() => _selectedQuestionStatus = 'unanswered');
+                      if (val)
+                        setState(() => _selectedQuestionStatus = 'unanswered');
                     },
                   ),
                   const SizedBox(width: 8),
@@ -461,7 +572,8 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                     label: const Text('Respondidas'),
                     selected: _selectedQuestionStatus == 'answered',
                     onSelected: (val) {
-                      if (val) setState(() => _selectedQuestionStatus = 'answered');
+                      if (val)
+                        setState(() => _selectedQuestionStatus = 'answered');
                     },
                   ),
                 ],
@@ -491,7 +603,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                       constraints: const BoxConstraints(maxHeight: 180),
                       child: Card(
                         clipBehavior: Clip.antiAlias,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
                         child: InkWell(
                           onTap: () {
                             showKnowledgeItemReader(
@@ -499,7 +613,8 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                               title: q.question,
                               content: q.answer != null && q.answer!.isNotEmpty
                                   ? '**Contexto:**\n${q.context ?? "Sem contexto"}\n\n---\n\n**Resposta Bíblica:**\n${q.answer}'
-                                  : (q.context ?? 'Dúvida ainda sem resposta bíblica cadastrada.'),
+                                  : (q.context ??
+                                        'Dúvida ainda sem resposta bíblica cadastrada.'),
                               category: q.category,
                               itemType: 'Dúvida',
                               updatedAt: q.updatedAt,
@@ -518,10 +633,18 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                                   children: [
                                     CircleAvatar(
                                       radius: 12,
-                                      backgroundColor: (isAnswered ? Colors.green : Colors.amber).withValues(alpha: 0.15),
+                                      backgroundColor:
+                                          (isAnswered
+                                                  ? Colors.green
+                                                  : Colors.amber)
+                                              .withValues(alpha: 0.15),
                                       child: Icon(
-                                        isAnswered ? Icons.check : Icons.question_mark,
-                                        color: isAnswered ? Colors.green : Colors.amber,
+                                        isAnswered
+                                            ? Icons.check
+                                            : Icons.question_mark,
+                                        color: isAnswered
+                                            ? Colors.green
+                                            : Colors.amber,
                                         size: 14,
                                       ),
                                     ),
@@ -529,28 +652,61 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                                     Expanded(
                                       child: Text(
                                         q.question,
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                        ),
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
                                     PopupMenuButton<String>(
-                                      icon: const Icon(Icons.more_vert, size: 20),
+                                      icon: const Icon(
+                                        Icons.more_vert,
+                                        size: 20,
+                                      ),
                                       onSelected: (val) {
-                                        if (val == 'answer') _showAnswerQuestionModal(q);
-                                        if (val == 'edit') _showEditQuestionModal(q);
-                                        if (val == 'research') _transformQuestionToResearch(q);
+                                        if (val == 'answer')
+                                          _showAnswerQuestionModal(q);
+                                        if (val == 'edit')
+                                          _showEditQuestionModal(q);
+                                        if (val == 'research')
+                                          _transformQuestionToResearch(q);
                                         if (val == 'export') _exportQuestion(q);
-                                        if (val == 'delete') km.softDeleteQuestion(q.id);
+                                        if (val == 'delete')
+                                          km.softDeleteQuestion(q.id);
                                       },
                                       itemBuilder: (ctx) => [
                                         PopupMenuItem(
                                           value: 'answer',
-                                          child: Text(isAnswered ? 'Editar Resposta' : 'Inserir Resposta'),
+                                          child: Text(
+                                            isAnswered
+                                                ? 'Editar Resposta'
+                                                : 'Inserir Resposta',
+                                          ),
                                         ),
-                                        const PopupMenuItem(value: 'edit', child: Text('Editar Dúvida')),
-                                        const PopupMenuItem(value: 'research', child: Text('Transformar em Pesquisa')),
-                                        const PopupMenuItem(value: 'export', child: Text('Exportar')),
-                                        const PopupMenuItem(value: 'delete', child: Text('Excluir', style: TextStyle(color: Colors.redAccent))),
+                                        const PopupMenuItem(
+                                          value: 'edit',
+                                          child: Text('Editar Dúvida'),
+                                        ),
+                                        const PopupMenuItem(
+                                          value: 'research',
+                                          child: Text(
+                                            'Transformar em Pesquisa',
+                                          ),
+                                        ),
+                                        const PopupMenuItem(
+                                          value: 'export',
+                                          child: Text('Exportar'),
+                                        ),
+                                        const PopupMenuItem(
+                                          value: 'delete',
+                                          child: Text(
+                                            'Excluir',
+                                            style: TextStyle(
+                                              color: Colors.redAccent,
+                                            ),
+                                          ),
+                                        ),
                                       ],
                                     ),
                                   ],
@@ -558,25 +714,37 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                                 const SizedBox(height: 6),
                                 Expanded(
                                   child: MarkdownPreviewText(
-                                    text: q.answer != null && q.answer!.isNotEmpty
+                                    text:
+                                        q.answer != null && q.answer!.isNotEmpty
                                         ? 'Resposta: ${q.answer!}'
-                                        : (q.context ?? 'Toque para abrir a janela de leitura e detalhes.'),
+                                        : (q.context ??
+                                              'Toque para abrir a janela de leitura e detalhes.'),
                                     maxLines: 3,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
                                       fontSize: 13,
-                                      color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                                      color: isDark
+                                          ? const Color(0xFFCBD5E1)
+                                          : const Color(0xFF475569),
                                     ),
                                   ),
                                 ),
                                 const SizedBox(height: 8),
                                 Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 2,
+                                      ),
                                       decoration: BoxDecoration(
-                                        color: (isAnswered ? Colors.green : Colors.amber).withValues(alpha: 0.12),
+                                        color:
+                                            (isAnswered
+                                                    ? Colors.green
+                                                    : Colors.amber)
+                                                .withValues(alpha: 0.12),
                                         borderRadius: BorderRadius.circular(6),
                                       ),
                                       child: Text(
@@ -584,13 +752,18 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                                         style: TextStyle(
                                           fontSize: 11,
                                           fontWeight: FontWeight.bold,
-                                          color: isAnswered ? Colors.green : Colors.amber,
+                                          color: isAnswered
+                                              ? Colors.green
+                                              : Colors.amber,
                                         ),
                                       ),
                                     ),
                                     Text(
                                       _formatDate(q.updatedAt),
-                                      style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.grey,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -646,7 +819,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
               if (t.isNotEmpty) allDocTags.add(t);
             }
           } catch (e, st) {
-            AppLogger.debug('Falha ao ler tags JSON do documento (${d.id}): $e', st);
+            AppLogger.debug(
+              'Falha ao ler tags JSON do documento (${d.id}): $e',
+              st,
+            );
           }
         }
 
@@ -654,10 +830,15 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
         final docs = allDocs.where((d) {
           if (_selectedDocTag == null) return true;
           try {
-            final list = (jsonDecode(d.tags) as List).map((e) => e.toString()).toList();
+            final list = (jsonDecode(d.tags) as List)
+                .map((e) => e.toString())
+                .toList();
             return list.contains(_selectedDocTag);
           } catch (e, st) {
-            AppLogger.debug('Falha ao filtrar tags do documento (${d.id}): $e', st);
+            AppLogger.debug(
+              'Falha ao filtrar tags do documento (${d.id}): $e',
+              st,
+            );
             return false;
           }
         }).toList();
@@ -674,25 +855,32 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                   ChoiceChip(
                     label: const Text('Todos'),
                     selected: _selectedDocCategory == null,
-                    onSelected: (val) => setState(() => _selectedDocCategory = null),
+                    onSelected: (val) =>
+                        setState(() => _selectedDocCategory = null),
                   ),
                   const SizedBox(width: 8),
                   ChoiceChip(
                     label: const Text('Manuais'),
                     selected: _selectedDocCategory == 'manual',
-                    onSelected: (val) => setState(() => _selectedDocCategory = val ? 'manual' : null),
+                    onSelected: (val) => setState(
+                      () => _selectedDocCategory = val ? 'manual' : null,
+                    ),
                   ),
                   const SizedBox(width: 8),
                   ChoiceChip(
                     label: const Text('Estudo'),
                     selected: _selectedDocCategory == 'study',
-                    onSelected: (val) => setState(() => _selectedDocCategory = val ? 'study' : null),
+                    onSelected: (val) => setState(
+                      () => _selectedDocCategory = val ? 'study' : null,
+                    ),
                   ),
                   const SizedBox(width: 8),
                   ChoiceChip(
                     label: const Text('Esboço'),
                     selected: _selectedDocCategory == 'outline',
-                    onSelected: (val) => setState(() => _selectedDocCategory = val ? 'outline' : null),
+                    onSelected: (val) => setState(
+                      () => _selectedDocCategory = val ? 'outline' : null,
+                    ),
                   ),
                 ],
               ),
@@ -702,15 +890,21 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
             if (allDocTags.isNotEmpty)
               Container(
                 height: 44,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 4,
+                ),
                 child: ListView(
                   scrollDirection: Axis.horizontal,
                   children: [
                     FilterChip(
                       label: const Text('Todas as Tags'),
                       selected: _selectedDocTag == null,
-                      onSelected: (val) => setState(() => _selectedDocTag = null),
-                      backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                      onSelected: (val) =>
+                          setState(() => _selectedDocTag = null),
+                      backgroundColor: isDark
+                          ? const Color(0xFF1E293B)
+                          : const Color(0xFFF1F5F9),
                     ),
                     const SizedBox(width: 8),
                     ...allDocTags.map((tag) {
@@ -718,10 +912,18 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                       return Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: FilterChip(
-                          avatar: Icon(Icons.tag, size: 14, color: isSelected ? Colors.white : AppTheme.primaryBlue),
+                          avatar: Icon(
+                            Icons.tag,
+                            size: 14,
+                            color: isSelected
+                                ? Colors.white
+                                : AppTheme.primaryBlue,
+                          ),
                           label: Text(tag),
                           selected: isSelected,
-                          onSelected: (val) => setState(() => _selectedDocTag = val ? tag : null),
+                          onSelected: (val) => setState(
+                            () => _selectedDocTag = val ? tag : null,
+                          ),
                         ),
                       );
                     }),
@@ -739,16 +941,23 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                   final sizeKb = (doc.fileSize / 1024).toStringAsFixed(1);
                   List<String> docTags = [];
                   try {
-                    docTags = (jsonDecode(doc.tags) as List).map((e) => e.toString()).toList();
+                    docTags = (jsonDecode(doc.tags) as List)
+                        .map((e) => e.toString())
+                        .toList();
                   } catch (e, st) {
-                    AppLogger.debug('Falha ao ler tags JSON na listagem de documentos (${doc.id}): $e', st);
+                    AppLogger.debug(
+                      'Falha ao ler tags JSON na listagem de documentos (${doc.id}): $e',
+                      st,
+                    );
                   }
 
                   return ConstrainedBox(
                     constraints: const BoxConstraints(maxHeight: 140),
                     child: Card(
                       clipBehavior: Clip.antiAlias,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       child: InkWell(
                         onTap: () => _openDocument(doc),
                         child: Padding(
@@ -758,7 +967,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                               Container(
                                 padding: const EdgeInsets.all(10),
                                 decoration: BoxDecoration(
-                                  color: AppTheme.primaryBlue.withValues(alpha: 0.12),
+                                  color: AppTheme.primaryBlue.withValues(
+                                    alpha: 0.12,
+                                  ),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Icon(
@@ -779,7 +990,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                                   children: [
                                     Text(
                                       doc.title,
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                     ),
@@ -788,7 +1002,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                                       '${doc.fileName} • $sizeKb KB • ${doc.category}',
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                        color: isDark
+                                            ? const Color(0xFF94A3B8)
+                                            : const Color(0xFF64748B),
                                       ),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
@@ -797,17 +1013,32 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                                       const SizedBox(height: 4),
                                       Wrap(
                                         spacing: 4,
-                                        children: docTags.take(3).map((t) => Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                                          decoration: BoxDecoration(
-                                            color: AppTheme.primaryBlue.withValues(alpha: 0.1),
-                                            borderRadius: BorderRadius.circular(4),
-                                          ),
-                                          child: Text(
-                                            '#$t',
-                                            style: const TextStyle(fontSize: 10, color: AppTheme.primaryBlue, fontWeight: FontWeight.bold),
-                                          ),
-                                        )).toList(),
+                                        children: docTags
+                                            .take(3)
+                                            .map(
+                                              (t) => Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 6,
+                                                      vertical: 1,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color: AppTheme.primaryBlue
+                                                      .withValues(alpha: 0.1),
+                                                  borderRadius:
+                                                      BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  '#$t',
+                                                  style: const TextStyle(
+                                                    fontSize: 10,
+                                                    color: AppTheme.primaryBlue,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ),
+                                            )
+                                            .toList(),
                                       ),
                                     ],
                                   ],
@@ -817,15 +1048,33 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                                 icon: const Icon(Icons.more_vert, size: 20),
                                 onSelected: (val) {
                                   if (val == 'open') _openDocument(doc);
-                                  if (val == 'external') _openDocumentExternal(doc);
-                                  if (val == 'edit') _showEditDocumentModal(doc);
-                                  if (val == 'delete') km.softDeleteDocument(doc.id);
+                                  if (val == 'external')
+                                    _openDocumentExternal(doc);
+                                  if (val == 'edit')
+                                    _showEditDocumentModal(doc);
+                                  if (val == 'delete')
+                                    km.softDeleteDocument(doc.id);
                                 },
                                 itemBuilder: (ctx) => [
-                                  const PopupMenuItem(value: 'open', child: Text('Abrir no App')),
-                                  const PopupMenuItem(value: 'external', child: Text('Abrir Externamente')),
-                                  const PopupMenuItem(value: 'edit', child: Text('Editar')),
-                                  const PopupMenuItem(value: 'delete', child: Text('Excluir', style: TextStyle(color: Colors.redAccent))),
+                                  const PopupMenuItem(
+                                    value: 'open',
+                                    child: Text('Abrir no App'),
+                                  ),
+                                  const PopupMenuItem(
+                                    value: 'external',
+                                    child: Text('Abrir Externamente'),
+                                  ),
+                                  const PopupMenuItem(
+                                    value: 'edit',
+                                    child: Text('Editar'),
+                                  ),
+                                  const PopupMenuItem(
+                                    value: 'delete',
+                                    child: Text(
+                                      'Excluir',
+                                      style: TextStyle(color: Colors.redAccent),
+                                    ),
+                                  ),
                                 ],
                               ),
                             ],
@@ -880,17 +1129,25 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
               if (t.isNotEmpty) allResourceTags.add(t);
             }
           } catch (e, st) {
-            AppLogger.debug('Falha ao ler tags JSON de recurso (${r.id}): $e', st);
+            AppLogger.debug(
+              'Falha ao ler tags JSON de recurso (${r.id}): $e',
+              st,
+            );
           }
         }
 
         final resources = allResources.where((r) {
           if (_selectedResourceTag == null) return true;
           try {
-            final list = (jsonDecode(r.tags) as List).map((e) => e.toString()).toList();
+            final list = (jsonDecode(r.tags) as List)
+                .map((e) => e.toString())
+                .toList();
             return list.contains(_selectedResourceTag);
           } catch (e, st) {
-            AppLogger.debug('Falha ao filtrar tags JSON de recurso (${r.id}): $e', st);
+            AppLogger.debug(
+              'Falha ao filtrar tags JSON de recurso (${r.id}): $e',
+              st,
+            );
             return false;
           }
         }).toList();
@@ -901,15 +1158,21 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
             if (allResourceTags.isNotEmpty)
               Container(
                 height: 44,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 4,
+                ),
                 child: ListView(
                   scrollDirection: Axis.horizontal,
                   children: [
                     FilterChip(
                       label: const Text('Todas as Tags'),
                       selected: _selectedResourceTag == null,
-                      onSelected: (val) => setState(() => _selectedResourceTag = null),
-                      backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                      onSelected: (val) =>
+                          setState(() => _selectedResourceTag = null),
+                      backgroundColor: isDark
+                          ? const Color(0xFF1E293B)
+                          : const Color(0xFFF1F5F9),
                     ),
                     const SizedBox(width: 8),
                     ...allResourceTags.map((tag) {
@@ -917,10 +1180,16 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                       return Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: FilterChip(
-                          avatar: Icon(Icons.tag, size: 14, color: isSelected ? Colors.white : Colors.teal),
+                          avatar: Icon(
+                            Icons.tag,
+                            size: 14,
+                            color: isSelected ? Colors.white : Colors.teal,
+                          ),
                           label: Text(tag),
                           selected: isSelected,
-                          onSelected: (val) => setState(() => _selectedResourceTag = val ? tag : null),
+                          onSelected: (val) => setState(
+                            () => _selectedResourceTag = val ? tag : null,
+                          ),
                         ),
                       );
                     }),
@@ -937,22 +1206,31 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                   final r = resources[i];
                   List<String> resTags = [];
                   try {
-                    resTags = (jsonDecode(r.tags) as List).map((e) => e.toString()).toList();
+                    resTags = (jsonDecode(r.tags) as List)
+                        .map((e) => e.toString())
+                        .toList();
                   } catch (e, st) {
-                    AppLogger.debug('Falha ao ler tags JSON na listagem de recursos (${r.id}): $e', st);
+                    AppLogger.debug(
+                      'Falha ao ler tags JSON na listagem de recursos (${r.id}): $e',
+                      st,
+                    );
                   }
 
                   return ConstrainedBox(
                     constraints: const BoxConstraints(maxHeight: 140),
                     child: Card(
                       clipBehavior: Clip.antiAlias,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       child: InkWell(
                         onTap: () {
                           showKnowledgeItemReader(
                             context,
                             title: r.title,
-                            content: r.description ?? 'Recurso / Link salvo na Base de Conhecimento.',
+                            content:
+                                r.description ??
+                                'Recurso / Link salvo na Base de Conhecimento.',
                             category: r.category,
                             itemType: 'Recurso',
                             url: r.url,
@@ -976,8 +1254,8 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                                   r.resourceType == 'video'
                                       ? Icons.play_circle_fill
                                       : r.resourceType == 'jw_pub'
-                                          ? Icons.menu_book
-                                          : Icons.link,
+                                      ? Icons.menu_book
+                                      : Icons.link,
                                   color: Colors.teal,
                                   size: 24,
                                 ),
@@ -990,16 +1268,24 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                                   children: [
                                     Text(
                                       r.title,
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                     const SizedBox(height: 4),
                                     MarkdownPreviewText(
-                                      text: r.description ?? r.url ?? r.resourceType,
+                                      text:
+                                          r.description ??
+                                          r.url ??
+                                          r.resourceType,
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                        color: isDark
+                                            ? const Color(0xFF94A3B8)
+                                            : const Color(0xFF64748B),
                                       ),
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
@@ -1008,17 +1294,33 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                                       const SizedBox(height: 4),
                                       Wrap(
                                         spacing: 4,
-                                        children: resTags.take(3).map((t) => Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                                          decoration: BoxDecoration(
-                                            color: Colors.teal.withValues(alpha: 0.1),
-                                            borderRadius: BorderRadius.circular(4),
-                                          ),
-                                          child: Text(
-                                            '#$t',
-                                            style: const TextStyle(fontSize: 10, color: Colors.teal, fontWeight: FontWeight.bold),
-                                          ),
-                                        )).toList(),
+                                        children: resTags
+                                            .take(3)
+                                            .map(
+                                              (t) => Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 6,
+                                                      vertical: 1,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.teal.withValues(
+                                                    alpha: 0.1,
+                                                  ),
+                                                  borderRadius:
+                                                      BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  '#$t',
+                                                  style: const TextStyle(
+                                                    fontSize: 10,
+                                                    color: Colors.teal,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ),
+                                            )
+                                            .toList(),
                                       ),
                                     ],
                                   ],
@@ -1027,15 +1329,31 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                               PopupMenuButton<String>(
                                 icon: const Icon(Icons.more_vert, size: 20),
                                 onSelected: (val) {
-                                  if (val == 'open' && r.url != null && r.url!.isNotEmpty) _openUrl(r.url!);
+                                  if (val == 'open' &&
+                                      r.url != null &&
+                                      r.url!.isNotEmpty)
+                                    _openUrl(r.url!);
                                   if (val == 'edit') _showEditResourceModal(r);
-                                  if (val == 'delete') km.softDeleteResource(r.id);
+                                  if (val == 'delete')
+                                    km.softDeleteResource(r.id);
                                 },
                                 itemBuilder: (ctx) => [
                                   if (r.url != null && r.url!.isNotEmpty)
-                                    const PopupMenuItem(value: 'open', child: Text('Abrir Link')),
-                                  const PopupMenuItem(value: 'edit', child: Text('Editar')),
-                                  const PopupMenuItem(value: 'delete', child: Text('Excluir', style: TextStyle(color: Colors.redAccent))),
+                                    const PopupMenuItem(
+                                      value: 'open',
+                                      child: Text('Abrir Link'),
+                                    ),
+                                  const PopupMenuItem(
+                                    value: 'edit',
+                                    child: Text('Editar'),
+                                  ),
+                                  const PopupMenuItem(
+                                    value: 'delete',
+                                    child: Text(
+                                      'Excluir',
+                                      style: TextStyle(color: Colors.redAccent),
+                                    ),
+                                  ),
                                 ],
                               ),
                             ],
@@ -1060,7 +1378,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
   void _showAddKnowledgeItemMenu() {
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (ctx) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 16),
@@ -1072,8 +1392,13 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                   backgroundColor: Color(0xFF8B5CF6),
                   child: Icon(Icons.note_add, color: Colors.white),
                 ),
-                title: const Text('Nova Nota', style: TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: const Text('Criar uma anotação de estudo ou pesquisa'),
+                title: const Text(
+                  'Nova Nota',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: const Text(
+                  'Criar uma anotação de estudo ou pesquisa',
+                ),
                 onTap: () {
                   Navigator.of(ctx).pop();
                   _showCreateNoteModal();
@@ -1084,7 +1409,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                   backgroundColor: Color(0xFFF59E0B),
                   child: Icon(Icons.help_outline, color: Colors.white),
                 ),
-                title: const Text('Nova Dúvida Teocrática', style: TextStyle(fontWeight: FontWeight.bold)),
+                title: const Text(
+                  'Nova Dúvida Teocrática',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
                 subtitle: const Text('Registrar pergunta de morador ou estudo'),
                 onTap: () {
                   Navigator.of(ctx).pop();
@@ -1096,7 +1424,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                   backgroundColor: AppTheme.primaryBlue,
                   child: Icon(Icons.upload_file, color: Colors.white),
                 ),
-                title: const Text('Anexar Documento', style: TextStyle(fontWeight: FontWeight.bold)),
+                title: const Text(
+                  'Anexar Documento',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
                 subtitle: const Text('Importar arquivo PDF ou texto local'),
                 onTap: () {
                   Navigator.of(ctx).pop();
@@ -1108,7 +1439,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                   backgroundColor: Colors.teal,
                   child: Icon(Icons.link, color: Colors.white),
                 ),
-                title: const Text('Novo Recurso / Link JW', style: TextStyle(fontWeight: FontWeight.bold)),
+                title: const Text(
+                  'Novo Recurso / Link JW',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
                 subtitle: const Text('Salvar link de publicação ou artigo'),
                 onTap: () {
                   Navigator.of(ctx).pop();
@@ -1149,19 +1483,38 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                     TextField(
                       controller: titleCtrl,
                       autofocus: true,
-                      decoration: const InputDecoration(labelText: 'Título da Nota', border: OutlineInputBorder()),
+                      decoration: const InputDecoration(
+                        labelText: 'Título da Nota',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       initialValue: category,
-                      decoration: const InputDecoration(labelText: 'Categoria', border: OutlineInputBorder()),
+                      decoration: const InputDecoration(
+                        labelText: 'Categoria',
+                        border: OutlineInputBorder(),
+                      ),
                       items: const [
-                        DropdownMenuItem(value: 'general', child: Text('Geral')),
-                        DropdownMenuItem(value: 'ministry', child: Text('Ministério')),
-                        DropdownMenuItem(value: 'research', child: Text('Pesquisa')),
-                        DropdownMenuItem(value: 'pastoral', child: Text('Pastoral')),
+                        DropdownMenuItem(
+                          value: 'general',
+                          child: Text('Geral'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'ministry',
+                          child: Text('Ministério'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'research',
+                          child: Text('Pesquisa'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'pastoral',
+                          child: Text('Pastoral'),
+                        ),
                       ],
-                      onChanged: (v) => setSheetState(() => category = v ?? 'general'),
+                      onChanged: (v) =>
+                          setSheetState(() => category = v ?? 'general'),
                     ),
                     const SizedBox(height: 12),
                     TextField(
@@ -1179,7 +1532,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                     TextField(
                       controller: contentCtrl,
                       maxLines: 6,
-                      decoration: const InputDecoration(labelText: 'Conteúdo (Markdown suportado)...', border: OutlineInputBorder()),
+                      decoration: const InputDecoration(
+                        labelText: 'Conteúdo (Markdown suportado)...',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
                     const SizedBox(height: 16),
                     Row(
@@ -1197,7 +1553,11 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                               final title = titleCtrl.text.trim();
                               if (title.isEmpty) return;
                               final content = contentCtrl.text.trim();
-                              final rawTags = tagsCtrl.text.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+                              final rawTags = tagsCtrl.text
+                                  .split(',')
+                                  .map((t) => t.trim())
+                                  .where((t) => t.isNotEmpty)
+                                  .toList();
                               final km = ref.read(knowledgeManagerProvider);
                               final note = await km.createNote(
                                 title: title,
@@ -1222,7 +1582,11 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                               final title = titleCtrl.text.trim();
                               if (title.isEmpty) return;
                               final content = contentCtrl.text.trim();
-                              final rawTags = tagsCtrl.text.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+                              final rawTags = tagsCtrl.text
+                                  .split(',')
+                                  .map((t) => t.trim())
+                                  .where((t) => t.isNotEmpty)
+                                  .toList();
                               final km = ref.read(knowledgeManagerProvider);
                               await km.createNote(
                                 title: title,
@@ -1232,7 +1596,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                               );
                               if (ctx.mounted) Navigator.of(ctx).pop();
                             },
-                            child: const Text('Salvar Nota', style: TextStyle(fontWeight: FontWeight.bold)),
+                            child: const Text(
+                              'Salvar Nota',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
                           ),
                         ),
                       ],
@@ -1250,9 +1617,15 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
   void _showEditNoteModal(KnowledgeNoteEntry note) {
     List<String> existingTags = [];
     try {
-      existingTags = (jsonDecode(note.tags) as List).map((e) => e.toString()).where((t) => !t.startsWith('research:')).toList();
+      existingTags = (jsonDecode(note.tags) as List)
+          .map((e) => e.toString())
+          .where((t) => !t.startsWith('research:'))
+          .toList();
     } catch (e, st) {
-      AppLogger.debug('Falha ao decodificar tags ao editar nota (${note.id}): $e', st);
+      AppLogger.debug(
+        'Falha ao decodificar tags ao editar nota (${note.id}): $e',
+        st,
+      );
     }
     String category = note.category;
 
@@ -1279,19 +1652,46 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                   children: [
                     TextField(
                       controller: titleCtrl,
-                      decoration: const InputDecoration(labelText: 'Título da Nota', border: OutlineInputBorder()),
+                      decoration: const InputDecoration(
+                        labelText: 'Título da Nota',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      initialValue: ['general', 'ministry', 'research', 'pastoral'].contains(category) ? category : 'general',
-                      decoration: const InputDecoration(labelText: 'Categoria', border: OutlineInputBorder()),
+                      initialValue:
+                          [
+                            'general',
+                            'ministry',
+                            'research',
+                            'pastoral',
+                          ].contains(category)
+                          ? category
+                          : 'general',
+                      decoration: const InputDecoration(
+                        labelText: 'Categoria',
+                        border: OutlineInputBorder(),
+                      ),
                       items: const [
-                        DropdownMenuItem(value: 'general', child: Text('Geral')),
-                        DropdownMenuItem(value: 'ministry', child: Text('Ministério')),
-                        DropdownMenuItem(value: 'research', child: Text('Pesquisa')),
-                        DropdownMenuItem(value: 'pastoral', child: Text('Pastoral')),
+                        DropdownMenuItem(
+                          value: 'general',
+                          child: Text('Geral'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'ministry',
+                          child: Text('Ministério'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'research',
+                          child: Text('Pesquisa'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'pastoral',
+                          child: Text('Pastoral'),
+                        ),
                       ],
-                      onChanged: (v) => setSheetState(() => category = v ?? 'general'),
+                      onChanged: (v) =>
+                          setSheetState(() => category = v ?? 'general'),
                     ),
                     const SizedBox(height: 12),
                     TextField(
@@ -1309,7 +1709,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                     TextField(
                       controller: contentCtrl,
                       maxLines: 6,
-                      decoration: const InputDecoration(labelText: 'Conteúdo (Markdown)...', border: OutlineInputBorder()),
+                      decoration: const InputDecoration(
+                        labelText: 'Conteúdo (Markdown)...',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
                     const SizedBox(height: 16),
                     Row(
@@ -1327,13 +1730,23 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                               final title = titleCtrl.text.trim();
                               if (title.isEmpty) return;
                               final content = contentCtrl.text.trim();
-                              final rawTags = tagsCtrl.text.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+                              final rawTags = tagsCtrl.text
+                                  .split(',')
+                                  .map((t) => t.trim())
+                                  .where((t) => t.isNotEmpty)
+                                  .toList();
                               // Preserva eventuais tags internas como research:
                               try {
-                                final internal = (jsonDecode(note.tags) as List).map((e) => e.toString()).where((t) => t.startsWith('research:')).toList();
+                                final internal = (jsonDecode(note.tags) as List)
+                                    .map((e) => e.toString())
+                                    .where((t) => t.startsWith('research:'))
+                                    .toList();
                                 rawTags.addAll(internal);
                               } catch (e, st) {
-                                AppLogger.debug('Falha ao preservar tags research ao editar nota (${note.id}): $e', st);
+                                AppLogger.debug(
+                                  'Falha ao preservar tags research ao editar nota (${note.id}): $e',
+                                  st,
+                                );
                               }
 
                               final km = ref.read(knowledgeManagerProvider);
@@ -1364,12 +1777,22 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                               final title = titleCtrl.text.trim();
                               if (title.isEmpty) return;
                               final content = contentCtrl.text.trim();
-                              final rawTags = tagsCtrl.text.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+                              final rawTags = tagsCtrl.text
+                                  .split(',')
+                                  .map((t) => t.trim())
+                                  .where((t) => t.isNotEmpty)
+                                  .toList();
                               try {
-                                final internal = (jsonDecode(note.tags) as List).map((e) => e.toString()).where((t) => t.startsWith('research:')).toList();
+                                final internal = (jsonDecode(note.tags) as List)
+                                    .map((e) => e.toString())
+                                    .where((t) => t.startsWith('research:'))
+                                    .toList();
                                 rawTags.addAll(internal);
                               } catch (e, st) {
-                                AppLogger.debug('Falha ao preservar tags research ao salvar nota (${note.id}): $e', st);
+                                AppLogger.debug(
+                                  'Falha ao preservar tags research ao salvar nota (${note.id}): $e',
+                                  st,
+                                );
                               }
 
                               final km = ref.read(knowledgeManagerProvider);
@@ -1382,7 +1805,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                               );
                               if (ctx.mounted) Navigator.of(ctx).pop();
                             },
-                            child: const Text('Salvar Alterações', style: TextStyle(fontWeight: FontWeight.bold)),
+                            child: const Text(
+                              'Salvar Alterações',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
                           ),
                         ),
                       ],
@@ -1419,7 +1845,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
               children: [
                 TextField(
                   controller: qCtrl,
-                  decoration: const InputDecoration(labelText: 'Pergunta do Morador ou Pesquisa', border: OutlineInputBorder()),
+                  decoration: const InputDecoration(
+                    labelText: 'Pergunta do Morador ou Pesquisa',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 RichMarkdownToolbar(controller: ctxCtrl),
@@ -1427,7 +1856,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                 TextField(
                   controller: ctxCtrl,
                   maxLines: 2,
-                  decoration: const InputDecoration(labelText: 'Contexto ou Objeção', border: OutlineInputBorder()),
+                  decoration: const InputDecoration(
+                    labelText: 'Contexto ou Objeção',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 RichMarkdownToolbar(controller: ansCtrl),
@@ -1435,7 +1867,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                 TextField(
                   controller: ansCtrl,
                   maxLines: 4,
-                  decoration: const InputDecoration(labelText: 'Resposta Bíblica', border: OutlineInputBorder()),
+                  decoration: const InputDecoration(
+                    labelText: 'Resposta Bíblica',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
                 const SizedBox(height: 16),
                 ElevatedButton(
@@ -1459,7 +1894,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                     );
                     if (ctx.mounted) Navigator.of(ctx).pop();
                   },
-                  child: const Text('Salvar Alterações', style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: const Text(
+                    'Salvar Alterações',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ),
               ],
             ),
@@ -1472,9 +1910,14 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
   void _showEditDocumentModal(KnowledgeDocumentEntry doc) {
     List<String> existingTags = [];
     try {
-      existingTags = (jsonDecode(doc.tags) as List).map((e) => e.toString()).toList();
+      existingTags = (jsonDecode(doc.tags) as List)
+          .map((e) => e.toString())
+          .toList();
     } catch (e, st) {
-      AppLogger.debug('Falha ao ler tags JSON do documento (${doc.id}): $e', st);
+      AppLogger.debug(
+        'Falha ao ler tags JSON do documento (${doc.id}): $e',
+        st,
+      );
     }
     String category = doc.category;
 
@@ -1500,19 +1943,40 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                   children: [
                     TextField(
                       controller: titleCtrl,
-                      decoration: const InputDecoration(labelText: 'Título do Documento', border: OutlineInputBorder()),
+                      decoration: const InputDecoration(
+                        labelText: 'Título do Documento',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      initialValue: ['manual', 'study', 'outline', 'other'].contains(category) ? category : 'manual',
-                      decoration: const InputDecoration(labelText: 'Categoria', border: OutlineInputBorder()),
+                      initialValue:
+                          [
+                            'manual',
+                            'study',
+                            'outline',
+                            'other',
+                          ].contains(category)
+                          ? category
+                          : 'manual',
+                      decoration: const InputDecoration(
+                        labelText: 'Categoria',
+                        border: OutlineInputBorder(),
+                      ),
                       items: const [
-                        DropdownMenuItem(value: 'manual', child: Text('Manual / Guia')),
+                        DropdownMenuItem(
+                          value: 'manual',
+                          child: Text('Manual / Guia'),
+                        ),
                         DropdownMenuItem(value: 'study', child: Text('Estudo')),
-                        DropdownMenuItem(value: 'outline', child: Text('Esboço')),
+                        DropdownMenuItem(
+                          value: 'outline',
+                          child: Text('Esboço'),
+                        ),
                         DropdownMenuItem(value: 'other', child: Text('Outro')),
                       ],
-                      onChanged: (v) => setSheetState(() => category = v ?? 'manual'),
+                      onChanged: (v) =>
+                          setSheetState(() => category = v ?? 'manual'),
                     ),
                     const SizedBox(height: 12),
                     TextField(
@@ -1534,12 +1998,24 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                       onPressed: () async {
                         final title = titleCtrl.text.trim();
                         if (title.isEmpty) return;
-                        final rawTags = tagsCtrl.text.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+                        final rawTags = tagsCtrl.text
+                            .split(',')
+                            .map((t) => t.trim())
+                            .where((t) => t.isNotEmpty)
+                            .toList();
                         final km = ref.read(knowledgeManagerProvider);
-                        await km.updateDocument(doc.id, title: title, category: category, tags: rawTags);
+                        await km.updateDocument(
+                          doc.id,
+                          title: title,
+                          category: category,
+                          tags: rawTags,
+                        );
                         if (ctx.mounted) Navigator.of(ctx).pop();
                       },
-                      child: const Text('Salvar Alterações', style: TextStyle(fontWeight: FontWeight.bold)),
+                      child: const Text(
+                        'Salvar Alterações',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ],
                 ),
@@ -1554,9 +2030,14 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
   void _showEditResourceModal(KnowledgeResourceEntry resource) {
     List<String> existingTags = [];
     try {
-      existingTags = (jsonDecode(resource.tags) as List).map((e) => e.toString()).toList();
+      existingTags = (jsonDecode(resource.tags) as List)
+          .map((e) => e.toString())
+          .toList();
     } catch (e, st) {
-      AppLogger.debug('Falha ao ler tags JSON do recurso (${resource.id}): $e', st);
+      AppLogger.debug(
+        'Falha ao ler tags JSON do recurso (${resource.id}): $e',
+        st,
+      );
     }
     String resourceType = resource.resourceType;
     String category = resource.category;
@@ -1590,12 +2071,18 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                   children: [
                     TextField(
                       controller: titleCtrl,
-                      decoration: const InputDecoration(labelText: 'Título do Recurso', border: OutlineInputBorder()),
+                      decoration: const InputDecoration(
+                        labelText: 'Título do Recurso',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: urlCtrl,
-                      decoration: const InputDecoration(labelText: 'Link / URL (JW.org ou pesquisa)', border: OutlineInputBorder()),
+                      decoration: const InputDecoration(
+                        labelText: 'Link / URL (JW.org ou pesquisa)',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     TextField(
@@ -1613,20 +2100,48 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                     TextField(
                       controller: descCtrl,
                       maxLines: 3,
-                      decoration: const InputDecoration(labelText: 'Descrição / Para que serve?', border: OutlineInputBorder()),
+                      decoration: const InputDecoration(
+                        labelText: 'Descrição / Para que serve?',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      initialValue: ['jw_pub', 'video', 'article', 'scripture_chain', 'link'].contains(resourceType) ? resourceType : 'link',
-                      decoration: const InputDecoration(labelText: 'Tipo de Recurso', border: OutlineInputBorder()),
+                      initialValue:
+                          [
+                            'jw_pub',
+                            'video',
+                            'article',
+                            'scripture_chain',
+                            'link',
+                          ].contains(resourceType)
+                          ? resourceType
+                          : 'link',
+                      decoration: const InputDecoration(
+                        labelText: 'Tipo de Recurso',
+                        border: OutlineInputBorder(),
+                      ),
                       items: const [
-                        DropdownMenuItem(value: 'jw_pub', child: Text('Publicação JW')),
+                        DropdownMenuItem(
+                          value: 'jw_pub',
+                          child: Text('Publicação JW'),
+                        ),
                         DropdownMenuItem(value: 'video', child: Text('Vídeo')),
-                        DropdownMenuItem(value: 'article', child: Text('Artigo de Revista')),
-                        DropdownMenuItem(value: 'scripture_chain', child: Text('Cadeia de Textos')),
-                        DropdownMenuItem(value: 'link', child: Text('Outro Link')),
+                        DropdownMenuItem(
+                          value: 'article',
+                          child: Text('Artigo de Revista'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'scripture_chain',
+                          child: Text('Cadeia de Textos'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'link',
+                          child: Text('Outro Link'),
+                        ),
                       ],
-                      onChanged: (v) => setSheetState(() => resourceType = v ?? 'link'),
+                      onChanged: (v) =>
+                          setSheetState(() => resourceType = v ?? 'link'),
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton(
@@ -1640,7 +2155,11 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                         if (title.isEmpty) return;
                         final urlText = urlCtrl.text.trim();
                         final descText = descCtrl.text.trim();
-                        final rawTags = tagsCtrl.text.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+                        final rawTags = tagsCtrl.text
+                            .split(',')
+                            .map((t) => t.trim())
+                            .where((t) => t.isNotEmpty)
+                            .toList();
                         final km = ref.read(knowledgeManagerProvider);
                         await km.updateResource(
                           resource.id,
@@ -1653,7 +2172,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                         );
                         if (ctx.mounted) Navigator.of(ctx).pop();
                       },
-                      child: const Text('Salvar Alterações', style: TextStyle(fontWeight: FontWeight.bold)),
+                      child: const Text(
+                        'Salvar Alterações',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ],
                 ),
@@ -1667,7 +2189,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
 
   Future<void> _transformNoteToResearch(KnowledgeNoteEntry note) async {
     final researchMgr = ref.read(researchManagerProvider);
-    final summary = note.content.length > 120 ? '${note.content.substring(0, 120)}...' : note.content;
+    final summary = note.content.length > 120
+        ? '${note.content.substring(0, 120)}...'
+        : note.content;
     final article = await researchMgr.addArticle(
       title: note.title,
       summary: summary,
@@ -1679,9 +2203,14 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
     final km = ref.read(knowledgeManagerProvider);
     List<String> currentTags = [];
     try {
-      currentTags = (jsonDecode(note.tags) as List).map((e) => e.toString()).toList();
+      currentTags = (jsonDecode(note.tags) as List)
+          .map((e) => e.toString())
+          .toList();
     } catch (e, st) {
-      AppLogger.debug('Falha ao ler tags JSON ao vincular nota à pesquisa (${note.id}): $e', st);
+      AppLogger.debug(
+        'Falha ao ler tags JSON ao vincular nota à pesquisa (${note.id}): $e',
+        st,
+      );
     }
     if (!currentTags.contains('research:${article.id}')) {
       currentTags.add('research:${article.id}');
@@ -1691,13 +2220,15 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Nota "${note.title}" transformada e vinculada à aba de Pesquisas!'),
+          content: Text(
+            'Nota "${note.title}" transformada e vinculada à aba de Pesquisas!',
+          ),
           action: SnackBarAction(
             label: 'Ver Pesquisas',
             onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const ResearchScreen()),
-              );
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const ResearchScreen()));
             },
           ),
         ),
@@ -1706,10 +2237,13 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
   }
 
   void _exportNote(KnowledgeNoteEntry note) {
-    final mdContent = '# ${note.title}\n\n**Categoria:** ${note.category}\n**Data:** ${_formatDate(note.updatedAt)}\n\n---\n\n${note.content}';
+    final mdContent =
+        '# ${note.title}\n\n**Categoria:** ${note.category}\n**Data:** ${_formatDate(note.updatedAt)}\n\n---\n\n${note.content}';
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
       builder: (ctx) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 12),
@@ -1719,25 +2253,41 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
               ListTile(
                 leading: const Icon(Icons.copy, color: AppTheme.primaryBlue),
                 title: const Text('Copiar Texto Formatado'),
-                subtitle: const Text('Copia o conteúdo em Markdown para a área de transferência'),
+                subtitle: const Text(
+                  'Copia o conteúdo em Markdown para a área de transferência',
+                ),
                 onTap: () {
                   Clipboard.setData(ClipboardData(text: mdContent));
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Nota copiada para a área de transferência!')),
+                    const SnackBar(
+                      content: Text(
+                        'Nota copiada para a área de transferência!',
+                      ),
+                    ),
                   );
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.download, color: AppTheme.primaryBlue),
+                leading: const Icon(
+                  Icons.download,
+                  color: AppTheme.primaryBlue,
+                ),
                 title: const Text('Baixar Arquivo Markdown (.md)'),
-                subtitle: const Text('Salva localmente o arquivo com formatação'),
+                subtitle: const Text(
+                  'Salva localmente o arquivo com formatação',
+                ),
                 onTap: () {
-                  final safeName = note.title.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+                  final safeName = note.title.replaceAll(
+                    RegExp(r'[^a-zA-Z0-9_-]'),
+                    '_',
+                  );
                   FileDownloader.download('$safeName.md', mdContent);
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Download da anotação concluído!')),
+                    const SnackBar(
+                      content: Text('Download da anotação concluído!'),
+                    ),
                   );
                 },
               ),
@@ -1765,7 +2315,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
 
     await researchMgr.addArticle(
       title: q.question,
-      summary: summary.length > 120 ? '${summary.substring(0, 120)}...' : summary,
+      summary: summary.length > 120
+          ? '${summary.substring(0, 120)}...'
+          : summary,
       content: contentBuffer.toString(),
       tags: ['Dúvida Teocrática', 'knowledge_question:${q.id}'],
     );
@@ -1773,13 +2325,15 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Dúvida transformada e enviada para a aba de Pesquisas!'),
+          content: Text(
+            'Dúvida transformada e enviada para a aba de Pesquisas!',
+          ),
           action: SnackBarAction(
             label: 'Ver Pesquisas',
             onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const ResearchScreen()),
-              );
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const ResearchScreen()));
             },
           ),
         ),
@@ -1789,7 +2343,8 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
 
   void _exportQuestion(KnowledgeQuestionEntry q) {
     final isAnswered = q.answer != null && q.answer!.isNotEmpty;
-    final mdContent = '# Pergunta Teocrática: ${q.question}\n\n'
+    final mdContent =
+        '# Pergunta Teocrática: ${q.question}\n\n'
         '**Status:** ${isAnswered ? "Respondida" : "Pendente"}\n'
         '**Data:** ${_formatDate(q.updatedAt)}\n'
         '${q.context != null && q.context!.isNotEmpty ? "\n**Contexto:**\n${q.context}\n" : ""}'
@@ -1797,7 +2352,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
 
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
       builder: (ctx) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 12),
@@ -1807,25 +2364,41 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
               ListTile(
                 leading: const Icon(Icons.copy, color: AppTheme.primaryBlue),
                 title: const Text('Copiar Texto Formatado'),
-                subtitle: const Text('Copia a pergunta e resposta em Markdown para a área de transferência'),
+                subtitle: const Text(
+                  'Copia a pergunta e resposta em Markdown para a área de transferência',
+                ),
                 onTap: () {
                   Clipboard.setData(ClipboardData(text: mdContent));
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Dúvida copiada para a área de transferência!')),
+                    const SnackBar(
+                      content: Text(
+                        'Dúvida copiada para a área de transferência!',
+                      ),
+                    ),
                   );
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.download, color: AppTheme.primaryBlue),
+                leading: const Icon(
+                  Icons.download,
+                  color: AppTheme.primaryBlue,
+                ),
                 title: const Text('Baixar Arquivo Markdown (.md)'),
-                subtitle: const Text('Salva localmente o arquivo com formatação'),
+                subtitle: const Text(
+                  'Salva localmente o arquivo com formatação',
+                ),
                 onTap: () {
-                  final safeName = q.question.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+                  final safeName = q.question.replaceAll(
+                    RegExp(r'[^a-zA-Z0-9_-]'),
+                    '_',
+                  );
                   FileDownloader.download('Duvida_$safeName.md', mdContent);
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Download da dúvida teocrática concluído!')),
+                    const SnackBar(
+                      content: Text('Download da dúvida teocrática concluído!'),
+                    ),
                   );
                 },
               ),
@@ -1858,7 +2431,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                 TextField(
                   controller: qCtrl,
                   autofocus: true,
-                  decoration: const InputDecoration(labelText: 'Pergunta do Morador ou Pesquisa', border: OutlineInputBorder()),
+                  decoration: const InputDecoration(
+                    labelText: 'Pergunta do Morador ou Pesquisa',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 RichMarkdownToolbar(controller: ctxCtrl),
@@ -1866,7 +2442,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                 TextField(
                   controller: ctxCtrl,
                   maxLines: 4,
-                  decoration: const InputDecoration(labelText: 'Contexto ou Objeção (opcional)', border: OutlineInputBorder()),
+                  decoration: const InputDecoration(
+                    labelText: 'Contexto ou Objeção (opcional)',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
                 const SizedBox(height: 16),
                 ElevatedButton(
@@ -1886,7 +2465,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                     );
                     if (ctx.mounted) Navigator.of(ctx).pop();
                   },
-                  child: const Text('Salvar Dúvida', style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: const Text(
+                    'Salvar Dúvida',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ),
               ],
             ),
@@ -1916,7 +2498,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
               children: [
                 Text(
                   'Pergunta: ${question.question}',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 RichMarkdownToolbar(controller: ansCtrl),
@@ -1944,7 +2529,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                     await km.answerQuestion(question.id, answer: ans);
                     if (ctx.mounted) Navigator.of(ctx).pop();
                   },
-                  child: const Text('Salvar Resposta', style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: const Text(
+                    'Salvar Resposta',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ),
               ],
             ),
@@ -1967,19 +2555,28 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
         try {
           fileBytes = await f.readAsBytes();
         } catch (e, st) {
-          AppLogger.debug('Falha ao ler bytes diretos do FilePicker (${f.name}): $e', st);
+          AppLogger.debug(
+            'Falha ao ler bytes diretos do FilePicker (${f.name}): $e',
+            st,
+          );
         }
-        int fileSize = fileBytes?.length ?? f.lengthSync() ?? (await f.length()) ?? 0;
+        int fileSize =
+            fileBytes?.length ?? f.lengthSync() ?? (await f.length()) ?? 0;
 
         if (!kIsWeb) {
           try {
-            if ((fileBytes == null || fileBytes.isEmpty) && f.path != null && f.path!.isNotEmpty) {
+            if ((fileBytes == null || fileBytes.isEmpty) &&
+                f.path != null &&
+                f.path!.isNotEmpty) {
               final sourceFile = File(f.path!);
               if (await sourceFile.exists()) {
                 try {
                   fileBytes = await sourceFile.readAsBytes();
                 } catch (e, st) {
-                  AppLogger.debug('Falha ao ler bytes do arquivo origem (${f.path}): $e', st);
+                  AppLogger.debug(
+                    'Falha ao ler bytes do arquivo origem (${f.path}): $e',
+                    st,
+                  );
                 }
               }
             }
@@ -2008,7 +2605,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
           }
         }
 
-        final fileExt = f.name.contains('.') ? f.name.split('.').last.toLowerCase() : 'other';
+        final fileExt = f.name.contains('.')
+            ? f.name.split('.').last.toLowerCase()
+            : 'other';
         final km = ref.read(knowledgeManagerProvider);
         final registeredDoc = await km.registerDocument(
           title: f.name.split('.').first,
@@ -2022,7 +2621,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
         if (fileBytes != null && fileBytes.isNotEmpty) {
           try {
             final appDb = ref.read(databaseProvider);
-            await appDb.into(appDb.appKvStore).insertOnConflictUpdate(
+            await appDb
+                .into(appDb.appKvStore)
+                .insertOnConflictUpdate(
                   AppKvStoreCompanion.insert(
                     key: 'doc_bytes_${registeredDoc.id}',
                     value: base64Encode(fileBytes),
@@ -2030,20 +2631,26 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                   ),
                 );
           } catch (e, st) {
-            AppLogger.warning('Falha ao armazenar bytes do documento (${registeredDoc.id}) em cache KV', e, st);
+            AppLogger.warning(
+              'Falha ao armazenar bytes do documento (${registeredDoc.id}) em cache KV',
+              e,
+              st,
+            );
           }
         }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Documento registrado na Base de Conhecimento!')),
+            const SnackBar(
+              content: Text('Documento registrado na Base de Conhecimento!'),
+            ),
           );
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao anexar documento: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Erro ao anexar documento: $e')));
       }
     }
   }
@@ -2072,12 +2679,18 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                 TextField(
                   controller: titleCtrl,
                   autofocus: true,
-                  decoration: const InputDecoration(labelText: 'Título do Recurso', border: OutlineInputBorder()),
+                  decoration: const InputDecoration(
+                    labelText: 'Título do Recurso',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: urlCtrl,
-                  decoration: const InputDecoration(labelText: 'URL (ex: https://www.jw.org/...)', border: OutlineInputBorder()),
+                  decoration: const InputDecoration(
+                    labelText: 'URL (ex: https://www.jw.org/...)',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 TextField(
@@ -2095,7 +2708,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                 TextField(
                   controller: descCtrl,
                   maxLines: 4,
-                  decoration: const InputDecoration(labelText: 'Descrição / Para qual ocasião serve?', border: OutlineInputBorder()),
+                  decoration: const InputDecoration(
+                    labelText: 'Descrição / Para qual ocasião serve?',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
                 const SizedBox(height: 16),
                 ElevatedButton(
@@ -2109,7 +2725,11 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                     if (title.isEmpty) return;
                     final urlText = urlCtrl.text.trim();
                     final descText = descCtrl.text.trim();
-                    final rawTags = tagsCtrl.text.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+                    final rawTags = tagsCtrl.text
+                        .split(',')
+                        .map((t) => t.trim())
+                        .where((t) => t.isNotEmpty)
+                        .toList();
                     final km = ref.read(knowledgeManagerProvider);
                     await km.createResource(
                       title: title,
@@ -2120,7 +2740,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
                     );
                     if (ctx.mounted) Navigator.of(ctx).pop();
                   },
-                  child: const Text('Salvar Recurso', style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: const Text(
+                    'Salvar Recurso',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ),
               ],
             ),
@@ -2141,7 +2764,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
           try {
             resolvedBytes = await direct.readAsBytes();
           } catch (e, st) {
-            AppLogger.debug('Falha ao ler arquivo direto (${doc.filePath}): $e', st);
+            AppLogger.debug(
+              'Falha ao ler arquivo direto (${doc.filePath}): $e',
+              st,
+            );
           }
         } else {
           final docDir = await getApplicationDocumentsDirectory();
@@ -2157,7 +2783,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
             candidates.add(File('${supportDir.path}/documents/$fileName'));
             candidates.add(File('${supportDir.path}/$fileName'));
           } catch (e, st) {
-            AppLogger.debug('Diretório ApplicationSupport indisponível: $e', st);
+            AppLogger.debug(
+              'Diretório ApplicationSupport indisponível: $e',
+              st,
+            );
           }
           try {
             final tempDir = await getTemporaryDirectory();
@@ -2173,23 +2802,30 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
               try {
                 resolvedBytes = await c.readAsBytes();
               } catch (e, st) {
-                AppLogger.debug('Falha ao ler candidato de documento (${c.path}): $e', st);
+                AppLogger.debug(
+                  'Falha ao ler candidato de documento (${c.path}): $e',
+                  st,
+                );
               }
               break;
             }
           }
         }
       } catch (e, st) {
-        AppLogger.warning('Falha ao localizar documento (${doc.id}) no disco', e, st);
+        AppLogger.warning(
+          'Falha ao localizar documento (${doc.id}) no disco',
+          e,
+          st,
+        );
       }
     }
 
     if (resolvedBytes == null || resolvedBytes.isEmpty) {
       try {
         final appDb = ref.read(databaseProvider);
-        final kv = await (appDb.select(appDb.appKvStore)
-              ..where((t) => t.key.equals('doc_bytes_${doc.id}')))
-            .getSingleOrNull();
+        final kv = await (appDb.select(
+          appDb.appKvStore,
+        )..where((t) => t.key.equals('doc_bytes_${doc.id}'))).getSingleOrNull();
         if (kv != null && kv.value.isNotEmpty) {
           resolvedBytes = base64Decode(kv.value);
         }
@@ -2220,7 +2856,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
           try {
             fileBytes = await direct.readAsBytes();
           } catch (e, st) {
-            AppLogger.debug('Falha ao ler arquivo direto para abrir (${doc.filePath}): $e', st);
+            AppLogger.debug(
+              'Falha ao ler arquivo direto para abrir (${doc.filePath}): $e',
+              st,
+            );
           }
         } else {
           final docDir = await getApplicationDocumentsDirectory();
@@ -2236,7 +2875,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
             candidates.add(File('${supportDir.path}/documents/$fileName'));
             candidates.add(File('${supportDir.path}/$fileName'));
           } catch (e, st) {
-            AppLogger.debug('ApplicationSupport indisponível ao abrir anexo: $e', st);
+            AppLogger.debug(
+              'ApplicationSupport indisponível ao abrir anexo: $e',
+              st,
+            );
           }
           try {
             final tempDir = await getTemporaryDirectory();
@@ -2252,14 +2894,21 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
               try {
                 fileBytes = await c.readAsBytes();
               } catch (e, st) {
-                AppLogger.debug('Falha ao ler candidato para abrir (${c.path}): $e', st);
+                AppLogger.debug(
+                  'Falha ao ler candidato para abrir (${c.path}): $e',
+                  st,
+                );
               }
               break;
             }
           }
         }
       } catch (e, st) {
-        AppLogger.warning('Falha ao localizar documento externo (${doc.id})', e, st);
+        AppLogger.warning(
+          'Falha ao localizar documento externo (${doc.id})',
+          e,
+          st,
+        );
       }
     }
 
@@ -2282,7 +2931,11 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
         }
       }
     } catch (e, st) {
-      AppLogger.warning('Falha ao abrir documento externamente; usando visualizador interno', e, st);
+      AppLogger.warning(
+        'Falha ao abrir documento externamente; usando visualizador interno',
+        e,
+        st,
+      );
       if (mounted) {
         await showUniversalAttachmentViewer(
           context,
@@ -2323,7 +2976,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
           backgroundColor: AppTheme.primaryBlue,
           foregroundColor: Colors.white,
           icon: const Icon(Icons.note_add),
-          label: const Text('Nova Nota', style: TextStyle(fontWeight: FontWeight.bold)),
+          label: const Text(
+            'Nova Nota',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
         );
       case 1:
         return FloatingActionButton.extended(
@@ -2332,7 +2988,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
           backgroundColor: AppTheme.primaryBlue,
           foregroundColor: Colors.white,
           icon: const Icon(Icons.help_outline),
-          label: const Text('Nova Dúvida', style: TextStyle(fontWeight: FontWeight.bold)),
+          label: const Text(
+            'Nova Dúvida',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
         );
       case 2:
         return FloatingActionButton.extended(
@@ -2341,7 +3000,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
           backgroundColor: AppTheme.primaryBlue,
           foregroundColor: Colors.white,
           icon: const Icon(Icons.upload_file),
-          label: const Text('Anexar Documento', style: TextStyle(fontWeight: FontWeight.bold)),
+          label: const Text(
+            'Anexar Documento',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
         );
       case 3:
         return FloatingActionButton.extended(
@@ -2350,7 +3012,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
           backgroundColor: AppTheme.primaryBlue,
           foregroundColor: Colors.white,
           icon: const Icon(Icons.add_link),
-          label: const Text('Novo Recurso', style: TextStyle(fontWeight: FontWeight.bold)),
+          label: const Text(
+            'Novo Recurso',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
         );
       default:
         return FloatingActionButton.extended(
@@ -2359,7 +3024,10 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
           backgroundColor: AppTheme.primaryBlue,
           foregroundColor: Colors.white,
           icon: const Icon(Icons.add),
-          label: const Text('Novo Item', style: TextStyle(fontWeight: FontWeight.bold)),
+          label: const Text(
+            'Novo Item',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
         );
     }
   }
@@ -2383,17 +3051,32 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> with 
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 56, color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
+            Icon(
+              icon,
+              size: 56,
+              color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
+            ),
             const SizedBox(height: 16),
             Text(
               title,
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: isDark
+                    ? const Color(0xFF94A3B8)
+                    : const Color(0xFF64748B),
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
               subtitle,
-              style: TextStyle(fontSize: 13, color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
+              style: TextStyle(
+                fontSize: 13,
+                color: isDark
+                    ? const Color(0xFF64748B)
+                    : const Color(0xFF94A3B8),
+              ),
               textAlign: TextAlign.center,
             ),
           ],

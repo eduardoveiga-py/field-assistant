@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -15,7 +16,10 @@ void main() {
       expect(AppVersion.buildNumber, equals(13));
       expect(AppVersion.displayVersion, equals('v1.3.6'));
       expect(AppVersion.userAgent, contains('MinisterioPessoal/1.3.6'));
-      expect(AppVersion.liveContainerSourceUrl, startsWith('livecontainer://sources?url='));
+      expect(
+        AppVersion.liveContainerSourceUrl,
+        startsWith('livecontainer://sources?url='),
+      );
       expect(AppVersion.releaseDate, isNotEmpty);
     });
 
@@ -80,57 +84,73 @@ void main() {
       expect(infoNoSize.formattedSize, equals('Tamanho sob consulta'));
     });
 
-    test('2. Consulta ao GitHub Releases detecta nova versão disponível', () async {
-      final mockClient = MockClient((request) async {
-        if (request.url.toString() == AppVersion.latestReleaseApiUrl) {
+    test(
+      '2. Consulta ao GitHub Releases detecta nova versão disponível',
+      () async {
+        final mockClient = MockClient((request) async {
+          if (request.url.toString() == AppVersion.latestReleaseApiUrl) {
+            final payload = {
+              'tag_name': 'v1.3.0',
+              'published_at': '2026-11-15T10:00:00Z',
+              'body': 'Nova versão com melhorias e correções.',
+              'assets': [
+                {
+                  'name': 'MinisterioPessoal.ipa',
+                  'browser_download_url': 'https://github.com/releases/download/v1.3.0/MinisterioPessoal.ipa',
+                  'size': 20971520, // 20 MB
+                },
+              ],
+            };
+            return http.Response(
+              jsonEncode(payload),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }
+          return http.Response('Not Found', 404);
+        });
+
+        final service = UpdateCheckerService(client: mockClient);
+        final updateInfo = await service.checkForUpdate(
+          currentVersion: '1.2.0',
+          platformOverride: TargetPlatform.iOS,
+        );
+
+        expect(updateInfo.hasUpdate, isTrue);
+        expect(updateInfo.latestVersion, equals('1.3.0'));
+        expect(updateInfo.releaseNotes, contains('Nova versão'));
+        expect(updateInfo.downloadUrl, contains('MinisterioPessoal.ipa'));
+        expect(updateInfo.sizeBytes, equals(20971520));
+        expect(updateInfo.formattedSize, equals('20.0 MB'));
+      },
+    );
+
+    test(
+      '3. Consulta ao GitHub Releases quando já na versão mais recente',
+      () async {
+        final mockClient = MockClient((request) async {
           final payload = {
-            'tag_name': 'v1.3.0',
-            'published_at': '2026-11-15T10:00:00Z',
-            'body': 'Nova versão com melhorias e correções.',
-            'assets': [
-              {
-                'name': 'MinisterioPessoal.ipa',
-                'browser_download_url': 'https://github.com/releases/download/v1.3.0/MinisterioPessoal.ipa',
-                'size': 20971520, // 20 MB
-              }
-            ],
+            'tag_name': 'v1.2.0',
+            'published_at': '2026-11-08T10:00:00Z',
+            'body': 'Versão atual.',
+            'assets': [],
           };
-          return http.Response(jsonEncode(payload), 200, headers: {'content-type': 'application/json'});
-        }
-        return http.Response('Not Found', 404);
-      });
+          return http.Response(
+            jsonEncode(payload),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        });
 
-      final service = UpdateCheckerService(client: mockClient);
-      final updateInfo = await service.checkForUpdate(
-        currentVersion: '1.2.0',
-        platformOverride: TargetPlatform.iOS,
-      );
+        final service = UpdateCheckerService(client: mockClient);
+        final updateInfo = await service.checkForUpdate(
+          currentVersion: '1.2.0',
+        );
 
-      expect(updateInfo.hasUpdate, isTrue);
-      expect(updateInfo.latestVersion, equals('1.3.0'));
-      expect(updateInfo.releaseNotes, contains('Nova versão'));
-      expect(updateInfo.downloadUrl, contains('MinisterioPessoal.ipa'));
-      expect(updateInfo.sizeBytes, equals(20971520));
-      expect(updateInfo.formattedSize, equals('20.0 MB'));
-    });
-
-    test('3. Consulta ao GitHub Releases quando já na versão mais recente', () async {
-      final mockClient = MockClient((request) async {
-        final payload = {
-          'tag_name': 'v1.2.0',
-          'published_at': '2026-11-08T10:00:00Z',
-          'body': 'Versão atual.',
-          'assets': [],
-        };
-        return http.Response(jsonEncode(payload), 200, headers: {'content-type': 'application/json'});
-      });
-
-      final service = UpdateCheckerService(client: mockClient);
-      final updateInfo = await service.checkForUpdate(currentVersion: '1.2.0');
-
-      expect(updateInfo.hasUpdate, isFalse);
-      expect(updateInfo.latestVersion, equals('1.2.0'));
-    });
+        expect(updateInfo.hasUpdate, isFalse);
+        expect(updateInfo.latestVersion, equals('1.2.0'));
+      },
+    );
 
     test('4. Fallback para apps.json quando GitHub API retorna erro 403 (Rate Limit)', () async {
       final mockClient = MockClient((request) async {
@@ -146,13 +166,18 @@ void main() {
                 'bundleIdentifier': 'com.ministeriopessoal.territorio',
                 'version': '1.2.5',
                 'versionDate': '2026-11-12',
-                'versionDescription': 'Atualização de emergência via apps.json.',
+                'versionDescription':
+                    'Atualização de emergência via apps.json.',
                 'downloadURL': 'https://cdn.example.com/app.ipa',
                 'size': 18874368,
-              }
+              },
             ],
           };
-          return http.Response(jsonEncode(payload), 200, headers: {'content-type': 'application/json'});
+          return http.Response(
+            jsonEncode(payload),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
         }
         return http.Response('Not Found', 404);
       });
@@ -166,19 +191,24 @@ void main() {
       expect(updateInfo.downloadUrl, equals('https://cdn.example.com/app.ipa'));
     });
 
-    test('5. Falha de rede resiliente retorna noUpdate sem lançar exceção', () async {
-      final mockClient = MockClient((request) async {
-        throw Exception('Network unreachable / offline');
-      });
+    test(
+      '5. Falha de rede resiliente retorna noUpdate sem lançar exceção',
+      () async {
+        final mockClient = MockClient((request) async {
+          throw Exception('Network unreachable / offline');
+        });
 
-      final service = UpdateCheckerService(client: mockClient);
-      final updateInfo = await service.checkForUpdate(currentVersion: '1.2.0');
+        final service = UpdateCheckerService(client: mockClient);
+        final updateInfo = await service.checkForUpdate(
+          currentVersion: '1.2.0',
+        );
 
-      expect(updateInfo.hasUpdate, isFalse);
-      expect(updateInfo.currentVersion, equals('1.2.0'));
-      expect(updateInfo.latestVersion, equals('1.2.0'));
-      expect(updateInfo.status, equals(UpdateCheckStatus.sourceUnavailable));
-    });
+        expect(updateInfo.hasUpdate, isFalse);
+        expect(updateInfo.currentVersion, equals('1.2.0'));
+        expect(updateInfo.latestVersion, equals('1.2.0'));
+        expect(updateInfo.status, equals(UpdateCheckStatus.sourceUnavailable));
+      },
+    );
 
     test('6. Seleciona APK no Android e IPA no iOS quando ambos os assets estão presentes', () async {
       final mockClient = MockClient((request) async {
@@ -199,7 +229,11 @@ void main() {
             },
           ],
         };
-        return http.Response(jsonEncode(payload), 200, headers: {'content-type': 'application/json'});
+        return http.Response(
+          jsonEncode(payload),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
       });
 
       final service = UpdateCheckerService(client: mockClient);
@@ -234,10 +268,14 @@ void main() {
               'versionDate': '2026-11-22',
               'downloadURL': 'https://cdn.example.com/app.ipa',
               'downloadURL_apk': 'https://cdn.example.com/app.apk',
-            }
+            },
           ],
         };
-        return http.Response(jsonEncode(payload), 200, headers: {'content-type': 'application/json'});
+        return http.Response(
+          jsonEncode(payload),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
       });
 
       final service = UpdateCheckerService(client: mockClient);
@@ -245,7 +283,10 @@ void main() {
         currentVersion: '1.2.0',
         platformOverride: TargetPlatform.android,
       );
-      expect(androidInfo.downloadUrl, equals('https://cdn.example.com/app.apk'));
+      expect(
+        androidInfo.downloadUrl,
+        equals('https://cdn.example.com/app.apk'),
+      );
 
       final iosInfo = await service.checkForUpdate(
         currentVersion: '1.2.0',
@@ -254,29 +295,43 @@ void main() {
       expect(iosInfo.downloadUrl, equals('https://cdn.example.com/app.ipa'));
     });
 
-    test('8. Diferenciação rigorosa dos status: upToDate e checkFailed', () async {
-      // Caso 1: upToDate
-      final upToDateClient = MockClient((request) async {
-        final payload = {
-          'tag_name': 'v1.2.0',
-          'published_at': '2026-11-08T10:00:00Z',
-          'assets': [],
-        };
-        return http.Response(jsonEncode(payload), 200, headers: {'content-type': 'application/json'});
-      });
-      final upToDateService = UpdateCheckerService(client: upToDateClient);
-      final upToDateResult = await upToDateService.checkForUpdate(currentVersion: '1.2.0');
-      expect(upToDateResult.status, equals(UpdateCheckStatus.upToDate));
+    test(
+      '8. Diferenciação rigorosa dos status: upToDate e checkFailed',
+      () async {
+        // Caso 1: upToDate
+        final upToDateClient = MockClient((request) async {
+          final payload = {
+            'tag_name': 'v1.2.0',
+            'published_at': '2026-11-08T10:00:00Z',
+            'assets': [],
+          };
+          return http.Response(
+            jsonEncode(payload),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        });
+        final upToDateService = UpdateCheckerService(client: upToDateClient);
+        final upToDateResult = await upToDateService.checkForUpdate(
+          currentVersion: '1.2.0',
+        );
+        expect(upToDateResult.status, equals(UpdateCheckStatus.upToDate));
 
-      // Caso 2: checkFailed (ex: HTTP 500 do servidor)
-      final failedClient = MockClient((request) async {
-        return http.Response('Internal Server Error', 500);
-      });
-      final failedService = UpdateCheckerService(client: failedClient);
-      final failedResult = await failedService.checkForUpdate(currentVersion: '1.2.0');
-      expect(failedResult.status, equals(UpdateCheckStatus.checkFailed));
-      expect(failedResult.errorMessage, contains('Não foi possível verificar'));
-    });
+        // Caso 2: checkFailed (ex: HTTP 500 do servidor)
+        final failedClient = MockClient((request) async {
+          return http.Response('Internal Server Error', 500);
+        });
+        final failedService = UpdateCheckerService(client: failedClient);
+        final failedResult = await failedService.checkForUpdate(
+          currentVersion: '1.2.0',
+        );
+        expect(failedResult.status, equals(UpdateCheckStatus.checkFailed));
+        expect(
+          failedResult.errorMessage,
+          contains('Não foi possível verificar'),
+        );
+      },
+    );
 
     test('9. Release com apenas .ipa nunca vaza URL do IPA para Android e vice-versa', () async {
       // Release contendo somente IPA nos assets
@@ -293,7 +348,11 @@ void main() {
             },
           ],
         };
-        return http.Response(jsonEncode(payload), 200, headers: {'content-type': 'application/json'});
+        return http.Response(
+          jsonEncode(payload),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
       });
 
       final ipaService = UpdateCheckerService(client: ipaOnlyClient);
@@ -315,12 +374,17 @@ void main() {
           'assets': [
             {
               'name': 'app-release.apk',
-              'browser_download_url': 'https://github.com/releases/download/v2.0.0/app-release.apk',
+              'browser_download_url':
+                  'https://github.com/releases/download/v2.0.0/app-release.apk',
               'size': 18000000,
             },
           ],
         };
-        return http.Response(jsonEncode(payload), 200, headers: {'content-type': 'application/json'});
+        return http.Response(
+          jsonEncode(payload),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
       });
 
       final apkService = UpdateCheckerService(client: apkOnlyClient);
@@ -336,34 +400,52 @@ void main() {
   });
 
   group('AppLocaleStrings & i18n Fallback Contract', () {
-    test('1. AppLocaleType.fromCode mapeia corretamente e faz fallback para ptBR', () {
-      expect(AppLocaleType.fromCode('pt_BR'), equals(AppLocaleType.ptBR));
-      expect(AppLocaleType.fromCode('en_US'), equals(AppLocaleType.enUS));
-      expect(AppLocaleType.fromCode('es_ES'), equals(AppLocaleType.esES));
-      expect(AppLocaleType.fromCode('fr_FR'), equals(AppLocaleType.ptBR));
-      expect(AppLocaleType.fromCode(null), equals(AppLocaleType.ptBR));
-    });
+    test(
+      '1. AppLocaleType.fromCode mapeia corretamente e faz fallback para ptBR',
+      () {
+        expect(AppLocaleType.fromCode('pt_BR'), equals(AppLocaleType.ptBR));
+        expect(AppLocaleType.fromCode('en_US'), equals(AppLocaleType.enUS));
+        expect(AppLocaleType.fromCode('es_ES'), equals(AppLocaleType.esES));
+        expect(AppLocaleType.fromCode('fr_FR'), equals(AppLocaleType.ptBR));
+        expect(AppLocaleType.fromCode(null), equals(AppLocaleType.ptBR));
+      },
+    );
 
-    test('2. Catálogo em Português (PT-BR) possui todas as strings essenciais', () {
-      final strings = AppLocaleStrings.of(AppLocaleType.ptBR);
-      expect(strings.appTitle, equals('Ministério Pessoal'));
-      expect(strings.navToday, equals('Hoje'));
-      expect(strings.navLanguages, equals('Idiomas & Tradução'));
-      expect(strings.navTerritoryMaps, equals('Mapas & Territórios'));
-      expect(strings.updatesTitle, equals('Atualizações do Aplicativo'));
-      expect(strings.territoryCoverageIndex, equals('Índice de Cobertura (IC)'));
-      expect(strings.doorstepScheduleTitle, equals('Agendar Retorno na Porta'));
-    });
+    test(
+      '2. Catálogo em Português (PT-BR) possui todas as strings essenciais',
+      () {
+        final strings = AppLocaleStrings.of(AppLocaleType.ptBR);
+        expect(strings.appTitle, equals('Ministério Pessoal'));
+        expect(strings.navToday, equals('Hoje'));
+        expect(strings.navLanguages, equals('Idiomas & Tradução'));
+        expect(strings.navTerritoryMaps, equals('Mapas & Territórios'));
+        expect(strings.updatesTitle, equals('Atualizações do Aplicativo'));
+        expect(
+          strings.territoryCoverageIndex,
+          equals('Índice de Cobertura (IC)'),
+        );
+        expect(
+          strings.doorstepScheduleTitle,
+          equals('Agendar Retorno na Porta'),
+        );
+      },
+    );
 
-    test('3. Catálogo em Inglês (EN-US) traduz elementos de UI e mantém fallbacks', () {
-      final strings = AppLocaleStrings.of(AppLocaleType.enUS);
-      expect(strings.appTitle, equals('Field Ministry Assistant'));
-      expect(strings.navToday, equals('Today'));
-      expect(strings.navStudies, equals('Bible Studies'));
-      expect(strings.navLanguages, equals('Languages & Translation'));
-      expect(strings.updatesTitle, equals('App Updates'));
-      expect(strings.doorstepScheduleTitle, equals('Doorstep Return Visit Booking'));
-    });
+    test(
+      '3. Catálogo em Inglês (EN-US) traduz elementos de UI e mantém fallbacks',
+      () {
+        final strings = AppLocaleStrings.of(AppLocaleType.enUS);
+        expect(strings.appTitle, equals('Field Ministry Assistant'));
+        expect(strings.navToday, equals('Today'));
+        expect(strings.navStudies, equals('Bible Studies'));
+        expect(strings.navLanguages, equals('Languages & Translation'));
+        expect(strings.updatesTitle, equals('App Updates'));
+        expect(
+          strings.doorstepScheduleTitle,
+          equals('Doorstep Return Visit Booking'),
+        );
+      },
+    );
 
     test('4. Catálogo em Espanhol (ES-ES) traduz elementos de UI e mantém integridade', () {
       final strings = AppLocaleStrings.of(AppLocaleType.esES);
@@ -372,7 +454,10 @@ void main() {
       expect(strings.navStudies, equals('Cursos Bíblicos'));
       expect(strings.navLanguages, equals('Idiomas & Traducción'));
       expect(strings.updatesTitle, equals('Actualizaciones de la Aplicación'));
-      expect(strings.doorstepScheduleTitle, equals('Agendar Revisita en la Puerta'));
+      expect(
+        strings.doorstepScheduleTitle,
+        equals('Agendar Revisita en la Puerta'),
+      );
     });
   });
 }

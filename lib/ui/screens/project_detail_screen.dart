@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -21,7 +22,8 @@ class ProjectDetailScreen extends ConsumerStatefulWidget {
   const ProjectDetailScreen({super.key, required this.projectId});
 
   @override
-  ConsumerState<ProjectDetailScreen> createState() => _ProjectDetailScreenState();
+  ConsumerState<ProjectDetailScreen> createState() =>
+      _ProjectDetailScreenState();
 }
 
 class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
@@ -35,30 +37,46 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       stream: projectMgr.watchProject(widget.projectId),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
         }
 
         final project = snapshot.data;
         if (project == null) {
           return Scaffold(
             appBar: AppBar(title: const Text('Projeto')),
-            body: const Center(child: Text('Projeto não encontrado ou excluído.')),
+            body: const Center(
+              child: Text('Projeto não encontrado ou excluído.'),
+            ),
           );
         }
 
         return Scaffold(
           appBar: AppBar(
-            title: Text(project.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+            title: Text(
+              project.name,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
             actions: [
               PopupMenuButton<String>(
                 icon: const Icon(Icons.more_vert),
                 onSelected: (val) => _handleMenuAction(val, project),
                 itemBuilder: (ctx) => [
-                  const PopupMenuItem(value: 'edit', child: Text('Editar Projeto')),
-                  const PopupMenuItem(value: 'complete', child: Text('Marcar como Concluído')),
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Text('Editar Projeto'),
+                  ),
+                  const PopupMenuItem(
+                    value: 'complete',
+                    child: Text('Marcar como Concluído'),
+                  ),
                   const PopupMenuItem(
                     value: 'delete',
-                    child: Text('Excluir Projeto', style: TextStyle(color: Colors.redAccent)),
+                    child: Text(
+                      'Excluir Projeto',
+                      style: TextStyle(color: Colors.redAccent),
+                    ),
                   ),
                 ],
               ),
@@ -83,7 +101,9 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                     color: isDark ? const Color(0xFF1E293B) : Colors.white,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                      color: isDark
+                          ? const Color(0xFF334155)
+                          : const Color(0xFFE2E8F0),
                     ),
                   ),
                   child: Column(
@@ -92,9 +112,14 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                       Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
                             decoration: BoxDecoration(
-                              color: AppTheme.primaryBlue.withValues(alpha: 0.15),
+                              color: AppTheme.primaryBlue.withValues(
+                                alpha: 0.15,
+                              ),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
@@ -108,9 +133,13 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                           ),
                           const SizedBox(width: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
                             decoration: BoxDecoration(
-                              color: _statusColor(project.status).withValues(alpha: 0.15),
+                              color: _statusColor(project.status)
+                                  .withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
@@ -126,34 +155,47 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                           if (project.targetDate != null)
                             Row(
                               children: [
-                                const Icon(Icons.flag_outlined, size: 14, color: Colors.grey),
+                                const Icon(
+                                  Icons.flag_outlined,
+                                  size: 14,
+                                  color: Colors.grey,
+                                ),
                                 const SizedBox(width: 4),
                                 Text(
                                   'Meta: ${_formatDate(project.targetDate!)}',
-                                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey,
+                                  ),
                                 ),
                               ],
                             ),
                         ],
                       ),
-                      if (project.objective != null && project.objective!.isNotEmpty) ...[
+                      if (project.objective != null &&
+                          project.objective!.isNotEmpty) ...[
                         const SizedBox(height: 12),
                         Text(
                           project.objective!,
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
-                            color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B),
+                            color: isDark
+                                ? const Color(0xFFF1F5F9)
+                                : const Color(0xFF1E293B),
                           ),
                         ),
                       ],
-                      if (project.description != null && project.description!.isNotEmpty) ...[
+                      if (project.description != null &&
+                          project.description!.isNotEmpty) ...[
                         const SizedBox(height: 6),
                         Text(
                           project.description!,
                           style: TextStyle(
                             fontSize: 13,
-                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                            color: isDark
+                                ? const Color(0xFF94A3B8)
+                                : const Color(0xFF64748B),
                           ),
                         ),
                       ],
@@ -168,14 +210,17 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
                                     'Progresso das Tarefas',
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.bold,
-                                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                      color: isDark
+                                          ? const Color(0xFF94A3B8)
+                                          : const Color(0xFF64748B),
                                     ),
                                   ),
                                   Text(
@@ -190,9 +235,15 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                               ),
                               const SizedBox(height: 8),
                               LinearProgressIndicator(
-                                value: prog.totalTasks > 0 ? prog.completedTasks / prog.totalTasks : 0.0,
-                                backgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                                valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primaryBlue),
+                                value: prog.totalTasks > 0
+                                    ? prog.completedTasks / prog.totalTasks
+                                    : 0.0,
+                                backgroundColor: isDark
+                                    ? const Color(0xFF334155)
+                                    : const Color(0xFFE2E8F0),
+                                valueColor: const AlwaysStoppedAnimation<Color>(
+                                  AppTheme.primaryBlue,
+                                ),
                                 minHeight: 8,
                                 borderRadius: BorderRadius.circular(4),
                               ),
@@ -211,7 +262,10 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                   children: [
                     const Text(
                       'Tarefas do Projeto',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     TextButton.icon(
                       onPressed: () => _showAddTaskModal(project),
@@ -232,7 +286,11 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                         alignment: Alignment.center,
                         child: Text(
                           'Nenhuma tarefa vinculada a este projeto ainda.',
-                          style: TextStyle(color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                          style: TextStyle(
+                            color: isDark
+                                ? const Color(0xFF94A3B8)
+                                : const Color(0xFF64748B),
+                          ),
                         ),
                       );
                     }
@@ -246,22 +304,30 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                         final task = tasks[i];
                         return Card(
                           margin: EdgeInsets.zero,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                           child: CheckboxListTile(
                             value: task.isCompleted,
                             activeColor: AppTheme.primaryBlue,
-                            onChanged: (val) => taskMgr.toggleTaskComplete(task.id, completed: val),
+                            onChanged: (val) => taskMgr.toggleTaskComplete(
+                              task.id,
+                              completed: val,
+                            ),
                             title: Text(
                               task.title,
                               style: TextStyle(
-                                decoration: task.isCompleted ? TextDecoration.lineThrough : null,
+                                decoration: task.isCompleted
+                                    ? TextDecoration.lineThrough
+                                    : null,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                if (task.description != null && task.description!.isNotEmpty) ...[
+                                if (task.description != null &&
+                                    task.description!.isNotEmpty) ...[
                                   const SizedBox(height: 2),
                                   MarkdownPreviewText(
                                     text: task.description!,
@@ -269,7 +335,9 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                      color: isDark
+                                          ? const Color(0xFF94A3B8)
+                                          : const Color(0xFF64748B),
                                     ),
                                   ),
                                 ],
@@ -354,27 +422,46 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       initialValue: priority,
-                      decoration: const InputDecoration(labelText: 'Prioridade', border: OutlineInputBorder()),
+                      decoration: const InputDecoration(
+                        labelText: 'Prioridade',
+                        border: OutlineInputBorder(),
+                      ),
                       items: const [
                         DropdownMenuItem(value: 'low', child: Text('Baixa')),
-                        DropdownMenuItem(value: 'normal', child: Text('Normal')),
+                        DropdownMenuItem(
+                          value: 'normal',
+                          child: Text('Normal'),
+                        ),
                         DropdownMenuItem(value: 'high', child: Text('Alta')),
-                        DropdownMenuItem(value: 'urgent', child: Text('Urgente')),
+                        DropdownMenuItem(
+                          value: 'urgent',
+                          child: Text('Urgente'),
+                        ),
                       ],
-                      onChanged: (v) => setModalState(() => priority = v ?? 'normal'),
+                      onChanged: (v) =>
+                          setModalState(() => priority = v ?? 'normal'),
                     ),
                     const SizedBox(height: 12),
                     ListTile(
-                      title: Text(dueDate == null ? 'Definir Data de Vencimento' : 'Vencimento: ${_formatDate(dueDate!)}'),
+                      title: Text(
+                        dueDate == null
+                            ? 'Definir Data de Vencimento'
+                            : 'Vencimento: ${_formatDate(dueDate!)}',
+                      ),
                       trailing: const Icon(Icons.calendar_today),
                       onTap: () async {
                         final picked = await showDatePicker(
                           context: context,
                           initialDate: DateTime.now(),
-                          firstDate: DateTime.now().subtract(const Duration(days: 30)),
-                          lastDate: DateTime.now().add(const Duration(days: 365)),
+                          firstDate: DateTime.now().subtract(
+                            const Duration(days: 30),
+                          ),
+                          lastDate: DateTime.now().add(
+                            const Duration(days: 365),
+                          ),
                         );
-                        if (picked != null) setModalState(() => dueDate = picked);
+                        if (picked != null)
+                          setModalState(() => dueDate = picked);
                       },
                     ),
                     const SizedBox(height: 16),
@@ -388,7 +475,11 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                         final title = titleCtrl.text.trim();
                         if (title.isEmpty) return;
                         final descText = descCtrl.text.trim();
-                        final rawTags = tagsCtrl.text.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+                        final rawTags = tagsCtrl.text
+                            .split(',')
+                            .map((t) => t.trim())
+                            .where((t) => t.isNotEmpty)
+                            .toList();
                         final taskMgr = ref.read(taskManagerProvider);
                         await taskMgr.createTask(
                           title: title,
@@ -401,7 +492,10 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                         );
                         if (ctx.mounted) Navigator.of(ctx).pop();
                       },
-                      child: const Text('Adicionar Tarefa', style: TextStyle(fontWeight: FontWeight.bold)),
+                      child: const Text(
+                        'Adicionar Tarefa',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ],
                 ),
@@ -433,7 +527,10 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         existingTags = (meta['tags'] as List).map((e) => e.toString()).toList();
       }
     } catch (e, st) {
-      AppLogger.debug('Falha ao ler metadata de tags do projeto (${project.id}): $e', st);
+      AppLogger.debug(
+        'Falha ao ler metadata de tags do projeto (${project.id}): $e',
+        st,
+      );
     }
     String category = project.category;
     DateTime? targetDate = project.targetDate;
@@ -465,7 +562,10 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                   children: [
                     TextField(
                       controller: nameCtrl,
-                      decoration: const InputDecoration(labelText: 'Nome do Projeto', border: OutlineInputBorder()),
+                      decoration: const InputDecoration(
+                        labelText: 'Nome do Projeto',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     TextField(
@@ -483,36 +583,62 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                     TextField(
                       controller: objCtrl,
                       maxLines: 3,
-                      decoration: const InputDecoration(labelText: 'Objetivo Principal (Markdown)', border: OutlineInputBorder()),
+                      decoration: const InputDecoration(
+                        labelText: 'Objetivo Principal (Markdown)',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      initialValue: ['ministry', 'personal', 'study'].contains(category) ? category : 'ministry',
-                      decoration: const InputDecoration(labelText: 'Categoria', border: OutlineInputBorder()),
+                      initialValue:
+                          ['ministry', 'personal', 'study'].contains(category)
+                          ? category
+                          : 'ministry',
+                      decoration: const InputDecoration(
+                        labelText: 'Categoria',
+                        border: OutlineInputBorder(),
+                      ),
                       items: const [
-                        DropdownMenuItem(value: 'ministry', child: Text('Ministério')),
-                        DropdownMenuItem(value: 'personal', child: Text('Pessoal')),
+                        DropdownMenuItem(
+                          value: 'ministry',
+                          child: Text('Ministério'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'personal',
+                          child: Text('Pessoal'),
+                        ),
                         DropdownMenuItem(value: 'study', child: Text('Estudo')),
                       ],
-                      onChanged: (v) => setModalState(() => category = v ?? 'ministry'),
+                      onChanged: (v) =>
+                          setModalState(() => category = v ?? 'ministry'),
                     ),
                     const SizedBox(height: 12),
                     ListTile(
-                      title: Text(targetDate == null ? 'Definir Prazo / Meta (Opcional)' : 'Meta: ${_formatDate(targetDate!)}'),
+                      title: Text(
+                        targetDate == null
+                            ? 'Definir Prazo / Meta (Opcional)'
+                            : 'Meta: ${_formatDate(targetDate!)}',
+                      ),
                       trailing: targetDate != null
                           ? IconButton(
                               icon: const Icon(Icons.clear, size: 18),
-                              onPressed: () => setModalState(() => targetDate = null),
+                              onPressed: () =>
+                                  setModalState(() => targetDate = null),
                             )
                           : const Icon(Icons.flag_outlined),
                       onTap: () async {
                         final picked = await showDatePicker(
                           context: context,
-                          initialDate: targetDate ?? DateTime.now().add(const Duration(days: 30)),
+                          initialDate:
+                              targetDate ??
+                              DateTime.now().add(const Duration(days: 30)),
                           firstDate: DateTime.now(),
-                          lastDate: DateTime.now().add(const Duration(days: 730)),
+                          lastDate: DateTime.now().add(
+                            const Duration(days: 730),
+                          ),
                         );
-                        if (picked != null) setModalState(() => targetDate = picked);
+                        if (picked != null)
+                          setModalState(() => targetDate = picked);
                       },
                     ),
                     const SizedBox(height: 16),
@@ -526,7 +652,11 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                         final name = nameCtrl.text.trim();
                         if (name.isEmpty) return;
                         final objText = objCtrl.text.trim();
-                        final rawTags = tagsCtrl.text.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+                        final rawTags = tagsCtrl.text
+                            .split(',')
+                            .map((t) => t.trim())
+                            .where((t) => t.isNotEmpty)
+                            .toList();
                         final projMgr = ref.read(projectManagerProvider);
                         await projMgr.updateProject(
                           project.id,
@@ -538,7 +668,10 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                         );
                         if (ctx.mounted) Navigator.of(ctx).pop();
                       },
-                      child: const Text('Salvar Alterações', style: TextStyle(fontWeight: FontWeight.bold)),
+                      child: const Text(
+                        'Salvar Alterações',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ],
                 ),
@@ -553,7 +686,11 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
   Widget _priorityIcon(String priority) {
     switch (priority) {
       case 'urgent':
-        return const Icon(Icons.priority_high, color: Colors.redAccent, size: 20);
+        return const Icon(
+          Icons.priority_high,
+          color: Colors.redAccent,
+          size: 20,
+        );
       case 'high':
         return const Icon(Icons.arrow_upward, color: Colors.amber, size: 20);
       case 'low':

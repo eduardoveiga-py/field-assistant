@@ -74,7 +74,11 @@ class VoiceNotesManager {
             ),
           );
     } catch (e, st) {
-      AppLogger.error('Falha ao enfileirar nota de voz $entityId na sync_queue', e, st);
+      AppLogger.error(
+        'Falha ao enfileirar nota de voz $entityId na sync_queue',
+        e,
+        st,
+      );
     }
   }
 
@@ -133,7 +137,11 @@ class VoiceNotesManager {
       if (rows.isEmpty) return null;
       return _entryToItem(rows.first);
     } catch (e, st) {
-      AppLogger.warning('Falha ao buscar última nota de voz de $personId', e, st);
+      AppLogger.warning(
+        'Falha ao buscar última nota de voz de $personId',
+        e,
+        st,
+      );
       return null;
     }
   }

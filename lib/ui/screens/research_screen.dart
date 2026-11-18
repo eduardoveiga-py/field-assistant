@@ -45,199 +45,222 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
           final newTagController = ctrls[0];
 
           return StatefulBuilder(
-        builder: (ctx, setDialogState) {
-          return AlertDialog(
-            title: const Row(
-              children: [
-                Icon(Icons.label, color: AppTheme.primaryBlue),
-                SizedBox(width: 8),
-                Text('Gerenciar Categorias / Tags'),
-              ],
-            ),
-            content: SizedBox(
-              width: double.maxFinite,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
+            builder: (ctx, setDialogState) {
+              return AlertDialog(
+                title: const Row(
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: newTagController,
-                            decoration: const InputDecoration(
-                              labelText: 'Nova Categoria / Tag',
-                              hintText: 'Ex: Arqueologia Bíblica',
-                              isDense: true,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        ElevatedButton(
-                          onPressed: () async {
-                            final text = newTagController.text.trim();
-                            if (text.isNotEmpty) {
-                              final mgr = ref.read(researchManagerProvider);
-                              await mgr.addTag(text);
-                              newTagController.clear();
-                              if (ctx.mounted) Navigator.pop(ctx);
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'Categoria "$text" criada com sucesso!',
-                                    ),
-                                  ),
-                                );
-                              }
-                            }
-                          },
-                          child: const Text('Adicionar'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    const Divider(),
-                    const Text(
-                      'Categorias Existentes:',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    if (tags.isEmpty)
-                      const Text(
-                        'Nenhuma categoria cadastrada.',
-                        style: TextStyle(color: AppTheme.textMuted),
-                      )
-                    else
-                      ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: tags.length,
-                        itemBuilder: (c, i) {
-                          final t = tags[i];
-                          return ListTile(
-                            dense: true,
-                            title: Text(
-                              t.name,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.edit, size: 18),
-                                  tooltip: 'Renomear',
-                                  onPressed: () {
-                                    showDialog(
-                                      context: context,
-                                      builder: (editCtx) => ManagedTextControllers(
-                                        initialTexts: [t.name],
-                                        builder: (editCtx, editCtrls) {
-                                          final editController = editCtrls[0];
-                                          return AlertDialog(
-                                            title: const Text('Renomear Categoria'),
-                                            content: TextField(
-                                              controller: editController,
-                                              autofocus: true,
-                                            ),
-                                            actions: [
-                                              TextButton(
-                                                onPressed: () =>
-                                                    Navigator.pop(editCtx),
-                                                child: const Text('Cancelar'),
-                                              ),
-                                              ElevatedButton(
-                                                onPressed: () async {
-                                                  final newName = editController
-                                                      .text
-                                                      .trim();
-                                                  if (newName.isNotEmpty) {
-                                                    final mgr = ref.read(
-                                                      researchManagerProvider,
-                                                    );
-                                                    await mgr.updateTag(
-                                                      t.id,
-                                                      newName,
-                                                    );
-                                                    if (editCtx.mounted) {
-                                                      Navigator.pop(editCtx);
-                                                    }
-                                                    if (ctx.mounted) {
-                                                      Navigator.pop(ctx);
-                                                    }
-                                                  }
-                                                },
-                                                child: const Text('Salvar'),
-                                              ),
-                                            ],
-                                          );
-                                        },
-                                      ),
-                                    );
-                                  },
-                                ),
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.delete_outline,
-                                    size: 18,
-                                    color: Colors.red,
-                                  ),
-                                  tooltip: 'Excluir',
-                                  onPressed: () async {
-                                    final mgr = ref.read(
-                                      researchManagerProvider,
-                                    );
-                                    await mgr.deleteTag(t.id);
-                                    if (ctx.mounted) Navigator.pop(ctx);
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            'Categoria "${t.name}" excluída.',
-                                          ),
-                                        ),
-                                      );
-                                    }
-                                  },
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
+                    Icon(Icons.label, color: AppTheme.primaryBlue),
+                    SizedBox(width: 8),
+                    Text('Gerenciar Categorias / Tags'),
                   ],
                 ),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Fechar'),
-              ),
-            ],
+                content: SizedBox(
+                  width: double.maxFinite,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: newTagController,
+                                decoration: const InputDecoration(
+                                  labelText: 'Nova Categoria / Tag',
+                                  hintText: 'Ex: Arqueologia Bíblica',
+                                  isDense: true,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton(
+                              onPressed: () async {
+                                final text = newTagController.text.trim();
+                                if (text.isNotEmpty) {
+                                  final mgr = ref.read(researchManagerProvider);
+                                  await mgr.addTag(text);
+                                  newTagController.clear();
+                                  if (ctx.mounted) Navigator.pop(ctx);
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          'Categoria "$text" criada com sucesso!',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
+                              child: const Text('Adicionar'),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        const Divider(),
+                        const Text(
+                          'Categorias Existentes:',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        if (tags.isEmpty)
+                          const Text(
+                            'Nenhuma categoria cadastrada.',
+                            style: TextStyle(color: AppTheme.textMuted),
+                          )
+                        else
+                          ListView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: tags.length,
+                            itemBuilder: (c, i) {
+                              final t = tags[i];
+                              return ListTile(
+                                dense: true,
+                                title: Text(
+                                  t.name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.edit, size: 18),
+                                      tooltip: 'Renomear',
+                                      onPressed: () {
+                                        showDialog(
+                                          context: context,
+                                          builder: (editCtx) =>
+                                              ManagedTextControllers(
+                                                initialTexts: [t.name],
+                                                builder: (editCtx, editCtrls) {
+                                                  final editController =
+                                                      editCtrls[0];
+                                                  return AlertDialog(
+                                                    title: const Text(
+                                                      'Renomear Categoria',
+                                                    ),
+                                                    content: TextField(
+                                                      controller:
+                                                          editController,
+                                                      autofocus: true,
+                                                    ),
+                                                    actions: [
+                                                      TextButton(
+                                                        onPressed: () =>
+                                                            Navigator.pop(
+                                                              editCtx,
+                                                            ),
+                                                        child: const Text(
+                                                          'Cancelar',
+                                                        ),
+                                                      ),
+                                                      ElevatedButton(
+                                                        onPressed: () async {
+                                                          final newName =
+                                                              editController
+                                                                  .text
+                                                                  .trim();
+                                                          if (newName
+                                                              .isNotEmpty) {
+                                                            final mgr = ref.read(
+                                                              researchManagerProvider,
+                                                            );
+                                                            await mgr.updateTag(
+                                                              t.id,
+                                                              newName,
+                                                            );
+                                                            if (editCtx
+                                                                .mounted) {
+                                                              Navigator.pop(
+                                                                editCtx,
+                                                              );
+                                                            }
+                                                            if (ctx.mounted) {
+                                                              Navigator.pop(
+                                                                ctx,
+                                                              );
+                                                            }
+                                                          }
+                                                        },
+                                                        child: const Text(
+                                                          'Salvar',
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  );
+                                                },
+                                              ),
+                                        );
+                                      },
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.delete_outline,
+                                        size: 18,
+                                        color: Colors.red,
+                                      ),
+                                      tooltip: 'Excluir',
+                                      onPressed: () async {
+                                        final mgr = ref.read(
+                                          researchManagerProvider,
+                                        );
+                                        await mgr.deleteTag(t.id);
+                                        if (ctx.mounted) Navigator.pop(ctx);
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                'Categoria "${t.name}" excluída.',
+                                              ),
+                                            ),
+                                          );
+                                        }
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Fechar'),
+                  ),
+                ],
+              );
+            },
           );
-        },
-      );
         },
       ),
     );
   }
 
-  void _showExportArticleModal(BuildContext context, ResearchArticleItem article) {
-    final mdContent = '# ${article.title}\n\n'
+  void _showExportArticleModal(
+    BuildContext context,
+    ResearchArticleItem article,
+  ) {
+    final mdContent =
+        '# ${article.title}\n\n'
         '**Resumo:** ${article.summary}\n'
         '${article.tags.isNotEmpty ? '**Tags:** ${article.tags.map((t) => '#$t').join(' ')}\n' : ''}'
         '\n---\n\n'
         '${article.content}';
 
-    final plainText = '${article.title}\n\n'
+    final plainText =
+        '${article.title}\n\n'
         'RESUMO:\n${article.summary}\n\n'
         'CONTEÚDO:\n${article.content}';
 
@@ -255,50 +278,81 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
               ListTile(
                 leading: const Icon(Icons.copy, color: AppTheme.primaryBlue),
                 title: const Text('Copiar Texto Formatado (Markdown)'),
-                subtitle: const Text('Copia título, resumo e conteúdo em Markdown'),
+                subtitle: const Text(
+                  'Copia título, resumo e conteúdo em Markdown',
+                ),
                 onTap: () {
                   Clipboard.setData(ClipboardData(text: mdContent));
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Pesquisa copiada como Markdown!')),
+                    const SnackBar(
+                      content: Text('Pesquisa copiada como Markdown!'),
+                    ),
                   );
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.text_snippet_outlined, color: AppTheme.primaryBlue),
+                leading: const Icon(
+                  Icons.text_snippet_outlined,
+                  color: AppTheme.primaryBlue,
+                ),
                 title: const Text('Copiar Texto Puro'),
-                subtitle: const Text('Copia o texto sem marcação para a área de transferência'),
+                subtitle: const Text(
+                  'Copia o texto sem marcação para a área de transferência',
+                ),
                 onTap: () {
                   Clipboard.setData(ClipboardData(text: plainText));
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Pesquisa copiada como texto puro!')),
+                    const SnackBar(
+                      content: Text('Pesquisa copiada como texto puro!'),
+                    ),
                   );
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.download, color: AppTheme.primaryBlue),
+                leading: const Icon(
+                  Icons.download,
+                  color: AppTheme.primaryBlue,
+                ),
                 title: const Text('Baixar Arquivo Markdown (.md)'),
-                subtitle: const Text('Salva o artigo localmente com formatação'),
+                subtitle: const Text(
+                  'Salva o artigo localmente com formatação',
+                ),
                 onTap: () {
-                  final safeName = article.title.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+                  final safeName = article.title.replaceAll(
+                    RegExp(r'[^a-zA-Z0-9_-]'),
+                    '_',
+                  );
                   FileDownloader.download('$safeName.md', mdContent);
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Download do arquivo .md concluído!')),
+                    const SnackBar(
+                      content: Text('Download do arquivo .md concluído!'),
+                    ),
                   );
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.file_download_outlined, color: AppTheme.primaryBlue),
+                leading: const Icon(
+                  Icons.file_download_outlined,
+                  color: AppTheme.primaryBlue,
+                ),
                 title: const Text('Baixar Arquivo de Texto (.txt)'),
-                subtitle: const Text('Salva o artigo em formato de texto simples'),
+                subtitle: const Text(
+                  'Salva o artigo em formato de texto simples',
+                ),
                 onTap: () {
-                  final safeName = article.title.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+                  final safeName = article.title.replaceAll(
+                    RegExp(r'[^a-zA-Z0-9_-]'),
+                    '_',
+                  );
                   FileDownloader.download('$safeName.txt', plainText);
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Download do arquivo .txt concluído!')),
+                    const SnackBar(
+                      content: Text('Download do arquivo .txt concluído!'),
+                    ),
                   );
                 },
               ),
@@ -484,9 +538,13 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       OutlinedButton.icon(
-                        icon: const Icon(Icons.file_download_outlined, size: 16),
+                        icon: const Icon(
+                          Icons.file_download_outlined,
+                          size: 16,
+                        ),
                         label: const Text('Exportar'),
-                        onPressed: () => _showExportArticleModal(context, article),
+                        onPressed: () =>
+                            _showExportArticleModal(context, article),
                       ),
                       const SizedBox(width: 8),
                       OutlinedButton.icon(
@@ -553,335 +611,344 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
           final tagInputController = ctrls[3];
 
           return StatefulBuilder(
-        builder: (ctx, setDialogState) {
-          final isDark = Theme.of(ctx).brightness == Brightness.dark;
-          return Dialog(
-            backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 580, maxHeight: 720),
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
+            builder: (ctx, setDialogState) {
+              final isDark = Theme.of(ctx).brightness == Brightness.dark;
+              return Dialog(
+                backgroundColor: isDark
+                    ? const Color(0xFF1E293B)
+                    : Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: 580,
+                    maxHeight: 720,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Icon(
-                          existing != null
-                              ? Icons.edit_document
-                              : Icons.menu_book,
-                          color: AppTheme.primaryBlue,
-                          size: 26,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            existing != null
-                                ? 'Editar Material de Pesquisa'
-                                : 'Nova Pesquisa para o Ministério',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close, size: 20),
-                          tooltip: 'Fechar',
-                          onPressed: () => Navigator.pop(ctx),
-                        ),
-                      ],
-                    ),
-                    const Divider(height: 20),
-                    Expanded(
-                      child: SingleChildScrollView(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        Row(
                           children: [
-                            const Text(
-                              'Cadastre argumentos, matérias bíblicas e raciocínios para usar durante as visitas e estudos.',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: AppTheme.textMuted,
-                              ),
+                            Icon(
+                              existing != null
+                                  ? Icons.edit_document
+                                  : Icons.menu_book,
+                              color: AppTheme.primaryBlue,
+                              size: 26,
                             ),
-                            const SizedBox(height: 12),
-                            TextField(
-                              controller: titleController,
-                              decoration: const InputDecoration(
-                                labelText: 'Título do Assunto *',
-                                hintText: 'Ex: Como provar que a Bíblia é a palavra de Deus',
-                              ),
-                              autofocus: existing == null,
-                            ),
-                            const SizedBox(height: 12),
-                            TextField(
-                              controller: summaryController,
-                              decoration: const InputDecoration(
-                                labelText: 'Pequeno Resumo (aparece no bloco da tela inicial) *',
-                                hintText: 'Ex: 3 argumentos práticos: harmonia interna, profecias e exatidão científica',
-                              ),
-                              maxLines: 2,
-                            ),
-                            const SizedBox(height: 12),
-                            RichMarkdownToolbar(controller: contentController),
-                            const SizedBox(height: 6),
-                            TextField(
-                              controller: contentController,
-                              decoration: const InputDecoration(
-                                labelText:
-                                    'Conteúdo Completo & Textos Bíblicos *',
-                                hintText: 'Digite o conteúdo detalhado, perguntas para raciocinar e textos bíblicos de referência...',
-                              ),
-                              maxLines: 6,
-                            ),
-                            const SizedBox(height: 12),
-
-                            // SELETOR DE CATEGORIAS / TAGS
-                            const Text(
-                              'Categorias / Tags:',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            if (availableTags.isNotEmpty)
-                              Wrap(
-                                spacing: 6,
-                                runSpacing: 6,
-                                children: availableTags.map((t) {
-                                  final isSelected = tags.contains(t.name);
-                                  return FilterChip(
-                                    label: Text(
-                                      t.name,
-                                      style: const TextStyle(fontSize: 11),
-                                    ),
-                                    selected: isSelected,
-                                    onSelected: (val) {
-                                      setDialogState(() {
-                                        if (val) {
-                                          tags.add(t.name);
-                                        } else {
-                                          tags.remove(t.name);
-                                        }
-                                      });
-                                    },
-                                  );
-                                }).toList(),
-                              ),
-                            const SizedBox(height: 6),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: TextField(
-                                    controller: tagInputController,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Ou criar nova tag',
-                                      hintText: 'Ex: profecias, trindade',
-                                      isDense: true,
-                                    ),
-                                  ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                existing != null
+                                    ? 'Editar Material de Pesquisa'
+                                    : 'Nova Pesquisa para o Ministério',
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
                                 ),
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.add_circle,
-                                    color: AppTheme.primaryBlue,
-                                  ),
-                                  onPressed: () async {
-                                    final text = tagInputController.text.trim();
-                                    if (text.isNotEmpty &&
-                                        !tags.contains(text)) {
-                                      final mgr = ref.read(
-                                        researchManagerProvider,
-                                      );
-                                      await mgr.addTag(text);
-                                      setDialogState(() {
-                                        tags.add(text);
-                                        tagInputController.clear();
-                                      });
-                                    }
-                                  },
-                                ),
-                              ],
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-
-                            const SizedBox(height: 12),
-                            // FOTOS / ARQUIVOS
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            IconButton(
+                              icon: const Icon(Icons.close, size: 20),
+                              tooltip: 'Fechar',
+                              onPressed: () => Navigator.pop(ctx),
+                            ),
+                          ],
+                        ),
+                        const Divider(height: 20),
+                        Expanded(
+                          child: SingleChildScrollView(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 const Text(
-                                  'Fotos / Arquivos de Apoio:',
+                                  'Cadastre argumentos, matérias bíblicas e raciocínios para usar durante as visitas e estudos.',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppTheme.textMuted,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                TextField(
+                                  controller: titleController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Título do Assunto *',
+                                    hintText: 'Ex: Como provar que a Bíblia é a palavra de Deus',
+                                  ),
+                                  autofocus: existing == null,
+                                ),
+                                const SizedBox(height: 12),
+                                TextField(
+                                  controller: summaryController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Pequeno Resumo (aparece no bloco da tela inicial) *',
+                                    hintText: 'Ex: 3 argumentos práticos: harmonia interna, profecias e exatidão científica',
+                                  ),
+                                  maxLines: 2,
+                                ),
+                                const SizedBox(height: 12),
+                                RichMarkdownToolbar(
+                                  controller: contentController,
+                                ),
+                                const SizedBox(height: 6),
+                                TextField(
+                                  controller: contentController,
+                                  decoration: const InputDecoration(
+                                    labelText:
+                                        'Conteúdo Completo & Textos Bíblicos *',
+                                    hintText: 'Digite o conteúdo detalhado, perguntas para raciocinar e textos bíblicos de referência...',
+                                  ),
+                                  maxLines: 6,
+                                ),
+                                const SizedBox(height: 12),
+
+                                // SELETOR DE CATEGORIAS / TAGS
+                                const Text(
+                                  'Categorias / Tags:',
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 13,
                                   ),
                                 ),
-                                IconButton.filledTonal(
-                                  icon: const Icon(
-                                    Icons.add_photo_alternate,
-                                    size: 18,
-                                  ),
-                                  onPressed: () async {
-                                    final img =
-                                        await MediaPickerHelper.pickImage(
-                                          context,
-                                          title: 'Anexar Imagem à Pesquisa',
-                                        );
-                                    if (img != null && img.isNotEmpty) {
-                                      setDialogState(
-                                        () => attachments.add(img),
+                                const SizedBox(height: 6),
+                                if (availableTags.isNotEmpty)
+                                  Wrap(
+                                    spacing: 6,
+                                    runSpacing: 6,
+                                    children: availableTags.map((t) {
+                                      final isSelected = tags.contains(t.name);
+                                      return FilterChip(
+                                        label: Text(
+                                          t.name,
+                                          style: const TextStyle(fontSize: 11),
+                                        ),
+                                        selected: isSelected,
+                                        onSelected: (val) {
+                                          setDialogState(() {
+                                            if (val) {
+                                              tags.add(t.name);
+                                            } else {
+                                              tags.remove(t.name);
+                                            }
+                                          });
+                                        },
                                       );
-                                    }
-                                  },
+                                    }).toList(),
+                                  ),
+                                const SizedBox(height: 6),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: TextField(
+                                        controller: tagInputController,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Ou criar nova tag',
+                                          hintText: 'Ex: profecias, trindade',
+                                          isDense: true,
+                                        ),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.add_circle,
+                                        color: AppTheme.primaryBlue,
+                                      ),
+                                      onPressed: () async {
+                                        final text = tagInputController.text
+                                            .trim();
+                                        if (text.isNotEmpty &&
+                                            !tags.contains(text)) {
+                                          final mgr = ref.read(
+                                            researchManagerProvider,
+                                          );
+                                          await mgr.addTag(text);
+                                          setDialogState(() {
+                                            tags.add(text);
+                                            tagInputController.clear();
+                                          });
+                                        }
+                                      },
+                                    ),
+                                  ],
                                 ),
+
+                                const SizedBox(height: 12),
+                                // FOTOS / ARQUIVOS
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text(
+                                      'Fotos / Arquivos de Apoio:',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                    IconButton.filledTonal(
+                                      icon: const Icon(
+                                        Icons.add_photo_alternate,
+                                        size: 18,
+                                      ),
+                                      onPressed: () async {
+                                        final img =
+                                            await MediaPickerHelper.pickImage(
+                                              context,
+                                              title: 'Anexar Imagem à Pesquisa',
+                                            );
+                                        if (img != null && img.isNotEmpty) {
+                                          setDialogState(
+                                            () => attachments.add(img),
+                                          );
+                                        }
+                                      },
+                                    ),
+                                  ],
+                                ),
+                                if (attachments.isNotEmpty) ...[
+                                  const SizedBox(height: 8),
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
+                                    children: List.generate(attachments.length, (
+                                      i,
+                                    ) {
+                                      return Stack(
+                                        clipBehavior: Clip.none,
+                                        children: [
+                                          Container(
+                                            width: 70,
+                                            height: 70,
+                                            decoration: BoxDecoration(
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                              border: Border.all(
+                                                color: Colors.grey.shade300,
+                                              ),
+                                            ),
+                                            child: ClipRRect(
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                              child:
+                                                  MediaPickerHelper.buildImageWidget(
+                                                    attachments[i],
+                                                  ),
+                                            ),
+                                          ),
+                                          Positioned(
+                                            top: -4,
+                                            right: -4,
+                                            child: InkWell(
+                                              onTap: () => setDialogState(
+                                                () => attachments.removeAt(i),
+                                              ),
+                                              child: Container(
+                                                padding: const EdgeInsets.all(
+                                                  2,
+                                                ),
+                                                decoration: const BoxDecoration(
+                                                  color: Colors.black87,
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: const Icon(
+                                                  Icons.close,
+                                                  color: Colors.white,
+                                                  size: 14,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      );
+                                    }),
+                                  ),
+                                ],
                               ],
                             ),
-                            if (attachments.isNotEmpty) ...[
-                              const SizedBox(height: 8),
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: List.generate(attachments.length, (
-                                  i,
-                                ) {
-                                  return Stack(
-                                    clipBehavior: Clip.none,
-                                    children: [
-                                      Container(
-                                        width: 70,
-                                        height: 70,
-                                        decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                          border: Border.all(
-                                            color: Colors.grey.shade300,
-                                          ),
-                                        ),
-                                        child: ClipRRect(
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                          child:
-                                              MediaPickerHelper.buildImageWidget(
-                                                attachments[i],
-                                              ),
-                                        ),
+                          ),
+                        ),
+                        const Divider(height: 20),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              child: const Text('Cancelar'),
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton.icon(
+                              icon: const Icon(Icons.check, size: 18),
+                              label: const Text('Salvar'),
+                              onPressed: () async {
+                                final title = titleController.text.trim();
+                                final summary = summaryController.text.trim();
+                                final content = contentController.text.trim();
+                                if (title.isEmpty ||
+                                    summary.isEmpty ||
+                                    content.isEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Por favor, preencha o título, o resumo e o conteúdo completo.',
                                       ),
-                                      Positioned(
-                                        top: -4,
-                                        right: -4,
-                                        child: InkWell(
-                                          onTap: () => setDialogState(
-                                            () => attachments.removeAt(i),
-                                          ),
-                                          child: Container(
-                                            padding: const EdgeInsets.all(2),
-                                            decoration: const BoxDecoration(
-                                              color: Colors.black87,
-                                              shape: BoxShape.circle,
-                                            ),
-                                            child: const Icon(
-                                              Icons.close,
-                                              color: Colors.white,
-                                              size: 14,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
+                                    ),
                                   );
-                                }),
-                              ),
-                            ],
+                                  return;
+                                }
+
+                                final mgr = ref.read(researchManagerProvider);
+                                if (existing != null) {
+                                  await mgr.updateArticle(
+                                    ResearchArticleItem(
+                                      id: existing.id,
+                                      title: title,
+                                      summary: summary,
+                                      content: content,
+                                      tags: tags,
+                                      attachments: attachments,
+                                      createdAt: existing.createdAt,
+                                      updatedAt: DateTime.now(),
+                                    ),
+                                  );
+                                } else {
+                                  await mgr.addArticle(
+                                    title: title,
+                                    summary: summary,
+                                    content: content,
+                                    tags: tags,
+                                    attachments: attachments,
+                                  );
+                                }
+
+                                if (ctx.mounted) Navigator.pop(ctx);
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        existing != null
+                                            ? 'Pesquisa atualizada!'
+                                            : 'Pesquisa cadastrada com sucesso!',
+                                      ),
+                                    ),
+                                  );
+                                }
+                              },
+                            ),
                           ],
-                        ),
-                      ),
-                    ),
-                    const Divider(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          child: const Text('Cancelar'),
-                        ),
-                        const SizedBox(width: 8),
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.check, size: 18),
-                          label: const Text('Salvar'),
-                          onPressed: () async {
-                            final title = titleController.text.trim();
-                            final summary = summaryController.text.trim();
-                            final content = contentController.text.trim();
-                            if (title.isEmpty ||
-                                summary.isEmpty ||
-                                content.isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Por favor, preencha o título, o resumo e o conteúdo completo.',
-                                  ),
-                                ),
-                              );
-                              return;
-                            }
-
-                            final mgr = ref.read(researchManagerProvider);
-                            if (existing != null) {
-                              await mgr.updateArticle(
-                                ResearchArticleItem(
-                                  id: existing.id,
-                                  title: title,
-                                  summary: summary,
-                                  content: content,
-                                  tags: tags,
-                                  attachments: attachments,
-                                  createdAt: existing.createdAt,
-                                  updatedAt: DateTime.now(),
-                                ),
-                              );
-                            } else {
-                              await mgr.addArticle(
-                                title: title,
-                                summary: summary,
-                                content: content,
-                                tags: tags,
-                                attachments: attachments,
-                              );
-                            }
-
-                            if (ctx.mounted) Navigator.pop(ctx);
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    existing != null
-                                        ? 'Pesquisa atualizada!'
-                                        : 'Pesquisa cadastrada com sucesso!',
-                                  ),
-                                ),
-                              );
-                            }
-                          },
                         ),
                       ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           );
-        },
-      );
         },
       ),
     );
@@ -1211,9 +1278,17 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
                                     children: [
                                       IconButton(
                                         visualDensity: VisualDensity.compact,
-                                        icon: const Icon(Icons.file_download_outlined, size: 18, color: AppTheme.primaryBlue),
+                                        icon: const Icon(
+                                          Icons.file_download_outlined,
+                                          size: 18,
+                                          color: AppTheme.primaryBlue,
+                                        ),
                                         tooltip: 'Exportar Pesquisa',
-                                        onPressed: () => _showExportArticleModal(context, item),
+                                        onPressed: () =>
+                                            _showExportArticleModal(
+                                              context,
+                                              item,
+                                            ),
                                       ),
                                       ElevatedButton.icon(
                                         style: ElevatedButton.styleFrom(

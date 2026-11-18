@@ -10,7 +10,11 @@ import '../../core/app_theme.dart';
 ///   com limites estritos de altura (maxHeight 0.88 * viewportHeight).
 Future<T?> showAdaptiveMinistrySheet<T>({
   required BuildContext context,
-  required Widget Function(BuildContext context, ScrollController? scrollController) builder,
+  required Widget Function(
+    BuildContext context,
+    ScrollController? scrollController,
+  )
+  builder,
   String? title,
   Widget? titleLeading,
   String? subtitle,
@@ -31,14 +35,14 @@ Future<T?> showAdaptiveMinistrySheet<T>({
 
         return Dialog(
           backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 24,
+            vertical: 24,
+          ),
           elevation: 0,
           child: Center(
             child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: 720,
-                maxHeight: maxHeight,
-              ),
+              constraints: BoxConstraints(maxWidth: 720, maxHeight: maxHeight),
               child: Container(
                 decoration: BoxDecoration(
                   color: isDark ? const Color(0xFF1E293B) : Colors.white,
@@ -57,7 +61,10 @@ Future<T?> showAdaptiveMinistrySheet<T>({
                   children: [
                     // Cabeçalho institucional com botão "✕" de fechar no topo
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 14,
+                      ),
                       decoration: BoxDecoration(
                         color: isDark
                             ? const Color(0xFF0F172A).withValues(alpha: 0.6)
@@ -145,13 +152,13 @@ Future<T?> showAdaptiveMinistrySheet<T>({
         duration: const Duration(milliseconds: 150),
         curve: Curves.easeOut,
         child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: maxHeight,
-          ),
+          constraints: BoxConstraints(maxHeight: maxHeight),
           child: Container(
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF1E293B) : Colors.white,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(24),
+              ),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.25),
@@ -178,7 +185,10 @@ Future<T?> showAdaptiveMinistrySheet<T>({
                 ),
                 if (title != null) ...[
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 8,
+                    ),
                     child: Row(
                       children: [
                         if (titleLeading != null) ...[

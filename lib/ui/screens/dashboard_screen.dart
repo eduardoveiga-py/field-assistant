@@ -73,206 +73,215 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           final notesController = ctrls[4];
 
           return StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: const Row(
-            children: [
-              Icon(Icons.add_task, color: AppTheme.primaryBlue),
-              SizedBox(width: 8),
-              Text('Lançar Atividade de Campo'),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+            builder: (ctx, setDialogState) => AlertDialog(
+              title: const Row(
+                children: [
+                  Icon(Icons.add_task, color: AppTheme.primaryBlue),
+                  SizedBox(width: 8),
+                  Text('Lançar Atividade de Campo'),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    OutlinedButton.icon(
-                      icon: const Icon(Icons.date_range, size: 16),
-                      label: Text(AppDateUtils.formatDate(selectedDate)),
-                      onPressed: () async {
-                        final p = await showDatePicker(
-                          context: context,
-                          initialDate: selectedDate,
-                          firstDate: DateTime(2020),
-                          lastDate: DateTime.now().add(
-                            const Duration(days: 30),
+                    Row(
+                      children: [
+                        OutlinedButton.icon(
+                          icon: const Icon(Icons.date_range, size: 16),
+                          label: Text(AppDateUtils.formatDate(selectedDate)),
+                          onPressed: () async {
+                            final p = await showDatePicker(
+                              context: context,
+                              initialDate: selectedDate,
+                              firstDate: DateTime(2020),
+                              lastDate: DateTime.now().add(
+                                const Duration(days: 30),
+                              ),
+                            );
+                            if (p != null)
+                              setDialogState(() => selectedDate = p);
+                          },
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            initialValue: selectedModality,
+                            decoration: const InputDecoration(
+                              labelText: 'Modalidade',
+                            ),
+                            items: const [
+                              DropdownMenuItem(
+                                value: 'campo',
+                                child: Text('De Casa em Casa'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'testemunho_publico',
+                                child: Text('Carrinho / Público'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'informal',
+                                child: Text('Informal'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'carta_telefone',
+                                child: Text('Cartas / Telefone'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'outro',
+                                child: Text('Outro'),
+                              ),
+                            ],
+                            onChanged: (val) {
+                              if (val != null) {
+                                setDialogState(() => selectedModality = val);
+                              }
+                            },
                           ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Tempo Dedicado:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: hoursController,
+                            decoration: const InputDecoration(
+                              labelText: 'Horas',
+                              suffixText: 'h',
+                            ),
+                            keyboardType: TextInputType.number,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: minutesController,
+                            decoration: const InputDecoration(
+                              labelText: 'Minutos',
+                              suffixText: 'min',
+                            ),
+                            keyboardType: TextInputType.number,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Resultados do Ministério (Witness Work):',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: placementsController,
+                            decoration: const InputDecoration(
+                              labelText: 'Publicações',
+                              hintText: '0',
+                            ),
+                            keyboardType: TextInputType.number,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: videosController,
+                            decoration: const InputDecoration(
+                              labelText: 'Vídeos Mostrados',
+                              hintText: '0',
+                            ),
+                            keyboardType: TextInputType.number,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: notesController,
+                      decoration: const InputDecoration(
+                        labelText: 'Observações / Ponto de pregação',
+                        hintText: 'Ex: Trabalho com cartões de contato no centro comercial',
+                      ),
+                      maxLines: 2,
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final h = int.tryParse(hoursController.text.trim()) ?? 0;
+                    final m = int.tryParse(minutesController.text.trim()) ?? 0;
+                    final totalSeconds = (h * 3600) + (m * 60);
+
+                    if (totalSeconds <= 0) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Informe ao menos alguns minutos de atividade.',
+                          ),
+                        ),
+                      );
+                      return;
+                    }
+
+                    final placements =
+                        int.tryParse(placementsController.text.trim()) ?? 0;
+                    final videos =
+                        int.tryParse(videosController.text.trim()) ?? 0;
+
+                    final formattedNotes =
+                        DashboardCalculator.formatActivityNotes(
+                          userNotes: notesController.text.trim().isEmpty
+                              ? null
+                              : notesController.text.trim(),
+                          placements: placements,
+                          videos: videos,
                         );
-                        if (p != null) setDialogState(() => selectedDate = p);
-                      },
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        initialValue: selectedModality,
-                        decoration: const InputDecoration(
-                          labelText: 'Modalidade',
-                        ),
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'campo',
-                            child: Text('De Casa em Casa'),
+
+                    final repo = ref.read(repositoryProvider);
+                    await repo.createActivityRecord(
+                      date: selectedDate,
+                      durationSeconds: totalSeconds,
+                      modality: selectedModality,
+                      notes: formattedNotes,
+                    );
+
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Atividade de campo registrada com sucesso!',
                           ),
-                          DropdownMenuItem(
-                            value: 'testemunho_publico',
-                            child: Text('Carrinho / Público'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'informal',
-                            child: Text('Informal'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'carta_telefone',
-                            child: Text('Cartas / Telefone'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'outro',
-                            child: Text('Outro'),
-                          ),
-                        ],
-                        onChanged: (val) {
-                          if (val != null) {
-                            setDialogState(() => selectedModality = val);
-                          }
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Tempo Dedicado:',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: hoursController,
-                        decoration: const InputDecoration(
-                          labelText: 'Horas',
-                          suffixText: 'h',
                         ),
-                        keyboardType: TextInputType.number,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        controller: minutesController,
-                        decoration: const InputDecoration(
-                          labelText: 'Minutos',
-                          suffixText: 'min',
-                        ),
-                        keyboardType: TextInputType.number,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Resultados do Ministério (Witness Work):',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: placementsController,
-                        decoration: const InputDecoration(
-                          labelText: 'Publicações',
-                          hintText: '0',
-                        ),
-                        keyboardType: TextInputType.number,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        controller: videosController,
-                        decoration: const InputDecoration(
-                          labelText: 'Vídeos Mostrados',
-                          hintText: '0',
-                        ),
-                        keyboardType: TextInputType.number,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: notesController,
-                  decoration: const InputDecoration(
-                    labelText: 'Observações / Ponto de pregação',
-                    hintText: 'Ex: Trabalho com cartões de contato no centro comercial',
-                  ),
-                  maxLines: 2,
+                      );
+                    }
+                  },
+                  child: const Text('Salvar Atividade'),
                 ),
               ],
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final h = int.tryParse(hoursController.text.trim()) ?? 0;
-                final m = int.tryParse(minutesController.text.trim()) ?? 0;
-                final totalSeconds = (h * 3600) + (m * 60);
-
-                if (totalSeconds <= 0) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Informe ao menos alguns minutos de atividade.',
-                      ),
-                    ),
-                  );
-                  return;
-                }
-
-                final placements =
-                    int.tryParse(placementsController.text.trim()) ?? 0;
-                final videos = int.tryParse(videosController.text.trim()) ?? 0;
-
-                final formattedNotes = DashboardCalculator.formatActivityNotes(
-                  userNotes: notesController.text.trim().isEmpty
-                      ? null
-                      : notesController.text.trim(),
-                  placements: placements,
-                  videos: videos,
-                );
-
-                final repo = ref.read(repositoryProvider);
-                await repo.createActivityRecord(
-                  date: selectedDate,
-                  durationSeconds: totalSeconds,
-                  modality: selectedModality,
-                  notes: formattedNotes,
-                );
-
-                if (ctx.mounted) Navigator.pop(ctx);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Atividade de campo registrada com sucesso!',
-                      ),
-                    ),
-                  );
-                }
-              },
-              child: const Text('Salvar Atividade'),
-            ),
-          ],
-        ),
-        );
+          );
         },
       ),
     );

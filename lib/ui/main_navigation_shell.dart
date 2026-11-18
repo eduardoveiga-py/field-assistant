@@ -397,10 +397,10 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
     final isTabletOrDesktop = MediaQuery.of(context).size.width >= 768;
     final isMapFullscreen = ref.watch(isMapFullscreenProvider);
 
-    if (isMapFullscreen && _currentFeature == AppFeature.territoryMaps && !_showingSettings) {
-      return Scaffold(
-        body: _buildScreenForCurrentState(),
-      );
+    if (isMapFullscreen &&
+        _currentFeature == AppFeature.territoryMaps &&
+        !_showingSettings) {
+      return Scaffold(body: _buildScreenForCurrentState());
     }
 
     if (isTabletOrDesktop) {
@@ -434,9 +434,7 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
           NavigationRailDestination(
             icon: Icon(railIcon),
             selectedIcon: Icon(selectedRailIcon),
-            label: Text(
-              _getFeatureLabel(f, strings),
-            ),
+            label: Text(_getFeatureLabel(f, strings)),
           ),
         );
         railFeatures.add(f);

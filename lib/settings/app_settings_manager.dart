@@ -201,7 +201,11 @@ class AppSettingsNotifier extends Notifier<Map<String, String>> {
             state = Map<String, String>.from(manager._memoryCache);
           })
           .catchError((Object e, StackTrace st) {
-            AppLogger.warning('Falha ao inicializar AppSettingsNotifier', e, st);
+            AppLogger.warning(
+              'Falha ao inicializar AppSettingsNotifier',
+              e,
+              st,
+            );
           });
     }
 

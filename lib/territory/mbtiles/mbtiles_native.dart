@@ -27,7 +27,9 @@ class MBTilesNative implements MBTilesBackend {
   @override
   Future<void> init() {
     if (_initialized) return Future.value();
-    return _initializing ??= _initialize().whenComplete(() { _initializing = null; });
+    return _initializing ??= _initialize().whenComplete(() {
+      _initializing = null;
+    });
   }
 
   Future<void> _initialize() async {
@@ -61,10 +63,15 @@ class MBTilesNative implements MBTilesBackend {
           try {
             backup.deleteSync();
           } catch (e, st) {
-            AppLogger.warning('Não foi possível remover backup do mapa.', e, st);
+            AppLogger.warning(
+              'Não foi possível remover backup do mapa.',
+              e,
+              st,
+            );
           }
         } else {
-          final damaged = '$originalPath.invalid.${DateTime.now().microsecondsSinceEpoch}';
+          final damaged =
+              '$originalPath.invalid.${DateTime.now().microsecondsSinceEpoch}';
           original.renameSync(damaged);
           try {
             backup.renameSync(originalPath);
@@ -92,8 +99,11 @@ class MBTilesNative implements MBTilesBackend {
       final db = sql.sqlite3.open(path, mode: sql.OpenMode.readOnly);
       _openDbs[key] = db;
       try {
-        final result = db.select("SELECT value FROM metadata WHERE name = 'scheme' LIMIT 1");
-        if (result.isNotEmpty && result.first['value']?.toString().toLowerCase() == 'xyz') {
+        final result = db.select(
+          "SELECT value FROM metadata WHERE name = 'scheme' LIMIT 1",
+        );
+        if (result.isNotEmpty &&
+            result.first['value']?.toString().toLowerCase() == 'xyz') {
           _xyzDatabases.add(key);
         }
       } on sql.SqliteException {
@@ -122,14 +132,18 @@ class MBTilesNative implements MBTilesBackend {
   @override
   bool isRegionInstalled(String regionId) {
     if (_mbtilesDir == null) return false;
-    final file = File('${_mbtilesDir!.path}${Platform.pathSeparator}$regionId.mbtiles');
+    final file = File(
+      '${_mbtilesDir!.path}${Platform.pathSeparator}$regionId.mbtiles',
+    );
     return file.existsSync() && file.lengthSync() > 0;
   }
 
   @override
   String getRegionFilePath(String regionId) {
     if (_mbtilesDir == null) {
-      throw StateError('MBTilesNative não inicializado. Chame init() primeiro.');
+      throw StateError(
+        'MBTilesNative não inicializado. Chame init() primeiro.',
+      );
     }
     return '${_mbtilesDir!.path}${Platform.pathSeparator}$regionId.mbtiles';
   }
@@ -137,7 +151,9 @@ class MBTilesNative implements MBTilesBackend {
   @override
   int? getRegionFileSize(String regionId) {
     if (_mbtilesDir == null) return null;
-    final file = File('${_mbtilesDir!.path}${Platform.pathSeparator}$regionId.mbtiles');
+    final file = File(
+      '${_mbtilesDir!.path}${Platform.pathSeparator}$regionId.mbtiles',
+    );
     if (file.existsSync()) {
       return file.lengthSync();
     }
@@ -210,7 +226,10 @@ class MBTilesNative implements MBTilesBackend {
       final backup = File('$finalPath.bak');
       if (backup.existsSync()) {
         _openMbtilesFile(finalPath);
-        throw FileSystemException('Backup de mapa pendente; resolva antes de atualizar.', backup.path);
+        throw FileSystemException(
+          'Backup de mapa pendente; resolva antes de atualizar.',
+          backup.path,
+        );
       }
       final hadOld = finalFile.existsSync();
       try {
@@ -225,20 +244,32 @@ class MBTilesNative implements MBTilesBackend {
       }
       _openMbtilesFile(finalPath);
       if (backup.existsSync()) {
-        try { backup.deleteSync(); } catch (_) { /* preserva backup se não puder removê-lo */ }
+        try {
+          backup.deleteSync();
+        } catch (_) {
+          /* preserva backup se não puder removê-lo */
+        }
       }
-      AppLogger.info('MBTiles instalado com sucesso: $finalPath ($downloadedBytes bytes)');
+      AppLogger.info(
+        'MBTiles instalado com sucesso: $finalPath ($downloadedBytes bytes)',
+      );
     } catch (e) {
       try {
         await sink.close();
       } catch (closeErr, closeSt) {
-        AppLogger.debug('Falha ao fechar sink temporário MBTiles: $closeErr', closeSt);
+        AppLogger.debug(
+          'Falha ao fechar sink temporário MBTiles: $closeErr',
+          closeSt,
+        );
       }
       if (tmpFile.existsSync()) {
         try {
           tmpFile.deleteSync();
         } catch (delErr, delSt) {
-          AppLogger.debug('Falha ao apagar tmpFile MBTiles ($finalPath.tmp): $delErr', delSt);
+          AppLogger.debug(
+            'Falha ao apagar tmpFile MBTiles ($finalPath.tmp): $delErr',
+            delSt,
+          );
         }
       }
       AppLogger.error('Falha ao salvar stream MBTiles ($regionId): $e');
@@ -258,15 +289,33 @@ class MBTilesNative implements MBTilesBackend {
       raf.closeSync();
     }
     const sqliteMagic = <int>[
-      0x53, 0x51, 0x4c, 0x69, 0x74, 0x65, 0x20, 0x66,
-      0x6f, 0x72, 0x6d, 0x61, 0x74, 0x20, 0x33, 0x00,
+      0x53,
+      0x51,
+      0x4c,
+      0x69,
+      0x74,
+      0x65,
+      0x20,
+      0x66,
+      0x6f,
+      0x72,
+      0x6d,
+      0x61,
+      0x74,
+      0x20,
+      0x33,
+      0x00,
     ];
     if (header.length < 16) {
-      throw FormatException('Cabeçalho SQLite ausente no arquivo MBTiles ($regionId)');
+      throw FormatException(
+        'Cabeçalho SQLite ausente no arquivo MBTiles ($regionId)',
+      );
     }
     for (int i = 0; i < 16; i++) {
       if (header[i] != sqliteMagic[i]) {
-        throw FormatException('Arquivo baixado não é um banco SQLite/MBTiles válido ($regionId)');
+        throw FormatException(
+          'Arquivo baixado não é um banco SQLite/MBTiles válido ($regionId)',
+        );
       }
     }
 
@@ -277,24 +326,53 @@ class MBTilesNative implements MBTilesBackend {
         "SELECT name FROM sqlite_master WHERE type IN ('table', 'view') AND name='tiles' LIMIT 1;",
       );
       if (tables.isEmpty) {
-        throw FormatException('Pacote MBTiles sem tabela obrigatória "tiles" ($regionId)');
+        throw FormatException(
+          'Pacote MBTiles sem tabela obrigatória "tiles" ($regionId)',
+        );
       }
       verifyDb.select(
         'SELECT zoom_level, tile_column, tile_row, tile_data FROM tiles LIMIT 0;',
       );
       final samples = verifyDb.select('SELECT tile_data FROM tiles LIMIT 1');
       if (samples.isEmpty || samples.first['tile_data'] is! Uint8List) {
-        throw FormatException('Pacote MBTiles sem imagem raster ($regionId)');
+        throw FormatException('Pacote MBTiles sem dados de tile ($regionId)');
       }
       final bytes = samples.first['tile_data'] as Uint8List;
-      final isPng = bytes.length >= 8 && bytes[0] == 0x89 && bytes[1] == 0x50 &&
-          bytes[2] == 0x4e && bytes[3] == 0x47 && bytes[4] == 0x0d &&
-          bytes[5] == 0x0a && bytes[6] == 0x1a && bytes[7] == 0x0a;
-      final isJpeg = bytes.length >= 3 && bytes[0] == 0xff && bytes[1] == 0xd8 && bytes[2] == 0xff;
-      final isWebp = bytes.length >= 12 && ascii.decode(bytes.sublist(0, 4), allowInvalid: true) == 'RIFF' &&
+      final isPng =
+          bytes.length >= 8 &&
+          bytes[0] == 0x89 &&
+          bytes[1] == 0x50 &&
+          bytes[2] == 0x4e &&
+          bytes[3] == 0x47 &&
+          bytes[4] == 0x0d &&
+          bytes[5] == 0x0a &&
+          bytes[6] == 0x1a &&
+          bytes[7] == 0x0a;
+      final isJpeg =
+          bytes.length >= 3 &&
+          bytes[0] == 0xff &&
+          bytes[1] == 0xd8 &&
+          bytes[2] == 0xff;
+      final isWebp =
+          bytes.length >= 12 &&
+          ascii.decode(bytes.sublist(0, 4), allowInvalid: true) == 'RIFF' &&
           ascii.decode(bytes.sublist(8, 12), allowInvalid: true) == 'WEBP';
-      if (!isPng && !isJpeg && !isWebp) {
-        throw FormatException('Pacote não contém tiles raster PNG, JPEG ou WebP compatíveis ($regionId)');
+      // MVT / PBF (vetorial) comumente comprimido com gzip (0x1f, 0x8b), zlib (0x78) ou protobuf não comprimido
+      final isGzipVector =
+          bytes.length >= 2 && bytes[0] == 0x1f && bytes[1] == 0x8b;
+      final isZlibVector =
+          bytes.length >= 2 &&
+          bytes[0] == 0x78 &&
+          (bytes[1] == 0x9c || bytes[1] == 0x01 || bytes[1] == 0xda);
+      final isRawMvt =
+          bytes.isNotEmpty &&
+          (bytes[0] == 0x1a || bytes[0] == 0x28 || bytes[0] == 0x0a);
+      final isVector = isGzipVector || isZlibVector || isRawMvt;
+
+      if (!isPng && !isJpeg && !isWebp && !isVector) {
+        throw FormatException(
+          'Pacote não contém tiles raster (PNG/JPEG/WebP) ou vetoriais (MVT/PBF) compatíveis ($regionId)',
+        );
       }
     } on FormatException {
       rethrow;
@@ -386,7 +464,10 @@ class MBTilesNative implements MBTilesBackend {
       try {
         tmpFile.deleteSync();
       } catch (e, st) {
-        AppLogger.debug('Falha ao remover temporário MBTiles (${tmpFile.path}): $e', st);
+        AppLogger.debug(
+          'Falha ao remover temporário MBTiles (${tmpFile.path}): $e',
+          st,
+        );
       }
     }
   }
@@ -406,7 +487,9 @@ class MBTilesNative implements MBTilesBackend {
         .toSet();
 
     // Fecha conexões para arquivos que deixaram de existir
-    final removedPaths = _openDbs.keys.where((p) => !currentFiles.contains(p)).toList();
+    final removedPaths = _openDbs.keys
+        .where((p) => !currentFiles.contains(p))
+        .toList();
     for (final p in removedPaths) {
       _closeDb(p);
     }
@@ -430,9 +513,12 @@ class MBTilesNative implements MBTilesBackend {
     // Each lookup opens read-only and closes its handles, so package replacement
     // and deletion do not leave a long-lived worker handle to an old file.
     final reader = (_reader == null || _reader!.isClosed)
-        ? (_reader = _TileReader()) : _reader!;
+        ? (_reader = _TileReader())
+        : _reader!;
     try {
-      final paths = _openDbs.keys.map((path) => [path, _xyzDatabases.contains(path)]).toList();
+      final paths = _openDbs.keys
+          .map((path) => [path, _xyzDatabases.contains(path)])
+          .toList();
       return await reader.getTile(paths, z, x, y);
     } catch (e, st) {
       AppLogger.debug('Falha ao consultar tile offline ($z/$x/$y): $e', st);
@@ -482,17 +568,28 @@ class _TileReader {
     });
     _errors.listen((_) => dispose());
     _exits.listen((_) => dispose());
-    Isolate.spawn(_tileReaderMain, _responses.sendPort,
-        onError: _errors.sendPort, onExit: _exits.sendPort).then((isolate) {
-      if (isClosed) {
-        isolate.kill(priority: Isolate.immediate);
-      } else {
-        _isolate = isolate;
-      }
-    }).catchError((Object _) => dispose());
+    Isolate.spawn(
+          _tileReaderMain,
+          _responses.sendPort,
+          onError: _errors.sendPort,
+          onExit: _exits.sendPort,
+        )
+        .then((isolate) {
+          if (isClosed) {
+            isolate.kill(priority: Isolate.immediate);
+          } else {
+            _isolate = isolate;
+          }
+        })
+        .catchError((Object _) => dispose());
   }
 
-  Future<Uint8List?> getTile(List<List<Object>> paths, int z, int x, int y) async {
+  Future<Uint8List?> getTile(
+    List<List<Object>> paths,
+    int z,
+    int x,
+    int y,
+  ) async {
     final port = await _ready.future.timeout(const Duration(seconds: 10));
     if (isClosed) return null;
     final id = _nextId++;
@@ -509,7 +606,8 @@ class _TileReader {
   void dispose() {
     if (isClosed) return;
     isClosed = true;
-    if (!_ready.isCompleted) _ready.completeError(StateError('Leitor de mapas encerrado.'));
+    if (!_ready.isCompleted)
+      _ready.completeError(StateError('Leitor de mapas encerrado.'));
     for (final c in _pending.values) {
       if (!c.isCompleted) c.complete(null);
     }

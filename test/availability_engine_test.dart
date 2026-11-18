@@ -474,7 +474,10 @@ void main() {
       );
       expect(avail.isAvailable, isFalse);
       expect(avail.suggestedAlternativeSlots, isNotEmpty);
-      expect(avail.suggestedAlternativeSlots.first.hour, greaterThanOrEqualTo(11));
+      expect(
+        avail.suggestedAlternativeSlots.first.hour,
+        greaterThanOrEqualTo(11),
+      );
     });
   });
 }

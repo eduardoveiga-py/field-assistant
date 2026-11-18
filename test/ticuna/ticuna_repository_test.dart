@@ -25,23 +25,26 @@ void main() {
   });
 
   group('TicunaRepository - Inicialização e Seed Data', () {
-    test('Inicializa tabelas e carrega vocabulário padrão autêntico Ticuna', () async {
-      final words = await repo.getAllWords();
-      expect(words.length, greaterThanOrEqualTo(10));
-      expect(words.any((w) => w.word == 'Taemãẽ'), isTrue);
-      expect(words.any((w) => w.word == 'Tamaü'), isTrue);
-      expect(words.any((w) => w.word == 'Tupana'), isTrue);
-      expect(words.any((w) => w.word == 'Duü̃'), isTrue);
+    test(
+      'Inicializa tabelas e carrega vocabulário padrão autêntico Ticuna',
+      () async {
+        final words = await repo.getAllWords();
+        expect(words.length, greaterThanOrEqualTo(10));
+        expect(words.any((w) => w.word == 'Taemãẽ'), isTrue);
+        expect(words.any((w) => w.word == 'Tamaü'), isTrue);
+        expect(words.any((w) => w.word == 'Tupana'), isTrue);
+        expect(words.any((w) => w.word == 'Duü̃'), isTrue);
 
-      final phrases = await repo.getAllPhrases();
-      expect(phrases.length, greaterThanOrEqualTo(5));
-      expect(phrases.any((p) => p.phrase.contains('Tamaü')), isTrue);
-      expect(phrases.any((p) => p.phrase.contains('Tupana')), isTrue);
+        final phrases = await repo.getAllPhrases();
+        expect(phrases.length, greaterThanOrEqualTo(5));
+        expect(phrases.any((p) => p.phrase.contains('Tamaü')), isTrue);
+        expect(phrases.any((p) => p.phrase.contains('Tupana')), isTrue);
 
-      final tags = await repo.getAllTags();
-      expect(tags.any((t) => t.name == 'Ministério'), isTrue);
-      expect(tags.any((t) => t.name == 'Saudações'), isTrue);
-    });
+        final tags = await repo.getAllTags();
+        expect(tags.any((t) => t.name == 'Ministério'), isTrue);
+        expect(tags.any((t) => t.name == 'Saudações'), isTrue);
+      },
+    );
 
     test('Estado explícito de inicialização bem-sucedida', () async {
       expect(repo.isInitialized, isTrue);
@@ -49,16 +52,22 @@ void main() {
       expect(repo.initializationError, isNull);
     });
 
-    test('Registra falha explícita quando a inicialização das tabelas falha', () async {
-      final brokenDb = _FailingDatabase();
-      final brokenRepo = TicunaRepository(brokenDb);
-      final words = await brokenRepo.getAllWords();
-      expect(words, isEmpty);
-      expect(brokenRepo.isInitialized, isFalse);
-      expect(brokenRepo.hasInitializationFailed, isTrue);
-      expect(brokenRepo.initializationError, contains('Simulated database corruption'));
-      await brokenDb.close();
-    });
+    test(
+      'Registra falha explícita quando a inicialização das tabelas falha',
+      () async {
+        final brokenDb = _FailingDatabase();
+        final brokenRepo = TicunaRepository(brokenDb);
+        final words = await brokenRepo.getAllWords();
+        expect(words, isEmpty);
+        expect(brokenRepo.isInitialized, isFalse);
+        expect(brokenRepo.hasInitializationFailed, isTrue);
+        expect(
+          brokenRepo.initializationError,
+          contains('Simulated database corruption'),
+        );
+        await brokenDb.close();
+      },
+    );
   });
 
   group('TicunaRepository - Dicionário (CRUD & Anki Spaced Repetition)', () {
@@ -89,9 +98,7 @@ void main() {
 
       // Atualiza
       await repo.updateWord(
-        words.first.copyWith(
-          translation: 'Todos nós / Coletivo',
-        ),
+        words.first.copyWith(translation: 'Todos nós / Coletivo'),
       );
       words = await repo.getAllWords(searchQuery: 'Ngoxü̃');
       expect(words.first.translation, equals('Todos nós / Coletivo'));
@@ -102,34 +109,37 @@ void main() {
       expect(words, isEmpty);
     });
 
-    test('recordWordReview aplica algoritmo de repetição espaçada estilo Anki', () async {
-      final item = await repo.addWord(
-        word: 'Yegorü Teste',
-        translation: 'Boas novas teste',
-      );
+    test(
+      'recordWordReview aplica algoritmo de repetição espaçada estilo Anki',
+      () async {
+        final item = await repo.addWord(
+          word: 'Yegorü Teste',
+          translation: 'Boas novas teste',
+        );
 
-      expect(item.reviewLevel, equals(0));
-      expect(item.reviewCount, equals(0));
+        expect(item.reviewLevel, equals(0));
+        expect(item.reviewCount, equals(0));
 
-      // Avaliação 2: "Bom" -> reviewLevel passa para 1, reviewCount = 1
-      await repo.recordWordReview(item.id, 2);
-      var words = await repo.getAllWords(searchQuery: 'Yegorü Teste');
-      expect(words.first.reviewLevel, equals(1));
-      expect(words.first.reviewCount, equals(1));
-      expect(words.first.lastReviewedAt, isNotNull);
+        // Avaliação 2: "Bom" -> reviewLevel passa para 1, reviewCount = 1
+        await repo.recordWordReview(item.id, 2);
+        var words = await repo.getAllWords(searchQuery: 'Yegorü Teste');
+        expect(words.first.reviewLevel, equals(1));
+        expect(words.first.reviewCount, equals(1));
+        expect(words.first.lastReviewedAt, isNotNull);
 
-      // Avaliação 3: "Fácil" -> reviewLevel avança +2 (nível 3), reviewCount = 2
-      await repo.recordWordReview(item.id, 3);
-      words = await repo.getAllWords(searchQuery: 'Yegorü Teste');
-      expect(words.first.reviewLevel, equals(3));
-      expect(words.first.reviewCount, equals(2));
+        // Avaliação 3: "Fácil" -> reviewLevel avança +2 (nível 3), reviewCount = 2
+        await repo.recordWordReview(item.id, 3);
+        words = await repo.getAllWords(searchQuery: 'Yegorü Teste');
+        expect(words.first.reviewLevel, equals(3));
+        expect(words.first.reviewCount, equals(2));
 
-      // Avaliação 1: "Errei" (De novo) -> reviewLevel volta para 1, reviewCount = 3
-      await repo.recordWordReview(item.id, 1);
-      words = await repo.getAllWords(searchQuery: 'Yegorü Teste');
-      expect(words.first.reviewLevel, equals(1));
-      expect(words.first.reviewCount, equals(3));
-    });
+        // Avaliação 1: "Errei" (De novo) -> reviewLevel volta para 1, reviewCount = 3
+        await repo.recordWordReview(item.id, 1);
+        words = await repo.getAllWords(searchQuery: 'Yegorü Teste');
+        expect(words.first.reviewLevel, equals(1));
+        expect(words.first.reviewCount, equals(3));
+      },
+    );
 
     test('Filtra termos por tag, favoritos e classe gramatical', () async {
       final favs = await repo.getAllWords(onlyFavorites: true);
@@ -138,8 +148,13 @@ void main() {
       final minist = await repo.getAllWords(tag: 'Ministério');
       expect(minist.every((w) => w.tags.contains('Ministério')), isTrue);
 
-      final substantivos = await repo.getAllWords(grammaticalClass: 'Substantivo');
-      expect(substantivos.every((w) => w.grammaticalClass == 'Substantivo'), isTrue);
+      final substantivos = await repo.getAllWords(
+        grammaticalClass: 'Substantivo',
+      );
+      expect(
+        substantivos.every((w) => w.grammaticalClass == 'Substantivo'),
+        isTrue,
+      );
     });
   });
 
@@ -175,74 +190,101 @@ void main() {
   });
 
   group('TicunaRepository - Import & Export (JSON & CSV)', () {
-    test('exportToJson e importFromJson realizam backup e restauração idempotente', () async {
-      final jsonBackup = await repo.exportToJson();
-      expect(jsonBackup, contains('"format": "ministerio_pessoal_ticuna_backup"'));
-      expect(jsonBackup, contains('Taemãẽ'));
-      expect(jsonBackup, contains('Tamaü'));
+    test(
+      'exportToJson e importFromJson realizam backup e restauração idempotente',
+      () async {
+        final jsonBackup = await repo.exportToJson();
+        expect(
+          jsonBackup,
+          contains('"format": "ministerio_pessoal_ticuna_backup"'),
+        );
+        expect(jsonBackup, contains('Taemãẽ'));
+        expect(jsonBackup, contains('Tamaü'));
 
-      // Importa mesclando (replace: false)
-      final importResult = await repo.importFromJson(jsonBackup, replace: false);
-      expect(importResult.success, isTrue);
-      expect(importResult.wordsCount, greaterThan(0));
-      expect(importResult.phrasesCount, greaterThan(0));
+        // Importa mesclando (replace: false)
+        final importResult = await repo.importFromJson(
+          jsonBackup,
+          replace: false,
+        );
+        expect(importResult.success, isTrue);
+        expect(importResult.wordsCount, greaterThan(0));
+        expect(importResult.phrasesCount, greaterThan(0));
 
-      // Importa substituindo tudo (replace: true)
-      final replaceResult = await repo.importFromJson(jsonBackup, replace: true);
-      expect(replaceResult.success, isTrue);
-      final wordsAfter = await repo.getAllWords();
-      expect(wordsAfter.isNotEmpty, isTrue);
-    });
+        // Importa substituindo tudo (replace: true)
+        final replaceResult = await repo.importFromJson(
+          jsonBackup,
+          replace: true,
+        );
+        expect(replaceResult.success, isTrue);
+        final wordsAfter = await repo.getAllWords();
+        expect(wordsAfter.isNotEmpty, isTrue);
+      },
+    );
 
-    test('exportToCsv e importFromCsv realizam exportação e importação tabular', () async {
-      final wordsCsv = await repo.exportToCsv(TicunaEntryType.word);
-      expect(wordsCsv, startsWith('word,translation,phonetics'));
-      expect(wordsCsv, contains('Taemãẽ'));
+    test(
+      'exportToCsv e importFromCsv realizam exportação e importação tabular',
+      () async {
+        final wordsCsv = await repo.exportToCsv(TicunaEntryType.word);
+        expect(wordsCsv, startsWith('word,translation,phonetics'));
+        expect(wordsCsv, contains('Taemãẽ'));
 
-      final phrasesCsv = await repo.exportToCsv(TicunaEntryType.phrase);
-      expect(phrasesCsv, startsWith('phrase,translation,category'));
+        final phrasesCsv = await repo.exportToCsv(TicunaEntryType.phrase);
+        expect(phrasesCsv, startsWith('phrase,translation,category'));
 
-      // Importa CSV de palavras
-      const customCsv = '''word,translation,phonetics,grammatical_class,example_sentence,example_translation,notes,tags
+        // Importa CSV de palavras
+        const customCsv = '''word,translation,phonetics,grammatical_class,example_sentence,example_translation,notes,tags
 "Kuwee","Obrigado amigo","ku-we-e","Interjeição","Kuwee nügũ","Obrigado amigo","Dica","Saudações;Ministério"
 ''';
-      final importWords = await repo.importFromCsv(customCsv, TicunaEntryType.word);
-      expect(importWords.success, isTrue);
-      expect(importWords.wordsCount, equals(1));
+        final importWords = await repo.importFromCsv(
+          customCsv,
+          TicunaEntryType.word,
+        );
+        expect(importWords.success, isTrue);
+        expect(importWords.wordsCount, equals(1));
 
-      final imported = await repo.getAllWords(searchQuery: 'Kuwee');
-      expect(imported.length, equals(1));
-      expect(imported.first.translation, equals('Obrigado amigo'));
-      expect(imported.first.tags, contains('Saudações'));
-    });
+        final imported = await repo.getAllWords(searchQuery: 'Kuwee');
+        expect(imported.length, equals(1));
+        expect(imported.first.translation, equals('Obrigado amigo'));
+        expect(imported.first.tags, contains('Saudações'));
+      },
+    );
 
-    test('importFromCsv suporta notas com quebras de linha entre aspas (RFC 4180)', () async {
-      const multilineCsv = '''word,translation,phonetics,grammatical_class,example_sentence,example_translation,notes,tags
+    test(
+      'importFromCsv suporta notas com quebras de linha entre aspas (RFC 4180)',
+      () async {
+        const multilineCsv = '''word,translation,phonetics,grammatical_class,example_sentence,example_translation,notes,tags
 "Tupana Meã","Deus é Bom","tu-pa-na me-ã","Frase","Exemplo","Tradução","Nota linha 1\nNota linha 2 com ""aspas""","Bíblia, Ministério"
 ''';
-      final res = await repo.importFromCsv(multilineCsv, TicunaEntryType.word);
-      expect(res.success, isTrue);
-      expect(res.wordsCount, equals(1));
-      final word = (await repo.getAllWords(searchQuery: 'Tupana Meã')).first;
-      expect(word.notes, contains('Nota linha 1\nNota linha 2 com "aspas"'));
-      expect(word.tags, contains('Bíblia'));
-      expect(word.tags, contains('Ministério'));
-    });
+        final res = await repo.importFromCsv(
+          multilineCsv,
+          TicunaEntryType.word,
+        );
+        expect(res.success, isTrue);
+        expect(res.wordsCount, equals(1));
+        final word = (await repo.getAllWords(searchQuery: 'Tupana Meã')).first;
+        expect(word.notes, contains('Nota linha 1\nNota linha 2 com "aspas"'));
+        expect(word.tags, contains('Bíblia'));
+        expect(word.tags, contains('Ministério'));
+      },
+    );
 
-    test('importAuto importa JSON array direto e detecta CSV automaticamente', () async {
-      const jsonArray = '''[
+    test(
+      'importAuto importa JSON array direto e detecta CSV automaticamente',
+      () async {
+        const jsonArray = '''[
         {"word": "Wotü̃", "translation": "Casa / Habitação"}
       ]''';
-      final resJson = await repo.importAuto(jsonArray);
-      expect(resJson.success, isTrue);
-      expect(resJson.wordsCount, equals(1));
+        final resJson = await repo.importAuto(jsonArray);
+        expect(resJson.success, isTrue);
+        expect(resJson.wordsCount, equals(1));
 
-      const csvContent = '''phrase,translation,category
+        const csvContent = '''phrase,translation,category
 "Tamaü meã","Bom dia de paz","Saudação"''';
-      final resCsv = await repo.importAuto(csvContent);
-      expect(resCsv.success, isTrue);
-      expect(resCsv.phrasesCount, equals(1));
-    });
+        final resCsv = await repo.importAuto(csvContent);
+        expect(resCsv.success, isTrue);
+        expect(resCsv.phrasesCount, equals(1));
+      },
+    );
 
     test('TicunaWord calcula intervalos Leitner e vencimento de revisão', () {
       final now = DateTime.now();
@@ -276,7 +318,10 @@ void main() {
       final initialQueue = await db.select(db.syncQueue).get();
       final initialCount = initialQueue.length;
 
-      final item = await repo.addWord(word: 'SyncWord', translation: 'Palavra Sync');
+      final item = await repo.addWord(
+        word: 'SyncWord',
+        translation: 'Palavra Sync',
+      );
       var q = await db.select(db.syncQueue).get();
       expect(q.length, equals(initialCount + 1));
       expect(q.last.operation, equals('INSERT'));
@@ -314,7 +359,10 @@ void main() {
 
       // Tentativa de adicionar palavra deve falhar devido à trigger
       await expectLater(
-        () => testRepo.addWord(word: 'PalavraNaoSalva', translation: 'Nao deve existir'),
+        () => testRepo.addWord(
+          word: 'PalavraNaoSalva',
+          translation: 'Nao deve existir',
+        ),
         throwsA(isA<Exception>()),
       );
 

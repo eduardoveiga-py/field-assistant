@@ -29,11 +29,17 @@ class AuthReturnScreen extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(success ? Icons.check_circle_outline : Icons.error_outline,
-                    size: 72, color: color),
+                Icon(
+                  success ? Icons.check_circle_outline : Icons.error_outline,
+                  size: 72,
+                  color: color,
+                ),
                 const SizedBox(height: 20),
-                Text(title, textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.headlineSmall),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
                 const SizedBox(height: 12),
                 Text(message, textAlign: TextAlign.center),
                 const SizedBox(height: 24),
@@ -87,13 +93,18 @@ class _AuthNewPasswordScreenState extends State<AuthNewPasswordScreen> {
       setState(() => _error = 'As senhas não coincidem.');
       return;
     }
-    setState(() { _busy = true; _error = null; });
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
     try {
       await widget.updatePassword(password);
       if (mounted) widget.onSuccess();
     } catch (_) {
       if (mounted) {
-        setState(() => _error = 'Não foi possível alterar a senha. Verifique sua conexão ou solicite um novo link de recuperação.');
+        setState(
+          () => _error = 'Não foi possível alterar a senha. Verifique sua conexão ou solicite um novo link de recuperação.',
+        );
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -130,19 +141,28 @@ class _AuthNewPasswordScreenState extends State<AuthNewPasswordScreen> {
                   obscureText: true,
                   autocorrect: false,
                   enableSuggestions: false,
-                  decoration: const InputDecoration(labelText: 'Confirmar nova senha'),
+                  decoration: const InputDecoration(
+                    labelText: 'Confirmar nova senha',
+                  ),
                 ),
                 if (_error != null) ...[
                   const SizedBox(height: 16),
-                  Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                  Text(
+                    _error!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
                 ],
                 const SizedBox(height: 24),
                 FilledButton(
                   onPressed: _busy ? null : _save,
                   child: Text(_busy ? 'Salvando...' : 'Salvar nova senha'),
                 ),
-                TextButton(onPressed: _busy ? null : widget.onCancel,
-                    child: const Text('Cancelar')),
+                TextButton(
+                  onPressed: _busy ? null : widget.onCancel,
+                  child: const Text('Cancelar'),
+                ),
               ],
             ),
           ),

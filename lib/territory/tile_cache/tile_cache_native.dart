@@ -117,7 +117,7 @@ class TileCacheNative implements TileCacheBackend {
   static http.Client _getSharedClient() => _sharedHttpClient ??= http.Client();
 
   TileCacheNative({Directory? customDir, this.httpClient})
-      : _cacheDir = customDir {
+    : _cacheDir = customDir {
     TileCacheService.setStaleQueuePruner(pruneStaleQueue);
   }
 
@@ -187,7 +187,12 @@ class TileCacheNative implements TileCacheBackend {
   bool isBlockedTile(Uint8List bytes) => _isBlockedTile(bytes);
 
   @override
-  Future<Uint8List?> getTile(int z, int x, int y, [MapLayerStyle? style]) async {
+  Future<Uint8List?> getTile(
+    int z,
+    int x,
+    int y, [
+    MapLayerStyle? style,
+  ]) async {
     final s = style ?? TileCacheService.instance.activeStyle;
     try {
       final dir = await _getDir();
@@ -202,21 +207,28 @@ class TileCacheNative implements TileCacheBackend {
         try {
           await file.delete();
         } catch (e, st) {
-          AppLogger.debug('Falha ao deletar tile bloqueado (${file.path}): $e', st);
+          AppLogger.debug(
+            'Falha ao deletar tile bloqueado (${file.path}): $e',
+            st,
+          );
         }
       }
 
       // Do not make live HTTP calls during automated tests unless a custom client is provided
-      if (httpClient == null && Platform.environment.containsKey('FLUTTER_TEST')) {
+      if (httpClient == null &&
+          Platform.environment.containsKey('FLUTTER_TEST')) {
         return null;
       }
 
-      bool isStale() => TileCacheService.instance.isTileRequestStale(z, x, y, s);
+      bool isStale() =>
+          TileCacheService.instance.isTileRequestStale(z, x, y, s);
       if (!await _acquireDownloadSlot(isStale: isStale)) return null;
       final client = httpClient ?? _getSharedClient();
       try {
         // 1ª Tentativa: Provedor de azulejos oficial com estilo selecionado e User-Agent plenamente identificado
-        final osmUri = Uri.parse(TileCacheService.instance.getTileUrl(z, x, y, s));
+        final osmUri = Uri.parse(
+          TileCacheService.instance.getTileUrl(z, x, y, s),
+        );
         try {
           final res = await client
               .get(
@@ -229,11 +241,13 @@ class TileCacheNative implements TileCacheBackend {
               .timeout(const Duration(seconds: 4));
 
           final etag = res.headers['etag']?.toLowerCase() ?? '';
-          final isWatermarked = etag.contains('wm-') ||
+          final isWatermarked =
+              etag.contains('wm-') ||
               res.bodyBytes.length == 2049 ||
               res.bodyBytes.length == 2513;
 
-          final isOsmBlocked = res.headers.containsKey('x-blocked') ||
+          final isOsmBlocked =
+              res.headers.containsKey('x-blocked') ||
               isWatermarked ||
               res.bodyBytes.length == _blockedTileByteLength ||
               _isBlockedTile(res.bodyBytes);
@@ -243,7 +257,10 @@ class TileCacheNative implements TileCacheBackend {
             return res.bodyBytes;
           }
         } catch (e, st) {
-          AppLogger.debug('Falha transitória ao baixar tile primário ($z/$x/$y): $e', st);
+          AppLogger.debug(
+            'Falha transitória ao baixar tile primário ($z/$x/$y): $e',
+            st,
+          );
         }
 
         if (isStale()) return null;
@@ -264,12 +281,15 @@ class TileCacheNative implements TileCacheBackend {
                 )
                 .timeout(const Duration(seconds: 4));
 
-            final fallbackEtag = resFallback.headers['etag']?.toLowerCase() ?? '';
-            final isFallbackWatermarked = fallbackEtag.contains('wm-') ||
+            final fallbackEtag =
+                resFallback.headers['etag']?.toLowerCase() ?? '';
+            final isFallbackWatermarked =
+                fallbackEtag.contains('wm-') ||
                 resFallback.bodyBytes.length == 2049 ||
                 resFallback.bodyBytes.length == 2513;
 
-            final isFallbackBlocked = resFallback.headers.containsKey('x-blocked') ||
+            final isFallbackBlocked =
+                resFallback.headers.containsKey('x-blocked') ||
                 isFallbackWatermarked ||
                 resFallback.bodyBytes.length == _blockedTileByteLength ||
                 _isBlockedTile(resFallback.bodyBytes);
@@ -279,20 +299,32 @@ class TileCacheNative implements TileCacheBackend {
               return resFallback.bodyBytes;
             }
           } catch (e, st) {
-            AppLogger.debug('Falha de rede no fallback OSM France ($z/$x/$y): $e', st);
+            AppLogger.debug(
+              'Falha de rede no fallback OSM France ($z/$x/$y): $e',
+              st,
+            );
           }
         }
       } finally {
         _releaseDownloadSlot();
       }
     } catch (e, st) {
-      AppLogger.debug('Erro offline ou de rede ao carregar tile ($z/$x/$y): $e', st);
+      AppLogger.debug(
+        'Erro offline ou de rede ao carregar tile ($z/$x/$y): $e',
+        st,
+      );
     }
     return null;
   }
 
   @override
-  Future<void> saveTile(int z, int x, int y, Uint8List bytes, [MapLayerStyle? style]) async {
+  Future<void> saveTile(
+    int z,
+    int x,
+    int y,
+    Uint8List bytes, [
+    MapLayerStyle? style,
+  ]) async {
     final s = style ?? TileCacheService.instance.activeStyle;
     // Rejeita salvar arquivos vazios, com bloqueio ou com marca d'água de erro (2049 / 2513 bytes)
     if (_isBlockedTile(bytes)) {
@@ -342,7 +374,10 @@ class TileCacheNative implements TileCacheBackend {
       }
       return false;
     } catch (e, st) {
-      AppLogger.debug('Falha ao verificar cache local do tile ($z/$x/$y): $e', st);
+      AppLogger.debug(
+        'Falha ao verificar cache local do tile ($z/$x/$y): $e',
+        st,
+      );
       return false;
     }
   }
@@ -369,7 +404,10 @@ class TileCacheNative implements TileCacheBackend {
             try {
               await entity.delete();
             } catch (e, st) {
-              AppLogger.debug('Falha ao limpar tile corrompido (${entity.path}): $e', st);
+              AppLogger.debug(
+                'Falha ao limpar tile corrompido (${entity.path}): $e',
+                st,
+              );
             }
           } else {
             count++;

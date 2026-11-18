@@ -45,7 +45,10 @@ class BrazilHolidays {
   static List<HolidayItem> forYear(int year) {
     final easter = easterSunday(year);
     return [
-      HolidayItem(name: 'Confraternização Universal', date: DateTime(year, 1, 1)),
+      HolidayItem(
+        name: 'Confraternização Universal',
+        date: DateTime(year, 1, 1),
+      ),
       HolidayItem(
         name: 'Terça-feira de Carnaval',
         date: easter.subtract(const Duration(days: 47)),
@@ -58,7 +61,10 @@ class BrazilHolidays {
       ),
       HolidayItem(name: 'Páscoa', date: easter),
       HolidayItem(name: 'Independência do Brasil', date: DateTime(year, 9, 7)),
-      HolidayItem(name: 'Nossa Senhora Aparecida', date: DateTime(year, 10, 12)),
+      HolidayItem(
+        name: 'Nossa Senhora Aparecida',
+        date: DateTime(year, 10, 12),
+      ),
       HolidayItem(name: 'Finados', date: DateTime(year, 11, 2)),
       HolidayItem(
         name: 'Proclamação da República',
@@ -75,7 +81,11 @@ class BrazilHolidays {
   /// Feriados dentro de um intervalo inclusivo [start, end].
   static List<HolidayItem> inRange(DateTime start, DateTime end) {
     final from = DateTime(start.year, start.month, start.day);
-    final to = DateTime(end.year, end.month, end.day).add(const Duration(days: 1));
+    final to = DateTime(
+      end.year,
+      end.month,
+      end.day,
+    ).add(const Duration(days: 1));
     final result = <HolidayItem>[];
     for (var y = from.year - 1; y <= to.year + 1; y++) {
       for (final h in forYear(y)) {

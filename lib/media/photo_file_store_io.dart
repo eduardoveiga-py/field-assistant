@@ -40,6 +40,10 @@ Future<void> deletePhotoFileFromDisk(String? filePath) async {
       await file.delete();
     }
   } catch (e, st) {
-    AppLogger.warning('Falha ao remover arquivo de foto do disco ($filePath)', e, st);
+    AppLogger.warning(
+      'Falha ao remover arquivo de foto do disco ($filePath)',
+      e,
+      st,
+    );
   }
 }

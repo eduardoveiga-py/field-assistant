@@ -64,11 +64,16 @@ class MockFixtures {
   static Uint8List validPngTile({int size = 1024}) {
     if (size <= onePixelPngBytes.length) return onePixelPngBytes;
     final bytes = Uint8List(size);
-    bytes.setRange(
-      0,
-      8,
-      const <int>[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A],
-    );
+    bytes.setRange(0, 8, const <int>[
+      0x89,
+      0x50,
+      0x4E,
+      0x47,
+      0x0D,
+      0x0A,
+      0x1A,
+      0x0A,
+    ]);
     for (int i = 8; i < size; i++) {
       bytes[i] = (i * 37) % 256;
     }
@@ -201,8 +206,7 @@ class MockFixtures {
       '535 5.7.8 Error: authentication failed\r\n';
   static const String smtpMailOk = '250 2.1.0 Ok\r\n';
   static const String smtpRcptOk = '250 2.1.5 Ok\r\n';
-  static const String smtpDataReady =
-      '354 End data with <CR><LF>.<CR><LF>\r\n';
+  static const String smtpDataReady = '354 End data with <CR><LF>.<CR><LF>\r\n';
   static const String smtpDataSuccess = '250 2.0.0 Ok: queued as 4X8Z9\r\n';
 
   // ===========================================================================
@@ -431,11 +435,7 @@ class MockFixtures {
   static Map<String, dynamic> rpcSyncUpsertSuccess({
     int count = 1,
     List<dynamic> errors = const [],
-  }) => {
-    'success': true,
-    'processed_count': count,
-    'errors': errors,
-  };
+  }) => {'success': true, 'processed_count': count, 'errors': errors};
 
   /// Resposta simulada de conflito otimista de revisão na RPC `sync_upsert`.
   static Map<String, dynamic> rpcSyncUpsertConflict({

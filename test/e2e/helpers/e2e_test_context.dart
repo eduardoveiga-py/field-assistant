@@ -58,9 +58,10 @@ class E2ETestContext {
 
     final repo = AppRepository(db);
     final settings = AppSettingsManager(db);
-    final tempDir = await Directory.systemTemp.createTemp('e2e_test_');
+    final tempDir = Directory.systemTemp.createTempSync('e2e_test_');
 
-    final handler = mockHttpHandler ??
+    final handler =
+        mockHttpHandler ??
         (http.Request request) async {
           final path = request.url.path;
           if (path.contains('/storage/v1/object')) {
@@ -98,7 +99,7 @@ class E2ETestContext {
     );
 
     final syncService = SupabaseSyncService(
-          allowLegacySyncForTesting: true,
+      allowLegacySyncForTesting: true,
       db: db,
       repository: repo,
       supabaseUrl: effectiveUrl,
@@ -131,9 +132,9 @@ class E2ETestContext {
   Future<void> dispose() async {
     syncService.dispose();
     await db.close();
-    if (await tempDir.exists()) {
+    if (tempDir.existsSync()) {
       try {
-        await tempDir.delete(recursive: true);
+        tempDir.deleteSync(recursive: true);
       } catch (_) {
         // Tratamento silencioso caso o sistema operacional retenha o arquivo temporariamente.
       }

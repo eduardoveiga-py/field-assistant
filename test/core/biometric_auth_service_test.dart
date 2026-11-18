@@ -23,7 +23,12 @@ void main() {
       final result = await authService.authenticate(
         localizedReason: 'Tentativa sem biometria e sem contexto',
       );
-      expect(result, isFalse, reason: 'Zero bypass: sem biometria e sem contexto deve retornar false.');
+      expect(
+        result,
+        isFalse,
+        reason:
+            'Zero bypass: sem biometria e sem contexto deve retornar false.',
+      );
       expect(authService.isSessionUnlocked, isFalse);
     });
 
@@ -31,27 +36,36 @@ void main() {
       expect(await authService.hasPin(), isFalse);
     });
 
-    test('setPin() rejeita PINs com tamanho menor que 4 ou maior que 8 dígitos', () async {
-      expect(() => authService.setPin('123'), throwsArgumentError);
-      expect(() => authService.setPin('123456789'), throwsArgumentError);
-    });
+    test(
+      'setPin() rejeita PINs com tamanho menor que 4 ou maior que 8 dígitos',
+      () async {
+        expect(() => authService.setPin('123'), throwsArgumentError);
+        expect(() => authService.setPin('123456789'), throwsArgumentError);
+      },
+    );
 
-    test('setPin() persiste hash e salt seguros e desbloqueia a sessão', () async {
-      final success = await authService.setPin('2580');
-      expect(success, isTrue);
-      expect(await authService.hasPin(), isTrue);
-      expect(authService.isSessionUnlocked, isTrue);
+    test(
+      'setPin() persiste hash e salt seguros e desbloqueia a sessão',
+      () async {
+        final success = await authService.setPin('2580');
+        expect(success, isTrue);
+        expect(await authService.hasPin(), isTrue);
+        expect(authService.isSessionUnlocked, isTrue);
 
-      const storage = FlutterSecureStorage();
-      final salt = await storage.read(key: 'app_security_pin_salt');
-      final hash = await storage.read(key: 'app_security_pin_hash');
+        const storage = FlutterSecureStorage();
+        final salt = await storage.read(key: 'app_security_pin_salt');
+        final hash = await storage.read(key: 'app_security_pin_hash');
 
-      expect(salt, isNotNull);
-      expect(salt!.length, equals(32)); // 16 bytes em hex = 32 chars
-      expect(hash, isNotNull);
-      expect(hash!.length, equals(64)); // SHA-256 = 64 hex chars
-      expect(hash, isNot(contains('2580'))); // O PIN nunca deve estar em texto claro
-    });
+        expect(salt, isNotNull);
+        expect(salt!.length, equals(32)); // 16 bytes em hex = 32 chars
+        expect(hash, isNotNull);
+        expect(hash!.length, equals(64)); // SHA-256 = 64 hex chars
+        expect(
+          hash,
+          isNot(contains('2580')),
+        ); // O PIN nunca deve estar em texto claro
+      },
+    );
 
     test('verifyPin() valida com precisão e rejeita PIN incorreto', () async {
       await authService.setPin('4321');
@@ -75,20 +89,29 @@ void main() {
       expect(authService.isSessionUnlocked, isFalse);
     });
 
-    test('changePin() altera com sucesso quando PIN atual é fornecido', () async {
-      await authService.setPin('1111');
-      authService.lockSession();
+    test(
+      'changePin() altera com sucesso quando PIN atual é fornecido',
+      () async {
+        await authService.setPin('1111');
+        authService.lockSession();
 
-      final failChange = await authService.changePin(currentPin: '0000', newPin: '2222');
-      expect(failChange, isFalse);
+        final failChange = await authService.changePin(
+          currentPin: '0000',
+          newPin: '2222',
+        );
+        expect(failChange, isFalse);
 
-      final successChange = await authService.changePin(currentPin: '1111', newPin: '2222');
-      expect(successChange, isTrue);
+        final successChange = await authService.changePin(
+          currentPin: '1111',
+          newPin: '2222',
+        );
+        expect(successChange, isTrue);
 
-      authService.lockSession();
-      expect(await authService.verifyPin('1111'), isFalse);
-      expect(await authService.verifyPin('2222'), isTrue);
-    });
+        authService.lockSession();
+        expect(await authService.verifyPin('1111'), isFalse);
+        expect(await authService.verifyPin('2222'), isTrue);
+      },
+    );
 
     test('Proteção contra força bruta: 5 tentativas incorretas acionam PinLockoutException', () async {
       await authService.setPin('1234');
@@ -99,7 +122,10 @@ void main() {
         expect(res, isFalse);
       }
 
-      expect(() => authService.verifyPin('1234'), throwsA(isA<PinLockoutException>()));
+      expect(
+        () => authService.verifyPin('1234'),
+        throwsA(isA<PinLockoutException>()),
+      );
     });
   });
 
@@ -119,7 +145,10 @@ void main() {
           home: Builder(
             builder: (context) => ElevatedButton(
               onPressed: () async {
-                result = await PinSetupDialog.show(context, biometricAuth: authService);
+                result = await PinSetupDialog.show(
+                  context,
+                  biometricAuth: authService,
+                );
               },
               child: const Text('Open Setup'),
             ),
@@ -147,7 +176,9 @@ void main() {
       expect(authService.isSessionUnlocked, isTrue);
     });
 
-    testWidgets('PinAuthDialog valida PIN cadastrado e desbloqueia', (tester) async {
+    testWidgets('PinAuthDialog valida PIN cadastrado e desbloqueia', (
+      tester,
+    ) async {
       await authService.setPin('7890');
       authService.lockSession();
 
@@ -158,7 +189,10 @@ void main() {
           home: Builder(
             builder: (context) => ElevatedButton(
               onPressed: () async {
-                result = await PinAuthDialog.show(context, biometricAuth: authService);
+                result = await PinAuthDialog.show(
+                  context,
+                  biometricAuth: authService,
+                );
               },
               child: const Text('Open Auth'),
             ),

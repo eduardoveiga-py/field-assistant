@@ -109,7 +109,11 @@ class RealVoiceDictationService implements VoiceDictationService {
     } on PlatformException {
       return false;
     } catch (e, st) {
-      AppLogger.warning('Falha ao inicializar serviço de ditado por voz', e, st);
+      AppLogger.warning(
+        'Falha ao inicializar serviço de ditado por voz',
+        e,
+        st,
+      );
       return false;
     }
   }
@@ -122,7 +126,8 @@ class RealVoiceDictationService implements VoiceDictationService {
     String localeId = 'pt_BR',
   }) async {
     final normalizedLocale = localeId.trim().toLowerCase();
-    if (normalizedLocale.startsWith('tca') || normalizedLocale.contains('ticuna')) {
+    if (normalizedLocale.startsWith('tca') ||
+        normalizedLocale.contains('ticuna')) {
       onError?.call(
         'Ditado automático em Ticuna não é suportado pelo sistema operacional. Grave o áudio ou digite manualmente.',
       );
@@ -141,9 +146,14 @@ class RealVoiceDictationService implements VoiceDictationService {
         try {
           final locales = await _speech.locales();
           if (locales.isNotEmpty) {
-            final normalizedTarget = localeId.toLowerCase().replaceAll('-', '_');
+            final normalizedTarget = localeId.toLowerCase().replaceAll(
+              '-',
+              '_',
+            );
             final hasLocale = locales.any(
-              (l) => l.localeId.toLowerCase().replaceAll('-', '_') == normalizedTarget,
+              (l) =>
+                  l.localeId.toLowerCase().replaceAll('-', '_') ==
+                  normalizedTarget,
             );
             if (!hasLocale) {
               onError?.call(
@@ -153,7 +163,10 @@ class RealVoiceDictationService implements VoiceDictationService {
             }
           }
         } catch (e, st) {
-          AppLogger.debug('Falha ao consultar idiomas locais de ditado: $e', st);
+          AppLogger.debug(
+            'Falha ao consultar idiomas locais de ditado: $e',
+            st,
+          );
         }
       }
 
@@ -171,10 +184,14 @@ class RealVoiceDictationService implements VoiceDictationService {
       );
     } on MissingPluginException catch (e) {
       _isListening = false;
-      onError?.call('Plugin de reconhecimento de voz não disponível na plataforma: ${e.message}');
+      onError?.call(
+        'Plugin de reconhecimento de voz não disponível na plataforma: ${e.message}',
+      );
     } on PlatformException catch (e) {
       _isListening = false;
-      onError?.call('Erro de plataforma no reconhecimento de voz: ${e.message}');
+      onError?.call(
+        'Erro de plataforma no reconhecimento de voz: ${e.message}',
+      );
     } catch (e) {
       _isListening = false;
       onError?.call('Erro ao iniciar reconhecimento de voz: $e');
@@ -224,7 +241,8 @@ class LocalVoiceDictationService implements VoiceDictationService {
     String localeId = 'pt_BR',
   }) async {
     final normalizedLocale = localeId.trim().toLowerCase();
-    if (normalizedLocale.startsWith('tca') || normalizedLocale.contains('ticuna')) {
+    if (normalizedLocale.startsWith('tca') ||
+        normalizedLocale.contains('ticuna')) {
       onError?.call(
         'Ditado automático em Ticuna não é suportado pelo sistema operacional. Grave o áudio ou digite manualmente.',
       );

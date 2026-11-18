@@ -210,7 +210,10 @@ class DoorstepBriefingHelper {
           jwLibraryUri = Uri.tryParse(resolved.fallbackUrl!.trim());
         }
       } catch (e, st) {
-        AppLogger.debug('Falha ao resolver URL do JW Library no briefing: $e', st);
+        AppLogger.debug(
+          'Falha ao resolver URL do JW Library no briefing: $e',
+          st,
+        );
         jwLibraryUri = null;
       }
     }

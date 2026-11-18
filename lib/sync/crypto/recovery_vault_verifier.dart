@@ -30,9 +30,10 @@ class RecoveryVaultVerifier {
   }) async {
     if (owner.isEmpty) throw ArgumentError('Conta inválida.');
     final random = Random.secure();
-    final id = List.generate(16, (_) => random.nextInt(256))
-        .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
-        .join();
+    final id = List.generate(
+      16,
+      (_) => random.nextInt(256),
+    ).map((byte) => byte.toRadixString(16).padLeft(2, '0')).join();
     final envelope = await RecoveryCrypto.seal(
       key: await _verifierKey(root),
       owner: owner,
@@ -51,12 +52,16 @@ class RecoveryVaultVerifier {
     required String owner,
     required Map<String, dynamic> marker,
   }) async {
-    if (owner.isEmpty || marker.length != 3 || marker['version'] != 1 ||
-        marker['vaultId'] is! String || marker['envelope'] is! Map) {
+    if (owner.isEmpty ||
+        marker.length != 3 ||
+        marker['version'] != 1 ||
+        marker['vaultId'] is! String ||
+        marker['envelope'] is! Map) {
       throw const FormatException('Marcador do cofre inválido.');
     }
     final id = marker['vaultId'] as String;
-    if (!_idPattern.hasMatch(id)) throw const FormatException('Identidade do cofre inválida.');
+    if (!_idPattern.hasMatch(id))
+      throw const FormatException('Identidade do cofre inválida.');
     final plaintext = await RecoveryCrypto.open(
       key: await _verifierKey(root),
       owner: owner,

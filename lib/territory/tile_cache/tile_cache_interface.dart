@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 /// Estilos de camada de mapa compatíveis com Organic Maps e navegação teocrática
@@ -38,7 +39,13 @@ enum MapLayerStyle {
 
 abstract class TileCacheBackend {
   Future<Uint8List?> getTile(int z, int x, int y, [MapLayerStyle? style]);
-  Future<void> saveTile(int z, int x, int y, Uint8List bytes, [MapLayerStyle? style]);
+  Future<void> saveTile(
+    int z,
+    int x,
+    int y,
+    Uint8List bytes, [
+    MapLayerStyle? style,
+  ]);
   Future<bool> isTileCached(int z, int x, int y, [MapLayerStyle? style]);
   Future<int> getCachedTileCount([MapLayerStyle? style]);
 }

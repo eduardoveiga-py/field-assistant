@@ -1,4 +1,5 @@
 import 'dart:ui' show Locale;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../app_logger.dart';
@@ -69,9 +70,12 @@ abstract class AppLocaleStrings {
   String get navSettings => 'Ajustes';
 
   // Greeting Contextual
-  String get greetingMorning => 'Bom dia, irmão! Que Jeová abençoe seu ministério nesta manhã.';
-  String get greetingAfternoon => 'Boa tarde! Renove suas forças no serviço de campo.';
-  String get greetingEvening => 'Boa noite! Hora de revisar as bênçãos e revisitas do dia.';
+  String get greetingMorning =>
+      'Bom dia, irmão! Que Jeová abençoe seu ministério nesta manhã.';
+  String get greetingAfternoon =>
+      'Boa tarde! Renove suas forças no serviço de campo.';
+  String get greetingEvening =>
+      'Boa noite! Hora de revisar as bênçãos e revisitas do dia.';
   String get greetingGeneral => 'Bom ministério de campo!';
 
   // Updates
@@ -98,7 +102,8 @@ abstract class AppLocaleStrings {
   // Proximity Scheduling
   String get doorstepScheduleTitle => 'Agendar Retorno na Porta';
   String get doorstepSuggestedSlots => 'Horários Recomendados por Proximidade';
-  String get doorstepConflictAlert => 'Conflito com outro compromisso na agenda';
+  String get doorstepConflictAlert =>
+      'Conflito com outro compromisso na agenda';
   String get doorstepConfirmBooking => 'Confirmar Agendamento';
 
   // Language & Translation Assistant
@@ -175,11 +180,14 @@ class _AppLocaleStringsEn extends AppLocaleStrings {
   String get navSettings => 'Settings';
 
   @override
-  String get greetingMorning => 'Good morning, brother! May Jehovah bless your morning ministry.';
+  String get greetingMorning =>
+      'Good morning, brother! May Jehovah bless your morning ministry.';
   @override
-  String get greetingAfternoon => 'Good afternoon! Renew your energy in field service.';
+  String get greetingAfternoon =>
+      'Good afternoon! Renew your energy in field service.';
   @override
-  String get greetingEvening => 'Good evening! Time to count blessings and return visits.';
+  String get greetingEvening =>
+      'Good evening! Time to count blessings and return visits.';
   @override
   String get greetingGeneral => 'Have a wonderful field ministry!';
 
@@ -290,11 +298,14 @@ class _AppLocaleStringsEs extends AppLocaleStrings {
   String get navSettings => 'Configuración';
 
   @override
-  String get greetingMorning => '¡Buenos días, hermano! Que Jehová bendiga su ministerio matutino.';
+  String get greetingMorning =>
+      '¡Buenos días, hermano! Que Jehová bendiga su ministerio matutino.';
   @override
-  String get greetingAfternoon => '¡Buenas tardes! Renueve sus fuerzas en el servicio del campo.';
+  String get greetingAfternoon =>
+      '¡Buenas tardes! Renueve sus fuerzas en el servicio del campo.';
   @override
-  String get greetingEvening => '¡Buenas noches! Tiempo de repasar las bendiciones y revisitas del día.';
+  String get greetingEvening =>
+      '¡Buenas noches! Tiempo de repasar las bendiciones y revisitas del día.';
   @override
   String get greetingGeneral => '¡Excelente ministerio del campo!';
 
@@ -338,14 +349,16 @@ class _AppLocaleStringsEs extends AppLocaleStrings {
   @override
   String get doorstepSuggestedSlots => 'Horarios Recomendados por Proximidad';
   @override
-  String get doorstepConflictAlert => 'Conflicto con otro compromiso en la agenda';
+  String get doorstepConflictAlert =>
+      'Conflicto con otro compromiso en la agenda';
   @override
   String get doorstepConfirmBooking => 'Confirmar Cita';
 
   @override
   String get languageAssistantTitle => 'Asistente Lingüístico & Traducción';
   @override
-  String get languageSituationalPhrases => 'Frases Situacionales del Ministerio';
+  String get languageSituationalPhrases =>
+      'Frases Situacionales del Ministerio';
   @override
   String get languageCompareMode => 'Comparador Multilingüe';
   @override
@@ -356,9 +369,7 @@ class _AppLocaleStringsEs extends AppLocaleStrings {
 
 /// Provider para gerenciar e observar o idioma selecionado
 final appLocaleTypeProvider =
-    NotifierProvider<AppLocaleNotifier, AppLocaleType>(
-  AppLocaleNotifier.new,
-);
+    NotifierProvider<AppLocaleNotifier, AppLocaleType>(AppLocaleNotifier.new);
 
 class AppLocaleNotifier extends Notifier<AppLocaleType> {
   static const String kvKey = 'app_user_locale';
@@ -372,14 +383,18 @@ class AppLocaleNotifier extends Notifier<AppLocaleType> {
   Future<void> _loadSavedLocale() async {
     try {
       final db = ref.read(global_providers.databaseProvider);
-      final row = await (db.select(db.appKvStore)
-            ..where((t) => t.key.equals(kvKey)))
-          .getSingleOrNull();
+      final row = await (db.select(
+        db.appKvStore,
+      )..where((t) => t.key.equals(kvKey))).getSingleOrNull();
       if (row != null && row.value.isNotEmpty) {
         state = AppLocaleType.fromCode(row.value);
       }
     } catch (e, st) {
-      AppLogger.warning('Falha ao carregar idioma salvo de app_kv_store', e, st);
+      AppLogger.warning(
+        'Falha ao carregar idioma salvo de app_kv_store',
+        e,
+        st,
+      );
     }
   }
 
@@ -387,14 +402,17 @@ class AppLocaleNotifier extends Notifier<AppLocaleType> {
     state = locale;
     try {
       final db = ref.read(global_providers.databaseProvider);
-      await db.into(db.appKvStore).insertOnConflictUpdate(
-        AppKvStoreCompanion.insert(
-          key: kvKey,
-          value: locale.code,
-        ),
-      );
+      await db
+          .into(db.appKvStore)
+          .insertOnConflictUpdate(
+            AppKvStoreCompanion.insert(key: kvKey, value: locale.code),
+          );
     } catch (e, st) {
-      AppLogger.warning('Falha ao persistir idioma selecionado em app_kv_store', e, st);
+      AppLogger.warning(
+        'Falha ao persistir idioma selecionado em app_kv_store',
+        e,
+        st,
+      );
     }
   }
 }

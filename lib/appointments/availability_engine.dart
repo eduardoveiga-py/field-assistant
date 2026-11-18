@@ -328,11 +328,13 @@ class AvailabilityEngine {
           continue;
         }
 
-        final effectiveStartA =
-            a.startTime.subtract(Duration(minutes: bufferMinutes));
+        final effectiveStartA = a.startTime.subtract(
+          Duration(minutes: bufferMinutes),
+        );
         final effectiveEndA = a.endTime.add(Duration(minutes: bufferMinutes));
 
-        final hasOverlap = effectiveStartA.isBefore(b.endTime) &&
+        final hasOverlap =
+            effectiveStartA.isBefore(b.endTime) &&
             effectiveEndA.isAfter(b.startTime);
         if (hasOverlap) {
           final pair = AppointmentConflictPair(

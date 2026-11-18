@@ -59,17 +59,20 @@ void main() {
       expect(data.hasLastVisitDate, isTrue);
     });
 
-    test('Retorna lastVisitDate nulo quando person e visit não possuem data', () {
-      final person = makePerson(lastContactAt: null);
-      final data = DoorstepBriefingHelper.build(
-        person: person,
-        latestVisit: null,
-      );
+    test(
+      'Retorna lastVisitDate nulo quando person e visit não possuem data',
+      () {
+        final person = makePerson(lastContactAt: null);
+        final data = DoorstepBriefingHelper.build(
+          person: person,
+          latestVisit: null,
+        );
 
-      expect(data.lastVisitDate, isNull);
-      expect(data.hasLastVisitDate, isFalse);
-      expect(data.hasAnyData, isFalse);
-    });
+        expect(data.lastVisitDate, isNull);
+        expect(data.hasLastVisitDate, isFalse);
+        expect(data.hasAnyData, isFalse);
+      },
+    );
 
     test('hasLastVisitDate é verdadeiro e hasAnyData é falso quando apenas lastVisitDate existe', () {
       final data = DoorstepBriefingData(lastVisitDate: testDate);
@@ -91,39 +94,48 @@ void main() {
   });
 
   group('DoorstepBriefingCard - Renderização da Data da Última Visita', () {
-    testWidgets('Exibe última visita no cabeçalho quando briefing possui dados completos', (tester) async {
-      final data = DoorstepBriefingData(
-        lessonAndPoint: 'Lição 04, Ponto 2',
-        lastVisitDate: DateTime(2026, 11, 4),
-      );
+    testWidgets(
+      'Exibe última visita no cabeçalho quando briefing possui dados completos',
+      (tester) async {
+        final data = DoorstepBriefingData(
+          lessonAndPoint: 'Lição 04, Ponto 2',
+          lastVisitDate: DateTime(2026, 11, 4),
+        );
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: DoorstepBriefingCard(data: data),
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(body: DoorstepBriefingCard(data: data)),
           ),
-        ),
-      );
+        );
 
-      expect(find.text('Briefing na Porta'), findsOneWidget);
-      expect(find.textContaining('Última visita: 04/11/2026'), findsOneWidget);
-    });
+        expect(find.text('Briefing na Porta'), findsOneWidget);
+        expect(
+          find.textContaining('Última visita: 04/11/2026'),
+          findsOneWidget,
+        );
+      },
+    );
 
-    testWidgets('Exibe última visita no card mesmo sem lição ou notas registradas', (tester) async {
-      final data = DoorstepBriefingData(
-        lastVisitDate: DateTime(2026, 11, 4),
-      );
+    testWidgets(
+      'Exibe última visita no card mesmo sem lição ou notas registradas',
+      (tester) async {
+        final data = DoorstepBriefingData(lastVisitDate: DateTime(2026, 11, 4));
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: DoorstepBriefingCard(data: data),
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(body: DoorstepBriefingCard(data: data)),
           ),
-        ),
-      );
+        );
 
-      expect(find.textContaining('Última visita: 04/11/2026'), findsOneWidget);
-      expect(find.textContaining('Histórico anterior registrado'), findsOneWidget);
-    });
+        expect(
+          find.textContaining('Última visita: 04/11/2026'),
+          findsOneWidget,
+        );
+        expect(
+          find.textContaining('Histórico anterior registrado'),
+          findsOneWidget,
+        );
+      },
+    );
   });
 }

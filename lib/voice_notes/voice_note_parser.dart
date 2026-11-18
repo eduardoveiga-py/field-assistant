@@ -699,8 +699,10 @@ class VoiceNoteParser {
     // 2. Se antes de "capítulo" houver um livro da Bíblia como palavra inteira
     if (matchedText.contains('cap')) {
       for (final book in _bibleBooks) {
-        if (RegExp(r'\b' + RegExp.escape(book) + r'\s*(?:do\s+livro\s+de\s+)?$', caseSensitive: false)
-            .hasMatch(before.trim())) {
+        if (RegExp(
+          r'\b' + RegExp.escape(book) + r'\s*(?:do\s+livro\s+de\s+)?$',
+          caseSensitive: false,
+        ).hasMatch(before.trim())) {
           return true;
         }
       }

@@ -81,7 +81,13 @@ class PublicationLinkResolver {
       // Formato oficial do buscador e compartilhamento JW para Lições do livro LFF
       // Exemplo de link canônico verificado: https://www.jw.org/finder?srcid=jwlshare&wtlocale=T&prefer=lang&pub=lff&lesson=1&docid=1102021201&par=3
       final docId = 1102021200 + lesson;
-      final partNumber = lesson <= 12 ? 1 : lesson <= 33 ? 2 : lesson <= 47 ? 3 : 4;
+      final partNumber = lesson <= 12
+          ? 1
+          : lesson <= 33
+          ? 2
+          : lesson <= 47
+          ? 3
+          : 4;
       final lessonPad = lesson.toString().padLeft(2, '0');
       var lessonWebUrl =
           'https://www.jw.org/pt/biblioteca/livros/seja-feliz-para-sempre/parte-$partNumber/licao-$lessonPad/';

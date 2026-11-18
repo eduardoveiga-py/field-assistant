@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:drift/native.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -28,12 +29,17 @@ class _TestJwImapClient extends JwImapClient {
     JwMissingUids? missingUids,
   }) async* {
     if (failWithNetworkError) {
-      throw const JwEmailConnectionException('Servidor IMAP inacessível na rede.');
+      throw const JwEmailConnectionException(
+        'Servidor IMAP inacessível na rede.',
+      );
     }
-    if (username == null || username.trim().isEmpty || password == null || password.trim().isEmpty) return;
+    if (username == null ||
+        username.trim().isEmpty ||
+        password == null ||
+        password.trim().isEmpty)
+      return;
     yield remoteList;
   }
-
 }
 
 void main() {
@@ -184,11 +190,12 @@ void main() {
         revision: 1,
       );
 
-      final projected = AppointmentsScreen.projectTasksAndProjectsToAppointments(
-        [],
-        [taskWithHour, taskDateOnly, completedTask, taskNoDueDate],
-        [projectWithHour, projectDateOnly, completedProject],
-      );
+      final projected =
+          AppointmentsScreen.projectTasksAndProjectsToAppointments(
+            [],
+            [taskWithHour, taskDateOnly, completedTask, taskNoDueDate],
+            [projectWithHour, projectDateOnly, completedProject],
+          );
 
       // Should only include active items with due/target dates: 2 tasks + 2 projects = 4
       expect(projected.length, equals(4));
@@ -197,15 +204,24 @@ void main() {
       expect(projTaskHour.startTime, equals(DateTime(2026, 11, 12, 14, 30)));
       expect(projTaskHour.endTime, equals(DateTime(2026, 11, 12, 15, 30)));
 
-      final projTaskDateOnly = projected.firstWhere((a) => a.id == 'task:t_date_only');
+      final projTaskDateOnly = projected.firstWhere(
+        (a) => a.id == 'task:t_date_only',
+      );
       expect(projTaskDateOnly.startTime, equals(DateTime(2026, 11, 13, 9, 0)));
       expect(projTaskDateOnly.endTime, equals(DateTime(2026, 11, 13, 10, 0)));
 
-      final projProjectHour = projected.firstWhere((a) => a.id == 'project:p_hour');
+      final projProjectHour = projected.firstWhere(
+        (a) => a.id == 'project:p_hour',
+      );
       expect(projProjectHour.startTime, equals(DateTime(2026, 11, 20, 16, 0)));
 
-      final projProjectDateOnly = projected.firstWhere((a) => a.id == 'project:p_date_only');
-      expect(projProjectDateOnly.startTime, equals(DateTime(2026, 11, 25, 10, 0)));
+      final projProjectDateOnly = projected.firstWhere(
+        (a) => a.id == 'project:p_date_only',
+      );
+      expect(
+        projProjectDateOnly.startTime,
+        equals(DateTime(2026, 11, 25, 10, 0)),
+      );
     });
   });
 
@@ -277,7 +293,10 @@ void main() {
         imapClient: _TestJwImapClient(remoteList: sampleMessages),
       );
 
-      final initialCount = await customService.syncEmails(username: 'user@jw.org', password: 'secretpassword');
+      final initialCount = await customService.syncEmails(
+        username: 'user@jw.org',
+        password: 'secretpassword',
+      );
       expect(initialCount, equals(3));
 
       final retained = await customService.watchRetainedEmails().first;
@@ -289,53 +308,64 @@ void main() {
       expect(first.from, equals('betel@hub.jw.org'));
 
       // Re-running sync is idempotent and does not create duplicates
-      final secondSyncCount = await customService.syncEmails(username: 'user@jw.org', password: 'secretpassword');
+      final secondSyncCount = await customService.syncEmails(
+        username: 'user@jw.org',
+        password: 'secretpassword',
+      );
       expect(secondSyncCount, equals(0));
     });
 
-    test('Hub communications filter correctly and retain restricted metadata', () async {
-      final sampleMessages = [
-        JwEmailMessage(
-          id: 'hub_01',
-          remoteUid: 201,
-          subject: 'Carta de Betel',
-          from: 'betel@hub.jw.org',
-          to: 'anciaos@jw.org',
-          date: DateTime(2026, 11, 1),
-          bodyText: 'Conteúdo restrito',
-          isHubCommunication: true,
-          hubType: 'letter',
-          isPermanentRetained: true,
-        ),
-        JwEmailMessage(
-          id: 'normal_01',
-          remoteUid: 202,
-          subject: 'E-mail Geral',
-          from: 'notificacoes@jw.org',
-          to: 'usuario@jw.org',
-          date: DateTime(2026, 11, 2),
-          bodyText: 'Conteúdo comum',
-          isHubCommunication: false,
-          isPermanentRetained: true,
-        ),
-      ];
+    test(
+      'Hub communications filter correctly and retain restricted metadata',
+      () async {
+        final sampleMessages = [
+          JwEmailMessage(
+            id: 'hub_01',
+            remoteUid: 201,
+            subject: 'Carta de Betel',
+            from: 'betel@hub.jw.org',
+            to: 'anciaos@jw.org',
+            date: DateTime(2026, 11, 1),
+            bodyText: 'Conteúdo restrito',
+            isHubCommunication: true,
+            hubType: 'letter',
+            isPermanentRetained: true,
+          ),
+          JwEmailMessage(
+            id: 'normal_01',
+            remoteUid: 202,
+            subject: 'E-mail Geral',
+            from: 'notificacoes@jw.org',
+            to: 'usuario@jw.org',
+            date: DateTime(2026, 11, 2),
+            bodyText: 'Conteúdo comum',
+            isHubCommunication: false,
+            isPermanentRetained: true,
+          ),
+        ];
 
-      final customService = JwEmailService(
-        db: db,
-        biometricAuth: biometricAuth,
-        imapClient: _TestJwImapClient(remoteList: sampleMessages),
-      );
+        final customService = JwEmailService(
+          db: db,
+          biometricAuth: biometricAuth,
+          imapClient: _TestJwImapClient(remoteList: sampleMessages),
+        );
 
-      await customService.syncEmails(username: 'user@jw.org', password: 'secretpassword');
+        await customService.syncEmails(
+          username: 'user@jw.org',
+          password: 'secretpassword',
+        );
 
-      final hubMessages = await customService.watchRetainedEmails(hubOnly: true).first;
-      expect(hubMessages.length, equals(1));
-      for (final msg in hubMessages) {
-        expect(msg.isHubCommunication, isTrue);
-        expect(msg.hubType, isNotNull);
-        expect(msg.id, equals('hub_01'));
-      }
-    });
+        final hubMessages = await customService
+            .watchRetainedEmails(hubOnly: true)
+            .first;
+        expect(hubMessages.length, equals(1));
+        for (final msg in hubMessages) {
+          expect(msg.isHubCommunication, isTrue);
+          expect(msg.hubType, isNotNull);
+          expect(msg.id, equals('hub_01'));
+        }
+      },
+    );
 
     test('Sync propagates JwEmailConnectionException when connection fails without seeding fake data', () async {
       final failingService = JwEmailService(
@@ -345,7 +375,10 @@ void main() {
       );
 
       expect(
-        () => failingService.syncEmails(username: 'user@jw.org', password: 'secretpassword'),
+        () => failingService.syncEmails(
+          username: 'user@jw.org',
+          password: 'secretpassword',
+        ),
         throwsA(isA<JwEmailConnectionException>()),
       );
 
@@ -355,38 +388,51 @@ void main() {
 
     test('identidade IMAP isola conta, servidor e UIDVALIDITY', () {
       String id(String username, int validity, {String host = 'mail.jw.org'}) =>
-          JwImapClient.scopedMessageId(host: host, port: 993, username: username,
-              uidValidity: validity, uid: 42);
+          JwImapClient.scopedMessageId(
+            host: host,
+            port: 993,
+            username: username,
+            uidValidity: validity,
+            uid: 42,
+          );
       expect(id('a@example.org', 1), id('a@example.org', 1));
       expect(id('a@example.org', 1), isNot(id('b@example.org', 1)));
       expect(id('a@example.org', 1), isNot(id('a@example.org', 2)));
-      expect(id('a@example.org', 1), isNot(id('a@example.org', 1, host: 'other.example.org')));
+      expect(
+        id('a@example.org', 1),
+        isNot(id('a@example.org', 1, host: 'other.example.org')),
+      );
     });
 
-    test('JwImapClient parses RFC2822 dates and strips FETCH envelope markers', () {
-      const client = JwImapClient();
-      final parsedDate = JwImapClient.parseEmailDate('Mon, 10 Nov 2026 12:00:00 -0400');
-      expect(parsedDate, isNotNull);
-      expect(parsedDate!.toUtc().hour, equals(16));
+    test(
+      'JwImapClient parses RFC2822 dates and strips FETCH envelope markers',
+      () {
+        const client = JwImapClient();
+        final parsedDate = JwImapClient.parseEmailDate(
+          'Mon, 10 Nov 2026 12:00:00 -0400',
+        );
+        expect(parsedDate, isNotNull);
+        expect(parsedDate!.toUtc().hour, equals(16));
 
-      final msgs = client.parseImapResponsesForTest([
-        '* 1 FETCH (UID 77 BODY[HEADER.FIELDS (Subject From Date)] {80}',
-        'Subject: =?UTF-8?B?UmV1bmnDo28=?=',
-        'From: secretaria@hub.jw.org',
-        'Date: Mon, 10 Nov 2026 12:00:00 -0400',
-        '',
-        'BODY[TEXT] {32}',
-        'Corpo real da mensagem',
-        ')',
-        'A004 OK FETCH completed',
-      ]);
+        final msgs = client.parseImapResponsesForTest([
+          '* 1 FETCH (UID 77 BODY[HEADER.FIELDS (Subject From Date)] {80}',
+          'Subject: =?UTF-8?B?UmV1bmnDo28=?=',
+          'From: secretaria@hub.jw.org',
+          'Date: Mon, 10 Nov 2026 12:00:00 -0400',
+          '',
+          'BODY[TEXT] {32}',
+          'Corpo real da mensagem',
+          ')',
+          'A004 OK FETCH completed',
+        ]);
 
-      expect(msgs.length, equals(1));
-      expect(msgs.first.remoteUid, equals(77));
-      expect(msgs.first.subject, equals('Reunião'));
-      expect(msgs.first.bodyText, equals('Corpo real da mensagem'));
-      expect(msgs.first.date.toUtc().year, equals(2026));
-    });
+        expect(msgs.length, equals(1));
+        expect(msgs.first.remoteUid, equals(77));
+        expect(msgs.first.subject, equals('Reunião'));
+        expect(msgs.first.bodyText, equals('Corpo real da mensagem'));
+        expect(msgs.first.date.toUtc().year, equals(2026));
+      },
+    );
 
     test('Dynamic Export generates compliant Markdown, EML (RFC822) and Plain Text', () async {
       final msg = JwEmailMessage(
@@ -399,7 +445,7 @@ void main() {
         bodyText: 'Irmão, você foi designado para o Discurso nº 2 sobre os atributos de Jeová.',
         tags: ['reunião', 'discurso', 'vida_e_ministerio'],
         attachments: [
-          {'name': 'Esboco_Discurso.pdf', 'size': 102400}
+          {'name': 'Esboco_Discurso.pdf', 'size': 102400},
         ],
       );
 
@@ -414,35 +460,45 @@ void main() {
       final eml = await emailService.exportEmail(msg, format: 'eml');
       expect(eml, contains('From: secretaria@jw.org'));
       expect(eml, contains('To: publicador@jw.org'));
-      expect(eml, contains('Subject: Designação para a Reunião de Meio de Semana'));
+      expect(
+        eml,
+        contains('Subject: Designação para a Reunião de Meio de Semana'),
+      );
       expect(eml, contains('X-JW-Retained: Permanent'));
       expect(eml, contains('MIME-Version: 1.0'));
 
       // Test Plain Text export
       final txt = await emailService.exportEmail(msg, format: 'text');
-      expect(txt, contains('ASSUNTO: Designação para a Reunião de Meio de Semana'));
+      expect(
+        txt,
+        contains('ASSUNTO: Designação para a Reunião de Meio de Semana'),
+      );
       expect(txt, contains('DE: secretaria@jw.org'));
     });
 
-    test('Draft teocratic email persists locally in permanent retention', () async {
-      final draft = JwEmailMessage(
-        id: 'draft_local_01',
-        subject: 'Rascunho de Carta aos Anciãos',
-        from: 'me@jw.org',
-        to: 'corpo.anciaos@jw.org',
-        date: DateTime.now(),
-        bodyText: 'Seguem as anotações referentes à visita de pastoreio realizada.',
-        isDraft: true,
-        tags: ['pastoreio', 'rascunho'],
-      );
+    test(
+      'Draft teocratic email persists locally in permanent retention',
+      () async {
+        final draft = JwEmailMessage(
+          id: 'draft_local_01',
+          subject: 'Rascunho de Carta aos Anciãos',
+          from: 'me@jw.org',
+          to: 'corpo.anciaos@jw.org',
+          date: DateTime.now(),
+          bodyText:
+              'Seguem as anotações referentes à visita de pastoreio realizada.',
+          isDraft: true,
+          tags: ['pastoreio', 'rascunho'],
+        );
 
-      await emailService.saveDraft(draft);
+        await emailService.saveDraft(draft);
 
-      final retained = await emailService.watchRetainedEmails().first;
-      final foundDraft = retained.firstWhere((m) => m.id == 'draft_local_01');
-      expect(foundDraft.isDraft, isTrue);
-      expect(foundDraft.subject, equals('Rascunho de Carta aos Anciãos'));
-    });
+        final retained = await emailService.watchRetainedEmails().first;
+        final foundDraft = retained.firstWhere((m) => m.id == 'draft_local_01');
+        expect(foundDraft.isDraft, isTrue);
+        expect(foundDraft.subject, equals('Rascunho de Carta aos Anciãos'));
+      },
+    );
   });
 
   group('Hub.jw.org Restricted Communications & Biometric Lock Service', () {
@@ -458,7 +514,9 @@ void main() {
     });
 
     test('authenticate fails when biometrics unavailable and no PIN context provided (no bypass)', () async {
-      final authenticated = await auth.authenticate(localizedReason: 'Teste de segurança');
+      final authenticated = await auth.authenticate(
+        localizedReason: 'Teste de segurança',
+      );
       expect(authenticated, isFalse);
       expect(auth.isSessionUnlocked, isFalse);
     });
@@ -506,13 +564,17 @@ void main() {
       // Transform to research
       final article = await rm.addArticle(
         title: note.title,
-        summary: note.content.length > 120 ? '${note.content.substring(0, 120)}...' : note.content,
+        summary: note.content.length > 120
+            ? '${note.content.substring(0, 120)}...'
+            : note.content,
         content: note.content,
         tags: [note.category, 'Nota Vinculada', 'knowledge_note:${note.id}'],
       );
 
       // Connect research link back to note
-      final tags = (jsonDecode(note.tags) as List).map((e) => e.toString()).toList();
+      final tags = (jsonDecode(note.tags) as List)
+          .map((e) => e.toString())
+          .toList();
       tags.add('research:${article.id}');
       await km.updateNote(note.id, tags: tags);
 
@@ -523,33 +585,45 @@ void main() {
       expect(article.tags, contains('Nota Vinculada'));
     });
 
-    test('Knowledge Question transforms to Research Article containing answer', () async {
-      final q = await km.createQuestion(
-        question: 'Quem são os 144.000 citados em Apocalipse?',
-        context: 'Pergunta frequente no ministério de campo',
-      );
-      await km.answerQuestion(q.id, answer: 'São os escolhidos para reinar com Cristo no céu (Apo. 14:1-3).');
+    test(
+      'Knowledge Question transforms to Research Article containing answer',
+      () async {
+        final q = await km.createQuestion(
+          question: 'Quem são os 144.000 citados em Apocalipse?',
+          context: 'Pergunta frequente no ministério de campo',
+        );
+        await km.answerQuestion(
+          q.id,
+          answer:
+              'São os escolhidos para reinar com Cristo no céu (Apo. 14:1-3).',
+        );
 
-      final answeredQ = (await km.watchQuestions().first).firstWhere((item) => item.id == q.id);
-      expect(answeredQ.answer, isNotNull);
+        final answeredQ = (await km.watchQuestions().first).firstWhere(
+          (item) => item.id == q.id,
+        );
+        expect(answeredQ.answer, isNotNull);
 
-      final contentBuffer = StringBuffer()
-        ..writeln('**Pergunta:** ${answeredQ.question}')
-        ..writeln()
-        ..writeln('**Contexto:**\n${answeredQ.context}\n')
-        ..writeln('**Resposta Bíblica:**\n${answeredQ.answer}');
+        final contentBuffer = StringBuffer()
+          ..writeln('**Pergunta:** ${answeredQ.question}')
+          ..writeln()
+          ..writeln('**Contexto:**\n${answeredQ.context}\n')
+          ..writeln('**Resposta Bíblica:**\n${answeredQ.answer}');
 
-      final article = await rm.addArticle(
-        title: answeredQ.question,
-        summary: answeredQ.context ?? 'Dúvida bíblica teocrática',
-        content: contentBuffer.toString(),
-        tags: ['Dúvida Teocrática', 'knowledge_question:${answeredQ.id}'],
-      );
+        final article = await rm.addArticle(
+          title: answeredQ.question,
+          summary: answeredQ.context ?? 'Dúvida bíblica teocrática',
+          content: contentBuffer.toString(),
+          tags: ['Dúvida Teocrática', 'knowledge_question:${answeredQ.id}'],
+        );
 
-      expect(article.title, equals('Quem são os 144.000 citados em Apocalipse?'));
-      expect(article.content, contains('Resposta Bíblica:'));
-      expect(article.content, contains('Apo. 14:1-3'));
-      expect(article.tags, contains('knowledge_question:${answeredQ.id}'));
-    });
+        expect(
+          article.title,
+          equals('Quem são os 144.000 citados em Apocalipse?'),
+        );
+        expect(article.content, contains('Resposta Bíblica:'));
+        expect(article.content, contains('Apo. 14:1-3'));
+        expect(article.tags, contains('knowledge_question:${answeredQ.id}'));
+      },
+    );
   });
 }

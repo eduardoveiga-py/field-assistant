@@ -59,7 +59,9 @@ final jwEmailServiceProvider = Provider<JwEmailService>((ref) {
   return JwEmailService(db: db, biometricAuth: biometric);
 });
 
-final retainedEmailsStreamProvider = StreamProvider<List<JwEmailMessage>>((ref) {
+final retainedEmailsStreamProvider = StreamProvider<List<JwEmailMessage>>((
+  ref,
+) {
   final emailService = ref.watch(jwEmailServiceProvider);
   return emailService.watchRetainedEmails();
 });
@@ -107,7 +109,9 @@ final knowledgeManagerProvider = Provider<KnowledgeManager>((ref) {
   return KnowledgeManager(db: db);
 });
 
-final recentNotesStreamProvider = StreamProvider<List<KnowledgeNoteEntry>>((ref) {
+final recentNotesStreamProvider = StreamProvider<List<KnowledgeNoteEntry>>((
+  ref,
+) {
   final km = ref.watch(knowledgeManagerProvider);
   return km.watchNotes();
 });
@@ -136,9 +140,9 @@ final appointmentsStreamProvider = StreamProvider<List<AppointmentEntry>>((
 /// Provedor reativo de conflitos de horário pós-sincronização
 final activeAppointmentConflictsProvider =
     Provider<List<AppointmentConflictPair>>((ref) {
-  final appointments = ref.watch(appointmentsStreamProvider).value ?? [];
-  return AvailabilityEngine.findActiveConflicts(appointments);
-});
+      final appointments = ref.watch(appointmentsStreamProvider).value ?? [];
+      return AvailabilityEngine.findActiveConflicts(appointments);
+    });
 
 final activitiesStreamProvider = StreamProvider<List<ActivityRecordEntry>>((
   ref,
@@ -190,15 +194,18 @@ final sunModeProvider = NotifierProvider<SunModeNotifier, bool>(
 
 // Eventos externos são mantidos separados dos compromissos locais para não
 // gerar uploads duplicados ou contabilizá-los como atividade ministerial.
-final externalCalendarEventsProvider = StreamProvider<List<ExternalCalendarEventEntry>>((ref) {
-  final db = ref.watch(databaseProvider);
-  return db.select(db.externalCalendarEvents).watch();
-});
+final externalCalendarEventsProvider =
+    StreamProvider<List<ExternalCalendarEventEntry>>((ref) {
+      final db = ref.watch(databaseProvider);
+      return db.select(db.externalCalendarEvents).watch();
+    });
 
-final calendarEventLinksProvider = StreamProvider<List<CalendarEventLinkEntry>>((ref) {
-  final db = ref.watch(databaseProvider);
-  return db.select(db.calendarEventLinks).watch();
-});
+final calendarEventLinksProvider = StreamProvider<List<CalendarEventLinkEntry>>(
+  (ref) {
+    final db = ref.watch(databaseProvider);
+    return db.select(db.calendarEventLinks).watch();
+  },
+);
 
 class PeopleFilterNotifier extends Notifier<String> {
   @override
@@ -226,9 +233,10 @@ class ShortcutsCategoryNotifier extends Notifier<String> {
 }
 
 /// Categoria ativa de atalhos rápidos na Home Screen ('principais', 'ministerio', 'produtividade', 'todos')
-final todayShortcutsCategoryProvider = NotifierProvider<ShortcutsCategoryNotifier, String>(
-  ShortcutsCategoryNotifier.new,
-);
+final todayShortcutsCategoryProvider =
+    NotifierProvider<ShortcutsCategoryNotifier, String>(
+      ShortcutsCategoryNotifier.new,
+    );
 
 class MapFullscreenNotifier extends Notifier<bool> {
   @override
@@ -250,7 +258,6 @@ final isMapFullscreenProvider = NotifierProvider<MapFullscreenNotifier, bool>(
 /// Contadores reativos da fila de sincronização (pendentes, falhas e conflitos)
 final syncQueueCountsProvider =
     StreamProvider<({int pending, int failed, int conflict})>((ref) {
-  final repo = ref.watch(repositoryProvider);
-  return repo.watchSyncQueueCounts();
-});
-
+      final repo = ref.watch(repositoryProvider);
+      return repo.watchSyncQueueCounts();
+    });

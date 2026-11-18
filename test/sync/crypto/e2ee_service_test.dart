@@ -62,43 +62,58 @@ void main() {
       await db.close();
     });
 
-    test('isKeyInstalled inicial retorna falso e true após setupNewVault', () async {
-      expect(await service.isKeyInstalled(testOwner), isFalse);
+    test(
+      'isKeyInstalled inicial retorna falso e true após setupNewVault',
+      () async {
+        expect(await service.isKeyInstalled(testOwner), isFalse);
 
-      final phrase = await service.setupNewVault(testOwner);
-      final words = phrase.split(' ');
-      expect(words.length, 24);
+        final phrase = await service.setupNewVault(testOwner);
+        final words = phrase.split(' ');
+        expect(words.length, 24);
 
-      expect(await service.isKeyInstalled(testOwner), isTrue);
-      expect(await service.getKey(testOwner), isNotNull);
-      expect(transport.marker, isNotNull);
-      expect(transport.marker!['version'], 1);
-    });
+        expect(await service.isKeyInstalled(testOwner), isTrue);
+        expect(await service.getKey(testOwner), isNotNull);
+        expect(transport.marker, isNotNull);
+        expect(transport.marker!['version'], 1);
+      },
+    );
 
-    test('restoreVault restaura chave com sucesso quando a frase é válida', () async {
-      final phrase = RecoveryCrypto.createPhrase();
-      final key = await RecoveryCrypto.keyFromPhrase(phrase);
-      final marker = await RecoveryVaultVerifier.create(root: key, owner: testOwner);
-      transport.marker = marker;
+    test(
+      'restoreVault restaura chave com sucesso quando a frase é válida',
+      () async {
+        final phrase = RecoveryCrypto.createPhrase();
+        final key = await RecoveryCrypto.keyFromPhrase(phrase);
+        final marker = await RecoveryVaultVerifier.create(
+          root: key,
+          owner: testOwner,
+        );
+        transport.marker = marker;
 
-      expect(await service.isKeyInstalled(testOwner), isFalse);
-      final ok = await service.restoreVault(testOwner, phrase);
-      expect(ok, isTrue);
-      expect(await service.isKeyInstalled(testOwner), isTrue);
-    });
+        expect(await service.isKeyInstalled(testOwner), isFalse);
+        final ok = await service.restoreVault(testOwner, phrase);
+        expect(ok, isTrue);
+        expect(await service.isKeyInstalled(testOwner), isTrue);
+      },
+    );
 
-    test('restoreVault falha se a frase não corresponder ao cofre existente', () async {
-      final phrase1 = RecoveryCrypto.createPhrase();
-      final phrase2 = RecoveryCrypto.createPhrase();
-      final key1 = await RecoveryCrypto.keyFromPhrase(phrase1);
-      final marker1 = await RecoveryVaultVerifier.create(root: key1, owner: testOwner);
-      transport.marker = marker1;
+    test(
+      'restoreVault falha se a frase não corresponder ao cofre existente',
+      () async {
+        final phrase1 = RecoveryCrypto.createPhrase();
+        final phrase2 = RecoveryCrypto.createPhrase();
+        final key1 = await RecoveryCrypto.keyFromPhrase(phrase1);
+        final marker1 = await RecoveryVaultVerifier.create(
+          root: key1,
+          owner: testOwner,
+        );
+        transport.marker = marker1;
 
-      expect(
-        () => service.restoreVault(testOwner, phrase2),
-        throwsA(isA<FormatException>()),
-      );
-    });
+        expect(
+          () => service.restoreVault(testOwner, phrase2),
+          throwsA(isA<FormatException>()),
+        );
+      },
+    );
 
     test('getRecordSync e getCheckpoint retornam instâncias ativas quando chave existe', () async {
       await service.setupNewVault(testOwner);

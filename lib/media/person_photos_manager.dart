@@ -42,8 +42,9 @@ class PersonPhotoItem {
   };
 
   factory PersonPhotoItem.fromEntry(PersonPhotoEntry e) {
-    final effective =
-        (e.filePath != null && e.filePath!.isNotEmpty) ? e.filePath! : e.imageData;
+    final effective = (e.filePath != null && e.filePath!.isNotEmpty)
+        ? e.filePath!
+        : e.imageData;
     return PersonPhotoItem(
       id: e.id,
       personId: e.personId,
@@ -101,7 +102,11 @@ class PersonPhotosManager {
           try {
             decodedBytes = base64Decode(clean.substring(headerEnd + 1));
           } catch (e, st) {
-            AppLogger.warning('Falha ao decodificar data URI da foto $photoId', e, st);
+            AppLogger.warning(
+              'Falha ao decodificar data URI da foto $photoId',
+              e,
+              st,
+            );
           }
         }
       }
@@ -129,16 +134,17 @@ class PersonPhotosManager {
   Future<int> migrateLegacyInlinePhotosToFiles() async {
     if (kIsWeb) return 0;
     int migrated = 0;
-    final rows = await (db.select(db.personPhotos)
-          ..where((t) => t.deletedAt.isNull()))
-        .get();
+    final rows = await (db.select(
+      db.personPhotos,
+    )..where((t) => t.deletedAt.isNull())).get();
     for (final row in rows) {
       if ((row.filePath == null || row.filePath!.isEmpty) &&
           row.imageData.startsWith('data:image/')) {
         final stored = await _prepareStoredMedia(row.id, row.imageData);
         if (stored.filePath != null && stored.filePath!.isNotEmpty) {
-          await (db.update(db.personPhotos)..where((t) => t.id.equals(row.id)))
-              .write(
+          await (db.update(
+            db.personPhotos,
+          )..where((t) => t.id.equals(row.id))).write(
             PersonPhotosCompanion(
               filePath: Value(stored.filePath),
               imageData: const Value(''),
@@ -172,9 +178,7 @@ class PersonPhotosManager {
   Future<List<PersonPhotoItem>> getPhotosForPerson(String personId) async {
     final rows =
         await (db.select(db.personPhotos)
-              ..where(
-                (t) => t.personId.equals(personId) & t.deletedAt.isNull(),
-              )
+              ..where((t) => t.personId.equals(personId) & t.deletedAt.isNull())
               ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
             .get();
     return rows.map(PersonPhotoItem.fromEntry).toList();
@@ -219,17 +223,21 @@ class PersonPhotosManager {
 
     await db.transaction(() async {
       await db.into(db.personPhotos).insert(entry);
-      await db.into(db.syncQueue).insert(
-        SyncQueueCompanion.insert(
-          id: _uuid.v4(),
-          entityType: 'person_photos',
-          entityId: photoId,
-          operation: 'INSERT',
-          payload: jsonEncode(SyncTimestamp.normalizeMapDates(entry.toJson())),
-          createdAt: now,
-          status: const Value('pending'),
-        ),
-      );
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: _uuid.v4(),
+              entityType: 'person_photos',
+              entityId: photoId,
+              operation: 'INSERT',
+              payload: jsonEncode(
+                SyncTimestamp.normalizeMapDates(entry.toJson()),
+              ),
+              createdAt: now,
+              status: const Value('pending'),
+            ),
+          );
     });
 
     return PersonPhotoItem.fromEntry(entry);
@@ -266,17 +274,19 @@ class PersonPhotosManager {
         await db.update(db.personPhotos).replace(updated);
         final payload = SyncTimestamp.normalizeMapDates(updated.toJson());
         payload['_base'] = SyncTimestamp.normalizeMapDates(existing.toJson());
-        await db.into(db.syncQueue).insert(
-          SyncQueueCompanion.insert(
-            id: _uuid.v4(),
-            entityType: 'person_photos',
-            entityId: existing.id,
-            operation: 'UPDATE',
-            payload: jsonEncode(payload),
-            createdAt: now,
-            status: const Value('pending'),
-          ),
-        );
+        await db
+            .into(db.syncQueue)
+            .insert(
+              SyncQueueCompanion.insert(
+                id: _uuid.v4(),
+                entityType: 'person_photos',
+                entityId: existing.id,
+                operation: 'UPDATE',
+                payload: jsonEncode(payload),
+                createdAt: now,
+                status: const Value('pending'),
+              ),
+            );
       });
     } else {
       final newId = _uuid.v4();
@@ -294,17 +304,21 @@ class PersonPhotosManager {
       );
       await db.transaction(() async {
         await db.into(db.personPhotos).insert(entry);
-        await db.into(db.syncQueue).insert(
-          SyncQueueCompanion.insert(
-            id: _uuid.v4(),
-            entityType: 'person_photos',
-            entityId: newId,
-            operation: 'INSERT',
-            payload: jsonEncode(SyncTimestamp.normalizeMapDates(entry.toJson())),
-            createdAt: now,
-            status: const Value('pending'),
-          ),
-        );
+        await db
+            .into(db.syncQueue)
+            .insert(
+              SyncQueueCompanion.insert(
+                id: _uuid.v4(),
+                entityType: 'person_photos',
+                entityId: newId,
+                operation: 'INSERT',
+                payload: jsonEncode(
+                  SyncTimestamp.normalizeMapDates(entry.toJson()),
+                ),
+                createdAt: now,
+                status: const Value('pending'),
+              ),
+            );
       });
     }
   }
@@ -317,43 +331,45 @@ class PersonPhotosManager {
 
   Future<void> deletePhoto(String personId, String photoType) async {
     final now = DateTime.now();
-    final rows = await (db.select(db.personPhotos)
-          ..where(
-            (t) =>
-                t.personId.equals(personId) &
-                t.photoType.equals(photoType) &
-                t.deletedAt.isNull(),
-          ))
-        .get();
+    final rows =
+        await (db.select(db.personPhotos)..where(
+              (t) =>
+                  t.personId.equals(personId) &
+                  t.photoType.equals(photoType) &
+                  t.deletedAt.isNull(),
+            ))
+            .get();
 
     await db.transaction(() async {
       for (final existing in rows) {
         final nextRev = existing.revision + 1;
-        await (db.update(db.personPhotos)
-              ..where((t) => t.id.equals(existing.id)))
-            .write(
+        await (db.update(
+          db.personPhotos,
+        )..where((t) => t.id.equals(existing.id))).write(
           PersonPhotosCompanion(
             deletedAt: Value(now),
             updatedAt: Value(now),
             revision: Value(nextRev),
           ),
         );
-        await db.into(db.syncQueue).insert(
-          SyncQueueCompanion.insert(
-            id: _uuid.v4(),
-            entityType: 'person_photos',
-            entityId: existing.id,
-            operation: 'DELETE',
-            payload: jsonEncode({
-              'id': existing.id,
-              'deleted_at': now.toUtc().toIso8601String(),
-              'updated_at': now.toUtc().toIso8601String(),
-              'revision': nextRev,
-            }),
-            createdAt: now,
-            status: const Value('pending'),
-          ),
-        );
+        await db
+            .into(db.syncQueue)
+            .insert(
+              SyncQueueCompanion.insert(
+                id: _uuid.v4(),
+                entityType: 'person_photos',
+                entityId: existing.id,
+                operation: 'DELETE',
+                payload: jsonEncode({
+                  'id': existing.id,
+                  'deleted_at': now.toUtc().toIso8601String(),
+                  'updated_at': now.toUtc().toIso8601String(),
+                  'revision': nextRev,
+                }),
+                createdAt: now,
+                status: const Value('pending'),
+              ),
+            );
       }
     });
 
@@ -364,37 +380,40 @@ class PersonPhotosManager {
 
   Future<void> deletePhotoById(String photoId) async {
     final now = DateTime.now();
-    final existing = await (db.select(db.personPhotos)
-          ..where((t) => t.id.equals(photoId)))
-        .getSingleOrNull();
+    final existing = await (db.select(
+      db.personPhotos,
+    )..where((t) => t.id.equals(photoId))).getSingleOrNull();
     if (existing == null) return;
 
     final nextRev = existing.revision + 1;
     await db.transaction(() async {
-      await (db.update(db.personPhotos)..where((t) => t.id.equals(photoId)))
-          .write(
+      await (db.update(
+        db.personPhotos,
+      )..where((t) => t.id.equals(photoId))).write(
         PersonPhotosCompanion(
           deletedAt: Value(now),
           updatedAt: Value(now),
           revision: Value(nextRev),
         ),
       );
-      await db.into(db.syncQueue).insert(
-        SyncQueueCompanion.insert(
-          id: _uuid.v4(),
-          entityType: 'person_photos',
-          entityId: photoId,
-          operation: 'DELETE',
-          payload: jsonEncode({
-            'id': photoId,
-            'deleted_at': now.toUtc().toIso8601String(),
-            'updated_at': now.toUtc().toIso8601String(),
-            'revision': nextRev,
-          }),
-          createdAt: now,
-          status: const Value('pending'),
-        ),
-      );
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: _uuid.v4(),
+              entityType: 'person_photos',
+              entityId: photoId,
+              operation: 'DELETE',
+              payload: jsonEncode({
+                'id': photoId,
+                'deleted_at': now.toUtc().toIso8601String(),
+                'updated_at': now.toUtc().toIso8601String(),
+                'revision': nextRev,
+              }),
+              createdAt: now,
+              status: const Value('pending'),
+            ),
+          );
     });
 
     await deletePhotoFileFromDisk(existing.filePath);
@@ -405,7 +424,10 @@ final personPhotosManagerProvider = Provider<PersonPhotosManager>((ref) {
   final repo = ref.watch(repositoryProvider);
   final mgr = PersonPhotosManager(repo.db);
   if (!kIsWeb) {
-    mgr.migrateLegacyInlinePhotosToFiles().catchError((Object e, StackTrace st) {
+    mgr.migrateLegacyInlinePhotosToFiles().catchError((
+      Object e,
+      StackTrace st,
+    ) {
       AppLogger.warning('Falha na migração de fotos inline legadas', e, st);
       return 0;
     });

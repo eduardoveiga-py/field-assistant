@@ -15,7 +15,9 @@ Future<String> saveVerifiedUpdateFile({
   if (!await targetDir.exists()) {
     await targetDir.create(recursive: true);
   }
-  final safeName = p.basename(fileName).replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+  final safeName = p
+      .basename(fileName)
+      .replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
   final file = File(p.join(targetDir.path, safeName));
   await file.writeAsBytes(bytes, flush: true);
   return file.path;

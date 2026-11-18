@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import '../../core/app_theme.dart';
 import '../../territory/geocoding_service.dart';
 import '../../territory/geolocation_helper.dart';
+import '../../territory/map_engine/raster_fallback_adapter.dart';
+import '../../territory/map_engine_adapter.dart';
 import '../../territory/tile_cache/tile_cache_service.dart';
 
 class MapLocationPickerDialog extends StatefulWidget {
@@ -13,8 +15,11 @@ class MapLocationPickerDialog extends StatefulWidget {
   final double? initialLng;
   final String? initialAddress;
   final String? initialNeighborhood;
+
   /// Permite testar respostas de geocodificação fora de ordem.
-  final Future<ReverseGeocodingResult?> Function(double, double)? reverseGeocode;
+  final Future<ReverseGeocodingResult?> Function(double, double)?
+  reverseGeocode;
+  final MapEngineAdapter? mapEngineAdapter;
 
   const MapLocationPickerDialog({
     super.key,
@@ -23,6 +28,7 @@ class MapLocationPickerDialog extends StatefulWidget {
     this.initialAddress,
     this.initialNeighborhood,
     this.reverseGeocode,
+    this.mapEngineAdapter,
   });
 
   @override
@@ -48,6 +54,8 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
   int _selectionGeneration = 0;
   bool _hasExplicitSelection = false;
   String _statusText = 'Toque no mapa para marcar a localização exata da casa.';
+  late final MapEngineAdapter _mapAdapter;
+  bool _ownsAdapter = false;
 
   // Constantes de visualização de grade de blocos
   static const int _gridHalfSize = 3; // 7x7 tiles = 1792x1792 px
@@ -118,10 +126,32 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
   @override
   void initState() {
     super.initState();
+    if (widget.mapEngineAdapter != null) {
+      _mapAdapter = widget.mapEngineAdapter!;
+    } else {
+      _mapAdapter = RasterFallbackAdapter();
+      _ownsAdapter = true;
+    }
+    _mapAdapter.initialize().then((_) {
+      if (mounted) {
+        _mapAdapter.moveCamera(
+          MapViewportState(
+            latitude: _viewCenterLat,
+            longitude: _viewCenterLng,
+            zoom: _zoom.toDouble(),
+          ),
+        );
+      }
+    });
     final lat = widget.initialLat;
     final lng = widget.initialLng;
-    _hasExplicitSelection = lat != null && lng != null &&
-        lat.isFinite && lng.isFinite && lat.abs() <= 85.0511 && lng.abs() <= 180 &&
+    _hasExplicitSelection =
+        lat != null &&
+        lng != null &&
+        lat.isFinite &&
+        lng.isFinite &&
+        lat.abs() <= 85.0511 &&
+        lng.abs() <= 180 &&
         (lat != 0 || lng != 0);
     _selectedLat = _hasExplicitSelection ? lat! : GeolocationHelper.defaultLat;
     _selectedLng = _hasExplicitSelection ? lng! : GeolocationHelper.defaultLng;
@@ -150,6 +180,9 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
   @override
   void dispose() {
     _transformationController.dispose();
+    if (_ownsAdapter) {
+      _mapAdapter.dispose();
+    }
     super.dispose();
   }
 
@@ -193,12 +226,17 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
 
     ReverseGeocodingResult? res;
     try {
-      res = await (widget.reverseGeocode ?? GeocodingService.reverseGeocode)(lat, lng);
+      res = await (widget.reverseGeocode ?? GeocodingService.reverseGeocode)(
+        lat,
+        lng,
+      );
     } catch (_) {
       // A localização escolhida continua válida mesmo se a busca falhar.
     }
-    if (!mounted || request != _addressRequest ||
-        lat != _selectedLat || lng != _selectedLng) {
+    if (!mounted ||
+        request != _addressRequest ||
+        lat != _selectedLat ||
+        lng != _selectedLng) {
       return;
     }
 
@@ -243,7 +281,8 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
       });
     } else {
       setState(() {
-        _statusText = '${result.userMessage} Mantendo o ponto atual; toque no mapa para ajustar.';
+        _statusText =
+            '${result.userMessage} Mantendo o ponto atual; toque no mapa para ajustar.';
       });
     }
   }
@@ -437,20 +476,39 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
                               final scale = m.getMaxScaleOnAxis();
                               final dx = m.storage[12];
                               final dy = m.storage[13];
-                              final px = originPx + (constraints.maxWidth / 2 - dx) / scale;
-                              final py = originPy + (constraints.maxHeight / 2 - dy) / scale;
-                              final lng = _pixelX2lon(px, _zoom).clamp(-179.999999, 179.999999);
-                              final lat = _pixelY2lat(py, _zoom).clamp(-85.0511, 85.0511);
-                              final newOriginX = (_lon2tileX(lng, _zoom) - _gridHalfSize) * _tileSize;
-                              final newOriginY = (_lat2tileY(lat, _zoom) - _gridHalfSize) * _tileSize;
+                              final px =
+                                  originPx +
+                                  (constraints.maxWidth / 2 - dx) / scale;
+                              final py =
+                                  originPy +
+                                  (constraints.maxHeight / 2 - dy) / scale;
+                              final lng = _pixelX2lon(
+                                px,
+                                _zoom,
+                              ).clamp(-179.999999, 179.999999);
+                              final lat = _pixelY2lat(
+                                py,
+                                _zoom,
+                              ).clamp(-85.0511, 85.0511);
+                              final newOriginX =
+                                  (_lon2tileX(lng, _zoom) - _gridHalfSize) *
+                                  _tileSize;
+                              final newOriginY =
+                                  (_lat2tileY(lat, _zoom) - _gridHalfSize) *
+                                  _tileSize;
                               setState(() {
                                 _viewCenterLat = lat;
                                 _viewCenterLng = lng;
                               });
-                              _transformationController.value = Matrix4.identity()
-                                ..translateByDouble(dx + (newOriginX - originPx) * scale,
-                                    dy + (newOriginY - originPy) * scale, 0, 1)
-                                ..scaleByDouble(scale, scale, 1, 1);
+                              _transformationController.value =
+                                  Matrix4.identity()
+                                    ..translateByDouble(
+                                      dx + (newOriginX - originPx) * scale,
+                                      dy + (newOriginY - originPy) * scale,
+                                      0,
+                                      1,
+                                    )
+                                    ..scaleByDouble(scale, scale, 1, 1);
                             },
                             child: GestureDetector(
                               onDoubleTap: () {
@@ -515,55 +573,58 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
                                             y: ty,
                                             size: _tileSize,
                                             isDark: isDark,
-                                            layerStyle: TileCacheService.instance.activeStyle,
+                                            layerStyle: TileCacheService
+                                                .instance
+                                                .activeStyle,
                                           ),
                                         ),
 
                                     // Pino da Casa / Localização Selecionada
-                                    if (_hasExplicitSelection) Positioned(
-                                      left: pinX - 50,
-                                      bottom: canvasHeight - pinY,
-                                      width: 100,
-                                      child: IgnorePointer(
-                                        child: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 6,
-                                                    vertical: 2,
+                                    if (_hasExplicitSelection)
+                                      Positioned(
+                                        left: pinX - 50,
+                                        bottom: canvasHeight - pinY,
+                                        width: 100,
+                                        child: IgnorePointer(
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 6,
+                                                      vertical: 2,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color: AppTheme.alertRed,
+                                                  borderRadius:
+                                                      BorderRadius.circular(6),
+                                                  boxShadow: const [
+                                                    BoxShadow(
+                                                      color: Colors.black26,
+                                                      blurRadius: 4,
+                                                      offset: Offset(0, 2),
+                                                    ),
+                                                  ],
+                                                ),
+                                                child: const Text(
+                                                  'Casa / Ponto',
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
                                                   ),
-                                              decoration: BoxDecoration(
-                                                color: AppTheme.alertRed,
-                                                borderRadius:
-                                                    BorderRadius.circular(6),
-                                                boxShadow: const [
-                                                  BoxShadow(
-                                                    color: Colors.black26,
-                                                    blurRadius: 4,
-                                                    offset: Offset(0, 2),
-                                                  ),
-                                                ],
-                                              ),
-                                              child: const Text(
-                                                'Casa / Ponto',
-                                                style: TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.bold,
                                                 ),
                                               ),
-                                            ),
-                                            const Icon(
-                                              Icons.location_on,
-                                              color: AppTheme.alertRed,
-                                              size: 40,
-                                            ),
-                                          ],
+                                              const Icon(
+                                                Icons.location_on,
+                                                color: AppTheme.alertRed,
+                                                size: 40,
+                                              ),
+                                            ],
+                                          ),
                                         ),
                                       ),
-                                    ),
                                   ],
                                 ),
                               ),
@@ -727,7 +788,9 @@ class _MapLocationPickerDialogState extends State<MapLocationPickerDialog> {
                         label: const Text('Confirmar Este Ponto'),
                         onPressed: () {
                           if (!_hasExplicitSelection) {
-                            setState(() => _statusText = 'Selecione um ponto no mapa ou obtenha a localização antes de confirmar.');
+                            setState(
+                              () => _statusText = 'Selecione um ponto no mapa ou obtenha a localização antes de confirmar.',
+                            );
                             return;
                           }
                           final address = _geocodedResult;

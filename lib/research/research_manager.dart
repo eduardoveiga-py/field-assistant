@@ -82,7 +82,11 @@ class ResearchArticleItem {
           return decoded.map((e) => e.toString()).toList();
         }
       } catch (e, st) {
-        AppLogger.warning('Falha ao decodificar lista JSON em ResearchArticle', e, st);
+        AppLogger.warning(
+          'Falha ao decodificar lista JSON em ResearchArticle',
+          e,
+          st,
+        );
       }
     }
     return [];
@@ -100,11 +104,8 @@ class ResearchTagItem {
     required this.createdAt,
   });
 
-  factory ResearchTagItem.fromEntry(ResearchTagEntry e) => ResearchTagItem(
-    id: e.id,
-    name: e.name,
-    createdAt: e.createdAt,
-  );
+  factory ResearchTagItem.fromEntry(ResearchTagEntry e) =>
+      ResearchTagItem(id: e.id, name: e.name, createdAt: e.createdAt);
 
   factory ResearchTagItem.fromMap(Map<String, dynamic> map) => ResearchTagItem(
     id: map['id'] as String,
@@ -139,15 +140,17 @@ class ResearchManager {
       ];
       await db.transaction(() async {
         for (final tag in defaultTags) {
-          await db.into(db.researchTags).insert(
-            ResearchTagsCompanion.insert(
-              id: _uuid.v4(),
-              name: tag,
-              createdAt: now,
-              updatedAt: Value(now),
-            ),
-            mode: InsertMode.insertOrIgnore,
-          );
+          await db
+              .into(db.researchTags)
+              .insert(
+                ResearchTagsCompanion.insert(
+                  id: _uuid.v4(),
+                  name: tag,
+                  createdAt: now,
+                  updatedAt: Value(now),
+                ),
+                mode: InsertMode.insertOrIgnore,
+              );
         }
       });
     }
@@ -219,17 +222,21 @@ class ResearchManager {
 
     await db.transaction(() async {
       await db.into(db.researchArticles).insert(entry);
-      await db.into(db.syncQueue).insert(
-        SyncQueueCompanion.insert(
-          id: _uuid.v4(),
-          entityType: 'research_articles',
-          entityId: id,
-          operation: 'INSERT',
-          payload: jsonEncode(SyncTimestamp.normalizeMapDates(entry.toJson())),
-          createdAt: now,
-          status: const Value('pending'),
-        ),
-      );
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: _uuid.v4(),
+              entityType: 'research_articles',
+              entityId: id,
+              operation: 'INSERT',
+              payload: jsonEncode(
+                SyncTimestamp.normalizeMapDates(entry.toJson()),
+              ),
+              createdAt: now,
+              status: const Value('pending'),
+            ),
+          );
     });
 
     return ResearchArticleItem.fromEntry(entry);
@@ -237,9 +244,9 @@ class ResearchManager {
 
   Future<void> updateArticle(ResearchArticleItem item) async {
     final now = DateTime.now();
-    final existing = await (db.select(db.researchArticles)
-          ..where((t) => t.id.equals(item.id)))
-        .getSingleOrNull();
+    final existing = await (db.select(
+      db.researchArticles,
+    )..where((t) => t.id.equals(item.id))).getSingleOrNull();
     final updated = ResearchArticleEntry(
       id: item.id,
       title: item.title.trim(),
@@ -264,53 +271,58 @@ class ResearchManager {
       if (existing != null) {
         payload['_base'] = SyncTimestamp.normalizeMapDates(existing.toJson());
       }
-      await db.into(db.syncQueue).insert(
-        SyncQueueCompanion.insert(
-          id: _uuid.v4(),
-          entityType: 'research_articles',
-          entityId: item.id,
-          operation: 'UPDATE',
-          payload: jsonEncode(payload),
-          createdAt: now,
-          status: const Value('pending'),
-        ),
-      );
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: _uuid.v4(),
+              entityType: 'research_articles',
+              entityId: item.id,
+              operation: 'UPDATE',
+              payload: jsonEncode(payload),
+              createdAt: now,
+              status: const Value('pending'),
+            ),
+          );
     });
   }
 
   Future<void> deleteArticle(String id) async {
     final now = DateTime.now();
-    final existing = await (db.select(db.researchArticles)
-          ..where((t) => t.id.equals(id)))
-        .getSingleOrNull();
+    final existing = await (db.select(
+      db.researchArticles,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
     if (existing == null) return;
 
     final nextRev = existing.revision + 1;
     await db.transaction(() async {
-      await (db.update(db.researchArticles)..where((t) => t.id.equals(id)))
-          .write(
+      await (db.update(
+        db.researchArticles,
+      )..where((t) => t.id.equals(id))).write(
         ResearchArticlesCompanion(
           deletedAt: Value(now),
           updatedAt: Value(now),
           revision: Value(nextRev),
         ),
       );
-      await db.into(db.syncQueue).insert(
-        SyncQueueCompanion.insert(
-          id: _uuid.v4(),
-          entityType: 'research_articles',
-          entityId: id,
-          operation: 'DELETE',
-          payload: jsonEncode({
-            'id': id,
-            'deleted_at': now.toUtc().toIso8601String(),
-            'updated_at': now.toUtc().toIso8601String(),
-            'revision': nextRev,
-          }),
-          createdAt: now,
-          status: const Value('pending'),
-        ),
-      );
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: _uuid.v4(),
+              entityType: 'research_articles',
+              entityId: id,
+              operation: 'DELETE',
+              payload: jsonEncode({
+                'id': id,
+                'deleted_at': now.toUtc().toIso8601String(),
+                'updated_at': now.toUtc().toIso8601String(),
+                'revision': nextRev,
+              }),
+              createdAt: now,
+              status: const Value('pending'),
+            ),
+          );
     });
   }
 
@@ -318,9 +330,10 @@ class ResearchManager {
   Future<ResearchTagItem> addTag(String name) async {
     final trimmed = name.trim();
     final now = DateTime.now();
-    final existingActive = await (db.select(db.researchTags)
-          ..where((t) => t.name.equals(trimmed) & t.deletedAt.isNull()))
-        .getSingleOrNull();
+    final existingActive =
+        await (db.select(db.researchTags)
+              ..where((t) => t.name.equals(trimmed) & t.deletedAt.isNull()))
+            .getSingleOrNull();
     if (existingActive != null) {
       return ResearchTagItem.fromEntry(existingActive);
     }
@@ -337,17 +350,21 @@ class ResearchManager {
 
     await db.transaction(() async {
       await db.into(db.researchTags).insert(entry);
-      await db.into(db.syncQueue).insert(
-        SyncQueueCompanion.insert(
-          id: _uuid.v4(),
-          entityType: 'research_tags',
-          entityId: id,
-          operation: 'INSERT',
-          payload: jsonEncode(SyncTimestamp.normalizeMapDates(entry.toJson())),
-          createdAt: now,
-          status: const Value('pending'),
-        ),
-      );
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: _uuid.v4(),
+              entityType: 'research_tags',
+              entityId: id,
+              operation: 'INSERT',
+              payload: jsonEncode(
+                SyncTimestamp.normalizeMapDates(entry.toJson()),
+              ),
+              createdAt: now,
+              status: const Value('pending'),
+            ),
+          );
     });
 
     return ResearchTagItem.fromEntry(entry);
@@ -356,9 +373,9 @@ class ResearchManager {
   Future<void> updateTag(String id, String newName) async {
     final trimmed = newName.trim();
     final now = DateTime.now();
-    final existing = await (db.select(db.researchTags)
-          ..where((t) => t.id.equals(id)))
-        .getSingleOrNull();
+    final existing = await (db.select(
+      db.researchTags,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
     if (existing == null) return;
     final oldName = existing.name;
 
@@ -372,17 +389,19 @@ class ResearchManager {
       await db.update(db.researchTags).replace(updated);
       final payload = SyncTimestamp.normalizeMapDates(updated.toJson());
       payload['_base'] = SyncTimestamp.normalizeMapDates(existing.toJson());
-      await db.into(db.syncQueue).insert(
-        SyncQueueCompanion.insert(
-          id: _uuid.v4(),
-          entityType: 'research_tags',
-          entityId: id,
-          operation: 'UPDATE',
-          payload: jsonEncode(payload),
-          createdAt: now,
-          status: const Value('pending'),
-        ),
-      );
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: _uuid.v4(),
+              entityType: 'research_tags',
+              entityId: id,
+              operation: 'UPDATE',
+              payload: jsonEncode(payload),
+              createdAt: now,
+              status: const Value('pending'),
+            ),
+          );
     });
 
     if (oldName != trimmed) {
@@ -411,9 +430,9 @@ class ResearchManager {
 
   Future<void> deleteTag(String id) async {
     final now = DateTime.now();
-    final existing = await (db.select(db.researchTags)
-          ..where((t) => t.id.equals(id)))
-        .getSingleOrNull();
+    final existing = await (db.select(
+      db.researchTags,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
     if (existing == null) return;
     final oldName = existing.name;
 
@@ -426,22 +445,24 @@ class ResearchManager {
           revision: Value(nextRev),
         ),
       );
-      await db.into(db.syncQueue).insert(
-        SyncQueueCompanion.insert(
-          id: _uuid.v4(),
-          entityType: 'research_tags',
-          entityId: id,
-          operation: 'DELETE',
-          payload: jsonEncode({
-            'id': id,
-            'deleted_at': now.toUtc().toIso8601String(),
-            'updated_at': now.toUtc().toIso8601String(),
-            'revision': nextRev,
-          }),
-          createdAt: now,
-          status: const Value('pending'),
-        ),
-      );
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: _uuid.v4(),
+              entityType: 'research_tags',
+              entityId: id,
+              operation: 'DELETE',
+              payload: jsonEncode({
+                'id': id,
+                'deleted_at': now.toUtc().toIso8601String(),
+                'updated_at': now.toUtc().toIso8601String(),
+                'revision': nextRev,
+              }),
+              createdAt: now,
+              status: const Value('pending'),
+            ),
+          );
     });
 
     final articles = await getAllArticles();

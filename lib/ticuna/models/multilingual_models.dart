@@ -63,7 +63,8 @@ class LanguageRegistry {
     isIndigenous: false,
     isFlagship: false,
     hasDiacritics: false,
-    description: 'Usado na fronteira tríplice (Tabatinga, Letícia e Santa Rosa).',
+    description:
+        'Usado na fronteira tríplice (Tabatinga, Letícia e Santa Rosa).',
   );
 
   static const LanguageMetadata guajajara = LanguageMetadata(
@@ -118,12 +119,36 @@ class LanguageRegistry {
 
 /// 6 Momentos-Chave do Ministério de Campo
 enum MinistryMoment {
-  greeting('1. Saudação Inicial', 'Cumprimento cordial respeitando a cultura local', '🤝'),
-  bibleReading('2. Leitura Bíblica', 'Apresentação e leitura de texto confortador', '📖'),
-  returnQuestion('3. Pergunta para Revisita', 'Pergunta reflexiva deixada para o retorno', '❓'),
-  studyOffer('4. Oferta de Estudo', 'Convite caloroso para exame da Bíblia', '💡'),
-  objections('5. Lidando com Objeções', 'Resposta respeitosa e calma a objeções comuns', '🛡️'),
-  parting('6. Despedida Cordial', 'Agradecimento e encerramento afetuoso', '👋');
+  greeting(
+    '1. Saudação Inicial',
+    'Cumprimento cordial respeitando a cultura local',
+    '🤝',
+  ),
+  bibleReading(
+    '2. Leitura Bíblica',
+    'Apresentação e leitura de texto confortador',
+    '📖',
+  ),
+  returnQuestion(
+    '3. Pergunta para Revisita',
+    'Pergunta reflexiva deixada para o retorno',
+    '❓',
+  ),
+  studyOffer(
+    '4. Oferta de Estudo',
+    'Convite caloroso para exame da Bíblia',
+    '💡',
+  ),
+  objections(
+    '5. Lidando com Objeções',
+    'Resposta respeitosa e calma a objeções comuns',
+    '🛡️',
+  ),
+  parting(
+    '6. Despedida Cordial',
+    'Agradecimento e encerramento afetuoso',
+    '👋',
+  );
 
   final String title;
   final String description;
@@ -180,9 +205,11 @@ class MinistryPhrasesCatalog {
       id: 'sp_greet_02',
       moment: MinistryMoment.greeting,
       title: 'Apresentação do Motivo da Visita',
-      portuguese: 'Vim compartilhar uma mensagem de esperança da Palavra de Deus.',
+      portuguese:
+          'Vim compartilhar uma mensagem de esperança da Palavra de Deus.',
       ticuna: 'Tupana arü ore i duü̃cü̃ẽ tá naa tütütama.',
-      spanish: 'Vengo a compartir un mensaje de esperanza de la Palabra de Dios.',
+      spanish:
+          'Vengo a compartir un mensaje de esperanza de la Palabra de Dios.',
       phonetics: 'tu-pa-na a-rü o-re i du-ü̃-cü̃-ẽ...',
       culturalNotes: 'Tupana é o Criador respeitado por toda a comunidade.',
       bibleVerse: 'Romanos 15:4',
@@ -193,18 +220,21 @@ class MinistryPhrasesCatalog {
       id: 'sp_bible_01',
       moment: MinistryMoment.bibleReading,
       title: 'Convite para Leitura de Salmo 37:29',
-      portuguese: 'Gostaria de ler com você o que Deus promete para o futuro da Terra.',
+      portuguese:
+          'Gostaria de ler com você o que Deus promete para o futuro da Terra.',
       ticuna: 'Kũ-yexma tá arü ore na Tupana ü̃guẽxẽ i na-yaxna.',
       spanish: 'Me gustaría leer con usted lo que Dios promete para el futuro de la Tierra.',
       phonetics: 'kũ-yex-ma tá a-rü o-re na tu-pa-na...',
-      culturalNotes: 'Mostre o texto diretamente na Bíblia impressa ou no app JW Library.',
+      culturalNotes:
+          'Mostre o texto diretamente na Bíblia impressa ou no app JW Library.',
       bibleVerse: 'Salmo 37:29',
     ),
     SituationalPhrase(
       id: 'sp_bible_02',
       moment: MinistryMoment.bibleReading,
       title: 'Fim das Doenças e Sofrimento',
-      portuguese: 'Deus promete enxugar toda lágrima e acabar com a dor e a morte.',
+      portuguese:
+          'Deus promete enxugar toda lágrima e acabar com a dor e a morte.',
       ticuna: 'Tupana tá na yaxõgü ya guxü̃ma i ngexta tüü̃ i daxu arü.',
       spanish: 'Dios promete secar toda lágrima y terminar con el dolor y la muerte.',
       phonetics: 'tu-pa-na tá na ya-xõ-gü ya gu-xü̃-ma...',
@@ -232,7 +262,8 @@ class MinistryPhrasesCatalog {
       ticuna: 'Tupana tá i ü̃naxwa taarü i ore nümata?',
       spanish: '¿Realmente escucha Dios todas las oraciones sinceras?',
       phonetics: 'tu-pa-na tá i ü̃-nax-wa taa-rü...',
-      culturalNotes: 'Assegure que podemos orar em qualquer língua, inclusive em Ticuna.',
+      culturalNotes:
+          'Assegure que podemos orar em qualquer língua, inclusive em Ticuna.',
       bibleVerse: 'Salmo 65:2',
     ),
 
@@ -243,7 +274,8 @@ class MinistryPhrasesCatalog {
       title: 'Oferta do Curso Bíblico Gratuito',
       portuguese: 'Temos um curso interativo da Bíblia sem nenhum custo.',
       ticuna: 'Ta-yaxõ Tupana arü ore i ñuxtama i taxu i ta-ma.',
-      spanish: 'Ofrecemos un curso interactivo de la Biblia completamente gratuito.',
+      spanish:
+          'Ofrecemos un curso interactivo de la Biblia completamente gratuito.',
       phonetics: 'ta-ya-xõ tu-pa-na a-rü o-re...',
       culturalNotes: 'Apresente a brochura "Seja Feliz Para Sempre!" mostrando as ilustrações ricas.',
       bibleVerse: 'Mateus 28:19, 20',
@@ -256,7 +288,8 @@ class MinistryPhrasesCatalog {
       title: 'Morador Ocupado no Momento',
       portuguese: 'Entendo perfeitamente que você está ocupado. Posso voltar outro dia?',
       ticuna: 'Ñaxna i nümá i ngexta taxu. Tá kuaxoxma i guma?',
-      spanish: 'Entiendo perfectamente que está ocupado. ¿Puedo volver otro día?',
+      spanish:
+          'Entiendo perfectamente que está ocupado. ¿Puedo volver otro día?',
       phonetics: 'ñax-na i nü-má i ngex-ta ta-xu...',
       culturalNotes: 'Respeite imediatamente o tempo do morador. Jamais insista além do limite cordial.',
     ),

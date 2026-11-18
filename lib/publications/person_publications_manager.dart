@@ -89,9 +89,7 @@ class PersonPublicationsManager {
   ) async {
     final rows =
         await (db.select(db.personPublications)
-              ..where(
-                (t) => t.personId.equals(personId) & t.deletedAt.isNull(),
-              )
+              ..where((t) => t.personId.equals(personId) & t.deletedAt.isNull())
               ..orderBy([(t) => OrderingTerm.desc(t.date)]))
             .get();
     return rows.map(PersonPublicationItem.fromEntry).toList();
@@ -126,8 +124,9 @@ class PersonPublicationsManager {
     final now = DateTime.now();
     final id = _uuid.v4();
     final d = date ?? now;
-    final cleanNotes =
-        notes != null && notes.trim().isNotEmpty ? notes.trim() : null;
+    final cleanNotes = notes != null && notes.trim().isNotEmpty
+        ? notes.trim()
+        : null;
 
     final entry = PersonPublicationEntry(
       id: id,
@@ -145,17 +144,21 @@ class PersonPublicationsManager {
 
     await db.transaction(() async {
       await db.into(db.personPublications).insert(entry);
-      await db.into(db.syncQueue).insert(
-        SyncQueueCompanion.insert(
-          id: _uuid.v4(),
-          entityType: 'person_publications',
-          entityId: id,
-          operation: 'INSERT',
-          payload: jsonEncode(SyncTimestamp.normalizeMapDates(entry.toJson())),
-          createdAt: now,
-          status: const Value('pending'),
-        ),
-      );
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: _uuid.v4(),
+              entityType: 'person_publications',
+              entityId: id,
+              operation: 'INSERT',
+              payload: jsonEncode(
+                SyncTimestamp.normalizeMapDates(entry.toJson()),
+              ),
+              createdAt: now,
+              status: const Value('pending'),
+            ),
+          );
     });
 
     return PersonPublicationItem.fromEntry(entry);
@@ -170,8 +173,9 @@ class PersonPublicationsManager {
     final now = DateTime.now();
     final id = _uuid.v4();
     final d = targetDate ?? now;
-    final cleanNotes =
-        notes != null && notes.trim().isNotEmpty ? notes.trim() : null;
+    final cleanNotes = notes != null && notes.trim().isNotEmpty
+        ? notes.trim()
+        : null;
 
     final entry = PersonPublicationEntry(
       id: id,
@@ -189,17 +193,21 @@ class PersonPublicationsManager {
 
     await db.transaction(() async {
       await db.into(db.personPublications).insert(entry);
-      await db.into(db.syncQueue).insert(
-        SyncQueueCompanion.insert(
-          id: _uuid.v4(),
-          entityType: 'person_publications',
-          entityId: id,
-          operation: 'INSERT',
-          payload: jsonEncode(SyncTimestamp.normalizeMapDates(entry.toJson())),
-          createdAt: now,
-          status: const Value('pending'),
-        ),
-      );
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: _uuid.v4(),
+              entityType: 'person_publications',
+              entityId: id,
+              operation: 'INSERT',
+              payload: jsonEncode(
+                SyncTimestamp.normalizeMapDates(entry.toJson()),
+              ),
+              createdAt: now,
+              status: const Value('pending'),
+            ),
+          );
     });
 
     return PersonPublicationItem.fromEntry(entry);
@@ -211,9 +219,9 @@ class PersonPublicationsManager {
     String? notes,
   }) async {
     final now = DateTime.now();
-    final existing = await (db.select(db.personPublications)
-          ..where((t) => t.id.equals(id)))
-        .getSingleOrNull();
+    final existing = await (db.select(
+      db.personPublications,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
     if (existing == null) return;
 
     final updated = existing.copyWith(
@@ -227,53 +235,58 @@ class PersonPublicationsManager {
       await db.update(db.personPublications).replace(updated);
       final payload = SyncTimestamp.normalizeMapDates(updated.toJson());
       payload['_base'] = SyncTimestamp.normalizeMapDates(existing.toJson());
-      await db.into(db.syncQueue).insert(
-        SyncQueueCompanion.insert(
-          id: _uuid.v4(),
-          entityType: 'person_publications',
-          entityId: id,
-          operation: 'UPDATE',
-          payload: jsonEncode(payload),
-          createdAt: now,
-          status: const Value('pending'),
-        ),
-      );
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: _uuid.v4(),
+              entityType: 'person_publications',
+              entityId: id,
+              operation: 'UPDATE',
+              payload: jsonEncode(payload),
+              createdAt: now,
+              status: const Value('pending'),
+            ),
+          );
     });
   }
 
   Future<void> deletePublication(String id) async {
     final now = DateTime.now();
-    final existing = await (db.select(db.personPublications)
-          ..where((t) => t.id.equals(id)))
-        .getSingleOrNull();
+    final existing = await (db.select(
+      db.personPublications,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
     if (existing == null) return;
 
     final nextRev = existing.revision + 1;
     await db.transaction(() async {
-      await (db.update(db.personPublications)..where((t) => t.id.equals(id)))
-          .write(
+      await (db.update(
+        db.personPublications,
+      )..where((t) => t.id.equals(id))).write(
         PersonPublicationsCompanion(
           deletedAt: Value(now),
           updatedAt: Value(now),
           revision: Value(nextRev),
         ),
       );
-      await db.into(db.syncQueue).insert(
-        SyncQueueCompanion.insert(
-          id: _uuid.v4(),
-          entityType: 'person_publications',
-          entityId: id,
-          operation: 'DELETE',
-          payload: jsonEncode({
-            'id': id,
-            'deleted_at': now.toUtc().toIso8601String(),
-            'updated_at': now.toUtc().toIso8601String(),
-            'revision': nextRev,
-          }),
-          createdAt: now,
-          status: const Value('pending'),
-        ),
-      );
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: _uuid.v4(),
+              entityType: 'person_publications',
+              entityId: id,
+              operation: 'DELETE',
+              payload: jsonEncode({
+                'id': id,
+                'deleted_at': now.toUtc().toIso8601String(),
+                'updated_at': now.toUtc().toIso8601String(),
+                'revision': nextRev,
+              }),
+              createdAt: now,
+              status: const Value('pending'),
+            ),
+          );
     });
   }
 }

@@ -20,7 +20,14 @@ import '../main_navigation_shell.dart';
 import '../providers.dart';
 import 'auth_return_screen.dart';
 
-enum _AuthGateState { loadingSplash, unauthenticated, authenticated, recovery, recoverySuccess, callbackError }
+enum _AuthGateState {
+  loadingSplash,
+  unauthenticated,
+  authenticated,
+  recovery,
+  recoverySuccess,
+  callbackError,
+}
 
 class AuthSplashScreen extends AuthGateShell {
   const AuthSplashScreen({super.key});
@@ -65,87 +72,106 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
 
     if (client != null) {
       _latestSession = client.auth.currentSession;
-      _authSub = client.auth.onAuthStateChange.listen((data) async {
-        if (!mounted) return;
-        _latestSession = data.session;
-        if (data.event == AuthChangeEvent.passwordRecovery && data.session != null) {
-          setState(() => _gateState = _AuthGateState.recovery);
-          return;
-        }
-        // Não sair da recuperação porque updateUser/refresh emitem outros eventos.
-        if (_gateState == _AuthGateState.recovery ||
-            _gateState == _AuthGateState.recoverySuccess) {
-          if (data.event == AuthChangeEvent.signedOut) {
-            setState(() => _gateState = _AuthGateState.unauthenticated);
+      _authSub = client.auth.onAuthStateChange.listen(
+        (data) async {
+          if (!mounted) return;
+          _latestSession = data.session;
+          if (data.event == AuthChangeEvent.passwordRecovery &&
+              data.session != null) {
+            setState(() => _gateState = _AuthGateState.recovery);
+            return;
           }
-          return;
-        }
-        // Não transiciona prematuramente se a splash screen ainda estiver ativa
-        if (!_isSplashActive) {
-          if (data.session == null) {
-            try {
-              final db = ref.read(databaseProvider);
-              await (db.delete(db.appKvStore)
-                    ..where((t) => t.key.equals('offline_mode_enabled')))
-                  .go();
-            } catch (e, st) {
-              AppLogger.warning('Falha ao limpar flag offline_mode_enabled após logout', e, st);
+          // Não sair da recuperação porque updateUser/refresh emitem outros eventos.
+          if (_gateState == _AuthGateState.recovery ||
+              _gateState == _AuthGateState.recoverySuccess) {
+            if (data.event == AuthChangeEvent.signedOut) {
+              setState(() => _gateState = _AuthGateState.unauthenticated);
+            }
+            return;
+          }
+          // Não transiciona prematuramente se a splash screen ainda estiver ativa
+          if (!_isSplashActive) {
+            if (data.session == null) {
+              try {
+                final db = ref.read(databaseProvider);
+                await (db.delete(
+                  db.appKvStore,
+                )..where((t) => t.key.equals('offline_mode_enabled'))).go();
+              } catch (e, st) {
+                AppLogger.warning(
+                  'Falha ao limpar flag offline_mode_enabled após logout',
+                  e,
+                  st,
+                );
+              }
+            }
+            setState(() {
+              _gateState = data.session != null
+                  ? _AuthGateState.authenticated
+                  : _AuthGateState.unauthenticated;
+            });
+            if (data.session != null) {
+              Future.microtask(() {
+                if (mounted) {
+                  ref.read(supabaseSyncServiceProvider).sync();
+                  ref.read(calendarSyncCoordinatorProvider).syncAll();
+                }
+              });
             }
           }
-          setState(() {
-            _gateState = data.session != null
-                ? _AuthGateState.authenticated
-                : _AuthGateState.unauthenticated;
-          });
-          if (data.session != null) {
-            Future.microtask(() {
-              if (mounted) {
-                ref.read(supabaseSyncServiceProvider).sync();
-                ref.read(calendarSyncCoordinatorProvider).syncAll();
-              }
-            });
+        },
+        onError: (Object error, StackTrace stackTrace) {
+          // Erros do stream também podem vir da renovação de sessão; não os
+          // rotulamos como falha de um link sem saber sua origem.
+          AppLogger.warning('Falha em evento de autenticação Supabase');
+          // Estes códigos identificam links de uso único inválidos/expirados;
+          // erros genéricos de rede ou login não são interpretados como callback.
+          if (mounted &&
+              error is AuthException &&
+              (error.code == 'otp_expired' ||
+                  error.statusCode == 'otp_expired')) {
+            setState(() => _gateState = _AuthGateState.callbackError);
           }
-        }
-      }, onError: (Object error, StackTrace stackTrace) {
-        // Erros do stream também podem vir da renovação de sessão; não os
-        // rotulamos como falha de um link sem saber sua origem.
-        AppLogger.warning('Falha em evento de autenticação Supabase');
-        // Estes códigos identificam links de uso único inválidos/expirados;
-        // erros genéricos de rede ou login não são interpretados como callback.
-        if (mounted && error is AuthException &&
-            (error.code == 'otp_expired' || error.statusCode == 'otp_expired')) {
-          setState(() => _gateState = _AuthGateState.callbackError);
-        }
-      });
+        },
+      );
     }
 
     // Na modalidade opt-in, o SDK não processa o link automaticamente. A
     // assinatura é criada APÓS o listener de autenticação, inclusive no cold start.
     if (client != null && NativeAuthCallback.enabled) {
       final callbackClient = client;
-      _linkSub = AppLinks().uriLinkStream.listen((uri) async {
-        if (!_callback.claim(uri)) return;
-        try {
-          await callbackClient.auth.getSessionFromUrl(uri);
-        } catch (_) {
-          // Nunca imprimir a URI: ela pode conter códigos ou tokens.
-          if (mounted) setState(() => _gateState = _AuthGateState.callbackError);
-        }
-      }, onError: (Object _, StackTrace _) {
-        if (mounted) setState(() => _gateState = _AuthGateState.callbackError);
-      });
+      _linkSub = AppLinks().uriLinkStream.listen(
+        (uri) async {
+          if (!_callback.claim(uri)) return;
+          try {
+            await callbackClient.auth.getSessionFromUrl(uri);
+          } catch (_) {
+            // Nunca imprimir a URI: ela pode conter códigos ou tokens.
+            if (mounted)
+              setState(() => _gateState = _AuthGateState.callbackError);
+          }
+        },
+        onError: (Object _, StackTrace _) {
+          if (mounted)
+            setState(() => _gateState = _AuthGateState.callbackError);
+        },
+      );
     }
 
     // Verifica se modo offline foi ativado previamente
     bool isOfflineMode = false;
     try {
       final db = ref.read(databaseProvider);
-      final offlineRow = await (db.select(db.appKvStore)
-            ..where((t) => t.key.equals('offline_mode_enabled')))
-          .getSingleOrNull();
+      final offlineRow = await (db.select(
+        db.appKvStore,
+      )..where((t) => t.key.equals('offline_mode_enabled'))).getSingleOrNull();
       isOfflineMode = offlineRow?.value == 'true';
     } catch (e, st) {
-      AppLogger.warning('Falha ao ler flag offline_mode_enabled na splash', e, st);
+      AppLogger.warning(
+        'Falha ao ler flag offline_mode_enabled na splash',
+        e,
+        st,
+      );
     }
 
     final hasSession = (_latestSession ?? client?.auth.currentSession) != null;
@@ -163,44 +189,40 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
     final syncTasks = <Future>[];
     if (hasSession) {
       syncTasks.add(
-        ref
-            .read(supabaseSyncServiceProvider)
-            .sync()
-            .catchError(
-              (Object e, StackTrace st) {
-                AppLogger.warning(
-                  'Falha na sincronização Supabase durante a Splash Screen (seguindo offline)',
-                  e,
-                  st,
-                );
-                return const SyncProcessResult(
-                  totalProcessed: 0,
-                  successCount: 0,
-                  failureCount: 0,
-                  conflictCount: 0,
-                  message: 'Modo offline ou sem conexão',
-                );
-              },
-            ),
+        ref.read(supabaseSyncServiceProvider).sync().catchError((
+          Object e,
+          StackTrace st,
+        ) {
+          AppLogger.warning(
+            'Falha na sincronização Supabase durante a Splash Screen (seguindo offline)',
+            e,
+            st,
+          );
+          return const SyncProcessResult(
+            totalProcessed: 0,
+            successCount: 0,
+            failureCount: 0,
+            conflictCount: 0,
+            message: 'Modo offline ou sem conexão',
+          );
+        }),
       );
       syncTasks.add(
-        ref
-            .read(calendarSyncCoordinatorProvider)
-            .syncAll()
-            .catchError(
-              (Object e, StackTrace st) {
-                AppLogger.warning(
-                  'Falha na sincronização de calendários durante a Splash Screen',
-                  e,
-                  st,
-                );
-                return CalendarSyncResult(
-                  success: false,
-                  eventsDownloaded: 0,
-                  eventsUploaded: 0,
-                );
-              },
-            ),
+        ref.read(calendarSyncCoordinatorProvider).syncAll().catchError((
+          Object e,
+          StackTrace st,
+        ) {
+          AppLogger.warning(
+            'Falha na sincronização de calendários durante a Splash Screen',
+            e,
+            st,
+          );
+          return CalendarSyncResult(
+            success: false,
+            eventsDownloaded: 0,
+            eventsUploaded: 0,
+          );
+        }),
       );
     }
 
@@ -214,12 +236,14 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
       // Usuário autenticado (ex.: abertura em outro dispositivo): aguarda a sincronização na Splash Screen
       // com timeout de resiliência (5s) para garantir atualização antes de navegar
       try {
-        await Future.wait([
-          minTimerFuture,
-          Future.wait(syncTasks),
-        ]).timeout(const Duration(milliseconds: 5000), onTimeout: () => []);
+        await Future.wait([minTimerFuture, Future.wait(syncTasks)])
+            .timeout(const Duration(milliseconds: 5000), onTimeout: () => []);
       } catch (e, st) {
-        AppLogger.warning('Timeout/falha ao sincronizar na Splash Screen', e, st);
+        AppLogger.warning(
+          'Timeout/falha ao sincronizar na Splash Screen',
+          e,
+          st,
+        );
       }
 
       if (mounted) {
@@ -290,9 +314,9 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
             if (currentUserId != null && currentUserId.isNotEmpty) {
               var prep =
                   await SyncOwnerGuard.prepareWorkspaceForAuthenticatedAccount(
-                db: db,
-                authenticatedUserId: currentUserId,
-              );
+                    db: db,
+                    authenticatedUserId: currentUserId,
+                  );
               if (prep.status ==
                       AccountWorkspacePreparationStatus
                           .requiresConfirmationDueToUnsyncedData &&
@@ -329,19 +353,23 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
                 }
                 prep =
                     await SyncOwnerGuard.prepareWorkspaceForAuthenticatedAccount(
-                  db: db,
-                  authenticatedUserId: currentUserId,
-                  discardUnsyncedIfSwitching: true,
-                );
+                      db: db,
+                      authenticatedUserId: currentUserId,
+                      discardUnsyncedIfSwitching: true,
+                    );
               }
             }
 
             try {
-              await (db.delete(db.appKvStore)
-                    ..where((t) => t.key.equals('offline_mode_enabled')))
-                  .go();
+              await (db.delete(
+                db.appKvStore,
+              )..where((t) => t.key.equals('offline_mode_enabled'))).go();
             } catch (e, st) {
-              AppLogger.warning('Falha ao desativar modo offline ao autenticar', e, st);
+              AppLogger.warning(
+                'Falha ao desativar modo offline ao autenticar',
+                e,
+                st,
+              );
             }
             if (mounted) {
               setState(() {
@@ -354,13 +382,15 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
           onContinueOffline: () async {
             try {
               final db = ref.read(databaseProvider);
-              await db.into(db.appKvStore).insertOnConflictUpdate(
-                AppKvStoreCompanion.insert(
-                  key: 'offline_mode_enabled',
-                  value: 'true',
-                  updatedAt: drift.Value(DateTime.now()),
-                ),
-              );
+              await db
+                  .into(db.appKvStore)
+                  .insertOnConflictUpdate(
+                    AppKvStoreCompanion.insert(
+                      key: 'offline_mode_enabled',
+                      value: 'true',
+                      updatedAt: drift.Value(DateTime.now()),
+                    ),
+                  );
             } catch (e, st) {
               AppLogger.warning('Falha ao gravar offline_mode_enabled', e, st);
             }
@@ -383,7 +413,8 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
           actionLabel: 'Voltar',
           onAction: () => setState(() {
             _gateState = Supabase.instance.client.auth.currentSession != null
-                ? _AuthGateState.authenticated : _AuthGateState.unauthenticated;
+                ? _AuthGateState.authenticated
+                : _AuthGateState.unauthenticated;
           }),
         );
       case _AuthGateState.recovery:
@@ -393,14 +424,18 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
               UserAttributes(password: password),
             );
           },
-          onSuccess: () => setState(() => _gateState = _AuthGateState.recoverySuccess),
+          onSuccess: () =>
+              setState(() => _gateState = _AuthGateState.recoverySuccess),
           onCancel: () async {
             try {
-              await Supabase.instance.client.auth.signOut(scope: SignOutScope.local);
+              await Supabase.instance.client.auth.signOut(
+                scope: SignOutScope.local,
+              );
             } catch (_) {
               // Sessão local pode já ter expirado.
             }
-            if (mounted) setState(() => _gateState = _AuthGateState.unauthenticated);
+            if (mounted)
+              setState(() => _gateState = _AuthGateState.unauthenticated);
           },
         );
       case _AuthGateState.recoverySuccess:
@@ -411,7 +446,8 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
           actionLabel: 'Continuar',
           onAction: () => setState(() {
             _gateState = Supabase.instance.client.auth.currentSession != null
-                ? _AuthGateState.authenticated : _AuthGateState.unauthenticated;
+                ? _AuthGateState.authenticated
+                : _AuthGateState.unauthenticated;
           }),
         );
     }
@@ -532,7 +568,10 @@ class _SplashScreenView extends StatelessWidget {
               ),
               const SizedBox(height: 18),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(12),
@@ -628,8 +667,7 @@ class _SupabaseAuthScreenState extends State<SupabaseAuthScreen> {
 
     if (!SupabaseSyncService.isInitialized) {
       setState(() {
-        _errorMessage =
-            'Servidor de nuvem ainda não configurado nesta compilação. Toque em "Continuar em Modo Offline (Sem Conta)" e configure seu projeto em Configurações se desejar sincronizar.';
+        _errorMessage = 'Servidor de nuvem ainda não configurado nesta compilação. Toque em "Continuar em Modo Offline (Sem Conta)" e configure seu projeto em Configurações se desejar sincronizar.';
         _infoMessage = null;
       });
       return;
@@ -666,7 +704,10 @@ class _SupabaseAuthScreenState extends State<SupabaseAuthScreen> {
               return;
             }
           } catch (e, st) {
-            AppLogger.debug('Login automático pós-cadastro requer confirmação de e-mail: $e', st);
+            AppLogger.debug(
+              'Login automático pós-cadastro requer confirmação de e-mail: $e',
+              st,
+            );
           }
           setState(() {
             _isSignUp = false;
@@ -705,8 +746,7 @@ class _SupabaseAuthScreenState extends State<SupabaseAuthScreen> {
     if (email.isEmpty) return;
     if (!SupabaseSyncService.isInitialized) {
       setState(() {
-        _errorMessage =
-            'Servidor de nuvem não configurado. Continue em Modo Offline e configure em Configurações.';
+        _errorMessage = 'Servidor de nuvem não configurado. Continue em Modo Offline e configure em Configurações.';
       });
       return;
     }
@@ -747,8 +787,7 @@ class _SupabaseAuthScreenState extends State<SupabaseAuthScreen> {
     }
     if (!SupabaseSyncService.isInitialized) {
       setState(() {
-        _errorMessage =
-            'Servidor de nuvem não configurado. Continue em Modo Offline e configure em Configurações.';
+        _errorMessage = 'Servidor de nuvem não configurado. Continue em Modo Offline e configure em Configurações.';
       });
       return;
     }
@@ -757,7 +796,10 @@ class _SupabaseAuthScreenState extends State<SupabaseAuthScreen> {
       _errorMessage = null;
     });
     try {
-      await Supabase.instance.client.auth.resetPasswordForEmail(email, redirectTo: NativeAuthCallback.redirectTo);
+      await Supabase.instance.client.auth.resetPasswordForEmail(
+        email,
+        redirectTo: NativeAuthCallback.redirectTo,
+      );
       setState(() {
         _infoMessage = 'E-mail de recuperação de senha enviado para $email.';
       });
@@ -1123,7 +1165,7 @@ class _SupabaseAuthScreenState extends State<SupabaseAuthScreen> {
                             onPressed: _isLoading
                                 ? null
                                 : (widget.onContinueOffline ??
-                                    widget.onAuthenticated),
+                                      widget.onAuthenticated),
                             child: const Text(
                               'Continuar em Modo Offline (Sem Conta)',
                               style: TextStyle(

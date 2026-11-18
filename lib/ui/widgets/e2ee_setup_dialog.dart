@@ -13,14 +13,12 @@ class E2eeSetupDialog extends ConsumerStatefulWidget {
   final String userId;
   final VoidCallback? onCompleted;
 
-  const E2eeSetupDialog({
-    super.key,
-    required this.userId,
-    this.onCompleted,
-  });
+  const E2eeSetupDialog({super.key, required this.userId, this.onCompleted});
 
   static Future<bool?> show(BuildContext context, {String? userId}) {
-    final effectiveId = (userId != null && userId.trim().isNotEmpty) ? userId.trim() : 'local_user';
+    final effectiveId = (userId != null && userId.trim().isNotEmpty)
+        ? userId.trim()
+        : 'local_user';
     return showDialog<bool>(
       context: context,
       barrierDismissible: false,
@@ -43,7 +41,8 @@ class _E2eeSetupDialogState extends ConsumerState<E2eeSetupDialog>
   bool _confirmedPhraseWritten = false;
 
   // Estado da aba 'Restaurar com Frase'
-  final TextEditingController _restorePhraseController = TextEditingController();
+  final TextEditingController _restorePhraseController =
+      TextEditingController();
   int _wordCount = 0;
 
   @override
@@ -96,28 +95,40 @@ class _E2eeSetupDialogState extends ConsumerState<E2eeSetupDialog>
         confirmation: _generatedPhrase!,
       );
       if (widget.userId != 'local_user') {
-        await e2ee.keyStore.copyOwnerKey(fromOwner: widget.userId, toOwner: 'local_user');
+        await e2ee.keyStore.copyOwnerKey(
+          fromOwner: widget.userId,
+          toOwner: 'local_user',
+        );
       }
 
       final key = await RecoveryCrypto.keyFromPhrase(_generatedPhrase!);
-      final marker = await RecoveryVaultVerifier.create(root: key, owner: widget.userId);
+      final marker = await RecoveryVaultVerifier.create(
+        root: key,
+        owner: widget.userId,
+      );
       final transport = e2ee.getVaultTransport(widget.userId);
       if (transport != null) {
         try {
           await transport.createIfAbsent(marker);
         } catch (e) {
-          AppLogger.warning('Não foi possível gravar marcador remoto imediatamente: $e');
+          AppLogger.warning(
+            'Não foi possível gravar marcador remoto imediatamente: $e',
+          );
         }
       }
 
-      AppLogger.info('Cofre E2EE configurado com sucesso para ${widget.userId}');
+      AppLogger.info(
+        'Cofre E2EE configurado com sucesso para ${widget.userId}',
+      );
       if (mounted) {
         // Dispara a sincronização imediatamente
         ref.read(supabaseSyncServiceProvider).sync();
         Navigator.of(context).pop(true);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Criptografia E2EE ativada! Sincronização em nuvem liberada.'),
+            content: Text(
+              'Criptografia E2EE ativada! Sincronização em nuvem liberada.',
+            ),
             backgroundColor: Colors.green,
           ),
         );
@@ -140,7 +151,8 @@ class _E2eeSetupDialogState extends ConsumerState<E2eeSetupDialog>
     final phrase = _restorePhraseController.text.trim();
     if (_wordCount != 24) {
       setState(() {
-        _errorMessage = 'A frase de recuperação precisa conter exatamente 24 palavras (digitadas: $_wordCount).';
+        _errorMessage =
+            'A frase de recuperação precisa conter exatamente 24 palavras (digitadas: $_wordCount).';
       });
       return;
     }
@@ -154,7 +166,10 @@ class _E2eeSetupDialogState extends ConsumerState<E2eeSetupDialog>
       final e2ee = ref.read(e2eeServiceProvider);
       await e2ee.restoreVault(widget.userId, phrase);
       if (widget.userId != 'local_user') {
-        await e2ee.keyStore.copyOwnerKey(fromOwner: widget.userId, toOwner: 'local_user');
+        await e2ee.keyStore.copyOwnerKey(
+          fromOwner: widget.userId,
+          toOwner: 'local_user',
+        );
       }
 
       if (mounted) {
@@ -163,7 +178,9 @@ class _E2eeSetupDialogState extends ConsumerState<E2eeSetupDialog>
         Navigator.of(context).pop(true);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Cofre E2EE restaurado com sucesso! Sincronização iniciada.'),
+            content: Text(
+              'Cofre E2EE restaurado com sucesso! Sincronização iniciada.',
+            ),
             backgroundColor: Colors.green,
           ),
         );
@@ -172,7 +189,8 @@ class _E2eeSetupDialogState extends ConsumerState<E2eeSetupDialog>
       AppLogger.error('Falha ao restaurar cofre E2EE', e, st);
       if (mounted) {
         setState(() {
-          _errorMessage = 'Frase de recuperação inválida ou não confere com o cofre desta conta: $e';
+          _errorMessage =
+              'Frase de recuperação inválida ou não confere com o cofre desta conta: $e';
         });
       }
     } finally {
@@ -234,7 +252,10 @@ class _E2eeSetupDialogState extends ConsumerState<E2eeSetupDialog>
                 labelColor: theme.colorScheme.primary,
                 tabs: const [
                   Tab(icon: Icon(Icons.key, size: 18), text: 'Novo Cofre'),
-                  Tab(icon: Icon(Icons.restore, size: 18), text: 'Restaurar com Frase'),
+                  Tab(
+                    icon: Icon(Icons.restore, size: 18),
+                    text: 'Restaurar com Frase',
+                  ),
                 ],
               ),
               const SizedBox(height: 12),
@@ -249,12 +270,19 @@ class _E2eeSetupDialogState extends ConsumerState<E2eeSetupDialog>
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
+                      Icon(
+                        Icons.error_outline,
+                        color: Colors.red.shade700,
+                        size: 20,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           _errorMessage!,
-                          style: TextStyle(fontSize: 12, color: Colors.red.shade900),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.red.shade900,
+                          ),
                         ),
                       ),
                     ],
@@ -300,7 +328,11 @@ class _E2eeSetupDialogState extends ConsumerState<E2eeSetupDialog>
           ),
           child: Row(
             children: [
-              Icon(Icons.warning_amber_rounded, color: Colors.amber.shade900, size: 20),
+              Icon(
+                Icons.warning_amber_rounded,
+                color: Colors.amber.shade900,
+                size: 20,
+              ),
               const SizedBox(width: 8),
               const Expanded(
                 child: Text(
@@ -318,7 +350,9 @@ class _E2eeSetupDialogState extends ConsumerState<E2eeSetupDialog>
             decoration: BoxDecoration(
               color: isDark ? Colors.grey.shade900 : Colors.grey.shade100,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: isDark ? Colors.grey.shade800 : Colors.grey.shade300),
+              border: Border.all(
+                color: isDark ? Colors.grey.shade800 : Colors.grey.shade300,
+              ),
             ),
             child: GridView.builder(
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -330,11 +364,18 @@ class _E2eeSetupDialogState extends ConsumerState<E2eeSetupDialog>
               itemCount: words.length,
               itemBuilder: (ctx, idx) {
                 return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: isDark ? Colors.black45 : Colors.white,
                     borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: isDark ? Colors.grey.shade700 : Colors.grey.shade300),
+                    border: Border.all(
+                      color: isDark
+                          ? Colors.grey.shade700
+                          : Colors.grey.shade300,
+                    ),
                   ),
                   child: Row(
                     children: [
@@ -342,7 +383,9 @@ class _E2eeSetupDialogState extends ConsumerState<E2eeSetupDialog>
                         '${idx + 1}.',
                         style: TextStyle(
                           fontSize: 10,
-                          color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                          color: isDark
+                              ? Colors.grey.shade400
+                              : Colors.grey.shade600,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -350,7 +393,10 @@ class _E2eeSetupDialogState extends ConsumerState<E2eeSetupDialog>
                       Expanded(
                         child: Text(
                           words[idx],
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -392,9 +438,15 @@ class _E2eeSetupDialogState extends ConsumerState<E2eeSetupDialog>
         ),
         const SizedBox(height: 4),
         ElevatedButton.icon(
-          onPressed: (_confirmedPhraseWritten && !_isLoading) ? _handleConfirmNewVault : null,
+          onPressed: (_confirmedPhraseWritten && !_isLoading)
+              ? _handleConfirmNewVault
+              : null,
           icon: _isLoading
-              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
               : const Icon(Icons.check_circle, size: 18),
           label: const Text('Ativar Criptografia E2EE'),
           style: ElevatedButton.styleFrom(
@@ -424,7 +476,9 @@ class _E2eeSetupDialogState extends ConsumerState<E2eeSetupDialog>
             maxLines: 7,
             decoration: InputDecoration(
               hintText: 'exemplo: abaixar abelha abismo abrigo...',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
               counterText: '$_wordCount / 24 palavras',
               counterStyle: TextStyle(
                 color: _wordCount == 24 ? Colors.green : Colors.orange,
@@ -447,9 +501,15 @@ class _E2eeSetupDialogState extends ConsumerState<E2eeSetupDialog>
         ),
         const SizedBox(height: 12),
         ElevatedButton.icon(
-          onPressed: (_wordCount == 24 && !_isLoading) ? _handleRestoreVault : null,
+          onPressed: (_wordCount == 24 && !_isLoading)
+              ? _handleRestoreVault
+              : null,
           icon: _isLoading
-              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
               : const Icon(Icons.lock_open, size: 18),
           label: const Text('Restaurar Cofre e Sincronizar'),
           style: ElevatedButton.styleFrom(
@@ -468,18 +528,24 @@ class E2eeViewPhraseDialog extends StatelessWidget {
 
   const E2eeViewPhraseDialog({super.key, required this.phrase});
 
-  static Future<void> show(BuildContext context, {required String phrase}) async {
+  static Future<void> show(
+    BuildContext context, {
+    required String phrase,
+  }) async {
     // Exige autenticação biométrica ou PIN antes de exibir a frase
     final bioAuth = BiometricAuthService();
     final authenticated = await bioAuth.authenticate(
       context: context,
-      localizedReason: 'Autentique-se para visualizar sua frase de recuperação E2EE',
+      localizedReason:
+          'Autentique-se para visualizar sua frase de recuperação E2EE',
     );
     if (!authenticated) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Autenticação necessária para visualizar a frase de segurança.'),
+            content: Text(
+              'Autenticação necessária para visualizar a frase de segurança.',
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -527,7 +593,9 @@ class E2eeViewPhraseDialog extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: isDark ? Colors.grey.shade900 : Colors.grey.shade100,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: isDark ? Colors.grey.shade800 : Colors.grey.shade300),
+                  border: Border.all(
+                    color: isDark ? Colors.grey.shade800 : Colors.grey.shade300,
+                  ),
                 ),
                 child: GridView.builder(
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -539,11 +607,18 @@ class E2eeViewPhraseDialog extends StatelessWidget {
                   itemCount: words.length,
                   itemBuilder: (ctx, idx) {
                     return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: isDark ? Colors.black45 : Colors.white,
                         borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: isDark ? Colors.grey.shade700 : Colors.grey.shade300),
+                        border: Border.all(
+                          color: isDark
+                              ? Colors.grey.shade700
+                              : Colors.grey.shade300,
+                        ),
                       ),
                       child: Row(
                         children: [
@@ -551,7 +626,9 @@ class E2eeViewPhraseDialog extends StatelessWidget {
                             '${idx + 1}.',
                             style: TextStyle(
                               fontSize: 10,
-                              color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                              color: isDark
+                                  ? Colors.grey.shade400
+                                  : Colors.grey.shade600,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -559,7 +636,10 @@ class E2eeViewPhraseDialog extends StatelessWidget {
                           Expanded(
                             child: Text(
                               words[idx],
-                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
@@ -578,7 +658,9 @@ class E2eeViewPhraseDialog extends StatelessWidget {
           onPressed: () {
             Clipboard.setData(ClipboardData(text: phrase));
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Frase copiada para a área de transferência!')),
+              const SnackBar(
+                content: Text('Frase copiada para a área de transferência!'),
+              ),
             );
           },
           icon: const Icon(Icons.copy, size: 16),

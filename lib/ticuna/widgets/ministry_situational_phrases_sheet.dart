@@ -25,7 +25,8 @@ class MinistrySituationalPhrasesSheet extends ConsumerStatefulWidget {
         ),
         child: const Text('🏹', style: TextStyle(fontSize: 22)),
       ),
-      builder: (ctx, _) => const MinistrySituationalPhrasesSheet(isEmbedded: true),
+      builder: (ctx, _) =>
+          const MinistrySituationalPhrasesSheet(isEmbedded: true),
     );
   }
 
@@ -72,8 +73,8 @@ class _MinistrySituationalPhrasesSheetState
     List<SituationalPhrase> phrases = query.isNotEmpty
         ? MinistryPhrasesCatalog.search(query)
         : (_selectedMoment != null
-            ? MinistryPhrasesCatalog.byMoment(_selectedMoment!)
-            : MinistryPhrasesCatalog.phrases);
+              ? MinistryPhrasesCatalog.byMoment(_selectedMoment!)
+              : MinistryPhrasesCatalog.phrases);
 
     final content = Column(
       children: [
@@ -140,188 +141,189 @@ class _MinistrySituationalPhrasesSheetState
         ],
 
         // Search Bar & Language Selector
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: 'Pesquisar frases, momentos, textos bíblicos...',
-                  prefixIcon: const Icon(Icons.search, size: 20),
-                  suffixIcon: _searchController.text.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear, size: 18),
-                          onPressed: () {
-                            _searchController.clear();
-                            setState(() {});
-                          },
-                        )
-                      : null,
-                  filled: true,
-                  fillColor: isDark
-                      ? const Color(0xFF0F172A)
-                      : const Color(0xFFF1F5F9),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-                onChanged: (val) {
-                  setState(() {});
-                },
-                onSubmitted: (val) {
-                  if (val.trim().isNotEmpty) {
-                    ref
-                        .read(multilingualAssistantServiceProvider)
-                        .addSearchTerm(val);
-                    _loadSearchHistory();
-                  }
-                },
-              ),
-            ),
-            const SizedBox(height: 10),
-
-            // Search History Chips (if available)
-            if (_recentSearches.isNotEmpty && _searchController.text.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: SizedBox(
-                  height: 32,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: _recentSearches.length,
-                    separatorBuilder: (_, _) => const SizedBox(width: 6),
-                    itemBuilder: (ctx, i) {
-                      final term = _recentSearches[i];
-                      return ActionChip(
-                        avatar: const Icon(Icons.history, size: 14),
-                        label: Text(term, style: const TextStyle(fontSize: 11)),
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                        onPressed: () {
-                          _searchController.text = term;
-                          setState(() {});
-                        },
-                      );
-                    },
-                  ),
-                ),
-              ),
-
-            const SizedBox(height: 8),
-
-            // 6 Moments Filter Chips
-            SizedBox(
-              height: 40,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(right: 6),
-                    child: FilterChip(
-                      selected: _selectedMoment == null,
-                      label: const Text('Todos (6 Momentos)'),
-                      onSelected: (sel) {
-                        setState(() {
-                          _selectedMoment = null;
-                        });
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: 'Pesquisar frases, momentos, textos bíblicos...',
+              prefixIcon: const Icon(Icons.search, size: 20),
+              suffixIcon: _searchController.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, size: 18),
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() {});
                       },
-                    ),
-                  ),
-                  ...MinistryMoment.values.map((m) {
-                    final isSel = _selectedMoment == m;
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: FilterChip(
-                        selected: isSel,
-                        label: Text('${m.iconEmoji} ${m.title}'),
-                        selectedColor:
-                            const Color(0xFF059669).withValues(alpha: 0.25),
-                        onSelected: (sel) {
-                          setState(() {
-                            _selectedMoment = sel ? m : null;
-                          });
-                        },
-                      ),
-                    );
-                  }),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-
-            // Comparison Language Selector bar
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  const Text(
-                    'Comparar com:',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(width: 8),
-                  ChoiceChip(
-                    label: const Text('🇪🇸 Español'),
-                    selected: _selectedComparisonLang == 'spa',
-                    onSelected: (sel) {
-                      if (sel) setState(() => _selectedComparisonLang = 'spa');
-                    },
-                  ),
-                  const SizedBox(width: 6),
-                  ChoiceChip(
-                    label: const Text('🌿 Guajajara'),
-                    selected: _selectedComparisonLang == 'gub',
-                    onSelected: (sel) {
-                      if (sel) setState(() => _selectedComparisonLang = 'gub');
-                    },
-                  ),
-                  const Spacer(),
-                  Text(
-                    '${phrases.length} frase(s)',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppTheme.textMuted,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 16),
-
-            // Phrases List
-            Expanded(
-              child: phrases.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.search_off,
-                              size: 48,
-                              color: isDark ? Colors.grey[600] : Colors.grey[400]),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'Nenhuma frase encontrada para esta busca.',
-                            style: TextStyle(color: AppTheme.textMuted),
-                          ),
-                        ],
-                      ),
                     )
-                  : ListView.builder(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      itemCount: phrases.length,
-                      itemBuilder: (ctx, idx) {
-                        final p = phrases[idx];
-                        return _buildPhraseCard(context, p, isDark);
-                      },
-                    ),
+                  : null,
+              filled: true,
+              fillColor: isDark
+                  ? const Color(0xFF0F172A)
+                  : const Color(0xFFF1F5F9),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 10,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
             ),
-          ],
-        );
+            onChanged: (val) {
+              setState(() {});
+            },
+            onSubmitted: (val) {
+              if (val.trim().isNotEmpty) {
+                ref
+                    .read(multilingualAssistantServiceProvider)
+                    .addSearchTerm(val);
+                _loadSearchHistory();
+              }
+            },
+          ),
+        ),
+        const SizedBox(height: 10),
+
+        // Search History Chips (if available)
+        if (_recentSearches.isNotEmpty && _searchController.text.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: SizedBox(
+              height: 32,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _recentSearches.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 6),
+                itemBuilder: (ctx, i) {
+                  final term = _recentSearches[i];
+                  return ActionChip(
+                    avatar: const Icon(Icons.history, size: 14),
+                    label: Text(term, style: const TextStyle(fontSize: 11)),
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    onPressed: () {
+                      _searchController.text = term;
+                      setState(() {});
+                    },
+                  );
+                },
+              ),
+            ),
+          ),
+
+        const SizedBox(height: 8),
+
+        // 6 Moments Filter Chips
+        SizedBox(
+          height: 40,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: FilterChip(
+                  selected: _selectedMoment == null,
+                  label: const Text('Todos (6 Momentos)'),
+                  onSelected: (sel) {
+                    setState(() {
+                      _selectedMoment = null;
+                    });
+                  },
+                ),
+              ),
+              ...MinistryMoment.values.map((m) {
+                final isSel = _selectedMoment == m;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: FilterChip(
+                    selected: isSel,
+                    label: Text('${m.iconEmoji} ${m.title}'),
+                    selectedColor: const Color(0xFF059669)
+                        .withValues(alpha: 0.25),
+                    onSelected: (sel) {
+                      setState(() {
+                        _selectedMoment = sel ? m : null;
+                      });
+                    },
+                  ),
+                );
+              }),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+
+        // Comparison Language Selector bar
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              const Text(
+                'Comparar com:',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(width: 8),
+              ChoiceChip(
+                label: const Text('🇪🇸 Español'),
+                selected: _selectedComparisonLang == 'spa',
+                onSelected: (sel) {
+                  if (sel) setState(() => _selectedComparisonLang = 'spa');
+                },
+              ),
+              const SizedBox(width: 6),
+              ChoiceChip(
+                label: const Text('🌿 Guajajara'),
+                selected: _selectedComparisonLang == 'gub',
+                onSelected: (sel) {
+                  if (sel) setState(() => _selectedComparisonLang = 'gub');
+                },
+              ),
+              const Spacer(),
+              Text(
+                '${phrases.length} frase(s)',
+                style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 16),
+
+        // Phrases List
+        Expanded(
+          child: phrases.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.search_off,
+                        size: 48,
+                        color: isDark ? Colors.grey[600] : Colors.grey[400],
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Nenhuma frase encontrada para esta busca.',
+                        style: TextStyle(color: AppTheme.textMuted),
+                      ),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  itemCount: phrases.length,
+                  itemBuilder: (ctx, idx) {
+                    final p = phrases[idx];
+                    return _buildPhraseCard(context, p, isDark);
+                  },
+                ),
+        ),
+      ],
+    );
 
     if (widget.isEmbedded) {
       return content;
@@ -349,7 +351,10 @@ class _MinistrySituationalPhrasesSheetState
   }
 
   Widget _buildPhraseCard(
-      BuildContext context, SituationalPhrase p, bool isDark) {
+    BuildContext context,
+    SituationalPhrase p,
+    bool isDark,
+  ) {
     return Card(
       margin: const EdgeInsets.only(bottom: 14),
       elevation: 1,
@@ -370,8 +375,10 @@ class _MinistrySituationalPhrasesSheetState
             Row(
               children: [
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF059669).withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(6),
@@ -388,8 +395,10 @@ class _MinistrySituationalPhrasesSheetState
                 if (p.bibleVerse != null) ...[
                   const SizedBox(width: 8),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF7C3AED).withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(6),
@@ -456,8 +465,11 @@ class _MinistrySituationalPhrasesSheetState
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      const Icon(Icons.volume_up,
-                          size: 14, color: Color(0xFF0D9488)),
+                      const Icon(
+                        Icons.volume_up,
+                        size: 14,
+                        color: Color(0xFF0D9488),
+                      ),
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
@@ -580,8 +592,11 @@ class _MinistrySituationalPhrasesSheetState
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.info_outline,
-                    size: 14, color: AppTheme.textMuted),
+                const Icon(
+                  Icons.info_outline,
+                  size: 14,
+                  color: AppTheme.textMuted,
+                ),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(

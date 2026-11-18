@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:drift/drift.dart' as drift;
+
 import '../../core/app_logger.dart';
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
@@ -61,7 +62,8 @@ class _ConnectedCalendarsScreenState
           await coordinator.googleProvider.getAvailableCalendars(),
         );
         gSelectedId = await coordinator.googleProvider.getSelectedCalendarId();
-        gReadOnlyIds = await coordinator.googleProvider.getReadOnlyCalendarIds();
+        gReadOnlyIds = await coordinator.googleProvider
+            .getReadOnlyCalendarIds();
       } catch (e) {
         debugPrint('Erro ao obter dados do Google Calendar: $e');
       }
@@ -76,7 +78,11 @@ class _ConnectedCalendarsScreenState
       try {
         aAuth = await coordinator.appleProvider.isAuthorized();
       } catch (e, st) {
-        AppLogger.warning('Falha ao verificar autorização Apple Calendar', e, st);
+        AppLogger.warning(
+          'Falha ao verificar autorização Apple Calendar',
+          e,
+          st,
+        );
       }
       if (aAuth) {
         try {
@@ -95,7 +101,11 @@ class _ConnectedCalendarsScreenState
     try {
       pendingConflicts = await coordinator.getPendingConflicts();
     } catch (e, st) {
-      AppLogger.warning('Falha ao carregar conflitos pendentes de calendário', e, st);
+      AppLogger.warning(
+        'Falha ao carregar conflitos pendentes de calendário',
+        e,
+        st,
+      );
     }
 
     if (mounted) {
@@ -112,8 +122,9 @@ class _ConnectedCalendarsScreenState
         if (gSelectedId == 'primary' &&
             _selectedGoogleCalId != null &&
             _selectedGoogleCalId != 'primary') {
-          coordinator.googleProvider
-              .setSelectedCalendarId(_selectedGoogleCalId!);
+          coordinator.googleProvider.setSelectedCalendarId(
+            _selectedGoogleCalId!,
+          );
         }
         _readOnlyGoogleCalIds = gReadOnlyIds;
 
@@ -171,7 +182,8 @@ class _ConnectedCalendarsScreenState
     });
     try {
       final coordinator = ref.read(calendarSyncCoordinatorProvider);
-      final authorized = await coordinator.googleProvider.requestAuthorization();
+      final authorized = await coordinator.googleProvider
+          .requestAuthorization();
       if (authorized) {
         await _syncNow();
       } else {
@@ -246,8 +258,7 @@ class _ConnectedCalendarsScreenState
     if (!coordinator.appleProvider.isSupportedOnCurrentPlatform) {
       if (mounted) {
         setState(() {
-          _syncMessage =
-              'Aviso: A sincronização com o Apple Calendar está disponível exclusivamente no iOS.';
+          _syncMessage = 'Aviso: A sincronização com o Apple Calendar está disponível exclusivamente no iOS.';
         });
       }
       return;
@@ -264,8 +275,7 @@ class _ConnectedCalendarsScreenState
         if (mounted) {
           setState(() {
             _isSyncing = false;
-            _syncMessage =
-                'Aviso: Permissão para acessar os Calendários da Apple não foi concedida.';
+            _syncMessage = 'Aviso: Permissão para acessar os Calendários da Apple não foi concedida.';
           });
         }
       }
@@ -611,7 +621,8 @@ class _ConnectedCalendarsScreenState
                     const SizedBox(height: 6),
                     DropdownButtonFormField<String>(
                       key: ValueKey('google-${_selectedGoogleCalId ?? "none"}'),
-                      initialValue: _googleCalendars
+                      initialValue:
+                          _googleCalendars
                               .where((c) => !c.isReadOnly)
                               .any((c) => c.id == _selectedGoogleCalId)
                           ? _selectedGoogleCalId
@@ -625,15 +636,12 @@ class _ConnectedCalendarsScreenState
                           vertical: 8,
                         ),
                       ),
-                      items: _googleCalendars
-                          .where((c) => !c.isReadOnly)
-                          .map((c) {
+                      items: _googleCalendars.where((c) => !c.isReadOnly).map((
+                        c,
+                      ) {
                         return DropdownMenuItem<String>(
                           value: c.id,
-                          child: Text(
-                            c.name,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                          child: Text(c.name, overflow: TextOverflow.ellipsis),
                         );
                       }).toList(),
                       onChanged: (val) async {
@@ -647,7 +655,9 @@ class _ConnectedCalendarsScreenState
                         }
                       },
                     ),
-                    if (_googleCalendars.any((calendar) => calendar.isReadOnly)) ...[
+                    if (_googleCalendars.any(
+                      (calendar) => calendar.isReadOnly,
+                    )) ...[
                       const SizedBox(height: 12),
                       const Text(
                         'Calendários adicionais (somente leitura):',
@@ -662,11 +672,16 @@ class _ConnectedCalendarsScreenState
                         style: TextStyle(fontSize: 12, color: Colors.grey),
                       ),
                       const SizedBox(height: 6),
-                      for (final calendar in _googleCalendars.where((c) => c.isReadOnly))
+                      for (final calendar in _googleCalendars.where(
+                        (c) => c.isReadOnly,
+                      ))
                         CheckboxListTile(
                           dense: true,
                           contentPadding: EdgeInsets.zero,
-                          title: Text(calendar.name, style: const TextStyle(fontSize: 13)),
+                          title: Text(
+                            calendar.name,
+                            style: const TextStyle(fontSize: 13),
+                          ),
                           value: _readOnlyGoogleCalIds.contains(calendar.id),
                           onChanged: (selected) async {
                             final ids = Set<String>.of(_readOnlyGoogleCalIds);
@@ -675,14 +690,23 @@ class _ConnectedCalendarsScreenState
                             } else {
                               ids.remove(calendar.id);
                             }
-                            final coordinator = ref.read(calendarSyncCoordinatorProvider);
+                            final coordinator = ref.read(
+                              calendarSyncCoordinatorProvider,
+                            );
                             final db = ref.read(databaseProvider);
-                            await coordinator.googleProvider.setReadOnlyCalendarIds(ids);
+                            await coordinator.googleProvider
+                                .setReadOnlyCalendarIds(ids);
                             if (selected != true) {
-                              await (db.delete(db.externalCalendarEvents)..where((event) =>
-                                  event.provider.equals('google') & event.calendarId.equals(calendar.id))).go();
+                              await (db.delete(db.externalCalendarEvents)
+                                    ..where(
+                                      (event) =>
+                                          event.provider.equals('google') &
+                                          event.calendarId.equals(calendar.id),
+                                    ))
+                                  .go();
                             }
-                            if (mounted) setState(() => _readOnlyGoogleCalIds = ids);
+                            if (mounted)
+                              setState(() => _readOnlyGoogleCalIds = ids);
                           },
                         ),
                     ],
@@ -734,17 +758,17 @@ class _ConnectedCalendarsScreenState
                               !isAppleSupported
                                   ? 'Disponível exclusivamente no iOS'
                                   : (_isAppleAuthorized
-                                      ? (_appleAccount ?? 'Acesso Autorizado')
-                                      : 'Não autorizado'),
+                                        ? (_appleAccount ?? 'Acesso Autorizado')
+                                        : 'Não autorizado'),
                               style: TextStyle(
                                 fontSize: 13,
                                 color: !isAppleSupported
                                     ? (isDark
-                                        ? const Color(0xFFFBBF24)
-                                        : const Color(0xFFB45309))
+                                          ? const Color(0xFFFBBF24)
+                                          : const Color(0xFFB45309))
                                     : (_isAppleAuthorized
-                                        ? Colors.green[700]
-                                        : Colors.grey),
+                                          ? Colors.green[700]
+                                          : Colors.grey),
                                 fontWeight: _isAppleAuthorized
                                     ? FontWeight.w600
                                     : FontWeight.normal,
@@ -824,7 +848,8 @@ class _ConnectedCalendarsScreenState
                     const SizedBox(height: 6),
                     DropdownButtonFormField<String>(
                       key: ValueKey('apple-${_selectedAppleCalId ?? "none"}'),
-                      initialValue: _appleCalendars
+                      initialValue:
+                          _appleCalendars
                               .where((c) => !c.isReadOnly)
                               .any((c) => c.id == _selectedAppleCalId)
                           ? _selectedAppleCalId
@@ -838,9 +863,9 @@ class _ConnectedCalendarsScreenState
                           vertical: 8,
                         ),
                       ),
-                      items: _appleCalendars
-                          .where((c) => !c.isReadOnly)
-                          .map((c) {
+                      items: _appleCalendars.where((c) => !c.isReadOnly).map((
+                        c,
+                      ) {
                         return DropdownMenuItem<String>(
                           value: c.id,
                           child: Text(

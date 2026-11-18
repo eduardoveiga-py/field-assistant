@@ -291,7 +291,10 @@ class DashboardCalculator {
           }
         }
       } catch (e, st) {
-        AppLogger.debug('Falha ao decodificar participantes da sessão (${session.id}): $e', st);
+        AppLogger.debug(
+          'Falha ao decodificar participantes da sessão (${session.id}): $e',
+          st,
+        );
       }
     }
 
@@ -550,7 +553,10 @@ class DashboardCalculator {
                 .firstOrNull;
           }
         } catch (e, st) {
-          AppLogger.debug('Falha ao ler participantIds em regularidade (${s.id}): $e', st);
+          AppLogger.debug(
+            'Falha ao ler participantIds em regularidade (${s.id}): $e',
+            st,
+          );
         }
         if (participant == null) {
           final partIds = studyParticipantMap[study.id];
@@ -736,7 +742,10 @@ class DashboardCalculator {
       final List<dynamic> ids = jsonDecode(session.participantIds);
       if (ids.isNotEmpty) return ids.length;
     } catch (e, st) {
-      AppLogger.debug('Falha ao contar participantIds da sessão (${session.id}): $e', st);
+      AppLogger.debug(
+        'Falha ao contar participantIds da sessão (${session.id}): $e',
+        st,
+      );
     }
     return 1;
   }

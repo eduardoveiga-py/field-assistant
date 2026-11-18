@@ -166,7 +166,11 @@ class LandmarkManager {
         _landmarksController.add(list);
       }
     } catch (e, st) {
-      AppLogger.warning('Falha ao atualizar stream de marcos do território', e, st);
+      AppLogger.warning(
+        'Falha ao atualizar stream de marcos do território',
+        e,
+        st,
+      );
     }
   }
 

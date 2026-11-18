@@ -74,13 +74,19 @@ class MarkdownPreviewText extends StatelessWidget {
       RegExp(r'~~([^~]+?)~~'),
       (m) => m.group(1) ?? '',
     );
-    // Limpa prefixos de cabeçalho: # , ## , ### 
+    // Limpa prefixos de cabeçalho: # , ## , ###
     cleaned = cleaned.replaceAll(RegExp(r'^#{1,6}\s+', multiLine: true), '');
-    // Limpa prefixos de citação: > 
+    // Limpa prefixos de citação: >
     cleaned = cleaned.replaceAll(RegExp(r'^>\s+', multiLine: true), '');
     // Substitui checkboxes
-    cleaned = cleaned.replaceAll(RegExp(r'^-\s+\[\s*\]\s+', multiLine: true), '☐ ');
-    cleaned = cleaned.replaceAll(RegExp(r'^-\s+\[x\]\s+', multiLine: true), '☑ ');
+    cleaned = cleaned.replaceAll(
+      RegExp(r'^-\s+\[\s*\]\s+', multiLine: true),
+      '☐ ',
+    );
+    cleaned = cleaned.replaceAll(
+      RegExp(r'^-\s+\[x\]\s+', multiLine: true),
+      '☑ ',
+    );
     // Substitui marcadores de lista por bullet
     cleaned = cleaned.replaceAll(RegExp(r'^[-*]\s+', multiLine: true), '• ');
     // Remove quebras de linha excessivas
@@ -104,8 +110,14 @@ class MarkdownPreviewText extends StatelessWidget {
     // Limpa citações
     cleaned = cleaned.replaceAll(RegExp(r'^>\s+', multiLine: true), '');
     // Checkboxes
-    cleaned = cleaned.replaceAll(RegExp(r'^-\s+\[\s*\]\s+', multiLine: true), '☐ ');
-    cleaned = cleaned.replaceAll(RegExp(r'^-\s+\[x\]\s+', multiLine: true), '☑ ');
+    cleaned = cleaned.replaceAll(
+      RegExp(r'^-\s+\[\s*\]\s+', multiLine: true),
+      '☐ ',
+    );
+    cleaned = cleaned.replaceAll(
+      RegExp(r'^-\s+\[x\]\s+', multiLine: true),
+      '☑ ',
+    );
     // Marcador de tópicos
     cleaned = cleaned.replaceAll(RegExp(r'^[-*]\s+', multiLine: true), '• ');
     // Reduz linhas em branco múltiplas
@@ -143,10 +155,12 @@ class MarkdownPreviewText extends StatelessWidget {
     int lastEnd = 0;
     for (final m in matches) {
       if (m.start > lastEnd) {
-        spans.add(TextSpan(
-          text: preprocessed.substring(lastEnd, m.start),
-          style: baseStyle,
-        ));
+        spans.add(
+          TextSpan(
+            text: preprocessed.substring(lastEnd, m.start),
+            style: baseStyle,
+          ),
+        );
       }
 
       if (m.group(2) != null) {
@@ -160,89 +174,110 @@ class MarkdownPreviewText extends StatelessWidget {
             markBg = Color(parsedColor).withValues(alpha: 0.35);
           }
         }
-        spans.add(TextSpan(
-          text: markText,
-          style: baseStyle.copyWith(
-            backgroundColor: markBg,
-            fontWeight: FontWeight.w600,
+        spans.add(
+          TextSpan(
+            text: markText,
+            style: baseStyle.copyWith(
+              backgroundColor: markBg,
+              fontWeight: FontWeight.w600,
+            ),
           ),
-        ));
+        );
       } else if (m.group(3) != null) {
         // ***bold italic***
-        spans.add(TextSpan(
-          text: m.group(3)!,
-          style: baseStyle.copyWith(
-            fontWeight: FontWeight.bold,
-            fontStyle: FontStyle.italic,
+        spans.add(
+          TextSpan(
+            text: m.group(3)!,
+            style: baseStyle.copyWith(
+              fontWeight: FontWeight.bold,
+              fontStyle: FontStyle.italic,
+            ),
           ),
-        ));
+        );
       } else if (m.group(4) != null) {
         // **bold**
-        spans.add(TextSpan(
-          text: m.group(4)!,
-          style: baseStyle.copyWith(fontWeight: FontWeight.bold),
-        ));
+        spans.add(
+          TextSpan(
+            text: m.group(4)!,
+            style: baseStyle.copyWith(fontWeight: FontWeight.bold),
+          ),
+        );
       } else if (m.group(5) != null) {
         // *italic*
-        spans.add(TextSpan(
-          text: m.group(5)!,
-          style: baseStyle.copyWith(fontStyle: FontStyle.italic),
-        ));
+        spans.add(
+          TextSpan(
+            text: m.group(5)!,
+            style: baseStyle.copyWith(fontStyle: FontStyle.italic),
+          ),
+        );
       } else if (m.group(6) != null) {
         // ___bold italic___
-        spans.add(TextSpan(
-          text: m.group(6)!,
-          style: baseStyle.copyWith(
-            fontWeight: FontWeight.bold,
-            fontStyle: FontStyle.italic,
+        spans.add(
+          TextSpan(
+            text: m.group(6)!,
+            style: baseStyle.copyWith(
+              fontWeight: FontWeight.bold,
+              fontStyle: FontStyle.italic,
+            ),
           ),
-        ));
+        );
       } else if (m.group(7) != null) {
         // __bold__
-        spans.add(TextSpan(
-          text: m.group(7)!,
-          style: baseStyle.copyWith(fontWeight: FontWeight.bold),
-        ));
+        spans.add(
+          TextSpan(
+            text: m.group(7)!,
+            style: baseStyle.copyWith(fontWeight: FontWeight.bold),
+          ),
+        );
       } else if (m.group(8) != null) {
         // _italic_
-        spans.add(TextSpan(
-          text: m.group(8)!,
-          style: baseStyle.copyWith(fontStyle: FontStyle.italic),
-        ));
+        spans.add(
+          TextSpan(
+            text: m.group(8)!,
+            style: baseStyle.copyWith(fontStyle: FontStyle.italic),
+          ),
+        );
       } else if (m.group(9) != null) {
         // `code`
-        spans.add(TextSpan(
-          text: m.group(9)!,
-          style: baseStyle.copyWith(
-            fontFamily: 'monospace',
-            backgroundColor: (baseStyle.color ?? Colors.black).withValues(alpha: 0.08),
+        spans.add(
+          TextSpan(
+            text: m.group(9)!,
+            style: baseStyle.copyWith(
+              fontFamily: 'monospace',
+              backgroundColor: (baseStyle.color ?? Colors.black).withValues(
+                alpha: 0.08,
+              ),
+            ),
           ),
-        ));
+        );
       } else if (m.group(10) != null) {
         // ~~strikethrough~~
-        spans.add(TextSpan(
-          text: m.group(10)!,
-          style: baseStyle.copyWith(decoration: TextDecoration.lineThrough),
-        ));
+        spans.add(
+          TextSpan(
+            text: m.group(10)!,
+            style: baseStyle.copyWith(decoration: TextDecoration.lineThrough),
+          ),
+        );
       } else if (m.group(11) != null) {
         // [link](url)
-        spans.add(TextSpan(
-          text: m.group(11)!,
-          style: baseStyle.copyWith(
-            color: AppTheme.primaryBlue,
-            fontWeight: FontWeight.w600,
+        spans.add(
+          TextSpan(
+            text: m.group(11)!,
+            style: baseStyle.copyWith(
+              color: AppTheme.primaryBlue,
+              fontWeight: FontWeight.w600,
+            ),
           ),
-        ));
+        );
       }
 
       lastEnd = m.end;
     }
 
     if (lastEnd < preprocessed.length) {
-      spans.add(TextSpan(
-        text: preprocessed.substring(lastEnd),
-        style: baseStyle,
-      ));
+      spans.add(
+        TextSpan(text: preprocessed.substring(lastEnd), style: baseStyle),
+      );
     }
 
     return spans;
@@ -251,7 +286,9 @@ class MarkdownPreviewText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final defaultStyle = DefaultTextStyle.of(context).style;
-    final effectiveStyle = style != null ? defaultStyle.merge(style) : defaultStyle;
+    final effectiveStyle = style != null
+        ? defaultStyle.merge(style)
+        : defaultStyle;
 
     final spans = parseSpans(text, effectiveStyle);
     if (spans.isEmpty) {

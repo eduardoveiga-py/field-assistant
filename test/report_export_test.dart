@@ -443,7 +443,11 @@ void main() {
       TileCacheService.instance.backend = fakeCache;
       await expectLater(
         TileCacheService.instance.preloadArea(
-          z: 14, minX: 10, maxX: 12, minY: 20, maxY: 21,
+          z: 14,
+          minX: 10,
+          maxX: 12,
+          minY: 20,
+          maxY: 21,
         ),
         throwsUnsupportedError,
       );
@@ -585,7 +589,12 @@ class _FakeTileCacheBackend implements TileCacheBackend {
   final Map<String, Uint8List> _store = {};
 
   @override
-  Future<Uint8List?> getTile(int z, int x, int y, [MapLayerStyle? style]) async {
+  Future<Uint8List?> getTile(
+    int z,
+    int x,
+    int y, [
+    MapLayerStyle? style,
+  ]) async {
     final s = style?.id ?? 'standard';
     final key = '$s/$z/$x/$y';
     if (!_store.containsKey(key)) {
@@ -595,7 +604,13 @@ class _FakeTileCacheBackend implements TileCacheBackend {
   }
 
   @override
-  Future<void> saveTile(int z, int x, int y, Uint8List bytes, [MapLayerStyle? style]) async {
+  Future<void> saveTile(
+    int z,
+    int x,
+    int y,
+    Uint8List bytes, [
+    MapLayerStyle? style,
+  ]) async {
     final s = style?.id ?? 'standard';
     _store['$s/$z/$x/$y'] = bytes;
   }

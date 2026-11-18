@@ -180,155 +180,162 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
           final notesController = ctrls[2];
 
           return StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('Registrar Atividade de Campo'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(
-                    Icons.calendar_today,
-                    color: AppTheme.primaryBlue,
-                  ),
-                  title: Text(AppDateUtils.formatDate(selectedDate)),
-                  trailing: const Icon(Icons.edit_calendar),
-                  onTap: () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: selectedDate,
-                      firstDate: DateTime.now().subtract(
-                        const Duration(days: 365),
-                      ),
-                      lastDate: DateTime.now().add(const Duration(days: 1)),
-                    );
-                    if (picked != null) {
-                      setDialogState(() => selectedDate = picked);
-                    }
-                  },
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Duração do Ministério:',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                ),
-                const SizedBox(height: 6),
-                Row(
+            builder: (ctx, setDialogState) => AlertDialog(
+              title: const Text('Registrar Atividade de Campo'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: TextField(
-                        controller: hoursController,
-                        decoration: const InputDecoration(
-                          labelText: 'Horas',
-                          suffixText: 'h',
-                        ),
-                        keyboardType: TextInputType.number,
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(
+                        Icons.calendar_today,
+                        color: AppTheme.primaryBlue,
+                      ),
+                      title: Text(AppDateUtils.formatDate(selectedDate)),
+                      trailing: const Icon(Icons.edit_calendar),
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: selectedDate,
+                          firstDate: DateTime.now().subtract(
+                            const Duration(days: 365),
+                          ),
+                          lastDate: DateTime.now().add(const Duration(days: 1)),
+                        );
+                        if (picked != null) {
+                          setDialogState(() => selectedDate = picked);
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Duração do Ministério:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextField(
-                        controller: minutesController,
-                        decoration: const InputDecoration(
-                          labelText: 'Minutos',
-                          suffixText: 'min',
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: hoursController,
+                            decoration: const InputDecoration(
+                              labelText: 'Horas',
+                              suffixText: 'h',
+                            ),
+                            keyboardType: TextInputType.number,
+                          ),
                         ),
-                        keyboardType: TextInputType.number,
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: minutesController,
+                            decoration: const InputDecoration(
+                              labelText: 'Minutos',
+                              suffixText: 'min',
+                            ),
+                            keyboardType: TextInputType.number,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedModality,
+                      decoration: const InputDecoration(
+                        labelText: 'Modalidade',
                       ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'campo',
+                          child: Text('De Casa em Casa'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'testemunho_publico',
+                          child: Text('Testemunho Público / Carrinho'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'informal',
+                          child: Text('Testemunho Informal'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'carta_telefone',
+                          child: Text('Cartas e Telefone'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'outro',
+                          child: Text('Outra modalidade'),
+                        ),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) {
+                          setDialogState(() => selectedModality = val);
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: notesController,
+                      decoration: const InputDecoration(
+                        labelText: 'Observações (opcional)',
+                        hintText: 'Companheiro(a), publicações colocadas...',
+                      ),
+                      maxLines: 2,
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  initialValue: selectedModality,
-                  decoration: const InputDecoration(labelText: 'Modalidade'),
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'campo',
-                      child: Text('De Casa em Casa'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'testemunho_publico',
-                      child: Text('Testemunho Público / Carrinho'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'informal',
-                      child: Text('Testemunho Informal'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'carta_telefone',
-                      child: Text('Cartas e Telefone'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'outro',
-                      child: Text('Outra modalidade'),
-                    ),
-                  ],
-                  onChanged: (val) {
-                    if (val != null) {
-                      setDialogState(() => selectedModality = val);
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final h = int.tryParse(hoursController.text.trim()) ?? 0;
+                    final m = int.tryParse(minutesController.text.trim()) ?? 0;
+                    final totalSeconds = (h * 3600) + (m * 60);
+
+                    if (totalSeconds <= 0) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Informe ao menos 1 minuto de atividade.',
+                          ),
+                        ),
+                      );
+                      return;
+                    }
+
+                    final repo = ref.read(repositoryProvider);
+                    await repo.createActivityRecord(
+                      date: selectedDate,
+                      durationSeconds: totalSeconds,
+                      modality: selectedModality,
+                      notes: notesController.text.trim().isEmpty
+                          ? null
+                          : notesController.text.trim(),
+                    );
+
+                    if (onSavedCallback != null) onSavedCallback();
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Atividade registrada com sucesso!'),
+                        ),
+                      );
                     }
                   },
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: notesController,
-                  decoration: const InputDecoration(
-                    labelText: 'Observações (opcional)',
-                    hintText: 'Companheiro(a), publicações colocadas...',
-                  ),
-                  maxLines: 2,
+                  child: const Text('Salvar'),
                 ),
               ],
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final h = int.tryParse(hoursController.text.trim()) ?? 0;
-                final m = int.tryParse(minutesController.text.trim()) ?? 0;
-                final totalSeconds = (h * 3600) + (m * 60);
-
-                if (totalSeconds <= 0) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Informe ao menos 1 minuto de atividade.'),
-                    ),
-                  );
-                  return;
-                }
-
-                final repo = ref.read(repositoryProvider);
-                await repo.createActivityRecord(
-                  date: selectedDate,
-                  durationSeconds: totalSeconds,
-                  modality: selectedModality,
-                  notes: notesController.text.trim().isEmpty
-                      ? null
-                      : notesController.text.trim(),
-                );
-
-                if (onSavedCallback != null) onSavedCallback();
-                if (ctx.mounted) Navigator.pop(ctx);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Atividade registrada com sucesso!'),
-                    ),
-                  );
-                }
-              },
-              child: const Text('Salvar'),
-            ),
-          ],
-        ),
-        );
+          );
         },
       ),
     );
@@ -409,7 +416,10 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
               // Card do Cronômetro de Campo com Detecção de Parada e Modo Carrinho (Ideia 2)
               SliverToBoxAdapter(
                 child: Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   elevation: isDark ? 0 : 2,
                   color: isDark ? const Color(0xFF1E293B) : Colors.white,
                   shape: RoundedRectangleBorder(
@@ -512,7 +522,9 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
                             decoration: BoxDecoration(
                               color: const Color(0xFFFEF3C7),
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: const Color(0xFFF59E0B)),
+                              border: Border.all(
+                                color: const Color(0xFFF59E0B),
+                              ),
                             ),
                             child: Row(
                               children: [
@@ -573,7 +585,9 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
                                 ),
                               ),
                               icon: Icon(
-                                _isTimerRunning ? Icons.pause : Icons.play_arrow,
+                                _isTimerRunning
+                                    ? Icons.pause
+                                    : Icons.play_arrow,
                                 size: 18,
                               ),
                               label: Text(
@@ -647,10 +661,8 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
                               ),
                         )
                         .toList();
-                    final currentMonthSeconds = currentMonthActivities.fold<int>(
-                      0,
-                      (sum, a) => sum + a.durationSeconds,
-                    );
+                    final currentMonthSeconds = currentMonthActivities
+                        .fold<int>(0, (sum, a) => sum + a.durationSeconds);
                     final currentMonthCompletedHours =
                         currentMonthSeconds / 3600.0;
 
@@ -771,7 +783,9 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: AppTheme.primaryBlue.withValues(alpha: 0.12),
+                              color: AppTheme.primaryBlue.withValues(
+                                alpha: 0.12,
+                              ),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(
@@ -832,9 +846,7 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
                           leading: Container(
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
-                              color: AppTheme.accentTeal.withValues(
-                                alpha: 0.1,
-                              ),
+                              color: AppTheme.accentTeal.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
@@ -847,9 +859,7 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
                           ),
                           title: Text(
                             _formatModality(act.modality),
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                            ),
+                            style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                           subtitle: Text(
                             '${AppDateUtils.formatDate(act.date)}${act.notes != null ? " • ${act.notes}" : ""}',
@@ -880,9 +890,7 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
                     },
                   ),
                 ),
-              const SliverToBoxAdapter(
-                child: SizedBox(height: 80),
-              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 80)),
             ],
           );
         },

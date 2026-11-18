@@ -90,7 +90,11 @@ class MinistryExperienceItem {
           return decoded.map((e) => e.toString()).toList();
         }
       } catch (e, st) {
-        AppLogger.warning('Falha ao decodificar lista JSON em MinistryExperience', e, st);
+        AppLogger.warning(
+          'Falha ao decodificar lista JSON em MinistryExperience',
+          e,
+          st,
+        );
       }
     }
     return [];
@@ -133,8 +137,8 @@ class ExperienceManager {
     final dt = dateTime ?? now;
     final cleanModality =
         locationOrModality != null && locationOrModality.trim().isNotEmpty
-            ? locationOrModality.trim()
-            : null;
+        ? locationOrModality.trim()
+        : null;
 
     final entry = MinistryExperienceEntry(
       id: id,
@@ -152,17 +156,21 @@ class ExperienceManager {
 
     await db.transaction(() async {
       await db.into(db.ministryExperiences).insert(entry);
-      await db.into(db.syncQueue).insert(
-        SyncQueueCompanion.insert(
-          id: _uuid.v4(),
-          entityType: 'ministry_experiences',
-          entityId: id,
-          operation: 'INSERT',
-          payload: jsonEncode(SyncTimestamp.normalizeMapDates(entry.toJson())),
-          createdAt: now,
-          status: const Value('pending'),
-        ),
-      );
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: _uuid.v4(),
+              entityType: 'ministry_experiences',
+              entityId: id,
+              operation: 'INSERT',
+              payload: jsonEncode(
+                SyncTimestamp.normalizeMapDates(entry.toJson()),
+              ),
+              createdAt: now,
+              status: const Value('pending'),
+            ),
+          );
     });
 
     return MinistryExperienceItem.fromEntry(entry);
@@ -170,10 +178,11 @@ class ExperienceManager {
 
   Future<void> updateExperience(MinistryExperienceItem item) async {
     final now = DateTime.now();
-    final existing = await (db.select(db.ministryExperiences)
-          ..where((t) => t.id.equals(item.id)))
-        .getSingleOrNull();
-    final cleanModality = item.locationOrModality != null &&
+    final existing = await (db.select(
+      db.ministryExperiences,
+    )..where((t) => t.id.equals(item.id))).getSingleOrNull();
+    final cleanModality =
+        item.locationOrModality != null &&
             item.locationOrModality!.trim().isNotEmpty
         ? item.locationOrModality!.trim()
         : null;
@@ -197,53 +206,58 @@ class ExperienceManager {
       if (existing != null) {
         payload['_base'] = SyncTimestamp.normalizeMapDates(existing.toJson());
       }
-      await db.into(db.syncQueue).insert(
-        SyncQueueCompanion.insert(
-          id: _uuid.v4(),
-          entityType: 'ministry_experiences',
-          entityId: item.id,
-          operation: 'UPDATE',
-          payload: jsonEncode(payload),
-          createdAt: now,
-          status: const Value('pending'),
-        ),
-      );
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: _uuid.v4(),
+              entityType: 'ministry_experiences',
+              entityId: item.id,
+              operation: 'UPDATE',
+              payload: jsonEncode(payload),
+              createdAt: now,
+              status: const Value('pending'),
+            ),
+          );
     });
   }
 
   Future<void> deleteExperience(String id) async {
     final now = DateTime.now();
-    final existing = await (db.select(db.ministryExperiences)
-          ..where((t) => t.id.equals(id)))
-        .getSingleOrNull();
+    final existing = await (db.select(
+      db.ministryExperiences,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
     if (existing == null) return;
 
     final nextRev = existing.revision + 1;
     await db.transaction(() async {
-      await (db.update(db.ministryExperiences)..where((t) => t.id.equals(id)))
-          .write(
+      await (db.update(
+        db.ministryExperiences,
+      )..where((t) => t.id.equals(id))).write(
         MinistryExperiencesCompanion(
           deletedAt: Value(now),
           updatedAt: Value(now),
           revision: Value(nextRev),
         ),
       );
-      await db.into(db.syncQueue).insert(
-        SyncQueueCompanion.insert(
-          id: _uuid.v4(),
-          entityType: 'ministry_experiences',
-          entityId: id,
-          operation: 'DELETE',
-          payload: jsonEncode({
-            'id': id,
-            'deleted_at': now.toUtc().toIso8601String(),
-            'updated_at': now.toUtc().toIso8601String(),
-            'revision': nextRev,
-          }),
-          createdAt: now,
-          status: const Value('pending'),
-        ),
-      );
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: _uuid.v4(),
+              entityType: 'ministry_experiences',
+              entityId: id,
+              operation: 'DELETE',
+              payload: jsonEncode({
+                'id': id,
+                'deleted_at': now.toUtc().toIso8601String(),
+                'updated_at': now.toUtc().toIso8601String(),
+                'revision': nextRev,
+              }),
+              createdAt: now,
+              status: const Value('pending'),
+            ),
+          );
     });
   }
 }

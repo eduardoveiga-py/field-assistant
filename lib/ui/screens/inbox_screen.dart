@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -37,7 +38,8 @@ class InboxScreen extends ConsumerStatefulWidget {
 
 class _InboxScreenState extends ConsumerState<InboxScreen>
     with SingleTickerProviderStateMixin {
-  String _selectedFilter = 'unprocessed'; // unprocessed, in_review, converted, all
+  String _selectedFilter =
+      'unprocessed'; // unprocessed, in_review, converted, all
   late final AudioPlayerService _playerService;
   String? _currentlyPlayingPath;
   bool _isPlaying = false;
@@ -69,7 +71,11 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
           try {
             await ref.read(supabaseSyncServiceProvider).sync();
           } catch (e, st) {
-            AppLogger.warning('Falha na sincronização inicial do Supabase na Web', e, st);
+            AppLogger.warning(
+              'Falha na sincronização inicial do Supabase na Web',
+              e,
+              st,
+            );
           }
         }());
       });
@@ -103,8 +109,12 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Sincronização em nuvem (Web): ${syncResult.message}'),
-              backgroundColor: syncResult.success ? Colors.green : Colors.orange,
+              content: Text(
+                'Sincronização em nuvem (Web): ${syncResult.message}',
+              ),
+              backgroundColor: syncResult.success
+                  ? Colors.green
+                  : Colors.orange,
             ),
           );
         }
@@ -112,55 +122,98 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
       }
 
       final db = ref.read(repositoryProvider).db;
-      final protocol = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_mail_protocol'))).getSingleOrNull();
+      final protocol = await (db.select(
+        db.appKvStore,
+      )..where((t) => t.key.equals('jw_mail_protocol'))).getSingleOrNull();
       if (protocol?.value == 'exchange') {
-        final email = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_eas_email'))).getSingleOrNull();
-        final host = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_eas_host'))).getSingleOrNull();
+        final email = await (db.select(
+          db.appKvStore,
+        )..where((t) => t.key.equals('jw_eas_email'))).getSingleOrNull();
+        final host = await (db.select(
+          db.appKvStore,
+        )..where((t) => t.key.equals('jw_eas_host'))).getSingleOrNull();
         const storage = FlutterSecureStorage();
         final password = await storage.read(key: 'jw_eas_password');
         final deviceId = await storage.read(key: 'jw_eas_device_id');
-        if (email == null || host == null || password == null || password.isEmpty || deviceId == null || deviceId.isEmpty) {
-          throw const ExchangeException('Configure novamente a conta Exchange em Configurações.');
+        if (email == null ||
+            host == null ||
+            password == null ||
+            password.isEmpty ||
+            deviceId == null ||
+            deviceId.isEmpty) {
+          throw const ExchangeException(
+            'Configure novamente a conta Exchange em Configurações.',
+          );
         }
-        final session = ExchangeProtocolSession(host: host.value, username: email.value,
-          password: password, deviceId: deviceId);
-        final result = await ExchangeReadService(db).sync(session: session, host: host.value,
-          account: email.value, deviceId: deviceId, allMailFolders: true);
+        final session = ExchangeProtocolSession(
+          host: host.value,
+          username: email.value,
+          password: password,
+          deviceId: deviceId,
+        );
+        final result = await ExchangeReadService(db).sync(
+          session: session,
+          host: host.value,
+          account: email.value,
+          deviceId: deviceId,
+          allMailFolders: true,
+        );
 
         // Envia imediatamente novas mensagens salvas para o Supabase
         unawaited(() async {
           try {
             await ref.read(supabaseSyncServiceProvider).sync();
           } catch (e, st) {
-            AppLogger.warning('Falha ao enviar mensagens Exchange ao Supabase', e, st);
+            AppLogger.warning(
+              'Falha ao enviar mensagens Exchange ao Supabase',
+              e,
+              st,
+            );
           }
         }());
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('${result.saved} prévia(s) Exchange salva(s) em ${result.foldersRead} pasta(s) e sincronizada(s) para a nuvem. '
-              '${result.moreAvailable ? 'Há mais mensagens; sincronize novamente. ' : ''}'
-              'Corpos podem ser parciais; anexos não foram importados.'),
-          ));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '${result.saved} prévia(s) Exchange salva(s) em ${result.foldersRead} pasta(s) e sincronizada(s) para a nuvem. '
+                '${result.moreAvailable ? 'Há mais mensagens; sincronize novamente. ' : ''}'
+                'Corpos podem ser parciais; anexos não foram importados.',
+              ),
+            ),
+          );
         }
         return;
       }
-      final emailEntry = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_imap_email'))).getSingleOrNull();
+      final emailEntry = await (db.select(
+        db.appKvStore,
+      )..where((t) => t.key.equals('jw_imap_email'))).getSingleOrNull();
       const secureStorage = FlutterSecureStorage();
       String? password = await secureStorage.read(key: 'jw_imap_password');
       if (password == null || password.isEmpty) {
-        final legacyPass = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_imap_password'))).getSingleOrNull();
+        final legacyPass = await (db.select(
+          db.appKvStore,
+        )..where((t) => t.key.equals('jw_imap_password'))).getSingleOrNull();
         password = legacyPass?.value;
       }
-      final hostEntry = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_imap_host'))).getSingleOrNull();
-      final portEntry = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_imap_port'))).getSingleOrNull();
+      final hostEntry = await (db.select(
+        db.appKvStore,
+      )..where((t) => t.key.equals('jw_imap_host'))).getSingleOrNull();
+      final portEntry = await (db.select(
+        db.appKvStore,
+      )..where((t) => t.key.equals('jw_imap_port'))).getSingleOrNull();
 
-      final host = (hostEntry?.value.trim().isNotEmpty == true) ? hostEntry!.value.trim() : 'mail.jw.org';
+      final host = (hostEntry?.value.trim().isNotEmpty == true)
+          ? hostEntry!.value.trim()
+          : 'mail.jw.org';
       final port = int.tryParse(portEntry?.value ?? '') ?? 993;
       final username = emailEntry?.value.trim();
 
       // Se a conta não estiver configurada, tenta sincronizar mensagens da nuvem Supabase antes
-      if (username == null || username.isEmpty || password == null || password.isEmpty) {
+      if (username == null ||
+          username.isEmpty ||
+          password == null ||
+          password.isEmpty) {
         final syncResult = await ref.read(supabaseSyncServiceProvider).sync();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -198,7 +251,11 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
         try {
           await ref.read(supabaseSyncServiceProvider).sync();
         } catch (e, st) {
-          AppLogger.warning('Falha ao enviar mensagens IMAP ao Supabase', e, st);
+          AppLogger.warning(
+            'Falha ao enviar mensagens IMAP ao Supabase',
+            e,
+            st,
+          );
         }
       }());
 
@@ -217,7 +274,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erro na sincronização de e-mail: $e. Páginas já salvas foram preservadas; sincronize novamente.'),
+            content: Text(
+              'Erro na sincronização de e-mail: $e. Páginas já salvas foram preservadas; sincronize novamente.',
+            ),
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
@@ -240,7 +299,11 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                 color: const Color(0xFF6366F1).withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.fingerprint_rounded, size: 56, color: Color(0xFF6366F1)),
+              child: const Icon(
+                Icons.fingerprint_rounded,
+                size: 56,
+                color: Color(0xFF6366F1),
+              ),
             ),
             const SizedBox(height: 20),
             const Text(
@@ -258,10 +321,16 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
             FilledButton.icon(
               style: FilledButton.styleFrom(
                 backgroundColor: const Color(0xFF6366F1),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
               ),
               icon: const Icon(Icons.lock_open, size: 18),
-              label: const Text('Autenticar com Biometria / PIN', style: TextStyle(fontWeight: FontWeight.bold)),
+              label: const Text(
+                'Autenticar com Biometria / PIN',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
               onPressed: () async {
                 final authenticated = await biometric.authenticate(
                   context: context,
@@ -289,9 +358,16 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
       appBar: AppBar(
         title: const Row(
           children: [
-            Icon(Icons.all_inbox_rounded, color: AppTheme.primaryBlue, size: 24),
+            Icon(
+              Icons.all_inbox_rounded,
+              color: AppTheme.primaryBlue,
+              size: 24,
+            ),
             SizedBox(width: 8),
-            Text('Inbox & JW Mail', style: TextStyle(fontWeight: FontWeight.bold)),
+            Text(
+              'Inbox & JW Mail',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
           ],
         ),
         actions: [
@@ -307,13 +383,20 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
             IconButton(
               tooltip: 'Sincronizar E-mails / Hub',
               icon: _isSyncingEmails
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
                   : const Icon(Icons.sync_alt, color: AppTheme.primaryBlue),
               onPressed: _isSyncingEmails ? null : _syncEmails,
             ),
             IconButton(
               tooltip: 'Nova Captura',
-              icon: const Icon(Icons.add_circle_outline, color: AppTheme.primaryBlue),
+              icon: const Icon(
+                Icons.add_circle_outline,
+                color: AppTheme.primaryBlue,
+              ),
               onPressed: () => QuickCaptureSheet.show(context),
             ),
           ],
@@ -323,7 +406,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                 controller: _tabController,
                 tabs: const [
                   Tab(icon: Icon(Icons.inbox), text: 'Capturas'),
-                  Tab(icon: Icon(Icons.mark_email_unread_outlined), text: 'JW Mail'),
+                  Tab(
+                    icon: Icon(Icons.mark_email_unread_outlined),
+                    text: 'JW Mail',
+                  ),
                   Tab(icon: Icon(Icons.shield_outlined), text: 'Hub Restrito'),
                 ],
               )
@@ -354,7 +440,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
       },
       backgroundColor: AppTheme.primaryBlue,
       foregroundColor: Colors.white,
-      icon: Icon(_tabController.index == 1 ? Icons.edit_note : Icons.bolt_rounded),
+      icon: Icon(
+        _tabController.index == 1 ? Icons.edit_note : Icons.bolt_rounded,
+      ),
       label: Text(
         _tabController.index == 1 ? 'Novo Rascunho' : 'Captura Rápida',
         style: const TextStyle(fontWeight: FontWeight.bold),
@@ -372,7 +460,11 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                _buildFilterChip('unprocessed', 'Pendentes', Icons.hourglass_top),
+                _buildFilterChip(
+                  'unprocessed',
+                  'Pendentes',
+                  Icons.hourglass_top,
+                ),
                 const SizedBox(width: 8),
                 _buildFilterChip('in_review', 'Em Análise', Icons.rate_review),
                 const SizedBox(width: 8),
@@ -402,7 +494,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
               }
 
               return ListView.separated(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 itemCount: entries.length,
                 separatorBuilder: (ctx, i) => const SizedBox(height: 10),
                 itemBuilder: (ctx, i) => _buildEntryCard(entries[i], isDark),
@@ -417,7 +512,11 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
   Widget _buildFilterChip(String key, String label, IconData icon) {
     final isSelected = _selectedFilter == key;
     return ChoiceChip(
-      avatar: Icon(icon, size: 14, color: isSelected ? Colors.white : AppTheme.primaryBlue),
+      avatar: Icon(
+        icon,
+        size: 14,
+        color: isSelected ? Colors.white : AppTheme.primaryBlue,
+      ),
       label: Text(label),
       selected: isSelected,
       onSelected: (val) {
@@ -452,7 +551,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                color: isDark
+                    ? const Color(0xFF94A3B8)
+                    : const Color(0xFF64748B),
               ),
               textAlign: TextAlign.center,
             ),
@@ -461,7 +562,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
               'Use a Captura Rápida a qualquer momento para guardar ideias sem interromper o que estiver fazendo.',
               style: TextStyle(
                 fontSize: 13,
-                color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                color: isDark
+                    ? const Color(0xFF64748B)
+                    : const Color(0xFF94A3B8),
               ),
               textAlign: TextAlign.center,
             ),
@@ -473,7 +576,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
 
   Widget _buildEntryCard(InboxEntry entry, bool isDark) {
     final isAudio = entry.sourceType == 'audio' && entry.mediaPath != null;
-    final isPlayingThisAudio = _currentlyPlayingPath == entry.mediaPath && _isPlaying;
+    final isPlayingThisAudio =
+        _currentlyPlayingPath == entry.mediaPath && _isPlaying;
     final attachmentsList = _parseJsonList(entry.attachments);
 
     return Container(
@@ -501,9 +605,13 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
               children: [
                 _buildSourceBadge(entry.sourceType),
                 const SizedBox(width: 8),
-                if (entry.suggestedCategory != null && entry.suggestedCategory!.isNotEmpty)
+                if (entry.suggestedCategory != null &&
+                    entry.suggestedCategory!.isNotEmpty)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: AppTheme.primaryBlue.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(6),
@@ -530,7 +638,11 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                       value: 'edit',
                       child: Row(
                         children: [
-                          Icon(Icons.edit_note, size: 18, color: AppTheme.primaryBlue),
+                          Icon(
+                            Icons.edit_note,
+                            size: 18,
+                            color: AppTheme.primaryBlue,
+                          ),
                           SizedBox(width: 8),
                           Text('Editar Captura'),
                         ],
@@ -541,7 +653,11 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                         value: 'in_review',
                         child: Row(
                           children: [
-                            Icon(Icons.rate_review, size: 18, color: Colors.amber),
+                            Icon(
+                              Icons.rate_review,
+                              size: 18,
+                              color: Colors.amber,
+                            ),
                             SizedBox(width: 8),
                             Text('Marcar Em Análise'),
                           ],
@@ -561,7 +677,11 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                       value: 'export',
                       child: Row(
                         children: [
-                          Icon(Icons.download_rounded, size: 18, color: Colors.blueAccent),
+                          Icon(
+                            Icons.download_rounded,
+                            size: 18,
+                            color: Colors.blueAccent,
+                          ),
                           SizedBox(width: 8),
                           Text('Exportar Item'),
                         ],
@@ -571,9 +691,16 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                       value: 'delete',
                       child: Row(
                         children: [
-                          Icon(Icons.delete_outline, size: 18, color: Colors.redAccent),
+                          Icon(
+                            Icons.delete_outline,
+                            size: 18,
+                            color: Colors.redAccent,
+                          ),
                           SizedBox(width: 8),
-                          Text('Excluir', style: TextStyle(color: Colors.redAccent)),
+                          Text(
+                            'Excluir',
+                            style: TextStyle(color: Colors.redAccent),
+                          ),
                         ],
                       ),
                     ),
@@ -589,7 +716,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
-                color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B),
+                color: isDark
+                    ? const Color(0xFFF1F5F9)
+                    : const Color(0xFF1E293B),
               ),
             ),
 
@@ -597,19 +726,28 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
             if (isAudio) ...[
               const SizedBox(height: 10),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                  color: isDark
+                      ? const Color(0xFF0F172A)
+                      : const Color(0xFFF8FAFC),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                    color: isDark
+                        ? const Color(0xFF334155)
+                        : const Color(0xFFE2E8F0),
                   ),
                 ),
                 child: Row(
                   children: [
                     IconButton(
                       icon: Icon(
-                        isPlayingThisAudio ? Icons.pause_circle_filled : Icons.play_circle_fill,
+                        isPlayingThisAudio
+                            ? Icons.pause_circle_filled
+                            : Icons.play_circle_fill,
                         color: AppTheme.primaryBlue,
                         size: 32,
                       ),
@@ -618,7 +756,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                     const SizedBox(width: 8),
                     Text(
                       'Áudio gravado (${entry.mediaDurationSeconds ?? 0}s)',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ],
                 ),
@@ -645,8 +786,14 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                       overflow: TextOverflow.ellipsis,
                     ),
                     onPressed: () {
-                      final path = att['path']?.toString() ?? entry.mediaPath ?? '';
-                      showUniversalAttachmentViewer(context, filePath: path, title: name, fileType: type);
+                      final path =
+                          att['path']?.toString() ?? entry.mediaPath ?? '';
+                      showUniversalAttachmentViewer(
+                        context,
+                        filePath: path,
+                        title: name,
+                        fileType: type,
+                      );
                     },
                   );
                 }).toList(),
@@ -700,7 +847,11 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                   const SizedBox(width: 6),
                   Text(
                     'Convertido em ${_entityTypeLabel(entry.convertedEntityType ?? '')}',
-                    style: const TextStyle(fontSize: 12, color: Colors.green, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.green,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
@@ -750,7 +901,11 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
           const SizedBox(width: 4),
           Text(
             label,
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color),
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
           ),
         ],
       ),
@@ -780,7 +935,11 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
             const SizedBox(width: 6),
             Text(
               label,
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
             ),
           ],
         ),
@@ -800,7 +959,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
     showAdaptiveMinistrySheet(
       context: context,
       title: 'Converter em Tarefa',
-      titleLeading: const Icon(Icons.check_circle_outline, color: Color(0xFF10B981)),
+      titleLeading: const Icon(
+        Icons.check_circle_outline,
+        color: Color(0xFF10B981),
+      ),
       builder: (ctx, scroll) => ManagedTextControllers(
         initialTexts: [entry.content, ''],
         builder: (ctx, ctrls) {
@@ -831,43 +993,82 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                           Expanded(
                             child: DropdownButtonFormField<String>(
                               initialValue: priority,
-                              decoration: const InputDecoration(labelText: 'Prioridade', border: OutlineInputBorder()),
+                              decoration: const InputDecoration(
+                                labelText: 'Prioridade',
+                                border: OutlineInputBorder(),
+                              ),
                               items: const [
-                                DropdownMenuItem(value: 'low', child: Text('Baixa')),
-                                DropdownMenuItem(value: 'normal', child: Text('Normal')),
-                                DropdownMenuItem(value: 'high', child: Text('Alta')),
-                                DropdownMenuItem(value: 'urgent', child: Text('Urgente')),
+                                DropdownMenuItem(
+                                  value: 'low',
+                                  child: Text('Baixa'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'normal',
+                                  child: Text('Normal'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'high',
+                                  child: Text('Alta'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'urgent',
+                                  child: Text('Urgente'),
+                                ),
                               ],
-                              onChanged: (v) => setModalState(() => priority = v ?? 'normal'),
+                              onChanged: (v) =>
+                                  setModalState(() => priority = v ?? 'normal'),
                             ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: DropdownButtonFormField<String>(
                               initialValue: category,
-                              decoration: const InputDecoration(labelText: 'Categoria', border: OutlineInputBorder()),
+                              decoration: const InputDecoration(
+                                labelText: 'Categoria',
+                                border: OutlineInputBorder(),
+                              ),
                               items: const [
-                                DropdownMenuItem(value: 'ministry', child: Text('Ministério')),
-                                DropdownMenuItem(value: 'personal', child: Text('Pessoal')),
-                                DropdownMenuItem(value: 'study', child: Text('Estudo')),
+                                DropdownMenuItem(
+                                  value: 'ministry',
+                                  child: Text('Ministério'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'personal',
+                                  child: Text('Pessoal'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'study',
+                                  child: Text('Estudo'),
+                                ),
                               ],
-                              onChanged: (v) => setModalState(() => category = v ?? 'ministry'),
+                              onChanged: (v) => setModalState(
+                                () => category = v ?? 'ministry',
+                              ),
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 12),
                       ListTile(
-                        title: Text(dueDate == null ? 'Definir Data de Vencimento' : 'Vencimento: ${_formatDate(dueDate!)}'),
+                        title: Text(
+                          dueDate == null
+                              ? 'Definir Data de Vencimento'
+                              : 'Vencimento: ${_formatDate(dueDate!)}',
+                        ),
                         trailing: const Icon(Icons.calendar_today),
                         onTap: () async {
                           final picked = await showDatePicker(
                             context: context,
                             initialDate: DateTime.now(),
-                            firstDate: DateTime.now().subtract(const Duration(days: 30)),
-                            lastDate: DateTime.now().add(const Duration(days: 365)),
+                            firstDate: DateTime.now().subtract(
+                              const Duration(days: 30),
+                            ),
+                            lastDate: DateTime.now().add(
+                              const Duration(days: 365),
+                            ),
                           );
-                          if (picked != null) setModalState(() => dueDate = picked);
+                          if (picked != null)
+                            setModalState(() => dueDate = picked);
                         },
                       ),
                       const SizedBox(height: 16),
@@ -878,7 +1079,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                           padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
                         onPressed: () async {
-                          final title = titleCtrl.text.trim().isEmpty ? entry.content : titleCtrl.text.trim();
+                          final title = titleCtrl.text.trim().isEmpty
+                              ? entry.content
+                              : titleCtrl.text.trim();
                           final desc = descCtrl.text.trim();
                           final inboxMgr = ref.read(inboxManagerProvider);
                           await inboxMgr.convertToTask(
@@ -892,11 +1095,16 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                           if (ctx.mounted) {
                             Navigator.of(ctx).pop();
                             ScaffoldMessenger.of(ctx).showSnackBar(
-                              const SnackBar(content: Text('Tarefa criada com sucesso!')),
+                              const SnackBar(
+                                content: Text('Tarefa criada com sucesso!'),
+                              ),
                             );
                           }
                         },
-                        child: const Text('Confirmar Conversão em Tarefa', style: TextStyle(fontWeight: FontWeight.bold)),
+                        child: const Text(
+                          'Confirmar Conversão em Tarefa',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
                       ),
                     ],
                   ),
@@ -915,7 +1123,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
     showAdaptiveMinistrySheet(
       context: context,
       title: 'Converter em Projeto',
-      titleLeading: const Icon(Icons.folder_special_outlined, color: Color(0xFF3B82F6)),
+      titleLeading: const Icon(
+        Icons.folder_special_outlined,
+        color: Color(0xFF3B82F6),
+      ),
       builder: (ctx, scroll) => ManagedTextControllers(
         initialTexts: [entry.content, ''],
         builder: (ctx, ctrls) {
@@ -933,12 +1144,18 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                 children: [
                   TextField(
                     controller: nameCtrl,
-                    decoration: const InputDecoration(labelText: 'Nome do Projeto', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(
+                      labelText: 'Nome do Projeto',
+                      border: OutlineInputBorder(),
+                    ),
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: objCtrl,
-                    decoration: const InputDecoration(labelText: 'Objetivo Principal', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(
+                      labelText: 'Objetivo Principal',
+                      border: OutlineInputBorder(),
+                    ),
                   ),
                   const SizedBox(height: 16),
                   ElevatedButton(
@@ -948,7 +1165,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                     onPressed: () async {
-                      final name = nameCtrl.text.trim().isEmpty ? entry.content : nameCtrl.text.trim();
+                      final name = nameCtrl.text.trim().isEmpty
+                          ? entry.content
+                          : nameCtrl.text.trim();
                       final obj = objCtrl.text.trim();
                       final inboxMgr = ref.read(inboxManagerProvider);
                       await inboxMgr.convertToProject(
@@ -960,11 +1179,16 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                       if (ctx.mounted) {
                         Navigator.of(ctx).pop();
                         ScaffoldMessenger.of(ctx).showSnackBar(
-                          const SnackBar(content: Text('Projeto criado com sucesso!')),
+                          const SnackBar(
+                            content: Text('Projeto criado com sucesso!'),
+                          ),
                         );
                       }
                     },
-                    child: const Text('Confirmar Conversão em Projeto', style: TextStyle(fontWeight: FontWeight.bold)),
+                    child: const Text(
+                      'Confirmar Conversão em Projeto',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ],
               ),
@@ -976,12 +1200,17 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
   }
 
   void _showConvertToNoteDialog(InboxEntry entry) {
-    final initTitle = entry.content.length > 40 ? '${entry.content.substring(0, 40)}...' : entry.content;
+    final initTitle = entry.content.length > 40
+        ? '${entry.content.substring(0, 40)}...'
+        : entry.content;
 
     showAdaptiveMinistrySheet(
       context: context,
       title: 'Converter em Nota de Conhecimento',
-      titleLeading: const Icon(Icons.note_add_outlined, color: Color(0xFF8B5CF6)),
+      titleLeading: const Icon(
+        Icons.note_add_outlined,
+        color: Color(0xFF8B5CF6),
+      ),
       builder: (ctx, scroll) => ManagedTextControllers(
         initialTexts: [initTitle, entry.content],
         builder: (ctx, ctrls) {
@@ -999,13 +1228,19 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                 children: [
                   TextField(
                     controller: titleCtrl,
-                    decoration: const InputDecoration(labelText: 'Título da Nota', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(
+                      labelText: 'Título da Nota',
+                      border: OutlineInputBorder(),
+                    ),
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: contentCtrl,
                     maxLines: 4,
-                    decoration: const InputDecoration(labelText: 'Conteúdo', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(
+                      labelText: 'Conteúdo',
+                      border: OutlineInputBorder(),
+                    ),
                   ),
                   const SizedBox(height: 16),
                   ElevatedButton(
@@ -1015,7 +1250,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                     onPressed: () async {
-                      final title = titleCtrl.text.trim().isEmpty ? 'Nova Nota' : titleCtrl.text.trim();
+                      final title = titleCtrl.text.trim().isEmpty
+                          ? 'Nova Nota'
+                          : titleCtrl.text.trim();
                       final content = contentCtrl.text.trim();
                       final inboxMgr = ref.read(inboxManagerProvider);
                       await inboxMgr.convertToNote(
@@ -1026,11 +1263,18 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                       if (ctx.mounted) {
                         Navigator.of(ctx).pop();
                         ScaffoldMessenger.of(ctx).showSnackBar(
-                          const SnackBar(content: Text('Nota salva na Base de Conhecimento!')),
+                          const SnackBar(
+                            content: Text(
+                              'Nota salva na Base de Conhecimento!',
+                            ),
+                          ),
                         );
                       }
                     },
-                    child: const Text('Confirmar Conversão em Nota', style: TextStyle(fontWeight: FontWeight.bold)),
+                    child: const Text(
+                      'Confirmar Conversão em Nota',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ],
               ),
@@ -1076,7 +1320,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                     onPressed: () async {
-                      final qText = qCtrl.text.trim().isEmpty ? entry.content : qCtrl.text.trim();
+                      final qText = qCtrl.text.trim().isEmpty
+                          ? entry.content
+                          : qCtrl.text.trim();
                       final inboxMgr = ref.read(inboxManagerProvider);
                       await inboxMgr.convertToQuestion(
                         entry.id,
@@ -1085,11 +1331,18 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                       if (ctx.mounted) {
                         Navigator.of(ctx).pop();
                         ScaffoldMessenger.of(ctx).showSnackBar(
-                          const SnackBar(content: Text('Dúvida registrada para pesquisa bíblica!')),
+                          const SnackBar(
+                            content: Text(
+                              'Dúvida registrada para pesquisa bíblica!',
+                            ),
+                          ),
                         );
                       }
                     },
-                    child: const Text('Confirmar Conversão em Dúvida', style: TextStyle(fontWeight: FontWeight.bold)),
+                    child: const Text(
+                      'Confirmar Conversão em Dúvida',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ],
               ),
@@ -1155,11 +1408,23 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                         border: OutlineInputBorder(),
                       ),
                       items: const [
-                        DropdownMenuItem(value: null, child: Text('Sem categoria')),
-                        DropdownMenuItem(value: 'ministry', child: Text('Ministério')),
-                        DropdownMenuItem(value: 'personal', child: Text('Pessoal')),
+                        DropdownMenuItem(
+                          value: null,
+                          child: Text('Sem categoria'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'ministry',
+                          child: Text('Ministério'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'personal',
+                          child: Text('Pessoal'),
+                        ),
                         DropdownMenuItem(value: 'study', child: Text('Estudo')),
-                        DropdownMenuItem(value: 'question', child: Text('Dúvida')),
+                        DropdownMenuItem(
+                          value: 'question',
+                          child: Text('Dúvida'),
+                        ),
                         DropdownMenuItem(value: 'idea', child: Text('Ideia')),
                       ],
                       onChanged: (v) => setModalState(() => category = v),
@@ -1183,11 +1448,16 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                         if (ctx.mounted) Navigator.pop(ctx);
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Captura atualizada com sucesso!')),
+                            const SnackBar(
+                              content: Text('Captura atualizada com sucesso!'),
+                            ),
                           );
                         }
                       },
-                      child: const Text('Salvar Alterações', style: TextStyle(fontWeight: FontWeight.bold)),
+                      child: const Text(
+                        'Salvar Alterações',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ],
                 ),
@@ -1296,13 +1566,21 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                   child: Icon(Icons.code, color: Color(0xFF3B82F6)),
                 ),
                 title: const Text('Markdown (.md)'),
-                subtitle: const Text('Formatado com cabeçalho, pronto para documentação'),
+                subtitle: const Text(
+                  'Formatado com cabeçalho, pronto para documentação',
+                ),
                 onTap: () async {
                   Navigator.pop(ctx);
-                  await ref.read(jwEmailServiceProvider).exportInboxEntry(entry, format: 'markdown');
+                  await ref
+                      .read(jwEmailServiceProvider)
+                      .exportInboxEntry(entry, format: 'markdown');
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Nota copiada e arquivo Markdown gerado!')),
+                      const SnackBar(
+                        content: Text(
+                          'Nota copiada e arquivo Markdown gerado!',
+                        ),
+                      ),
                     );
                   }
                 },
@@ -1316,10 +1594,14 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                 subtitle: const Text('Copia texto puro e baixa arquivo .txt'),
                 onTap: () async {
                   Navigator.pop(ctx);
-                  await ref.read(jwEmailServiceProvider).exportInboxEntry(entry, format: 'text');
+                  await ref
+                      .read(jwEmailServiceProvider)
+                      .exportInboxEntry(entry, format: 'text');
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Nota copiada em texto puro!')),
+                      const SnackBar(
+                        content: Text('Nota copiada em texto puro!'),
+                      ),
                     );
                   }
                 },
@@ -1366,13 +1648,21 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                   child: Icon(Icons.code, color: Color(0xFF3B82F6)),
                 ),
                 title: const Text('Markdown (.md)'),
-                subtitle: const Text('Metadados teocráticos e corpo formatado em Markdown'),
+                subtitle: const Text(
+                  'Metadados teocráticos e corpo formatado em Markdown',
+                ),
                 onTap: () async {
                   Navigator.pop(ctx);
-                  await ref.read(jwEmailServiceProvider).exportEmail(msg, format: 'markdown');
+                  await ref
+                      .read(jwEmailServiceProvider)
+                      .exportEmail(msg, format: 'markdown');
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('E-mail copiado e arquivo Markdown baixado!')),
+                      const SnackBar(
+                        content: Text(
+                          'E-mail copiado e arquivo Markdown baixado!',
+                        ),
+                      ),
                     );
                   }
                 },
@@ -1383,13 +1673,19 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                   child: Icon(Icons.mail_outline, color: Color(0xFFD97706)),
                 ),
                 title: const Text('Formato Padrão RFC822 / E-mail (.eml)'),
-                subtitle: const Text('Compatível com clientes de e-mail e arquivos oficiais'),
+                subtitle: const Text(
+                  'Compatível com clientes de e-mail e arquivos oficiais',
+                ),
                 onTap: () async {
                   Navigator.pop(ctx);
-                  await ref.read(jwEmailServiceProvider).exportEmail(msg, format: 'eml');
+                  await ref
+                      .read(jwEmailServiceProvider)
+                      .exportEmail(msg, format: 'eml');
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Arquivo .eml gerado com sucesso!')),
+                      const SnackBar(
+                        content: Text('Arquivo .eml gerado com sucesso!'),
+                      ),
                     );
                   }
                 },
@@ -1400,13 +1696,19 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                   child: Icon(Icons.text_snippet, color: Color(0xFF10B981)),
                 ),
                 title: const Text('Texto Puro (.txt)'),
-                subtitle: const Text('Copia para a área de transferência e baixa .txt'),
+                subtitle: const Text(
+                  'Copia para a área de transferência e baixa .txt',
+                ),
                 onTap: () async {
                   Navigator.pop(ctx);
-                  await ref.read(jwEmailServiceProvider).exportEmail(msg, format: 'text');
+                  await ref
+                      .read(jwEmailServiceProvider)
+                      .exportEmail(msg, format: 'text');
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Conteúdo copiado em texto puro!')),
+                      const SnackBar(
+                        content: Text('Conteúdo copiado em texto puro!'),
+                      ),
                     );
                   }
                 },
@@ -1440,7 +1742,11 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
           ),
           child: Row(
             children: [
-              const Icon(Icons.security_rounded, size: 24, color: Color(0xFF2563EB)),
+              const Icon(
+                Icons.security_rounded,
+                size: 24,
+                color: Color(0xFF2563EB),
+              ),
               const SizedBox(width: 10),
               const Expanded(
                 child: Column(
@@ -1448,7 +1754,11 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                   children: [
                     Text(
                       'Cópias locais e prévias',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1D4ED8)),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: Color(0xFF1D4ED8),
+                      ),
                     ),
                     SizedBox(height: 2),
                     Text(
@@ -1464,7 +1774,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                   padding: const EdgeInsets.symmetric(horizontal: 10),
                 ),
                 onPressed: _isSyncingEmails ? null : _syncEmails,
-                child: Text(_isSyncingEmails ? '...' : 'Sincronizar', style: const TextStyle(fontSize: 12)),
+                child: Text(
+                  _isSyncingEmails ? '...' : 'Sincronizar',
+                  style: const TextStyle(fontSize: 12),
+                ),
               ),
             ],
           ),
@@ -1487,8 +1800,13 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                       },
                     )
                   : null,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 10,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
               isDense: true,
             ),
             onChanged: (val) => setState(() {}),
@@ -1510,7 +1828,13 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                   },
                 ),
                 const SizedBox(width: 6),
-                ...['assembleia', 'circuito', 'cartas', 'broadcasting', 'notícias'].map((tag) {
+                ...[
+                  'assembleia',
+                  'circuito',
+                  'cartas',
+                  'broadcasting',
+                  'notícias',
+                ].map((tag) {
                   final isSel = _selectedEmailTag == tag;
                   return Padding(
                     padding: const EdgeInsets.only(right: 6),
@@ -1549,17 +1873,28 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.mark_email_unread_outlined, size: 52, color: Colors.grey.shade400),
+                        Icon(
+                          Icons.mark_email_unread_outlined,
+                          size: 52,
+                          color: Colors.grey.shade400,
+                        ),
                         const SizedBox(height: 14),
                         const Text(
                           'Nenhuma correspondência teocrática retida',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
                         ),
                         const SizedBox(height: 8),
                         const Text(
                           'Configure Exchange ActiveSync ou IMAP em Ajustes e toque em Sincronizar Agora. Exchange salva apenas prévias experimentais, sem anexos; mantenha o correio oficial e seu backup.',
                           textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 13, color: Colors.grey, height: 1.4),
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey,
+                            height: 1.4,
+                          ),
                         ),
                         const SizedBox(height: 20),
                         Wrap(
@@ -1571,10 +1906,15 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                               onPressed: () {
                                 Navigator.push(
                                   context,
-                                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                                  MaterialPageRoute(
+                                    builder: (_) => const SettingsScreen(),
+                                  ),
                                 );
                               },
-                              icon: const Icon(Icons.settings_outlined, size: 18),
+                              icon: const Icon(
+                                Icons.settings_outlined,
+                                size: 18,
+                              ),
                               label: const Text('Configurar E-mail'),
                             ),
                             FilledButton.icon(
@@ -1593,32 +1933,61 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
               final folders = <String, String>{};
               for (final email in emails) {
                 if (email.folderId != null) {
-                  folders[email.folderId!] = email.folderName ?? 'Pasta Exchange';
+                  folders[email.folderId!] =
+                      email.folderName ?? 'Pasta Exchange';
                 }
               }
-              final selected = folders.containsKey(_selectedEmailFolder) ? _selectedEmailFolder : null;
-              final visible = selected == null ? emails : emails.where((email) => email.folderId == selected).toList();
-              return Column(children: [
-                if (folders.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: DropdownButton<String>(
-                      isExpanded: true,
-                      value: selected ?? '',
-                      items: [
-                        const DropdownMenuItem(value: '', child: Text('Todas as pastas')),
-                        ...folders.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value, overflow: TextOverflow.ellipsis))),
-                      ],
-                      onChanged: (value) => setState(() => _selectedEmailFolder = value == '' ? null : value),
+              final selected = folders.containsKey(_selectedEmailFolder)
+                  ? _selectedEmailFolder
+                  : null;
+              final visible = selected == null
+                  ? emails
+                  : emails
+                        .where((email) => email.folderId == selected)
+                        .toList();
+              return Column(
+                children: [
+                  if (folders.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: DropdownButton<String>(
+                        isExpanded: true,
+                        value: selected ?? '',
+                        items: [
+                          const DropdownMenuItem(
+                            value: '',
+                            child: Text('Todas as pastas'),
+                          ),
+                          ...folders.entries.map(
+                            (e) => DropdownMenuItem(
+                              value: e.key,
+                              child: Text(
+                                e.value,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                        ],
+                        onChanged: (value) => setState(
+                          () =>
+                              _selectedEmailFolder = value == '' ? null : value,
+                        ),
+                      ),
+                    ),
+                  Expanded(
+                    child: ListView.separated(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      itemCount: visible.length,
+                      separatorBuilder: (c, i) => const SizedBox(height: 10),
+                      itemBuilder: (c, i) =>
+                          _buildEmailCard(visible[i], isDark, isHub: false),
                     ),
                   ),
-                Expanded(child: ListView.separated(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  itemCount: visible.length,
-                  separatorBuilder: (c, i) => const SizedBox(height: 10),
-                  itemBuilder: (c, i) => _buildEmailCard(visible[i], isDark, isHub: false),
-                )),
-              ]);
+                ],
+              );
             },
           ),
         ),
@@ -1647,7 +2016,11 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                   color: const Color(0xFF6366F1).withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.fingerprint_rounded, size: 56, color: Color(0xFF6366F1)),
+                child: const Icon(
+                  Icons.fingerprint_rounded,
+                  size: 56,
+                  color: Color(0xFF6366F1),
+                ),
               ),
               const SizedBox(height: 20),
               const Text(
@@ -1664,10 +2037,16 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
               FilledButton.icon(
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFF6366F1),
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
                 ),
                 icon: const Icon(Icons.lock_open, size: 18),
-                label: const Text('Autenticar com Biometria / PIN', style: TextStyle(fontWeight: FontWeight.bold)),
+                label: const Text(
+                  'Autenticar com Biometria / PIN',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
                 onPressed: () async {
                   final authenticated = await biometric.authenticate(
                     context: context,
@@ -1695,11 +2074,17 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
           decoration: BoxDecoration(
             color: const Color(0xFF10B981).withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
+            border: Border.all(
+              color: const Color(0xFF10B981).withValues(alpha: 0.4),
+            ),
           ),
           child: Row(
             children: [
-              const Icon(Icons.verified_user, size: 20, color: Color(0xFF10B981)),
+              const Icon(
+                Icons.verified_user,
+                size: 20,
+                color: Color(0xFF10B981),
+              ),
               const SizedBox(width: 10),
               const Expanded(
                 child: Text(
@@ -1712,7 +2097,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                 ),
               ),
               TextButton.icon(
-                style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                ),
                 icon: const Icon(Icons.lock, size: 16),
                 label: const Text('Bloquear', style: TextStyle(fontSize: 12)),
                 onPressed: () {
@@ -1744,11 +2131,18 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.lock_outline, size: 48, color: Colors.grey.shade400),
+                        Icon(
+                          Icons.lock_outline,
+                          size: 48,
+                          color: Colors.grey.shade400,
+                        ),
                         const SizedBox(height: 12),
                         const Text(
                           'Nenhuma correspondência restrita do Hub',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                          ),
                         ),
                         const SizedBox(height: 6),
                         const Text(
@@ -1763,10 +2157,14 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
               }
 
               return ListView.separated(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 itemCount: letters.length,
                 separatorBuilder: (c, i) => const SizedBox(height: 10),
-                itemBuilder: (c, i) => _buildEmailCard(letters[i], isDark, isHub: true),
+                itemBuilder: (c, i) =>
+                    _buildEmailCard(letters[i], isDark, isHub: true),
               );
             },
           ),
@@ -1779,9 +2177,15 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
   // CARD DE E-MAIL / CARTA
   // ==========================================
 
-  Widget _buildEmailCard(JwEmailMessage msg, bool isDark, {bool isHub = false}) {
+  Widget _buildEmailCard(
+    JwEmailMessage msg,
+    bool isDark, {
+    bool isHub = false,
+  }) {
     final badgeColor = isHub
-        ? (msg.hubType == 'form' ? const Color(0xFF8B5CF6) : const Color(0xFFEF4444))
+        ? (msg.hubType == 'form'
+              ? const Color(0xFF8B5CF6)
+              : const Color(0xFFEF4444))
         : (msg.isDraft ? Colors.amber : const Color(0xFF3B82F6));
     final badgeLabel = isHub
         ? (msg.hubType == 'form' ? 'FORMULÁRIO HUB' : 'CARTA DO CORPO')
@@ -1813,7 +2217,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: badgeColor.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(6),
@@ -1829,9 +2236,18 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                 ),
                 const SizedBox(width: 8),
                 Tooltip(
-                  message: msg.isPermanentRetained ? 'Cópia local salva' : 'Prévia Exchange incompleta; não é backup',
-                  child: Icon(msg.isPermanentRetained ? Icons.shield_rounded : Icons.info_outline,
-                    size: 14, color: msg.isPermanentRetained ? const Color(0xFF10B981) : Colors.orange),
+                  message: msg.isPermanentRetained
+                      ? 'Cópia local salva'
+                      : 'Prévia Exchange incompleta; não é backup',
+                  child: Icon(
+                    msg.isPermanentRetained
+                        ? Icons.shield_rounded
+                        : Icons.info_outline,
+                    size: 14,
+                    color: msg.isPermanentRetained
+                        ? const Color(0xFF10B981)
+                        : Colors.orange,
+                  ),
                 ),
                 const Spacer(),
                 Text(
@@ -1854,7 +2270,11 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                       value: 'export',
                       child: Row(
                         children: [
-                          Icon(Icons.download_rounded, size: 18, color: Colors.blueAccent),
+                          Icon(
+                            Icons.download_rounded,
+                            size: 18,
+                            color: Colors.blueAccent,
+                          ),
                           SizedBox(width: 8),
                           Text('Exportar (.md / .eml)'),
                         ],
@@ -1864,7 +2284,11 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                       value: 'to_task',
                       child: Row(
                         children: [
-                          Icon(Icons.check_circle_outline, size: 18, color: Colors.green),
+                          Icon(
+                            Icons.check_circle_outline,
+                            size: 18,
+                            color: Colors.green,
+                          ),
                           SizedBox(width: 8),
                           Text('Virar Tarefa'),
                         ],
@@ -1891,7 +2315,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
               'De: ${msg.from}',
               style: TextStyle(
                 fontSize: 12,
-                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                color: isDark
+                    ? const Color(0xFF94A3B8)
+                    : const Color(0xFF64748B),
               ),
             ),
             const SizedBox(height: 4),
@@ -1902,7 +2328,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.bold,
-                color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B),
+                color: isDark
+                    ? const Color(0xFFF1F5F9)
+                    : const Color(0xFF1E293B),
               ),
             ),
             const SizedBox(height: 6),
@@ -1914,7 +2342,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 13,
-                color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                color: isDark
+                    ? const Color(0xFFCBD5E1)
+                    : const Color(0xFF475569),
               ),
             ),
             const SizedBox(height: 10),
@@ -1925,7 +2355,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                 if (msg.attachments.isNotEmpty)
                   Container(
                     margin: const EdgeInsets.only(right: 8),
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.grey.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(6),
@@ -1933,27 +2366,44 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.attach_file, size: 12, color: Colors.blueGrey),
+                        const Icon(
+                          Icons.attach_file,
+                          size: 12,
+                          color: Colors.blueGrey,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           '${msg.attachments.length} anexo(s)',
-                          style: const TextStyle(fontSize: 11, color: Colors.blueGrey),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Colors.blueGrey,
+                          ),
                         ),
                       ],
                     ),
                   ),
-                ...msg.tags.take(3).map((tag) => Container(
-                      margin: const EdgeInsets.only(right: 6),
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryBlue.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(6),
+                ...msg.tags
+                    .take(3)
+                    .map(
+                      (tag) => Container(
+                        margin: const EdgeInsets.only(right: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryBlue.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '#$tag',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: AppTheme.primaryBlue,
+                          ),
+                        ),
                       ),
-                      child: Text(
-                        '#$tag',
-                        style: const TextStyle(fontSize: 10, color: AppTheme.primaryBlue),
-                      ),
-                    )),
+                    ),
                 const Spacer(),
                 TextButton(
                   style: TextButton.styleFrom(
@@ -1961,7 +2411,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                     padding: EdgeInsets.zero,
                   ),
                   onPressed: () => _showEmailDetailsModal(context, msg),
-                  child: const Text('Ler Detalhes', style: TextStyle(fontSize: 12)),
+                  child: const Text(
+                    'Ler Detalhes',
+                    style: TextStyle(fontSize: 12),
+                  ),
                 ),
               ],
             ),
@@ -1998,7 +2451,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                     Expanded(
                       child: Text(
                         msg.subject,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
                       ),
                     ),
                     IconButton(
@@ -2021,24 +2477,51 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.shield_outlined, size: 14, color: Color(0xFF10B981)),
+                          const Icon(
+                            Icons.shield_outlined,
+                            size: 14,
+                            color: Color(0xFF10B981),
+                          ),
                           const SizedBox(width: 6),
                           Text(
-                            msg.isPermanentRetained ? 'Cópia local salva' : 'Prévia parcial: não é backup completo',
-                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF047857)),
+                            msg.isPermanentRetained
+                                ? 'Cópia local salva'
+                                : 'Prévia parcial: não é backup completo',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF047857),
+                            ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 6),
-                      if (msg.folderName != null) Text('Pasta: ${msg.folderName}', style: const TextStyle(fontSize: 12)),
-                      Text('De: ${msg.from}', style: const TextStyle(fontSize: 12)),
-                      Text('Para: ${msg.to}', style: const TextStyle(fontSize: 12)),
-                      Text('Data: ${msg.date.day}/${msg.date.month}/${msg.date.year} às ${msg.date.hour}:${msg.date.minute.toString().padLeft(2, '0')}',
-                          style: const TextStyle(fontSize: 12)),
+                      if (msg.folderName != null)
+                        Text(
+                          'Pasta: ${msg.folderName}',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      Text(
+                        'De: ${msg.from}',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      Text(
+                        'Para: ${msg.to}',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      Text(
+                        'Data: ${msg.date.day}/${msg.date.month}/${msg.date.year} às ${msg.date.hour}:${msg.date.minute.toString().padLeft(2, '0')}',
+                        style: const TextStyle(fontSize: 12),
+                      ),
                       if (msg.tags.isNotEmpty) ...[
                         const SizedBox(height: 4),
-                        Text('Tags: ${msg.tags.map((t) => "#$t").join(" ")}',
-                            style: const TextStyle(fontSize: 12, color: AppTheme.primaryBlue)),
+                        Text(
+                          'Tags: ${msg.tags.map((t) => "#$t").join(" ")}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.primaryBlue,
+                          ),
+                        ),
                       ],
                     ],
                   ),
@@ -2057,7 +2540,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                         ),
                         if (msg.attachments.isNotEmpty) ...[
                           const SizedBox(height: 20),
-                          const Text('Anexos:', style: TextStyle(fontWeight: FontWeight.bold)),
+                          const Text(
+                            'Anexos:',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
                           const SizedBox(height: 8),
                           ...msg.attachments.map((att) {
                             final name = att['name']?.toString() ?? 'anexo';
@@ -2065,7 +2551,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                             final type = att['type'] as String? ?? 'pdf';
                             return ListTile(
                               dense: true,
-                              leading: const Icon(Icons.attach_file, color: AppTheme.primaryBlue),
+                              leading: const Icon(
+                                Icons.attach_file,
+                                color: AppTheme.primaryBlue,
+                              ),
                               title: Text(name),
                               trailing: IconButton(
                                 icon: const Icon(Icons.open_in_new),
@@ -2115,8 +2604,11 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                         label: const Text('Responder SMTP'),
                         onPressed: () {
                           Navigator.pop(ctx);
-                          final replyTo = JwSmtpClient.extractValidEmailAddress(msg.from) ?? msg.from;
-                          final replySubj = msg.subject.toLowerCase().startsWith('re:')
+                          final replyTo =
+                              JwSmtpClient.extractValidEmailAddress(msg.from) ??
+                              msg.from;
+                          final replySubj =
+                              msg.subject.toLowerCase().startsWith('re:')
                               ? msg.subject
                               : 'Re: ${msg.subject}';
                           _showNewDraftDialog(
@@ -2206,14 +2698,20 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.edit_note, color: AppTheme.primaryBlue),
+                          const Icon(
+                            Icons.edit_note,
+                            color: AppTheme.primaryBlue,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               existingDraft != null
                                   ? 'Enviar ou Editar Rascunho'
                                   : 'Compor / Rascunho Teocrático',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
                             ),
                           ),
                         ],
@@ -2234,7 +2732,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                 inlineError!,
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: Theme.of(ctx).colorScheme.onErrorContainer,
+                                  color: Theme.of(ctx)
+                                      .colorScheme
+                                      .onErrorContainer,
                                 ),
                               ),
                               if (needsConfig) ...[
@@ -2305,7 +2805,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                         runSpacing: 8,
                         children: [
                           TextButton(
-                            onPressed: isSending ? null : () => Navigator.pop(ctx),
+                            onPressed: isSending
+                                ? null
+                                : () => Navigator.pop(ctx),
                             child: const Text('Cancelar'),
                           ),
                           OutlinedButton.icon(
@@ -2326,34 +2828,49 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                     final bodyText = contentCtrl.text.trim();
                                     final tags = tagsCtrl.text
                                         .split(',')
-                                        .map((t) => t.trim().replaceAll('#', ''))
+                                        .map(
+                                          (t) => t.trim().replaceAll('#', ''),
+                                        )
                                         .where((t) => t.isNotEmpty)
                                         .toList();
 
                                     final db = ref.read(repositoryProvider).db;
-                                    final emailEntry = await (db.select(db.appKvStore)
-                                          ..where((t) => t.key.equals('jw_imap_email')))
-                                        .getSingleOrNull();
-                                    final userEmail = emailEntry?.value.trim() ?? '';
+                                    final emailEntry =
+                                        await (db.select(db.appKvStore)..where(
+                                              (t) =>
+                                                  t.key.equals('jw_imap_email'),
+                                            ))
+                                            .getSingleOrNull();
+                                    final userEmail =
+                                        emailEntry?.value.trim() ?? '';
 
                                     final draft = JwEmailMessage(
-                                      id: existingDraft?.id ?? const Uuid().v4(),
+                                      id:
+                                          existingDraft?.id ??
+                                          const Uuid().v4(),
                                       subject: subject,
-                                      from: userEmail.isNotEmpty ? userEmail : 'local@dispositivo',
+                                      from: userEmail.isNotEmpty
+                                          ? userEmail
+                                          : 'local@dispositivo',
                                       to: to,
                                       date: DateTime.now(),
                                       bodyText: bodyText,
                                       isDraft: true,
                                       tags: tags,
                                     );
-                                    await ref.read(jwEmailServiceProvider).saveDraft(draft);
+                                    await ref
+                                        .read(jwEmailServiceProvider)
+                                        .saveDraft(draft);
                                     if (ctx.mounted) Navigator.pop(ctx);
                                     if (mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Rascunho salvo na retenção permanente!'),
-                                        ),
-                                      );
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'Rascunho salvo na retenção permanente!',
+                                              ),
+                                            ),
+                                          );
                                     }
                                   },
                           ),
@@ -2368,7 +2885,11 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                     ),
                                   )
                                 : const Icon(Icons.send_rounded, size: 16),
-                            label: Text(isSending ? 'Enviando SMTP...' : 'Enviar Agora (SMTP)'),
+                            label: Text(
+                              isSending
+                                  ? 'Enviando SMTP...'
+                                  : 'Enviar Agora (SMTP)',
+                            ),
                             onPressed: isSending
                                 ? null
                                 : () async {
@@ -2376,10 +2897,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                     final subject = subjectCtrl.text.trim();
                                     final bodyText = contentCtrl.text.trim();
                                     if (to.isEmpty ||
-                                        JwSmtpClient.parseRecipients(to).isEmpty) {
+                                        JwSmtpClient.parseRecipients(to)
+                                            .isEmpty) {
                                       setSheetState(() {
-                                        inlineError =
-                                            'Informe pelo menos um destinatário de e-mail válido no campo "Para".';
+                                        inlineError = 'Informe pelo menos um destinatário de e-mail válido no campo "Para".';
                                         needsConfig = false;
                                       });
                                       return;
@@ -2399,9 +2920,17 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                     });
 
                                     try {
-                                      final db = ref.read(repositoryProvider).db;
-                                      final protocol = await (db.select(db.appKvStore)
-                                            ..where((t) => t.key.equals('jw_mail_protocol'))).getSingleOrNull();
+                                      final db = ref
+                                          .read(repositoryProvider)
+                                          .db;
+                                      final protocol =
+                                          await (db.select(db.appKvStore)
+                                                ..where(
+                                                  (t) => t.key.equals(
+                                                    'jw_mail_protocol',
+                                                  ),
+                                                ))
+                                              .getSingleOrNull();
                                       if (protocol?.value == 'exchange') {
                                         if (ctx.mounted) {
                                           setSheetState(() {
@@ -2411,64 +2940,115 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                         }
                                         return;
                                       }
-                                      final emailEntry = await (db.select(db.appKvStore)
-                                            ..where((t) => t.key.equals('jw_imap_email')))
-                                          .getSingleOrNull();
-                                      const secureStorage = FlutterSecureStorage();
-                                      String? password = await secureStorage.read(key: 'jw_imap_password');
-                                      if (password == null || password.isEmpty) {
-                                        final legacyPass = await (db.select(db.appKvStore)
-                                              ..where((t) => t.key.equals('jw_imap_password')))
-                                            .getSingleOrNull();
+                                      final emailEntry =
+                                          await (db.select(db.appKvStore)
+                                                ..where(
+                                                  (t) => t.key.equals(
+                                                    'jw_imap_email',
+                                                  ),
+                                                ))
+                                              .getSingleOrNull();
+                                      const secureStorage =
+                                          FlutterSecureStorage();
+                                      String? password = await secureStorage
+                                          .read(key: 'jw_imap_password');
+                                      if (password == null ||
+                                          password.isEmpty) {
+                                        final legacyPass =
+                                            await (db.select(db.appKvStore)
+                                                  ..where(
+                                                    (t) => t.key.equals(
+                                                      'jw_imap_password',
+                                                    ),
+                                                  ))
+                                                .getSingleOrNull();
                                         password = legacyPass?.value;
                                       }
-                                      final username = emailEntry?.value.trim() ?? '';
-                                      if (username.isEmpty || password == null || password.isEmpty) {
+                                      final username =
+                                          emailEntry?.value.trim() ?? '';
+                                      if (username.isEmpty ||
+                                          password == null ||
+                                          password.isEmpty) {
                                         if (ctx.mounted) {
                                           setSheetState(() {
                                             isSending = false;
                                             needsConfig = true;
-                                            inlineError =
-                                                'Credenciais IMAP/SMTP não configuradas. Configure seu e-mail e senha teocráticos em Configurações antes de enviar.';
+                                            inlineError = 'Credenciais IMAP/SMTP não configuradas. Configure seu e-mail e senha teocráticos em Configurações antes de enviar.';
                                           });
                                         }
                                         return;
                                       }
 
-                                      final smtpHostEntry = await (db.select(db.appKvStore)
-                                            ..where((t) => t.key.equals('jw_smtp_host')))
-                                          .getSingleOrNull();
-                                      final imapHostEntry = await (db.select(db.appKvStore)
-                                            ..where((t) => t.key.equals('jw_imap_host')))
-                                          .getSingleOrNull();
-                                      final smtpPortEntry = await (db.select(db.appKvStore)
-                                            ..where((t) => t.key.equals('jw_smtp_port')))
-                                          .getSingleOrNull();
-                                      final smtpSecEntry = await (db.select(db.appKvStore)
-                                            ..where((t) => t.key.equals('jw_smtp_security')))
-                                          .getSingleOrNull();
+                                      final smtpHostEntry =
+                                          await (db.select(db.appKvStore)
+                                                ..where(
+                                                  (t) => t.key.equals(
+                                                    'jw_smtp_host',
+                                                  ),
+                                                ))
+                                              .getSingleOrNull();
+                                      final imapHostEntry =
+                                          await (db.select(db.appKvStore)
+                                                ..where(
+                                                  (t) => t.key.equals(
+                                                    'jw_imap_host',
+                                                  ),
+                                                ))
+                                              .getSingleOrNull();
+                                      final smtpPortEntry =
+                                          await (db.select(db.appKvStore)
+                                                ..where(
+                                                  (t) => t.key.equals(
+                                                    'jw_smtp_port',
+                                                  ),
+                                                ))
+                                              .getSingleOrNull();
+                                      final smtpSecEntry =
+                                          await (db.select(db.appKvStore)
+                                                ..where(
+                                                  (t) => t.key.equals(
+                                                    'jw_smtp_security',
+                                                  ),
+                                                ))
+                                              .getSingleOrNull();
 
                                       final smtpHost =
-                                          (smtpHostEntry?.value.trim().isNotEmpty == true)
-                                              ? smtpHostEntry!.value.trim()
-                                              : ((imapHostEntry?.value.trim().isNotEmpty == true)
-                                                  ? imapHostEntry!.value.trim()
-                                                  : 'mail.jw.org');
+                                          (smtpHostEntry?.value
+                                                  .trim()
+                                                  .isNotEmpty ==
+                                              true)
+                                          ? smtpHostEntry!.value.trim()
+                                          : ((imapHostEntry?.value
+                                                        .trim()
+                                                        .isNotEmpty ==
+                                                    true)
+                                                ? imapHostEntry!.value.trim()
+                                                : 'mail.jw.org');
                                       final securityMode =
-                                          (smtpSecEntry?.value.trim().isNotEmpty == true)
-                                              ? smtpSecEntry!.value.trim()
-                                              : 'starttls';
-                                      final smtpPort = int.tryParse(smtpPortEntry?.value ?? '') ??
+                                          (smtpSecEntry?.value
+                                                  .trim()
+                                                  .isNotEmpty ==
+                                              true)
+                                          ? smtpSecEntry!.value.trim()
+                                          : 'starttls';
+                                      final smtpPort =
+                                          int.tryParse(
+                                            smtpPortEntry?.value ?? '',
+                                          ) ??
                                           (securityMode == 'ssl' ? 465 : 587);
 
                                       final tags = tagsCtrl.text
                                           .split(',')
-                                          .map((t) => t.trim().replaceAll('#', ''))
+                                          .map(
+                                            (t) => t.trim().replaceAll('#', ''),
+                                          )
                                           .where((t) => t.isNotEmpty)
                                           .toList();
 
                                       final msgToSend = JwEmailMessage(
-                                        id: existingDraft?.id ?? const Uuid().v4(),
+                                        id:
+                                            existingDraft?.id ??
+                                            const Uuid().v4(),
                                         subject: subject,
                                         from: username,
                                         to: to,
@@ -2478,7 +3058,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                         tags: tags,
                                       );
 
-                                      await ref.read(jwEmailServiceProvider).sendEmail(
+                                      await ref
+                                          .read(jwEmailServiceProvider)
+                                          .sendEmail(
                                             host: smtpHost,
                                             port: smtpPort,
                                             username: username,
@@ -2490,7 +3072,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
 
                                       if (ctx.mounted) Navigator.pop(ctx);
                                       if (mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
                                           SnackBar(
                                             content: Text(
                                               'E-mail enviado via SMTP ($smtpHost:$smtpPort) e salvo na retenção permanente!',
@@ -2500,12 +3084,18 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
                                         );
                                       }
                                     } catch (e, st) {
-                                      AppLogger.warning('Falha ao enviar e-mail SMTP', e, st);
+                                      AppLogger.warning(
+                                        'Falha ao enviar e-mail SMTP',
+                                        e,
+                                        st,
+                                      );
                                       if (ctx.mounted) {
                                         setSheetState(() {
                                           isSending = false;
-                                          needsConfig = e is JwEmailAuthException;
-                                          inlineError = 'Falha no envio SMTP: $e';
+                                          needsConfig =
+                                              e is JwEmailAuthException;
+                                          inlineError =
+                                              'Falha no envio SMTP: $e';
                                         });
                                       }
                                     }
@@ -2530,7 +3120,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
 
   Future<void> _convertEmailToTask(JwEmailMessage msg) async {
     try {
-      await ref.read(taskManagerProvider).createTask(
+      await ref
+          .read(taskManagerProvider)
+          .createTask(
             title: msg.subject,
             description: 'E-mail de ${msg.from}:\n\n${msg.bodyText}',
             priority: 'normal',
@@ -2539,21 +3131,24 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
           );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('E-mail convertido em Tarefa com sucesso!')),
+          const SnackBar(
+            content: Text('E-mail convertido em Tarefa com sucesso!'),
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao converter: $e')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Erro ao converter: $e')));
       }
     }
   }
 
   Future<void> _convertEmailToResearch(JwEmailMessage msg) async {
     try {
-      await ref.read(researchManagerProvider).addArticle(
+      await ref
+          .read(researchManagerProvider)
+          .addArticle(
             title: msg.subject,
             summary: 'Correspondência JW de ${msg.from}',
             content: msg.bodyText,
@@ -2561,7 +3156,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen>
           );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Correspondência convertida em Artigo de Pesquisa!')),
+          const SnackBar(
+            content: Text('Correspondência convertida em Artigo de Pesquisa!'),
+          ),
         );
       }
     } catch (e) {

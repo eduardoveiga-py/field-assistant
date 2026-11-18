@@ -21,8 +21,7 @@ import '../database/repository.dart';
 /// Lançado quando um backup legado (v1 sem salt PBKDF2) é submetido sem confirmação explícita.
 class LegacyBackupNotAllowedException extends FormatException {
   const LegacyBackupNotAllowedException([
-    super.message =
-        'Backup no formato legado (v1, SHA-256 sem salt). Confirme explicitamente para importar e re-exporte na v2.',
+    super.message = 'Backup no formato legado (v1, SHA-256 sem salt). Confirme explicitamente para importar e re-exporte na v2.',
   ]);
 }
 
@@ -157,10 +156,12 @@ class BackupService {
 
   Future<bool> _tableExists(String tableName) async {
     try {
-      final rows = await repository.db.customSelect(
-        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
-        variables: [Variable.withString(tableName)],
-      ).get();
+      final rows = await repository.db
+          .customSelect(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+            variables: [Variable.withString(tableName)],
+          )
+          .get();
       return rows.isNotEmpty;
     } catch (e, st) {
       AppLogger.warning(
@@ -174,7 +175,9 @@ class BackupService {
 
   Future<List<Map<String, dynamic>>> _readRawTableRows(String tableName) async {
     if (!await _tableExists(tableName)) return const [];
-    final rows = await repository.db.customSelect('SELECT * FROM $tableName').get();
+    final rows = await repository.db
+        .customSelect('SELECT * FROM $tableName')
+        .get();
     return rows.map((r) => Map<String, dynamic>.from(r.data)).toList();
   }
 
@@ -409,13 +412,13 @@ class BackupService {
     final syncQueue = formatVersion >= 3
         ? const <SyncQueueEntry>[]
         : (await db.select(db.syncQueue).get())
-            .where(
-              (sq) =>
-                  sq.status == 'pending' &&
-                  (sq.operation.toUpperCase() == 'INSERT' ||
-                      sq.operation.toUpperCase() == 'UPDATE'),
-            )
-            .toList();
+              .where(
+                (sq) =>
+                    sq.status == 'pending' &&
+                    (sq.operation.toUpperCase() == 'INSERT' ||
+                        sq.operation.toUpperCase() == 'UPDATE'),
+              )
+              .toList();
     final voiceNotes = await db.select(db.voiceNotes).get();
     final phoneContacts = await db.select(db.phoneContacts).get();
     final landmarks = await db.select(db.territoryLandmarks).get();
@@ -526,7 +529,9 @@ class BackupService {
             if (await f.exists()) {
               final bytes = await f.readAsBytes();
               knowledgeDocumentFiles[doc.id] = base64Encode(bytes);
-              knowledgeDocumentHashes[doc.id] = sha256.convert(bytes).toString();
+              knowledgeDocumentHashes[doc.id] = sha256
+                  .convert(bytes)
+                  .toString();
             }
           } catch (e, st) {
             AppLogger.warning(
@@ -561,10 +566,10 @@ class BackupService {
             final mime = ext.endsWith('.png')
                 ? 'image/png'
                 : ext.endsWith('.webp')
-                    ? 'image/webp'
-                    : ext.endsWith('.gif')
-                        ? 'image/gif'
-                        : 'image/jpeg';
+                ? 'image/webp'
+                : ext.endsWith('.gif')
+                ? 'image/gif'
+                : 'image/jpeg';
             photoMap['imageData'] = 'data:$mime;base64,${base64Encode(bytes)}';
             photoMap['filePath'] = null;
           }
@@ -721,9 +726,13 @@ class BackupService {
       if (containerVersion == 2 || containerVersion == 3) {
         final saltBase64 = container['salt'] as String;
         final saltBytes = base64Decode(saltBase64);
-        final defaultIter = containerVersion == 3 ? defaultV3Iterations : 100000;
+        final defaultIter = containerVersion == 3
+            ? defaultV3Iterations
+            : 100000;
         final rawIterations = container['iterations'];
-        final iterations = rawIterations is num ? rawIterations.toInt() : defaultIter;
+        final iterations = rawIterations is num
+            ? rawIterations.toInt()
+            : defaultIter;
         final minIter = containerVersion == 3
             ? defaultV3Iterations
             : minAllowedKdfIterations;
@@ -1055,7 +1064,11 @@ class BackupService {
             corruptedAudioIds.add(entry.key);
           }
         } catch (e, st) {
-          AppLogger.warning('Falha ao validar hash de áudio voiceNote (${entry.key})', e, st);
+          AppLogger.warning(
+            'Falha ao validar hash de áudio voiceNote (${entry.key})',
+            e,
+            st,
+          );
           corruptedAudioIds.add(entry.key);
         }
       } else {
@@ -1075,7 +1088,11 @@ class BackupService {
             corruptedAudioIds.add(entry.key);
           }
         } catch (e, st) {
-          AppLogger.warning('Falha ao validar hash de áudio Ticuna (${entry.key})', e, st);
+          AppLogger.warning(
+            'Falha ao validar hash de áudio Ticuna (${entry.key})',
+            e,
+            st,
+          );
           corruptedAudioIds.add(entry.key);
         }
       } else {
@@ -1097,7 +1114,11 @@ class BackupService {
             corruptedDocumentIds.add(entry.key);
           }
         } catch (e, st) {
-          AppLogger.warning('Falha ao validar hash de documento (${entry.key})', e, st);
+          AppLogger.warning(
+            'Falha ao validar hash de documento (${entry.key})',
+            e,
+            st,
+          );
           corruptedDocumentIds.add(entry.key);
         }
       } else {
@@ -1147,22 +1168,39 @@ class BackupService {
   }
 
   static const Set<String> _dateFieldNames = {
-    'createdAt', 'created_at',
-    'updatedAt', 'updated_at',
-    'deletedAt', 'deleted_at',
-    'date', 'dateTimeField', 'date_time_field',
-    'firstContactAt', 'first_contact_at',
-    'lastContactAt', 'last_contact_at',
-    'nextActionAt', 'next_action_at',
-    'suggestedReturnDate', 'suggested_return_date',
-    'startedAt', 'started_at',
-    'lastSessionAt', 'last_session_at',
-    'nextPlannedAt', 'next_planned_at',
-    'startTime', 'start_time',
-    'endTime', 'end_time',
-    'lastModifiedExternal', 'last_modified_external',
-    'lastSyncedAt', 'last_synced_at',
-    'lastReviewedAt', 'last_reviewed_at',
+    'createdAt',
+    'created_at',
+    'updatedAt',
+    'updated_at',
+    'deletedAt',
+    'deleted_at',
+    'date',
+    'dateTimeField',
+    'date_time_field',
+    'firstContactAt',
+    'first_contact_at',
+    'lastContactAt',
+    'last_contact_at',
+    'nextActionAt',
+    'next_action_at',
+    'suggestedReturnDate',
+    'suggested_return_date',
+    'startedAt',
+    'started_at',
+    'lastSessionAt',
+    'last_session_at',
+    'nextPlannedAt',
+    'next_planned_at',
+    'startTime',
+    'start_time',
+    'endTime',
+    'end_time',
+    'lastModifiedExternal',
+    'last_modified_external',
+    'lastSyncedAt',
+    'last_synced_at',
+    'lastReviewedAt',
+    'last_reviewed_at',
   };
 
   Map<String, dynamic> _normalizePayloadDates(Map<String, dynamic> payload) {
@@ -1295,8 +1333,7 @@ class BackupService {
     final ticunaWordsRows = (data['ticunaWords'] as List<dynamic>?) ?? [];
     final ticunaPhrasesRows = (data['ticunaPhrases'] as List<dynamic>?) ?? [];
     final ticunaTagsRows = (data['ticunaTags'] as List<dynamic>?) ?? [];
-    final ticunaAudios =
-        (data['ticunaAudios'] as Map<String, dynamic>?) ?? {};
+    final ticunaAudios = (data['ticunaAudios'] as Map<String, dynamic>?) ?? {};
     final ticunaAudioHashes =
         (data['ticunaAudioHashes'] as Map<String, dynamic>?) ?? {};
 
@@ -1381,7 +1418,11 @@ class BackupService {
                   newlyAddedFiles.add(targetFile);
                 }
               } catch (e, st) {
-                AppLogger.warning('Falha ao preparar restauração de áudio voiceNote ($id)', e, st);
+                AppLogger.warning(
+                  'Falha ao preparar restauração de áudio voiceNote ($id)',
+                  e,
+                  st,
+                );
                 corruptedFiles.add(id);
               }
             }
@@ -1411,18 +1452,22 @@ class BackupService {
               await stagingFile.writeAsBytes(audioBytes, flush: true);
               stagedTicunaFiles[key] = stagingFile;
 
-              final targetFile =
-                  File('${restoredTicunaDir.path}/$safeKey.m4a');
+              final targetFile = File('${restoredTicunaDir.path}/$safeKey.m4a');
               if (await targetFile.exists()) {
-                final backupFile =
-                    File('${audioBackupDir.path}/tc_$safeKey.m4a');
+                final backupFile = File(
+                  '${audioBackupDir.path}/tc_$safeKey.m4a',
+                );
                 await targetFile.copy(backupFile.path);
                 replacedOriginalsBackup[targetFile] = backupFile;
               } else {
                 newlyAddedFiles.add(targetFile);
               }
             } catch (e, st) {
-              AppLogger.warning('Falha ao preparar restauração de áudio Ticuna ($key)', e, st);
+              AppLogger.warning(
+                'Falha ao preparar restauração de áudio Ticuna ($key)',
+                e,
+                st,
+              );
               corruptedFiles.add(key);
             }
           }
@@ -1451,25 +1496,34 @@ class BackupService {
                 final rawName =
                     (docMap['fileName'] ?? docMap['file_name'] ?? 'doc')
                         .toString();
-                final safeName =
-                    rawName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
-                final stagingFile =
-                    File('${stagingDir.path}/doc_${id}_$safeName');
+                final safeName = rawName.replaceAll(
+                  RegExp(r'[^a-zA-Z0-9._-]'),
+                  '_',
+                );
+                final stagingFile = File(
+                  '${stagingDir.path}/doc_${id}_$safeName',
+                );
                 await stagingFile.writeAsBytes(bytes, flush: true);
                 stagedDocFiles[id] = stagingFile;
 
-                final targetFile =
-                    File('${restoredDocsDir.path}/doc_${id}_$safeName');
+                final targetFile = File(
+                  '${restoredDocsDir.path}/doc_${id}_$safeName',
+                );
                 if (await targetFile.exists()) {
-                  final backupFile =
-                      File('${audioBackupDir.path}/doc_${id}_$safeName');
+                  final backupFile = File(
+                    '${audioBackupDir.path}/doc_${id}_$safeName',
+                  );
                   await targetFile.copy(backupFile.path);
                   replacedOriginalsBackup[targetFile] = backupFile;
                 } else {
                   newlyAddedFiles.add(targetFile);
                 }
               } catch (e, st) {
-                AppLogger.warning('Falha ao preparar restauração de documento ($id)', e, st);
+                AppLogger.warning(
+                  'Falha ao preparar restauração de documento ($id)',
+                  e,
+                  st,
+                );
                 corruptedFiles.add(id);
               }
             }
@@ -1480,14 +1534,22 @@ class BackupService {
           try {
             stagingDir.deleteSync(recursive: true);
           } catch (delErr, delSt) {
-            AppLogger.warning('Falha ao limpar stagingDir após erro de mídia', delErr, delSt);
+            AppLogger.warning(
+              'Falha ao limpar stagingDir após erro de mídia',
+              delErr,
+              delSt,
+            );
           }
         }
         if (audioBackupDir != null && audioBackupDir.existsSync()) {
           try {
             audioBackupDir.deleteSync(recursive: true);
           } catch (delErr, delSt) {
-            AppLogger.warning('Falha ao limpar audioBackupDir após erro de mídia', delErr, delSt);
+            AppLogger.warning(
+              'Falha ao limpar audioBackupDir após erro de mídia',
+              delErr,
+              delSt,
+            );
           }
         }
         throw RestoreMediaException(
@@ -1806,14 +1868,24 @@ class BackupService {
           )..where((tbl) => tbl.id.equals(entry.id))).getSingleOrNull();
           if (existing == null) {
             await db.into(db.familyTies).insert(entry);
-            await _reconstituteSyncQueue('family_ties', entry.id, 'INSERT', map);
+            await _reconstituteSyncQueue(
+              'family_ties',
+              entry.id,
+              'INSERT',
+              map,
+            );
             totalRestoredCount++;
           } else if ((entry.updatedAt ?? entry.createdAt).isAfter(
                 existing.updatedAt ?? existing.createdAt,
               ) ||
               entry.revision > existing.revision) {
             await db.update(db.familyTies).replace(entry);
-            await _reconstituteSyncQueue('family_ties', entry.id, 'UPDATE', map);
+            await _reconstituteSyncQueue(
+              'family_ties',
+              entry.id,
+              'UPDATE',
+              map,
+            );
             totalRestoredCount++;
           }
         }
@@ -2198,7 +2270,8 @@ class BackupService {
         }
 
         // 25. Perguntas de Conhecimento
-        final questionRows = (data['knowledgeQuestions'] as List<dynamic>?) ?? [];
+        final questionRows =
+            (data['knowledgeQuestions'] as List<dynamic>?) ?? [];
         for (final item in questionRows) {
           final map = item as Map<String, dynamic>;
           final entry = KnowledgeQuestionEntry.fromJson(map);
@@ -2327,10 +2400,12 @@ class BackupService {
             await stagedTicunaFiles[audioKey]!.copy(targetFile.path);
             map['audio_path'] = targetFile.path;
           }
-          final existingRows = await db.customSelect(
-            'SELECT updated_at FROM ticuna_words WHERE id = ?',
-            variables: [Variable.withString(id)],
-          ).get();
+          final existingRows = await db
+              .customSelect(
+                'SELECT updated_at FROM ticuna_words WHERE id = ?',
+                variables: [Variable.withString(id)],
+              )
+              .get();
           final existingUpdated = existingRows.isEmpty
               ? null
               : DateTime.tryParse(
@@ -2339,7 +2414,8 @@ class BackupService {
           final incomingUpdated = DateTime.tryParse(
             map['updated_at']?.toString() ?? '',
           );
-          final shouldWrite = existingRows.isEmpty ||
+          final shouldWrite =
+              existingRows.isEmpty ||
               (incomingUpdated != null &&
                   (existingUpdated == null ||
                       incomingUpdated.isAfter(existingUpdated)));
@@ -2397,10 +2473,12 @@ class BackupService {
             await stagedTicunaFiles[audioKey]!.copy(targetFile.path);
             map['audio_path'] = targetFile.path;
           }
-          final existingRows = await db.customSelect(
-            'SELECT updated_at FROM ticuna_phrases WHERE id = ?',
-            variables: [Variable.withString(id)],
-          ).get();
+          final existingRows = await db
+              .customSelect(
+                'SELECT updated_at FROM ticuna_phrases WHERE id = ?',
+                variables: [Variable.withString(id)],
+              )
+              .get();
           final existingUpdated = existingRows.isEmpty
               ? null
               : DateTime.tryParse(
@@ -2409,7 +2487,8 @@ class BackupService {
           final incomingUpdated = DateTime.tryParse(
             map['updated_at']?.toString() ?? '',
           );
-          final shouldWrite = existingRows.isEmpty ||
+          final shouldWrite =
+              existingRows.isEmpty ||
               (incomingUpdated != null &&
                   (existingUpdated == null ||
                       incomingUpdated.isAfter(existingUpdated)));
@@ -2452,19 +2531,18 @@ class BackupService {
           final map = Map<String, dynamic>.from(item as Map<String, dynamic>);
           final id = map['id']?.toString();
           final name = map['name']?.toString();
-          if (id == null || id.isEmpty || name == null || name.isEmpty) continue;
-          final existing = await db.customSelect(
-            'SELECT id FROM ticuna_tags WHERE id = ? OR name = ?',
-            variables: [Variable.withString(id), Variable.withString(name)],
-          ).get();
+          if (id == null || id.isEmpty || name == null || name.isEmpty)
+            continue;
+          final existing = await db
+              .customSelect(
+                'SELECT id FROM ticuna_tags WHERE id = ? OR name = ?',
+                variables: [Variable.withString(id), Variable.withString(name)],
+              )
+              .get();
           if (existing.isEmpty) {
             await db.customStatement(
               'INSERT OR IGNORE INTO ticuna_tags (id, name, created_at) VALUES (?, ?, ?)',
-              [
-                id,
-                name,
-                map['created_at'] ?? DateTime.now().toIso8601String(),
-              ],
+              [id, name, map['created_at'] ?? DateTime.now().toIso8601String()],
             );
             totalRestoredCount++;
           }
@@ -2492,17 +2570,21 @@ class BackupService {
         // Nunca reinjeta operações quando o dispositivo já está vinculado a uma
         // conta (`automatic_sync_owner_id`), nem operações destrutivas (DELETE/HARD_DELETE)
         // ou já finalizadas/conflitantes. Em backups v3, `syncQueue` nunca é exportada.
-        final boundOwnerRow = await (db.select(
-          db.appKvStore,
-        )..where((t) => t.key.equals('automatic_sync_owner_id'))).getSingleOrNull();
+        final boundOwnerRow =
+            await (db.select(db.appKvStore)
+                  ..where((t) => t.key.equals('automatic_sync_owner_id')))
+                .getSingleOrNull();
         final hasBoundOwner =
             boundOwnerRow != null && boundOwnerRow.value.trim().isNotEmpty;
         if (!hasBoundOwner) {
           final syncQueueRows = (data['syncQueue'] as List<dynamic>?) ?? [];
           for (final item in syncQueueRows) {
-            final rawMap = Map<String, dynamic>.from(item as Map<String, dynamic>);
+            final rawMap = Map<String, dynamic>.from(
+              item as Map<String, dynamic>,
+            );
             final opName = rawMap['operation']?.toString().toUpperCase() ?? '';
-            final status = rawMap['status']?.toString().toLowerCase() ?? 'pending';
+            final status =
+                rawMap['status']?.toString().toLowerCase() ?? 'pending';
             if (status != 'pending' ||
                 (opName != 'INSERT' && opName != 'UPDATE')) {
               continue;
@@ -2531,8 +2613,7 @@ class BackupService {
             )..where((tbl) => tbl.entityId.equals(entry.entityId))).get();
             final hasPendingForEntity = existingForEntity.any(
               (row) =>
-                  row.entityType == entry.entityType &&
-                  row.status == 'pending',
+                  row.entityType == entry.entityType && row.status == 'pending',
             );
             if (existingById == null && !hasPendingForEntity) {
               await db.into(db.syncQueue).insert(entry);
@@ -2578,14 +2659,22 @@ class BackupService {
         try {
           stagingDir.deleteSync(recursive: true);
         } catch (cleanupErr, cleanupSt) {
-          AppLogger.warning('Falha ao remover stagingDir no rollback', cleanupErr, cleanupSt);
+          AppLogger.warning(
+            'Falha ao remover stagingDir no rollback',
+            cleanupErr,
+            cleanupSt,
+          );
         }
       }
       if (audioBackupDir != null && audioBackupDir.existsSync()) {
         try {
           audioBackupDir.deleteSync(recursive: true);
         } catch (cleanupErr, cleanupSt) {
-          AppLogger.warning('Falha ao remover audioBackupDir no rollback', cleanupErr, cleanupSt);
+          AppLogger.warning(
+            'Falha ao remover audioBackupDir no rollback',
+            cleanupErr,
+            cleanupSt,
+          );
         }
       }
 
@@ -2597,14 +2686,22 @@ class BackupService {
       try {
         stagingDir.deleteSync(recursive: true);
       } catch (cleanupErr, cleanupSt) {
-        AppLogger.warning('Falha ao remover stagingDir após restauração', cleanupErr, cleanupSt);
+        AppLogger.warning(
+          'Falha ao remover stagingDir após restauração',
+          cleanupErr,
+          cleanupSt,
+        );
       }
     }
     if (audioBackupDir != null && audioBackupDir.existsSync()) {
       try {
         audioBackupDir.deleteSync(recursive: true);
       } catch (cleanupErr, cleanupSt) {
-        AppLogger.warning('Falha ao remover audioBackupDir após restauração', cleanupErr, cleanupSt);
+        AppLogger.warning(
+          'Falha ao remover audioBackupDir após restauração',
+          cleanupErr,
+          cleanupSt,
+        );
       }
     }
 
@@ -2668,9 +2765,9 @@ class BackupService {
     final stored = await _storage.read(key: _silentBackupKeySecret);
     if (stored != null && stored.isNotEmpty) {
       if (legacyRow != null) {
-        await (db.delete(db.appKvStore)
-              ..where((tbl) => tbl.key.equals(_silentBackupKeySecret)))
-            .go();
+        await (db.delete(
+          db.appKvStore,
+        )..where((tbl) => tbl.key.equals(_silentBackupKeySecret))).go();
       }
       return stored;
     }
@@ -2680,12 +2777,14 @@ class BackupService {
         : base64Encode(_generateSecureRandom(32));
     await _storage.write(key: _silentBackupKeySecret, value: secret);
     if (await _storage.read(key: _silentBackupKeySecret) != secret) {
-      throw const StorageUnavailableException('Não foi possível persistir a chave do backup.');
+      throw const StorageUnavailableException(
+        'Não foi possível persistir a chave do backup.',
+      );
     }
     if (legacyRow != null) {
-      await (db.delete(db.appKvStore)
-            ..where((tbl) => tbl.key.equals(_silentBackupKeySecret)))
-          .go();
+      await (db.delete(
+        db.appKvStore,
+      )..where((tbl) => tbl.key.equals(_silentBackupKeySecret))).go();
     }
     return secret;
   }
@@ -2722,7 +2821,9 @@ class BackupService {
       final backupDir = Directory('${dir.path}/backups');
       await backupDir.create(recursive: true);
       final backupFile = File('${backupDir.path}/silent_backup.bak');
-      final temporaryFile = File('${backupDir.path}/silent_backup_${_uuid.v4()}.tmp');
+      final temporaryFile = File(
+        '${backupDir.path}/silent_backup_${_uuid.v4()}.tmp',
+      );
       try {
         await temporaryFile.writeAsString(backupJson, flush: true);
         await _validateSnapshotFile(temporaryFile, password: deviceSecret);

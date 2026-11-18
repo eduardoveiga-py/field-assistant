@@ -378,7 +378,8 @@ class ResearchArticles extends Table {
   TextColumn get status => text().withDefault(const Constant('active'))();
   TextColumn get conclusion => text().nullable()();
   TextColumn get projectId => text().nullable().named('project_id')();
-  TextColumn get mainQuestionId => text().nullable().named('main_question_id')();
+  TextColumn get mainQuestionId =>
+      text().nullable().named('main_question_id')();
 
   // Auditoria e sincronização
   DateTimeColumn get createdAt => dateTime().named('created_at')();
@@ -506,11 +507,13 @@ class CalendarEventLinks extends Table {
 @DataClassName('AppLanguageEntry')
 class AppLanguages extends Table {
   TextColumn get id => text()(); // UUID v4 ou code (ex: 'tca', 'gub', 'yan')
-  TextColumn get name => text()(); // ex: 'Ticuna (Magüta)', 'Guajajara (Tenetehara)'
+  TextColumn get name =>
+      text()(); // ex: 'Ticuna (Magüta)', 'Guajajara (Tenetehara)'
   TextColumn get code => text()(); // ISO 639-3 (ex: 'tca')
   TextColumn get symbol => text()(); // Emoji/ícone (ex: '🏹', '🌿')
-  TextColumn get diacritics =>
-      text().withDefault(const Constant('[]'))(); // JSON array com caracteres especiais
+  TextColumn get diacritics => text().withDefault(
+    const Constant('[]'),
+  )(); // JSON array com caracteres especiais
   BoolColumn get isDefault =>
       boolean().withDefault(const Constant(false)).named('is_default')();
   DateTimeColumn get createdAt => dateTime().named('created_at')();
@@ -527,26 +530,28 @@ class AppLanguages extends Table {
 class InboxEntries extends Table {
   TextColumn get id => text()(); // UUID v4
   TextColumn get content => text()();
-  TextColumn get sourceType =>
-      text().withDefault(const Constant('text')).named('source_type')(); // text, audio, image, file, link, share
+  TextColumn get sourceType => text()
+      .withDefault(const Constant('text'))
+      .named('source_type')(); // text, audio, image, file, link, share
   TextColumn get mediaPath => text().nullable().named('media_path')();
   IntColumn get mediaDurationSeconds =>
       integer().nullable().named('media_duration_seconds')();
   TextColumn get attachments =>
       text().withDefault(const Constant('[]'))(); // JSON array
-  TextColumn get status =>
-      text().withDefault(const Constant('unprocessed'))(); // unprocessed, in_review, converted, archived
+  TextColumn get status => text().withDefault(
+    const Constant('unprocessed'),
+  )(); // unprocessed, in_review, converted, archived
   TextColumn get suggestedCategory =>
       text().nullable().named('suggested_category')();
-  TextColumn get convertedEntityType =>
-      text().nullable().named('converted_entity_type')(); // task, project, note, question, research, document, resource, person
+  TextColumn get convertedEntityType => text().nullable().named(
+    'converted_entity_type',
+  )(); // task, project, note, question, research, document, resource, person
   TextColumn get convertedEntityId =>
       text().nullable().named('converted_entity_id')();
   DateTimeColumn get capturedAt => dateTime().named('captured_at')();
   DateTimeColumn get processedAt =>
       dateTime().nullable().named('processed_at')();
-  TextColumn get metadata =>
-      text().withDefault(const Constant('{}'))(); // JSON
+  TextColumn get metadata => text().withDefault(const Constant('{}'))(); // JSON
 
   // Auditoria e sincronização
   DateTimeColumn get createdAt => dateTime().named('created_at')();
@@ -567,18 +572,20 @@ class Projects extends Table {
   TextColumn get name => text()();
   TextColumn get objective => text().nullable()();
   TextColumn get description => text().nullable()();
-  TextColumn get category =>
-      text().withDefault(const Constant('ministry'))(); // ministry, tech, personal, research, linguistic
-  TextColumn get status =>
-      text().withDefault(const Constant('active'))(); // planning, active, paused, completed, archived
+  TextColumn get category => text().withDefault(
+    const Constant('ministry'),
+  )(); // ministry, tech, personal, research, linguistic
+  TextColumn get status => text().withDefault(
+    const Constant('active'),
+  )(); // planning, active, paused, completed, archived
   TextColumn get colorHex => text().nullable().named('color_hex')();
   TextColumn get iconName => text().nullable().named('icon_name')();
   DateTimeColumn get startDate => dateTime().nullable().named('start_date')();
   DateTimeColumn get targetDate => dateTime().nullable().named('target_date')();
-  DateTimeColumn get completedAt => dateTime().nullable().named('completed_at')();
+  DateTimeColumn get completedAt =>
+      dateTime().nullable().named('completed_at')();
   TextColumn get originInboxId => text().nullable().named('origin_inbox_id')();
-  TextColumn get metadata =>
-      text().withDefault(const Constant('{}'))(); // JSON
+  TextColumn get metadata => text().withDefault(const Constant('{}'))(); // JSON
 
   DateTimeColumn get createdAt => dateTime().named('created_at')();
   DateTimeColumn get updatedAt => dateTime().named('updated_at')();
@@ -602,30 +609,36 @@ class Tasks extends Table {
 
   TextColumn get title => text()();
   TextColumn get description => text().nullable()();
-  TextColumn get status =>
-      text().withDefault(const Constant('todo'))(); // todo, in_progress, waiting, completed, cancelled, archived
-  TextColumn get priority =>
-      text().withDefault(const Constant('normal'))(); // low, normal, high, urgent
-  TextColumn get category =>
-      text().withDefault(const Constant('ministry'))(); // ministry, tech, personal, research, linguistic
+  TextColumn get status => text().withDefault(
+    const Constant('todo'),
+  )(); // todo, in_progress, waiting, completed, cancelled, archived
+  TextColumn get priority => text().withDefault(
+    const Constant('normal'),
+  )(); // low, normal, high, urgent
+  TextColumn get category => text().withDefault(
+    const Constant('ministry'),
+  )(); // ministry, tech, personal, research, linguistic
 
   DateTimeColumn get startDate => dateTime().nullable().named('start_date')();
   DateTimeColumn get dueDate => dateTime().nullable().named('due_date')();
-  DateTimeColumn get scheduledAt => dateTime().nullable().named('scheduled_at')();
-  IntColumn get durationMinutes =>
-      integer().nullable().named('duration_minutes').withDefault(const Constant(30))();
-  DateTimeColumn get completedAt => dateTime().nullable().named('completed_at')();
+  DateTimeColumn get scheduledAt =>
+      dateTime().nullable().named('scheduled_at')();
+  IntColumn get durationMinutes => integer()
+      .nullable()
+      .named('duration_minutes')
+      .withDefault(const Constant(30))();
+  DateTimeColumn get completedAt =>
+      dateTime().nullable().named('completed_at')();
 
   BoolColumn get isRecurring =>
       boolean().named('is_recurring').withDefault(const Constant(false))();
-  TextColumn get recurrenceRule =>
-      text().nullable().named('recurrence_rule')(); // daily, weekly, monthly, custom RRULE
-  TextColumn get appointmentId =>
-      text().nullable().named('appointment_id')();
+  TextColumn get recurrenceRule => text().nullable().named(
+    'recurrence_rule',
+  )(); // daily, weekly, monthly, custom RRULE
+  TextColumn get appointmentId => text().nullable().named('appointment_id')();
   TextColumn get attachments =>
       text().withDefault(const Constant('[]'))(); // JSON array
-  TextColumn get metadata =>
-      text().withDefault(const Constant('{}'))(); // JSON
+  TextColumn get metadata => text().withDefault(const Constant('{}'))(); // JSON
 
   DateTimeColumn get createdAt => dateTime().named('created_at')();
   DateTimeColumn get updatedAt => dateTime().named('updated_at')();
@@ -649,9 +662,11 @@ class KnowledgeNotes extends Table {
 
   TextColumn get title => text()();
   TextColumn get content => text()(); // Markdown format
-  TextColumn get category =>
-      text().withDefault(const Constant('general'))(); // biblical, ministry, ticuna, tech, personal, general
-  TextColumn get tags => text().withDefault(const Constant('[]'))(); // JSON array
+  TextColumn get category => text().withDefault(
+    const Constant('general'),
+  )(); // biblical, ministry, ticuna, tech, personal, general
+  TextColumn get tags =>
+      text().withDefault(const Constant('[]'))(); // JSON array
   TextColumn get attachments =>
       text().withDefault(const Constant('[]'))(); // JSON array
   TextColumn get sources =>
@@ -680,10 +695,12 @@ class KnowledgeQuestions extends Table {
 
   TextColumn get question => text()();
   TextColumn get context => text().nullable()();
-  TextColumn get category =>
-      text().withDefault(const Constant('biblical'))(); // biblical, ministry, ticuna, tech, personal
-  TextColumn get status =>
-      text().withDefault(const Constant('unanswered'))(); // unanswered, researching, answered, archived
+  TextColumn get category => text().withDefault(
+    const Constant('biblical'),
+  )(); // biblical, ministry, ticuna, tech, personal
+  TextColumn get status => text().withDefault(
+    const Constant('unanswered'),
+  )(); // unanswered, researching, answered, archived
   TextColumn get answer => text().nullable()();
   DateTimeColumn get answeredAt => dateTime().nullable().named('answered_at')();
 
@@ -715,8 +732,7 @@ class KnowledgeDocuments extends Table {
       text().named('file_path')(); // Caminho local relativo seguro
   TextColumn get remoteStoragePath =>
       text().nullable().named('remote_storage_path')(); // Supabase storage
-  TextColumn get sha256Checksum =>
-      text().nullable().named('sha256_checksum')();
+  TextColumn get sha256Checksum => text().nullable().named('sha256_checksum')();
   TextColumn get description => text().nullable()();
   TextColumn get tags => text().withDefault(const Constant('[]'))();
   TextColumn get category => text().withDefault(const Constant('general'))();
@@ -740,8 +756,7 @@ class KnowledgeResources extends Table {
   TextColumn get originInboxId => text().nullable().named('origin_inbox_id')();
 
   TextColumn get title => text()();
-  TextColumn get resourceType =>
-      text().named('resource_type')(); // link, video, jw_publication, tool, reference, template, tutorial, other
+  TextColumn get resourceType => text().named('resource_type')(); // link, video, jw_publication, tool, reference, template, tutorial, other
   TextColumn get description => text().nullable()();
   TextColumn get url => text().nullable()();
   TextColumn get localAssetPath =>
@@ -764,8 +779,10 @@ class TicunaWords extends Table {
   TextColumn get word => text()();
   TextColumn get translation => text()();
   TextColumn get phonetics => text().nullable()();
-  TextColumn get grammaticalClass => text().nullable().named('grammatical_class')();
-  TextColumn get exampleSentence => text().nullable().named('example_sentence')();
+  TextColumn get grammaticalClass =>
+      text().nullable().named('grammatical_class')();
+  TextColumn get exampleSentence =>
+      text().nullable().named('example_sentence')();
   TextColumn get exampleTranslation =>
       text().nullable().named('example_translation')();
   TextColumn get notes => text().nullable()();
@@ -776,12 +793,15 @@ class TicunaWords extends Table {
       integer().named('review_level').withDefault(const Constant(0))();
   IntColumn get reviewCount =>
       integer().named('review_count').withDefault(const Constant(0))();
-  TextColumn get lastReviewedAt => text().nullable().named('last_reviewed_at')();
+  TextColumn get lastReviewedAt =>
+      text().nullable().named('last_reviewed_at')();
   TextColumn get audioPath => text().nullable().named('audio_path')();
   IntColumn get audioDurationSeconds =>
       integer().nullable().named('audio_duration_seconds')();
-  TextColumn get languageId =>
-      text().nullable().named('language_id').withDefault(const Constant('tca'))();
+  TextColumn get languageId => text()
+      .nullable()
+      .named('language_id')
+      .withDefault(const Constant('tca'))();
   TextColumn get createdAt => text().named('created_at')();
   TextColumn get updatedAt => text().named('updated_at')();
 
@@ -803,8 +823,10 @@ class TicunaPhrases extends Table {
   TextColumn get audioPath => text().nullable().named('audio_path')();
   IntColumn get audioDurationSeconds =>
       integer().nullable().named('audio_duration_seconds')();
-  TextColumn get languageId =>
-      text().nullable().named('language_id').withDefault(const Constant('tca'))();
+  TextColumn get languageId => text()
+      .nullable()
+      .named('language_id')
+      .withDefault(const Constant('tca'))();
   TextColumn get createdAt => text().named('created_at')();
   TextColumn get updatedAt => text().named('updated_at')();
 

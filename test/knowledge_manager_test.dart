@@ -17,54 +17,61 @@ void main() {
       await db.close();
     });
 
-    test('TC-KNW-01: Criação, fixação e busca de notas de conhecimento', () async {
-      final note1 = await km.createNote(
-        title: 'Como iniciar conversas com pescadores',
-        content: 'Usar ilustração sobre redes e previsão do tempo...',
-        category: 'ministry',
-      );
-      final note2 = await km.createNote(
-        title: 'Vocabulário Ticuna de boas-vindas',
-        content: 'Ta-ẽ-mã! Nùmá tá i yae?',
-        category: 'ticuna',
-      );
+    test(
+      'TC-KNW-01: Criação, fixação e busca de notas de conhecimento',
+      () async {
+        final note1 = await km.createNote(
+          title: 'Como iniciar conversas com pescadores',
+          content: 'Usar ilustração sobre redes e previsão do tempo...',
+          category: 'ministry',
+        );
+        final note2 = await km.createNote(
+          title: 'Vocabulário Ticuna de boas-vindas',
+          content: 'Ta-ẽ-mã! Nùmá tá i yae?',
+          category: 'ticuna',
+        );
 
-      expect(note1.title, contains('pescadores'));
-      expect(note2.category, equals('ticuna'));
+        expect(note1.title, contains('pescadores'));
+        expect(note2.category, equals('ticuna'));
 
-      // Fixa a segunda nota no topo
-      await km.togglePinNote(note2.id);
-      final notes = await km.watchNotes().first;
-      expect(notes.first.id, equals(note2.id));
-      expect(notes.first.isPinned, isTrue);
+        // Fixa a segunda nota no topo
+        await km.togglePinNote(note2.id);
+        final notes = await km.watchNotes().first;
+        expect(notes.first.id, equals(note2.id));
+        expect(notes.first.isPinned, isTrue);
 
-      // Busca textual filtrada
-      final searchRes = await km.watchNotes(query: 'pescadores').first;
-      expect(searchRes.length, equals(1));
-      expect(searchRes.first.id, equals(note1.id));
-    });
+        // Busca textual filtrada
+        final searchRes = await km.watchNotes(query: 'pescadores').first;
+        expect(searchRes.length, equals(1));
+        expect(searchRes.first.id, equals(note1.id));
+      },
+    );
 
-    test('TC-KNW-02: Gestão de dúvidas teocráticas e respostas bíblicas', () async {
-      final q = await km.createQuestion(
-        question: 'Por que Deus permite o sofrimento?',
-        context: 'Pergunta feita pela dona Maria na rua do porto',
-        category: 'biblical',
-      );
+    test(
+      'TC-KNW-02: Gestão de dúvidas teocráticas e respostas bíblicas',
+      () async {
+        final q = await km.createQuestion(
+          question: 'Por que Deus permite o sofrimento?',
+          context: 'Pergunta feita pela dona Maria na rua do porto',
+          category: 'biblical',
+        );
 
-      expect(q.status, equals('unanswered'));
-      expect(q.answer, isNull);
+        expect(q.status, equals('unanswered'));
+        expect(q.answer, isNull);
 
-      // Responde a dúvida
-      await km.answerQuestion(
-        q.id,
-        answer: 'Baseado em Tiago 1:13 e 1 João 5:19: Deus nunca causa o mal...',
-      );
+        // Responde a dúvida
+        await km.answerQuestion(
+          q.id,
+          answer:
+              'Baseado em Tiago 1:13 e 1 João 5:19: Deus nunca causa o mal...',
+        );
 
-      final updated = (await km.watchQuestions().first).first;
-      expect(updated.status, equals('answered'));
-      expect(updated.answer, contains('Tiago 1:13'));
-      expect(updated.answeredAt, isNotNull);
-    });
+        final updated = (await km.watchQuestions().first).first;
+        expect(updated.status, equals('answered'));
+        expect(updated.answer, contains('Tiago 1:13'));
+        expect(updated.answeredAt, isNotNull);
+      },
+    );
 
     test('TC-KNW-03: Registro de documentos locais com hash SHA-256', () async {
       final doc = await km.registerDocument(
@@ -73,7 +80,8 @@ void main() {
         fileType: 'pdf',
         fileSize: 204800,
         filePath: 'knowledge_vault/manual_campo_2026.pdf',
-        sha256Checksum: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+        sha256Checksum:
+            'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
         category: 'manual',
       );
 
@@ -94,7 +102,8 @@ void main() {
 
       await km.createNote(
         title: 'A Bíblia e a paz mental',
-        content: 'Filipenses 4:6, 7 — A paz de Deus que excede todo o entendimento',
+        content:
+            'Filipenses 4:6, 7 — A paz de Deus que excede todo o entendimento',
       );
 
       // Busca unificada por palavra "Bíblia" encontra recurso e nota

@@ -218,9 +218,7 @@ class TicunaUnicodeHelper {
         height: height,
       );
     }
-    return style.copyWith(
-      fontFamilyFallback: fontFallback,
-    );
+    return style.copyWith(fontFamilyFallback: fontFallback);
   }
 }
 
@@ -237,12 +235,13 @@ class TicunaInputFormatter extends TextInputFormatter {
     if (normalized == newValue.text) return newValue;
 
     final diff = normalized.length - newValue.text.length;
-    final newOffset =
-        (newValue.selection.baseOffset + diff).clamp(0, normalized.length);
+    final newOffset = (newValue.selection.baseOffset + diff).clamp(
+      0,
+      normalized.length,
+    );
     return TextEditingValue(
       text: normalized,
       selection: TextSelection.collapsed(offset: newOffset),
     );
   }
 }
-

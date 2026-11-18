@@ -58,16 +58,18 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _fallbackPersonFuture =
-        ref.read(repositoryProvider).getPersonById(widget.personId);
+    _fallbackPersonFuture = ref
+        .read(repositoryProvider)
+        .getPersonById(widget.personId);
   }
 
   @override
   void didUpdateWidget(covariant PersonDetailScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.personId != widget.personId) {
-      _fallbackPersonFuture =
-          ref.read(repositoryProvider).getPersonById(widget.personId);
+      _fallbackPersonFuture = ref
+          .read(repositoryProvider)
+          .getPersonById(widget.personId);
     }
   }
 
@@ -211,402 +213,407 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
     showDialog(
       context: context,
       builder: (ctx) => ManagedTextControllers(
-        initialTexts: [
-          'Estudo de ${person.name}',
-          '1',
-          '1',
-        ],
+        initialTexts: ['Estudo de ${person.name}', '1', '1'],
         builder: (ctx, ctrls) {
           final titleController = ctrls[0];
           final lessonController = ctrls[1];
           final paragraphController = ctrls[2];
           return StatefulBuilder(
-        builder: (ctx, setDialogState) {
-          final isDark = Theme.of(ctx).brightness == Brightness.dark;
+            builder: (ctx, setDialogState) {
+              final isDark = Theme.of(ctx).brightness == Brightness.dark;
 
-          return AlertDialog(
-            title: Row(
-              children: [
-                const Icon(Icons.school, color: Color(0xFF7C3AED)),
-                const SizedBox(width: 8),
-                Expanded(child: Text('Iniciar Estudo: ${person.name}')),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    margin: const EdgeInsets.only(bottom: 12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF7C3AED).withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: const Color(0xFF7C3AED).withValues(alpha: 0.25),
-                      ),
-                    ),
-                    child: const Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          Icons.info_outline,
-                          size: 16,
-                          color: Color(0xFF7C3AED),
-                        ),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Estudo já em andamento? Defina a data real de início e a lição atual para que as estatísticas reflitam a realidade com precisão sem necessidade de sessões passadas fictícias.',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Color(0xFF5B21B6),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  TextField(
-                    controller: titleController,
-                    decoration: const InputDecoration(
-                      labelText: 'Título do estudo *',
-                      hintText: 'Ex: Estudo da Família Lima',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    initialValue: selectedStatus,
-                    decoration: const InputDecoration(
-                      labelText: 'Situação Inicial *',
-                    ),
-                    items: const [
-                      DropdownMenuItem(
-                        value: 'ativo',
-                        child: Text('Ativo (Em andamento)'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'pausado',
-                        child: Text('Pausado'),
-                      ),
-                    ],
-                    onChanged: (val) {
-                      if (val != null) {
-                        setDialogState(() => selectedStatus = val);
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  // Data de Início Real
-                  Row(
+              return AlertDialog(
+                title: Row(
+                  children: [
+                    const Icon(Icons.school, color: Color(0xFF7C3AED)),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text('Iniciar Estudo: ${person.name}')),
+                  ],
+                ),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          icon: const Icon(Icons.calendar_today, size: 16),
-                          label: Text(
-                            'Início: ${AppDateUtils.formatDate(selectedStartedAt)}',
-                            style: const TextStyle(fontSize: 12),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF7C3AED)
+                              .withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: const Color(0xFF7C3AED)
+                                .withValues(alpha: 0.25),
                           ),
-                          onPressed: () async {
-                            final picked = await showDatePicker(
-                              context: context,
-                              initialDate: selectedStartedAt,
-                              firstDate: DateTime(2010),
-                              lastDate: DateTime.now().add(
-                                const Duration(days: 365),
+                        ),
+                        child: const Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              Icons.info_outline,
+                              size: 16,
+                              color: Color(0xFF7C3AED),
+                            ),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Estudo já em andamento? Defina a data real de início e a lição atual para que as estatísticas reflitam a realidade com precisão sem necessidade de sessões passadas fictícias.',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Color(0xFF5B21B6),
+                                ),
                               ),
-                            );
-                            if (picked != null) {
-                              setDialogState(() => selectedStartedAt = picked);
-                            }
-                          },
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  // Data da Última Sessão Realizada (opcional)
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          icon: const Icon(Icons.history, size: 16),
-                          label: Text(
-                            selectedLastSessionAt != null
-                                ? 'Última Sessão: ${AppDateUtils.formatDate(selectedLastSessionAt!)}'
-                                : 'Última Sessão (opcional)',
-                            style: const TextStyle(fontSize: 12),
+                      TextField(
+                        controller: titleController,
+                        decoration: const InputDecoration(
+                          labelText: 'Título do estudo *',
+                          hintText: 'Ex: Estudo da Família Lima',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        initialValue: selectedStatus,
+                        decoration: const InputDecoration(
+                          labelText: 'Situação Inicial *',
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'ativo',
+                            child: Text('Ativo (Em andamento)'),
                           ),
-                          onPressed: () async {
-                            final picked = await showDatePicker(
-                              context: context,
-                              initialDate:
-                                  selectedLastSessionAt ?? selectedStartedAt,
-                              firstDate: DateTime(2010),
-                              lastDate: DateTime.now(),
-                            );
-                            if (picked != null) {
-                              setDialogState(
-                                () => selectedLastSessionAt = picked,
-                              );
-                            }
-                          },
-                        ),
-                      ),
-                      if (selectedLastSessionAt != null)
-                        IconButton(
-                          icon: const Icon(Icons.clear, size: 16),
-                          tooltip: 'Remover data',
-                          onPressed: () => setDialogState(
-                            () => selectedLastSessionAt = null,
+                          DropdownMenuItem(
+                            value: 'pausado',
+                            child: Text('Pausado'),
                           ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    initialValue: selectedPublicationId,
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Publicação Principal',
-                    ),
-                    items: PublicationCatalog.allPublications.map((p) {
-                      return DropdownMenuItem(
-                        value: p.id,
-                        child: Text(
-                          p.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      if (val != null) {
-                        setDialogState(() => selectedPublicationId = val);
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    initialValue: selectedLanguage,
-                    decoration: const InputDecoration(
-                      labelText: 'Idioma do estudo',
-                    ),
-                    items: const [
-                      DropdownMenuItem(value: 'pt', child: Text('Português')),
-                      DropdownMenuItem(
-                        value: 'bzs',
-                        child: Text('Libras (Língua de Sinais)'),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) {
+                            setDialogState(() => selectedStatus = val);
+                          }
+                        },
                       ),
-                      DropdownMenuItem(value: 'tca', child: Text('Ticuna')),
-                    ],
-                    onChanged: (val) {
-                      if (val != null) {
-                        setDialogState(() => selectedLanguage = val);
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: lessonController,
-                          decoration: const InputDecoration(
-                            labelText: 'Lição Inicial / Atual',
-                          ),
-                          keyboardType: TextInputType.number,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextField(
-                          controller: paragraphController,
-                          decoration: const InputDecoration(
-                            labelText: 'Parágrafo / Ponto',
-                          ),
-                          keyboardType: TextInputType.number,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    initialValue: selectedFrequency,
-                    decoration: const InputDecoration(
-                      labelText: 'Frequência do estudo',
-                    ),
-                    items: const [
-                      DropdownMenuItem(
-                        value: 'semanal',
-                        child: Text('Semanal (1x por semana)'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'duas_vezes_semana',
-                        child: Text('Intensivo (2x por semana)'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'quinzenal',
-                        child: Text('Quinzenal'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'variavel',
-                        child: Text('Variável / Flexível'),
-                      ),
-                    ],
-                    onChanged: (val) {
-                      if (val != null) {
-                        setDialogState(() => selectedFrequency = val);
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF7C3AED).withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.info_outline,
-                          size: 16,
-                          color: Color(0xFF7C3AED),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'O status de ${person.name} será automaticamente atualizado para "Estudo Bíblico" e integrado aos relatórios mensais.',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: isDark
-                                  ? const Color(0xFFCBD5E1)
-                                  : const Color(0xFF5B21B6),
+                      const SizedBox(height: 12),
+                      // Data de Início Real
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              icon: const Icon(Icons.calendar_today, size: 16),
+                              label: Text(
+                                'Início: ${AppDateUtils.formatDate(selectedStartedAt)}',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                              onPressed: () async {
+                                final picked = await showDatePicker(
+                                  context: context,
+                                  initialDate: selectedStartedAt,
+                                  firstDate: DateTime(2010),
+                                  lastDate: DateTime.now().add(
+                                    const Duration(days: 365),
+                                  ),
+                                );
+                                if (picked != null) {
+                                  setDialogState(
+                                    () => selectedStartedAt = picked,
+                                  );
+                                }
+                              },
                             ),
                           ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      // Data da Última Sessão Realizada (opcional)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              icon: const Icon(Icons.history, size: 16),
+                              label: Text(
+                                selectedLastSessionAt != null
+                                    ? 'Última Sessão: ${AppDateUtils.formatDate(selectedLastSessionAt!)}'
+                                    : 'Última Sessão (opcional)',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                              onPressed: () async {
+                                final picked = await showDatePicker(
+                                  context: context,
+                                  initialDate:
+                                      selectedLastSessionAt ??
+                                      selectedStartedAt,
+                                  firstDate: DateTime(2010),
+                                  lastDate: DateTime.now(),
+                                );
+                                if (picked != null) {
+                                  setDialogState(
+                                    () => selectedLastSessionAt = picked,
+                                  );
+                                }
+                              },
+                            ),
+                          ),
+                          if (selectedLastSessionAt != null)
+                            IconButton(
+                              icon: const Icon(Icons.clear, size: 16),
+                              tooltip: 'Remover data',
+                              onPressed: () => setDialogState(
+                                () => selectedLastSessionAt = null,
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        initialValue: selectedPublicationId,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Publicação Principal',
                         ),
-                      ],
-                    ),
+                        items: PublicationCatalog.allPublications.map((p) {
+                          return DropdownMenuItem(
+                            value: p.id,
+                            child: Text(
+                              p.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setDialogState(() => selectedPublicationId = val);
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        initialValue: selectedLanguage,
+                        decoration: const InputDecoration(
+                          labelText: 'Idioma do estudo',
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'pt',
+                            child: Text('Português'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'bzs',
+                            child: Text('Libras (Língua de Sinais)'),
+                          ),
+                          DropdownMenuItem(value: 'tca', child: Text('Ticuna')),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) {
+                            setDialogState(() => selectedLanguage = val);
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: lessonController,
+                              decoration: const InputDecoration(
+                                labelText: 'Lição Inicial / Atual',
+                              ),
+                              keyboardType: TextInputType.number,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextField(
+                              controller: paragraphController,
+                              decoration: const InputDecoration(
+                                labelText: 'Parágrafo / Ponto',
+                              ),
+                              keyboardType: TextInputType.number,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        initialValue: selectedFrequency,
+                        decoration: const InputDecoration(
+                          labelText: 'Frequência do estudo',
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'semanal',
+                            child: Text('Semanal (1x por semana)'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'duas_vezes_semana',
+                            child: Text('Intensivo (2x por semana)'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'quinzenal',
+                            child: Text('Quinzenal'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'variavel',
+                            child: Text('Variável / Flexível'),
+                          ),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) {
+                            setDialogState(() => selectedFrequency = val);
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF7C3AED)
+                              .withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.info_outline,
+                              size: 16,
+                              color: Color(0xFF7C3AED),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'O status de ${person.name} será automaticamente atualizado para "Estudo Bíblico" e integrado aos relatórios mensais.',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDark
+                                      ? const Color(0xFFCBD5E1)
+                                      : const Color(0xFF5B21B6),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      GlobalAppointmentSchedulingSection(
+                        title: 'Agendar Primeiro Estudo na Agenda',
+                        isEnabled: scheduleFirstStudy,
+                        onToggle: (v) =>
+                            setDialogState(() => scheduleFirstStudy = v),
+                        selectedDateTime: firstStudyDateTime,
+                        onDateTimeChanged: (dt) =>
+                            setDialogState(() => firstStudyDateTime = dt),
+                        durationMinutes: firstStudyDuration,
+                        onDurationChanged: (d) =>
+                            setDialogState(() => firstStudyDuration = d),
+                        existingAppointments:
+                            ref.read(appointmentsStreamProvider).value ?? [],
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 14),
-                  GlobalAppointmentSchedulingSection(
-                    title: 'Agendar Primeiro Estudo na Agenda',
-                    isEnabled: scheduleFirstStudy,
-                    onToggle: (v) =>
-                        setDialogState(() => scheduleFirstStudy = v),
-                    selectedDateTime: firstStudyDateTime,
-                    onDateTimeChanged: (dt) =>
-                        setDialogState(() => firstStudyDateTime = dt),
-                    durationMinutes: firstStudyDuration,
-                    onDurationChanged: (d) =>
-                        setDialogState(() => firstStudyDuration = d),
-                    existingAppointments:
-                        ref.read(appointmentsStreamProvider).value ?? [],
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Cancelar'),
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF7C3AED),
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: () async {
+                      final title = titleController.text.trim();
+                      if (title.isEmpty) return;
+
+                      if (scheduleFirstStudy) {
+                        final allAppts =
+                            ref.read(appointmentsStreamProvider).value ?? [];
+                        final avail = AvailabilityEngine.checkAvailability(
+                          startTime: firstStudyDateTime,
+                          durationMinutes: firstStudyDuration,
+                          existingAppointments: allAppts,
+                        );
+                        final canProceed =
+                            await GlobalAppointmentSchedulingSection.confirmConflictIfNeeded(
+                              context: context,
+                              availability: avail,
+                            );
+                        if (!canProceed) return;
+                      }
+
+                      final initialLesson =
+                          int.tryParse(lessonController.text.trim()) ?? 1;
+                      final initialPara =
+                          int.tryParse(paragraphController.text.trim()) ?? 1;
+
+                      final repo = ref.read(repositoryProvider);
+                      await repo.createStudy(
+                        title: title,
+                        publicationId: selectedPublicationId,
+                        language: selectedLanguage,
+                        status: selectedStatus,
+                        startedAt: selectedStartedAt,
+                        lastSessionAt: selectedLastSessionAt,
+                        currentLesson: initialLesson,
+                        currentParagraph: initialPara,
+                        frequency: selectedFrequency,
+                        participantPersonIds: [person.id],
+                        primaryParticipantId: person.id,
+                      );
+
+                      final shouldUpdateContact =
+                          selectedLastSessionAt != null &&
+                          (person.lastContactAt == null ||
+                              selectedLastSessionAt!.isAfter(
+                                person.lastContactAt!,
+                              ));
+                      if (person.status != 'estudo' || shouldUpdateContact) {
+                        await repo.updatePerson(
+                          person.copyWith(
+                            status: 'estudo',
+                            lastContactAt: shouldUpdateContact
+                                ? Value(selectedLastSessionAt)
+                                : Value(person.lastContactAt),
+                          ),
+                        );
+                      }
+
+                      if (scheduleFirstStudy) {
+                        await repo.createAppointment(
+                          personId: person.id,
+                          title: 'Estudo Bíblico: ${person.name}',
+                          startTime: firstStudyDateTime,
+                          endTime: firstStudyDateTime.add(
+                            Duration(minutes: firstStudyDuration),
+                          ),
+                          durationMinutes: firstStudyDuration,
+                          status: 'confirmado',
+                          locationNotes: person.address != null
+                              ? 'Local: ${person.address}'
+                              : null,
+                        );
+                      }
+
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Estudo Bíblico iniciado com sucesso com ${person.name}!',
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                    child: const Text('Iniciar Estudo'),
                   ),
                 ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancelar'),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF7C3AED),
-                  foregroundColor: Colors.white,
-                ),
-                onPressed: () async {
-                  final title = titleController.text.trim();
-                  if (title.isEmpty) return;
-
-                  if (scheduleFirstStudy) {
-                    final allAppts =
-                        ref.read(appointmentsStreamProvider).value ?? [];
-                    final avail = AvailabilityEngine.checkAvailability(
-                      startTime: firstStudyDateTime,
-                      durationMinutes: firstStudyDuration,
-                      existingAppointments: allAppts,
-                    );
-                    final canProceed =
-                        await GlobalAppointmentSchedulingSection.confirmConflictIfNeeded(
-                          context: context,
-                          availability: avail,
-                        );
-                    if (!canProceed) return;
-                  }
-
-                  final initialLesson =
-                      int.tryParse(lessonController.text.trim()) ?? 1;
-                  final initialPara =
-                      int.tryParse(paragraphController.text.trim()) ?? 1;
-
-                  final repo = ref.read(repositoryProvider);
-                  await repo.createStudy(
-                    title: title,
-                    publicationId: selectedPublicationId,
-                    language: selectedLanguage,
-                    status: selectedStatus,
-                    startedAt: selectedStartedAt,
-                    lastSessionAt: selectedLastSessionAt,
-                    currentLesson: initialLesson,
-                    currentParagraph: initialPara,
-                    frequency: selectedFrequency,
-                    participantPersonIds: [person.id],
-                    primaryParticipantId: person.id,
-                  );
-
-                  final shouldUpdateContact =
-                      selectedLastSessionAt != null &&
-                      (person.lastContactAt == null ||
-                          selectedLastSessionAt!.isAfter(
-                            person.lastContactAt!,
-                          ));
-                  if (person.status != 'estudo' || shouldUpdateContact) {
-                    await repo.updatePerson(
-                      person.copyWith(
-                        status: 'estudo',
-                        lastContactAt: shouldUpdateContact
-                            ? Value(selectedLastSessionAt)
-                            : Value(person.lastContactAt),
-                      ),
-                    );
-                  }
-
-                  if (scheduleFirstStudy) {
-                    await repo.createAppointment(
-                      personId: person.id,
-                      title: 'Estudo Bíblico: ${person.name}',
-                      startTime: firstStudyDateTime,
-                      endTime: firstStudyDateTime.add(
-                        Duration(minutes: firstStudyDuration),
-                      ),
-                      durationMinutes: firstStudyDuration,
-                      status: 'confirmado',
-                      locationNotes: person.address != null
-                          ? 'Local: ${person.address}'
-                          : null,
-                    );
-                  }
-
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'Estudo Bíblico iniciado com sucesso com ${person.name}!',
-                        ),
-                      ),
-                    );
-                  }
-                },
-                child: const Text('Iniciar Estudo'),
-              ),
-            ],
-          );
-        },
+              );
+            },
           );
         },
       ),
@@ -635,262 +642,273 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
           final lessonController = ctrls[1];
           final paragraphController = ctrls[2];
           return StatefulBuilder(
-        builder: (ctx, setDialogState) {
-          return AlertDialog(
-            title: const Row(
-              children: [
-                Icon(Icons.edit_note, color: Color(0xFF7C3AED)),
-                SizedBox(width: 8),
-                Expanded(child: Text('Editar Dados do Estudo')),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TextField(
-                    controller: titleController,
-                    decoration: const InputDecoration(
-                      labelText: 'Título do estudo *',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    initialValue: selectedStatus,
-                    decoration: const InputDecoration(
-                      labelText: 'Situação do Estudo',
-                    ),
-                    items: const [
-                      DropdownMenuItem(value: 'ativo', child: Text('Ativo')),
-                      DropdownMenuItem(
-                        value: 'pausado',
-                        child: Text('Pausado'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'concluido',
-                        child: Text('Concluído'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'encerrado',
-                        child: Text('Encerrado'),
-                      ),
-                    ],
-                    onChanged: (val) {
-                      if (val != null) {
-                        setDialogState(() => selectedStatus = val);
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  // Data de Início Real
-                  Row(
+            builder: (ctx, setDialogState) {
+              return AlertDialog(
+                title: const Row(
+                  children: [
+                    Icon(Icons.edit_note, color: Color(0xFF7C3AED)),
+                    SizedBox(width: 8),
+                    Expanded(child: Text('Editar Dados do Estudo')),
+                  ],
+                ),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          icon: const Icon(Icons.calendar_today, size: 16),
-                          label: Text(
-                            'Início: ${AppDateUtils.formatDate(realStartDate)}',
-                            style: const TextStyle(fontSize: 12),
+                      TextField(
+                        controller: titleController,
+                        decoration: const InputDecoration(
+                          labelText: 'Título do estudo *',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        initialValue: selectedStatus,
+                        decoration: const InputDecoration(
+                          labelText: 'Situação do Estudo',
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'ativo',
+                            child: Text('Ativo'),
                           ),
-                          onPressed: () async {
-                            final picked = await showDatePicker(
-                              context: context,
-                              initialDate: realStartDate,
-                              firstDate: DateTime(2010),
-                              lastDate: DateTime.now().add(
-                                const Duration(days: 365),
+                          DropdownMenuItem(
+                            value: 'pausado',
+                            child: Text('Pausado'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'concluido',
+                            child: Text('Concluído'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'encerrado',
+                            child: Text('Encerrado'),
+                          ),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) {
+                            setDialogState(() => selectedStatus = val);
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      // Data de Início Real
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              icon: const Icon(Icons.calendar_today, size: 16),
+                              label: Text(
+                                'Início: ${AppDateUtils.formatDate(realStartDate)}',
+                                style: const TextStyle(fontSize: 12),
                               ),
-                            );
-                            if (picked != null) {
-                              setDialogState(() => realStartDate = picked);
-                            }
-                          },
+                              onPressed: () async {
+                                final picked = await showDatePicker(
+                                  context: context,
+                                  initialDate: realStartDate,
+                                  firstDate: DateTime(2010),
+                                  lastDate: DateTime.now().add(
+                                    const Duration(days: 365),
+                                  ),
+                                );
+                                if (picked != null) {
+                                  setDialogState(() => realStartDate = picked);
+                                }
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      // Lição e Ponto Atual
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: lessonController,
+                              decoration: const InputDecoration(
+                                labelText: 'Lição Atual',
+                                hintText: 'Ex: 15',
+                              ),
+                              keyboardType: TextInputType.number,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: TextField(
+                              controller: paragraphController,
+                              decoration: const InputDecoration(
+                                labelText: 'Ponto / Parágrafo',
+                                hintText: 'Ex: 2',
+                              ),
+                              keyboardType: TextInputType.number,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      // Data da Última Sessão
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              icon: const Icon(Icons.history, size: 16),
+                              label: Text(
+                                lastSessionDate != null
+                                    ? 'Última Sessão: ${AppDateUtils.formatDate(lastSessionDate!)}'
+                                    : 'Última Sessão (opcional)',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                              onPressed: () async {
+                                final picked = await showDatePicker(
+                                  context: context,
+                                  initialDate:
+                                      lastSessionDate ?? DateTime.now(),
+                                  firstDate: DateTime(2010),
+                                  lastDate: DateTime.now(),
+                                );
+                                if (picked != null) {
+                                  setDialogState(
+                                    () => lastSessionDate = picked,
+                                  );
+                                }
+                              },
+                            ),
+                          ),
+                          if (lastSessionDate != null)
+                            IconButton(
+                              icon: const Icon(Icons.clear, size: 16),
+                              tooltip: 'Remover data',
+                              onPressed: () =>
+                                  setDialogState(() => lastSessionDate = null),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        initialValue: selectedPublicationId,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Publicação',
                         ),
+                        items: PublicationCatalog.allPublications.map((p) {
+                          return DropdownMenuItem(
+                            value: p.id,
+                            child: Text(
+                              p.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setDialogState(() => selectedPublicationId = val);
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        initialValue: selectedLanguage,
+                        decoration: const InputDecoration(
+                          labelText: 'Idioma do estudo',
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'pt',
+                            child: Text('Português'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'bzs',
+                            child: Text('Libras (Língua de Sinais)'),
+                          ),
+                          DropdownMenuItem(value: 'tca', child: Text('Ticuna')),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) {
+                            setDialogState(() => selectedLanguage = val);
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        initialValue: selectedFrequency,
+                        decoration: const InputDecoration(
+                          labelText: 'Frequência do estudo',
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'semanal',
+                            child: Text('Semanal (1x por semana)'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'duas_vezes_semana',
+                            child: Text('Intensivo (2x por semana)'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'quinzenal',
+                            child: Text('Quinzenal (A cada 15 dias)'),
+                          ),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) {
+                            setDialogState(() => selectedFrequency = val);
+                          }
+                        },
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  // Lição e Ponto Atual
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: lessonController,
-                          decoration: const InputDecoration(
-                            labelText: 'Lição Atual',
-                            hintText: 'Ex: 15',
-                          ),
-                          keyboardType: TextInputType.number,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextField(
-                          controller: paragraphController,
-                          decoration: const InputDecoration(
-                            labelText: 'Ponto / Parágrafo',
-                            hintText: 'Ex: 2',
-                          ),
-                          keyboardType: TextInputType.number,
-                        ),
-                      ),
-                    ],
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Cancelar'),
                   ),
-                  const SizedBox(height: 12),
-                  // Data da Última Sessão
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          icon: const Icon(Icons.history, size: 16),
-                          label: Text(
-                            lastSessionDate != null
-                                ? 'Última Sessão: ${AppDateUtils.formatDate(lastSessionDate!)}'
-                                : 'Última Sessão (opcional)',
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                          onPressed: () async {
-                            final picked = await showDatePicker(
-                              context: context,
-                              initialDate: lastSessionDate ?? DateTime.now(),
-                              firstDate: DateTime(2010),
-                              lastDate: DateTime.now(),
-                            );
-                            if (picked != null) {
-                              setDialogState(() => lastSessionDate = picked);
-                            }
-                          },
-                        ),
-                      ),
-                      if (lastSessionDate != null)
-                        IconButton(
-                          icon: const Icon(Icons.clear, size: 16),
-                          tooltip: 'Remover data',
-                          onPressed: () =>
-                              setDialogState(() => lastSessionDate = null),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    initialValue: selectedPublicationId,
-                    isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Publicação'),
-                    items: PublicationCatalog.allPublications.map((p) {
-                      return DropdownMenuItem(
-                        value: p.id,
-                        child: Text(
-                          p.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF7C3AED),
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: () async {
+                      final title = titleController.text.trim();
+                      if (title.isEmpty) return;
+                      final lesson =
+                          int.tryParse(lessonController.text.trim()) ?? 1;
+                      final paragraph =
+                          int.tryParse(paragraphController.text.trim()) ?? 1;
+
+                      final repo = ref.read(repositoryProvider);
+                      await repo.updateStudy(
+                        study.copyWith(
+                          title: title,
+                          status: selectedStatus,
+                          startedAt: realStartDate,
+                          lastSessionAt: Value(lastSessionDate),
+                          publicationId: selectedPublicationId,
+                          language: selectedLanguage,
+                          currentLesson: Value(lesson),
+                          currentParagraph: Value(paragraph),
+                          frequency: selectedFrequency,
                         ),
                       );
-                    }).toList(),
-                    onChanged: (val) {
-                      if (val != null) {
-                        setDialogState(() => selectedPublicationId = val);
+
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Dados do estudo atualizados com sucesso!',
+                            ),
+                          ),
+                        );
                       }
                     },
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    initialValue: selectedLanguage,
-                    decoration: const InputDecoration(
-                      labelText: 'Idioma do estudo',
-                    ),
-                    items: const [
-                      DropdownMenuItem(value: 'pt', child: Text('Português')),
-                      DropdownMenuItem(
-                        value: 'bzs',
-                        child: Text('Libras (Língua de Sinais)'),
-                      ),
-                      DropdownMenuItem(value: 'tca', child: Text('Ticuna')),
-                    ],
-                    onChanged: (val) {
-                      if (val != null) {
-                        setDialogState(() => selectedLanguage = val);
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    initialValue: selectedFrequency,
-                    decoration: const InputDecoration(
-                      labelText: 'Frequência do estudo',
-                    ),
-                    items: const [
-                      DropdownMenuItem(
-                        value: 'semanal',
-                        child: Text('Semanal (1x por semana)'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'duas_vezes_semana',
-                        child: Text('Intensivo (2x por semana)'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'quinzenal',
-                        child: Text('Quinzenal (A cada 15 dias)'),
-                      ),
-                    ],
-                    onChanged: (val) {
-                      if (val != null) {
-                        setDialogState(() => selectedFrequency = val);
-                      }
-                    },
+                    child: const Text('Salvar Alterações'),
                   ),
                 ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancelar'),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF7C3AED),
-                  foregroundColor: Colors.white,
-                ),
-                onPressed: () async {
-                  final title = titleController.text.trim();
-                  if (title.isEmpty) return;
-                  final lesson =
-                      int.tryParse(lessonController.text.trim()) ?? 1;
-                  final paragraph =
-                      int.tryParse(paragraphController.text.trim()) ?? 1;
-
-                  final repo = ref.read(repositoryProvider);
-                  await repo.updateStudy(
-                    study.copyWith(
-                      title: title,
-                      status: selectedStatus,
-                      startedAt: realStartDate,
-                      lastSessionAt: Value(lastSessionDate),
-                      publicationId: selectedPublicationId,
-                      language: selectedLanguage,
-                      currentLesson: Value(lesson),
-                      currentParagraph: Value(paragraph),
-                      frequency: selectedFrequency,
-                    ),
-                  );
-
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Dados do estudo atualizados com sucesso!',
-                        ),
-                      ),
-                    );
-                  }
-                },
-                child: const Text('Salvar Alterações'),
-              ),
-            ],
-          );
-        },
+              );
+            },
           );
         },
       ),
@@ -993,7 +1011,10 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                       if (currentTags.isEmpty)
                         const Text(
                           'Nenhuma tag cadastrada ainda.',
-                          style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                          style: TextStyle(
+                            color: AppTheme.textMuted,
+                            fontSize: 13,
+                          ),
                         )
                       else
                         Wrap(
@@ -1107,7 +1128,8 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                         ),
                       ],
                       onChanged: (val) {
-                        if (val != null) setDialogState(() => selectedReason = val);
+                        if (val != null)
+                          setDialogState(() => selectedReason = val);
                       },
                     ),
                     const SizedBox(height: 12),
@@ -1146,7 +1168,9 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                         pauseOrCloseReason: Value(reasonPayload),
                       ),
                     );
-                    await repo.updatePerson(person.copyWith(status: 'revisita'));
+                    await repo.updatePerson(
+                      person.copyWith(status: 'revisita'),
+                    );
                     if (ctx.mounted) Navigator.pop(ctx);
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -1259,7 +1283,8 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                         ),
                       ],
                       onChanged: (val) {
-                        if (val != null) setDialogState(() => selectedReason = val);
+                        if (val != null)
+                          setDialogState(() => selectedReason = val);
                       },
                     ),
                     const SizedBox(height: 12),
@@ -1267,8 +1292,7 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                       controller: notesController,
                       decoration: const InputDecoration(
                         labelText: 'Observação complementar (opcional)',
-                        hintText:
-                            'Ex: Deixou portas abertas para uma ocasião futura...',
+                        hintText: 'Ex: Deixou portas abertas para uma ocasião futura...',
                       ),
                       maxLines: 2,
                     ),
@@ -1467,523 +1491,552 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
           final lngCtrl = ctrls[6];
           final scheduleCtrl = ctrls[7];
           return StatefulBuilder(
-        builder: (ctx, setDialogState) {
-          final isDark = Theme.of(ctx).brightness == Brightness.dark;
-          return Dialog(
-            backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 540, maxHeight: 680),
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            builder: (ctx, setDialogState) {
+              final isDark = Theme.of(ctx).brightness == Brightness.dark;
+              return Dialog(
+                backgroundColor: isDark
+                    ? const Color(0xFF1E293B)
+                    : Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: 540,
+                    maxHeight: 680,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const Row(
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Icon(
-                              Icons.edit,
-                              color: AppTheme.primaryBlue,
-                              size: 24,
+                            const Row(
+                              children: [
+                                Icon(
+                                  Icons.edit,
+                                  color: AppTheme.primaryBlue,
+                                  size: 24,
+                                ),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Editar Dados do Contato',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
                             ),
-                            SizedBox(width: 8),
-                            Text(
-                              'Editar Dados do Contato',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
+                            IconButton(
+                              icon: const Icon(Icons.close),
+                              onPressed: () => Navigator.pop(ctx),
                             ),
                           ],
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.close),
-                          onPressed: () => Navigator.pop(ctx),
-                        ),
-                      ],
-                    ),
-                    const Divider(height: 20),
-                    Expanded(
-                      child: SingleChildScrollView(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            TextField(
-                              controller: nameCtrl,
-                              decoration: const InputDecoration(
-                                labelText: 'Nome Completo *',
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            TextField(
-                              controller: phoneCtrl,
-                              decoration: const InputDecoration(
-                                labelText: 'Telefone / WhatsApp',
-                                hintText: '(11) 98765-4321',
-                              ),
-                              keyboardType: TextInputType.phone,
-                            ),
-                            const SizedBox(height: 12),
-                            DropdownButtonFormField<String>(
-                              initialValue: currentStatus,
-                              decoration: const InputDecoration(
-                                labelText: 'Situação / Classificação',
-                              ),
-                              items: const [
-                                DropdownMenuItem(
-                                  value: 'interessado',
-                                  child: Text('👤 Interessado'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'revisita',
-                                  child: Text('🔄 Revisita Ativa'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'estudo',
-                                  child: Text('📖 Estudo Bíblico'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'revisita_passada',
-                                  child: Text('📦 Revisita Repassada'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'revisita_encerrada',
-                                  child: Text('⛔ Revisita Encerrada'),
-                                ),
-                              ],
-                              onChanged: (val) {
-                                if (val != null) {
-                                  setDialogState(() => currentStatus = val);
-                                }
-                              },
-                            ),
-                            const SizedBox(height: 12),
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: AppTheme.primaryBlue.withValues(
-                                  alpha: 0.06,
-                                ),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: AppTheme.primaryBlue.withValues(
-                                    alpha: 0.2,
+                        const Divider(height: 20),
+                        Expanded(
+                          child: SingleChildScrollView(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                TextField(
+                                  controller: nameCtrl,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Nome Completo *',
                                   ),
                                 ),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Row(
-                                    children: [
-                                      Icon(
-                                        Icons.history_edu,
-                                        size: 16,
-                                        color: AppTheme.primaryBlue,
+                                const SizedBox(height: 12),
+                                TextField(
+                                  controller: phoneCtrl,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Telefone / WhatsApp',
+                                    hintText: '(11) 98765-4321',
+                                  ),
+                                  keyboardType: TextInputType.phone,
+                                ),
+                                const SizedBox(height: 12),
+                                DropdownButtonFormField<String>(
+                                  initialValue: currentStatus,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Situação / Classificação',
+                                  ),
+                                  items: const [
+                                    DropdownMenuItem(
+                                      value: 'interessado',
+                                      child: Text('👤 Interessado'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'revisita',
+                                      child: Text('🔄 Revisita Ativa'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'estudo',
+                                      child: Text('📖 Estudo Bíblico'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'revisita_passada',
+                                      child: Text('📦 Revisita Repassada'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'revisita_encerrada',
+                                      child: Text('⛔ Revisita Encerrada'),
+                                    ),
+                                  ],
+                                  onChanged: (val) {
+                                    if (val != null) {
+                                      setDialogState(() => currentStatus = val);
+                                    }
+                                  },
+                                ),
+                                const SizedBox(height: 12),
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.primaryBlue.withValues(
+                                      alpha: 0.06,
+                                    ),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: AppTheme.primaryBlue.withValues(
+                                        alpha: 0.2,
                                       ),
-                                      SizedBox(width: 6),
-                                      Text(
-                                        'Histórico Prévio (Primeiro Uso / Contato Antigo)',
+                                    ),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Row(
+                                        children: [
+                                          Icon(
+                                            Icons.history_edu,
+                                            size: 16,
+                                            color: AppTheme.primaryBlue,
+                                          ),
+                                          SizedBox(width: 6),
+                                          Text(
+                                            'Histórico Prévio (Primeiro Uso / Contato Antigo)',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppTheme.primaryBlue,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: OutlinedButton.icon(
+                                              icon: const Icon(
+                                                Icons.calendar_today,
+                                                size: 14,
+                                              ),
+                                              label: Text(
+                                                '1º Contato: ${AppDateUtils.formatDate(editFirstContact)}',
+                                                style: const TextStyle(
+                                                  fontSize: 11,
+                                                ),
+                                              ),
+                                              onPressed: () async {
+                                                final p = await showDatePicker(
+                                                  context: context,
+                                                  initialDate: editFirstContact,
+                                                  firstDate: DateTime(2010),
+                                                  lastDate: DateTime.now(),
+                                                );
+                                                if (p != null) {
+                                                  setDialogState(
+                                                    () => editFirstContact = p,
+                                                  );
+                                                }
+                                              },
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Expanded(
+                                            child: OutlinedButton.icon(
+                                              icon: const Icon(
+                                                Icons.history,
+                                                size: 14,
+                                              ),
+                                              label: Text(
+                                                editLastContact != null
+                                                    ? 'Últ. Visita: ${AppDateUtils.formatDate(editLastContact!)}'
+                                                    : 'Última Visita (opcional)',
+                                                style: const TextStyle(
+                                                  fontSize: 11,
+                                                ),
+                                              ),
+                                              onPressed: () async {
+                                                final p = await showDatePicker(
+                                                  context: context,
+                                                  initialDate:
+                                                      editLastContact ??
+                                                      DateTime.now(),
+                                                  firstDate: DateTime(2010),
+                                                  lastDate: DateTime.now(),
+                                                );
+                                                if (p != null) {
+                                                  setDialogState(
+                                                    () => editLastContact = p,
+                                                  );
+                                                }
+                                              },
+                                            ),
+                                          ),
+                                          if (editLastContact != null)
+                                            IconButton(
+                                              icon: const Icon(
+                                                Icons.clear,
+                                                size: 14,
+                                              ),
+                                              tooltip: 'Remover data',
+                                              onPressed: () => setDialogState(
+                                                () => editLastContact = null,
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                const Text(
+                                  'Localização & Bairro / Setor',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                    color: AppTheme.primaryBlue,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                TextField(
+                                  controller: addrCtrl,
+                                  decoration: const InputDecoration(
+                                    labelText:
+                                        'Endereço (Rua, Número, Bloco/Apto)',
+                                    hintText:
+                                        'Ex: Rua das Flores, 120, Apto 42',
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: TextField(
+                                        controller: neighborhoodCtrl,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Bairro / Setor',
+                                          hintText:
+                                              'Ex: Centro, Vila Nova, Porto...',
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: TextField(
+                                        controller: refCtrl,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Ponto de Referência',
+                                          hintText: 'Ex: Próximo à padaria',
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                if (sectors.isNotEmpty) ...[
+                                  const SizedBox(height: 6),
+                                  SingleChildScrollView(
+                                    scrollDirection: Axis.horizontal,
+                                    child: Row(
+                                      children: sectors.map((sec) {
+                                        final isChosen =
+                                            neighborhoodCtrl.text
+                                                .trim()
+                                                .toLowerCase() ==
+                                            sec.name.toLowerCase();
+                                        return Padding(
+                                          padding: const EdgeInsets.only(
+                                            right: 6,
+                                          ),
+                                          child: ActionChip(
+                                            avatar: Icon(
+                                              Icons.location_city,
+                                              size: 14,
+                                              color: isChosen
+                                                  ? Colors.white
+                                                  : AppTheme.primaryBlue,
+                                            ),
+                                            label: Text(
+                                              sec.name,
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: isChosen
+                                                    ? Colors.white
+                                                    : null,
+                                              ),
+                                            ),
+                                            backgroundColor: isChosen
+                                                ? AppTheme.primaryBlue
+                                                : null,
+                                            onPressed: () {
+                                              setDialogState(() {
+                                                neighborhoodCtrl.text =
+                                                    sec.name;
+                                              });
+                                            },
+                                          ),
+                                        );
+                                      }).toList(),
+                                    ),
+                                  ),
+                                ],
+                                const SizedBox(height: 10),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: TextField(
+                                        controller: latCtrl,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Latitude GPS',
+                                          hintText: '-3.1022',
+                                        ),
+                                        keyboardType:
+                                            const TextInputType.numberWithOptions(
+                                              decimal: true,
+                                              signed: true,
+                                            ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: TextField(
+                                        controller: lngCtrl,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Longitude GPS',
+                                          hintText: '-67.9397',
+                                        ),
+                                        keyboardType:
+                                            const TextInputType.numberWithOptions(
+                                              decimal: true,
+                                              signed: true,
+                                            ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: [
+                                    OutlinedButton.icon(
+                                      icon: const Icon(
+                                        Icons.my_location,
+                                        size: 16,
+                                      ),
+                                      label: const Text(
+                                        '🧭 GPS Atual',
+                                        style: TextStyle(fontSize: 12),
+                                      ),
+                                      onPressed: () async {
+                                        final pos =
+                                            await GeolocationHelper.getCurrentLocation();
+                                        if (pos != null) {
+                                          setDialogState(() {
+                                            latCtrl.text = pos.latitude
+                                                .toStringAsFixed(6);
+                                            lngCtrl.text = pos.longitude
+                                                .toStringAsFixed(6);
+                                          });
+                                          final geo =
+                                              await GeocodingService.reverseGeocode(
+                                                pos.latitude,
+                                                pos.longitude,
+                                              );
+                                          if (geo != null) {
+                                            setDialogState(() {
+                                              if (addrCtrl.text
+                                                      .trim()
+                                                      .isEmpty &&
+                                                  geo
+                                                      .streetAndNumber
+                                                      .isNotEmpty) {
+                                                addrCtrl.text =
+                                                    geo.streetAndNumber;
+                                              }
+                                              if (neighborhoodCtrl.text
+                                                      .trim()
+                                                      .isEmpty &&
+                                                  geo.neighborhood != null) {
+                                                neighborhoodCtrl.text =
+                                                    geo.neighborhood!;
+                                              }
+                                            });
+                                          }
+                                        }
+                                      },
+                                    ),
+                                    ElevatedButton.icon(
+                                      icon: const Icon(Icons.map, size: 16),
+                                      label: const Text(
+                                        '🗺️ Escolher no Mapa',
                                         style: TextStyle(
                                           fontSize: 12,
                                           fontWeight: FontWeight.bold,
-                                          color: AppTheme.primaryBlue,
                                         ),
                                       ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: OutlinedButton.icon(
-                                          icon: const Icon(
-                                            Icons.calendar_today,
-                                            size: 14,
-                                          ),
-                                          label: Text(
-                                            '1º Contato: ${AppDateUtils.formatDate(editFirstContact)}',
-                                            style: const TextStyle(
-                                              fontSize: 11,
-                                            ),
-                                          ),
-                                          onPressed: () async {
-                                            final p = await showDatePicker(
-                                              context: context,
-                                              initialDate: editFirstContact,
-                                              firstDate: DateTime(2010),
-                                              lastDate: DateTime.now(),
-                                            );
-                                            if (p != null) {
-                                              setDialogState(
-                                                () => editFirstContact = p,
-                                              );
-                                            }
-                                          },
-                                        ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Expanded(
-                                        child: OutlinedButton.icon(
-                                          icon: const Icon(
-                                            Icons.history,
-                                            size: 14,
-                                          ),
-                                          label: Text(
-                                            editLastContact != null
-                                                ? 'Últ. Visita: ${AppDateUtils.formatDate(editLastContact!)}'
-                                                : 'Última Visita (opcional)',
-                                            style: const TextStyle(
-                                              fontSize: 11,
-                                            ),
-                                          ),
-                                          onPressed: () async {
-                                            final p = await showDatePicker(
-                                              context: context,
-                                              initialDate:
-                                                  editLastContact ??
-                                                  DateTime.now(),
-                                              firstDate: DateTime(2010),
-                                              lastDate: DateTime.now(),
-                                            );
-                                            if (p != null) {
-                                              setDialogState(
-                                                () => editLastContact = p,
-                                              );
-                                            }
-                                          },
-                                        ),
-                                      ),
-                                      if (editLastContact != null)
-                                        IconButton(
-                                          icon: const Icon(
-                                            Icons.clear,
-                                            size: 14,
-                                          ),
-                                          tooltip: 'Remover data',
-                                          onPressed: () => setDialogState(
-                                            () => editLastContact = null,
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            const Text(
-                              'Localização & Bairro / Setor',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                                color: AppTheme.primaryBlue,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            TextField(
-                              controller: addrCtrl,
-                              decoration: const InputDecoration(
-                                labelText: 'Endereço (Rua, Número, Bloco/Apto)',
-                                hintText: 'Ex: Rua das Flores, 120, Apto 42',
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: TextField(
-                                    controller: neighborhoodCtrl,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Bairro / Setor',
-                                      hintText: 'Ex: Centro, Vila Nova, Porto...',
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: TextField(
-                                    controller: refCtrl,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Ponto de Referência',
-                                      hintText: 'Ex: Próximo à padaria',
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            if (sectors.isNotEmpty) ...[
-                              const SizedBox(height: 6),
-                              SingleChildScrollView(
-                                scrollDirection: Axis.horizontal,
-                                child: Row(
-                                  children: sectors.map((sec) {
-                                    final isChosen =
-                                        neighborhoodCtrl.text
-                                            .trim()
-                                            .toLowerCase() ==
-                                        sec.name.toLowerCase();
-                                    return Padding(
-                                      padding: const EdgeInsets.only(right: 6),
-                                      child: ActionChip(
-                                        avatar: Icon(
-                                          Icons.location_city,
-                                          size: 14,
-                                          color: isChosen
-                                              ? Colors.white
-                                              : AppTheme.primaryBlue,
-                                        ),
-                                        label: Text(
-                                          sec.name,
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: isChosen
-                                                ? Colors.white
-                                                : null,
-                                          ),
-                                        ),
-                                        backgroundColor: isChosen
-                                            ? AppTheme.primaryBlue
-                                            : null,
-                                        onPressed: () {
-                                          setDialogState(() {
-                                            neighborhoodCtrl.text = sec.name;
-                                          });
-                                        },
-                                      ),
-                                    );
-                                  }).toList(),
-                                ),
-                              ),
-                            ],
-                            const SizedBox(height: 10),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: TextField(
-                                    controller: latCtrl,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Latitude GPS',
-                                      hintText: '-3.1022',
-                                    ),
-                                    keyboardType:
-                                        const TextInputType.numberWithOptions(
-                                          decimal: true,
-                                          signed: true,
-                                        ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: TextField(
-                                    controller: lngCtrl,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Longitude GPS',
-                                      hintText: '-67.9397',
-                                    ),
-                                    keyboardType:
-                                        const TextInputType.numberWithOptions(
-                                          decimal: true,
-                                          signed: true,
-                                        ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                OutlinedButton.icon(
-                                  icon: const Icon(Icons.my_location, size: 16),
-                                  label: const Text(
-                                    '🧭 GPS Atual',
-                                    style: TextStyle(fontSize: 12),
-                                  ),
-                                  onPressed: () async {
-                                    final pos =
-                                        await GeolocationHelper.getCurrentLocation();
-                                    if (pos != null) {
-                                      setDialogState(() {
-                                        latCtrl.text = pos.latitude
-                                            .toStringAsFixed(6);
-                                        lngCtrl.text = pos.longitude
-                                            .toStringAsFixed(6);
-                                      });
-                                      final geo =
-                                          await GeocodingService.reverseGeocode(
-                                            pos.latitude,
-                                            pos.longitude,
-                                          );
-                                      if (geo != null) {
-                                        setDialogState(() {
-                                          if (addrCtrl.text.trim().isEmpty &&
-                                              geo.streetAndNumber.isNotEmpty) {
-                                            addrCtrl.text = geo.streetAndNumber;
-                                          }
-                                          if (neighborhoodCtrl.text
-                                                  .trim()
-                                                  .isEmpty &&
-                                              geo.neighborhood != null) {
-                                            neighborhoodCtrl.text =
-                                                geo.neighborhood!;
-                                          }
-                                        });
-                                      }
-                                    }
-                                  },
-                                ),
-                                ElevatedButton.icon(
-                                  icon: const Icon(Icons.map, size: 16),
-                                  label: const Text(
-                                    '🗺️ Escolher no Mapa',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  onPressed: () async {
-                                    final curLat = double.tryParse(
-                                      latCtrl.text.trim(),
-                                    );
-                                    final curLng = double.tryParse(
-                                      lngCtrl.text.trim(),
-                                    );
-                                    final res =
-                                        await showDialog<
-                                          ReverseGeocodingResult
-                                        >(
-                                          context: context,
-                                          builder: (_) =>
-                                              MapLocationPickerDialog(
-                                                initialLat: curLat,
-                                                initialLng: curLng,
-                                              ),
+                                      onPressed: () async {
+                                        final curLat = double.tryParse(
+                                          latCtrl.text.trim(),
                                         );
-                                    if (res != null) {
-                                      setDialogState(() {
-                                        latCtrl.text = res.latitude
-                                            .toStringAsFixed(6);
-                                        lngCtrl.text = res.longitude
-                                            .toStringAsFixed(6);
-                                        if (res.streetAndNumber.isNotEmpty &&
-                                            addrCtrl.text.trim().isEmpty) {
-                                          addrCtrl.text = res.streetAndNumber;
+                                        final curLng = double.tryParse(
+                                          lngCtrl.text.trim(),
+                                        );
+                                        final res =
+                                            await showDialog<
+                                              ReverseGeocodingResult
+                                            >(
+                                              context: context,
+                                              builder: (_) =>
+                                                  MapLocationPickerDialog(
+                                                    initialLat: curLat,
+                                                    initialLng: curLng,
+                                                  ),
+                                            );
+                                        if (res != null) {
+                                          setDialogState(() {
+                                            latCtrl.text = res.latitude
+                                                .toStringAsFixed(6);
+                                            lngCtrl.text = res.longitude
+                                                .toStringAsFixed(6);
+                                            if (res
+                                                    .streetAndNumber
+                                                    .isNotEmpty &&
+                                                addrCtrl.text.trim().isEmpty) {
+                                              addrCtrl.text =
+                                                  res.streetAndNumber;
+                                            }
+                                            if (res.neighborhood != null &&
+                                                res.neighborhood!.isNotEmpty &&
+                                                neighborhoodCtrl.text
+                                                    .trim()
+                                                    .isEmpty) {
+                                              neighborhoodCtrl.text =
+                                                  res.neighborhood!;
+                                            }
+                                          });
                                         }
-                                        if (res.neighborhood != null &&
-                                            res.neighborhood!.isNotEmpty &&
-                                            neighborhoodCtrl.text
-                                                .trim()
-                                                .isEmpty) {
-                                          neighborhoodCtrl.text =
-                                              res.neighborhood!;
-                                        }
-                                      });
-                                    }
-                                  },
+                                      },
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                TextField(
+                                  controller: scheduleCtrl,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Dia e Horário Habitual',
+                                    hintText: 'Ex: Sábado às 09:00',
+                                  ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 12),
-                            TextField(
-                              controller: scheduleCtrl,
-                              decoration: const InputDecoration(
-                                labelText: 'Dia e Horário Habitual',
-                                hintText: 'Ex: Sábado às 09:00',
-                              ),
+                          ),
+                        ),
+                        const Divider(height: 20),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              child: const Text('Cancelar'),
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton.icon(
+                              icon: const Icon(Icons.check, size: 18),
+                              label: const Text('Salvar Alterações'),
+                              onPressed: () async {
+                                final name = nameCtrl.text.trim();
+                                if (name.isEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'O nome do contato é obrigatório.',
+                                      ),
+                                    ),
+                                  );
+                                  return;
+                                }
+                                final phone = phoneCtrl.text.trim();
+                                final addrParts = <String>[];
+                                if (addrCtrl.text.trim().isNotEmpty) {
+                                  addrParts.add(addrCtrl.text.trim());
+                                }
+                                if (neighborhoodCtrl.text.trim().isNotEmpty) {
+                                  addrParts.add(
+                                    'Bairro: ${neighborhoodCtrl.text.trim()}',
+                                  );
+                                }
+                                if (refCtrl.text.trim().isNotEmpty) {
+                                  addrParts.add('Ref: ${refCtrl.text.trim()}');
+                                }
+                                final fullAddress = addrParts.isNotEmpty
+                                    ? addrParts.join(' - ')
+                                    : null;
+
+                                final lat = double.tryParse(
+                                  latCtrl.text.trim(),
+                                );
+                                final lng = double.tryParse(
+                                  lngCtrl.text.trim(),
+                                );
+                                final sched = scheduleCtrl.text.trim();
+
+                                await repo.updatePerson(
+                                  person.copyWith(
+                                    name: name,
+                                    phone: Value(
+                                      phone.isNotEmpty ? phone : null,
+                                    ),
+                                    address: Value(fullAddress),
+                                    latitude: Value(lat),
+                                    longitude: Value(lng),
+                                    firstContactAt: editFirstContact,
+                                    lastContactAt: Value(editLastContact),
+                                    preferredSchedule: Value(
+                                      sched.isNotEmpty ? sched : null,
+                                    ),
+                                    status: currentStatus,
+                                    updatedAt: DateTime.now(),
+                                  ),
+                                );
+
+                                if (ctx.mounted) Navigator.pop(ctx);
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Dados do contato atualizados com sucesso!',
+                                      ),
+                                    ),
+                                  );
+                                }
+                              },
                             ),
                           ],
                         ),
-                      ),
-                    ),
-                    const Divider(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          child: const Text('Cancelar'),
-                        ),
-                        const SizedBox(width: 8),
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.check, size: 18),
-                          label: const Text('Salvar Alterações'),
-                          onPressed: () async {
-                            final name = nameCtrl.text.trim();
-                            if (name.isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'O nome do contato é obrigatório.',
-                                  ),
-                                ),
-                              );
-                              return;
-                            }
-                            final phone = phoneCtrl.text.trim();
-                            final addrParts = <String>[];
-                            if (addrCtrl.text.trim().isNotEmpty) {
-                              addrParts.add(addrCtrl.text.trim());
-                            }
-                            if (neighborhoodCtrl.text.trim().isNotEmpty) {
-                              addrParts.add(
-                                'Bairro: ${neighborhoodCtrl.text.trim()}',
-                              );
-                            }
-                            if (refCtrl.text.trim().isNotEmpty) {
-                              addrParts.add('Ref: ${refCtrl.text.trim()}');
-                            }
-                            final fullAddress = addrParts.isNotEmpty
-                                ? addrParts.join(' - ')
-                                : null;
-
-                            final lat = double.tryParse(latCtrl.text.trim());
-                            final lng = double.tryParse(lngCtrl.text.trim());
-                            final sched = scheduleCtrl.text.trim();
-
-                            await repo.updatePerson(
-                              person.copyWith(
-                                name: name,
-                                phone: Value(phone.isNotEmpty ? phone : null),
-                                address: Value(fullAddress),
-                                latitude: Value(lat),
-                                longitude: Value(lng),
-                                firstContactAt: editFirstContact,
-                                lastContactAt: Value(editLastContact),
-                                preferredSchedule: Value(
-                                  sched.isNotEmpty ? sched : null,
-                                ),
-                                status: currentStatus,
-                                updatedAt: DateTime.now(),
-                              ),
-                            );
-
-                            if (ctx.mounted) Navigator.pop(ctx);
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Dados do contato atualizados com sucesso!',
-                                  ),
-                                ),
-                              );
-                            }
-                          },
-                        ),
                       ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
-          );
-        },
+              );
+            },
           );
         },
       ),
@@ -2079,684 +2132,700 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
           final notesController = ctrls[2];
           final nextStepController = ctrls[3];
           return StatefulBuilder(
-        builder: (ctx, setDialogState) {
-          final isDark = Theme.of(ctx).brightness == Brightness.dark;
-          final lessonInfo = LffBookCatalog.getLesson(selectedLesson);
-          final progressPercent = LffBookCatalog.calculateProgressPercentage(
-            lesson: selectedLesson,
-            point: selectedEndPoint,
-          );
+            builder: (ctx, setDialogState) {
+              final isDark = Theme.of(ctx).brightness == Brightness.dark;
+              final lessonInfo = LffBookCatalog.getLesson(selectedLesson);
+              final progressPercent =
+                  LffBookCatalog.calculateProgressPercentage(
+                    lesson: selectedLesson,
+                    point: selectedEndPoint,
+                  );
 
-          int currentUnitMaxPoints = 6;
-          final foundUnit = allUnits
-              .where((u) => u.id == selectedUnitId)
-              .firstOrNull;
-          currentUnitMaxPoints =
-              foundUnit?.totalPoints ?? (lessonInfo?.totalPoints ?? 6);
+              int currentUnitMaxPoints = 6;
+              final foundUnit = allUnits
+                  .where((u) => u.id == selectedUnitId)
+                  .firstOrNull;
+              currentUnitMaxPoints =
+                  foundUnit?.totalPoints ?? (lessonInfo?.totalPoints ?? 6);
 
-          void updatePoints(int startP, int endP) {
-            setDialogState(() {
-              selectedStartPoint = startP;
-              selectedEndPoint = endP;
-              paragraphsController.text = startP == endP
-                  ? '$startP'
-                  : '$startP-$endP';
-              final nextProg = LffBookCatalog.getNextProgression(
-                currentLesson: selectedLesson,
-                currentPoint: endP,
-              );
-              nextStepController.text = nextProg.label;
-            });
-          }
+              void updatePoints(int startP, int endP) {
+                setDialogState(() {
+                  selectedStartPoint = startP;
+                  selectedEndPoint = endP;
+                  paragraphsController.text = startP == endP
+                      ? '$startP'
+                      : '$startP-$endP';
+                  final nextProg = LffBookCatalog.getNextProgression(
+                    currentLesson: selectedLesson,
+                    currentPoint: endP,
+                  );
+                  nextStepController.text = nextProg.label;
+                });
+              }
 
-          return AlertDialog(
-            title: Text('Registrar Sessão: ${study.title}'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Seletor de Desfecho da Sessão: Realizada com Sucesso vs Falhou/Cancelada
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 14),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: InkWell(
-                            onTap: () => setDialogState(
-                              () => sessionOutcome = 'realizada',
-                            ),
-                            borderRadius: BorderRadius.circular(8),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 10,
-                                horizontal: 8,
-                              ),
-                              decoration: BoxDecoration(
-                                color: sessionOutcome == 'realizada'
-                                    ? AppTheme.successGreen.withValues(
-                                        alpha: 0.15,
-                                      )
-                                    : (isDark
-                                          ? const Color(0xFF1E293B)
-                                          : const Color(0xFFF1F5F9)),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: sessionOutcome == 'realizada'
-                                      ? AppTheme.successGreen
-                                      : Colors.transparent,
-                                  width: 1.5,
+              return AlertDialog(
+                title: Text('Registrar Sessão: ${study.title}'),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Seletor de Desfecho da Sessão: Realizada com Sucesso vs Falhou/Cancelada
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 14),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: InkWell(
+                                onTap: () => setDialogState(
+                                  () => sessionOutcome = 'realizada',
                                 ),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.check_circle,
-                                    size: 16,
-                                    color: sessionOutcome == 'realizada'
-                                        ? AppTheme.successGreen
-                                        : Colors.grey,
+                                borderRadius: BorderRadius.circular(8),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 10,
+                                    horizontal: 8,
                                   ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    'Realizada',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.bold,
+                                  decoration: BoxDecoration(
+                                    color: sessionOutcome == 'realizada'
+                                        ? AppTheme.successGreen.withValues(
+                                            alpha: 0.15,
+                                          )
+                                        : (isDark
+                                              ? const Color(0xFF1E293B)
+                                              : const Color(0xFFF1F5F9)),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
                                       color: sessionOutcome == 'realizada'
                                           ? AppTheme.successGreen
-                                          : Colors.grey,
+                                          : Colors.transparent,
+                                      width: 1.5,
                                     ),
                                   ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: InkWell(
-                            onTap: () => setDialogState(
-                              () => sessionOutcome = 'cancelada',
-                            ),
-                            borderRadius: BorderRadius.circular(8),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 10,
-                                horizontal: 8,
-                              ),
-                              decoration: BoxDecoration(
-                                color: sessionOutcome == 'cancelada'
-                                    ? AppTheme.alertRed.withValues(alpha: 0.15)
-                                    : (isDark
-                                          ? const Color(0xFF1E293B)
-                                          : const Color(0xFFF1F5F9)),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: sessionOutcome == 'cancelada'
-                                      ? AppTheme.alertRed
-                                      : Colors.transparent,
-                                  width: 1.5,
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.check_circle,
+                                        size: 16,
+                                        color: sessionOutcome == 'realizada'
+                                            ? AppTheme.successGreen
+                                            : Colors.grey,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'Realizada',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                          color: sessionOutcome == 'realizada'
+                                              ? AppTheme.successGreen
+                                              : Colors.grey,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.cancel,
-                                    size: 16,
-                                    color: sessionOutcome == 'cancelada'
-                                        ? AppTheme.alertRed
-                                        : Colors.grey,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: InkWell(
+                                onTap: () => setDialogState(
+                                  () => sessionOutcome = 'cancelada',
+                                ),
+                                borderRadius: BorderRadius.circular(8),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 10,
+                                    horizontal: 8,
                                   ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    'Falhou / Cancelada',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.bold,
+                                  decoration: BoxDecoration(
+                                    color: sessionOutcome == 'cancelada'
+                                        ? AppTheme.alertRed.withValues(
+                                            alpha: 0.15,
+                                          )
+                                        : (isDark
+                                              ? const Color(0xFF1E293B)
+                                              : const Color(0xFFF1F5F9)),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
                                       color: sessionOutcome == 'cancelada'
                                           ? AppTheme.alertRed
-                                          : Colors.grey,
+                                          : Colors.transparent,
+                                      width: 1.5,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.cancel,
+                                        size: 16,
+                                        color: sessionOutcome == 'cancelada'
+                                            ? AppTheme.alertRed
+                                            : Colors.grey,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'Falhou / Cancelada',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                          color: sessionOutcome == 'cancelada'
+                                              ? AppTheme.alertRed
+                                              : Colors.grey,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      if (sessionOutcome == 'cancelada') ...[
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEE2E2),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFF87171)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Row(
+                                children: [
+                                  Icon(
+                                    Icons.warning_amber_rounded,
+                                    color: Color(0xFFDC2626),
+                                    size: 18,
+                                  ),
+                                  SizedBox(width: 6),
+                                  Text(
+                                    'Registrar Falha / Não Realização',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF991B1B),
+                                      fontSize: 13,
                                     ),
                                   ),
                                 ],
                               ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  if (sessionOutcome == 'cancelada') ...[
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFEE2E2),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFF87171)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Row(
-                            children: [
-                              Icon(
-                                Icons.warning_amber_rounded,
-                                color: Color(0xFFDC2626),
-                                size: 18,
-                              ),
-                              SizedBox(width: 6),
-                              Text(
-                                'Registrar Falha / Não Realização',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF991B1B),
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          const Text(
-                            'O registro da falha é contabilizado no histórico e na prioridade de atenção do estudante.',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Color(0xFF7F1D1D),
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          DropdownButtonFormField<String>(
-                            initialValue: failureMotive,
-                            isExpanded: true,
-                            decoration: const InputDecoration(
-                              labelText: 'Motivo da Falha / Não Realização *',
-                              filled: true,
-                              fillColor: Colors.white,
-                            ),
-                            items: const [
-                              DropdownMenuItem(
-                                value: 'Cancelado pelo estudante',
-                                child: Text('Cancelado pelo estudante'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'Estudante ausente / Não atendeu',
-                                child: Text('Estudante ausente / Não atendeu'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'Imprevisto pessoal do publicador',
-                                child: Text('Imprevisto pessoal do publicador'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'Desmarcado com antecedência',
-                                child: Text('Desmarcado com antecedência'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'Outro motivo',
-                                child: Text('Outro motivo'),
-                              ),
-                            ],
-                            onChanged: (val) {
-                              if (val != null) {
-                                setDialogState(() => failureMotive = val);
-                              }
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                  ] else ...[
-                    // Progresso do Livro Seja Feliz Para Sempre!
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF7C3AED).withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: const Color(0xFF7C3AED)
-                              .withValues(alpha: 0.25),
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
+                              const SizedBox(height: 6),
                               const Text(
-                                'Progresso no Livro:',
+                                'O registro da falha é contabilizado no histórico e na prioridade de atenção do estudante.',
                                 style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF7C3AED),
+                                  fontSize: 11,
+                                  color: Color(0xFF7F1D1D),
                                 ),
                               ),
-                              Text(
-                                '${progressPercent.toStringAsFixed(1)}%',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF7C3AED),
+                              const SizedBox(height: 10),
+                              DropdownButtonFormField<String>(
+                                initialValue: failureMotive,
+                                isExpanded: true,
+                                decoration: const InputDecoration(
+                                  labelText:
+                                      'Motivo da Falha / Não Realização *',
+                                  filled: true,
+                                  fillColor: Colors.white,
                                 ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: LinearProgressIndicator(
-                              value: progressPercent / 100.0,
-                              minHeight: 8,
-                              backgroundColor: Colors.purple.shade100,
-                              valueColor: const AlwaysStoppedAnimation<Color>(
-                                Color(0xFF7C3AED),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Seletor Inteligente de Unidade (Lições 1-60, Revisões 1-4, Entenda Melhor 1-7)
-                    DropdownButtonFormField<String>(
-                      initialValue: selectedUnitId,
-                      isExpanded: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Unidade / Lição Estudada (lff) *',
-                      ),
-                      items: allUnits.map((u) {
-                        return DropdownMenuItem<String>(
-                          value: u.id,
-                          child: Text(
-                            u.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 13),
-                          ),
-                        );
-                      }).toList(),
-                      onChanged: (val) {
-                        if (val != null) {
-                          setDialogState(() {
-                            selectedUnitId = val;
-                            if (val.startsWith('lesson_')) {
-                              selectedLesson = int.parse(
-                                val.replaceFirst('lesson_', ''),
-                              );
-                              lessonController.text = selectedLesson.toString();
-                              final nextProg =
-                                  LffBookCatalog.getNextProgression(
-                                    currentLesson: selectedLesson,
-                                    currentPoint: selectedEndPoint,
-                                  );
-                              nextStepController.text = nextProg.label;
-                            } else {
-                              nextStepController.text = val;
-                            }
-                          });
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Seletor dos Pontos da Lição
-                    Text(
-                      'Pontos Cobertos:',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      children: List.generate(currentUnitMaxPoints, (idx) {
-                        final pNum = idx + 1;
-                        final isSelected =
-                            pNum >= selectedStartPoint &&
-                            pNum <= selectedEndPoint;
-                        return FilterChip(
-                          label: Text('Ponto $pNum'),
-                          selected: isSelected,
-                          selectedColor: const Color(0xFF7C3AED)
-                              .withValues(alpha: 0.25),
-                          checkmarkColor: const Color(0xFF7C3AED),
-                          onSelected: (val) {
-                            if (val) {
-                              if (pNum < selectedStartPoint) {
-                                updatePoints(pNum, selectedEndPoint);
-                              } else {
-                                updatePoints(selectedStartPoint, pNum);
-                              }
-                            } else {
-                              if (selectedStartPoint == selectedEndPoint) {
-                                // Mínimo 1 selecionado
-                              } else if (pNum == selectedEndPoint) {
-                                final newEnd = pNum - 1 < selectedStartPoint
-                                    ? selectedStartPoint
-                                    : pNum - 1;
-                                updatePoints(selectedStartPoint, newEnd);
-                              } else {
-                                updatePoints(pNum, pNum);
-                              }
-                            }
-                          },
-                        );
-                      }),
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: paragraphsController,
-                      decoration: const InputDecoration(
-                        labelText:
-                            'Parágrafos / Pontos Estudados (livre para editar)',
-                        hintText: 'Ex: 1, 2-3, 1-6 ou anotação personalizada',
-                      ),
-                      onChanged: (text) {
-                        final parsed = int.tryParse(text.trim());
-                        if (parsed != null &&
-                            parsed >= 1 &&
-                            parsed <= currentUnitMaxPoints) {
-                          setDialogState(() {
-                            selectedStartPoint = parsed;
-                            selectedEndPoint = parsed;
-                            final nextProg = LffBookCatalog.getNextProgression(
-                              currentLesson: selectedLesson,
-                              currentPoint: parsed,
-                            );
-                            nextStepController.text = nextProg.label;
-                          });
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Seletor de Contagem de Presentes / Assistência
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF7C3AED).withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: const Color(0xFF7C3AED).withValues(alpha: 0.3),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Número de Presentes',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 13,
-                                    color: Color(0xFF7C3AED),
+                                items: const [
+                                  DropdownMenuItem(
+                                    value: 'Cancelado pelo estudante',
+                                    child: Text('Cancelado pelo estudante'),
                                   ),
-                                ),
-                                Text(
-                                  'Estudante e acompanhantes',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: isDark
-                                        ? const Color(0xFFCBD5E1)
-                                        : AppTheme.textMuted,
+                                  DropdownMenuItem(
+                                    value: 'Estudante ausente / Não atendeu',
+                                    child: Text(
+                                      'Estudante ausente / Não atendeu',
+                                    ),
                                   ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Row(
-                            children: [
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.remove_circle_outline,
-                                  color: Color(0xFF7C3AED),
-                                ),
-                                onPressed: () {
-                                  if (attendanceCount > 1) {
-                                    setDialogState(() => attendanceCount--);
+                                  DropdownMenuItem(
+                                    value: 'Imprevisto pessoal do publicador',
+                                    child: Text(
+                                      'Imprevisto pessoal do publicador',
+                                    ),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'Desmarcado com antecedência',
+                                    child: Text('Desmarcado com antecedência'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'Outro motivo',
+                                    child: Text('Outro motivo'),
+                                  ),
+                                ],
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    setDialogState(() => failureMotive = val);
                                   }
                                 },
                               ),
-                              Text(
-                                '$attendanceCount',
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF7C3AED),
-                                ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ] else ...[
+                        // Progresso do Livro Seja Feliz Para Sempre!
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF7C3AED)
+                                .withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: const Color(0xFF7C3AED)
+                                  .withValues(alpha: 0.25),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text(
+                                    'Progresso no Livro:',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF7C3AED),
+                                    ),
+                                  ),
+                                  Text(
+                                    '${progressPercent.toStringAsFixed(1)}%',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF7C3AED),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.add_circle_outline,
-                                  color: Color(0xFF7C3AED),
+                              const SizedBox(height: 6),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(4),
+                                child: LinearProgressIndicator(
+                                  value: progressPercent / 100.0,
+                                  minHeight: 8,
+                                  backgroundColor: Colors.purple.shade100,
+                                  valueColor:
+                                      const AlwaysStoppedAnimation<Color>(
+                                        Color(0xFF7C3AED),
+                                      ),
                                 ),
-                                onPressed: () {
-                                  setDialogState(() => attendanceCount++);
-                                },
                               ),
                             ],
                           ),
-                        ],
+                        ),
+                        const SizedBox(height: 14),
+
+                        // Seletor Inteligente de Unidade (Lições 1-60, Revisões 1-4, Entenda Melhor 1-7)
+                        DropdownButtonFormField<String>(
+                          initialValue: selectedUnitId,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Unidade / Lição Estudada (lff) *',
+                          ),
+                          items: allUnits.map((u) {
+                            return DropdownMenuItem<String>(
+                              value: u.id,
+                              child: Text(
+                                u.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 13),
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null) {
+                              setDialogState(() {
+                                selectedUnitId = val;
+                                if (val.startsWith('lesson_')) {
+                                  selectedLesson = int.parse(
+                                    val.replaceFirst('lesson_', ''),
+                                  );
+                                  lessonController.text = selectedLesson
+                                      .toString();
+                                  final nextProg =
+                                      LffBookCatalog.getNextProgression(
+                                        currentLesson: selectedLesson,
+                                        currentPoint: selectedEndPoint,
+                                      );
+                                  nextStepController.text = nextProg.label;
+                                } else {
+                                  nextStepController.text = val;
+                                }
+                              });
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Seletor dos Pontos da Lição
+                        Text(
+                          'Pontos Cobertos:',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          children: List.generate(currentUnitMaxPoints, (idx) {
+                            final pNum = idx + 1;
+                            final isSelected =
+                                pNum >= selectedStartPoint &&
+                                pNum <= selectedEndPoint;
+                            return FilterChip(
+                              label: Text('Ponto $pNum'),
+                              selected: isSelected,
+                              selectedColor: const Color(0xFF7C3AED)
+                                  .withValues(alpha: 0.25),
+                              checkmarkColor: const Color(0xFF7C3AED),
+                              onSelected: (val) {
+                                if (val) {
+                                  if (pNum < selectedStartPoint) {
+                                    updatePoints(pNum, selectedEndPoint);
+                                  } else {
+                                    updatePoints(selectedStartPoint, pNum);
+                                  }
+                                } else {
+                                  if (selectedStartPoint == selectedEndPoint) {
+                                    // Mínimo 1 selecionado
+                                  } else if (pNum == selectedEndPoint) {
+                                    final newEnd = pNum - 1 < selectedStartPoint
+                                        ? selectedStartPoint
+                                        : pNum - 1;
+                                    updatePoints(selectedStartPoint, newEnd);
+                                  } else {
+                                    updatePoints(pNum, pNum);
+                                  }
+                                }
+                              },
+                            );
+                          }),
+                        ),
+                        const SizedBox(height: 10),
+                        TextField(
+                          controller: paragraphsController,
+                          decoration: const InputDecoration(
+                            labelText: 'Parágrafos / Pontos Estudados (livre para editar)',
+                            hintText:
+                                'Ex: 1, 2-3, 1-6 ou anotação personalizada',
+                          ),
+                          onChanged: (text) {
+                            final parsed = int.tryParse(text.trim());
+                            if (parsed != null &&
+                                parsed >= 1 &&
+                                parsed <= currentUnitMaxPoints) {
+                              setDialogState(() {
+                                selectedStartPoint = parsed;
+                                selectedEndPoint = parsed;
+                                final nextProg =
+                                    LffBookCatalog.getNextProgression(
+                                      currentLesson: selectedLesson,
+                                      currentPoint: parsed,
+                                    );
+                                nextStepController.text = nextProg.label;
+                              });
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 14),
+
+                        // Seletor de Contagem de Presentes / Assistência
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF7C3AED)
+                                .withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: const Color(0xFF7C3AED)
+                                  .withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Número de Presentes',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                        color: Color(0xFF7C3AED),
+                                      ),
+                                    ),
+                                    Text(
+                                      'Estudante e acompanhantes',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: isDark
+                                            ? const Color(0xFFCBD5E1)
+                                            : AppTheme.textMuted,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Row(
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.remove_circle_outline,
+                                      color: Color(0xFF7C3AED),
+                                    ),
+                                    onPressed: () {
+                                      if (attendanceCount > 1) {
+                                        setDialogState(() => attendanceCount--);
+                                      }
+                                    },
+                                  ),
+                                  Text(
+                                    '$attendanceCount',
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF7C3AED),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.add_circle_outline,
+                                      color: Color(0xFF7C3AED),
+                                    ),
+                                    onPressed: () {
+                                      setDialogState(() => attendanceCount++);
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+
+                      TextField(
+                        controller: notesController,
+                        decoration: InputDecoration(
+                          labelText: sessionOutcome == 'cancelada'
+                              ? 'Observações da falha'
+                              : 'Observações da sessão',
+                          hintText: sessionOutcome == 'cancelada'
+                              ? 'Descreva o que houve ou motivo de contato...'
+                              : 'Dúvidas esclarecidas, pontos de interesse...',
+                        ),
+                        maxLines: 2,
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-
-                  TextField(
-                    controller: notesController,
-                    decoration: InputDecoration(
-                      labelText: sessionOutcome == 'cancelada'
-                          ? 'Observações da falha'
-                          : 'Observações da sessão',
-                      hintText: sessionOutcome == 'cancelada'
-                          ? 'Descreva o que houve ou motivo de contato...'
-                          : 'Dúvidas esclarecidas, pontos de interesse...',
-                    ),
-                    maxLines: 2,
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: nextStepController,
+                        decoration: const InputDecoration(
+                          labelText: 'Próximo assunto',
+                          hintText: 'Ex: Lição 2, Ponto 1 em diante',
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      GlobalAppointmentSchedulingSection(
+                        title: 'Agendar Próximo Estudo',
+                        isEnabled: scheduleNextStudy,
+                        onToggle: (v) =>
+                            setDialogState(() => scheduleNextStudy = v),
+                        selectedDateTime: nextStudyDateTime,
+                        onDateTimeChanged: (dt) =>
+                            setDialogState(() => nextStudyDateTime = dt),
+                        durationMinutes: nextStudyDuration,
+                        onDurationChanged: (d) =>
+                            setDialogState(() => nextStudyDuration = d),
+                        existingAppointments:
+                            ref.read(appointmentsStreamProvider).value ?? [],
+                        existingPersonAppointment: existingUpcomingAppt,
+                        frequencyText: freqLabel,
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: nextStepController,
-                    decoration: const InputDecoration(
-                      labelText: 'Próximo assunto',
-                      hintText: 'Ex: Lição 2, Ponto 1 em diante',
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  GlobalAppointmentSchedulingSection(
-                    title: 'Agendar Próximo Estudo',
-                    isEnabled: scheduleNextStudy,
-                    onToggle: (v) =>
-                        setDialogState(() => scheduleNextStudy = v),
-                    selectedDateTime: nextStudyDateTime,
-                    onDateTimeChanged: (dt) =>
-                        setDialogState(() => nextStudyDateTime = dt),
-                    durationMinutes: nextStudyDuration,
-                    onDurationChanged: (d) =>
-                        setDialogState(() => nextStudyDuration = d),
-                    existingAppointments:
-                        ref.read(appointmentsStreamProvider).value ?? [],
-                    existingPersonAppointment: existingUpcomingAppt,
-                    frequencyText: freqLabel,
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancelar'),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: sessionOutcome == 'cancelada'
-                      ? AppTheme.alertRed
-                      : const Color(0xFF7C3AED),
-                  foregroundColor: Colors.white,
                 ),
-                onPressed: () async {
-                  if (scheduleNextStudy) {
-                    final allAppts =
-                        ref.read(appointmentsStreamProvider).value ?? [];
-                    final avail = AvailabilityEngine.checkAvailability(
-                      startTime: nextStudyDateTime,
-                      durationMinutes: nextStudyDuration,
-                      existingAppointments: allAppts,
-                    );
-                    final canProceed =
-                        await GlobalAppointmentSchedulingSection.confirmConflictIfNeeded(
-                          context: context,
-                          availability: avail,
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Cancelar'),
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: sessionOutcome == 'cancelada'
+                          ? AppTheme.alertRed
+                          : const Color(0xFF7C3AED),
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: () async {
+                      if (scheduleNextStudy) {
+                        final allAppts =
+                            ref.read(appointmentsStreamProvider).value ?? [];
+                        final avail = AvailabilityEngine.checkAvailability(
+                          startTime: nextStudyDateTime,
+                          durationMinutes: nextStudyDuration,
+                          existingAppointments: allAppts,
                         );
-                    if (!canProceed) return;
-                  }
+                        final canProceed =
+                            await GlobalAppointmentSchedulingSection.confirmConflictIfNeeded(
+                              context: context,
+                              availability: avail,
+                            );
+                        if (!canProceed) return;
+                      }
 
-                  final repo = ref.read(repositoryProvider);
+                      final repo = ref.read(repositoryProvider);
 
-                  if (sessionOutcome == 'cancelada') {
-                    final formattedNotes = notesController.text.trim().isEmpty
-                        ? '[Sessão Cancelada: $failureMotive]'
-                        : '[Sessão Cancelada: $failureMotive] ${notesController.text.trim()}';
+                      if (sessionOutcome == 'cancelada') {
+                        final formattedNotes =
+                            notesController.text.trim().isEmpty
+                            ? '[Sessão Cancelada: $failureMotive]'
+                            : '[Sessão Cancelada: $failureMotive] ${notesController.text.trim()}';
 
-                    await repo.createStudySession(
-                      studyId: study.id,
-                      dateTime: DateTime.now(),
-                      lessonCovered: study.currentLesson,
-                      paragraphsCovered: null,
-                      sessionNotes: formattedNotes,
-                      nextStep: nextStepController.text.trim().isEmpty
-                          ? null
-                          : nextStepController.text.trim(),
-                      status: 'cancelada',
-                      participantIds: [person.id],
-                    );
-
-                    if (nextStepController.text.trim().isNotEmpty) {
-                      await repo.updateStudy(
-                        study.copyWith(
-                          nextTopic: Value(nextStepController.text.trim()),
-                        ),
-                      );
-                    }
-                  } else {
-                    final lesson =
-                        int.tryParse(lessonController.text.trim()) ??
-                        selectedLesson;
-                    final formattedNotes =
-                        DashboardCalculator.formatSessionNotesWithAttendance(
-                          notesController.text.trim().isEmpty
-                              ? null
-                              : notesController.text.trim(),
-                          attendanceCount,
-                        );
-
-                    await repo.createStudySession(
-                      studyId: study.id,
-                      dateTime: DateTime.now(),
-                      lessonCovered: lesson,
-                      paragraphsCovered:
-                          paragraphsController.text.trim().isEmpty
-                          ? null
-                          : paragraphsController.text.trim(),
-                      sessionNotes: formattedNotes,
-                      nextStep: nextStepController.text.trim().isEmpty
-                          ? null
-                          : nextStepController.text.trim(),
-                      status: 'realizada',
-                      participantIds: [person.id],
-                    );
-
-                    await repo.updateStudy(
-                      study.copyWith(
-                        currentLesson: Value(lesson),
-                        currentParagraph: Value(
-                          int.tryParse(paragraphsController.text.trim()) ??
-                              selectedEndPoint,
-                        ),
-                        nextTopic: Value(
-                          nextStepController.text.trim().isEmpty
+                        await repo.createStudySession(
+                          studyId: study.id,
+                          dateTime: DateTime.now(),
+                          lessonCovered: study.currentLesson,
+                          paragraphsCovered: null,
+                          sessionNotes: formattedNotes,
+                          nextStep: nextStepController.text.trim().isEmpty
                               ? null
                               : nextStepController.text.trim(),
-                        ),
-                        lastSessionAt: Value(DateTime.now()),
-                      ),
-                    );
-                  }
+                          status: 'cancelada',
+                          participantIds: [person.id],
+                        );
 
-                  if (scheduleNextStudy) {
-                    // Prevenção de duplicidade: atualiza compromisso existente na mesma data ou cria novo
-                    final existingAppts =
-                        ref.read(appointmentsStreamProvider).value ?? [];
-                    final existingOnDate = existingAppts.firstWhereOrNull(
-                      (a) =>
-                          a.deletedAt == null &&
-                          a.status != 'cancelado' &&
-                          a.personId == person.id &&
-                          a.startTime.year == nextStudyDateTime.year &&
-                          a.startTime.month == nextStudyDateTime.month &&
-                          a.startTime.day == nextStudyDateTime.day,
-                    );
+                        if (nextStepController.text.trim().isNotEmpty) {
+                          await repo.updateStudy(
+                            study.copyWith(
+                              nextTopic: Value(nextStepController.text.trim()),
+                            ),
+                          );
+                        }
+                      } else {
+                        final lesson =
+                            int.tryParse(lessonController.text.trim()) ??
+                            selectedLesson;
+                        final formattedNotes =
+                            DashboardCalculator.formatSessionNotesWithAttendance(
+                              notesController.text.trim().isEmpty
+                                  ? null
+                                  : notesController.text.trim(),
+                              attendanceCount,
+                            );
 
-                    if (existingOnDate != null) {
-                      await repo.updateAppointment(
-                        existingOnDate.copyWith(
-                          studyId: Value(study.id),
-                          startTime: nextStudyDateTime,
-                          endTime: nextStudyDateTime.add(
-                            Duration(minutes: nextStudyDuration),
+                        await repo.createStudySession(
+                          studyId: study.id,
+                          dateTime: DateTime.now(),
+                          lessonCovered: lesson,
+                          paragraphsCovered:
+                              paragraphsController.text.trim().isEmpty
+                              ? null
+                              : paragraphsController.text.trim(),
+                          sessionNotes: formattedNotes,
+                          nextStep: nextStepController.text.trim().isEmpty
+                              ? null
+                              : nextStepController.text.trim(),
+                          status: 'realizada',
+                          participantIds: [person.id],
+                        );
+
+                        await repo.updateStudy(
+                          study.copyWith(
+                            currentLesson: Value(lesson),
+                            currentParagraph: Value(
+                              int.tryParse(paragraphsController.text.trim()) ??
+                                  selectedEndPoint,
+                            ),
+                            nextTopic: Value(
+                              nextStepController.text.trim().isEmpty
+                                  ? null
+                                  : nextStepController.text.trim(),
+                            ),
+                            lastSessionAt: Value(DateTime.now()),
                           ),
-                          durationMinutes: nextStudyDuration,
-                          status: 'confirmado',
-                        ),
-                      );
-                    } else {
-                      await repo.createAppointment(
-                        personId: person.id,
-                        studyId: study.id,
-                        title: 'Estudo Bíblico: ${person.name}',
-                        startTime: nextStudyDateTime,
-                        endTime: nextStudyDateTime.add(
-                          Duration(minutes: nextStudyDuration),
-                        ),
-                        durationMinutes: nextStudyDuration,
-                        status: 'confirmado',
-                        locationNotes: person.address != null
-                            ? 'Local: ${person.address}'
-                            : null,
-                      );
-                    }
-                  }
+                        );
+                      }
 
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          sessionOutcome == 'cancelada'
-                              ? 'Falha no estudo registrada ($failureMotive).'
-                              : 'Sessão registrada com sucesso! ($attendanceCount presentes computados)',
-                        ),
-                      ),
-                    );
-                  }
-                },
-                child: const Text('Salvar Sessão'),
-              ),
-            ],
-          );
-        },
+                      if (scheduleNextStudy) {
+                        // Prevenção de duplicidade: atualiza compromisso existente na mesma data ou cria novo
+                        final existingAppts =
+                            ref.read(appointmentsStreamProvider).value ?? [];
+                        final existingOnDate = existingAppts.firstWhereOrNull(
+                          (a) =>
+                              a.deletedAt == null &&
+                              a.status != 'cancelado' &&
+                              a.personId == person.id &&
+                              a.startTime.year == nextStudyDateTime.year &&
+                              a.startTime.month == nextStudyDateTime.month &&
+                              a.startTime.day == nextStudyDateTime.day,
+                        );
+
+                        if (existingOnDate != null) {
+                          await repo.updateAppointment(
+                            existingOnDate.copyWith(
+                              studyId: Value(study.id),
+                              startTime: nextStudyDateTime,
+                              endTime: nextStudyDateTime.add(
+                                Duration(minutes: nextStudyDuration),
+                              ),
+                              durationMinutes: nextStudyDuration,
+                              status: 'confirmado',
+                            ),
+                          );
+                        } else {
+                          await repo.createAppointment(
+                            personId: person.id,
+                            studyId: study.id,
+                            title: 'Estudo Bíblico: ${person.name}',
+                            startTime: nextStudyDateTime,
+                            endTime: nextStudyDateTime.add(
+                              Duration(minutes: nextStudyDuration),
+                            ),
+                            durationMinutes: nextStudyDuration,
+                            status: 'confirmado',
+                            locationNotes: person.address != null
+                                ? 'Local: ${person.address}'
+                                : null,
+                          );
+                        }
+                      }
+
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              sessionOutcome == 'cancelada'
+                                  ? 'Falha no estudo registrada ($failureMotive).'
+                                  : 'Sessão registrada com sucesso! ($attendanceCount presentes computados)',
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                    child: const Text('Salvar Sessão'),
+                  ),
+                ],
+              );
+            },
           );
         },
       ),
@@ -2873,602 +2942,617 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
           }
 
           return StatefulBuilder(
-        builder: (ctx, setSheetState) {
-          final isDark = Theme.of(ctx).brightness == Brightness.dark;
-          final allAppts = ref.read(appointmentsStreamProvider).value ?? [];
+            builder: (ctx, setSheetState) {
+              final isDark = Theme.of(ctx).brightness == Brightness.dark;
+              final allAppts = ref.read(appointmentsStreamProvider).value ?? [];
 
-          return Padding(
-            padding: EdgeInsets.only(
-              top: 20,
-              left: 16,
-              right: 16,
-              bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              return Padding(
+                padding: EdgeInsets.only(
+                  top: 20,
+                  left: 16,
+                  right: 16,
+                  bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Expanded(
-                        child: Text(
-                          'Registrar Conversa com ${person.name}',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close),
-                        onPressed: () => Navigator.pop(ctx),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(minHeight: 48),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF4F46E5),
-                          side: const BorderSide(
-                            color: Color(0xFF4F46E5),
-                            width: 1.5,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        icon: const Icon(Icons.mic, size: 20),
-                        label: const Text(
-                          'Preencher via Registro Rápido / Ditado (15s)',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                          ),
-                        ),
-                        onPressed: () {
-                          Navigator.pop(ctx);
-                          QuickVoiceNoteDialog.show(
-                            context: context,
-                            person: person,
-                            linkedStudy: existingStudy,
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                  if (draft != null) ...[
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppTheme.accentTeal.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Icon(
-                            Icons.history_toggle_off,
-                            size: 16,
-                            color: AppTheme.accentTeal,
-                          ),
-                          const SizedBox(width: 8),
-                          const Expanded(
+                          Expanded(
                             child: Text(
-                              'Rascunho recuperado automaticamente.',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: AppTheme.accentTeal,
+                              'Registrar Conversa com ${person.name}',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
                           ),
-                          TextButton(
-                            style: TextButton.styleFrom(
-                              visualDensity: VisualDensity.compact,
+                          IconButton(
+                            icon: const Icon(Icons.close),
+                            onPressed: () => Navigator.pop(ctx),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(minHeight: 48),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF4F46E5),
+                              side: const BorderSide(
+                                color: Color(0xFF4F46E5),
+                                width: 1.5,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            icon: const Icon(Icons.mic, size: 20),
+                            label: const Text(
+                              'Preencher via Registro Rápido / Ditado (15s)',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
                             ),
                             onPressed: () {
-                              _quickVisitDrafts.remove(person.id);
-                              setSheetState(() {
-                                notesController.clear();
-                                topicsController.clear();
-                                nextStepController.clear();
-                              });
-                            },
-                            child: const Text(
-                              'Limpar',
-                              style: TextStyle(fontSize: 11),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                  DropdownButtonFormField<String>(
-                    initialValue: selectedType,
-                    decoration: const InputDecoration(
-                      labelText: 'Tipo de Contato',
-                    ),
-                    items: [
-                      const DropdownMenuItem(
-                        value: 'revisita',
-                        child: Text('Revisita Presencial'),
-                      ),
-                      if (isStudiesEnabled)
-                        const DropdownMenuItem(
-                          value: 'estudo',
-                          child: Text('Estudo Bíblico'),
-                        ),
-                      const DropdownMenuItem(
-                        value: 'conversa_inicial',
-                        child: Text('Conversa Inicial'),
-                      ),
-                      const DropdownMenuItem(
-                        value: 'contato_telefonico',
-                        child: Text('Contato Telefônico / Carta'),
-                      ),
-                      const DropdownMenuItem(
-                        value: 'tentativa_sem_contato',
-                        child: Text('Tentativa sem Contato (Não contou)'),
-                      ),
-                    ],
-                    onChanged: (val) {
-                      if (val != null) {
-                        setSheetState(() {
-                          selectedType = val;
-                          if (val == 'estudo') {
-                            recordStudy = true;
-                            returnDuration = 60;
-                          } else if (existingStudy == null &&
-                              person.status != 'estudo') {
-                            returnDuration = 30;
-                          }
-                          updateDraft();
-                        });
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 10),
-
-                  if (isStudiesEnabled && selectedType != 'estudo') ...[
-                    InkWell(
-                      onTap: () {
-                        setSheetState(() {
-                          recordStudy = !recordStudy;
-                          if (recordStudy) returnDuration = 60;
-                          updateDraft();
-                        });
-                      },
-                      child: Row(
-                        children: [
-                          Checkbox(
-                            value: recordStudy,
-                            activeColor: const Color(0xFF7C3AED),
-                            onChanged: (val) {
-                              setSheetState(() {
-                                recordStudy = val ?? false;
-                                if (recordStudy) returnDuration = 60;
-                                updateDraft();
-                              });
+                              Navigator.pop(ctx);
+                              QuickVoiceNoteDialog.show(
+                                context: context,
+                                person: person,
+                                linkedStudy: existingStudy,
+                              );
                             },
                           ),
-                          const Expanded(
-                            child: Text(
-                              'Considerou matéria de estudo bíblico nesta conversa',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF7C3AED),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-
-                  // Seção Especial de Estudo Bíblico (Unificação de fluxo)
-                  if (selectedType == 'estudo' || recordStudy) ...[
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF7C3AED).withValues(alpha: 0.06),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: const Color(0xFF7C3AED)
-                              .withValues(alpha: 0.25),
                         ),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
+                      if (draft != null) ...[
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppTheme.accentTeal.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
                             children: [
                               const Icon(
-                                Icons.menu_book,
-                                size: 18,
-                                color: Color(0xFF7C3AED),
+                                Icons.history_toggle_off,
+                                size: 16,
+                                color: AppTheme.accentTeal,
                               ),
                               const SizedBox(width: 8),
-                              Text(
-                                existingStudy != null
-                                    ? 'Progresso do Estudo Bíblico'
-                                    : 'Novo Estudo Bíblico Integrado',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                  color: Color(0xFF7C3AED),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          DropdownButtonFormField<String>(
-                            initialValue: selectedPublicationId,
-                            isExpanded: true,
-                            decoration: const InputDecoration(
-                              labelText: 'Publicação',
-                            ),
-                            items: PublicationCatalog.allPublications.map((p) {
-                              return DropdownMenuItem(
-                                value: p.id,
+                              const Expanded(
                                 child: Text(
-                                  p.title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              );
-                            }).toList(),
-                            onChanged: (val) {
-                              if (val != null) {
-                                setSheetState(
-                                  () => selectedPublicationId = val,
-                                );
-                              }
-                            },
-                          ),
-                          const SizedBox(height: 10),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: TextField(
-                                  controller: lessonController,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Lição estudada',
+                                  'Rascunho recuperado automaticamente.',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppTheme.accentTeal,
                                   ),
-                                  keyboardType: TextInputType.number,
                                 ),
                               ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: TextField(
-                                  controller: paragraphsController,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Parágrafos considerados',
+                              TextButton(
+                                style: TextButton.styleFrom(
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                                onPressed: () {
+                                  _quickVisitDrafts.remove(person.id);
+                                  setSheetState(() {
+                                    notesController.clear();
+                                    topicsController.clear();
+                                    nextStepController.clear();
+                                  });
+                                },
+                                child: const Text(
+                                  'Limpar',
+                                  style: TextStyle(fontSize: 11),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      DropdownButtonFormField<String>(
+                        initialValue: selectedType,
+                        decoration: const InputDecoration(
+                          labelText: 'Tipo de Contato',
+                        ),
+                        items: [
+                          const DropdownMenuItem(
+                            value: 'revisita',
+                            child: Text('Revisita Presencial'),
+                          ),
+                          if (isStudiesEnabled)
+                            const DropdownMenuItem(
+                              value: 'estudo',
+                              child: Text('Estudo Bíblico'),
+                            ),
+                          const DropdownMenuItem(
+                            value: 'conversa_inicial',
+                            child: Text('Conversa Inicial'),
+                          ),
+                          const DropdownMenuItem(
+                            value: 'contato_telefonico',
+                            child: Text('Contato Telefônico / Carta'),
+                          ),
+                          const DropdownMenuItem(
+                            value: 'tentativa_sem_contato',
+                            child: Text('Tentativa sem Contato (Não contou)'),
+                          ),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) {
+                            setSheetState(() {
+                              selectedType = val;
+                              if (val == 'estudo') {
+                                recordStudy = true;
+                                returnDuration = 60;
+                              } else if (existingStudy == null &&
+                                  person.status != 'estudo') {
+                                returnDuration = 30;
+                              }
+                              updateDraft();
+                            });
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 10),
+
+                      if (isStudiesEnabled && selectedType != 'estudo') ...[
+                        InkWell(
+                          onTap: () {
+                            setSheetState(() {
+                              recordStudy = !recordStudy;
+                              if (recordStudy) returnDuration = 60;
+                              updateDraft();
+                            });
+                          },
+                          child: Row(
+                            children: [
+                              Checkbox(
+                                value: recordStudy,
+                                activeColor: const Color(0xFF7C3AED),
+                                onChanged: (val) {
+                                  setSheetState(() {
+                                    recordStudy = val ?? false;
+                                    if (recordStudy) returnDuration = 60;
+                                    updateDraft();
+                                  });
+                                },
+                              ),
+                              const Expanded(
+                                child: Text(
+                                  'Considerou matéria de estudo bíblico nesta conversa',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF7C3AED),
                                   ),
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 10),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
 
-                          // Contagem de Assistência / Presentes
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      // Seção Especial de Estudo Bíblico (Unificação de fluxo)
+                      if (selectedType == 'estudo' || recordStudy) ...[
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF7C3AED)
+                                .withValues(alpha: 0.06),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: const Color(0xFF7C3AED)
+                                  .withValues(alpha: 0.25),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      'Assistência / Ouvintes',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 13,
-                                        color: Color(0xFF7C3AED),
-                                      ),
-                                    ),
-                                    Text(
-                                      'Estudante e acompanhantes',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: isDark
-                                            ? const Color(0xFFCBD5E1)
-                                            : AppTheme.textMuted,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
                               Row(
                                 children: [
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.remove_circle_outline,
-                                      color: Color(0xFF7C3AED),
-                                    ),
-                                    onPressed: () {
-                                      if (attendanceCount > 1) {
-                                        setSheetState(() => attendanceCount--);
-                                      }
-                                    },
+                                  const Icon(
+                                    Icons.menu_book,
+                                    size: 18,
+                                    color: Color(0xFF7C3AED),
                                   ),
+                                  const SizedBox(width: 8),
                                   Text(
-                                    '$attendanceCount',
+                                    existingStudy != null
+                                        ? 'Progresso do Estudo Bíblico'
+                                        : 'Novo Estudo Bíblico Integrado',
                                     style: const TextStyle(
-                                      fontSize: 18,
                                       fontWeight: FontWeight.bold,
+                                      fontSize: 14,
                                       color: Color(0xFF7C3AED),
                                     ),
                                   ),
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.add_circle_outline,
-                                      color: Color(0xFF7C3AED),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              DropdownButtonFormField<String>(
+                                initialValue: selectedPublicationId,
+                                isExpanded: true,
+                                decoration: const InputDecoration(
+                                  labelText: 'Publicação',
+                                ),
+                                items: PublicationCatalog.allPublications.map((
+                                  p,
+                                ) {
+                                  return DropdownMenuItem(
+                                    value: p.id,
+                                    child: Text(
+                                      p.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
-                                    onPressed: () {
-                                      setSheetState(() => attendanceCount++);
-                                    },
+                                  );
+                                }).toList(),
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    setSheetState(
+                                      () => selectedPublicationId = val,
+                                    );
+                                  }
+                                },
+                              ),
+                              const SizedBox(height: 10),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: TextField(
+                                      controller: lessonController,
+                                      decoration: const InputDecoration(
+                                        labelText: 'Lição estudada',
+                                      ),
+                                      keyboardType: TextInputType.number,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: TextField(
+                                      controller: paragraphsController,
+                                      decoration: const InputDecoration(
+                                        labelText: 'Parágrafos considerados',
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+
+                              // Contagem de Assistência / Presentes
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'Assistência / Ouvintes',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13,
+                                            color: Color(0xFF7C3AED),
+                                          ),
+                                        ),
+                                        Text(
+                                          'Estudante e acompanhantes',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: isDark
+                                                ? const Color(0xFFCBD5E1)
+                                                : AppTheme.textMuted,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Row(
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.remove_circle_outline,
+                                          color: Color(0xFF7C3AED),
+                                        ),
+                                        onPressed: () {
+                                          if (attendanceCount > 1) {
+                                            setSheetState(
+                                              () => attendanceCount--,
+                                            );
+                                          }
+                                        },
+                                      ),
+                                      Text(
+                                        '$attendanceCount',
+                                        style: const TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF7C3AED),
+                                        ),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.add_circle_outline,
+                                          color: Color(0xFF7C3AED),
+                                        ),
+                                        onPressed: () {
+                                          setSheetState(
+                                            () => attendanceCount++,
+                                          );
+                                        },
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
                             ],
                           ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                  ],
+                        ),
+                        const SizedBox(height: 12),
+                      ],
 
-                  TextField(
-                    controller: topicsController,
-                    decoration: const InputDecoration(
-                      labelText: 'Ponto Bíblico / Assunto considerado',
-                      hintText: 'Ex: Mateus 24:14 ou Lição 02',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: notesController,
-                    decoration: const InputDecoration(
-                      labelText: 'Anotações da conversa',
-                      hintText:
-                          'Dúvidas expressas pelo morador, comentários...',
-                    ),
-                    maxLines: 2,
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: nextStepController,
-                    decoration: const InputDecoration(
-                      labelText: 'Próximo passo / Próximo estudo combinado',
-                      hintText:
-                          'Ex: Responder por que Deus permite o sofrimento',
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-
-                  // SEÇÃO DE AGENDAMENTO GLOBAL COM AVAILABILITY ENGINE
-                  GlobalAppointmentSchedulingSection(
-                    title: (selectedType == 'estudo' || recordStudy)
-                        ? 'Agendar Próximo Estudo'
-                        : 'Agendar Próximo Retorno',
-                    isEnabled: scheduleReturn,
-                    onToggle: (val) =>
-                        setSheetState(() => scheduleReturn = val),
-                    selectedDateTime: returnDateTime,
-                    onDateTimeChanged: (dt) =>
-                        setSheetState(() => returnDateTime = dt),
-                    durationMinutes: returnDuration,
-                    onDurationChanged: (dur) =>
-                        setSheetState(() => returnDuration = dur),
-                    existingAppointments: allAppts,
-                    existingPersonAppointment: existingUpcomingAppt,
-                    frequencyText: freqLabel,
-                  ),
-                  const SizedBox(height: 16),
-
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor:
-                            (selectedType == 'estudo' || recordStudy)
-                            ? const Color(0xFF7C3AED)
-                            : AppTheme.primaryBlue,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                      onPressed: () async {
-                        if (scheduleReturn) {
-                          final availability =
-                              AvailabilityEngine.checkAvailability(
-                                startTime: returnDateTime,
-                                durationMinutes: returnDuration,
-                                existingAppointments: allAppts,
-                              );
-                          final proceed =
-                              await GlobalAppointmentSchedulingSection.confirmConflictIfNeeded(
-                                context: context,
-                                availability: availability,
-                              );
-                          if (!proceed) return;
-                        }
-
-                        final isStudyConsidered =
-                            selectedType == 'estudo' || recordStudy;
-                        final repo = ref.read(repositoryProvider);
-                        String? appointmentId;
-
-                        // 1. Agendamento Global (se ativado)
-                        if (scheduleReturn) {
-                          final apptTitle = isStudyConsidered
-                              ? 'Estudo Bíblico: ${person.name}'
-                              : 'Revisita: ${person.name}';
-
-                          // Prevenção de duplicidade: atualiza compromisso existente na mesma data ou cria novo
-                          final existingAppts =
-                              ref.read(appointmentsStreamProvider).value ?? [];
-                          final existingOnDate = existingAppts.firstWhereOrNull(
-                            (a) =>
-                                a.deletedAt == null &&
-                                a.status != 'cancelado' &&
-                                a.personId == person.id &&
-                                a.startTime.year == returnDateTime.year &&
-                                a.startTime.month == returnDateTime.month &&
-                                a.startTime.day == returnDateTime.day,
-                          );
-
-                          if (existingOnDate != null) {
-                            await repo.updateAppointment(
-                              existingOnDate.copyWith(
-                                studyId: existingStudy != null
-                                    ? Value(existingStudy.id)
-                                    : const Value.absent(),
-                                startTime: returnDateTime,
-                                endTime: returnDateTime.add(
-                                  Duration(minutes: returnDuration),
-                                ),
-                                durationMinutes: returnDuration,
-                                status: 'confirmado',
-                              ),
-                            );
-                            appointmentId = existingOnDate.id;
-                          } else {
-                            final appt = await repo.createAppointment(
-                              personId: person.id,
-                              studyId: existingStudy?.id,
-                              title: apptTitle,
-                              startTime: returnDateTime,
-                              endTime: returnDateTime.add(
-                                Duration(minutes: returnDuration),
-                              ),
-                              durationMinutes: returnDuration,
-                              status: 'confirmado',
-                              locationNotes: person.address != null
-                                  ? 'Local: ${person.address}'
-                                  : null,
-                            );
-                            appointmentId = appt.id;
-                          }
-                        }
-
-                        // 2. Registro da Visita (Atômico)
-                        final formattedNotes = isStudyConsidered
-                            ? DashboardCalculator.formatSessionNotesWithAttendance(
-                                notesController.text.trim().isEmpty
-                                    ? null
-                                    : notesController.text.trim(),
-                                attendanceCount,
-                              )
-                            : (notesController.text.trim().isEmpty
-                                  ? null
-                                  : notesController.text.trim());
-
-                        await repo.createVisit(
-                          personId: person.id,
-                          dateTime: selectedDate,
-                          contactType: selectedType,
-                          result: selectedResult,
-                          topicsDiscussed: topicsController.text.trim().isEmpty
-                              ? null
-                              : topicsController.text.trim(),
-                          notes: formattedNotes,
-                          nextStep: nextStepController.text.trim().isEmpty
-                              ? null
-                              : nextStepController.text.trim(),
-                          suggestedReturnDate: scheduleReturn
-                              ? returnDateTime
-                              : null,
-                          appointmentId: appointmentId,
-                        );
-
-                        // 3. Registro do Estudo e Sessão (se tipo Estudo ou matéria considerada)
-                        if (isStudyConsidered) {
-                          final lesson =
-                              int.tryParse(lessonController.text.trim()) ?? 1;
-                          final paraText =
-                              paragraphsController.text.trim().isEmpty
-                              ? '1-5'
-                              : paragraphsController.text.trim();
-
-                          String studyId;
-                          if (existingStudy != null) {
-                            studyId = existingStudy.id;
-                          } else {
-                            final newStudy = await repo.createStudy(
-                              title: 'Estudo de ${person.name}',
-                              publicationId: selectedPublicationId,
-                              language: 'pt',
-                              currentLesson: lesson,
-                              currentParagraph: int.tryParse(paraText) ?? 1,
-                              participantPersonIds: [person.id],
-                              primaryParticipantId: person.id,
-                            );
-                            studyId = newStudy.id;
-                          }
-
-                          await repo.createStudySession(
-                            studyId: studyId,
-                            dateTime: selectedDate,
-                            publicationCode: selectedPublicationId,
-                            lessonCovered: lesson,
-                            paragraphsCovered: paraText,
-                            sessionNotes: formattedNotes,
-                            nextStep: nextStepController.text.trim().isEmpty
-                                ? null
-                                : nextStepController.text.trim(),
-                            status: 'realizada',
-                            participantIds: [person.id],
-                          );
-
-                          if (person.status != 'estudo') {
-                            await repo.updatePerson(
-                              person.copyWith(status: 'estudo'),
-                            );
-                          }
-                        }
-
-                        _quickVisitDrafts.remove(person.id);
-                        if (ctx.mounted) Navigator.pop(ctx);
-
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                isStudyConsidered
-                                    ? 'Visita, sessão de estudo e agendamento salvos com sucesso!'
-                                    : 'Visita e agendamento registrados com sucesso!',
-                              ),
-                            ),
-                          );
-                        }
-                      },
-                      child: Text(
-                        (selectedType == 'estudo' || recordStudy)
-                            ? 'Salvar Visita & Estudo Bíblico'
-                            : 'Salvar Visita',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
+                      TextField(
+                        controller: topicsController,
+                        decoration: const InputDecoration(
+                          labelText: 'Ponto Bíblico / Assunto considerado',
+                          hintText: 'Ex: Mateus 24:14 ou Lição 02',
                         ),
                       ),
-                    ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: notesController,
+                        decoration: const InputDecoration(
+                          labelText: 'Anotações da conversa',
+                          hintText:
+                              'Dúvidas expressas pelo morador, comentários...',
+                        ),
+                        maxLines: 2,
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: nextStepController,
+                        decoration: const InputDecoration(
+                          labelText: 'Próximo passo / Próximo estudo combinado',
+                          hintText:
+                              'Ex: Responder por que Deus permite o sofrimento',
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      // SEÇÃO DE AGENDAMENTO GLOBAL COM AVAILABILITY ENGINE
+                      GlobalAppointmentSchedulingSection(
+                        title: (selectedType == 'estudo' || recordStudy)
+                            ? 'Agendar Próximo Estudo'
+                            : 'Agendar Próximo Retorno',
+                        isEnabled: scheduleReturn,
+                        onToggle: (val) =>
+                            setSheetState(() => scheduleReturn = val),
+                        selectedDateTime: returnDateTime,
+                        onDateTimeChanged: (dt) =>
+                            setSheetState(() => returnDateTime = dt),
+                        durationMinutes: returnDuration,
+                        onDurationChanged: (dur) =>
+                            setSheetState(() => returnDuration = dur),
+                        existingAppointments: allAppts,
+                        existingPersonAppointment: existingUpcomingAppt,
+                        frequencyText: freqLabel,
+                      ),
+                      const SizedBox(height: 16),
+
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor:
+                                (selectedType == 'estudo' || recordStudy)
+                                ? const Color(0xFF7C3AED)
+                                : AppTheme.primaryBlue,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          onPressed: () async {
+                            if (scheduleReturn) {
+                              final availability =
+                                  AvailabilityEngine.checkAvailability(
+                                    startTime: returnDateTime,
+                                    durationMinutes: returnDuration,
+                                    existingAppointments: allAppts,
+                                  );
+                              final proceed =
+                                  await GlobalAppointmentSchedulingSection.confirmConflictIfNeeded(
+                                    context: context,
+                                    availability: availability,
+                                  );
+                              if (!proceed) return;
+                            }
+
+                            final isStudyConsidered =
+                                selectedType == 'estudo' || recordStudy;
+                            final repo = ref.read(repositoryProvider);
+                            String? appointmentId;
+
+                            // 1. Agendamento Global (se ativado)
+                            if (scheduleReturn) {
+                              final apptTitle = isStudyConsidered
+                                  ? 'Estudo Bíblico: ${person.name}'
+                                  : 'Revisita: ${person.name}';
+
+                              // Prevenção de duplicidade: atualiza compromisso existente na mesma data ou cria novo
+                              final existingAppts =
+                                  ref.read(appointmentsStreamProvider).value ??
+                                  [];
+                              final existingOnDate = existingAppts
+                                  .firstWhereOrNull(
+                                    (a) =>
+                                        a.deletedAt == null &&
+                                        a.status != 'cancelado' &&
+                                        a.personId == person.id &&
+                                        a.startTime.year ==
+                                            returnDateTime.year &&
+                                        a.startTime.month ==
+                                            returnDateTime.month &&
+                                        a.startTime.day == returnDateTime.day,
+                                  );
+
+                              if (existingOnDate != null) {
+                                await repo.updateAppointment(
+                                  existingOnDate.copyWith(
+                                    studyId: existingStudy != null
+                                        ? Value(existingStudy.id)
+                                        : const Value.absent(),
+                                    startTime: returnDateTime,
+                                    endTime: returnDateTime.add(
+                                      Duration(minutes: returnDuration),
+                                    ),
+                                    durationMinutes: returnDuration,
+                                    status: 'confirmado',
+                                  ),
+                                );
+                                appointmentId = existingOnDate.id;
+                              } else {
+                                final appt = await repo.createAppointment(
+                                  personId: person.id,
+                                  studyId: existingStudy?.id,
+                                  title: apptTitle,
+                                  startTime: returnDateTime,
+                                  endTime: returnDateTime.add(
+                                    Duration(minutes: returnDuration),
+                                  ),
+                                  durationMinutes: returnDuration,
+                                  status: 'confirmado',
+                                  locationNotes: person.address != null
+                                      ? 'Local: ${person.address}'
+                                      : null,
+                                );
+                                appointmentId = appt.id;
+                              }
+                            }
+
+                            // 2. Registro da Visita (Atômico)
+                            final formattedNotes = isStudyConsidered
+                                ? DashboardCalculator.formatSessionNotesWithAttendance(
+                                    notesController.text.trim().isEmpty
+                                        ? null
+                                        : notesController.text.trim(),
+                                    attendanceCount,
+                                  )
+                                : (notesController.text.trim().isEmpty
+                                      ? null
+                                      : notesController.text.trim());
+
+                            await repo.createVisit(
+                              personId: person.id,
+                              dateTime: selectedDate,
+                              contactType: selectedType,
+                              result: selectedResult,
+                              topicsDiscussed:
+                                  topicsController.text.trim().isEmpty
+                                  ? null
+                                  : topicsController.text.trim(),
+                              notes: formattedNotes,
+                              nextStep: nextStepController.text.trim().isEmpty
+                                  ? null
+                                  : nextStepController.text.trim(),
+                              suggestedReturnDate: scheduleReturn
+                                  ? returnDateTime
+                                  : null,
+                              appointmentId: appointmentId,
+                            );
+
+                            // 3. Registro do Estudo e Sessão (se tipo Estudo ou matéria considerada)
+                            if (isStudyConsidered) {
+                              final lesson =
+                                  int.tryParse(lessonController.text.trim()) ??
+                                  1;
+                              final paraText =
+                                  paragraphsController.text.trim().isEmpty
+                                  ? '1-5'
+                                  : paragraphsController.text.trim();
+
+                              String studyId;
+                              if (existingStudy != null) {
+                                studyId = existingStudy.id;
+                              } else {
+                                final newStudy = await repo.createStudy(
+                                  title: 'Estudo de ${person.name}',
+                                  publicationId: selectedPublicationId,
+                                  language: 'pt',
+                                  currentLesson: lesson,
+                                  currentParagraph: int.tryParse(paraText) ?? 1,
+                                  participantPersonIds: [person.id],
+                                  primaryParticipantId: person.id,
+                                );
+                                studyId = newStudy.id;
+                              }
+
+                              await repo.createStudySession(
+                                studyId: studyId,
+                                dateTime: selectedDate,
+                                publicationCode: selectedPublicationId,
+                                lessonCovered: lesson,
+                                paragraphsCovered: paraText,
+                                sessionNotes: formattedNotes,
+                                nextStep: nextStepController.text.trim().isEmpty
+                                    ? null
+                                    : nextStepController.text.trim(),
+                                status: 'realizada',
+                                participantIds: [person.id],
+                              );
+
+                              if (person.status != 'estudo') {
+                                await repo.updatePerson(
+                                  person.copyWith(status: 'estudo'),
+                                );
+                              }
+                            }
+
+                            _quickVisitDrafts.remove(person.id);
+                            if (ctx.mounted) Navigator.pop(ctx);
+
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    isStudyConsidered
+                                        ? 'Visita, sessão de estudo e agendamento salvos com sucesso!'
+                                        : 'Visita e agendamento registrados com sucesso!',
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                          child: Text(
+                            (selectedType == 'estudo' || recordStudy)
+                                ? 'Salvar Visita & Estudo Bíblico'
+                                : 'Salvar Visita',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
-          );
-        },
+                ),
+              );
+            },
           );
         },
       ),
@@ -3694,180 +3778,187 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
         builder: (ctx, ctrls) {
           final customController = ctrls[0];
           return StatefulBuilder(
-        builder: (ctx, setDialogState) {
-          final formattedTime =
-              '${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}';
-          final previewText = isCustom
-              ? customController.text
-              : '$selectedDay às $formattedTime';
+            builder: (ctx, setDialogState) {
+              final formattedTime =
+                  '${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}';
+              final previewText = isCustom
+                  ? customController.text
+                  : '$selectedDay às $formattedTime';
 
-          return AlertDialog(
-            title: const Row(
-              children: [
-                Icon(Icons.alarm, color: Color(0xFF7C3AED)),
-                SizedBox(width: 8),
-                Text('Dia e Horário Habitual'),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Defina o dia e horário habitual do estudo bíblico (ex: "Sábado às 09:00").',
-                    style: TextStyle(fontSize: 13, color: AppTheme.textMuted),
-                  ),
-                  const SizedBox(height: 14),
-                  if (!isCustom) ...[
-                    DropdownButtonFormField<String>(
-                      initialValue: selectedDay,
-                      decoration: const InputDecoration(
-                        labelText: 'Dia da Semana',
+              return AlertDialog(
+                title: const Row(
+                  children: [
+                    Icon(Icons.alarm, color: Color(0xFF7C3AED)),
+                    SizedBox(width: 8),
+                    Text('Dia e Horário Habitual'),
+                  ],
+                ),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Defina o dia e horário habitual do estudo bíblico (ex: "Sábado às 09:00").',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppTheme.textMuted,
+                        ),
                       ),
-                      items: daysOfWeek
-                          .map(
-                            (d) => DropdownMenuItem(value: d, child: Text(d)),
-                          )
-                          .toList(),
-                      onChanged: (val) {
-                        if (val != null) {
-                          if (val == 'Personalizado') {
-                            setDialogState(() => isCustom = true);
-                          } else {
-                            setDialogState(() => selectedDay = val);
-                          }
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      const SizedBox(height: 14),
+                      if (!isCustom) ...[
+                        DropdownButtonFormField<String>(
+                          initialValue: selectedDay,
+                          decoration: const InputDecoration(
+                            labelText: 'Dia da Semana',
+                          ),
+                          items: daysOfWeek
+                              .map(
+                                (d) =>
+                                    DropdownMenuItem(value: d, child: Text(d)),
+                              )
+                              .toList(),
+                          onChanged: (val) {
+                            if (val != null) {
+                              if (val == 'Personalizado') {
+                                setDialogState(() => isCustom = true);
+                              } else {
+                                setDialogState(() => selectedDay = val);
+                              }
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text(
-                              'Horário Específico',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: AppTheme.textMuted,
-                              ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Horário Específico',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppTheme.textMuted,
+                                  ),
+                                ),
+                                Text(
+                                  formattedTime,
+                                  style: const TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF7C3AED),
+                                  ),
+                                ),
+                              ],
                             ),
-                            Text(
-                              formattedTime,
-                              style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF7C3AED),
+                            OutlinedButton.icon(
+                              icon: const Icon(Icons.access_time, size: 18),
+                              label: const Text('Selecionar Hora'),
+                              onPressed: () async {
+                                final picked = await showTimePicker(
+                                  context: context,
+                                  initialTime: selectedTime,
+                                );
+                                if (picked != null) {
+                                  setDialogState(() => selectedTime = picked);
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        TextButton(
+                          onPressed: () =>
+                              setDialogState(() => isCustom = true),
+                          child: const Text(
+                            'Escrever texto livre personalizado...',
+                          ),
+                        ),
+                      ] else ...[
+                        TextField(
+                          controller: customController,
+                          decoration: const InputDecoration(
+                            labelText: 'Horário habitual personalizado',
+                            hintText:
+                                'Ex: Sábado às 09:00 ou Domingos após reunião',
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextButton(
+                          onPressed: () =>
+                              setDialogState(() => isCustom = false),
+                          child: const Text(
+                            'Voltar para seleção de dia e hora padrão',
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF7C3AED)
+                              .withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.info_outline,
+                              size: 16,
+                              color: Color(0xFF7C3AED),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Será salvo como: "$previewText"',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF7C3AED),
+                                ),
                               ),
                             ),
                           ],
                         ),
-                        OutlinedButton.icon(
-                          icon: const Icon(Icons.access_time, size: 18),
-                          label: const Text('Selecionar Hora'),
-                          onPressed: () async {
-                            final picked = await showTimePicker(
-                              context: context,
-                              initialTime: selectedTime,
-                            );
-                            if (picked != null) {
-                              setDialogState(() => selectedTime = picked);
-                            }
-                          },
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    TextButton(
-                      onPressed: () => setDialogState(() => isCustom = true),
-                      child: const Text(
-                        'Escrever texto livre personalizado...',
                       ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Cancelar'),
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF7C3AED),
+                      foregroundColor: Colors.white,
                     ),
-                  ] else ...[
-                    TextField(
-                      controller: customController,
-                      decoration: const InputDecoration(
-                        labelText: 'Horário habitual personalizado',
-                        hintText:
-                            'Ex: Sábado às 09:00 ou Domingos após reunião',
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextButton(
-                      onPressed: () => setDialogState(() => isCustom = false),
-                      child: const Text(
-                        'Voltar para seleção de dia e hora padrão',
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF7C3AED).withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.info_outline,
-                          size: 16,
-                          color: Color(0xFF7C3AED),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Será salvo como: "$previewText"',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF7C3AED),
+                    onPressed: () async {
+                      final textToSave = isCustom
+                          ? customController.text.trim()
+                          : '$selectedDay às $formattedTime';
+                      final repo = ref.read(repositoryProvider);
+                      await repo.updatePerson(
+                        person.copyWith(preferredSchedule: Value(textToSave)),
+                      );
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Horário habitual atualizado para "$textToSave"',
                             ),
                           ),
-                        ),
-                      ],
-                    ),
+                        );
+                      }
+                    },
+                    child: const Text('Salvar Horário'),
                   ),
                 ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancelar'),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF7C3AED),
-                  foregroundColor: Colors.white,
-                ),
-                onPressed: () async {
-                  final textToSave = isCustom
-                      ? customController.text.trim()
-                      : '$selectedDay às $formattedTime';
-                  final repo = ref.read(repositoryProvider);
-                  await repo.updatePerson(
-                    person.copyWith(preferredSchedule: Value(textToSave)),
-                  );
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'Horário habitual atualizado para "$textToSave"',
-                        ),
-                      ),
-                    );
-                  }
-                },
-                child: const Text('Salvar Horário'),
-              ),
-            ],
-          );
-        },
+              );
+            },
           );
         },
       ),
@@ -3909,7 +4000,10 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                 children: [
                   Text(
                     'Registre circunstâncias familiares, dúvidas levantadas, assuntos de interesse ou necessidades de ${person.name}.',
-                    style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textMuted,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   TextField(
@@ -4034,7 +4128,10 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                 children: [
                   Text(
                     'Defina um alvo espiritual ou tarefa deixada para ${person.name} até a próxima visita.',
-                    style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textMuted,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   TextField(
@@ -4083,7 +4180,9 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                   final title = titleController.text.trim();
                   if (title.isEmpty) return;
 
-                  final currentTargets = _parseTargets(person.contactRestrictions);
+                  final currentTargets = _parseTargets(
+                    person.contactRestrictions,
+                  );
                   if (isEditing) {
                     final idx = currentTargets.indexWhere(
                       (t) => t['id'] == targetToEdit['id'],
@@ -4572,7 +4671,10 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                                           .where((s) => s.isNotEmpty)
                                           .toList();
                                     } catch (e, st) {
-                                      AppLogger.debug('Falha ao ler tags JSON no cabeçalho (${person.id}): $e', st);
+                                      AppLogger.debug(
+                                        'Falha ao ler tags JSON no cabeçalho (${person.id}): $e',
+                                        st,
+                                      );
                                     }
                                   } else {
                                     personTags = person.tags
@@ -4697,10 +4799,16 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                           visualDensity: VisualDensity.compact,
                           onPressed: () async {
                             final uri = Uri.parse('tel:${person.phone}');
-                            final jwAppUri = Uri.tryParse('jwlibrary:///finder?${uri.query}');
-                if (jwAppUri != null && await canLaunchUrl(jwAppUri)) {
-                  await launchUrl(jwAppUri, mode: LaunchMode.externalApplication);
-                } else if (await canLaunchUrl(uri)) {
+                            final jwAppUri = Uri.tryParse(
+                              'jwlibrary:///finder?${uri.query}',
+                            );
+                            if (jwAppUri != null &&
+                                await canLaunchUrl(jwAppUri)) {
+                              await launchUrl(
+                                jwAppUri,
+                                mode: LaunchMode.externalApplication,
+                              );
+                            } else if (await canLaunchUrl(uri)) {
                               await launchUrl(uri);
                             }
                           },
@@ -4719,10 +4827,16 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                               '',
                             );
                             final uri = Uri.parse('https://wa.me/$cleanPhone');
-                            final jwAppUri = Uri.tryParse('jwlibrary:///finder?${uri.query}');
-                if (jwAppUri != null && await canLaunchUrl(jwAppUri)) {
-                  await launchUrl(jwAppUri, mode: LaunchMode.externalApplication);
-                } else if (await canLaunchUrl(uri)) {
+                            final jwAppUri = Uri.tryParse(
+                              'jwlibrary:///finder?${uri.query}',
+                            );
+                            if (jwAppUri != null &&
+                                await canLaunchUrl(jwAppUri)) {
+                              await launchUrl(
+                                jwAppUri,
+                                mode: LaunchMode.externalApplication,
+                              );
+                            } else if (await canLaunchUrl(uri)) {
                               await launchUrl(
                                 uri,
                                 mode: LaunchMode.externalApplication,
@@ -5176,7 +5290,8 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                 'Agendar Retorno na Porta (Proximidade)',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
-              onPressed: () => DoorstepReturnBookingDialog.show(context, person),
+              onPressed: () =>
+                  DoorstepReturnBookingDialog.show(context, person),
             ),
           ),
           const SizedBox(height: 8),
@@ -6548,26 +6663,47 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
 
           // Tarefas Formais Integradas (Módulo B)
           StreamBuilder<List<TaskEntry>>(
-            stream: ref.watch(taskManagerProvider).watchTasksForPerson(person.id),
+            stream: ref
+                .watch(taskManagerProvider)
+                .watchTasksForPerson(person.id),
             builder: (ctx, snap) {
               final tasks = snap.data ?? [];
               if (tasks.isEmpty) return const SizedBox.shrink();
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Tarefas Vinculadas a este Contato', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  const Text(
+                    'Tarefas Vinculadas a este Contato',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
                   const SizedBox(height: 8),
-                  ...tasks.map((task) => Card(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    child: CheckboxListTile(
-                      value: task.status == 'completed',
-                      activeColor: AppTheme.primaryBlue,
-                      onChanged: (val) => ref.read(taskManagerProvider).toggleTaskComplete(task.id, completed: val),
-                      title: Text(task.title, style: TextStyle(decoration: task.status == 'completed' ? TextDecoration.lineThrough : null, fontWeight: FontWeight.w600)),
-                      subtitle: task.dueDate != null ? Text('Vencimento: //') : null,
+                  ...tasks.map(
+                    (task) => Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: CheckboxListTile(
+                        value: task.status == 'completed',
+                        activeColor: AppTheme.primaryBlue,
+                        onChanged: (val) => ref
+                            .read(taskManagerProvider)
+                            .toggleTaskComplete(task.id, completed: val),
+                        title: Text(
+                          task.title,
+                          style: TextStyle(
+                            decoration: task.status == 'completed'
+                                ? TextDecoration.lineThrough
+                                : null,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        subtitle: task.dueDate != null
+                            ? Text('Vencimento: //')
+                            : null,
+                      ),
                     ),
-                  )),
+                  ),
                   const SizedBox(height: 14),
                   const Divider(),
                   const SizedBox(height: 10),

@@ -26,222 +26,236 @@ class MediaPickerHelper {
           final urlController = ctrls[0];
 
           return AlertDialog(
-          title: Row(
-            children: [
-              const Icon(Icons.add_a_photo, color: AppTheme.primaryBlue),
-              const SizedBox(width: 8),
-              Text(title, style: const TextStyle(fontSize: 18)),
-            ],
-          ),
-          content: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Escolha como deseja adicionar a foto:',
-                    style: TextStyle(fontSize: 13, color: AppTheme.textMuted),
-                  ),
-                  const SizedBox(height: 16),
+            title: Row(
+              children: [
+                const Icon(Icons.add_a_photo, color: AppTheme.primaryBlue),
+                const SizedBox(width: 8),
+                Text(title, style: const TextStyle(fontSize: 18)),
+              ],
+            ),
+            content: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Escolha como deseja adicionar a foto:',
+                      style: TextStyle(fontSize: 13, color: AppTheme.textMuted),
+                    ),
+                    const SizedBox(height: 16),
 
-                  // OPÇÃO 1: CÂMERA (Tirar Foto)
-                  ListTile(
-                    leading: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: AppTheme.accentTeal.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.photo_camera,
-                        color: AppTheme.accentTeal,
-                      ),
-                    ),
-                    title: const Text(
-                      'Tirar Foto com a Câmera',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                    subtitle: const Text(
-                      'Abre a câmera do dispositivo móvel ou tablet',
-                      style: TextStyle(fontSize: 12),
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    onTap: () async {
-                      try {
-                        final picker = ImagePicker();
-                        final XFile? file = await picker.pickImage(
-                          source: ImageSource.camera,
-                          maxWidth: 1280,
-                          maxHeight: 1280,
-                          imageQuality: 80,
-                        );
-                        if (file != null) {
-                          final bytes = await file.readAsBytes();
-                          final base64String = base64Encode(bytes);
-                          final mimeType = file.mimeType ?? 'image/jpeg';
-                          if (ctx.mounted) {
-                            Navigator.pop(ctx, 'data:$mimeType;base64,$base64String');
-                          }
-                          return;
-                        }
-                      } catch (e) {
-                        if (kIsWeb) {
-                          final result = await pickImageFromBrowser(
-                            useCamera: true,
-                          );
-                          if (result != null && result.isNotEmpty && ctx.mounted) {
-                            Navigator.pop(ctx, result);
-                            return;
-                          }
-                        }
-                        if (ctx.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Câmera indisponível no ambiente atual ($e). Utilize a Galeria de Fotos ou cole link/base64.'),
-                            ),
-                          );
-                        }
-                      }
-                    },
-                  ),
-                  const Divider(height: 16),
-
-                  // OPÇÃO 2: DISPOSITIVO (Galeria / Arquivos)
-                  ListTile(
-                    leading: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryBlue.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.photo_library,
-                        color: AppTheme.primaryBlue,
-                      ),
-                    ),
-                    title: const Text(
-                      'Escolher do Dispositivo / Galeria',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                    subtitle: const Text(
-                      'Selecione uma imagem salva no aparelho',
-                      style: TextStyle(fontSize: 12),
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    onTap: () async {
-                      try {
-                        final picker = ImagePicker();
-                        final XFile? file = await picker.pickImage(
-                          source: ImageSource.gallery,
-                          maxWidth: 1280,
-                          maxHeight: 1280,
-                          imageQuality: 80,
-                        );
-                        if (file != null) {
-                          final bytes = await file.readAsBytes();
-                          final base64String = base64Encode(bytes);
-                          final mimeType = file.mimeType ?? 'image/jpeg';
-                          if (ctx.mounted) {
-                            Navigator.pop(ctx, 'data:$mimeType;base64,$base64String');
-                          }
-                          return;
-                        }
-                      } catch (e) {
-                        if (kIsWeb) {
-                          final result = await pickImageFromBrowser(
-                            useCamera: false,
-                          );
-                          if (result != null && result.isNotEmpty && ctx.mounted) {
-                            Navigator.pop(ctx, result);
-                            return;
-                          }
-                        }
-                        if (ctx.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Não foi possível abrir a galeria: $e'),
-                            ),
-                          );
-                        }
-                      }
-                    },
-                  ),
-                  const Divider(height: 16),
-
-                  // OPÇÃO 3: COLAR URL OU BASE64 (Funciona em qualquer ambiente / Desktop)
-                  ExpansionTile(
-                    leading: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.purple.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(Icons.link, color: Colors.purple),
-                    ),
-                    title: const Text(
-                      'Colar Link ou Imagem Base64',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                    subtitle: const Text(
-                      'Inserir URL da web ou código Base64',
-                      style: TextStyle(fontSize: 12),
-                    ),
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: Column(
-                          children: [
-                            TextField(
-                              controller: urlController,
-                              decoration: const InputDecoration(
-                                labelText: 'URL da imagem ou data:image/...',
-                                hintText: 'https://exemplo.com/foto.jpg',
-                                isDense: true,
-                              ),
-                              maxLines: 2,
-                            ),
-                            const SizedBox(height: 8),
-                            ElevatedButton.icon(
-                              icon: const Icon(Icons.check, size: 16),
-                              label: const Text('Usar esta Imagem'),
-                              onPressed: () {
-                                final text = urlController.text.trim();
-                                if (text.isNotEmpty) {
-                                  Navigator.pop(ctx, text);
-                                }
-                              },
-                            ),
-                          ],
+                    // OPÇÃO 1: CÂMERA (Tirar Foto)
+                    ListTile(
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppTheme.accentTeal.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.photo_camera,
+                          color: AppTheme.accentTeal,
                         ),
                       ),
-                    ],
-                  ),
-                ],
+                      title: const Text(
+                        'Tirar Foto com a Câmera',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      subtitle: const Text(
+                        'Abre a câmera do dispositivo móvel ou tablet',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      onTap: () async {
+                        try {
+                          final picker = ImagePicker();
+                          final XFile? file = await picker.pickImage(
+                            source: ImageSource.camera,
+                            maxWidth: 1280,
+                            maxHeight: 1280,
+                            imageQuality: 80,
+                          );
+                          if (file != null) {
+                            final bytes = await file.readAsBytes();
+                            final base64String = base64Encode(bytes);
+                            final mimeType = file.mimeType ?? 'image/jpeg';
+                            if (ctx.mounted) {
+                              Navigator.pop(
+                                ctx,
+                                'data:$mimeType;base64,$base64String',
+                              );
+                            }
+                            return;
+                          }
+                        } catch (e) {
+                          if (kIsWeb) {
+                            final result = await pickImageFromBrowser(
+                              useCamera: true,
+                            );
+                            if (result != null &&
+                                result.isNotEmpty &&
+                                ctx.mounted) {
+                              Navigator.pop(ctx, result);
+                              return;
+                            }
+                          }
+                          if (ctx.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Câmera indisponível no ambiente atual ($e). Utilize a Galeria de Fotos ou cole link/base64.',
+                                ),
+                              ),
+                            );
+                          }
+                        }
+                      },
+                    ),
+                    const Divider(height: 16),
+
+                    // OPÇÃO 2: DISPOSITIVO (Galeria / Arquivos)
+                    ListTile(
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryBlue.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.photo_library,
+                          color: AppTheme.primaryBlue,
+                        ),
+                      ),
+                      title: const Text(
+                        'Escolher do Dispositivo / Galeria',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      subtitle: const Text(
+                        'Selecione uma imagem salva no aparelho',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      onTap: () async {
+                        try {
+                          final picker = ImagePicker();
+                          final XFile? file = await picker.pickImage(
+                            source: ImageSource.gallery,
+                            maxWidth: 1280,
+                            maxHeight: 1280,
+                            imageQuality: 80,
+                          );
+                          if (file != null) {
+                            final bytes = await file.readAsBytes();
+                            final base64String = base64Encode(bytes);
+                            final mimeType = file.mimeType ?? 'image/jpeg';
+                            if (ctx.mounted) {
+                              Navigator.pop(
+                                ctx,
+                                'data:$mimeType;base64,$base64String',
+                              );
+                            }
+                            return;
+                          }
+                        } catch (e) {
+                          if (kIsWeb) {
+                            final result = await pickImageFromBrowser(
+                              useCamera: false,
+                            );
+                            if (result != null &&
+                                result.isNotEmpty &&
+                                ctx.mounted) {
+                              Navigator.pop(ctx, result);
+                              return;
+                            }
+                          }
+                          if (ctx.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Não foi possível abrir a galeria: $e',
+                                ),
+                              ),
+                            );
+                          }
+                        }
+                      },
+                    ),
+                    const Divider(height: 16),
+
+                    // OPÇÃO 3: COLAR URL OU BASE64 (Funciona em qualquer ambiente / Desktop)
+                    ExpansionTile(
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.purple.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.link, color: Colors.purple),
+                      ),
+                      title: const Text(
+                        'Colar Link ou Imagem Base64',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      subtitle: const Text(
+                        'Inserir URL da web ou código Base64',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Column(
+                            children: [
+                              TextField(
+                                controller: urlController,
+                                decoration: const InputDecoration(
+                                  labelText: 'URL da imagem ou data:image/...',
+                                  hintText: 'https://exemplo.com/foto.jpg',
+                                  isDense: true,
+                                ),
+                                maxLines: 2,
+                              ),
+                              const SizedBox(height: 8),
+                              ElevatedButton.icon(
+                                icon: const Icon(Icons.check, size: 16),
+                                label: const Text('Usar esta Imagem'),
+                                onPressed: () {
+                                  final text = urlController.text.trim();
+                                  if (text.isNotEmpty) {
+                                    Navigator.pop(ctx, text);
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancelar'),
-            ),
-          ],
-        );
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancelar'),
+              ),
+            ],
+          );
         },
       ),
     );

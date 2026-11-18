@@ -27,13 +27,10 @@ void main() {
       await db.close();
     });
 
-    test(
-      'Tabela inicia completamente vazia sem setores fictícios',
-      () async {
-        final sectors = await sectorManager.getSectors();
-        expect(sectors, isEmpty);
-      },
-    );
+    test('Tabela inicia completamente vazia sem setores fictícios', () async {
+      final sectors = await sectorManager.getSectors();
+      expect(sectors, isEmpty);
+    });
 
     test('Adiciona novo setor personalizado com sucesso', () async {
       final sec = await sectorManager.addSector(
@@ -88,19 +85,16 @@ void main() {
       expect(initialSectors, isEmpty);
     });
 
-    test(
-      'Após exclusão de setores, a tabela permanece vazia sem auto-injeção de sementes',
-      () async {
-        final sec = await sectorManager.addSector('Setor Único');
-        await sectorManager.deleteSector(sec.id);
+    test('Após exclusão de setores, a tabela permanece vazia sem auto-injeção de sementes', () async {
+      final sec = await sectorManager.addSector('Setor Único');
+      await sectorManager.deleteSector(sec.id);
 
-        final afterDelete = await sectorManager.getSectors();
-        expect(afterDelete, isEmpty);
+      final afterDelete = await sectorManager.getSectors();
+      expect(afterDelete, isEmpty);
 
-        final secondCheck = await sectorManager.getSectors();
-        expect(secondCheck, isEmpty);
-      },
-    );
+      final secondCheck = await sectorManager.getSectors();
+      expect(secondCheck, isEmpty);
+    });
   });
 
   group('Gerenciamento de Pontos de Referência / Marcos do Território (LandmarkManager)', () {
@@ -121,30 +115,27 @@ void main() {
       expect(landmarks, isEmpty);
     });
 
-    test(
-      'Adiciona ponto de referência com coordenadas do território e categoria válidas',
-      () async {
-        final landmark = await landmarkManager.addLandmark(
-          name: 'Padaria Estrela',
-          category: 'padaria',
-          address: 'Av. Principal, 500',
-          latitude: -3.1030,
-          longitude: -67.9400,
-          notes: 'Ponto de encontro da saída de campo',
-        );
+    test('Adiciona ponto de referência com coordenadas do território e categoria válidas', () async {
+      final landmark = await landmarkManager.addLandmark(
+        name: 'Padaria Estrela',
+        category: 'padaria',
+        address: 'Av. Principal, 500',
+        latitude: -3.1030,
+        longitude: -67.9400,
+        notes: 'Ponto de encontro da saída de campo',
+      );
 
-        expect(landmark.id, isNotEmpty);
-        expect(landmark.name, equals('Padaria Estrela'));
-        expect(landmark.category, equals('padaria'));
-        expect(landmark.categoryLabel, equals('Padaria / Comércio'));
-        expect(landmark.latitude, equals(-3.1030));
-        expect(landmark.longitude, equals(-67.9400));
+      expect(landmark.id, isNotEmpty);
+      expect(landmark.name, equals('Padaria Estrela'));
+      expect(landmark.category, equals('padaria'));
+      expect(landmark.categoryLabel, equals('Padaria / Comércio'));
+      expect(landmark.latitude, equals(-3.1030));
+      expect(landmark.longitude, equals(-67.9400));
 
-        final all = await landmarkManager.getLandmarks();
-        expect(all.length, equals(1));
-        expect(all.any((l) => l.name == 'Padaria Estrela'), isTrue);
-      },
-    );
+      final all = await landmarkManager.getLandmarks();
+      expect(all.length, equals(1));
+      expect(all.any((l) => l.name == 'Padaria Estrela'), isTrue);
+    });
 
     test('Atualização e exclusão de ponto de referência', () async {
       final lm = await landmarkManager.addLandmark(
@@ -200,25 +191,22 @@ void main() {
       },
     );
 
-    test(
-      'Após exclusão de todos os marcos, a tabela permanece vazia sem recriar sementes',
-      () async {
-        final lm = await landmarkManager.addLandmark(
-          name: 'Posto de Saúde Local',
-          category: 'saude',
-          latitude: -3.1022,
-          longitude: -67.9397,
-        );
-        await landmarkManager.deleteLandmark(lm.id);
+    test('Após exclusão de todos os marcos, a tabela permanece vazia sem recriar sementes', () async {
+      final lm = await landmarkManager.addLandmark(
+        name: 'Posto de Saúde Local',
+        category: 'saude',
+        latitude: -3.1022,
+        longitude: -67.9397,
+      );
+      await landmarkManager.deleteLandmark(lm.id);
 
-        final afterDelete = await landmarkManager.getLandmarks();
-        expect(afterDelete, isEmpty);
+      final afterDelete = await landmarkManager.getLandmarks();
+      expect(afterDelete, isEmpty);
 
-        // Chamada subsequente a getLandmarks() não deve re-popular
-        final secondCheck = await landmarkManager.getLandmarks();
-        expect(secondCheck, isEmpty);
-      },
-    );
+      // Chamada subsequente a getLandmarks() não deve re-popular
+      final secondCheck = await landmarkManager.getLandmarks();
+      expect(secondCheck, isEmpty);
+    });
   });
 
   group('Contagem de Assistência e Presentes (DashboardCalculator)', () {

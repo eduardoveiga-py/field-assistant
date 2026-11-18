@@ -47,7 +47,8 @@ class _ValidAudioBytesMatcher extends Matcher {
       return false;
     }
 
-    final isRiffWave = bytes.length >= 12 &&
+    final isRiffWave =
+        bytes.length >= 12 &&
         bytes[0] == 0x52 &&
         bytes[1] == 0x49 &&
         bytes[2] == 0x46 &&
@@ -57,8 +58,7 @@ class _ValidAudioBytesMatcher extends Matcher {
         bytes[10] == 0x56 &&
         bytes[11] == 0x45;
     if (isRiffWave && !bytes.skip(44).any((b) => b != 0)) {
-      matchState['reason'] =
-          'Arquivo RIFF/WAVE contém cabeçalho, porém amostras PCM após os 44 bytes estão zeradas.';
+      matchState['reason'] = 'Arquivo RIFF/WAVE contém cabeçalho, porém amostras PCM após os 44 bytes estão zeradas.';
       return false;
     }
 

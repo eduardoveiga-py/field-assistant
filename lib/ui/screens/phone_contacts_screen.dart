@@ -193,362 +193,375 @@ class _PhoneContactsScreenState extends ConsumerState<PhoneContactsScreen> {
           final tagInputController = ctrls[6];
 
           return StatefulBuilder(
-        builder: (ctx, setDialogState) {
-          final isDark = Theme.of(ctx).brightness == Brightness.dark;
+            builder: (ctx, setDialogState) {
+              final isDark = Theme.of(ctx).brightness == Brightness.dark;
 
-          return AlertDialog(
-            title: Row(
-              children: [
-                Icon(
-                  existing != null ? Icons.edit : Icons.person_add_alt,
-                  color: AppTheme.primaryBlue,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  existing != null
-                      ? 'Editar Contato Telefônico'
-                      : 'Novo Contato Telefônico',
-                ),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Cadastre contatos obtidos na rua, carrinho ou testemunho informal sem localização exata da casa.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isDark
-                          ? const Color(0xFFCBD5E1)
-                          : AppTheme.textMuted,
+              return AlertDialog(
+                title: Row(
+                  children: [
+                    Icon(
+                      existing != null ? Icons.edit : Icons.person_add_alt,
+                      color: AppTheme.primaryBlue,
                     ),
-                  ),
-                  const SizedBox(height: 14),
-                  TextField(
-                    controller: nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Nome ou como conheceu *',
-                      hintText: 'Ex: Carlos do Ponto de Ônibus',
+                    const SizedBox(width: 8),
+                    Text(
+                      existing != null
+                          ? 'Editar Contato Telefônico'
+                          : 'Novo Contato Telefônico',
                     ),
-                    autofocus: existing == null,
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: phoneController,
-                          decoration: const InputDecoration(
-                            labelText: 'Telefone Principal *',
-                            hintText: '(11) 98765-4321',
-                          ),
-                          keyboardType: TextInputType.phone,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextField(
-                          controller: secPhoneController,
-                          decoration: const InputDecoration(
-                            labelText: 'Telefone Recado / Fixo',
-                            hintText: '(11) 3333-2222',
-                          ),
-                          keyboardType: TextInputType.phone,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  DropdownButtonFormField<String>(
-                    initialValue: selectedOrigin,
-                    decoration: const InputDecoration(
-                      labelText: 'Origem do Contato',
-                    ),
-                    items: const [
-                      DropdownMenuItem(
-                        value: 'Testemunho na Rua',
-                        child: Text('🚶 Testemunho na Rua / Praça'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'TPL / Carrinho',
-                        child: Text('🛒 TPL (Testemunho Público / Carrinho)'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'Testemunho Informal',
-                        child: Text('💬 Testemunho Informal'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'Telefone',
-                        child: Text('📞 Testemunho por Telefone'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'Outro',
-                        child: Text('📍 Outra Origem'),
-                      ),
-                    ],
-                    onChanged: (val) {
-                      if (val != null) {
-                        setDialogState(() => selectedOrigin = val);
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 12),
-
-                  // CHECKBOX WHATSAPP
-                  CheckboxListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text(
-                      'Tem WhatsApp?',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                    subtitle: const Text(
-                      'Habilita botão de conversa direta no WhatsApp',
-                      style: TextStyle(fontSize: 11),
-                    ),
-                    value: hasWhatsApp,
-                    onChanged: (val) =>
-                        setDialogState(() => hasWhatsApp = val ?? false),
-                  ),
-                  if (hasWhatsApp) ...[
-                    TextField(
-                      controller: waInfoController,
-                      decoration: const InputDecoration(
-                        labelText: 'Informações do WhatsApp (opcional)',
-                        hintText: 'Ex: Mesmo número ou colar link do contato',
-                      ),
-                    ),
-                    const SizedBox(height: 8),
                   ],
-
-                  // CHECKBOX OUTRAS REDES SOCIAIS
-                  CheckboxListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text(
-                      'Tem outras Redes Sociais?',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                    subtitle: const Text(
-                      'Instagram, Facebook, LinkedIn...',
-                      style: TextStyle(fontSize: 11),
-                    ),
-                    value: hasSocial,
-                    onChanged: (val) =>
-                        setDialogState(() => hasSocial = val ?? false),
-                  ),
-                  if (hasSocial) ...[
-                    Row(
-                      children: [
-                        Expanded(
-                          flex: 2,
-                          child: DropdownButtonFormField<String>(
-                            initialValue: selectedPlatform,
-                            decoration: const InputDecoration(
-                              labelText: 'Rede',
-                            ),
-                            items: const [
-                              DropdownMenuItem(
-                                value: 'Instagram',
-                                child: Text('Instagram'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'Facebook',
-                                child: Text('Facebook'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'LinkedIn',
-                                child: Text('LinkedIn'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'Telegram',
-                                child: Text('Telegram'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'Outra',
-                                child: Text('Outra'),
-                              ),
-                            ],
-                            onChanged: (val) {
-                              if (val != null) {
-                                setDialogState(() => selectedPlatform = val);
-                              }
-                            },
-                          ),
+                ),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Cadastre contatos obtidos na rua, carrinho ou testemunho informal sem localização exata da casa.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark
+                              ? const Color(0xFFCBD5E1)
+                              : AppTheme.textMuted,
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          flex: 3,
-                          child: TextField(
-                            controller: socialHandleController,
-                            decoration: const InputDecoration(
-                              labelText: '@usuario ou link',
-                              hintText: '@nome.sobrenome',
+                      ),
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: nameController,
+                        decoration: const InputDecoration(
+                          labelText: 'Nome ou como conheceu *',
+                          hintText: 'Ex: Carlos do Ponto de Ônibus',
+                        ),
+                        autofocus: existing == null,
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: phoneController,
+                              decoration: const InputDecoration(
+                                labelText: 'Telefone Principal *',
+                                hintText: '(11) 98765-4321',
+                              ),
+                              keyboardType: TextInputType.phone,
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-
-                  const SizedBox(height: 10),
-                  // TAGS
-                  const Text(
-                    'Tags / Categorias:',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                  ),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 6,
-                    children: tags.map((t) {
-                      return Chip(
-                        label: Text(t, style: const TextStyle(fontSize: 11)),
-                        deleteIcon: const Icon(Icons.close, size: 14),
-                        onDeleted: () => setDialogState(() => tags.remove(t)),
-                        visualDensity: VisualDensity.compact,
-                      );
-                    }).toList(),
-                  ),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: tagInputController,
-                          decoration: const InputDecoration(
-                            labelText: 'Nova tag',
-                            hintText: 'Ex: jovem, interessado, bíblia',
-                            isDense: true,
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: TextField(
+                              controller: secPhoneController,
+                              decoration: const InputDecoration(
+                                labelText: 'Telefone Recado / Fixo',
+                                hintText: '(11) 3333-2222',
+                              ),
+                              keyboardType: TextInputType.phone,
+                            ),
                           ),
-                        ),
+                        ],
                       ),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.add_circle,
-                          color: AppTheme.primaryBlue,
+                      const SizedBox(height: 10),
+                      DropdownButtonFormField<String>(
+                        initialValue: selectedOrigin,
+                        decoration: const InputDecoration(
+                          labelText: 'Origem do Contato',
                         ),
-                        onPressed: () {
-                          final text = tagInputController.text.trim();
-                          if (text.isNotEmpty && !tags.contains(text)) {
-                            setDialogState(() {
-                              tags.add(text);
-                              tagInputController.clear();
-                            });
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'Testemunho na Rua',
+                            child: Text('🚶 Testemunho na Rua / Praça'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'TPL / Carrinho',
+                            child: Text(
+                              '🛒 TPL (Testemunho Público / Carrinho)',
+                            ),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Testemunho Informal',
+                            child: Text('💬 Testemunho Informal'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Telefone',
+                            child: Text('📞 Testemunho por Telefone'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Outro',
+                            child: Text('📍 Outra Origem'),
+                          ),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) {
+                            setDialogState(() => selectedOrigin = val);
                           }
                         },
                       ),
+                      const SizedBox(height: 12),
+
+                      // CHECKBOX WHATSAPP
+                      CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text(
+                          'Tem WhatsApp?',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        subtitle: const Text(
+                          'Habilita botão de conversa direta no WhatsApp',
+                          style: TextStyle(fontSize: 11),
+                        ),
+                        value: hasWhatsApp,
+                        onChanged: (val) =>
+                            setDialogState(() => hasWhatsApp = val ?? false),
+                      ),
+                      if (hasWhatsApp) ...[
+                        TextField(
+                          controller: waInfoController,
+                          decoration: const InputDecoration(
+                            labelText: 'Informações do WhatsApp (opcional)',
+                            hintText:
+                                'Ex: Mesmo número ou colar link do contato',
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+
+                      // CHECKBOX OUTRAS REDES SOCIAIS
+                      CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text(
+                          'Tem outras Redes Sociais?',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        subtitle: const Text(
+                          'Instagram, Facebook, LinkedIn...',
+                          style: TextStyle(fontSize: 11),
+                        ),
+                        value: hasSocial,
+                        onChanged: (val) =>
+                            setDialogState(() => hasSocial = val ?? false),
+                      ),
+                      if (hasSocial) ...[
+                        Row(
+                          children: [
+                            Expanded(
+                              flex: 2,
+                              child: DropdownButtonFormField<String>(
+                                initialValue: selectedPlatform,
+                                decoration: const InputDecoration(
+                                  labelText: 'Rede',
+                                ),
+                                items: const [
+                                  DropdownMenuItem(
+                                    value: 'Instagram',
+                                    child: Text('Instagram'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'Facebook',
+                                    child: Text('Facebook'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'LinkedIn',
+                                    child: Text('LinkedIn'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'Telegram',
+                                    child: Text('Telegram'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'Outra',
+                                    child: Text('Outra'),
+                                  ),
+                                ],
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    setDialogState(
+                                      () => selectedPlatform = val,
+                                    );
+                                  }
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              flex: 3,
+                              child: TextField(
+                                controller: socialHandleController,
+                                decoration: const InputDecoration(
+                                  labelText: '@usuario ou link',
+                                  hintText: '@nome.sobrenome',
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+
+                      const SizedBox(height: 10),
+                      // TAGS
+                      const Text(
+                        'Tags / Categorias:',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        children: tags.map((t) {
+                          return Chip(
+                            label: Text(
+                              t,
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                            deleteIcon: const Icon(Icons.close, size: 14),
+                            onDeleted: () =>
+                                setDialogState(() => tags.remove(t)),
+                            visualDensity: VisualDensity.compact,
+                          );
+                        }).toList(),
+                      ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: tagInputController,
+                              decoration: const InputDecoration(
+                                labelText: 'Nova tag',
+                                hintText: 'Ex: jovem, interessado, bíblia',
+                                isDense: true,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.add_circle,
+                              color: AppTheme.primaryBlue,
+                            ),
+                            onPressed: () {
+                              final text = tagInputController.text.trim();
+                              if (text.isNotEmpty && !tags.contains(text)) {
+                                setDialogState(() {
+                                  tags.add(text);
+                                  tagInputController.clear();
+                                });
+                              }
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: notesController,
+                        decoration: const InputDecoration(
+                          labelText: 'Observações do Contato',
+                          hintText: 'Ex: Conversamos sobre o futuro. Pediu para mandar mensagem na quinta.',
+                        ),
+                        maxLines: 2,
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: notesController,
-                    decoration: const InputDecoration(
-                      labelText: 'Observações do Contato',
-                      hintText: 'Ex: Conversamos sobre o futuro. Pediu para mandar mensagem na quinta.',
-                    ),
-                    maxLines: 2,
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Cancelar'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () async {
+                      final name = nameController.text.trim();
+                      final phone = phoneController.text.trim();
+                      if (name.isEmpty || phone.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Por favor, informe ao menos o nome e o telefone.',
+                            ),
+                          ),
+                        );
+                        return;
+                      }
+
+                      final mgr = ref.read(phoneContactsManagerProvider);
+                      if (existing != null) {
+                        await mgr.updatePhoneContact(
+                          PhoneContactItem(
+                            id: existing.id,
+                            name: name,
+                            phone: phone,
+                            secondaryPhone:
+                                secPhoneController.text.trim().isEmpty
+                                ? null
+                                : secPhoneController.text.trim(),
+                            hasWhatsApp: hasWhatsApp,
+                            whatsAppInfo: waInfoController.text.trim().isEmpty
+                                ? null
+                                : waInfoController.text.trim(),
+                            hasSocial: hasSocial,
+                            socialPlatform: hasSocial ? selectedPlatform : null,
+                            socialHandle: hasSocial
+                                ? socialHandleController.text.trim()
+                                : null,
+                            notes: notesController.text.trim().isEmpty
+                                ? null
+                                : notesController.text.trim(),
+                            tags: tags,
+                            origin: selectedOrigin,
+                            convertedPersonId: existing.convertedPersonId,
+                            createdAt: existing.createdAt,
+                            updatedAt: DateTime.now(),
+                          ),
+                        );
+                      } else {
+                        await mgr.addPhoneContact(
+                          name: name,
+                          phone: phone,
+                          secondaryPhone: secPhoneController.text.trim().isEmpty
+                              ? null
+                              : secPhoneController.text.trim(),
+                          hasWhatsApp: hasWhatsApp,
+                          whatsAppInfo: waInfoController.text.trim().isEmpty
+                              ? null
+                              : waInfoController.text.trim(),
+                          hasSocial: hasSocial,
+                          socialPlatform: hasSocial ? selectedPlatform : null,
+                          socialHandle: hasSocial
+                              ? socialHandleController.text.trim()
+                              : null,
+                          notes: notesController.text.trim().isEmpty
+                              ? null
+                              : notesController.text.trim(),
+                          tags: tags,
+                          origin: selectedOrigin,
+                        );
+                      }
+
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              existing != null
+                                  ? 'Contato atualizado!'
+                                  : 'Contato telefônico salvo com sucesso!',
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                    child: const Text('Salvar'),
                   ),
                 ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancelar'),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  final name = nameController.text.trim();
-                  final phone = phoneController.text.trim();
-                  if (name.isEmpty || phone.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Por favor, informe ao menos o nome e o telefone.',
-                        ),
-                      ),
-                    );
-                    return;
-                  }
-
-                  final mgr = ref.read(phoneContactsManagerProvider);
-                  if (existing != null) {
-                    await mgr.updatePhoneContact(
-                      PhoneContactItem(
-                        id: existing.id,
-                        name: name,
-                        phone: phone,
-                        secondaryPhone: secPhoneController.text.trim().isEmpty
-                            ? null
-                            : secPhoneController.text.trim(),
-                        hasWhatsApp: hasWhatsApp,
-                        whatsAppInfo: waInfoController.text.trim().isEmpty
-                            ? null
-                            : waInfoController.text.trim(),
-                        hasSocial: hasSocial,
-                        socialPlatform: hasSocial ? selectedPlatform : null,
-                        socialHandle: hasSocial
-                            ? socialHandleController.text.trim()
-                            : null,
-                        notes: notesController.text.trim().isEmpty
-                            ? null
-                            : notesController.text.trim(),
-                        tags: tags,
-                        origin: selectedOrigin,
-                        convertedPersonId: existing.convertedPersonId,
-                        createdAt: existing.createdAt,
-                        updatedAt: DateTime.now(),
-                      ),
-                    );
-                  } else {
-                    await mgr.addPhoneContact(
-                      name: name,
-                      phone: phone,
-                      secondaryPhone: secPhoneController.text.trim().isEmpty
-                          ? null
-                          : secPhoneController.text.trim(),
-                      hasWhatsApp: hasWhatsApp,
-                      whatsAppInfo: waInfoController.text.trim().isEmpty
-                          ? null
-                          : waInfoController.text.trim(),
-                      hasSocial: hasSocial,
-                      socialPlatform: hasSocial ? selectedPlatform : null,
-                      socialHandle: hasSocial
-                          ? socialHandleController.text.trim()
-                          : null,
-                      notes: notesController.text.trim().isEmpty
-                          ? null
-                          : notesController.text.trim(),
-                      tags: tags,
-                      origin: selectedOrigin,
-                    );
-                  }
-
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          existing != null
-                              ? 'Contato atualizado!'
-                              : 'Contato telefônico salvo com sucesso!',
-                        ),
-                      ),
-                    );
-                  }
-                },
-                child: const Text('Salvar'),
-              ),
-            ],
+              );
+            },
           );
-        },
-      );
         },
       ),
     );
@@ -584,7 +597,10 @@ class _PhoneContactsScreenState extends ConsumerState<PhoneContactsScreen> {
                     children: [
                       const Text(
                         'Você conseguiu o endereço da casa? Promova este contato para o cadastro completo de Pessoas para gerenciar revisitas, rotas e mapa.',
-                        style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.textMuted,
+                        ),
                       ),
                       const SizedBox(height: 12),
                       TextField(
@@ -641,7 +657,9 @@ class _PhoneContactsScreenState extends ConsumerState<PhoneContactsScreen> {
                       if (addr.isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Por favor, informe o endereço da casa.'),
+                            content: Text(
+                              'Por favor, informe o endereço da casa.',
+                            ),
                           ),
                         );
                         return;

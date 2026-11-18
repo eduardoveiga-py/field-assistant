@@ -50,22 +50,25 @@ void main() {
         expect(resolved.displayText, contains('Salmo 23'));
       });
 
-      test('TC-PUB-04: Navegação direta com parâmetro de lição e parágrafo/ponto', () {
-        final resolved = PublicationLinkResolver.resolve(
-          publicationId: 'lff-book',
-          languageCode: 'pt',
-          lesson: 8,
-          paragraph: 3,
-        );
+      test(
+        'TC-PUB-04: Navegação direta com parâmetro de lição e parágrafo/ponto',
+        () {
+          final resolved = PublicationLinkResolver.resolve(
+            publicationId: 'lff-book',
+            languageCode: 'pt',
+            lesson: 8,
+            paragraph: 3,
+          );
 
-        expect(resolved.url, contains('pub=lff'));
-        expect(resolved.url, contains('lesson=8'));
-        expect(resolved.url, contains('docid=1102021208'));
-        expect(resolved.url, contains('par=3'));
-        expect(resolved.fallbackUrl, contains('parte-1/licao-08/#p3'));
-        expect(resolved.displayText, contains('Lição 8, § 3'));
-        expect(resolved.isDirectParagraphSupported, isTrue);
-      });
+          expect(resolved.url, contains('pub=lff'));
+          expect(resolved.url, contains('lesson=8'));
+          expect(resolved.url, contains('docid=1102021208'));
+          expect(resolved.url, contains('par=3'));
+          expect(resolved.fallbackUrl, contains('parte-1/licao-08/#p3'));
+          expect(resolved.displayText, contains('Lição 8, § 3'));
+          expect(resolved.isDirectParagraphSupported, isTrue);
+        },
+      );
 
       test('TC-PUB-05: Lições em outras partes mapeiam corretamente as seções canônicas', () {
         final resPart2 = PublicationLinkResolver.resolve(

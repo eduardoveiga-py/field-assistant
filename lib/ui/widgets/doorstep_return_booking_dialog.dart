@@ -86,7 +86,9 @@ class _DoorstepReturnBookingDialogState
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                  color: isDark
+                      ? const Color(0xFF0F172A)
+                      : const Color(0xFFF8FAFC),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
                     color: isDark ? Colors.white12 : Colors.grey.shade200,
@@ -97,17 +99,26 @@ class _DoorstepReturnBookingDialogState
                   children: [
                     Text(
                       widget.person.name,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
                     ),
                     if (widget.person.address != null)
                       Text(
                         '📍 ${widget.person.address}',
-                        style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.textMuted,
+                        ),
                       ),
                     if (widget.person.preferredSchedule != null)
                       Text(
                         '🕒 Preferência: ${widget.person.preferredSchedule}',
-                        style: const TextStyle(fontSize: 11, color: AppTheme.accentTeal),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.accentTeal,
+                        ),
                       ),
                   ],
                 ),
@@ -121,7 +132,9 @@ class _DoorstepReturnBookingDialogState
               if (recommendations.isEmpty)
                 const Text('Nenhuma recomendação disponível no momento.')
               else
-                ...recommendations.map((rec) => _buildSlotCard(context, rec, isDark)),
+                ...recommendations.map(
+                  (rec) => _buildSlotCard(context, rec, isDark),
+                ),
             ],
           ),
         ),
@@ -158,16 +171,26 @@ class _DoorstepReturnBookingDialogState
           children: [
             Row(
               children: [
-                const Icon(Icons.calendar_today_outlined, size: 16, color: Color(0xFFD97706)),
+                const Icon(
+                  Icons.calendar_today_outlined,
+                  size: 16,
+                  color: Color(0xFFD97706),
+                ),
                 const SizedBox(width: 6),
                 Text(
                   '${AppDateUtils.formatDate(rec.startTime)} às ${AppDateUtils.formatTime(rec.startTime)}',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
                 ),
                 const Spacer(),
                 if (rec.distanceMeters != null)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF16A34A).withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(4),
@@ -220,7 +243,10 @@ class _DoorstepReturnBookingDialogState
                   padding: const EdgeInsets.symmetric(vertical: 8),
                 ),
                 icon: const Icon(Icons.check, size: 16),
-                label: const Text('Confirmar Este Horário', style: TextStyle(fontSize: 12)),
+                label: const Text(
+                  'Confirmar Este Horário',
+                  style: TextStyle(fontSize: 12),
+                ),
                 onPressed: _isSaving ? null : () => _confirmBooking(rec),
               ),
             ),
@@ -261,7 +287,10 @@ class _DoorstepReturnBookingDialogState
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao agendar: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Erro ao agendar: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } finally {

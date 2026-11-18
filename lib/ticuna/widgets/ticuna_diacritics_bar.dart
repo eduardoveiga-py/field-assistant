@@ -224,10 +224,7 @@ class TicunaDiacriticsBar extends StatelessWidget {
             borderRadius: BorderRadius.circular(8),
             onTap: () => _handleTap(char),
             child: Container(
-              constraints: const BoxConstraints(
-                minWidth: 46,
-                minHeight: 48,
-              ),
+              constraints: const BoxConstraints(minWidth: 46, minHeight: 48),
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(8),

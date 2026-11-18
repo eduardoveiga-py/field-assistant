@@ -12,10 +12,22 @@ class DelayedTiles implements TileCacheBackend {
     pending.add(c);
     return c.future;
   }
+
   @override
-  Future<void> saveTile(int z, int x, int y, Uint8List bytes, [MapLayerStyle? style]) async {}
+  Future<void> saveTile(
+    int z,
+    int x,
+    int y,
+    Uint8List bytes, [
+    MapLayerStyle? style,
+  ]) async {}
   @override
-  Future<bool> isTileCached(int z, int x, int y, [MapLayerStyle? style]) async => false;
+  Future<bool> isTileCached(
+    int z,
+    int x,
+    int y, [
+    MapLayerStyle? style,
+  ]) async => false;
   @override
   Future<int> getCachedTileCount([MapLayerStyle? style]) async => 0;
 }

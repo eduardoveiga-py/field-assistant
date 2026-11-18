@@ -296,7 +296,8 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
         if (p.deletedAt != null) continue;
         final nameMatch = p.name.toLowerCase().contains(query);
         final addrMatch = p.address?.toLowerCase().contains(query) ?? false;
-        final noteMatch = p.generalNotes?.toLowerCase().contains(query) ?? false;
+        final noteMatch =
+            p.generalNotes?.toLowerCase().contains(query) ?? false;
         final nextMatch =
             p.nextActionNote?.toLowerCase().contains(query) ?? false;
 
@@ -413,7 +414,9 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
                 title: a.title,
                 subtitle:
                     'Pesquisa • Status: ${a.status}${a.summary.isNotEmpty ? ' • ${a.summary}' : ''}',
-                snippet: contentMatch ? a.content : (summaryMatch ? a.summary : null),
+                snippet: contentMatch
+                    ? a.content
+                    : (summaryMatch ? a.summary : null),
                 type: GlobalSearchResultType.research,
                 onTap: () {
                   Navigator.push(
@@ -503,7 +506,14 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
     // 7. Tarefas e 8. Projetos (governados por tasksProjects — FA-FUNC-01)
     if (isTasksProjectsEnabled) {
       try {
-        final tasks = await (db.select(db.tasks)..where((t) => (t.title.like('%$query%') | t.description.like('%$query%')) & t.deletedAt.isNull())).get();
+        final tasks =
+            await (db.select(db.tasks)..where(
+                  (t) =>
+                      (t.title.like('%$query%') |
+                          t.description.like('%$query%')) &
+                      t.deletedAt.isNull(),
+                ))
+                .get();
         for (final t in tasks) {
           results.add(
             GlobalSearchResultItem(
@@ -513,7 +523,10 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
               snippet: t.description,
               type: GlobalSearchResultType.task,
               onTap: () {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const TasksScreen()));
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const TasksScreen()),
+                );
               },
             ),
           );
@@ -523,7 +536,13 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
       }
 
       try {
-        final projs = await (db.select(db.projects)..where((t) => (t.name.like('%$query%') | t.objective.like('%$query%')) & t.deletedAt.isNull())).get();
+        final projs =
+            await (db.select(db.projects)..where(
+                  (t) =>
+                      (t.name.like('%$query%') | t.objective.like('%$query%')) &
+                      t.deletedAt.isNull(),
+                ))
+                .get();
         for (final pr in projs) {
           results.add(
             GlobalSearchResultItem(
@@ -533,7 +552,12 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
               snippet: pr.objective,
               type: GlobalSearchResultType.project,
               onTap: () {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => ProjectDetailScreen(projectId: pr.id)));
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ProjectDetailScreen(projectId: pr.id),
+                  ),
+                );
               },
             ),
           );
@@ -546,7 +570,13 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
     // 9. Base de Conhecimento (Notas — governada por knowledge — FA-FUNC-01)
     if (isKnowledgeEnabled) {
       try {
-        final notes = await (db.select(db.knowledgeNotes)..where((t) => (t.title.like('%$query%') | t.content.like('%$query%')) & t.deletedAt.isNull())).get();
+        final notes =
+            await (db.select(db.knowledgeNotes)..where(
+                  (t) =>
+                      (t.title.like('%$query%') | t.content.like('%$query%')) &
+                      t.deletedAt.isNull(),
+                ))
+                .get();
         for (final n in notes) {
           results.add(
             GlobalSearchResultItem(
@@ -556,7 +586,12 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
               snippet: n.content,
               type: GlobalSearchResultType.knowledge,
               onTap: () {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const KnowledgeBaseScreen()));
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const KnowledgeBaseScreen(),
+                  ),
+                );
               },
             ),
           );
@@ -569,16 +604,25 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
     // 10. Inbox Universal (governada por inbox — FA-FUNC-01)
     if (isInboxEnabled) {
       try {
-        final inboxEntries = await (db.select(db.inboxEntries)..where((t) => t.content.like('%$query%') & t.deletedAt.isNull())).get();
+        final inboxEntries =
+            await (db.select(db.inboxEntries)..where(
+                  (t) => t.content.like('%$query%') & t.deletedAt.isNull(),
+                ))
+                .get();
         for (final inb in inboxEntries) {
           results.add(
             GlobalSearchResultItem(
               id: inb.id,
-              title: inb.content.length > 50 ? '${inb.content.substring(0, 50)}...' : inb.content,
+              title: inb.content.length > 50
+                  ? '${inb.content.substring(0, 50)}...'
+                  : inb.content,
               subtitle: 'Inbox • Status: ${inb.status}',
               type: GlobalSearchResultType.inbox,
               onTap: () {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const InboxScreen()));
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const InboxScreen()),
+                );
               },
             ),
           );

@@ -6,7 +6,8 @@ enum TicunaEntryType {
   word,
   phrase;
 
-  String get displayName => this == TicunaEntryType.word ? 'Dicionário' : 'Frases Úteis';
+  String get displayName =>
+      this == TicunaEntryType.word ? 'Dicionário' : 'Frases Úteis';
 }
 
 /// Item do Dicionário Ticuna (estilo Flashcard / Anki)
@@ -14,7 +15,8 @@ class TicunaWord {
   final String id;
   final String word; // Palavra ou termo em Ticuna
   final String translation; // Tradução em Português
-  final String? phonetics; // Notas de pronúncia e tons (ex: "ta-e-mã-ẽ [tom alto]")
+  final String?
+  phonetics; // Notas de pronúncia e tons (ex: "ta-e-mã-ẽ [tom alto]")
   final String? grammaticalClass; // Substantivo, Verbo, Adjetivo, Pronome, etc.
   final String? exampleSentence; // Exemplo prático de frase em Ticuna
   final String? exampleTranslation; // Tradução da frase de exemplo
@@ -183,8 +185,12 @@ class TicunaWord {
           : null,
       audioDurationSeconds: (map['audio_duration_seconds'] as num?)?.toInt(),
       languageId: map['language_id'] as String? ?? 'tca',
-      createdAt: DateTime.tryParse(map['created_at'] as String? ?? '') ?? DateTime.now(),
-      updatedAt: DateTime.tryParse(map['updated_at'] as String? ?? '') ?? DateTime.now(),
+      createdAt:
+          DateTime.tryParse(map['created_at'] as String? ?? '') ??
+          DateTime.now(),
+      updatedAt:
+          DateTime.tryParse(map['updated_at'] as String? ?? '') ??
+          DateTime.now(),
     );
   }
 }
@@ -194,7 +200,8 @@ class TicunaPhrase {
   final String id;
   final String phrase; // Frase em Ticuna
   final String translation; // Tradução em Português
-  final String? category; // Tópico/categoria (Saudação, Campo, Bíblia, Perguntas, etc.)
+  final String?
+  category; // Tópico/categoria (Saudação, Campo, Bíblia, Perguntas, etc.)
   final String? phonetics; // Pronúncia sugerida
   final String? notes; // Versículo bíblico ou observação contextual
   final List<String> tags; // Tags associadas
@@ -299,8 +306,12 @@ class TicunaPhrase {
           : null,
       audioDurationSeconds: (map['audio_duration_seconds'] as num?)?.toInt(),
       languageId: map['language_id'] as String? ?? 'tca',
-      createdAt: DateTime.tryParse(map['created_at'] as String? ?? '') ?? DateTime.now(),
-      updatedAt: DateTime.tryParse(map['updated_at'] as String? ?? '') ?? DateTime.now(),
+      createdAt:
+          DateTime.tryParse(map['created_at'] as String? ?? '') ??
+          DateTime.now(),
+      updatedAt:
+          DateTime.tryParse(map['updated_at'] as String? ?? '') ??
+          DateTime.now(),
     );
   }
 }
@@ -326,7 +337,8 @@ class TicunaTag {
   factory TicunaTag.fromMap(Map<String, dynamic> map) => TicunaTag(
     id: map['id']?.toString() ?? '',
     name: map['name'] as String? ?? '',
-    createdAt: DateTime.tryParse(map['created_at'] as String? ?? '') ?? DateTime.now(),
+    createdAt:
+        DateTime.tryParse(map['created_at'] as String? ?? '') ?? DateTime.now(),
   );
 }
 
@@ -367,7 +379,9 @@ class TicunaExportData {
 
     return TicunaExportData(
       version: (map['version'] as num?)?.toInt() ?? 1,
-      exportedAt: DateTime.tryParse(map['exported_at'] as String? ?? '') ?? DateTime.now(),
+      exportedAt:
+          DateTime.tryParse(map['exported_at'] as String? ?? '') ??
+          DateTime.now(),
       words: rawWords
           .map((e) => TicunaWord.fromMap(Map<String, dynamic>.from(e as Map)))
           .toList(),

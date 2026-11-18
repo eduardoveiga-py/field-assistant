@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -71,14 +72,23 @@ void main() {
       expect(TicunaUnicodeHelper.normalize('u~'), equals('ũ'));
       expect(TicunaUnicodeHelper.normalize('e~'), equals('ẽ'));
       expect(TicunaUnicodeHelper.normalize('Duü~'), equals('Duü\u0303'));
-      expect(TicunaUnicodeHelper.normalize('ü\u0303´'), equals('ü\u0303\u0301'));
-      expect(TicunaUnicodeHelper.normalize('Ü\u0303´'), equals('Ü\u0303\u0301'));
+      expect(
+        TicunaUnicodeHelper.normalize('ü\u0303´'),
+        equals('ü\u0303\u0301'),
+      );
+      expect(
+        TicunaUnicodeHelper.normalize('Ü\u0303´'),
+        equals('Ü\u0303\u0301'),
+      );
     });
 
     test('Garante que ü̃ NUNCA é substituído por ũ e que termos canônicos são preservados', () {
       // ü̃ e ũ são fonemas distintos na língua Ticuna
       expect(TicunaUnicodeHelper.normalize('ü\u0303'), equals('ü\u0303'));
-      expect(TicunaUnicodeHelper.normalize('ü\u0303\u0301'), equals('ü\u0303\u0301'));
+      expect(
+        TicunaUnicodeHelper.normalize('ü\u0303\u0301'),
+        equals('ü\u0303\u0301'),
+      );
       expect(TicunaUnicodeHelper.normalize('ũ'), equals('ũ'));
       expect(TicunaUnicodeHelper.normalize('Ũ'), equals('Ũ'));
       expect(TicunaUnicodeHelper.normalize('Duü\u0303'), equals('Duü\u0303'));
@@ -88,7 +98,10 @@ void main() {
       expect(TicunaUnicodeHelper.normalize('Ũ\u0308'), equals('Ü\u0303'));
       expect(TicunaUnicodeHelper.normalize('ũ¨'), equals('ü\u0303'));
       expect(TicunaUnicodeHelper.normalize('Ũ¨'), equals('Ü\u0303'));
-      expect(TicunaUnicodeHelper.normalize('ũ\u0308\u0301'), equals('ü\u0303\u0301'));
+      expect(
+        TicunaUnicodeHelper.normalize('ũ\u0308\u0301'),
+        equals('ü\u0303\u0301'),
+      );
 
       // Recuperação do termo canônico "Duü̃" (pessoa/gente)
       expect(TicunaUnicodeHelper.normalize('Duũũ'), equals('Duü\u0303'));
@@ -106,275 +119,290 @@ void main() {
       expect(result.text, equals('Duü\u0303'));
     });
 
-    test('textStyle fornece fallbacks tipográficos sem corte vertical de linha', () {
-      final style = TicunaUnicodeHelper.textStyle(
-        fontSize: 18,
-        fontWeight: FontWeight.bold,
-        color: Colors.teal,
-      );
+    test(
+      'textStyle fornece fallbacks tipográficos sem corte vertical de linha',
+      () {
+        final style = TicunaUnicodeHelper.textStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          color: Colors.teal,
+        );
 
-      expect(style.fontSize, equals(18));
-      expect(style.fontWeight, equals(FontWeight.bold));
-      expect(style.color, equals(Colors.teal));
-      // Garante que não haja clipping agressivo de altura
-      expect(style.height, isNull);
-      // Garante que haja fallback de fontes com suporte a GPOS
-      expect(style.fontFamilyFallback, isNotNull);
-      expect(style.fontFamilyFallback, contains('Gentium Plus'));
-      expect(style.fontFamilyFallback, contains('Charis SIL'));
-      expect(style.fontFamilyFallback, contains('Noto Sans'));
-    });
+        expect(style.fontSize, equals(18));
+        expect(style.fontWeight, equals(FontWeight.bold));
+        expect(style.color, equals(Colors.teal));
+        // Garante que não haja clipping agressivo de altura
+        expect(style.height, isNull);
+        // Garante que haja fallback de fontes com suporte a GPOS
+        expect(style.fontFamilyFallback, isNotNull);
+        expect(style.fontFamilyFallback, contains('Gentium Plus'));
+        expect(style.fontFamilyFallback, contains('Charis SIL'));
+        expect(style.fontFamilyFallback, contains('Noto Sans'));
+      },
+    );
   });
 
-  group('TicunaAudioService - Gravação Compacta e Velocidade de Reprodução', () {
-    late ITicunaAudioService audioService;
+  group(
+    'TicunaAudioService - Gravação Compacta e Velocidade de Reprodução',
+    () {
+      late ITicunaAudioService audioService;
 
-    setUp(() {
-      audioService = FakeTicunaAudioService();
-    });
+      setUp(() {
+        audioService = FakeTicunaAudioService();
+      });
 
-    tearDown(() {
-      audioService.dispose();
-    });
+      tearDown(() {
+        audioService.dispose();
+      });
 
-    test('Inicia e para gravação produzindo arquivo leve e temporário', () async {
-      expect(audioService.isRecording, isFalse);
+      test(
+        'Inicia e para gravação produzindo arquivo leve e temporário',
+        () async {
+          expect(audioService.isRecording, isFalse);
 
-      final path = await audioService.startRecording(
-        id: 'test_word_123',
-        prefix: 'word',
+          final path = await audioService.startRecording(
+            id: 'test_word_123',
+            prefix: 'word',
+          );
+
+          expect(path, isNotEmpty);
+          expect(path.endsWith('.m4a'), isTrue);
+          expect(audioService.isRecording, isTrue);
+
+          final result = await audioService.stopRecording();
+          expect(result, isNotNull);
+          expect(result!.filePath, equals(path));
+          expect(result.durationSeconds, greaterThanOrEqualTo(1));
+          // Arquivo de 1 a 15 segundos em 32kbps mono deve ser leve (< 100 KB)
+          expect(result.fileSizeBytes, lessThan(100 * 1024));
+          expect(audioService.isRecording, isFalse);
+
+          // Limpeza
+          await audioService.deleteAudioFile(path);
+        },
       );
 
-      expect(path, isNotEmpty);
-      expect(path.endsWith('.m4a'), isTrue);
-      expect(audioService.isRecording, isTrue);
+      test('Controla e altera a velocidade de reprodução', () async {
+        expect(audioService.currentPlaybackSpeed, equals(1.0));
 
-      final result = await audioService.stopRecording();
-      expect(result, isNotNull);
-      expect(result!.filePath, equals(path));
-      expect(result.durationSeconds, greaterThanOrEqualTo(1));
-      // Arquivo de 1 a 15 segundos em 32kbps mono deve ser leve (< 100 KB)
-      expect(result.fileSizeBytes, lessThan(100 * 1024));
-      expect(audioService.isRecording, isFalse);
+        await audioService.setPlaybackSpeed(0.5);
+        expect(audioService.currentPlaybackSpeed, equals(0.5));
 
-      // Limpeza
-      await audioService.deleteAudioFile(path);
-    });
+        await audioService.setPlaybackSpeed(0.75);
+        expect(audioService.currentPlaybackSpeed, equals(0.75));
 
-    test('Controla e altera a velocidade de reprodução', () async {
-      expect(audioService.currentPlaybackSpeed, equals(1.0));
+        await audioService.setPlaybackSpeed(1.25);
+        expect(audioService.currentPlaybackSpeed, equals(1.25));
 
-      await audioService.setPlaybackSpeed(0.5);
-      expect(audioService.currentPlaybackSpeed, equals(0.5));
+        await audioService.setPlaybackSpeed(1.0);
+        expect(audioService.currentPlaybackSpeed, equals(1.0));
+      });
 
-      await audioService.setPlaybackSpeed(0.75);
-      expect(audioService.currentPlaybackSpeed, equals(0.75));
+      test('Cancela gravação e descarta arquivo sem erros', () async {
+        final path = await audioService.startRecording(
+          id: 'test_cancel',
+          prefix: 'phrase',
+        );
+        expect(audioService.isRecording, isTrue);
 
-      await audioService.setPlaybackSpeed(1.25);
-      expect(audioService.currentPlaybackSpeed, equals(1.25));
+        await audioService.cancelRecording();
+        expect(audioService.isRecording, isFalse);
 
-      await audioService.setPlaybackSpeed(1.0);
-      expect(audioService.currentPlaybackSpeed, equals(1.0));
-    });
+        final file = File(path);
+        expect(await file.exists(), isFalse);
+      });
 
-    test('Cancela gravação e descarta arquivo sem erros', () async {
-      final path = await audioService.startRecording(
-        id: 'test_cancel',
-        prefix: 'phrase',
-      );
-      expect(audioService.isRecording, isTrue);
+      test('TicunaAudioService real suporta play/pause/stop e deleteAudioFile defensivamente', () async {
+        final realService = TicunaAudioService();
+        addTearDown(realService.dispose);
 
-      await audioService.cancelRecording();
-      expect(audioService.isRecording, isFalse);
+        // Reprodução com URL blob simulada
+        await realService.play(
+          'blob:http://localhost:8080/fake-blob-uuid',
+          speed: 1.0,
+        );
+        expect(realService.currentPlaybackSpeed, equals(1.0));
 
-      final file = File(path);
-      expect(await file.exists(), isFalse);
-    });
+        await realService.pause();
+        await realService.stop();
 
-    test('TicunaAudioService real suporta play/pause/stop e deleteAudioFile defensivamente', () async {
-      final realService = TicunaAudioService();
-      addTearDown(realService.dispose);
+        // deleteAudioFile com blob ou vazio retorna true defensivamente
+        expect(
+          await realService.deleteAudioFile('blob:http://localhost/test'),
+          isTrue,
+        );
+        expect(await realService.deleteAudioFile(''), isFalse);
+      });
 
-      // Reprodução com URL blob simulada
-      await realService.play('blob:http://localhost:8080/fake-blob-uuid', speed: 1.0);
-      expect(realService.currentPlaybackSpeed, equals(1.0));
+      test('T-AUD-05: TicunaAudioService falha na reprodução emite false e upload sem auth retorna null (M12)', () async {
+        final realService = TicunaAudioService();
+        addTearDown(realService.dispose);
 
-      await realService.pause();
-      await realService.stop();
+        final emittedStates = <bool>[];
+        final sub = realService.playerPlayingStream.listen(emittedStates.add);
+        addTearDown(sub.cancel);
 
-      // deleteAudioFile com blob ou vazio retorna true defensivamente
-      expect(await realService.deleteAudioFile('blob:http://localhost/test'), isTrue);
-      expect(await realService.deleteAudioFile(''), isFalse);
-    });
+        await realService.play('/caminho/inexistente/ticuna_falso.m4a');
+        await Future.delayed(const Duration(milliseconds: 20));
+        expect(realService.isPlaying, isFalse);
+        expect(emittedStates.contains(false), isTrue);
 
-    test('T-AUD-05: TicunaAudioService falha na reprodução emite false e upload sem auth retorna null (M12)', () async {
-      final realService = TicunaAudioService();
-      addTearDown(realService.dispose);
+        final uploadRes = await realService.uploadToSupabase(
+          id: 'word_unauth_1',
+          localFilePath: '/caminho/inexistente.m4a',
+        );
+        expect(uploadRes, isNull);
+      });
+    },
+  );
 
-      final emittedStates = <bool>[];
-      final sub = realService.playerPlayingStream.listen(emittedStates.add);
-      addTearDown(sub.cancel);
+  group(
+    'TicunaRepository - Persistência de Áudio e Diacríticos no Drift/SQLite',
+    () {
+      late AppDatabase db;
+      late TicunaRepository repo;
 
-      await realService.play('/caminho/inexistente/ticuna_falso.m4a');
-      await Future.delayed(const Duration(milliseconds: 20));
-      expect(realService.isPlaying, isFalse);
-      expect(emittedStates.contains(false), isTrue);
+      setUp(() async {
+        db = AppDatabase.forTesting(NativeDatabase.memory());
+        repo = TicunaRepository(db);
+        await repo.getAllWords();
+      });
 
-      final uploadRes = await realService.uploadToSupabase(
-        id: 'word_unauth_1',
-        localFilePath: '/caminho/inexistente.m4a',
-      );
-      expect(uploadRes, isNull);
-    });
-  });
+      tearDown(() async {
+        await db.close();
+      });
 
-  group('TicunaRepository - Persistência de Áudio e Diacríticos no Drift/SQLite', () {
-    late AppDatabase db;
-    late TicunaRepository repo;
+      test(
+        'Grava termo com caracteres acentuados empilhados no banco fielmente',
+        () async {
+          final item = await repo.addWord(
+            word: 'Ü\u0303\u0301recura',
+            translation: 'Palavra / Teste Diacrítico',
+            phonetics: 'ü-re-cu-ra',
+            grammaticalClass: 'Substantivo',
+            audioPath: '/local/test_audio.m4a',
+            audioDurationSeconds: 4,
+          );
 
-    setUp(() async {
-      db = AppDatabase.forTesting(NativeDatabase.memory());
-      repo = TicunaRepository(db);
-      await repo.getAllWords();
-    });
+          final words = await repo.getAllWords();
+          final saved = words.firstWhere((w) => w.id == item.id);
+          expect(saved.word, equals('Ü\u0303\u0301recura'));
+          expect(saved.audioPath, equals('/local/test_audio.m4a'));
+          expect(saved.audioDurationSeconds, equals(4));
 
-    tearDown(() async {
-      await db.close();
-    });
+          // Atualiza o áudio
+          await repo.updateWordAudio(
+            item.id,
+            '/local/new_pronunciation.m4a',
+            durationSeconds: 6,
+          );
 
-    test('Grava termo com caracteres acentuados empilhados no banco fielmente', () async {
-      final item = await repo.addWord(
-        word: 'Ü\u0303\u0301recura',
-        translation: 'Palavra / Teste Diacrítico',
-        phonetics: 'ü-re-cu-ra',
-        grammaticalClass: 'Substantivo',
-        audioPath: '/local/test_audio.m4a',
-        audioDurationSeconds: 4,
-      );
+          final updatedWords = await repo.getAllWords();
+          final updated = updatedWords.firstWhere((w) => w.id == item.id);
+          expect(updated.audioPath, equals('/local/new_pronunciation.m4a'));
+          expect(updated.audioDurationSeconds, equals(6));
 
-      final words = await repo.getAllWords();
-      final saved = words.firstWhere((w) => w.id == item.id);
-      expect(saved.word, equals('Ü\u0303\u0301recura'));
-      expect(saved.audioPath, equals('/local/test_audio.m4a'));
-      expect(saved.audioDurationSeconds, equals(4));
-
-      // Atualiza o áudio
-      await repo.updateWordAudio(
-        item.id,
-        '/local/new_pronunciation.m4a',
-        durationSeconds: 6,
-      );
-
-      final updatedWords = await repo.getAllWords();
-      final updated = updatedWords.firstWhere((w) => w.id == item.id);
-      expect(updated.audioPath, equals('/local/new_pronunciation.m4a'));
-      expect(updated.audioDurationSeconds, equals(6));
-
-      // Apaga o áudio
-      await repo.deleteWordAudio(item.id);
-      final clearedWords = await repo.getAllWords();
-      final cleared = clearedWords.firstWhere((w) => w.id == item.id);
-      expect(cleared.audioPath, isNull);
-    });
-
-    test('Grava frase com áudio e remove áudio para regravar', () async {
-      final phrase = await repo.addPhrase(
-        phrase: 'Tamaü! Ku meã pe\'ĩ?',
-        translation: 'Olá! Você está bem?',
-        audioPath: '/local/phrase_audio.m4a',
-        audioDurationSeconds: 5,
+          // Apaga o áudio
+          await repo.deleteWordAudio(item.id);
+          final clearedWords = await repo.getAllWords();
+          final cleared = clearedWords.firstWhere((w) => w.id == item.id);
+          expect(cleared.audioPath, isNull);
+        },
       );
 
-      var phrases = await repo.getAllPhrases();
-      var found = phrases.firstWhere((p) => p.id == phrase.id);
-      expect(found.audioPath, equals('/local/phrase_audio.m4a'));
-      expect(found.audioDurationSeconds, equals(5));
+      test('Grava frase com áudio e remove áudio para regravar', () async {
+        final phrase = await repo.addPhrase(
+          phrase: 'Tamaü! Ku meã pe\'ĩ?',
+          translation: 'Olá! Você está bem?',
+          audioPath: '/local/phrase_audio.m4a',
+          audioDurationSeconds: 5,
+        );
 
-      // Apaga áudio para regravar
-      await repo.deletePhraseAudio(phrase.id);
-      phrases = await repo.getAllPhrases();
-      found = phrases.firstWhere((p) => p.id == phrase.id);
-      expect(found.audioPath, isNull);
-    });
+        var phrases = await repo.getAllPhrases();
+        var found = phrases.firstWhere((p) => p.id == phrase.id);
+        expect(found.audioPath, equals('/local/phrase_audio.m4a'));
+        expect(found.audioDurationSeconds, equals(5));
 
-    test('Operações de CRUD no repositório enfileiram mutações na SyncQueue para sincronização multi-dispositivo', () async {
-      final initialQueue = await db.select(db.syncQueue).get();
-      final initialCount = initialQueue.length;
+        // Apaga áudio para regravar
+        await repo.deletePhraseAudio(phrase.id);
+        phrases = await repo.getAllPhrases();
+        found = phrases.firstWhere((p) => p.id == phrase.id);
+        expect(found.audioPath, isNull);
+      });
 
-      // Adiciona palavra
-      final w = await repo.addWord(
-        word: 'Nawü̃',
-        translation: 'Irmão',
-      );
-      var queue = await db.select(db.syncQueue).get();
-      expect(queue.length, equals(initialCount + 1));
-      expect(queue.last.entityType, equals('ticuna_words'));
-      expect(queue.last.operation, equals('INSERT'));
-      expect(queue.last.entityId, equals(w.id));
+      test('Operações de CRUD no repositório enfileiram mutações na SyncQueue para sincronização multi-dispositivo', () async {
+        final initialQueue = await db.select(db.syncQueue).get();
+        final initialCount = initialQueue.length;
 
-      // Atualiza palavra
-      await repo.updateWord(w.copyWith(translation: 'Irmão / Companheiro'));
-      queue = await db.select(db.syncQueue).get();
-      expect(queue.length, equals(initialCount + 2));
-      expect(queue.last.operation, equals('UPDATE'));
+        // Adiciona palavra
+        final w = await repo.addWord(word: 'Nawü̃', translation: 'Irmão');
+        var queue = await db.select(db.syncQueue).get();
+        expect(queue.length, equals(initialCount + 1));
+        expect(queue.last.entityType, equals('ticuna_words'));
+        expect(queue.last.operation, equals('INSERT'));
+        expect(queue.last.entityId, equals(w.id));
 
-      // Remove palavra
-      await repo.deleteWord(w.id);
-      queue = await db.select(db.syncQueue).get();
-      expect(queue.length, equals(initialCount + 3));
-      expect(queue.last.operation, equals('DELETE'));
+        // Atualiza palavra
+        await repo.updateWord(w.copyWith(translation: 'Irmão / Companheiro'));
+        queue = await db.select(db.syncQueue).get();
+        expect(queue.length, equals(initialCount + 2));
+        expect(queue.last.operation, equals('UPDATE'));
 
-      // Adiciona frase
-      final p = await repo.addPhrase(
-        phrase: 'Tamaü',
-        translation: 'Olá',
-      );
-      queue = await db.select(db.syncQueue).get();
-      expect(queue.last.entityType, equals('ticuna_phrases'));
-      expect(queue.last.operation, equals('INSERT'));
-      expect(queue.last.entityId, equals(p.id));
+        // Remove palavra
+        await repo.deleteWord(w.id);
+        queue = await db.select(db.syncQueue).get();
+        expect(queue.length, equals(initialCount + 3));
+        expect(queue.last.operation, equals('DELETE'));
 
-      // Remove frase
-      await repo.deletePhrase(p.id);
-      queue = await db.select(db.syncQueue).get();
-      expect(queue.last.entityType, equals('ticuna_phrases'));
-      expect(queue.last.operation, equals('DELETE'));
-    });
+        // Adiciona frase
+        final p = await repo.addPhrase(phrase: 'Tamaü', translation: 'Olá');
+        queue = await db.select(db.syncQueue).get();
+        expect(queue.last.entityType, equals('ticuna_phrases'));
+        expect(queue.last.operation, equals('INSERT'));
+        expect(queue.last.entityId, equals(p.id));
 
-    test('Migra automaticamente termos corrompidos com diacríticos como Duũ para o canônico Duü̃', () async {
-      // Cria instância nova de repositório após inserção forçada de dado corrompido
-      await db.customInsert(
-        "INSERT INTO ticuna_words (id, word, translation, phonetics, example_sentence, created_at, updated_at) "
-        "VALUES ('legacy_corrupt_1', 'Duũ', 'Gente / Pessoa', 'du-u', 'Duũ meã', '2026-01-01', '2026-01-01')",
-      );
-      await db.customInsert(
-        "INSERT INTO ticuna_words (id, word, translation, phonetics, example_sentence, created_at, updated_at) "
-        "VALUES ('legacy_corrupt_2', 'Duũũ', 'Gente', 'du-u', 'Duũũ meã', '2026-01-01', '2026-01-01')",
-      );
+        // Remove frase
+        await repo.deletePhrase(p.id);
+        queue = await db.select(db.syncQueue).get();
+        expect(queue.last.entityType, equals('ticuna_phrases'));
+        expect(queue.last.operation, equals('DELETE'));
+      });
 
-      final freshRepo = TicunaRepository(db);
-      final words = await freshRepo.getAllWords();
+      test('Migra automaticamente termos corrompidos com diacríticos como Duũ para o canônico Duü̃', () async {
+        // Cria instância nova de repositório após inserção forçada de dado corrompido
+        await db.customInsert(
+          "INSERT INTO ticuna_words (id, word, translation, phonetics, example_sentence, created_at, updated_at) "
+          "VALUES ('legacy_corrupt_1', 'Duũ', 'Gente / Pessoa', 'du-u', 'Duũ meã', '2026-01-01', '2026-01-01')",
+        );
+        await db.customInsert(
+          "INSERT INTO ticuna_words (id, word, translation, phonetics, example_sentence, created_at, updated_at) "
+          "VALUES ('legacy_corrupt_2', 'Duũũ', 'Gente', 'du-u', 'Duũũ meã', '2026-01-01', '2026-01-01')",
+        );
 
-      final w1 = words.firstWhere((w) => w.id == 'legacy_corrupt_1');
-      expect(w1.word, equals('Duü\u0303'));
-      expect(w1.phonetics, equals('du-ü\u0303 [nasal]'));
-      expect(w1.exampleSentence, equals('Duü\u0303 meã'));
+        final freshRepo = TicunaRepository(db);
+        final words = await freshRepo.getAllWords();
 
-      final w2 = words.firstWhere((w) => w.id == 'legacy_corrupt_2');
-      expect(w2.word, equals('Duü\u0303'));
-    });
-  });
+        final w1 = words.firstWhere((w) => w.id == 'legacy_corrupt_1');
+        expect(w1.word, equals('Duü\u0303'));
+        expect(w1.phonetics, equals('du-ü\u0303 [nasal]'));
+        expect(w1.exampleSentence, equals('Duü\u0303 meã'));
+
+        final w2 = words.firstWhere((w) => w.id == 'legacy_corrupt_2');
+        expect(w2.word, equals('Duü\u0303'));
+      });
+    },
+  );
 
   group('TicunaAudioPlayerWidget - Interface Gráfica', () {
-    testWidgets('Exibe botão "Gravar" quando não há áudio gravado', (tester) async {
+    testWidgets('Exibe botão "Gravar" quando não há áudio gravado', (
+      tester,
+    ) async {
       final fakeAudio = FakeTicunaAudioService();
       addTearDown(fakeAudio.dispose);
 
       await tester.pumpWidget(
         ProviderScope(
-          overrides: [
-            ticunaAudioServiceProvider.overrideWithValue(fakeAudio),
-          ],
+          overrides: [ticunaAudioServiceProvider.overrideWithValue(fakeAudio)],
           child: const MaterialApp(
             home: Scaffold(
               body: TicunaAudioPlayerWidget(
@@ -394,41 +422,44 @@ void main() {
       expect(find.byIcon(Icons.mic_none), findsOneWidget);
     });
 
-    testWidgets('Exibe player com play, duração e velocidade quando áudio existe', (tester) async {
-      final fakeAudio = FakeTicunaAudioService();
-      addTearDown(fakeAudio.dispose);
+    testWidgets(
+      'Exibe player com play, duração e velocidade quando áudio existe',
+      (tester) async {
+        final fakeAudio = FakeTicunaAudioService();
+        addTearDown(fakeAudio.dispose);
 
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            ticunaAudioServiceProvider.overrideWithValue(fakeAudio),
-          ],
-          child: const MaterialApp(
-            home: Scaffold(
-              body: TicunaAudioPlayerWidget(
-                id: 'w2',
-                title: 'Duü̃',
-                audioPath: '/data/user/duu.m4a',
-                audioDurationSeconds: 4,
-                compact: true,
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              ticunaAudioServiceProvider.overrideWithValue(fakeAudio),
+            ],
+            child: const MaterialApp(
+              home: Scaffold(
+                body: TicunaAudioPlayerWidget(
+                  id: 'w2',
+                  title: 'Duü̃',
+                  audioPath: '/data/user/duu.m4a',
+                  audioDurationSeconds: 4,
+                  compact: true,
+                ),
               ),
             ),
           ),
-        ),
-      );
+        );
 
-      await tester.pumpAndSettle();
+        await tester.pumpAndSettle();
 
-      expect(find.byIcon(Icons.play_circle_filled), findsOneWidget);
-      expect(find.text('00:04'), findsOneWidget);
-      expect(find.text('1.0x'), findsOneWidget);
-      expect(find.byIcon(Icons.more_vert), findsOneWidget);
+        expect(find.byIcon(Icons.play_circle_filled), findsOneWidget);
+        expect(find.text('00:04'), findsOneWidget);
+        expect(find.text('1.0x'), findsOneWidget);
+        expect(find.byIcon(Icons.more_vert), findsOneWidget);
 
-      // Toca na tag de velocidade para alternar
-      await tester.tap(find.text('1.0x'));
-      await tester.pumpAndSettle();
+        // Toca na tag de velocidade para alternar
+        await tester.tap(find.text('1.0x'));
+        await tester.pumpAndSettle();
 
-      expect(find.text('1.25x'), findsOneWidget);
-    });
+        expect(find.text('1.25x'), findsOneWidget);
+      },
+    );
   });
 }

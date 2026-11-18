@@ -74,7 +74,11 @@ void main() {
       final tamperedDir = Directory('${tempDir.path}/tampered')..createSync();
       final badHashClient = MockClient((request) async {
         if (request.url.toString().endsWith('app-arm64-v8a-release.apk')) {
-          return http.Response.bytes(utf8.encode('CORRUPTED_BYTES'), 200, request: request);
+          return http.Response.bytes(
+            utf8.encode('CORRUPTED_BYTES'),
+            200,
+            request: request,
+          );
         }
         return http.Response('Not found', 404, request: request);
       });
@@ -98,11 +102,15 @@ void main() {
       expect(resMismatch.verified, isFalse);
       expect(resMismatch.launched, isFalse);
       expect(resMismatch.errorMessage, contains('SHA-256'));
-      expect(tamperedDir.listSync(), isEmpty,
-          reason: 'Arquivo com SHA-256 divergente não pode ser salvo em disco');
+      expect(
+        tamperedDir.listSync(),
+        isEmpty,
+        reason: 'Arquivo com SHA-256 divergente não pode ser salvo em disco',
+      );
 
       // 3. Fail-closed quando nem info.sha256 nem SHA256SUMS.txt existem
-      final noManifestDir = Directory('${tempDir.path}/no_manifest')..createSync();
+      final noManifestDir = Directory('${tempDir.path}/no_manifest')
+        ..createSync();
       final noManifestClient = MockClient((request) async {
         return http.Response('Not found', 404, request: request);
       });
@@ -124,26 +132,32 @@ void main() {
       expect(SupabaseConfig.isConfigured, isFalse);
     });
 
-    testWidgets('C3: FatalPersistenceScreen exibe falha crítica de persistência e dispara onRetry', (tester) async {
-      var retried = false;
-      await tester.pumpWidget(
-        MaterialApp(
-          home: FatalPersistenceScreen(
-            errorMessage: 'IndexedDB blocked in private browsing',
-            onRetry: () => retried = true,
+    testWidgets(
+      'C3: FatalPersistenceScreen exibe falha crítica de persistência e dispara onRetry',
+      (tester) async {
+        var retried = false;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: FatalPersistenceScreen(
+              errorMessage: 'IndexedDB blocked in private browsing',
+              onRetry: () => retried = true,
+            ),
           ),
-        ),
-      );
+        );
 
-      expect(find.text('Armazenamento Local Indisponível'), findsOneWidget);
-      expect(find.text('IndexedDB blocked in private browsing'), findsOneWidget);
-      final retryButton = find.text('Tentar Reconectar');
-      expect(retryButton, findsOneWidget);
+        expect(find.text('Armazenamento Local Indisponível'), findsOneWidget);
+        expect(
+          find.text('IndexedDB blocked in private browsing'),
+          findsOneWidget,
+        );
+        final retryButton = find.text('Tentar Reconectar');
+        expect(retryButton, findsOneWidget);
 
-      await tester.tap(retryButton);
-      await tester.pump();
-      expect(retried, isTrue);
-    });
+        await tester.tap(retryButton);
+        await tester.pump();
+        expect(retried, isTrue);
+      },
+    );
 
     test('M4/M6: DemoDataGenerator persiste flag demo_mode=true na app_kv_store e limpa ao remover dados demo', () async {
       final db = AppDatabase.forTesting(NativeDatabase.memory());
@@ -152,17 +166,19 @@ void main() {
 
       await DemoDataGenerator.populateDemoData(repo);
 
-      final flagRow = await (db.select(db.appKvStore)
-            ..where((t) => t.key.equals(DemoDataGenerator.demoModeKvKey)))
-          .getSingleOrNull();
+      final flagRow =
+          await (db.select(db.appKvStore)
+                ..where((t) => t.key.equals(DemoDataGenerator.demoModeKvKey)))
+              .getSingleOrNull();
       expect(flagRow, isNotNull);
       expect(flagRow!.value, equals('true'));
       expect(await DemoDataGenerator.hasDemoData(repo), isTrue);
 
       await DemoDataGenerator.clearDemoData(repo);
-      final afterClearFlag = await (db.select(db.appKvStore)
-            ..where((t) => t.key.equals(DemoDataGenerator.demoModeKvKey)))
-          .getSingleOrNull();
+      final afterClearFlag =
+          await (db.select(db.appKvStore)
+                ..where((t) => t.key.equals(DemoDataGenerator.demoModeKvKey)))
+              .getSingleOrNull();
       expect(afterClearFlag, isNull);
       expect(await DemoDataGenerator.hasDemoData(repo), isFalse);
     });

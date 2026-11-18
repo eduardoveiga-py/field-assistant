@@ -67,17 +67,19 @@ class TicunaRepository {
     Map<String, dynamic> payload,
   ) async {
     try {
-      await db.into(db.syncQueue).insert(
-        SyncQueueCompanion.insert(
-          id: _uuid.v4(),
-          entityType: entityType,
-          entityId: entityId,
-          operation: operation,
-          payload: jsonEncode(payload),
-          createdAt: DateTime.now(),
-          status: const Value('pending'),
-        ),
-      );
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: _uuid.v4(),
+              entityType: entityType,
+              entityId: entityId,
+              operation: operation,
+              payload: jsonEncode(payload),
+              createdAt: DateTime.now(),
+              status: const Value('pending'),
+            ),
+          );
     } catch (e, st) {
       AppLogger.error(
         'Erro ao enfileirar operação na syncQueue ($entityType / $entityId / $operation): $e',
@@ -141,34 +143,58 @@ class TicunaRepository {
 
       // Migrações idempotentes caso colunas já existam em bancos preexistentes
       try {
-        await db.customStatement('ALTER TABLE ticuna_words ADD COLUMN audio_path TEXT;');
+        await db.customStatement(
+          'ALTER TABLE ticuna_words ADD COLUMN audio_path TEXT;',
+        );
       } catch (e) {
-        AppLogger.debug('Coluna audio_path em ticuna_words já existe ou inicializada: $e');
+        AppLogger.debug(
+          'Coluna audio_path em ticuna_words já existe ou inicializada: $e',
+        );
       }
       try {
-        await db.customStatement('ALTER TABLE ticuna_words ADD COLUMN audio_duration_seconds INTEGER;');
+        await db.customStatement(
+          'ALTER TABLE ticuna_words ADD COLUMN audio_duration_seconds INTEGER;',
+        );
       } catch (e) {
-        AppLogger.debug('Coluna audio_duration_seconds em ticuna_words já existe ou inicializada: $e');
+        AppLogger.debug(
+          'Coluna audio_duration_seconds em ticuna_words já existe ou inicializada: $e',
+        );
       }
       try {
-        await db.customStatement("ALTER TABLE ticuna_words ADD COLUMN language_id TEXT DEFAULT 'tca';");
+        await db.customStatement(
+          "ALTER TABLE ticuna_words ADD COLUMN language_id TEXT DEFAULT 'tca';",
+        );
       } catch (e) {
-        AppLogger.debug('Coluna language_id em ticuna_words já existe ou inicializada: $e');
+        AppLogger.debug(
+          'Coluna language_id em ticuna_words já existe ou inicializada: $e',
+        );
       }
       try {
-        await db.customStatement('ALTER TABLE ticuna_phrases ADD COLUMN audio_path TEXT;');
+        await db.customStatement(
+          'ALTER TABLE ticuna_phrases ADD COLUMN audio_path TEXT;',
+        );
       } catch (e) {
-        AppLogger.debug('Coluna audio_path em ticuna_phrases já existe ou inicializada: $e');
+        AppLogger.debug(
+          'Coluna audio_path em ticuna_phrases já existe ou inicializada: $e',
+        );
       }
       try {
-        await db.customStatement('ALTER TABLE ticuna_phrases ADD COLUMN audio_duration_seconds INTEGER;');
+        await db.customStatement(
+          'ALTER TABLE ticuna_phrases ADD COLUMN audio_duration_seconds INTEGER;',
+        );
       } catch (e) {
-        AppLogger.debug('Coluna audio_duration_seconds em ticuna_phrases já existe ou inicializada: $e');
+        AppLogger.debug(
+          'Coluna audio_duration_seconds em ticuna_phrases já existe ou inicializada: $e',
+        );
       }
       try {
-        await db.customStatement("ALTER TABLE ticuna_phrases ADD COLUMN language_id TEXT DEFAULT 'tca';");
+        await db.customStatement(
+          "ALTER TABLE ticuna_phrases ADD COLUMN language_id TEXT DEFAULT 'tca';",
+        );
       } catch (e) {
-        AppLogger.debug('Coluna language_id em ticuna_phrases já existe ou inicializada: $e');
+        AppLogger.debug(
+          'Coluna language_id em ticuna_phrases já existe ou inicializada: $e',
+        );
       }
 
       // Normalização defensiva para recuperar termos canônicos corrigidos
@@ -177,7 +203,11 @@ class TicunaRepository {
           "UPDATE ticuna_words SET word = 'Duü\u0303', phonetics = 'du-ü\u0303 [nasal]', example_sentence = 'Duü\u0303 meã' WHERE word = 'Duũ' OR word = 'Duũũ' OR word LIKE 'Duũ%' OR word LIKE 'duũ%';",
         );
       } catch (e, st) {
-        AppLogger.warning('Aviso na normalização de termos canônicos Ticuna: $e', e, st);
+        AppLogger.warning(
+          'Aviso na normalização de termos canônicos Ticuna: $e',
+          e,
+          st,
+        );
       }
 
       // Seed inicial de tags e vocabulário caso tabelas estejam vazias
@@ -195,11 +225,7 @@ class TicunaRepository {
       _initialized = false;
       _initializationFailed = true;
       _initializationError = e.toString();
-      AppLogger.error(
-        'Falha ao inicializar tabelas Ticuna: $e',
-        e,
-        st,
-      );
+      AppLogger.error('Falha ao inicializar tabelas Ticuna: $e', e, st);
     }
   }
 
@@ -461,7 +487,8 @@ class TicunaRepository {
       TicunaPhrase(
         id: _uuid.v4(),
         phrase: 'Pa ga tora gu ü̃ duü̃ rü meã gu Bíblia arü estudo.',
-        translation: 'Gostaríamos de conversar sobre um estudo bíblico gratuito.',
+        translation:
+            'Gostaríamos de conversar sobre um estudo bíblico gratuito.',
         category: 'Oferecer Estudo',
         phonetics: 'pa ga to-ra...',
         notes: 'Oferta de estudo do manual Seja Feliz Para Sempre!.',
@@ -539,14 +566,16 @@ class TicunaRepository {
   }) async {
     await _initTables();
     try {
-      final rows = await db.customSelect(
-        'SELECT * FROM ticuna_words ORDER BY word ASC',
-      ).get();
+      final rows = await db
+          .customSelect('SELECT * FROM ticuna_words ORDER BY word ASC')
+          .get();
 
       var list = rows.map((r) => TicunaWord.fromMap(r.data)).toList();
 
       if (searchQuery != null && searchQuery.trim().isNotEmpty) {
-        final q = TicunaUnicodeHelper.normalize(searchQuery.trim().toLowerCase());
+        final q = TicunaUnicodeHelper.normalize(
+          searchQuery.trim().toLowerCase(),
+        );
         list = list.where((w) {
           final wordNorm = TicunaUnicodeHelper.normalize(w.word.toLowerCase());
           return wordNorm.contains(q) ||
@@ -554,7 +583,9 @@ class TicunaRepository {
               (w.phonetics?.toLowerCase().contains(q) ?? false) ||
               (w.notes?.toLowerCase().contains(q) ?? false) ||
               (w.exampleSentence != null &&
-                  TicunaUnicodeHelper.normalize(w.exampleSentence!.toLowerCase()).contains(q)) ||
+                  TicunaUnicodeHelper.normalize(
+                    w.exampleSentence!.toLowerCase(),
+                  ).contains(q)) ||
               (w.exampleTranslation?.toLowerCase().contains(q) ?? false);
         }).toList();
       }
@@ -570,7 +601,9 @@ class TicunaRepository {
       if (grammaticalClass != null &&
           grammaticalClass.isNotEmpty &&
           grammaticalClass != 'Todas') {
-        list = list.where((w) => w.grammaticalClass == grammaticalClass).toList();
+        list = list
+            .where((w) => w.grammaticalClass == grammaticalClass)
+            .toList();
       }
 
       return list;
@@ -699,9 +732,11 @@ class TicunaRepository {
           Variable.withString(item.translation.trim()),
           Variable.withString(item.phonetics?.trim() ?? ''),
           Variable.withString(item.grammaticalClass?.trim() ?? ''),
-          Variable.withString(item.exampleSentence != null
-              ? TicunaUnicodeHelper.normalize(item.exampleSentence!.trim())
-              : ''),
+          Variable.withString(
+            item.exampleSentence != null
+                ? TicunaUnicodeHelper.normalize(item.exampleSentence!.trim())
+                : '',
+          ),
           Variable.withString(item.exampleTranslation?.trim() ?? ''),
           Variable.withString(item.notes?.trim() ?? ''),
           Variable.withString(jsonEncode(item.tags)),
@@ -772,10 +807,12 @@ class TicunaRepository {
 
   Future<void> toggleWordFavorite(String id) async {
     await _initTables();
-    final rows = await db.customSelect(
-      'SELECT is_favorite FROM ticuna_words WHERE id = ?',
-      variables: [Variable.withString(id)],
-    ).get();
+    final rows = await db
+        .customSelect(
+          'SELECT is_favorite FROM ticuna_words WHERE id = ?',
+          variables: [Variable.withString(id)],
+        )
+        .get();
 
     if (rows.isNotEmpty) {
       final current = rows.first.read<int>('is_favorite') == 1;
@@ -803,10 +840,12 @@ class TicunaRepository {
   /// Registra uma sessão de revisão no estilo Anki (1=De novo, 2=Bom, 3=Fácil)
   Future<void> recordWordReview(String id, int rating) async {
     await _initTables();
-    final rows = await db.customSelect(
-      'SELECT review_level, review_count FROM ticuna_words WHERE id = ?',
-      variables: [Variable.withString(id)],
-    ).get();
+    final rows = await db
+        .customSelect(
+          'SELECT review_level, review_count FROM ticuna_words WHERE id = ?',
+          variables: [Variable.withString(id)],
+        )
+        .get();
 
     if (rows.isNotEmpty) {
       final currentLevel = rows.first.read<int>('review_level');
@@ -865,16 +904,20 @@ class TicunaRepository {
   }) async {
     await _initTables();
     try {
-      final rows = await db.customSelect(
-        'SELECT * FROM ticuna_phrases ORDER BY phrase ASC',
-      ).get();
+      final rows = await db
+          .customSelect('SELECT * FROM ticuna_phrases ORDER BY phrase ASC')
+          .get();
 
       var list = rows.map((r) => TicunaPhrase.fromMap(r.data)).toList();
 
       if (searchQuery != null && searchQuery.trim().isNotEmpty) {
-        final q = TicunaUnicodeHelper.normalize(searchQuery.trim().toLowerCase());
+        final q = TicunaUnicodeHelper.normalize(
+          searchQuery.trim().toLowerCase(),
+        );
         list = list.where((p) {
-          final phraseNorm = TicunaUnicodeHelper.normalize(p.phrase.toLowerCase());
+          final phraseNorm = TicunaUnicodeHelper.normalize(
+            p.phrase.toLowerCase(),
+          );
           return phraseNorm.contains(q) ||
               p.translation.toLowerCase().contains(q) ||
               (p.phonetics?.toLowerCase().contains(q) ?? false) ||
@@ -993,7 +1036,9 @@ class TicunaRepository {
         WHERE id = ?
         ''',
         variables: [
-          Variable.withString(TicunaUnicodeHelper.normalize(item.phrase.trim())),
+          Variable.withString(
+            TicunaUnicodeHelper.normalize(item.phrase.trim()),
+          ),
           Variable.withString(item.translation.trim()),
           Variable.withString(item.category?.trim() ?? ''),
           Variable.withString(item.phonetics?.trim() ?? ''),
@@ -1063,10 +1108,12 @@ class TicunaRepository {
 
   Future<void> togglePhraseFavorite(String id) async {
     await _initTables();
-    final rows = await db.customSelect(
-      'SELECT is_favorite FROM ticuna_phrases WHERE id = ?',
-      variables: [Variable.withString(id)],
-    ).get();
+    final rows = await db
+        .customSelect(
+          'SELECT is_favorite FROM ticuna_phrases WHERE id = ?',
+          variables: [Variable.withString(id)],
+        )
+        .get();
 
     if (rows.isNotEmpty) {
       final current = rows.first.read<int>('is_favorite') == 1;
@@ -1098,9 +1145,9 @@ class TicunaRepository {
   Future<List<TicunaTag>> getAllTags() async {
     await _initTables();
     try {
-      final rows = await db.customSelect(
-        'SELECT * FROM ticuna_tags ORDER BY name ASC',
-      ).get();
+      final rows = await db
+          .customSelect('SELECT * FROM ticuna_tags ORDER BY name ASC')
+          .get();
       return rows.map((r) => TicunaTag.fromMap(r.data)).toList();
     } catch (e, st) {
       AppLogger.error('Erro ao buscar tags Ticuna: $e', e, st);
@@ -1170,7 +1217,9 @@ class TicunaRepository {
     final buffer = StringBuffer();
 
     if (type == TicunaEntryType.word) {
-      buffer.writeln('word,translation,phonetics,grammatical_class,example_sentence,example_translation,notes,tags');
+      buffer.writeln(
+        'word,translation,phonetics,grammatical_class,example_sentence,example_translation,notes,tags',
+      );
       final words = await getAllWords();
       for (final w in words) {
         final tagsStr = w.tags.join(';');
@@ -1320,7 +1369,8 @@ class TicunaRepository {
       final now = DateTime.now();
 
       // Pula cabeçalho se houver
-      final dataRecords = records.first.isNotEmpty &&
+      final dataRecords =
+          records.first.isNotEmpty &&
               (records.first[0].toLowerCase().contains('word') ||
                   records.first[0].toLowerCase().contains('phrase') ||
                   records.first[0].toLowerCase().contains('palavra') ||
@@ -1341,10 +1391,10 @@ class TicunaRepository {
           final notes = parts.length > 6 ? parts[6].trim() : null;
           final tags = parts.length > 7
               ? parts[7]
-                  .split(RegExp(r'[;,]'))
-                  .map((s) => s.trim())
-                  .where((s) => s.isNotEmpty)
-                  .toList()
+                    .split(RegExp(r'[;,]'))
+                    .map((s) => s.trim())
+                    .where((s) => s.isNotEmpty)
+                    .toList()
               : <String>[];
 
           if (word.isNotEmpty && translation.isNotEmpty) {
@@ -1354,12 +1404,13 @@ class TicunaRepository {
                 word: TicunaUnicodeHelper.normalize(word),
                 translation: translation,
                 phonetics: phonetics?.isEmpty ?? true ? null : phonetics,
-                grammaticalClass:
-                    grammaticalClass?.isEmpty ?? true ? null : grammaticalClass,
+                grammaticalClass: grammaticalClass?.isEmpty ?? true
+                    ? null
+                    : grammaticalClass,
                 exampleSentence:
                     (exampleSentence != null && exampleSentence.isNotEmpty)
-                        ? TicunaUnicodeHelper.normalize(exampleSentence)
-                        : null,
+                    ? TicunaUnicodeHelper.normalize(exampleSentence)
+                    : null,
                 exampleTranslation: exampleTranslation?.isEmpty ?? true
                     ? null
                     : exampleTranslation,
@@ -1379,10 +1430,10 @@ class TicunaRepository {
           final notes = parts.length > 4 ? parts[4].trim() : null;
           final tags = parts.length > 5
               ? parts[5]
-                  .split(RegExp(r'[;,]'))
-                  .map((s) => s.trim())
-                  .where((s) => s.isNotEmpty)
-                  .toList()
+                    .split(RegExp(r'[;,]'))
+                    .map((s) => s.trim())
+                    .where((s) => s.isNotEmpty)
+                    .toList()
               : <String>[];
 
           if (phrase.isNotEmpty && translation.isNotEmpty) {

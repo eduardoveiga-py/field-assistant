@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:drift/drift.dart' as drift;
 import 'package:uuid/uuid.dart';
 
@@ -19,10 +20,10 @@ class ProjectProgress {
   });
 
   factory ProjectProgress.empty() => const ProjectProgress(
-        totalTasks: 0,
-        completedTasks: 0,
-        progressPercent: 0.0,
-      );
+    totalTasks: 0,
+    completedTasks: 0,
+    progressPercent: 0.0,
+  );
 }
 
 /// Gerenciador do Módulo B — Projetos do Field Assistant.
@@ -74,7 +75,9 @@ class ProjectManager {
       await _recordSyncQueue(id, 'INSERT');
     });
 
-    return (await (db.select(db.projects)..where((t) => t.id.equals(id))).getSingle());
+    return (await (db.select(
+      db.projects,
+    )..where((t) => t.id.equals(id))).getSingle());
   }
 
   Future<void> updateProject(
@@ -94,20 +97,40 @@ class ProjectManager {
       final existing = await getProjectById(id);
       if (existing == null) return;
       final companion = ProjectsCompanion(
-        name: name != null ? drift.Value(name.trim()) : const drift.Value.absent(),
-        objective: objective != null ? drift.Value(objective.trim()) : const drift.Value.absent(),
-        description: description != null ? drift.Value(description.trim()) : const drift.Value.absent(),
-        category: category != null ? drift.Value(category) : const drift.Value.absent(),
-        status: status != null ? drift.Value(status) : const drift.Value.absent(),
-        colorHex: colorHex != null ? drift.Value(colorHex) : const drift.Value.absent(),
-        iconName: iconName != null ? drift.Value(iconName) : const drift.Value.absent(),
-        targetDate: targetDate != null ? drift.Value(targetDate) : const drift.Value.absent(),
-        metadata: tags != null ? drift.Value(jsonEncode({'tags': tags})) : const drift.Value.absent(),
+        name: name != null
+            ? drift.Value(name.trim())
+            : const drift.Value.absent(),
+        objective: objective != null
+            ? drift.Value(objective.trim())
+            : const drift.Value.absent(),
+        description: description != null
+            ? drift.Value(description.trim())
+            : const drift.Value.absent(),
+        category: category != null
+            ? drift.Value(category)
+            : const drift.Value.absent(),
+        status: status != null
+            ? drift.Value(status)
+            : const drift.Value.absent(),
+        colorHex: colorHex != null
+            ? drift.Value(colorHex)
+            : const drift.Value.absent(),
+        iconName: iconName != null
+            ? drift.Value(iconName)
+            : const drift.Value.absent(),
+        targetDate: targetDate != null
+            ? drift.Value(targetDate)
+            : const drift.Value.absent(),
+        metadata: tags != null
+            ? drift.Value(jsonEncode({'tags': tags}))
+            : const drift.Value.absent(),
         updatedAt: drift.Value(now),
         revision: drift.Value(existing.revision + 1),
       );
 
-      await (db.update(db.projects)..where((t) => t.id.equals(id))).write(companion);
+      await (db.update(
+        db.projects,
+      )..where((t) => t.id.equals(id))).write(companion);
       await _recordSyncQueue(id, 'UPDATE', baseData: existing.toJson());
     });
   }
@@ -150,18 +173,28 @@ class ProjectManager {
 
   Stream<List<ProjectEntry>> watchActiveProjects() {
     return (db.select(db.projects)
-          ..where((t) =>
-              t.status.isIn(['planning', 'active']) & t.deletedAt.isNull())
+          ..where(
+            (t) => t.status.isIn(['planning', 'active']) & t.deletedAt.isNull(),
+          )
           ..orderBy([
-            (t) => drift.OrderingTerm(expression: t.targetDate, mode: drift.OrderingMode.asc, nulls: drift.NullsOrder.last),
-            (t) => drift.OrderingTerm(expression: t.createdAt, mode: drift.OrderingMode.desc),
+            (t) => drift.OrderingTerm(
+              expression: t.targetDate,
+              mode: drift.OrderingMode.asc,
+              nulls: drift.NullsOrder.last,
+            ),
+            (t) => drift.OrderingTerm(
+              expression: t.createdAt,
+              mode: drift.OrderingMode.desc,
+            ),
           ]))
         .watch();
   }
 
-  Stream<List<ProjectEntry>> watchAllProjects({String? category, String? status}) {
-    final q = db.select(db.projects)
-      ..where((t) => t.deletedAt.isNull());
+  Stream<List<ProjectEntry>> watchAllProjects({
+    String? category,
+    String? status,
+  }) {
+    final q = db.select(db.projects)..where((t) => t.deletedAt.isNull());
 
     if (category != null && category.isNotEmpty && category != 'all') {
       q.where((t) => t.category.equals(category));
@@ -171,20 +204,30 @@ class ProjectManager {
     }
 
     q.orderBy([
-      (t) => drift.OrderingTerm(expression: t.targetDate, mode: drift.OrderingMode.asc, nulls: drift.NullsOrder.last),
-      (t) => drift.OrderingTerm(expression: t.createdAt, mode: drift.OrderingMode.desc),
+      (t) => drift.OrderingTerm(
+        expression: t.targetDate,
+        mode: drift.OrderingMode.asc,
+        nulls: drift.NullsOrder.last,
+      ),
+      (t) => drift.OrderingTerm(
+        expression: t.createdAt,
+        mode: drift.OrderingMode.desc,
+      ),
     ]);
 
     return q.watch();
   }
 
   Stream<ProjectEntry?> watchProject(String id) {
-    return (db.select(db.projects)..where((t) => t.id.equals(id) & t.deletedAt.isNull()))
+    return (db.select(db.projects)
+          ..where((t) => t.id.equals(id) & t.deletedAt.isNull()))
         .watchSingleOrNull();
   }
 
   Future<ProjectEntry?> getProjectById(String id) {
-    return (db.select(db.projects)..where((t) => t.id.equals(id))).getSingleOrNull();
+    return (db.select(
+      db.projects,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
   }
 
   /// Observa o progresso percentual e contagem de tarefas de um projeto
@@ -193,16 +236,16 @@ class ProjectManager {
           ..where((t) => t.projectId.equals(projectId) & t.deletedAt.isNull()))
         .watch()
         .map((tasks) {
-      if (tasks.isEmpty) return ProjectProgress.empty();
-      final total = tasks.length;
-      final completed = tasks.where((t) => t.status == "completed").length;
-      final percent = (completed / total) * 100.0;
-      return ProjectProgress(
-        totalTasks: total,
-        completedTasks: completed,
-        progressPercent: percent,
-      );
-    });
+          if (tasks.isEmpty) return ProjectProgress.empty();
+          final total = tasks.length;
+          final completed = tasks.where((t) => t.status == "completed").length;
+          final percent = (completed / total) * 100.0;
+          return ProjectProgress(
+            totalTasks: total,
+            completedTasks: completed,
+            progressPercent: percent,
+          );
+        });
   }
 
   Future<void> _recordSyncQueue(
@@ -222,18 +265,24 @@ class ProjectManager {
       if (baseData != null) {
         payloadMap['_base'] = SyncTimestamp.normalizeMapDates(baseData);
       }
-      await db.into(db.syncQueue).insert(
-        SyncQueueCompanion.insert(
-          id: _uuid.v4(),
-          entityType: 'projects',
-          entityId: entityId,
-          operation: operation,
-          payload: jsonEncode(payloadMap),
-          createdAt: now,
-        ),
-      );
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: _uuid.v4(),
+              entityType: 'projects',
+              entityId: entityId,
+              operation: operation,
+              payload: jsonEncode(payloadMap),
+              createdAt: now,
+            ),
+          );
     } catch (e, st) {
-      AppLogger.error('Erro ao enfileirar mutação de Projeto ($entityId)', e, st);
+      AppLogger.error(
+        'Erro ao enfileirar mutação de Projeto ($entityId)',
+        e,
+        st,
+      );
     }
   }
 }

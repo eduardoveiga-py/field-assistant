@@ -1,6 +1,8 @@
 import 'dart:typed_data';
 
-import 'media_bytes_web.dart' if (dart.library.io) 'media_bytes_io.dart' as impl;
+import 'media_bytes_web.dart'
+    if (dart.library.io) 'media_bytes_io.dart'
+    as impl;
 
 /// Carrega bytes de mídia (áudio, foto ou documento) de forma segura em todas as plataformas
 /// (sem depender de `dart:io` no navegador Web).
@@ -27,4 +29,5 @@ Future<bool> localMediaExists(String pathOrUrl) =>
     impl.localMediaExists(pathOrUrl);
 
 /// Resolve o diretório base padrão de documentos da aplicação (string vazia na Web).
-Future<String> resolveDefaultDocumentsDir() => impl.resolveDefaultDocumentsDir();
+Future<String> resolveDefaultDocumentsDir() =>
+    impl.resolveDefaultDocumentsDir();

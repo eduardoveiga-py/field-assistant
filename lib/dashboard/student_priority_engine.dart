@@ -102,7 +102,11 @@ class StudentPriorityEngine {
       }
       return map;
     } catch (e, st) {
-      AppLogger.warning('Falha ao carregar ordenação manual de estudantes', e, st);
+      AppLogger.warning(
+        'Falha ao carregar ordenação manual de estudantes',
+        e,
+        st,
+      );
       return {};
     }
   }
@@ -124,7 +128,11 @@ class StudentPriorityEngine {
         );
       }
     } catch (e, st) {
-      AppLogger.warning('Falha ao salvar ordenação manual de estudantes', e, st);
+      AppLogger.warning(
+        'Falha ao salvar ordenação manual de estudantes',
+        e,
+        st,
+      );
     }
   }
 
@@ -287,7 +295,10 @@ class StudentPriorityEngine {
             }
           }
         } catch (e, st) {
-          AppLogger.debug('Falha ao decodificar metas espirituais (${person.id}): $e', st);
+          AppLogger.debug(
+            'Falha ao decodificar metas espirituais (${person.id}): $e',
+            st,
+          );
         }
       }
       // Metas cumpridas aumentam a pontuação

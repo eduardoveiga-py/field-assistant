@@ -137,7 +137,9 @@ class _PinAuthDialogState extends State<PinAuthDialog> {
           child: const Text('Cancelar'),
         ),
         FilledButton(
-          style: FilledButton.styleFrom(backgroundColor: const Color(0xFF6366F1)),
+          style: FilledButton.styleFrom(
+            backgroundColor: const Color(0xFF6366F1),
+          ),
           onPressed: _isLoading ? null : _submitPin,
           child: _isLoading
               ? const SizedBox(

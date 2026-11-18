@@ -95,10 +95,8 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
     _recordingService =
         widget.recordingService ?? AudioRecordingService.platform();
     _dictationService =
-        widget.dictationService ??
-        VoiceDictationService.platform();
-    _playerService =
-        widget.playerService ?? AudioPlayerService.platform();
+        widget.dictationService ?? VoiceDictationService.platform();
+    _playerService = widget.playerService ?? AudioPlayerService.platform();
     // Inicia explicitamente como revisita por padrão seguro, exigindo confirmação do usuário para estudo
     _selectedContactType = 'revisita';
     _selectedResult = 'revisita_feita';
@@ -241,7 +239,9 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
       final path = _recordingResult?.filePath;
       if (path == null || path.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Nenhum áudio gravado para reproduzir.')),
+          const SnackBar(
+            content: Text('Nenhum áudio gravado para reproduzir.'),
+          ),
         );
         return;
       }
@@ -443,7 +443,9 @@ class _QuickVoiceNoteDialogState extends ConsumerState<QuickVoiceNoteDialog> {
                 fontWeight: isSunMode ? FontWeight.bold : FontWeight.w500,
                 color: isSunMode
                     ? Colors.black
-                    : (isDark ? const Color(0xFF93C5FD) : const Color(0xFF1E40AF)),
+                    : (isDark
+                          ? const Color(0xFF93C5FD)
+                          : const Color(0xFF1E40AF)),
               ),
             ),
           ),

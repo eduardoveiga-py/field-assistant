@@ -67,212 +67,213 @@ class _PersonFamilyTiesTabState extends ConsumerState<PersonFamilyTiesTab> {
           final manualNameController = ctrls[0];
 
           return StatefulBuilder(
-        builder: (ctx, setDialogState) {
-          final isDark = Theme.of(ctx).brightness == Brightness.dark;
+            builder: (ctx, setDialogState) {
+              final isDark = Theme.of(ctx).brightness == Brightness.dark;
 
-          return AlertDialog(
-            title: const Row(
-              children: [
-                Icon(Icons.family_restroom, color: AppTheme.primaryBlue),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Vínculo Familiar',
-                    style: TextStyle(fontSize: 18),
-                  ),
-                ),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Vincule cônjuges, pais, filhos e parentes. Ao vincular uma pessoa cadastrada, o parentesco recíproco é atualizado automaticamente!',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isDark
-                          ? const Color(0xFFCBD5E1)
-                          : AppTheme.textMuted,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-
-                  SegmentedButton<String>(
-                    segments: const [
-                      ButtonSegment(
-                        value: 'registered',
-                        label: Text(
-                          'Pessoa Cadastrada',
-                          style: TextStyle(fontSize: 12),
-                        ),
+              return AlertDialog(
+                title: const Row(
+                  children: [
+                    Icon(Icons.family_restroom, color: AppTheme.primaryBlue),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Vínculo Familiar',
+                        style: TextStyle(fontSize: 18),
                       ),
-                      ButtonSegment(
-                        value: 'manual',
-                        label: Text(
-                          'Digitar Nome',
-                          style: TextStyle(fontSize: 12),
-                        ),
-                      ),
-                    ],
-                    selected: {selectedMode},
-                    onSelectionChanged: (val) {
-                      setDialogState(() => selectedMode = val.first);
-                    },
-                  ),
-                  const SizedBox(height: 14),
-
-                  if (selectedMode == 'registered') ...[
-                    if (otherPeople.isEmpty)
-                      const Text(
-                        'Não há outras pessoas cadastradas para vincular.',
-                        style: TextStyle(
-                          color: AppTheme.textMuted,
-                          fontSize: 13,
-                        ),
-                      )
-                    else
-                      DropdownButtonFormField<PersonEntry>(
-                        initialValue: selectedPerson,
-                        isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Selecione a pessoa cadastrada *',
-                        ),
-                        items: otherPeople.map((p) {
-                          return DropdownMenuItem(
-                            value: p,
-                            child: Text(
-                              '${p.name} (${p.status.toUpperCase()})',
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (val) {
-                          setDialogState(() => selectedPerson = val);
-                        },
-                      ),
-                  ] else ...[
-                    TextField(
-                      controller: manualNameController,
-                      decoration: const InputDecoration(
-                        labelText: 'Nome do familiar / parente *',
-                        hintText: 'Ex: Pedro Silva (Filho)',
-                      ),
-                      autofocus: true,
                     ),
                   ],
-                  const SizedBox(height: 12),
-
-                  DropdownButtonFormField<String>(
-                    initialValue: selectedRelationship,
-                    decoration: const InputDecoration(
-                      labelText: 'Grau de Parentesco / Relação *',
-                    ),
-                    items: _relationshipOptions.map((r) {
-                      return DropdownMenuItem(value: r, child: Text(r));
-                    }).toList(),
-                    onChanged: (val) {
-                      if (val != null) {
-                        setDialogState(() => selectedRelationship = val);
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 8),
-
-                  if (selectedMode == 'registered' && selectedPerson != null)
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(6),
+                ),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Vincule cônjuges, pais, filhos e parentes. Ao vincular uma pessoa cadastrada, o parentesco recíproco é atualizado automaticamente!',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark
+                              ? const Color(0xFFCBD5E1)
+                              : AppTheme.textMuted,
+                        ),
                       ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.sync_alt,
-                            size: 16,
-                            color: AppTheme.primaryBlue,
+                      const SizedBox(height: 14),
+
+                      SegmentedButton<String>(
+                        segments: const [
+                          ButtonSegment(
+                            value: 'registered',
+                            label: Text(
+                              'Pessoa Cadastrada',
+                              style: TextStyle(fontSize: 12),
+                            ),
                           ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              'No cadastro de "${selectedPerson!.name}", aparecerá automaticamente: "${FamilyTiesManager.getReciprocalRelationship(selectedRelationship)}: ${widget.person.name}".',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: AppTheme.primaryBlue,
-                                fontWeight: FontWeight.bold,
-                              ),
+                          ButtonSegment(
+                            value: 'manual',
+                            label: Text(
+                              'Digitar Nome',
+                              style: TextStyle(fontSize: 12),
                             ),
                           ),
                         ],
+                        selected: {selectedMode},
+                        onSelectionChanged: (val) {
+                          setDialogState(() => selectedMode = val.first);
+                        },
                       ),
-                    ),
+                      const SizedBox(height: 14),
+
+                      if (selectedMode == 'registered') ...[
+                        if (otherPeople.isEmpty)
+                          const Text(
+                            'Não há outras pessoas cadastradas para vincular.',
+                            style: TextStyle(
+                              color: AppTheme.textMuted,
+                              fontSize: 13,
+                            ),
+                          )
+                        else
+                          DropdownButtonFormField<PersonEntry>(
+                            initialValue: selectedPerson,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Selecione a pessoa cadastrada *',
+                            ),
+                            items: otherPeople.map((p) {
+                              return DropdownMenuItem(
+                                value: p,
+                                child: Text(
+                                  '${p.name} (${p.status.toUpperCase()})',
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (val) {
+                              setDialogState(() => selectedPerson = val);
+                            },
+                          ),
+                      ] else ...[
+                        TextField(
+                          controller: manualNameController,
+                          decoration: const InputDecoration(
+                            labelText: 'Nome do familiar / parente *',
+                            hintText: 'Ex: Pedro Silva (Filho)',
+                          ),
+                          autofocus: true,
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+
+                      DropdownButtonFormField<String>(
+                        initialValue: selectedRelationship,
+                        decoration: const InputDecoration(
+                          labelText: 'Grau de Parentesco / Relação *',
+                        ),
+                        items: _relationshipOptions.map((r) {
+                          return DropdownMenuItem(value: r, child: Text(r));
+                        }).toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setDialogState(() => selectedRelationship = val);
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 8),
+
+                      if (selectedMode == 'registered' &&
+                          selectedPerson != null)
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.sync_alt,
+                                size: 16,
+                                color: AppTheme.primaryBlue,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  'No cadastro de "${selectedPerson!.name}", aparecerá automaticamente: "${FamilyTiesManager.getReciprocalRelationship(selectedRelationship)}: ${widget.person.name}".',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: AppTheme.primaryBlue,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Cancelar'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () async {
+                      String name;
+                      String? relatedId;
+
+                      if (selectedMode == 'registered') {
+                        if (selectedPerson == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Selecione uma pessoa cadastrada.'),
+                            ),
+                          );
+                          return;
+                        }
+                        name = selectedPerson!.name;
+                        relatedId = selectedPerson!.id;
+                      } else {
+                        name = manualNameController.text.trim();
+                        if (name.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Informe o nome do familiar.'),
+                            ),
+                          );
+                          return;
+                        }
+                      }
+
+                      final mgr = ref.read(familyTiesManagerProvider);
+                      await mgr.addFamilyTie(
+                        personId: widget.person.id,
+                        personName: widget.person.name,
+                        relatedPersonId: relatedId,
+                        relatedPersonName: name,
+                        relationshipType: selectedRelationship,
+                      );
+
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              relatedId != null
+                                  ? 'Vínculo adicionado e sincronizado reciprocamente com ${selectedPerson!.name}!'
+                                  : 'Vínculo familiar salvo com sucesso!',
+                            ),
+                            backgroundColor: AppTheme.successGreen,
+                          ),
+                        );
+                      }
+                    },
+                    child: const Text('Salvar Vínculo'),
+                  ),
                 ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancelar'),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  String name;
-                  String? relatedId;
-
-                  if (selectedMode == 'registered') {
-                    if (selectedPerson == null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Selecione uma pessoa cadastrada.'),
-                        ),
-                      );
-                      return;
-                    }
-                    name = selectedPerson!.name;
-                    relatedId = selectedPerson!.id;
-                  } else {
-                    name = manualNameController.text.trim();
-                    if (name.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Informe o nome do familiar.'),
-                        ),
-                      );
-                      return;
-                    }
-                  }
-
-                  final mgr = ref.read(familyTiesManagerProvider);
-                  await mgr.addFamilyTie(
-                    personId: widget.person.id,
-                    personName: widget.person.name,
-                    relatedPersonId: relatedId,
-                    relatedPersonName: name,
-                    relationshipType: selectedRelationship,
-                  );
-
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          relatedId != null
-                              ? 'Vínculo adicionado e sincronizado reciprocamente com ${selectedPerson!.name}!'
-                              : 'Vínculo familiar salvo com sucesso!',
-                        ),
-                        backgroundColor: AppTheme.successGreen,
-                      ),
-                    );
-                  }
-                },
-                child: const Text('Salvar Vínculo'),
-              ),
-            ],
+              );
+            },
           );
-        },
-      );
         },
       ),
     );

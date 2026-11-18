@@ -47,7 +47,8 @@ class FamilyTieItem {
   factory FamilyTieItem.fromMap(Map<String, dynamic> map) => FamilyTieItem(
     id: map['id'] as String,
     personId: (map['person_id'] ?? map['personId']) as String,
-    relatedPersonId: (map['related_person_id'] ?? map['relatedPersonId']) as String?,
+    relatedPersonId:
+        (map['related_person_id'] ?? map['relatedPersonId']) as String?,
     relatedPersonName:
         (map['related_person_name'] ?? map['relatedPersonName']) as String,
     relationshipType:
@@ -65,9 +66,9 @@ class FamilyTiesManager {
   FamilyTiesManager(this.db);
 
   Future<List<FamilyTieItem>> getAllTies() async {
-    final rows = await (db.select(db.familyTies)
-          ..where((t) => t.deletedAt.isNull()))
-        .get();
+    final rows = await (db.select(
+      db.familyTies,
+    )..where((t) => t.deletedAt.isNull())).get();
     return rows.map(FamilyTieItem.fromEntry).toList();
   }
 
@@ -149,10 +150,9 @@ class FamilyTiesManager {
   }) async {
     final now = DateTime.now();
     final tieId = _uuid.v4();
-    final cleanRelatedId =
-        relatedPersonId != null && relatedPersonId.isNotEmpty
-            ? relatedPersonId
-            : null;
+    final cleanRelatedId = relatedPersonId != null && relatedPersonId.isNotEmpty
+        ? relatedPersonId
+        : null;
 
     final entry = FamilyTieEntry(
       id: tieId,
@@ -168,17 +168,21 @@ class FamilyTiesManager {
 
     await db.transaction(() async {
       await db.into(db.familyTies).insert(entry);
-      await db.into(db.syncQueue).insert(
-        SyncQueueCompanion.insert(
-          id: _uuid.v4(),
-          entityType: 'family_ties',
-          entityId: tieId,
-          operation: 'INSERT',
-          payload: jsonEncode(SyncTimestamp.normalizeMapDates(entry.toJson())),
-          createdAt: now,
-          status: const Value('pending'),
-        ),
-      );
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: _uuid.v4(),
+              entityType: 'family_ties',
+              entityId: tieId,
+              operation: 'INSERT',
+              payload: jsonEncode(
+                SyncTimestamp.normalizeMapDates(entry.toJson()),
+              ),
+              createdAt: now,
+              status: const Value('pending'),
+            ),
+          );
 
       // VÍNCULO RECÍPROCO AUTOMÁTICO
       if (cleanRelatedId != null && cleanRelatedId != personId) {
@@ -204,17 +208,19 @@ class FamilyTiesManager {
           payload['_base'] = SyncTimestamp.normalizeMapDates(
             existingReciprocal.toJson(),
           );
-          await db.into(db.syncQueue).insert(
-            SyncQueueCompanion.insert(
-              id: _uuid.v4(),
-              entityType: 'family_ties',
-              entityId: updatedRec.id,
-              operation: 'UPDATE',
-              payload: jsonEncode(payload),
-              createdAt: now,
-              status: const Value('pending'),
-            ),
-          );
+          await db
+              .into(db.syncQueue)
+              .insert(
+                SyncQueueCompanion.insert(
+                  id: _uuid.v4(),
+                  entityType: 'family_ties',
+                  entityId: updatedRec.id,
+                  operation: 'UPDATE',
+                  payload: jsonEncode(payload),
+                  createdAt: now,
+                  status: const Value('pending'),
+                ),
+              );
         } else {
           final recId = _uuid.v4();
           final recEntry = FamilyTieEntry(
@@ -229,19 +235,21 @@ class FamilyTiesManager {
             revision: 1,
           );
           await db.into(db.familyTies).insert(recEntry);
-          await db.into(db.syncQueue).insert(
-            SyncQueueCompanion.insert(
-              id: _uuid.v4(),
-              entityType: 'family_ties',
-              entityId: recId,
-              operation: 'INSERT',
-              payload: jsonEncode(
-                SyncTimestamp.normalizeMapDates(recEntry.toJson()),
-              ),
-              createdAt: now,
-              status: const Value('pending'),
-            ),
-          );
+          await db
+              .into(db.syncQueue)
+              .insert(
+                SyncQueueCompanion.insert(
+                  id: _uuid.v4(),
+                  entityType: 'family_ties',
+                  entityId: recId,
+                  operation: 'INSERT',
+                  payload: jsonEncode(
+                    SyncTimestamp.normalizeMapDates(recEntry.toJson()),
+                  ),
+                  createdAt: now,
+                  status: const Value('pending'),
+                ),
+              );
         }
       }
     });
@@ -255,9 +263,9 @@ class FamilyTiesManager {
     String? newRelatedPersonName,
   }) async {
     final now = DateTime.now();
-    final existing = await (db.select(db.familyTies)
-          ..where((t) => t.id.equals(id)))
-        .getSingleOrNull();
+    final existing = await (db.select(
+      db.familyTies,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
     if (existing == null) return;
 
     final updated = existing.copyWith(
@@ -272,28 +280,31 @@ class FamilyTiesManager {
       await db.update(db.familyTies).replace(updated);
       final payload = SyncTimestamp.normalizeMapDates(updated.toJson());
       payload['_base'] = SyncTimestamp.normalizeMapDates(existing.toJson());
-      await db.into(db.syncQueue).insert(
-        SyncQueueCompanion.insert(
-          id: _uuid.v4(),
-          entityType: 'family_ties',
-          entityId: id,
-          operation: 'UPDATE',
-          payload: jsonEncode(payload),
-          createdAt: now,
-          status: const Value('pending'),
-        ),
-      );
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: _uuid.v4(),
+              entityType: 'family_ties',
+              entityId: id,
+              operation: 'UPDATE',
+              payload: jsonEncode(payload),
+              createdAt: now,
+              status: const Value('pending'),
+            ),
+          );
 
       if (existing.relatedPersonId != null &&
           existing.relatedPersonId!.isNotEmpty) {
         final reciprocalType = getReciprocalRelationship(newRelationshipType);
-        final rec = await (db.select(db.familyTies)..where(
-              (t) =>
-                  t.personId.equals(existing.relatedPersonId!) &
-                  t.relatedPersonId.equals(existing.personId) &
-                  t.deletedAt.isNull(),
-            ))
-            .getSingleOrNull();
+        final rec =
+            await (db.select(db.familyTies)..where(
+                  (t) =>
+                      t.personId.equals(existing.relatedPersonId!) &
+                      t.relatedPersonId.equals(existing.personId) &
+                      t.deletedAt.isNull(),
+                ))
+                .getSingleOrNull();
         if (rec != null) {
           final updatedRec = rec.copyWith(
             relationshipType: reciprocalType,
@@ -301,19 +312,23 @@ class FamilyTiesManager {
             revision: rec.revision + 1,
           );
           await db.update(db.familyTies).replace(updatedRec);
-          final recPayload = SyncTimestamp.normalizeMapDates(updatedRec.toJson());
-          recPayload['_base'] = SyncTimestamp.normalizeMapDates(rec.toJson());
-          await db.into(db.syncQueue).insert(
-            SyncQueueCompanion.insert(
-              id: _uuid.v4(),
-              entityType: 'family_ties',
-              entityId: rec.id,
-              operation: 'UPDATE',
-              payload: jsonEncode(recPayload),
-              createdAt: now,
-              status: const Value('pending'),
-            ),
+          final recPayload = SyncTimestamp.normalizeMapDates(
+            updatedRec.toJson(),
           );
+          recPayload['_base'] = SyncTimestamp.normalizeMapDates(rec.toJson());
+          await db
+              .into(db.syncQueue)
+              .insert(
+                SyncQueueCompanion.insert(
+                  id: _uuid.v4(),
+                  entityType: 'family_ties',
+                  entityId: rec.id,
+                  operation: 'UPDATE',
+                  payload: jsonEncode(recPayload),
+                  createdAt: now,
+                  status: const Value('pending'),
+                ),
+              );
         }
       }
     });
@@ -324,9 +339,9 @@ class FamilyTiesManager {
     bool deleteReciprocal = true,
   }) async {
     final now = DateTime.now();
-    final existing = await (db.select(db.familyTies)
-          ..where((t) => t.id.equals(id)))
-        .getSingleOrNull();
+    final existing = await (db.select(
+      db.familyTies,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
     if (existing == null) return;
 
     await db.transaction(() async {
@@ -338,59 +353,65 @@ class FamilyTiesManager {
           revision: Value(nextRev),
         ),
       );
-      await db.into(db.syncQueue).insert(
-        SyncQueueCompanion.insert(
-          id: _uuid.v4(),
-          entityType: 'family_ties',
-          entityId: id,
-          operation: 'DELETE',
-          payload: jsonEncode({
-            'id': id,
-            'deleted_at': now.toUtc().toIso8601String(),
-            'updated_at': now.toUtc().toIso8601String(),
-            'revision': nextRev,
-          }),
-          createdAt: now,
-          status: const Value('pending'),
-        ),
-      );
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: _uuid.v4(),
+              entityType: 'family_ties',
+              entityId: id,
+              operation: 'DELETE',
+              payload: jsonEncode({
+                'id': id,
+                'deleted_at': now.toUtc().toIso8601String(),
+                'updated_at': now.toUtc().toIso8601String(),
+                'revision': nextRev,
+              }),
+              createdAt: now,
+              status: const Value('pending'),
+            ),
+          );
 
       if (deleteReciprocal &&
           existing.relatedPersonId != null &&
           existing.relatedPersonId!.isNotEmpty) {
-        final rec = await (db.select(db.familyTies)..where(
-              (t) =>
-                  t.personId.equals(existing.relatedPersonId!) &
-                  t.relatedPersonId.equals(existing.personId) &
-                  t.deletedAt.isNull(),
-            ))
-            .getSingleOrNull();
+        final rec =
+            await (db.select(db.familyTies)..where(
+                  (t) =>
+                      t.personId.equals(existing.relatedPersonId!) &
+                      t.relatedPersonId.equals(existing.personId) &
+                      t.deletedAt.isNull(),
+                ))
+                .getSingleOrNull();
         if (rec != null) {
           final recNextRev = rec.revision + 1;
-          await (db.update(db.familyTies)..where((t) => t.id.equals(rec.id)))
-              .write(
+          await (db.update(
+            db.familyTies,
+          )..where((t) => t.id.equals(rec.id))).write(
             FamilyTiesCompanion(
               deletedAt: Value(now),
               updatedAt: Value(now),
               revision: Value(recNextRev),
             ),
           );
-          await db.into(db.syncQueue).insert(
-            SyncQueueCompanion.insert(
-              id: _uuid.v4(),
-              entityType: 'family_ties',
-              entityId: rec.id,
-              operation: 'DELETE',
-              payload: jsonEncode({
-                'id': rec.id,
-                'deleted_at': now.toUtc().toIso8601String(),
-                'updated_at': now.toUtc().toIso8601String(),
-                'revision': recNextRev,
-              }),
-              createdAt: now,
-              status: const Value('pending'),
-            ),
-          );
+          await db
+              .into(db.syncQueue)
+              .insert(
+                SyncQueueCompanion.insert(
+                  id: _uuid.v4(),
+                  entityType: 'family_ties',
+                  entityId: rec.id,
+                  operation: 'DELETE',
+                  payload: jsonEncode({
+                    'id': rec.id,
+                    'deleted_at': now.toUtc().toIso8601String(),
+                    'updated_at': now.toUtc().toIso8601String(),
+                    'revision': recNextRev,
+                  }),
+                  createdAt: now,
+                  status: const Value('pending'),
+                ),
+              );
         }
       }
     });

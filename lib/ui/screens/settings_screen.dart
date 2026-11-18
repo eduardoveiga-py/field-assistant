@@ -8,6 +8,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'package:eas_client/eas_client.dart' as eas;
+
 import '../../inbox/exchange_service.dart';
 import '../../appointments/calendar_sync_coordinator.dart';
 import '../../core/app_logger.dart';
@@ -50,10 +51,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _hasPinConfigured = false;
   final TextEditingController _jwEmailCtrl = TextEditingController();
   final TextEditingController _jwPasswordCtrl = TextEditingController();
-  final TextEditingController _jwHostCtrl = TextEditingController(text: 'mail.jw.org');
+  final TextEditingController _jwHostCtrl = TextEditingController(
+    text: 'mail.jw.org',
+  );
   final TextEditingController _jwPortCtrl = TextEditingController(text: '993');
-  final TextEditingController _jwSmtpHostCtrl = TextEditingController(text: 'mail.jw.org');
-  final TextEditingController _jwSmtpPortCtrl = TextEditingController(text: '587');
+  final TextEditingController _jwSmtpHostCtrl = TextEditingController(
+    text: 'mail.jw.org',
+  );
+  final TextEditingController _jwSmtpPortCtrl = TextEditingController(
+    text: '587',
+  );
   String _jwSmtpSecurity = 'starttls';
   bool _isTestingJwEmail = false;
   bool _isTestingExchange = false;
@@ -67,7 +74,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<bool> _getE2eeFuture(String effectiveUserId) {
     if (_e2eeFuture == null || _lastEffectiveUserId != effectiveUserId) {
       _lastEffectiveUserId = effectiveUserId;
-      _e2eeFuture = ref.read(e2eeServiceProvider).isKeyInstalled(effectiveUserId);
+      _e2eeFuture = ref
+          .read(e2eeServiceProvider)
+          .isKeyInstalled(effectiveUserId);
     }
     return _e2eeFuture!;
   }
@@ -153,7 +162,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     try {
       final coordinator = ref.read(calendarSyncCoordinatorProvider);
       final isAuth = await coordinator.googleProvider.isAuthorized();
-      final account = await coordinator.googleProvider.getConnectedAccountName();
+      final account = await coordinator.googleProvider
+          .getConnectedAccountName();
       if (mounted) {
         setState(() {
           _isGoogleConnected = isAuth;
@@ -168,29 +178,49 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _loadJwEmailConfig() async {
     try {
       final db = ref.read(repositoryProvider).db;
-      final email = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_imap_email'))).getSingleOrNull();
+      final email = await (db.select(
+        db.appKvStore,
+      )..where((t) => t.key.equals('jw_imap_email'))).getSingleOrNull();
       const secureStorage = FlutterSecureStorage();
       String? pass = await secureStorage.read(key: 'jw_imap_password');
 
       // Migração automática retroativa: se a senha ainda estava em texto puro no SQLite,
       // migra com segurança para o Keychain/KeyStore e elimina do banco relacional
       if (pass == null || pass.isEmpty) {
-        final legacyPass = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_imap_password'))).getSingleOrNull();
+        final legacyPass = await (db.select(
+          db.appKvStore,
+        )..where((t) => t.key.equals('jw_imap_password'))).getSingleOrNull();
         if (legacyPass != null && legacyPass.value.isNotEmpty) {
           pass = legacyPass.value;
           await secureStorage.write(key: 'jw_imap_password', value: pass);
-          await (db.delete(db.appKvStore)..where((t) => t.key.equals('jw_imap_password'))).go();
+          await (db.delete(
+            db.appKvStore,
+          )..where((t) => t.key.equals('jw_imap_password'))).go();
         }
       }
 
-      final easEmail = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_eas_email'))).getSingleOrNull();
-      final easHost = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_eas_host'))).getSingleOrNull();
+      final easEmail = await (db.select(
+        db.appKvStore,
+      )..where((t) => t.key.equals('jw_eas_email'))).getSingleOrNull();
+      final easHost = await (db.select(
+        db.appKvStore,
+      )..where((t) => t.key.equals('jw_eas_host'))).getSingleOrNull();
       final easPassword = await secureStorage.read(key: 'jw_eas_password');
-      final host = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_imap_host'))).getSingleOrNull();
-      final port = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_imap_port'))).getSingleOrNull();
-      final smtpHost = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_smtp_host'))).getSingleOrNull();
-      final smtpPort = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_smtp_port'))).getSingleOrNull();
-      final smtpSecurity = await (db.select(db.appKvStore)..where((t) => t.key.equals('jw_smtp_security'))).getSingleOrNull();
+      final host = await (db.select(
+        db.appKvStore,
+      )..where((t) => t.key.equals('jw_imap_host'))).getSingleOrNull();
+      final port = await (db.select(
+        db.appKvStore,
+      )..where((t) => t.key.equals('jw_imap_port'))).getSingleOrNull();
+      final smtpHost = await (db.select(
+        db.appKvStore,
+      )..where((t) => t.key.equals('jw_smtp_host'))).getSingleOrNull();
+      final smtpPort = await (db.select(
+        db.appKvStore,
+      )..where((t) => t.key.equals('jw_smtp_port'))).getSingleOrNull();
+      final smtpSecurity = await (db.select(
+        db.appKvStore,
+      )..where((t) => t.key.equals('jw_smtp_security'))).getSingleOrNull();
 
       if (mounted) {
         setState(() {
@@ -199,8 +229,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           if (easPassword != null) _exchangePasswordCtrl.text = easPassword;
           if (email != null) _jwEmailCtrl.text = email.value;
           if (pass != null) _jwPasswordCtrl.text = pass;
-          if (host != null && host.value.isNotEmpty) _jwHostCtrl.text = host.value;
-          if (port != null && port.value.isNotEmpty) _jwPortCtrl.text = port.value;
+          if (host != null && host.value.isNotEmpty)
+            _jwHostCtrl.text = host.value;
+          if (port != null && port.value.isNotEmpty)
+            _jwPortCtrl.text = port.value;
           if (smtpHost != null && smtpHost.value.isNotEmpty) {
             _jwSmtpHostCtrl.text = smtpHost.value;
           } else if (host != null && host.value.isNotEmpty) {
@@ -210,13 +242,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             _jwSmtpPortCtrl.text = smtpPort.value;
           }
           if (smtpSecurity != null &&
-              (smtpSecurity.value == 'starttls' || smtpSecurity.value == 'ssl')) {
+              (smtpSecurity.value == 'starttls' ||
+                  smtpSecurity.value == 'ssl')) {
             _jwSmtpSecurity = smtpSecurity.value;
           }
         });
       }
     } catch (e, st) {
-      AppLogger.warning('Falha ao carregar configuração IMAP do JW Mail', e, st);
+      AppLogger.warning(
+        'Falha ao carregar configuração IMAP do JW Mail',
+        e,
+        st,
+      );
     }
   }
 
@@ -237,256 +274,268 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           final locationController = ctrls[1];
 
           return StatefulBuilder(
-        builder: (ctx, setDialogState) {
-          final isDark = Theme.of(ctx).brightness == Brightness.dark;
+            builder: (ctx, setDialogState) {
+              final isDark = Theme.of(ctx).brightness == Brightness.dark;
 
-          return AlertDialog(
-            title: const Row(
-              children: [
-                Icon(Icons.event_available, color: Color(0xFF7C3AED)),
-                SizedBox(width: 8),
-                Expanded(child: Text('Cadastrar Evento Teocrático')),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Cadastre datas especiais para inserção automática no calendário oficial e sincronização.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isDark
-                          ? const Color(0xFFCBD5E1)
-                          : AppTheme.textMuted,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  DropdownButtonFormField<String>(
-                    initialValue: selectedType,
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Tipo de Evento Teocrático *',
-                    ),
-                    items: const [
-                      DropdownMenuItem(
-                        value: 'Visita do Superintendente de Circuito',
-                        child: Text('Visita do Superintendente de Circuito'),
+              return AlertDialog(
+                title: const Row(
+                  children: [
+                    Icon(Icons.event_available, color: Color(0xFF7C3AED)),
+                    SizedBox(width: 8),
+                    Expanded(child: Text('Cadastrar Evento Teocrático')),
+                  ],
+                ),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Cadastre datas especiais para inserção automática no calendário oficial e sincronização.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark
+                              ? const Color(0xFFCBD5E1)
+                              : AppTheme.textMuted,
+                        ),
                       ),
-                      DropdownMenuItem(
-                        value: 'Assembleia de Circuito',
-                        child: Text('Assembleia de Circuito'),
+                      const SizedBox(height: 14),
+                      DropdownButtonFormField<String>(
+                        initialValue: selectedType,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Tipo de Evento Teocrático *',
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'Visita do Superintendente de Circuito',
+                            child: Text(
+                              'Visita do Superintendente de Circuito',
+                            ),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Assembleia de Circuito',
+                            child: Text('Assembleia de Circuito'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Congresso Regional',
+                            child: Text('Congresso Regional'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Celebração da Morte de Cristo',
+                            child: Text('Celebração da Morte de Cristo'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Reunião Especial',
+                            child: Text('Reunião Especial'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Dia Especial de Testemunho',
+                            child: Text('Dia Especial de Testemunho'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Outro Evento Teocrático',
+                            child: Text('Outro Evento Teocrático'),
+                          ),
+                        ],
+                        onChanged: (val) {
+                          if (val != null)
+                            setDialogState(() => selectedType = val);
+                        },
                       ),
-                      DropdownMenuItem(
-                        value: 'Congresso Regional',
-                        child: Text('Congresso Regional'),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: titleController,
+                        decoration: const InputDecoration(
+                          labelText: 'Tema / Título complementar (opcional)',
+                          hintText: 'Ex: Seja Corajoso! ou Tema da Visita',
+                        ),
                       ),
-                      DropdownMenuItem(
-                        value: 'Celebração da Morte de Cristo',
-                        child: Text('Celebração da Morte de Cristo'),
+                      const SizedBox(height: 14),
+                      const Text(
+                        'Data e Horário de Início:',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
                       ),
-                      DropdownMenuItem(
-                        value: 'Reunião Especial',
-                        child: Text('Reunião Especial'),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              icon: const Icon(Icons.calendar_today, size: 16),
+                              label: Text(
+                                AppDateUtils.formatDate(startDate),
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                              onPressed: () async {
+                                final d = await showDatePicker(
+                                  context: context,
+                                  initialDate: startDate,
+                                  firstDate: DateTime.now().subtract(
+                                    const Duration(days: 30),
+                                  ),
+                                  lastDate: DateTime.now().add(
+                                    const Duration(days: 730),
+                                  ),
+                                );
+                                if (d != null) {
+                                  setDialogState(() {
+                                    startDate = d;
+                                    if (endDate.isBefore(d)) endDate = d;
+                                  });
+                                }
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              icon: const Icon(Icons.access_time, size: 16),
+                              label: Text(
+                                '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                              onPressed: () async {
+                                final t = await showTimePicker(
+                                  context: context,
+                                  initialTime: startTime,
+                                );
+                                if (t != null)
+                                  setDialogState(() => startTime = t);
+                              },
+                            ),
+                          ),
+                        ],
                       ),
-                      DropdownMenuItem(
-                        value: 'Dia Especial de Testemunho',
-                        child: Text('Dia Especial de Testemunho'),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Data e Horário de Término:',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
                       ),
-                      DropdownMenuItem(
-                        value: 'Outro Evento Teocrático',
-                        child: Text('Outro Evento Teocrático'),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              icon: const Icon(Icons.calendar_today, size: 16),
+                              label: Text(
+                                AppDateUtils.formatDate(endDate),
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                              onPressed: () async {
+                                final d = await showDatePicker(
+                                  context: context,
+                                  initialDate: endDate,
+                                  firstDate: startDate,
+                                  lastDate: DateTime.now().add(
+                                    const Duration(days: 730),
+                                  ),
+                                );
+                                if (d != null)
+                                  setDialogState(() => endDate = d);
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              icon: const Icon(Icons.access_time, size: 16),
+                              label: Text(
+                                '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                              onPressed: () async {
+                                final t = await showTimePicker(
+                                  context: context,
+                                  initialTime: endTime,
+                                );
+                                if (t != null)
+                                  setDialogState(() => endTime = t);
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: locationController,
+                        decoration: const InputDecoration(
+                          labelText: 'Local / Salão / Anotações',
+                          hintText: 'Ex: Salão de Assembleias, Salão do Reino, JW Stream...',
+                        ),
                       ),
                     ],
-                    onChanged: (val) {
-                      if (val != null) setDialogState(() => selectedType = val);
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Cancelar'),
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF7C3AED),
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: () async {
+                      final startDateTime = DateTime(
+                        startDate.year,
+                        startDate.month,
+                        startDate.day,
+                        startTime.hour,
+                        startTime.minute,
+                      );
+                      final endDateTime = DateTime(
+                        endDate.year,
+                        endDate.month,
+                        endDate.day,
+                        endTime.hour,
+                        endTime.minute,
+                      );
+
+                      int durationMins = endDateTime
+                          .difference(startDateTime)
+                          .inMinutes;
+                      if (durationMins <= 0) durationMins = 120;
+
+                      final extra = titleController.text.trim();
+                      final fullTitle =
+                          '[Evento Teocrático] $selectedType${extra.isNotEmpty ? ": $extra" : ""}';
+
+                      final repo = ref.read(repositoryProvider);
+                      await repo.createAppointment(
+                        title: fullTitle,
+                        startTime: startDateTime,
+                        endTime: endDateTime,
+                        durationMinutes: durationMins,
+                        locationNotes: locationController.text.trim().isEmpty
+                            ? null
+                            : locationController.text.trim(),
+                        status: 'confirmado',
+                      );
+
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Evento "$selectedType" inserido automaticamente no calendário oficial!',
+                            ),
+                          ),
+                        );
+                      }
                     },
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: titleController,
-                    decoration: const InputDecoration(
-                      labelText: 'Tema / Título complementar (opcional)',
-                      hintText: 'Ex: Seja Corajoso! ou Tema da Visita',
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  const Text(
-                    'Data e Horário de Início:',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          icon: const Icon(Icons.calendar_today, size: 16),
-                          label: Text(
-                            AppDateUtils.formatDate(startDate),
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                          onPressed: () async {
-                            final d = await showDatePicker(
-                              context: context,
-                              initialDate: startDate,
-                              firstDate: DateTime.now().subtract(
-                                const Duration(days: 30),
-                              ),
-                              lastDate: DateTime.now().add(
-                                const Duration(days: 730),
-                              ),
-                            );
-                            if (d != null) {
-                              setDialogState(() {
-                                startDate = d;
-                                if (endDate.isBefore(d)) endDate = d;
-                              });
-                            }
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          icon: const Icon(Icons.access_time, size: 16),
-                          label: Text(
-                            '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}',
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                          onPressed: () async {
-                            final t = await showTimePicker(
-                              context: context,
-                              initialTime: startTime,
-                            );
-                            if (t != null) setDialogState(() => startTime = t);
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Data e Horário de Término:',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          icon: const Icon(Icons.calendar_today, size: 16),
-                          label: Text(
-                            AppDateUtils.formatDate(endDate),
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                          onPressed: () async {
-                            final d = await showDatePicker(
-                              context: context,
-                              initialDate: endDate,
-                              firstDate: startDate,
-                              lastDate: DateTime.now().add(
-                                const Duration(days: 730),
-                              ),
-                            );
-                            if (d != null) setDialogState(() => endDate = d);
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          icon: const Icon(Icons.access_time, size: 16),
-                          label: Text(
-                            '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}',
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                          onPressed: () async {
-                            final t = await showTimePicker(
-                              context: context,
-                              initialTime: endTime,
-                            );
-                            if (t != null) setDialogState(() => endTime = t);
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: locationController,
-                    decoration: const InputDecoration(
-                      labelText: 'Local / Salão / Anotações',
-                      hintText: 'Ex: Salão de Assembleias, Salão do Reino, JW Stream...',
-                    ),
+                    child: const Text('Salvar no Calendário'),
                   ),
                 ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancelar'),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF7C3AED),
-                  foregroundColor: Colors.white,
-                ),
-                onPressed: () async {
-                  final startDateTime = DateTime(
-                    startDate.year,
-                    startDate.month,
-                    startDate.day,
-                    startTime.hour,
-                    startTime.minute,
-                  );
-                  final endDateTime = DateTime(
-                    endDate.year,
-                    endDate.month,
-                    endDate.day,
-                    endTime.hour,
-                    endTime.minute,
-                  );
-
-                  int durationMins = endDateTime
-                      .difference(startDateTime)
-                      .inMinutes;
-                  if (durationMins <= 0) durationMins = 120;
-
-                  final extra = titleController.text.trim();
-                  final fullTitle =
-                      '[Evento Teocrático] $selectedType${extra.isNotEmpty ? ": $extra" : ""}';
-
-                  final repo = ref.read(repositoryProvider);
-                  await repo.createAppointment(
-                    title: fullTitle,
-                    startTime: startDateTime,
-                    endTime: endDateTime,
-                    durationMinutes: durationMins,
-                    locationNotes: locationController.text.trim().isEmpty
-                        ? null
-                        : locationController.text.trim(),
-                    status: 'confirmado',
-                  );
-
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'Evento "$selectedType" inserido automaticamente no calendário oficial!',
-                        ),
-                      ),
-                    );
-                  }
-                },
-                child: const Text('Salvar no Calendário'),
-              ),
-            ],
+              );
+            },
           );
-        },
-      );
         },
       ),
     );
@@ -513,9 +562,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   void _showRestoreDialog(BuildContext context) {
     showDialog<void>(
       context: context,
-      builder: (_) => _RestoreBackupDialog(
-        backupService: ref.read(backupServiceProvider),
-      ),
+      builder: (_) =>
+          _RestoreBackupDialog(backupService: ref.read(backupServiceProvider)),
     );
   }
 
@@ -535,7 +583,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final allAppointments = ref.watch(appointmentsStreamProvider).value ?? [];
-    final syncCounts = ref.watch(syncQueueCountsProvider).value ??
+    final syncCounts =
+        ref.watch(syncQueueCountsProvider).value ??
         (pending: 0, failed: 0, conflict: 0);
     final theocraticEvents =
         allAppointments
@@ -593,7 +642,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           : 'Local-First',
                       style: const TextStyle(fontSize: 11),
                     ),
-                    backgroundColor: (syncCounts.conflict > 0 || syncCounts.failed > 0)
+                    backgroundColor:
+                        (syncCounts.conflict > 0 || syncCounts.failed > 0)
                         ? const Color(0xFFFEE2E2)
                         : const Color(0xFFE0E7FF),
                   ),
@@ -629,11 +679,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               foregroundColor: Colors.black87,
                             ),
                             icon: const Icon(Icons.refresh, size: 18),
-                            label: Text('Reprocessar ${syncCounts.failed} Falha(s) Agora'),
+                            label: Text(
+                              'Reprocessar ${syncCounts.failed} Falha(s) Agora',
+                            ),
                             onPressed: () async {
                               final repo = ref.read(repositoryProvider);
                               await repo.retryAllFailedOperations();
-                              final res = await ref.read(supabaseSyncServiceProvider).sync();
+                              final res = await ref
+                                  .read(supabaseSyncServiceProvider)
+                                  .sync();
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(content: Text(res.message)),
@@ -647,14 +701,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
                 const Divider(height: 1),
                 ListTile(
-                  leading: const Icon(Icons.import_export, color: AppTheme.primaryBlue),
+                  leading: const Icon(
+                    Icons.import_export,
+                    color: AppTheme.primaryBlue,
+                  ),
                   title: const Text('Importar / Exportar Calendário'),
                   subtitle: const Text('Arquivos .ics e URL de calendário.'),
                   trailing: const Icon(Icons.arrow_forward_ios, size: 14),
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => const AppointmentsScreen(calendarToolsOnly: true),
+                      builder: (_) =>
+                          const AppointmentsScreen(calendarToolsOnly: true),
                     ),
                   ),
                 ),
@@ -680,27 +738,34 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
                 const Divider(height: 1),
                 ListTile(
-                  leading: const Icon(Icons.account_circle, color: Color(0xFF4285F4)),
+                  leading: const Icon(
+                    Icons.account_circle,
+                    color: Color(0xFF4285F4),
+                  ),
                   title: const Text('Conta Google Conectada'),
-                  subtitle: Text(_isGoogleConnected
-                      ? 'Conectado como: ${_googleAccountEmail ?? "Conta ativa"}'
-                      : 'Nenhuma conta Google conectada'),
+                  subtitle: Text(
+                    _isGoogleConnected
+                        ? 'Conectado como: ${_googleAccountEmail ?? "Conta ativa"}'
+                        : 'Nenhuma conta Google conectada',
+                  ),
                   trailing: _isGoogleConnected
                       ? Wrap(
                           spacing: 4,
                           children: [
                             TextButton(
                               onPressed: () async {
-                                final coord = ref.read(calendarSyncCoordinatorProvider);
-                                final ok = await coord.googleProvider.requestAuthorization();
+                                final coord = ref.read(
+                                  calendarSyncCoordinatorProvider,
+                                );
+                                final ok = await coord.googleProvider
+                                    .requestAuthorization();
                                 if (ok) {
                                   await _loadGoogleStatus();
                                 } else if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text(
-                                        coord.googleProvider.lastError ??
-                                            'Não foi possível autenticar com a conta Google.',
+                                        coord.googleProvider.lastError ?? 'Não foi possível autenticar com a conta Google.',
                                       ),
                                     ),
                                   );
@@ -709,15 +774,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               child: const Text('Trocar'),
                             ),
                             IconButton(
-                              icon: const Icon(Icons.link_off, color: Colors.redAccent),
+                              icon: const Icon(
+                                Icons.link_off,
+                                color: Colors.redAccent,
+                              ),
                               tooltip: 'Desconectar Conta Google',
                               onPressed: () async {
-                                final coord = ref.read(calendarSyncCoordinatorProvider);
+                                final coord = ref.read(
+                                  calendarSyncCoordinatorProvider,
+                                );
                                 await coord.googleProvider.disconnect();
                                 await _loadGoogleStatus();
                                 if (!context.mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Conta Google desconectada com sucesso.')),
+                                  const SnackBar(
+                                    content: Text(
+                                      'Conta Google desconectada com sucesso.',
+                                    ),
+                                  ),
                                 );
                               },
                             ),
@@ -727,20 +801,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           icon: const Icon(Icons.login, size: 16),
                           label: const Text('Conectar'),
                           onPressed: () async {
-                            final coord = ref.read(calendarSyncCoordinatorProvider);
-                            final ok = await coord.googleProvider.requestAuthorization();
+                            final coord = ref.read(
+                              calendarSyncCoordinatorProvider,
+                            );
+                            final ok = await coord.googleProvider
+                                .requestAuthorization();
                             if (ok) {
                               await _loadGoogleStatus();
                               if (!context.mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Conta Google conectada com sucesso!')),
+                                const SnackBar(
+                                  content: Text(
+                                    'Conta Google conectada com sucesso!',
+                                  ),
+                                ),
                               );
                             } else if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text(
-                                    coord.googleProvider.lastError ??
-                                        'Não foi possível conectar a conta Google.',
+                                    coord.googleProvider.lastError ?? 'Não foi possível conectar a conta Google.',
                                   ),
                                 ),
                               );
@@ -933,8 +1013,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                   .performSilentBackupIfNeeded(force: true);
                               if (mounted) {
                                 setState(() {
-                                  _lastSilentBackupFuture =
-                                      backupSvc.getLastSilentBackupDate();
+                                  _lastSilentBackupFuture = backupSvc
+                                      .getLastSilentBackupDate();
                                 });
                               }
                               if (context.mounted) {
@@ -1231,7 +1311,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             child: ListTile(
               leading: Icon(
                 _hasPinConfigured ? Icons.lock : Icons.lock_open_outlined,
-                color: _hasPinConfigured ? AppTheme.successGreen : AppTheme.alertAmber,
+                color: _hasPinConfigured
+                    ? AppTheme.successGreen
+                    : AppTheme.alertAmber,
               ),
               title: const Text('PIN de Segurança do Aplicativo'),
               subtitle: Text(
@@ -1266,7 +1348,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       SizedBox(width: 8),
                       Text(
                         'Ambiente de Testes e Demonstração',
-                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ],
                   ),
@@ -1275,7 +1360,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     'Gere contatos, visitas, estudos e compromissos fictícios para demonstrar o aplicativo ou zerar todos os dados locais.',
                     style: TextStyle(
                       fontSize: 13,
-                      color: isDark ? const Color(0xFFCBD5E1) : AppTheme.textMuted,
+                      color: isDark
+                          ? const Color(0xFFCBD5E1)
+                          : AppTheme.textMuted,
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -1287,7 +1374,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF7C3AED),
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
                         ),
                         icon: const Icon(Icons.add_chart, size: 18),
                         label: const Text(
@@ -1300,7 +1390,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                content: Text('Dados de demonstração gerados com sucesso!'),
+                                content: Text(
+                                  'Dados de demonstração gerados com sucesso!',
+                                ),
                               ),
                             );
                           }
@@ -1310,7 +1402,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         style: OutlinedButton.styleFrom(
                           foregroundColor: const Color(0xFFD97706),
                           side: const BorderSide(color: Color(0xFFD97706)),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
                         ),
                         icon: const Icon(Icons.delete_sweep_outlined, size: 18),
                         label: const Text(
@@ -1319,7 +1414,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                         onPressed: () async {
                           final repo = ref.read(repositoryProvider);
-                          final count = await DemoDataGenerator.clearDemoData(repo);
+                          final count = await DemoDataGenerator.clearDemoData(
+                            repo,
+                          );
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
@@ -1337,9 +1434,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppTheme.alertRed,
                           side: const BorderSide(color: AppTheme.alertRed),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
                         ),
-                        icon: const Icon(Icons.delete_forever_outlined, size: 18),
+                        icon: const Icon(
+                          Icons.delete_forever_outlined,
+                          size: 18,
+                        ),
                         label: const Text(
                           'Zerar Banco Local',
                           style: TextStyle(fontWeight: FontWeight.bold),
@@ -1374,7 +1477,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text('Banco de dados local zerado com sucesso!'),
+                                  content: Text(
+                                    'Banco de dados local zerado com sucesso!',
+                                  ),
                                 ),
                               );
                             }
@@ -1527,7 +1632,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     case UpdateCheckStatus.updateAvailable:
                       cardColor = const Color(0xFF2563EB);
                       cardIcon = Icons.download_for_offline_rounded;
-                      cardTitle = 'Nova Versão Disponível: v${_checkedUpdateInfo!.latestVersion}';
+                      cardTitle =
+                          'Nova Versão Disponível: v${_checkedUpdateInfo!.latestVersion}';
                       break;
                     case UpdateCheckStatus.upToDate:
                       cardColor = const Color(0xFF16A34A);
@@ -1561,16 +1667,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       children: [
                         Row(
                           children: [
-                            Icon(
-                              cardIcon,
-                              color: cardColor,
-                              size: 20,
-                            ),
+                            Icon(cardIcon, color: cardColor, size: 20),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 cardTitle,
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
                               ),
                             ),
                           ],
@@ -1579,7 +1684,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           const SizedBox(height: 6),
                           Text(
                             'Lançamento: ${_checkedUpdateInfo!.releaseDate} • ${_checkedUpdateInfo!.formattedSize}',
-                            style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.textMuted,
+                            ),
                           ),
                           const SizedBox(height: 8),
                           Text(
@@ -1594,7 +1702,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               backgroundColor: const Color(0xFF2563EB),
                               foregroundColor: Colors.white,
                             ),
-                            icon: const Icon(Icons.install_mobile_rounded, size: 18),
+                            icon: const Icon(
+                              Icons.install_mobile_rounded,
+                              size: 18,
+                            ),
                             label: const Text('Atualizar Agora'),
                             onPressed: () {
                               ref
@@ -1606,7 +1717,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           const SizedBox(height: 6),
                           Text(
                             _checkedUpdateInfo!.releaseNotes,
-                            style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.textMuted,
+                            ),
                           ),
                         ],
                       ],
@@ -1641,9 +1755,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.refresh, size: 18),
-                label: Text(_isCheckingUpdate
-                    ? 'Verificando atualizações...'
-                    : 'Verificar Atualizações Agora'),
+                label: Text(
+                  _isCheckingUpdate
+                      ? 'Verificando atualizações...'
+                      : 'Verificar Atualizações Agora',
+                ),
                 onPressed: _isCheckingUpdate
                     ? null
                     : () async {
@@ -1733,7 +1849,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.cloud_off, color: Colors.amber.shade800, size: 20),
+                    Icon(
+                      Icons.cloud_off,
+                      color: Colors.amber.shade800,
+                      size: 20,
+                    ),
                     const SizedBox(width: 8),
                     const Expanded(
                       child: Text(
@@ -1751,7 +1871,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 Icon(
                   isConnected
                       ? Icons.check_circle
-                      : (isSupabaseReady ? Icons.error_outline : Icons.cloud_off),
+                      : (isSupabaseReady
+                            ? Icons.error_outline
+                            : Icons.cloud_off),
                   color: isConnected
                       ? Colors.green
                       : (isSupabaseReady ? Colors.orange : Colors.red),
@@ -1762,8 +1884,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   isConnected
                       ? 'Status: Conectado'
                       : (isSupabaseReady
-                          ? 'Status: Não conectado'
-                          : 'Status: Indisponível (offline)'),
+                            ? 'Status: Não conectado'
+                            : 'Status: Indisponível (offline)'),
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     color: isConnected
@@ -1798,7 +1920,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         children: [
                           Row(
                             children: [
-                              Icon(Icons.lock, color: Colors.green.shade700, size: 18),
+                              Icon(
+                                Icons.lock,
+                                color: Colors.green.shade700,
+                                size: 18,
+                              ),
                               const SizedBox(width: 8),
                               const Expanded(
                                 child: Text(
@@ -1811,7 +1937,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                 ),
                               ),
                               Chip(
-                                label: const Text('Protegido', style: TextStyle(fontSize: 10, color: Colors.white)),
+                                label: const Text(
+                                  'Protegido',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.white,
+                                  ),
+                                ),
                                 backgroundColor: Colors.green.shade700,
                                 visualDensity: VisualDensity.compact,
                                 padding: EdgeInsets.zero,
@@ -1830,20 +1962,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             children: [
                               ElevatedButton.icon(
                                 onPressed: () async {
-                                  final updated = await E2eeSetupDialog.show(context, userId: effectiveUserId);
+                                  final updated = await E2eeSetupDialog.show(
+                                    context,
+                                    userId: effectiveUserId,
+                                  );
                                   if (updated == true && mounted) {
                                     _e2eeFuture = null;
                                     setState(() {});
                                   }
                                 },
                                 icon: const Icon(Icons.sync_lock, size: 16),
-                                label: const Text('Configurar / Restaurar Chave (24 Palavras)'),
+                                label: const Text(
+                                  'Configurar / Restaurar Chave (24 Palavras)',
+                                ),
                               ),
                               OutlinedButton.icon(
                                 onPressed: () async {
-                                  final isInstalled = await ref.read(e2eeServiceProvider).isKeyInstalled(effectiveUserId);
+                                  final isInstalled = await ref
+                                      .read(e2eeServiceProvider)
+                                      .isKeyInstalled(effectiveUserId);
                                   final hasVault = currentUser != null
-                                      ? await ref.read(e2eeServiceProvider).hasRemoteVault(currentUser.id)
+                                      ? await ref
+                                            .read(e2eeServiceProvider)
+                                            .hasRemoteVault(currentUser.id)
                                       : false;
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
@@ -1852,10 +1993,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                           hasVault
                                               ? 'Cofre remoto E2EE ativo e sincronizado com este dispositivo.'
                                               : (isInstalled
-                                                  ? 'Chave E2EE instalada localmente neste dispositivo.'
-                                                  : 'Chave E2EE não encontrada.'),
+                                                    ? 'Chave E2EE instalada localmente neste dispositivo.'
+                                                    : 'Chave E2EE não encontrada.'),
                                         ),
-                                        backgroundColor: isInstalled ? Colors.green : Colors.orange,
+                                        backgroundColor: isInstalled
+                                            ? Colors.green
+                                            : Colors.orange,
                                       ),
                                     );
                                   }
@@ -1881,7 +2024,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         children: [
                           Row(
                             children: [
-                              Icon(Icons.shield_outlined, color: Colors.amber.shade900, size: 20),
+                              Icon(
+                                Icons.shield_outlined,
+                                color: Colors.amber.shade900,
+                                size: 20,
+                              ),
                               const SizedBox(width: 8),
                               const Expanded(
                                 child: Text(
@@ -1903,14 +2050,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           const SizedBox(height: 8),
                           ElevatedButton.icon(
                             onPressed: () async {
-                              final updated = await E2eeSetupDialog.show(context, userId: effectiveUserId);
+                              final updated = await E2eeSetupDialog.show(
+                                context,
+                                userId: effectiveUserId,
+                              );
                               if (updated == true && mounted) {
                                 _e2eeFuture = null;
                                 setState(() {});
                               }
                             },
                             icon: const Icon(Icons.security, size: 16),
-                            label: const Text('Configurar / Restaurar Chave de 24 Palavras'),
+                            label: const Text(
+                              'Configurar / Restaurar Chave de 24 Palavras',
+                            ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.amber.shade800,
                               foregroundColor: Colors.white,
@@ -1938,7 +2090,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         AppLogger.error('Falha ao inicializar Supabase', e, st);
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Erro ao conectar Supabase: $e')),
+                            SnackBar(
+                              content: Text('Erro ao conectar Supabase: $e'),
+                            ),
                           );
                         }
                       }
@@ -1951,8 +2105,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ? null
                       : () async {
                           try {
-                            final result =
-                                await ref.read(supabaseSyncServiceProvider).sync();
+                            final result = await ref
+                                .read(supabaseSyncServiceProvider)
+                                .sync();
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(content: Text(result.message)),
@@ -1960,10 +2115,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             }
                           } catch (e, st) {
                             AppLogger.error(
-                                'Erro ao sincronizar via configurações', e, st);
+                              'Erro ao sincronizar via configurações',
+                              e,
+                              st,
+                            );
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Erro ao sincronizar: $e')),
+                                SnackBar(
+                                  content: Text('Erro ao sincronizar: $e'),
+                                ),
                               );
                             }
                           }
@@ -1978,12 +2138,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         await Supabase.instance.client.auth.signOut();
                         setState(() {});
                       } catch (e, st) {
-                        AppLogger.warning('Falha ao fazer logout do Supabase', e, st);
+                        AppLogger.warning(
+                          'Falha ao fazer logout do Supabase',
+                          e,
+                          st,
+                        );
                       }
                     },
                     icon: const Icon(Icons.logout, color: Colors.red, size: 18),
-                    label: const Text('Sair da Conta (Logout)',
-                        style: TextStyle(color: Colors.red)),
+                    label: const Text(
+                      'Sair da Conta (Logout)',
+                      style: TextStyle(color: Colors.red),
+                    ),
                   )
                 else
                   ElevatedButton.icon(
@@ -1999,22 +2165,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                     try {
                                       if (Supabase.instance.isInitialized) {
                                         currentUserId = Supabase
-                                            .instance.client.auth.currentUser?.id;
+                                            .instance
+                                            .client
+                                            .auth
+                                            .currentUser
+                                            ?.id;
                                       }
                                     } catch (_) {}
                                     if (currentUserId != null &&
                                         currentUserId.isNotEmpty) {
-                                      final prep = await SyncOwnerGuard
-                                          .prepareWorkspaceForAuthenticatedAccount(
-                                        db: db,
-                                        authenticatedUserId: currentUserId,
-                                      );
+                                      final prep =
+                                          await SyncOwnerGuard.prepareWorkspaceForAuthenticatedAccount(
+                                            db: db,
+                                            authenticatedUserId: currentUserId,
+                                          );
                                       if (prep.status ==
                                               AccountWorkspacePreparationStatus
                                                   .requiresConfirmationDueToUnsyncedData &&
                                           authContext.mounted) {
-                                        final confirmed =
-                                            await showDialog<bool>(
+                                        final confirmed = await showDialog<bool>(
                                           context: authContext,
                                           barrierDismissible: false,
                                           builder: (dialogCtx) => AlertDialog(
@@ -2027,15 +2196,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                             ),
                                             actions: [
                                               TextButton(
-                                                onPressed: () => Navigator.of(
-                                                  dialogCtx,
-                                                ).pop(false),
+                                                onPressed: () =>
+                                                    Navigator.of(dialogCtx)
+                                                        .pop(false),
                                                 child: const Text('Cancelar'),
                                               ),
                                               FilledButton(
-                                                onPressed: () => Navigator.of(
-                                                  dialogCtx,
-                                                ).pop(true),
+                                                onPressed: () =>
+                                                    Navigator.of(dialogCtx)
+                                                        .pop(true),
                                                 child: const Text(
                                                   'Limpar Local e Entrar',
                                                 ),
@@ -2045,23 +2214,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                         );
                                         if (confirmed != true) {
                                           try {
-                                            await Supabase
-                                                .instance.client.auth
+                                            await Supabase.instance.client.auth
                                                 .signOut(
-                                              scope: SignOutScope.local,
-                                            );
+                                                  scope: SignOutScope.local,
+                                                );
                                           } catch (_) {}
                                           return;
                                         }
-                                        await SyncOwnerGuard
-                                            .prepareWorkspaceForAuthenticatedAccount(
+                                        await SyncOwnerGuard.prepareWorkspaceForAuthenticatedAccount(
                                           db: db,
                                           authenticatedUserId: currentUserId,
                                           discardUnsyncedIfSwitching: true,
                                         );
                                       }
                                     }
-                                    if (!mounted || !authContext.mounted) return;
+                                    if (!mounted || !authContext.mounted)
+                                      return;
                                     Navigator.of(authContext).pop();
                                     setState(() {});
                                   },
@@ -2191,9 +2359,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       : () async {
                           final validationError =
                               SupabaseSyncService.validateSupabaseCredentials(
-                            urlCtrl.text,
-                            keyCtrl.text,
-                          );
+                                urlCtrl.text,
+                                keyCtrl.text,
+                              );
                           if (validationError != null) {
                             setDlgState(() => errorText = validationError);
                             return;
@@ -2254,42 +2422,90 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     required String smtpSecurity,
   }) async {
     final now = Value(DateTime.now());
-    await db.into(db.appKvStore).insertOnConflictUpdate(
-      AppKvStoreCompanion.insert(key: 'jw_imap_email', value: email, updatedAt: now),
+    await db
+        .into(db.appKvStore)
+        .insertOnConflictUpdate(
+          AppKvStoreCompanion.insert(
+            key: 'jw_imap_email',
+            value: email,
+            updatedAt: now,
+          ),
+        );
+    await const FlutterSecureStorage().write(
+      key: 'jw_imap_password',
+      value: pass,
     );
-    await const FlutterSecureStorage().write(key: 'jw_imap_password', value: pass);
-    await (db.delete(db.appKvStore)..where((t) => t.key.equals('jw_imap_password'))).go();
-    await db.into(db.appKvStore).insertOnConflictUpdate(
-      AppKvStoreCompanion.insert(key: 'jw_imap_host', value: imapHost, updatedAt: now),
-    );
-    await db.into(db.appKvStore).insertOnConflictUpdate(
-      AppKvStoreCompanion.insert(key: 'jw_imap_port', value: imapPort.toString(), updatedAt: now),
-    );
-    await db.into(db.appKvStore).insertOnConflictUpdate(
-      AppKvStoreCompanion.insert(key: 'jw_smtp_host', value: smtpHost, updatedAt: now),
-    );
-    await db.into(db.appKvStore).insertOnConflictUpdate(
-      AppKvStoreCompanion.insert(key: 'jw_smtp_port', value: smtpPort.toString(), updatedAt: now),
-    );
-    await db.into(db.appKvStore).insertOnConflictUpdate(
-      AppKvStoreCompanion.insert(key: 'jw_smtp_security', value: smtpSecurity, updatedAt: now),
-    );
+    await (db.delete(
+      db.appKvStore,
+    )..where((t) => t.key.equals('jw_imap_password'))).go();
+    await db
+        .into(db.appKvStore)
+        .insertOnConflictUpdate(
+          AppKvStoreCompanion.insert(
+            key: 'jw_imap_host',
+            value: imapHost,
+            updatedAt: now,
+          ),
+        );
+    await db
+        .into(db.appKvStore)
+        .insertOnConflictUpdate(
+          AppKvStoreCompanion.insert(
+            key: 'jw_imap_port',
+            value: imapPort.toString(),
+            updatedAt: now,
+          ),
+        );
+    await db
+        .into(db.appKvStore)
+        .insertOnConflictUpdate(
+          AppKvStoreCompanion.insert(
+            key: 'jw_smtp_host',
+            value: smtpHost,
+            updatedAt: now,
+          ),
+        );
+    await db
+        .into(db.appKvStore)
+        .insertOnConflictUpdate(
+          AppKvStoreCompanion.insert(
+            key: 'jw_smtp_port',
+            value: smtpPort.toString(),
+            updatedAt: now,
+          ),
+        );
+    await db
+        .into(db.appKvStore)
+        .insertOnConflictUpdate(
+          AppKvStoreCompanion.insert(
+            key: 'jw_smtp_security',
+            value: smtpSecurity,
+            updatedAt: now,
+          ),
+        );
   }
 
   Future<void> _testAndSaveJwEmail({bool includeImap = true}) async {
     final email = _jwEmailCtrl.text.trim();
     final pass = _jwPasswordCtrl.text;
-    final imapHost = _jwHostCtrl.text.trim().isNotEmpty ? _jwHostCtrl.text.trim() : 'mail.jw.org';
+    final imapHost = _jwHostCtrl.text.trim().isNotEmpty
+        ? _jwHostCtrl.text.trim()
+        : 'mail.jw.org';
     final imapPort = int.tryParse(_jwPortCtrl.text.trim()) ?? 993;
     final smtpHost = _jwSmtpHostCtrl.text.trim().isNotEmpty
         ? _jwSmtpHostCtrl.text.trim()
         : imapHost;
     final defaultSmtpPort = _jwSmtpSecurity == 'ssl' ? 465 : 587;
-    final smtpPort = int.tryParse(_jwSmtpPortCtrl.text.trim()) ?? defaultSmtpPort;
+    final smtpPort =
+        int.tryParse(_jwSmtpPortCtrl.text.trim()) ?? defaultSmtpPort;
 
     if (email.isEmpty || pass.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Preencha o e-mail e a senha antes de testar a conexão.')),
+        const SnackBar(
+          content: Text(
+            'Preencha o e-mail e a senha antes de testar a conexão.',
+          ),
+        ),
       );
       return;
     }
@@ -2327,9 +2543,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         smtpSecurity: _jwSmtpSecurity,
       );
 
-      await db.into(db.appKvStore).insertOnConflictUpdate(
-        AppKvStoreCompanion.insert(key: 'jw_mail_protocol', value: 'imap', updatedAt: Value(DateTime.now())),
-      );
+      await db
+          .into(db.appKvStore)
+          .insertOnConflictUpdate(
+            AppKvStoreCompanion.insert(
+              key: 'jw_mail_protocol',
+              value: 'imap',
+              updatedAt: Value(DateTime.now()),
+            ),
+          );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -2362,7 +2584,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final email = _exchangeEmailCtrl.text.trim();
     final password = _exchangePasswordCtrl.text;
     if (host.isEmpty || email.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Informe servidor, usuário e senha Exchange.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Informe servidor, usuário e senha Exchange.'),
+        ),
+      );
       return;
     }
     setState(() => _isTestingExchange = true);
@@ -2373,7 +2599,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         deviceId = const Uuid().v4().replaceAll('-', '');
         await storage.write(key: 'jw_eas_device_id', value: deviceId);
       }
-      final session = ExchangeProtocolSession(host: host, username: email, password: password, deviceId: deviceId);
+      final session = ExchangeProtocolSession(
+        host: host,
+        username: email,
+        password: password,
+        deviceId: deviceId,
+      );
       try {
         await session.inboxId();
       } finally {
@@ -2383,26 +2614,49 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final db = ref.read(repositoryProvider).db;
       await db.transaction(() async {
         final now = Value(DateTime.now());
-        for (final entry in {'jw_eas_host': host.toLowerCase(), 'jw_eas_email': email, 'jw_mail_protocol': 'exchange'}.entries) {
-          await db.into(db.appKvStore).insertOnConflictUpdate(
-            AppKvStoreCompanion.insert(key: entry.key, value: entry.value, updatedAt: now));
+        for (final entry in {
+          'jw_eas_host': host.toLowerCase(),
+          'jw_eas_email': email,
+          'jw_mail_protocol': 'exchange',
+        }.entries) {
+          await db
+              .into(db.appKvStore)
+              .insertOnConflictUpdate(
+                AppKvStoreCompanion.insert(
+                  key: entry.key,
+                  value: entry.value,
+                  updatedAt: now,
+                ),
+              );
         }
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Conexão Exchange verificada e salva. As mensagens ainda não foram baixadas: abra Inbox & JW Mail e toque em Sincronizar. Leitura experimental.'),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 10),
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Conexão Exchange verificada e salva. As mensagens ainda não foram baixadas: abra Inbox & JW Mail e toque em Sincronizar. Leitura experimental.',
+            ),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 10),
+          ),
+        );
       }
     } catch (e) {
-      String message = 'Não foi possível verificar o Exchange. Confira servidor, autenticação e rede.';
+      String message =
+          'Não foi possível verificar o Exchange. Confira servidor, autenticação e rede.';
       if (e is ExchangeException) message = e.message;
       if (e is eas.EasAuthException) message = 'Autenticação Exchange recusada. O provedor pode exigir OAuth ou outro método.';
-      if (e is eas.EasForbiddenException) message = 'O servidor negou acesso para este dispositivo ou conta.';
+      if (e is eas.EasForbiddenException)
+        message = 'O servidor negou acesso para este dispositivo ou conta.';
       if (e is eas.EasCommandException && e.requiresProvisioning) message = 'O servidor exige políticas de segurança que o app ainda não aplica.';
       if (e is eas.EasRemoteWipeException) message = 'O servidor solicita ação de segurança; nada foi apagado ou confirmado pelo aplicativo.';
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), duration: const Duration(seconds: 8)));
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            duration: const Duration(seconds: 8),
+          ),
+        );
     } finally {
       if (mounted) setState(() => _isTestingExchange = false);
     }
@@ -2410,27 +2664,66 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Widget _buildExchangeConfigCard() => Card(
     child: ExpansionTile(
-      title: const Text('Exchange ActiveSync (experimental)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-      children: [Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Somente leitura da INBOX, por senha (Basic) e HTTPS. Não suporta OAuth, políticas de dispositivo, envio ou anexos. Mensagens podem ser parciais; mantenha o correio oficial e seu backup.', style: TextStyle(fontSize: 12)),
-          const SizedBox(height: 12),
-          TextField(controller: _exchangeEmailCtrl, keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(labelText: 'Usuário Exchange', border: OutlineInputBorder())),
-          const SizedBox(height: 12),
-          TextField(controller: _exchangePasswordCtrl, obscureText: true,
-            decoration: const InputDecoration(labelText: 'Senha Exchange', border: OutlineInputBorder())),
-          const SizedBox(height: 12),
-          TextField(controller: _exchangeHostCtrl, keyboardType: TextInputType.url,
-            decoration: const InputDecoration(labelText: 'Servidor Exchange (somente nome)', hintText: 'eas.exemplo.org', border: OutlineInputBorder())),
-          const SizedBox(height: 8),
-          const Text('Use somente o servidor oficial autorizado pelo provedor; sua senha será enviada a esse servidor via HTTPS.', style: TextStyle(fontSize: 12)),
-          const SizedBox(height: 12),
-          ElevatedButton(onPressed: _isTestingExchange ? null : _testExchange,
-            child: Text(_isTestingExchange ? 'Testando Exchange...' : 'Testar Exchange e salvar')),
-        ]),
-      )],
+      title: const Text(
+        'Exchange ActiveSync (experimental)',
+        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+      ),
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Somente leitura da INBOX, por senha (Basic) e HTTPS. Não suporta OAuth, políticas de dispositivo, envio ou anexos. Mensagens podem ser parciais; mantenha o correio oficial e seu backup.',
+                style: TextStyle(fontSize: 12),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _exchangeEmailCtrl,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(
+                  labelText: 'Usuário Exchange',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _exchangePasswordCtrl,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'Senha Exchange',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _exchangeHostCtrl,
+                keyboardType: TextInputType.url,
+                decoration: const InputDecoration(
+                  labelText: 'Servidor Exchange (somente nome)',
+                  hintText: 'eas.exemplo.org',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Use somente o servidor oficial autorizado pelo provedor; sua senha será enviada a esse servidor via HTTPS.',
+                style: TextStyle(fontSize: 12),
+              ),
+              const SizedBox(height: 12),
+              ElevatedButton(
+                onPressed: _isTestingExchange ? null : _testExchange,
+                child: Text(
+                  _isTestingExchange
+                      ? 'Testando Exchange...'
+                      : 'Testar Exchange e salvar',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     ),
   );
 
@@ -2443,7 +2736,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           children: [
             const Row(
               children: [
-                Icon(Icons.mark_email_unread_outlined, color: AppTheme.primaryBlue, size: 22),
+                Icon(
+                  Icons.mark_email_unread_outlined,
+                  color: AppTheme.primaryBlue,
+                  size: 22,
+                ),
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -2539,7 +2836,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             const SizedBox(height: 10),
             Row(
               children: [
-                const Text('Segurança SMTP:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                const Text(
+                  'Segurança SMTP:',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                ),
                 const SizedBox(width: 10),
                 ChoiceChip(
                   label: const Text('STARTTLS (587)'),
@@ -2547,7 +2847,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   onSelected: (_) {
                     setState(() {
                       _jwSmtpSecurity = 'starttls';
-                      if (_jwSmtpPortCtrl.text.trim() == '465' || _jwSmtpPortCtrl.text.trim().isEmpty) {
+                      if (_jwSmtpPortCtrl.text.trim() == '465' ||
+                          _jwSmtpPortCtrl.text.trim().isEmpty) {
                         _jwSmtpPortCtrl.text = '587';
                       }
                     });
@@ -2560,7 +2861,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   onSelected: (_) {
                     setState(() {
                       _jwSmtpSecurity = 'ssl';
-                      if (_jwSmtpPortCtrl.text.trim() == '587' || _jwSmtpPortCtrl.text.trim().isEmpty) {
+                      if (_jwSmtpPortCtrl.text.trim() == '587' ||
+                          _jwSmtpPortCtrl.text.trim().isEmpty) {
                         _jwSmtpPortCtrl.text = '465';
                       }
                     });
@@ -2577,25 +2879,45 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.primaryBlue,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
                   ),
                   icon: _isTestingJwEmail
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
                       : const Icon(Icons.save_outlined, size: 18),
-                  label: Text(_isTestingJwEmail ? 'Testando Conexão...' : 'Testar IMAP/SMTP e Salvar'),
-                  onPressed: _isTestingJwEmail ? null : () => _testAndSaveJwEmail(includeImap: true),
+                  label: Text(
+                    _isTestingJwEmail
+                        ? 'Testando Conexão...'
+                        : 'Testar IMAP/SMTP e Salvar',
+                  ),
+                  onPressed: _isTestingJwEmail
+                      ? null
+                      : () => _testAndSaveJwEmail(includeImap: true),
                 ),
                 OutlinedButton.icon(
                   icon: const Icon(Icons.send_rounded, size: 16),
                   label: const Text('Testar Só SMTP'),
-                  onPressed: _isTestingJwEmail ? null : () => _testAndSaveJwEmail(includeImap: false),
+                  onPressed: _isTestingJwEmail
+                      ? null
+                      : () => _testAndSaveJwEmail(includeImap: false),
                 ),
                 OutlinedButton.icon(
                   icon: const Icon(Icons.clear, size: 16),
                   label: const Text('Limpar'),
                   onPressed: () async {
                     final db = ref.read(repositoryProvider).db;
-                    await const FlutterSecureStorage().delete(key: 'jw_imap_password');
+                    await const FlutterSecureStorage().delete(
+                      key: 'jw_imap_password',
+                    );
                     for (final k in const [
                       'jw_imap_email',
                       'jw_imap_password',
@@ -2605,7 +2927,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       'jw_smtp_port',
                       'jw_smtp_security',
                     ]) {
-                      await (db.delete(db.appKvStore)..where((t) => t.key.equals(k))).go();
+                      await (db.delete(
+                        db.appKvStore,
+                      )..where((t) => t.key.equals(k))).go();
                     }
                     setState(() {
                       _jwEmailCtrl.clear();
@@ -2618,7 +2942,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     });
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Configurações removidas.')),
+                        const SnackBar(
+                          content: Text('Configurações removidas.'),
+                        ),
                       );
                     }
                   },
@@ -2792,8 +3118,9 @@ class _SyncQueueManagementSheetState
     if (!mounted) return;
     setState(() => _loading = true);
     try {
-      final list =
-          await ref.read(repositoryProvider).getUnresolvedSyncOperations();
+      final list = await ref
+          .read(repositoryProvider)
+          .getUnresolvedSyncOperations();
       if (!mounted) return;
       setState(() {
         _items = list;
@@ -2865,7 +3192,11 @@ class _SyncQueueManagementSheetState
       }
       await _loadQueue();
     } catch (e, st) {
-      AppLogger.error('Erro ao resolver conflito mantendo local ${op.id}', e, st);
+      AppLogger.error(
+        'Erro ao resolver conflito mantendo local ${op.id}',
+        e,
+        st,
+      );
       if (mounted) {
         setState(() => _statusMessage = 'Erro ao resolver conflito: $e');
       }
@@ -2913,7 +3244,14 @@ class _SyncQueueManagementSheetState
       }
       if (diffs.isEmpty && raw['_remote'] is Map) {
         final remote = Map<String, dynamic>.from(raw['_remote'] as Map);
-        const ignored = {'_remote', '_conflicts', '_base', 'id', 'user_id', 'userId'};
+        const ignored = {
+          '_remote',
+          '_conflicts',
+          '_base',
+          'id',
+          'user_id',
+          'userId',
+        };
         for (final key in remote.keys) {
           if (ignored.contains(key)) continue;
           final rVal = remote[key]?.toString() ?? '';
@@ -2931,12 +3269,15 @@ class _SyncQueueManagementSheetState
 
   @override
   Widget build(BuildContext context) {
-    final pendingCount = _items.where((i) => i.status == 'pending' || i.status == 'in_progress').length;
+    final pendingCount = _items
+        .where((i) => i.status == 'pending' || i.status == 'in_progress')
+        .length;
     final failedCount = _items.where((i) => i.status == 'failed').length;
     final conflictCount = _items.where((i) => i.status == 'conflict').length;
     final filtered = _items.where((i) {
       if (_filter == 'all') return true;
-      if (_filter == 'pending') return i.status == 'pending' || i.status == 'in_progress';
+      if (_filter == 'pending')
+        return i.status == 'pending' || i.status == 'in_progress';
       return i.status == _filter;
     }).toList();
 
@@ -2967,7 +3308,10 @@ class _SyncQueueManagementSheetState
                   const Expanded(
                     child: Text(
                       'Fila de Sincronização (Sync Queue)',
-                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                   IconButton(
@@ -2981,7 +3325,10 @@ class _SyncQueueManagementSheetState
                 const SizedBox(height: 4),
                 Text(
                   _statusMessage!,
-                  style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic,
+                  ),
                 ),
               ],
               const SizedBox(height: 8),
@@ -3054,184 +3401,190 @@ class _SyncQueueManagementSheetState
                 child: _loading
                     ? const Center(child: CircularProgressIndicator())
                     : filtered.isEmpty
-                        ? const Center(
-                            child: Text(
-                              'Nenhum item pendente, com falha ou conflito neste filtro.',
-                              textAlign: TextAlign.center,
-                            ),
-                          )
-                        : ListView.builder(
-                            controller: scrollController,
-                            itemCount: filtered.length,
-                            itemBuilder: (context, index) {
-                              final op = filtered[index];
-                              final isConflict = op.status == 'conflict';
-                              final isFailed = op.status == 'failed';
-                              final badgeColor = isConflict
-                                  ? AppTheme.alertAmber
-                                  : isFailed
-                                      ? AppTheme.alertRed
-                                      : AppTheme.primaryBlue;
-                              final badgeLabel = isConflict
-                                  ? 'CONFLITO'
-                                  : isFailed
-                                      ? 'FALHA'
-                                      : 'PENDENTE';
-                              final diffs = isConflict
-                                  ? _extractConflictFields(op)
-                                  : const <Map<String, String>>[];
+                    ? const Center(
+                        child: Text(
+                          'Nenhum item pendente, com falha ou conflito neste filtro.',
+                          textAlign: TextAlign.center,
+                        ),
+                      )
+                    : ListView.builder(
+                        controller: scrollController,
+                        itemCount: filtered.length,
+                        itemBuilder: (context, index) {
+                          final op = filtered[index];
+                          final isConflict = op.status == 'conflict';
+                          final isFailed = op.status == 'failed';
+                          final badgeColor = isConflict
+                              ? AppTheme.alertAmber
+                              : isFailed
+                              ? AppTheme.alertRed
+                              : AppTheme.primaryBlue;
+                          final badgeLabel = isConflict
+                              ? 'CONFLITO'
+                              : isFailed
+                              ? 'FALHA'
+                              : 'PENDENTE';
+                          final diffs = isConflict
+                              ? _extractConflictFields(op)
+                              : const <Map<String, String>>[];
 
-                              return Card(
-                                margin: const EdgeInsets.only(bottom: 10),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(12),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
                                     children: [
-                                      Row(
-                                        children: [
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 8,
-                                              vertical: 3,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: badgeColor.withValues(alpha: 0.16),
-                                              borderRadius: BorderRadius.circular(6),
-                                            ),
-                                            child: Text(
-                                              badgeLabel,
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.bold,
-                                                color: isConflict
-                                                    ? Colors.orange.shade900
-                                                    : badgeColor,
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Text(
-                                              '${op.entityType} • ${op.operation}',
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 13,
-                                              ),
-                                            ),
-                                          ),
-                                          Text(
-                                            'Tentativas: ${op.attempts}',
-                                            style: const TextStyle(fontSize: 11),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        'ID: ${op.entityId}',
-                                        style: const TextStyle(
-                                          fontSize: 11,
-                                          color: Colors.grey,
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 3,
                                         ),
-                                      ),
-                                      if (op.lastError != null &&
-                                          op.lastError!.trim().isNotEmpty) ...[
-                                        const SizedBox(height: 6),
-                                        Text(
-                                          op.lastError!,
+                                        decoration: BoxDecoration(
+                                          color: badgeColor.withValues(
+                                            alpha: 0.16,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            6,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          badgeLabel,
                                           style: TextStyle(
-                                            fontSize: 12,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
                                             color: isConflict
                                                 ? Colors.orange.shade900
-                                                : AppTheme.alertRed,
+                                                : badgeColor,
                                           ),
                                         ),
-                                      ],
-                                      if (diffs.isNotEmpty) ...[
-                                        const SizedBox(height: 8),
-                                        Container(
-                                          padding: const EdgeInsets.all(8),
-                                          decoration: BoxDecoration(
-                                            color: Colors.amber.withValues(alpha: 0.1),
-                                            borderRadius: BorderRadius.circular(6),
-                                          ),
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              const Text(
-                                                'Campos divergentes:',
-                                                style: TextStyle(
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 4),
-                                              for (final d in diffs.take(6))
-                                                Padding(
-                                                  padding: const EdgeInsets.only(
-                                                    bottom: 2,
-                                                  ),
-                                                  child: Text(
-                                                    '• ${d['field']}: Local="${d['local']}" vs Remoto="${d['remote']}"',
-                                                    style: const TextStyle(
-                                                      fontSize: 11,
-                                                    ),
-                                                  ),
-                                                ),
-                                            ],
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          '${op.entityType} • ${op.operation}',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13,
                                           ),
                                         ),
-                                      ],
-                                      const SizedBox(height: 8),
-                                      Wrap(
-                                        spacing: 8,
-                                        runSpacing: 6,
-                                        children: [
-                                          if (isConflict) ...[
-                                            ElevatedButton.icon(
-                                              onPressed: _busy
-                                                  ? null
-                                                  : () => _resolveKeepLocal(op),
-                                              icon: const Icon(
-                                                Icons.upload,
-                                                size: 16,
-                                              ),
-                                              label: const Text('Manter Local'),
-                                            ),
-                                            OutlinedButton.icon(
-                                              onPressed: _busy
-                                                  ? null
-                                                  : () => _resolveAcceptRemote(op),
-                                              icon: const Icon(
-                                                Icons.download,
-                                                size: 16,
-                                              ),
-                                              label: const Text('Aceitar Remoto'),
-                                            ),
-                                          ] else
-                                            OutlinedButton.icon(
-                                              onPressed: _busy
-                                                  ? null
-                                                  : () => _retryOne(op),
-                                              icon: const Icon(
-                                                Icons.refresh,
-                                                size: 16,
-                                              ),
-                                              label: Text(
-                                                isFailed
-                                                    ? 'Reprocessar'
-                                                    : 'Tentar Enviar Agora',
-                                              ),
-                                            ),
-                                        ],
+                                      ),
+                                      Text(
+                                        'Tentativas: ${op.attempts}',
+                                        style: const TextStyle(fontSize: 11),
                                       ),
                                     ],
                                   ),
-                                ),
-                              );
-                            },
-                          ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'ID: ${op.entityId}',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                  if (op.lastError != null &&
+                                      op.lastError!.trim().isNotEmpty) ...[
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      op.lastError!,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: isConflict
+                                            ? Colors.orange.shade900
+                                            : AppTheme.alertRed,
+                                      ),
+                                    ),
+                                  ],
+                                  if (diffs.isNotEmpty) ...[
+                                    const SizedBox(height: 8),
+                                    Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: Colors.amber.withValues(
+                                          alpha: 0.1,
+                                        ),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          const Text(
+                                            'Campos divergentes:',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          for (final d in diffs.take(6))
+                                            Padding(
+                                              padding: const EdgeInsets.only(
+                                                bottom: 2,
+                                              ),
+                                              child: Text(
+                                                '• ${d['field']}: Local="${d['local']}" vs Remoto="${d['remote']}"',
+                                                style: const TextStyle(
+                                                  fontSize: 11,
+                                                ),
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                  const SizedBox(height: 8),
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 6,
+                                    children: [
+                                      if (isConflict) ...[
+                                        ElevatedButton.icon(
+                                          onPressed: _busy
+                                              ? null
+                                              : () => _resolveKeepLocal(op),
+                                          icon: const Icon(
+                                            Icons.upload,
+                                            size: 16,
+                                          ),
+                                          label: const Text('Manter Local'),
+                                        ),
+                                        OutlinedButton.icon(
+                                          onPressed: _busy
+                                              ? null
+                                              : () => _resolveAcceptRemote(op),
+                                          icon: const Icon(
+                                            Icons.download,
+                                            size: 16,
+                                          ),
+                                          label: const Text('Aceitar Remoto'),
+                                        ),
+                                      ] else
+                                        OutlinedButton.icon(
+                                          onPressed: _busy
+                                              ? null
+                                              : () => _retryOne(op),
+                                          icon: const Icon(
+                                            Icons.refresh,
+                                            size: 16,
+                                          ),
+                                          label: Text(
+                                            isFailed
+                                                ? 'Reprocessar'
+                                                : 'Tentar Enviar Agora',
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
               ),
             ],
           ),
@@ -3326,7 +3679,9 @@ class _ExportBackupDialogState extends State<_ExportBackupDialog> {
                 Navigator.pop(c);
                 messenger.showSnackBar(
                   const SnackBar(
-                    content: Text('Backup copiado para a área de transferência!'),
+                    content: Text(
+                      'Backup copiado para a área de transferência!',
+                    ),
                   ),
                 );
               },
@@ -3358,7 +3713,9 @@ class _ExportBackupDialogState extends State<_ExportBackupDialog> {
             'Defina uma senha forte. O arquivo será criptografado com AES-256-GCM (PBKDF2 100k) e só poderá ser restaurado com esta senha.',
             style: TextStyle(
               fontSize: 13,
-              color: isDarkDialog ? const Color(0xFFCBD5E1) : AppTheme.textMuted,
+              color: isDarkDialog
+                  ? const Color(0xFFCBD5E1)
+                  : AppTheme.textMuted,
             ),
           ),
           const SizedBox(height: 12),
@@ -3468,8 +3825,12 @@ class _RestoreBackupDialogState extends State<_RestoreBackupDialog> {
                 Text('• Estudos bíblicos: ${preview.studiesToAdd}'),
                 Text('• Sessões de estudo: ${preview.sessionsToAdd}'),
                 Text('• Compromissos: ${preview.appointmentsToAdd}'),
-                Text('• Idiomas / Ticuna: ${preview.appLanguagesToAdd + preview.ticunaWordsToAdd + preview.ticunaPhrasesToAdd}'),
-                Text('• Documentos de conhecimento: ${preview.knowledgeDocumentsToAdd}'),
+                Text(
+                  '• Idiomas / Ticuna: ${preview.appLanguagesToAdd + preview.ticunaWordsToAdd + preview.ticunaPhrasesToAdd}',
+                ),
+                Text(
+                  '• Documentos de conhecimento: ${preview.knowledgeDocumentsToAdd}',
+                ),
                 if (!preview.isIntegral) ...[
                   const SizedBox(height: 8),
                   Text(
@@ -3560,7 +3921,8 @@ class _RestoreBackupDialogState extends State<_RestoreBackupDialog> {
               CheckboxListTile(
                 contentPadding: EdgeInsets.zero,
                 value: _allowLegacyV1,
-                onChanged: (val) => setState(() => _allowLegacyV1 = val ?? false),
+                onChanged: (val) =>
+                    setState(() => _allowLegacyV1 = val ?? false),
                 title: const Text(
                   'Permitir backup legado (v1, criptografia antiga sem salt)',
                   style: TextStyle(fontSize: 12),

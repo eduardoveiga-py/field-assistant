@@ -11,18 +11,23 @@ class RecoveryCrypto {
 
   /// Vinte e quatro palavras BIP39 em português, criadas com Random.secure.
   static String createPhrase() => Mnemonic.generate(
-        Language.portuguese,
-        length: MnemonicLength.words24,
-      ).sentence;
+    Language.portuguese,
+    length: MnemonicLength.words24,
+  ).sentence;
 
   /// Apenas frases de 24 palavras geradas no formato definido aqui são aceitas.
   /// Não recebe senha escolhida pelo usuário: usa 256 bits de entropia aleatória.
   static Future<SecretKey> keyFromPhrase(String phrase) async {
     final words = phrase.trim().split(RegExp(r'\s+'));
-    if (words.length != 24) throw const FormatException('Frase de recuperação inválida.');
+    if (words.length != 24)
+      throw const FormatException('Frase de recuperação inválida.');
     try {
-      final mnemonic = Mnemonic.fromWords(words: words, language: Language.portuguese);
-      if (mnemonic.entropy.length != 32) throw const FormatException('Entropia inválida.');
+      final mnemonic = Mnemonic.fromWords(
+        words: words,
+        language: Language.portuguese,
+      );
+      if (mnemonic.entropy.length != 32)
+        throw const FormatException('Entropia inválida.');
       // HKDF com domínio específico; a frase codifica uma chave aleatória, não
       // uma senha curta. Nunca substituir por texto escolhido pelo usuário.
       return await Hkdf(hmac: Hmac.sha256(), outputLength: 32).deriveKey(
@@ -50,7 +55,8 @@ class RecoveryCrypto {
     required String id,
     required List<int> plaintext,
   }) async {
-    if (plaintext.length > 1024 * 1024) throw ArgumentError('Bloco excede 1 MiB.');
+    if (plaintext.length > 1024 * 1024)
+      throw ArgumentError('Bloco excede 1 MiB.');
     final box = await AesGcm.with256bits().encrypt(
       plaintext,
       secretKey: key,
@@ -72,17 +78,25 @@ class RecoveryCrypto {
     required String id,
     required Map<String, dynamic> envelope,
   }) async {
-    if (envelope.length != 5 || envelope['v'] != 1 || envelope['algorithm'] != 'A256GCM' ||
-        envelope['nonce'] is! String || envelope['ciphertext'] is! String || envelope['tag'] is! String ||
+    if (envelope.length != 5 ||
+        envelope['v'] != 1 ||
+        envelope['algorithm'] != 'A256GCM' ||
+        envelope['nonce'] is! String ||
+        envelope['ciphertext'] is! String ||
+        envelope['tag'] is! String ||
         (envelope['nonce'] as String).length != 16 ||
         (envelope['tag'] as String).length != 24 ||
         (envelope['ciphertext'] as String).length > 1398104) {
-      throw const FormatException('Envelope criptografado inválido ou não suportado.');
+      throw const FormatException(
+        'Envelope criptografado inválido ou não suportado.',
+      );
     }
     final nonce = base64Decode(envelope['nonce'] as String);
     final ciphertext = base64Decode(envelope['ciphertext'] as String);
     final tag = base64Decode(envelope['tag'] as String);
-    if (nonce.length != 12 || tag.length != 16 || ciphertext.length > 1024 * 1024) {
+    if (nonce.length != 12 ||
+        tag.length != 16 ||
+        ciphertext.length > 1024 * 1024) {
       throw const FormatException('Envelope criptografado inválido.');
     }
     final plaintext = await AesGcm.with256bits().decrypt(

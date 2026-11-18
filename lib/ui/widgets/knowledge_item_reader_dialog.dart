@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -122,9 +123,8 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao abrir link: $e')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Erro ao abrir link: $e')));
       }
     }
   }
@@ -150,7 +150,9 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                  color: isDark
+                      ? const Color(0xFF1E293B)
+                      : const Color(0xFFF8FAFC),
                   border: Border(
                     bottom: BorderSide(
                       color: isDark ? Colors.white10 : Colors.black12,
@@ -176,7 +178,10 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
                           Row(
                             children: [
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
                                 decoration: BoxDecoration(
                                   color: typeColor.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(6),
@@ -192,9 +197,14 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
                               ),
                               const SizedBox(width: 6),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: (isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05)),
+                                  color: (isDark
+                                      ? Colors.white10
+                                      : Colors.black.withValues(alpha: 0.05)),
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Text(
@@ -202,7 +212,9 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
                                   style: TextStyle(
                                     fontSize: 10,
                                     fontWeight: FontWeight.w600,
-                                    color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                                    color: isDark
+                                        ? const Color(0xFFCBD5E1)
+                                        : const Color(0xFF475569),
                                   ),
                                 ),
                               ),
@@ -210,7 +222,10 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
                                 const Spacer(),
                                 Text(
                                   'Atualizado em ${updatedAt!.day.toString().padLeft(2, '0')}/${updatedAt!.month.toString().padLeft(2, '0')}/${updatedAt!.year}',
-                                  style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey,
+                                  ),
                                 ),
                               ],
                             ],
@@ -230,7 +245,9 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
                               subtitle!,
                               style: TextStyle(
                                 fontSize: 13,
-                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                color: isDark
+                                    ? const Color(0xFF94A3B8)
+                                    : const Color(0xFF64748B),
                               ),
                             ),
                           ],
@@ -248,8 +265,13 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
 
               // Barra de Tags e Ações Rápidas
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                color: isDark ? const Color(0xFF131D31) : const Color(0xFFF1F5F9),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                color: isDark
+                    ? const Color(0xFF131D31)
+                    : const Color(0xFFF1F5F9),
                 child: Row(
                   children: [
                     Expanded(
@@ -262,13 +284,22 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
                                     padding: const EdgeInsets.only(right: 6),
                                     child: Chip(
                                       visualDensity: VisualDensity.compact,
-                                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                      avatar: const Icon(Icons.tag, size: 12, color: AppTheme.primaryBlue),
+                                      materialTapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
+                                      avatar: const Icon(
+                                        Icons.tag,
+                                        size: 12,
+                                        color: AppTheme.primaryBlue,
+                                      ),
                                       label: Text(
                                         t,
-                                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
-                                      backgroundColor: AppTheme.primaryBlue.withValues(alpha: 0.1),
+                                      backgroundColor: AppTheme.primaryBlue
+                                          .withValues(alpha: 0.1),
                                       side: BorderSide.none,
                                     ),
                                   );
@@ -279,13 +310,19 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
                               'Sem tags vinculadas',
                               style: TextStyle(
                                 fontSize: 11,
-                                color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                                color: isDark
+                                    ? const Color(0xFF64748B)
+                                    : const Color(0xFF94A3B8),
                               ),
                             ),
                     ),
                     if (url != null && url!.isNotEmpty)
                       IconButton(
-                        icon: const Icon(Icons.open_in_new, size: 18, color: Colors.teal),
+                        icon: const Icon(
+                          Icons.open_in_new,
+                          size: 18,
+                          color: Colors.teal,
+                        ),
                         tooltip: 'Abrir link original',
                         onPressed: () => _launchUrlStr(context, url!),
                       ),
@@ -293,9 +330,15 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
                       icon: const Icon(Icons.copy, size: 18),
                       tooltip: 'Copiar conteúdo',
                       onPressed: () {
-                        Clipboard.setData(ClipboardData(text: '$title\n\n$content'));
+                        Clipboard.setData(
+                          ClipboardData(text: '$title\n\n$content'),
+                        );
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Conteúdo copiado para a área de transferência!')),
+                          const SnackBar(
+                            content: Text(
+                              'Conteúdo copiado para a área de transferência!',
+                            ),
+                          ),
                         );
                       },
                     ),
@@ -307,7 +350,11 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
                       ),
                     if (onEdit != null)
                       IconButton(
-                        icon: const Icon(Icons.edit_outlined, size: 18, color: AppTheme.primaryBlue),
+                        icon: const Icon(
+                          Icons.edit_outlined,
+                          size: 18,
+                          color: AppTheme.primaryBlue,
+                        ),
                         tooltip: 'Editar',
                         onPressed: () {
                           Navigator.of(context).pop();
@@ -316,7 +363,11 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
                       ),
                     if (onDelete != null)
                       IconButton(
-                        icon: const Icon(Icons.delete_outline, size: 18, color: Colors.redAccent),
+                        icon: const Icon(
+                          Icons.delete_outline,
+                          size: 18,
+                          color: Colors.redAccent,
+                        ),
                         tooltip: 'Excluir',
                         onPressed: () {
                           Navigator.of(context).pop();
@@ -340,7 +391,10 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
                         const Divider(),
                         const Text(
                           'Anexos & Documentos:',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
                         ),
                         const SizedBox(height: 10),
                         Wrap(
@@ -348,11 +402,18 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
                           runSpacing: 8,
                           children: attachments.map((att) {
                             final name = att['name']?.toString() ?? 'anexo';
-                            final path = att['path']?.toString() ?? att['filePath']?.toString() ?? '';
+                            final path =
+                                att['path']?.toString() ??
+                                att['filePath']?.toString() ??
+                                '';
                             final type = att['type']?.toString() ?? 'file';
 
                             return ActionChip(
-                              avatar: const Icon(Icons.attachment, size: 16, color: AppTheme.primaryBlue),
+                              avatar: const Icon(
+                                Icons.attachment,
+                                size: 16,
+                                color: AppTheme.primaryBlue,
+                              ),
                               label: Text(name),
                               onPressed: () {
                                 if (path.isNotEmpty) {
@@ -379,11 +440,18 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
     );
   }
 
-  Widget _buildRichMarkdownBody(BuildContext context, String rawText, bool isDark) {
+  Widget _buildRichMarkdownBody(
+    BuildContext context,
+    String rawText,
+    bool isDark,
+  ) {
     if (rawText.trim().isEmpty) {
       return Text(
         'Nenhum conteúdo adicional registrado.',
-        style: TextStyle(color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8), fontStyle: FontStyle.italic),
+        style: TextStyle(
+          color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+          fontStyle: FontStyle.italic,
+        ),
       );
     }
 
@@ -411,57 +479,79 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
 
       // Título Grande: ### Título ou ## ou #
       if (trimmed.startsWith('### ')) {
-        widgets.add(Padding(
-          padding: const EdgeInsets.only(top: 14, bottom: 6),
-          child: Text(
-            trimmed.substring(4),
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.primaryBlue),
+        widgets.add(
+          Padding(
+            padding: const EdgeInsets.only(top: 14, bottom: 6),
+            child: Text(
+              trimmed.substring(4),
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.primaryBlue,
+              ),
+            ),
           ),
-        ));
+        );
         continue;
       }
       if (trimmed.startsWith('#### ')) {
-        widgets.add(Padding(
-          padding: const EdgeInsets.only(top: 10, bottom: 4),
-          child: Text(
-            trimmed.substring(5),
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+        widgets.add(
+          Padding(
+            padding: const EdgeInsets.only(top: 10, bottom: 4),
+            child: Text(
+              trimmed.substring(5),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+            ),
           ),
-        ));
+        );
         continue;
       }
       if (trimmed.startsWith('# ')) {
-        widgets.add(Padding(
-          padding: const EdgeInsets.only(top: 16, bottom: 8),
-          child: Text(
-            trimmed.substring(2),
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.primaryBlue),
+        widgets.add(
+          Padding(
+            padding: const EdgeInsets.only(top: 16, bottom: 8),
+            child: Text(
+              trimmed.substring(2),
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.primaryBlue,
+              ),
+            ),
           ),
-        ));
+        );
         continue;
       }
 
       // Citação: > citação
       if (trimmed.startsWith('> ')) {
-        widgets.add(Container(
-          margin: const EdgeInsets.symmetric(vertical: 6),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            color: (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
-            border: const Border(
-              left: BorderSide(color: AppTheme.primaryBlue, width: 4),
+        widgets.add(
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: (isDark
+                  ? const Color(0xFF1E293B)
+                  : const Color(0xFFF1F5F9)),
+              border: const Border(
+                left: BorderSide(color: AppTheme.primaryBlue, width: 4),
+              ),
+              borderRadius: const BorderRadius.horizontal(
+                right: Radius.circular(6),
+              ),
             ),
-            borderRadius: const BorderRadius.horizontal(right: Radius.circular(6)),
-          ),
-          child: Text(
-            trimmed.substring(2),
-            style: TextStyle(
-              fontSize: 13,
-              fontStyle: FontStyle.italic,
-              color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+            child: Text(
+              trimmed.substring(2),
+              style: TextStyle(
+                fontSize: 13,
+                fontStyle: FontStyle.italic,
+                color: isDark
+                    ? const Color(0xFFCBD5E1)
+                    : const Color(0xFF334155),
+              ),
             ),
           ),
-        ));
+        );
         continue;
       }
 
@@ -469,54 +559,71 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
       if (trimmed.startsWith('- [ ] ') || trimmed.startsWith('- [x] ')) {
         final isChecked = trimmed.startsWith('- [x] ');
         final itemText = trimmed.substring(6);
-        widgets.add(Padding(
-          padding: const EdgeInsets.symmetric(vertical: 2),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(
-                isChecked ? Icons.check_box : Icons.check_box_outline_blank,
-                size: 18,
-                color: isChecked ? AppTheme.primaryBlue : Colors.grey,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  itemText,
-                  style: TextStyle(
-                    fontSize: 14,
-                    decoration: isChecked ? TextDecoration.lineThrough : null,
-                    color: isChecked ? Colors.grey : null,
+        widgets.add(
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  isChecked ? Icons.check_box : Icons.check_box_outline_blank,
+                  size: 18,
+                  color: isChecked ? AppTheme.primaryBlue : Colors.grey,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    itemText,
+                    style: TextStyle(
+                      fontSize: 14,
+                      decoration: isChecked ? TextDecoration.lineThrough : null,
+                      color: isChecked ? Colors.grey : null,
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ));
+        );
         continue;
       }
 
       if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-        widgets.add(Padding(
-          padding: const EdgeInsets.symmetric(vertical: 2),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('• ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.primaryBlue)),
-              Expanded(
-                child: _buildFormattedSpans(context, trimmed.substring(2), isDark),
-              ),
-            ],
+        widgets.add(
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '• ',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: AppTheme.primaryBlue,
+                  ),
+                ),
+                Expanded(
+                  child: _buildFormattedSpans(
+                    context,
+                    trimmed.substring(2),
+                    isDark,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ));
+        );
         continue;
       }
 
       // Linha normal com formatação inline
-      widgets.add(Padding(
-        padding: const EdgeInsets.symmetric(vertical: 2),
-        child: _buildFormattedSpans(context, line, isDark),
-      ));
+      widgets.add(
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: _buildFormattedSpans(context, line, isDark),
+        ),
+      );
     }
 
     return Column(
@@ -525,7 +632,12 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
     );
   }
 
-  Widget _buildInlineImage(BuildContext context, String src, String alt, bool isDark) {
+  Widget _buildInlineImage(
+    BuildContext context,
+    String src,
+    String alt,
+    bool isDark,
+  ) {
     return Container(
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
@@ -538,25 +650,36 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
           ClipRRect(
             borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
             child: InkWell(
-              onTap: () => showUniversalAttachmentViewer(context, filePath: src, title: alt),
+              onTap: () => showUniversalAttachmentViewer(
+                context,
+                filePath: src,
+                title: alt,
+              ),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxHeight: 280),
                 child: src.startsWith('http')
                     ? Image.network(src, fit: BoxFit.cover)
                     : !kIsWeb && File(src).existsSync()
-                        ? Image.file(File(src), fit: BoxFit.cover)
-                        : Container(
-                            height: 120,
-                            alignment: Alignment.center,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.image, color: Colors.grey, size: 28),
-                                const SizedBox(width: 8),
-                                Text(alt, style: const TextStyle(color: Colors.grey)),
-                              ],
+                    ? Image.file(File(src), fit: BoxFit.cover)
+                    : Container(
+                        height: 120,
+                        alignment: Alignment.center,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.image,
+                              color: Colors.grey,
+                              size: 28,
                             ),
-                          ),
+                            const SizedBox(width: 8),
+                            Text(
+                              alt,
+                              style: const TextStyle(color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                      ),
               ),
             ),
           ),
@@ -565,16 +688,27 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               child: Row(
                 children: [
-                  const Icon(Icons.photo_outlined, size: 14, color: Colors.grey),
+                  const Icon(
+                    Icons.photo_outlined,
+                    size: 14,
+                    color: Colors.grey,
+                  ),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       alt,
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey,
+                      ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  const Text('Toque para expandir', style: TextStyle(fontSize: 11, color: AppTheme.primaryBlue)),
+                  const Text(
+                    'Toque para expandir',
+                    style: TextStyle(fontSize: 11, color: AppTheme.primaryBlue),
+                  ),
                 ],
               ),
             ),
@@ -596,7 +730,9 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
 
     if (matches.isEmpty) {
       return RichText(
-        text: TextSpan(children: _parseInlineFormatting(text, baseStyle, isDark)),
+        text: TextSpan(
+          children: _parseInlineFormatting(text, baseStyle, isDark),
+        ),
       );
     }
 
@@ -605,11 +741,13 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
 
     for (final match in matches) {
       if (match.start > lastEnd) {
-        children.addAll(_parseInlineFormatting(
-          text.substring(lastEnd, match.start),
-          baseStyle,
-          isDark,
-        ));
+        children.addAll(
+          _parseInlineFormatting(
+            text.substring(lastEnd, match.start),
+            baseStyle,
+            isDark,
+          ),
+        );
       }
 
       final label = match.group(1) ?? 'Link';
@@ -617,70 +755,76 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
       final isJwPublication = label.contains('📖');
       final isJwVideo = label.contains('🎥');
 
-      children.add(WidgetSpan(
-        alignment: PlaceholderAlignment.middle,
-        child: InkWell(
-          onTap: () => _launchUrlStr(context, linkUrl),
-          borderRadius: BorderRadius.circular(6),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            margin: const EdgeInsets.symmetric(horizontal: 2),
-            decoration: BoxDecoration(
-              color: isJwPublication
-                  ? const Color(0xFF4338CA).withValues(alpha: 0.12)
-                  : isJwVideo
-                      ? const Color(0xFFDC2626).withValues(alpha: 0.12)
-                      : AppTheme.primaryBlue.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(
+      children.add(
+        WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
+          child: InkWell(
+            onTap: () => _launchUrlStr(context, linkUrl),
+            borderRadius: BorderRadius.circular(6),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              margin: const EdgeInsets.symmetric(horizontal: 2),
+              decoration: BoxDecoration(
                 color: isJwPublication
-                    ? const Color(0xFF4338CA)
+                    ? const Color(0xFF4338CA).withValues(alpha: 0.12)
                     : isJwVideo
-                        ? const Color(0xFFDC2626)
-                        : AppTheme.primaryBlue,
-                width: 0.8,
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: isJwPublication
-                        ? const Color(0xFF4338CA)
-                        : isJwVideo
-                            ? const Color(0xFFDC2626)
-                            : AppTheme.primaryBlue,
-                  ),
+                    ? const Color(0xFFDC2626).withValues(alpha: 0.12)
+                    : AppTheme.primaryBlue.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: isJwPublication
+                      ? const Color(0xFF4338CA)
+                      : isJwVideo
+                      ? const Color(0xFFDC2626)
+                      : AppTheme.primaryBlue,
+                  width: 0.8,
                 ),
-                const SizedBox(width: 4),
-                const Icon(Icons.open_in_new, size: 12, color: AppTheme.primaryBlue),
-              ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: isJwPublication
+                          ? const Color(0xFF4338CA)
+                          : isJwVideo
+                          ? const Color(0xFFDC2626)
+                          : AppTheme.primaryBlue,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(
+                    Icons.open_in_new,
+                    size: 12,
+                    color: AppTheme.primaryBlue,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
-      ));
+      );
 
       lastEnd = match.end;
     }
 
     if (lastEnd < text.length) {
-      children.addAll(_parseInlineFormatting(
-        text.substring(lastEnd),
-        baseStyle,
-        isDark,
-      ));
+      children.addAll(
+        _parseInlineFormatting(text.substring(lastEnd), baseStyle, isDark),
+      );
     }
 
-    return RichText(
-      text: TextSpan(children: children),
-    );
+    return RichText(text: TextSpan(children: children));
   }
 
-  List<InlineSpan> _parseInlineFormatting(String text, TextStyle baseStyle, bool isDark) {
+  List<InlineSpan> _parseInlineFormatting(
+    String text,
+    TextStyle baseStyle,
+    bool isDark,
+  ) {
     final spans = <InlineSpan>[];
     final tokenRegex = RegExp(
       r'(?:<mark style="background:(#[a-fA-F0-9]{6})">([\s\S]*?)</mark>)|(?:\*\*(.+?)\*\*)|(?:\*([^\*]+)\*)|(?:`([^`]+)`)',
@@ -694,7 +838,9 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
     int lastEnd = 0;
     for (final m in matches) {
       if (m.start > lastEnd) {
-        spans.add(TextSpan(text: text.substring(lastEnd, m.start), style: baseStyle));
+        spans.add(
+          TextSpan(text: text.substring(lastEnd, m.start), style: baseStyle),
+        );
       }
 
       if (m.group(1) != null && m.group(2) != null) {
@@ -702,55 +848,67 @@ class KnowledgeItemReaderDialog extends StatelessWidget {
         final hexStr = m.group(1)!;
         final markText = m.group(2)!;
         final parsedColor = int.tryParse(hexStr.replaceFirst('#', '0xFF'));
-        final Color markColor = parsedColor != null ? Color(parsedColor) : Colors.amber;
-        spans.add(WidgetSpan(
-          alignment: PlaceholderAlignment.middle,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-            decoration: BoxDecoration(
-              color: markColor.withValues(alpha: 0.35),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              markText,
-              style: baseStyle.copyWith(
-                fontWeight: FontWeight.w600,
-                color: isDark ? Colors.white : Colors.black87,
+        final Color markColor = parsedColor != null
+            ? Color(parsedColor)
+            : Colors.amber;
+        spans.add(
+          WidgetSpan(
+            alignment: PlaceholderAlignment.middle,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+              decoration: BoxDecoration(
+                color: markColor.withValues(alpha: 0.35),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                markText,
+                style: baseStyle.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
               ),
             ),
           ),
-        ));
+        );
       } else if (m.group(3) != null) {
         // Bold: **text**
-        spans.add(TextSpan(
-          text: m.group(3)!,
-          style: baseStyle.copyWith(fontWeight: FontWeight.bold),
-        ));
+        spans.add(
+          TextSpan(
+            text: m.group(3)!,
+            style: baseStyle.copyWith(fontWeight: FontWeight.bold),
+          ),
+        );
       } else if (m.group(4) != null) {
         // Italic: *text*
-        spans.add(TextSpan(
-          text: m.group(4)!,
-          style: baseStyle.copyWith(fontStyle: FontStyle.italic),
-        ));
+        spans.add(
+          TextSpan(
+            text: m.group(4)!,
+            style: baseStyle.copyWith(fontStyle: FontStyle.italic),
+          ),
+        );
       } else if (m.group(5) != null) {
         // Code: `text`
-        spans.add(WidgetSpan(
-          alignment: PlaceholderAlignment.middle,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              m.group(5)!,
-              style: baseStyle.copyWith(
-                fontFamily: 'monospace',
-                fontSize: (baseStyle.fontSize ?? 14) * 0.9,
+        spans.add(
+          WidgetSpan(
+            alignment: PlaceholderAlignment.middle,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? const Color(0xFF334155)
+                    : const Color(0xFFE2E8F0),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                m.group(5)!,
+                style: baseStyle.copyWith(
+                  fontFamily: 'monospace',
+                  fontSize: (baseStyle.fontSize ?? 14) * 0.9,
+                ),
               ),
             ),
           ),
-        ));
+        );
       }
 
       lastEnd = m.end;

@@ -32,7 +32,9 @@ class MBTilesWeb implements MBTilesBackend {
     void Function(double progress, int downloadedBytes)? onProgress,
     bool Function()? isCancelled,
   }) async {
-    throw UnsupportedError('Armazenamento offline de MBTiles não é suportado no navegador Web.');
+    throw UnsupportedError(
+      'Armazenamento offline de MBTiles não é suportado no navegador Web.',
+    );
   }
 
   @override
@@ -41,11 +43,14 @@ class MBTilesWeb implements MBTilesBackend {
     required String sourceFilePath,
     void Function(double progress, int copiedBytes)? onProgress,
   }) async {
-    throw UnsupportedError('Importação local de arquivo .mbtiles não é suportada no navegador Web.');
+    throw UnsupportedError(
+      'Importação local de arquivo .mbtiles não é suportada no navegador Web.',
+    );
   }
 
   @override
-  Future<Map<String, dynamic>> loadUrlConfig() async => const <String, dynamic>{};
+  Future<Map<String, dynamic>> loadUrlConfig() async =>
+      const <String, dynamic>{};
 
   @override
   Future<void> saveUrlConfig(Map<String, dynamic> config) async {}

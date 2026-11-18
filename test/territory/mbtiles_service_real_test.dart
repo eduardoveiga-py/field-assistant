@@ -27,7 +27,8 @@ void main() {
     seedDb.execute('CREATE TABLE metadata (name TEXT, value TEXT);');
     seedDb.execute("INSERT INTO metadata VALUES ('name', 'Test Solimoes');");
     seedDb.execute(
-        'CREATE TABLE tiles (zoom_level INTEGER, tile_column INTEGER, tile_row INTEGER, tile_data BLOB);');
+      'CREATE TABLE tiles (zoom_level INTEGER, tile_column INTEGER, tile_row INTEGER, tile_data BLOB);',
+    );
     // Insert a tile at z=6, x=20, y=30 (which corresponds to TMS row = (1<<6)-1-30 = 33)
     final tmsY = (1 << 6) - 1 - 30;
     seedDb.execute(
@@ -62,21 +63,23 @@ void main() {
       expect(solimoes.isInstalled, isFalse);
       expect(solimoes.downloadProgress, equals(0.0));
       expect(backend.isRegionInstalled('br_am_solimoes'), isFalse);
-      expect(service.resolveDownloadUrl(solimoes),
-          'https://github.com/${AppVersion.githubRepo}/releases/download/v1.3.4/br_am_solimoes.mbtiles');
+      expect(
+        service.resolveDownloadUrl(solimoes),
+        'https://github.com/${AppVersion.githubRepo}/releases/download/v1.3.4/br_am_solimoes.mbtiles',
+      );
       expect(solimoes.sizeBytes, 264892416);
     });
 
-    test(
-        'Real HTTP streaming download saves to disk, performs atomic swap, and marks isInstalled=true',
-        () async {
+    test('Real HTTP streaming download saves to disk, performs atomic swap, and marks isInstalled=true', () async {
       final progressList = <double>[];
       final downloadedBytesList = <int>[];
 
       final mockClient = MockClient.streaming((request, stream) async {
         expect(request.method, equals('GET'));
-        expect(request.url.toString(),
-            'https://github.com/${AppVersion.githubRepo}/releases/download/v1.3.4/br_am_solimoes.mbtiles');
+        expect(
+          request.url.toString(),
+          'https://github.com/${AppVersion.githubRepo}/releases/download/v1.3.4/br_am_solimoes.mbtiles',
+        );
 
         // Stream the valid MBTiles bytes in 3 discrete chunks
         final chunkSize = (validMbtilesBytes.length / 3).ceil();
@@ -119,7 +122,9 @@ void main() {
       expect(finalFile.lengthSync(), equals(validMbtilesBytes.length));
 
       // Verify state in service
-      final solimoes = service.currentRegions.firstWhere((r) => r.id == 'br_am_solimoes');
+      final solimoes = service.currentRegions.firstWhere(
+        (r) => r.id == 'br_am_solimoes',
+      );
       expect(solimoes.isInstalled, isTrue);
       expect(solimoes.downloadProgress, equals(1.0));
       expect(solimoes.sizeBytes, equals(validMbtilesBytes.length));
@@ -131,8 +136,7 @@ void main() {
       expect(tile, equals([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]));
     });
 
-    test('Status isInstalled persists when a new service/backend is initialized from existing disk',
-        () async {
+    test('Status isInstalled persists when a new service/backend is initialized from existing disk', () async {
       // Place valid MBTiles file on disk
       final targetFile = File('${tempDir.path}/br_am_solimoes.mbtiles');
       targetFile.writeAsBytesSync(validMbtilesBytes, flush: true);
@@ -142,7 +146,9 @@ void main() {
       final freshService = MBTilesService.custom(backend: freshBackend);
       await freshService.init();
 
-      final solimoes = freshService.currentRegions.firstWhere((r) => r.id == 'br_am_solimoes');
+      final solimoes = freshService.currentRegions.firstWhere(
+        (r) => r.id == 'br_am_solimoes',
+      );
       expect(solimoes.isInstalled, isTrue);
       expect(freshBackend.isRegionInstalled('br_am_solimoes'), isTrue);
       expect(solimoes.sizeBytes, equals(validMbtilesBytes.length));
@@ -167,7 +173,9 @@ void main() {
       expect(targetFile.existsSync(), isFalse);
       expect(backend.isRegionInstalled('br_am_solimoes'), isFalse);
 
-      final solimoes = service.currentRegions.firstWhere((r) => r.id == 'br_am_solimoes');
+      final solimoes = service.currentRegions.firstWhere(
+        (r) => r.id == 'br_am_solimoes',
+      );
       expect(solimoes.isInstalled, isFalse);
       expect(solimoes.downloadProgress, equals(0.0));
     });
@@ -182,7 +190,9 @@ void main() {
         throwsA(isA<MBTilesDownloadException>()),
       );
 
-      final solimoes = service.currentRegions.firstWhere((r) => r.id == 'br_am_solimoes');
+      final solimoes = service.currentRegions.firstWhere(
+        (r) => r.id == 'br_am_solimoes',
+      );
       expect(solimoes.isInstalled, isFalse);
       expect(solimoes.downloadProgress, equals(0.0));
 
@@ -212,7 +222,10 @@ void main() {
         );
       });
 
-      final downloadFuture = service.downloadRegion('br_am_solimoes', httpClient: mockClient);
+      final downloadFuture = service.downloadRegion(
+        'br_am_solimoes',
+        httpClient: mockClient,
+      );
 
       // Wait a tick for download to start
       await Future.delayed(const Duration(milliseconds: 30));
@@ -225,7 +238,9 @@ void main() {
         await downloadFuture;
       } catch (_) {}
 
-      final solimoes = service.currentRegions.firstWhere((r) => r.id == 'br_am_solimoes');
+      final solimoes = service.currentRegions.firstWhere(
+        (r) => r.id == 'br_am_solimoes',
+      );
       expect(solimoes.isInstalled, isFalse);
       expect(solimoes.downloadProgress, equals(0.0));
     });
@@ -248,10 +263,15 @@ void main() {
       final freshService = MBTilesService.custom(backend: freshBackend);
       await freshService.init();
 
-      expect(freshService.customBaseUrl, equals('https://cdn.example.org/maps/'));
+      expect(
+        freshService.customBaseUrl,
+        equals('https://cdn.example.org/maps/'),
+      );
       expect(
         freshService.resolveDownloadUrl(
-          freshService.currentRegions.firstWhere((r) => r.id == 'br_am_solimoes'),
+          freshService.currentRegions.firstWhere(
+            (r) => r.id == 'br_am_solimoes',
+          ),
         ),
         equals('https://mirror.example.org/custom/alto_solimoes.mbtiles'),
       );
@@ -266,7 +286,9 @@ void main() {
       await freshService.setBaseCatalogUrl(null);
       expect(
         freshService.resolveDownloadUrl(
-          freshService.currentRegions.firstWhere((r) => r.id == 'br_am_solimoes'),
+          freshService.currentRegions.firstWhere(
+            (r) => r.id == 'br_am_solimoes',
+          ),
         ),
         endsWith('/releases/download/v1.3.4/br_am_solimoes.mbtiles'),
       );
@@ -276,7 +298,9 @@ void main() {
     });
 
     test('importLocalMbtiles validates SQLite + tiles table and rejects invalid packages', () async {
-      final externalDir = Directory.systemTemp.createTempSync('mbtiles_import_src_');
+      final externalDir = Directory.systemTemp.createTempSync(
+        'mbtiles_import_src_',
+      );
       addTearDown(() {
         if (externalDir.existsSync()) {
           try {
@@ -288,7 +312,9 @@ void main() {
       final validSrc = File('${externalDir.path}/meu_mapa.mbtiles')
         ..writeAsBytesSync(validMbtilesBytes, flush: true);
 
-      final imported = await service.importLocalMbtiles(sourceFilePath: validSrc.path);
+      final imported = await service.importLocalMbtiles(
+        sourceFilePath: validSrc.path,
+      );
       expect(imported.isInstalled, isTrue);
       expect(imported.id, equals('local_meu_mapa'));
       expect(backend.isRegionInstalled(imported.id), isTrue);
@@ -327,13 +353,17 @@ void main() {
       final viewDb = sql.sqlite3.open(viewDbPath);
       viewDb.execute('CREATE TABLE images (tile_id TEXT, tile_data BLOB);');
       viewDb.execute(
-          'CREATE TABLE map (zoom_level INTEGER, tile_column INTEGER, tile_row INTEGER, tile_id TEXT);');
+        'CREATE TABLE map (zoom_level INTEGER, tile_column INTEGER, tile_row INTEGER, tile_id TEXT);',
+      );
       viewDb.execute(
-          'CREATE VIEW tiles AS SELECT zoom_level, tile_column, tile_row, tile_data FROM map JOIN images ON map.tile_id = images.tile_id;');
+        'CREATE VIEW tiles AS SELECT zoom_level, tile_column, tile_row, tile_data FROM map JOIN images ON map.tile_id = images.tile_id;',
+      );
       viewDb.execute(
-          "INSERT INTO images VALUES ('t1', X'89504E470D0A1A0A0102');");
+        "INSERT INTO images VALUES ('t1', X'89504E470D0A1A0A0102');",
+      );
       viewDb.execute(
-          "INSERT INTO map VALUES (8, 40, ${(1 << 8) - 1 - 50}, 't1');");
+        "INSERT INTO map VALUES (8, 40, ${(1 << 8) - 1 - 50}, 't1');",
+      );
       viewDb.close();
 
       final importedView = await service.importLocalMbtiles(
@@ -349,10 +379,10 @@ void main() {
       );
     });
 
-    test(
-        'downloadRegion failure and updateAll preserve already-installed local .mbtiles and skip local-only packages',
-        () async {
-      final externalDir = Directory.systemTemp.createTempSync('mbtiles_preserve_');
+    test('downloadRegion failure and updateAll preserve already-installed local .mbtiles and skip local-only packages', () async {
+      final externalDir = Directory.systemTemp.createTempSync(
+        'mbtiles_preserve_',
+      );
       addTearDown(() {
         if (externalDir.existsSync()) {
           try {
@@ -375,15 +405,21 @@ void main() {
       );
       expect(customRegion.id, equals('local_custom_aldeia'));
 
-      final client404 = MockClient((req) async => http.Response('Not Found', 404));
+      final client404 = MockClient(
+        (req) async => http.Response('Not Found', 404),
+      );
       final failedNames = await service.updateAll(httpClient: client404);
 
       // br_am_solimoes failed 404, local_custom_aldeia was skipped cleanly
-      expect(failedNames, equals(['Santo Antônio do Içá e entorno (experimental)']));
+      expect(
+        failedNames,
+        equals(['Santo Antônio do Içá e entorno (experimental)']),
+      );
 
       // Installed status & physical file must remain intact on disk
-      final solimoesAfter =
-          service.currentRegions.firstWhere((r) => r.id == 'br_am_solimoes');
+      final solimoesAfter = service.currentRegions.firstWhere(
+        (r) => r.id == 'br_am_solimoes',
+      );
       expect(solimoesAfter.isInstalled, isTrue);
       expect(solimoesAfter.downloadProgress, equals(1.0));
       expect(backend.isRegionInstalled('br_am_solimoes'), isTrue);

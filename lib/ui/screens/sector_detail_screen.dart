@@ -132,7 +132,9 @@ class _SectorDetailScreenState extends ConsumerState<SectorDetailScreen> {
               children: [
                 TextField(
                   controller: nameController,
-                  decoration: const InputDecoration(labelText: 'Nome do Bairro *'),
+                  decoration: const InputDecoration(
+                    labelText: 'Nome do Bairro *',
+                  ),
                   autofocus: true,
                 ),
                 const SizedBox(height: 12),

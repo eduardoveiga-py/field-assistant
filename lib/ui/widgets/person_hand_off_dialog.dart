@@ -81,7 +81,10 @@ class PersonHandOffHelper {
           buffer.writeln('📝 *Observações:* ${person.generalNotes}');
         }
       } catch (e, st) {
-        AppLogger.debug('Observações da pessoa em texto simples (não JSON): $e', st);
+        AppLogger.debug(
+          'Observações da pessoa em texto simples (não JSON): $e',
+          st,
+        );
         buffer.writeln('📝 *Observações:* ${person.generalNotes}');
       }
     }
@@ -124,228 +127,239 @@ class PersonHandOffHelper {
           final notesController = ctrls[1];
 
           return StatefulBuilder(
-        builder: (ctx, setDialogState) {
-          final isDark = Theme.of(ctx).brightness == Brightness.dark;
+            builder: (ctx, setDialogState) {
+              final isDark = Theme.of(ctx).brightness == Brightness.dark;
 
-          return AlertDialog(
-            title: const Row(
-              children: [
-                Icon(Icons.forward_to_inbox, color: AppTheme.accentTeal),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Passar Revisita',
-                    style: TextStyle(fontSize: 18),
+              return AlertDialog(
+                title: const Row(
+                  children: [
+                    Icon(Icons.forward_to_inbox, color: AppTheme.accentTeal),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Passar Revisita',
+                        style: TextStyle(fontSize: 18),
+                      ),
+                    ),
+                  ],
+                ),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Esta mensagem contém todos os dados necessários (endereço, mapa, horário e anotações) para outro publicador assumir o contato:',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.textMuted,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+
+                      // Mensagem Gerada
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? const Color(0xFF1E293B)
+                              : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        constraints: const BoxConstraints(maxHeight: 150),
+                        child: SingleChildScrollView(
+                          child: SelectableText(
+                            message,
+                            style: const TextStyle(fontSize: 12, height: 1.4),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              icon: const Icon(Icons.copy, size: 16),
+                              label: const Text(
+                                'Copiar',
+                                style: TextStyle(fontSize: 12),
+                              ),
+                              onPressed: () {
+                                Clipboard.setData(ClipboardData(text: message));
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Mensagem da revisita copiada!',
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                foregroundColor: Colors.white,
+                              ),
+                              icon: const Icon(Icons.chat, size: 16),
+                              label: const Text(
+                                'WhatsApp',
+                                style: TextStyle(fontSize: 12),
+                              ),
+                              onPressed: () => shareViaWhatsApp(message),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 24),
+
+                      const Text(
+                        'Registrar Repasse (Marcar Revisita Passada):',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: AppTheme.primaryBlue,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Ao confirmar, a revisita mudará para o status "Revisita passada". O registro é preservado mas não aparecerá mais na sua agenda nem nas estatísticas ativas.',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.textMuted,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: toPublisherController,
+                        decoration: const InputDecoration(
+                          labelText: 'Para quem passou a revisita? *',
+                          hintText: 'Ex: Irmão Lucas / Pioneira Ana',
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              icon: const Icon(Icons.calendar_month, size: 16),
+                              label: Text(
+                                '${chosenDate.day}/${chosenDate.month}/${chosenDate.year} às ${chosenDate.hour.toString().padLeft(2, "0")}:${chosenDate.minute.toString().padLeft(2, "0")}',
+                              ),
+                              onPressed: () async {
+                                final d = await showDatePicker(
+                                  context: context,
+                                  initialDate: chosenDate,
+                                  firstDate: DateTime(2020),
+                                  lastDate: DateTime.now().add(
+                                    const Duration(days: 1),
+                                  ),
+                                );
+                                if (d != null && context.mounted) {
+                                  final t = await showTimePicker(
+                                    context: context,
+                                    initialTime: TimeOfDay.fromDateTime(
+                                      chosenDate,
+                                    ),
+                                  );
+                                  if (t != null) {
+                                    setDialogState(() {
+                                      chosenDate = DateTime(
+                                        d.year,
+                                        d.month,
+                                        d.day,
+                                        t.hour,
+                                        t.minute,
+                                      );
+                                    });
+                                  }
+                                }
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: notesController,
+                        decoration: const InputDecoration(
+                          labelText: 'Observações do repasse (opcional)',
+                          hintText:
+                              'Ex: Passado por mensagem de WhatsApp com mapa',
+                        ),
+                        maxLines: 2,
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Esta mensagem contém todos os dados necessários (endereço, mapa, horário e anotações) para outro publicador assumir o contato:',
-                    style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Cancelar'),
                   ),
-                  const SizedBox(height: 10),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.accentTeal,
+                      foregroundColor: Colors.white,
+                    ),
+                    icon: const Icon(Icons.check, size: 16),
+                    label: const Text('Confirmar Repasse'),
+                    onPressed: () async {
+                      final publisher = toPublisherController.text.trim();
+                      if (publisher.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Por favor, informe para quem passou a revisita.',
+                            ),
+                          ),
+                        );
+                        return;
+                      }
 
-                  // Mensagem Gerada
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? const Color(0xFF1E293B)
-                          : const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.grey.shade300),
-                    ),
-                    constraints: const BoxConstraints(maxHeight: 150),
-                    child: SingleChildScrollView(
-                      child: SelectableText(
-                        message,
-                        style: const TextStyle(fontSize: 12, height: 1.4),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
+                      final repo = ref.read(repositoryProvider);
+                      final dtFormatted = AppDateUtils.formatDateTimeWithAt(
+                        chosenDate,
+                      );
+                      final noteEntry =
+                          'Revisita passada para $publisher em $dtFormatted.${notesController.text.trim().isNotEmpty ? " Obs: ${notesController.text.trim()}" : ""}';
+                      final existingNotes = person.generalNotes ?? '';
+                      final updatedNotes = existingNotes.isEmpty
+                          ? noteEntry
+                          : '$existingNotes\n$noteEntry';
 
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          icon: const Icon(Icons.copy, size: 16),
-                          label: const Text(
-                            'Copiar',
-                            style: TextStyle(fontSize: 12),
+                      // Guarda nota no histórico e atualiza status para 'revisita_passada'
+                      await repo.updatePerson(
+                        person.copyWith(
+                          status: 'revisita_passada',
+                          nextActionNote: Value(
+                            'Passada para $publisher ($dtFormatted)',
                           ),
-                          onPressed: () {
-                            Clipboard.setData(ClipboardData(text: message));
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Mensagem da revisita copiada!'),
-                              ),
-                            );
-                          },
+                          nextActionAt: const Value(null),
+                          generalNotes: Value(updatedNotes),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            foregroundColor: Colors.white,
-                          ),
-                          icon: const Icon(Icons.chat, size: 16),
-                          label: const Text(
-                            'WhatsApp',
-                            style: TextStyle(fontSize: 12),
-                          ),
-                          onPressed: () => shareViaWhatsApp(message),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const Divider(height: 24),
+                      );
 
-                  const Text(
-                    'Registrar Repasse (Marcar Revisita Passada):',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      color: AppTheme.primaryBlue,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Ao confirmar, a revisita mudará para o status "Revisita passada". O registro é preservado mas não aparecerá mais na sua agenda nem nas estatísticas ativas.',
-                    style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: toPublisherController,
-                    decoration: const InputDecoration(
-                      labelText: 'Para quem passou a revisita? *',
-                      hintText: 'Ex: Irmão Lucas / Pioneira Ana',
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          icon: const Icon(Icons.calendar_month, size: 16),
-                          label: Text(
-                            '${chosenDate.day}/${chosenDate.month}/${chosenDate.year} às ${chosenDate.hour.toString().padLeft(2, "0")}:${chosenDate.minute.toString().padLeft(2, "0")}',
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Revisita de "${person.name}" marcada como passada para $publisher!',
+                            ),
                           ),
-                          onPressed: () async {
-                            final d = await showDatePicker(
-                              context: context,
-                              initialDate: chosenDate,
-                              firstDate: DateTime(2020),
-                              lastDate: DateTime.now().add(
-                                const Duration(days: 1),
-                              ),
-                            );
-                            if (d != null && context.mounted) {
-                              final t = await showTimePicker(
-                                context: context,
-                                initialTime: TimeOfDay.fromDateTime(chosenDate),
-                              );
-                              if (t != null) {
-                                setDialogState(() {
-                                  chosenDate = DateTime(
-                                    d.year,
-                                    d.month,
-                                    d.day,
-                                    t.hour,
-                                    t.minute,
-                                  );
-                                });
-                              }
-                            }
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: notesController,
-                    decoration: const InputDecoration(
-                      labelText: 'Observações do repasse (opcional)',
-                      hintText: 'Ex: Passado por mensagem de WhatsApp com mapa',
-                    ),
-                    maxLines: 2,
+                        );
+                      }
+                    },
                   ),
                 ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancelar'),
-              ),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.accentTeal,
-                  foregroundColor: Colors.white,
-                ),
-                icon: const Icon(Icons.check, size: 16),
-                label: const Text('Confirmar Repasse'),
-                onPressed: () async {
-                  final publisher = toPublisherController.text.trim();
-                  if (publisher.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Por favor, informe para quem passou a revisita.',
-                        ),
-                      ),
-                    );
-                    return;
-                  }
-
-                  final repo = ref.read(repositoryProvider);
-                  final dtFormatted = AppDateUtils.formatDateTimeWithAt(
-                    chosenDate,
-                  );
-                  final noteEntry =
-                      'Revisita passada para $publisher em $dtFormatted.${notesController.text.trim().isNotEmpty ? " Obs: ${notesController.text.trim()}" : ""}';
-                  final existingNotes = person.generalNotes ?? '';
-                  final updatedNotes = existingNotes.isEmpty
-                      ? noteEntry
-                      : '$existingNotes\n$noteEntry';
-
-                  // Guarda nota no histórico e atualiza status para 'revisita_passada'
-                  await repo.updatePerson(
-                    person.copyWith(
-                      status: 'revisita_passada',
-                      nextActionNote: Value(
-                        'Passada para $publisher ($dtFormatted)',
-                      ),
-                      nextActionAt: const Value(null),
-                      generalNotes: Value(updatedNotes),
-                    ),
-                  );
-
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'Revisita de "${person.name}" marcada como passada para $publisher!',
-                        ),
-                      ),
-                    );
-                  }
-                },
-              ),
-            ],
+              );
+            },
           );
-        },
-      );
         },
       ),
     );

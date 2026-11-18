@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import '../core/app_logger.dart';
 import '../database/app_database.dart';
 
@@ -43,7 +44,9 @@ class TerritoryDataPortService {
     buffer.writeln('<kml xmlns="http://www.opengis.net/kml/2.2">');
     buffer.writeln('  <Document>');
     buffer.writeln('    <name>${_xmlEscape(territoryName)}</name>');
-    buffer.writeln('    <description>Exportado do aplicativo Ministério Pessoal</description>');
+    buffer.writeln(
+      '    <description>Exportado do aplicativo Ministério Pessoal</description>',
+    );
 
     for (final p in people) {
       if (p.deletedAt != null) continue;
@@ -63,7 +66,9 @@ class TerritoryDataPortService {
       if (p.generalNotes != null && p.generalNotes!.isNotEmpty) {
         desc.write('Notas: ${p.generalNotes}');
       }
-      buffer.writeln('      <description>${_xmlEscape(desc.toString())}</description>');
+      buffer.writeln(
+        '      <description>${_xmlEscape(desc.toString())}</description>',
+      );
 
       if (lat != null && lng != null) {
         buffer.writeln('      <Point>');
@@ -81,10 +86,22 @@ class TerritoryDataPortService {
   /// Importa contatos de uma string KML
   static List<ImportedTerritoryContact> importFromKml(String kmlContent) {
     final results = <ImportedTerritoryContact>[];
-    final placemarkRegex = RegExp(r'<Placemark\b[^>]*>([\s\S]*?)<\/Placemark>', caseSensitive: false);
-    final nameRegex = RegExp(r'<name\b[^>]*>([\s\S]*?)<\/name>', caseSensitive: false);
-    final descRegex = RegExp(r'<description\b[^>]*>([\s\S]*?)<\/description>', caseSensitive: false);
-    final coordRegex = RegExp(r'<coordinates\b[^>]*>([\s\S]*?)<\/coordinates>', caseSensitive: false);
+    final placemarkRegex = RegExp(
+      r'<Placemark\b[^>]*>([\s\S]*?)<\/Placemark>',
+      caseSensitive: false,
+    );
+    final nameRegex = RegExp(
+      r'<name\b[^>]*>([\s\S]*?)<\/name>',
+      caseSensitive: false,
+    );
+    final descRegex = RegExp(
+      r'<description\b[^>]*>([\s\S]*?)<\/description>',
+      caseSensitive: false,
+    );
+    final coordRegex = RegExp(
+      r'<coordinates\b[^>]*>([\s\S]*?)<\/coordinates>',
+      caseSensitive: false,
+    );
 
     for (final match in placemarkRegex.allMatches(kmlContent)) {
       final block = match.group(1) ?? '';
@@ -168,7 +185,9 @@ class TerritoryDataPortService {
   }
 
   /// Importa contatos a partir de uma string GeoJSON
-  static List<ImportedTerritoryContact> importFromGeoJson(String geoJsonContent) {
+  static List<ImportedTerritoryContact> importFromGeoJson(
+    String geoJsonContent,
+  ) {
     final results = <ImportedTerritoryContact>[];
     try {
       final dynamic data = jsonDecode(geoJsonContent);
@@ -205,7 +224,10 @@ class TerritoryDataPortService {
         );
       }
     } catch (e, st) {
-      AppLogger.debug('JSON/GeoJSON malformado ao importar contatos de território: $e', st);
+      AppLogger.debug(
+        'JSON/GeoJSON malformado ao importar contatos de território: $e',
+        st,
+      );
     }
 
     return results;
@@ -222,15 +244,17 @@ class TerritoryDataPortService {
 
     for (final p in people) {
       if (p.deletedAt != null) continue;
-      buffer.writeln([
-        _csvEscape(p.name),
-        _csvEscape(p.phone ?? ''),
-        _csvEscape(p.address ?? ''),
-        _csvEscape(p.status),
-        p.latitude?.toString() ?? '',
-        p.longitude?.toString() ?? '',
-        _csvEscape(p.generalNotes ?? ''),
-      ].join(','));
+      buffer.writeln(
+        [
+          _csvEscape(p.name),
+          _csvEscape(p.phone ?? ''),
+          _csvEscape(p.address ?? ''),
+          _csvEscape(p.status),
+          p.latitude?.toString() ?? '',
+          p.longitude?.toString() ?? '',
+          _csvEscape(p.generalNotes ?? ''),
+        ].join(','),
+      );
     }
 
     return buffer.toString();
@@ -243,15 +267,19 @@ class TerritoryDataPortService {
 
     // Detecta delimitador (, ou ;)
     final firstNewline = csvContent.indexOf('\n');
-    final headerSnippet = firstNewline == -1 ? csvContent : csvContent.substring(0, firstNewline);
+    final headerSnippet = firstNewline == -1
+        ? csvContent
+        : csvContent.substring(0, firstNewline);
     final separator = headerSnippet.contains(';') ? ';' : ',';
 
     final rows = _parseCsvRows(csvContent, separator);
     if (rows.isEmpty) return results;
 
     final firstRow = rows.first;
-    final startIndex = (firstRow.isNotEmpty &&
-            (firstRow[0].toLowerCase().contains('nome') || firstRow[0].toLowerCase().contains('name')))
+    final startIndex =
+        (firstRow.isNotEmpty &&
+            (firstRow[0].toLowerCase().contains('nome') ||
+                firstRow[0].toLowerCase().contains('name')))
         ? 1
         : 0;
 
@@ -265,8 +293,12 @@ class TerritoryDataPortService {
       final status = columns.length > 3 && columns[3].trim().isNotEmpty
           ? columns[3].trim().toLowerCase()
           : 'interessado';
-      final lat = columns.length > 4 ? double.tryParse(columns[4].trim()) : null;
-      final lng = columns.length > 5 ? double.tryParse(columns[5].trim()) : null;
+      final lat = columns.length > 4
+          ? double.tryParse(columns[4].trim())
+          : null;
+      final lng = columns.length > 5
+          ? double.tryParse(columns[5].trim())
+          : null;
       final notes = columns.length > 6 ? columns[6].trim() : null;
 
       if (name.isNotEmpty) {
@@ -314,12 +346,16 @@ class TerritoryDataPortService {
     if (idx == -1) return null;
     final start = idx + prefix.length;
     final end = desc.indexOf('\n', start);
-    final val = (end == -1 ? desc.substring(start) : desc.substring(start, end)).trim();
+    final val = (end == -1 ? desc.substring(start) : desc.substring(start, end))
+        .trim();
     return val.isEmpty ? null : _xmlUnescape(val);
   }
 
   static String _csvEscape(String text) {
-    if (text.contains(',') || text.contains(';') || text.contains('"') || text.contains('\n')) {
+    if (text.contains(',') ||
+        text.contains(';') ||
+        text.contains('"') ||
+        text.contains('\n')) {
       return '"${text.replaceAll('"', '""')}"';
     }
     return text;

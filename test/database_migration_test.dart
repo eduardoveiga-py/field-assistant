@@ -431,7 +431,10 @@ void main() {
       final verReopened = await appDbReopened
           .customSelect('PRAGMA user_version;')
           .getSingle();
-      expect(verReopened.read<int>('user_version'), equals(appDbReopened.schemaVersion));
+      expect(
+        verReopened.read<int>('user_version'),
+        equals(appDbReopened.schemaVersion),
+      );
       expect(
         (await appDbReopened.select(appDbReopened.familyTies).get()).length,
         equals(1),
@@ -531,7 +534,9 @@ void main() {
       expect(ver.read<int>('user_version'), equals(appDb.schemaVersion));
 
       // 1. Verifica coluna last_attempt_at em sync_queue
-      final qRow = await (appDb.select(appDb.syncQueue)..where((t) => t.id.equals('q_v4'))).getSingle();
+      final qRow = await (appDb.select(
+        appDb.syncQueue,
+      )..where((t) => t.id.equals('q_v4'))).getSingle();
       expect(qRow.id, equals('q_v4'));
       expect(qRow.lastAttemptAt, isNull);
 
@@ -604,16 +609,20 @@ void main() {
       expect(resCount, isEmpty);
 
       // 2. Insere e valida registros tipados nas novas tabelas
-      await appDb.into(appDb.inboxEntries).insert(
-        InboxEntriesCompanion.insert(
-          id: 'inbox_1',
-          content: 'Ideia para revisita sobre profecias',
-          capturedAt: DateTime.now(),
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        ),
-      );
-      final savedInbox = await (appDb.select(appDb.inboxEntries)..where((t) => t.id.equals('inbox_1'))).getSingle();
+      await appDb
+          .into(appDb.inboxEntries)
+          .insert(
+            InboxEntriesCompanion.insert(
+              id: 'inbox_1',
+              content: 'Ideia para revisita sobre profecias',
+              capturedAt: DateTime.now(),
+              createdAt: DateTime.now(),
+              updatedAt: DateTime.now(),
+            ),
+          );
+      final savedInbox = await (appDb.select(
+        appDb.inboxEntries,
+      )..where((t) => t.id.equals('inbox_1'))).getSingle();
       expect(savedInbox.content, equals('Ideia para revisita sobre profecias'));
       expect(savedInbox.status, equals('unprocessed'));
 
@@ -641,32 +650,42 @@ void main() {
       expect(ver.read<int>('user_version'), equals(appDb.schemaVersion));
 
       // 1. Verifica se a coluna updated_at existe em app_kv_store
-      final columns = await appDb.customSelect("PRAGMA table_info(app_kv_store)").get();
+      final columns = await appDb
+          .customSelect("PRAGMA table_info(app_kv_store)")
+          .get();
       final colNames = columns.map((c) => c.read<String>('name')).toSet();
       expect(colNames.contains('updated_at'), isTrue);
 
       // 2. Insere e atualiza dados com updated_at usando insertOnConflictUpdate
       final now = DateTime.now();
-      await appDb.into(appDb.appKvStore).insertOnConflictUpdate(
-        AppKvStoreCompanion.insert(
-          key: 'jw_imap_email',
-          value: 'usuario@jw.org',
-          updatedAt: Value(now),
-        ),
-      );
-      await appDb.into(appDb.appKvStore).insertOnConflictUpdate(
-        AppKvStoreCompanion.insert(
-          key: 'jw_imap_host',
-          value: 'mail.jw.org',
-          updatedAt: Value(now),
-        ),
-      );
+      await appDb
+          .into(appDb.appKvStore)
+          .insertOnConflictUpdate(
+            AppKvStoreCompanion.insert(
+              key: 'jw_imap_email',
+              value: 'usuario@jw.org',
+              updatedAt: Value(now),
+            ),
+          );
+      await appDb
+          .into(appDb.appKvStore)
+          .insertOnConflictUpdate(
+            AppKvStoreCompanion.insert(
+              key: 'jw_imap_host',
+              value: 'mail.jw.org',
+              updatedAt: Value(now),
+            ),
+          );
 
-      final emailRow = await (appDb.select(appDb.appKvStore)..where((t) => t.key.equals('jw_imap_email'))).getSingle();
+      final emailRow = await (appDb.select(
+        appDb.appKvStore,
+      )..where((t) => t.key.equals('jw_imap_email'))).getSingle();
       expect(emailRow.value, equals('usuario@jw.org'));
       expect(emailRow.updatedAt, isNotNull);
 
-      final hostRow = await (appDb.select(appDb.appKvStore)..where((t) => t.key.equals('jw_imap_host'))).getSingle();
+      final hostRow = await (appDb.select(
+        appDb.appKvStore,
+      )..where((t) => t.key.equals('jw_imap_host'))).getSingle();
       expect(hostRow.value, equals('mail.jw.org'));
       expect(hostRow.updatedAt, isNotNull);
 

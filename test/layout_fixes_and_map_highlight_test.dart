@@ -291,41 +291,55 @@ void main() {
       },
     );
 
-    testWidgets('Zoom mantém o contato próximo ao ponto esperado após arrastar', (tester) async {
-      tester.view.physicalSize = const Size(1024, 768);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      final db = AppDatabase.forTesting(NativeDatabase.memory());
-      addTearDown(db.close);
-      addTearDown(() async {
+    testWidgets(
+      'Zoom mantém o contato próximo ao ponto esperado após arrastar',
+      (tester) async {
+        tester.view.physicalSize = const Size(1024, 768);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final db = AppDatabase.forTesting(NativeDatabase.memory());
+        addTearDown(db.close);
+        addTearDown(() async {
+          await tester.pumpWidget(const SizedBox());
+          await tester.pump(const Duration(milliseconds: 100));
+        });
+        final now = DateTime.now();
+        await db
+            .into(db.people)
+            .insert(
+              PeopleCompanion.insert(
+                id: 'zoom-test',
+                name: 'Contatozoom',
+                latitude: const Value(-3.1022),
+                longitude: const Value(-67.9397),
+                firstContactAt: now,
+                createdAt: now,
+                updatedAt: now,
+              ),
+            );
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [databaseProvider.overrideWithValue(db)],
+            child: const MaterialApp(home: ContactsMapScreen()),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(CachedTileWidget).evaluate().length, lessThan(300));
+        await tester.drag(find.byType(InteractiveViewer), const Offset(150, 0));
+        await tester.pumpAndSettle();
+        final before = tester.getCenter(find.text('Contatozoom').first);
+        final focal = tester.getCenter(find.byType(InteractiveViewer));
+        await tester.tap(find.byTooltip('Aproximar Zoom'));
+        await tester.pumpAndSettle();
+        final after = tester.getCenter(find.text('Contatozoom').first);
+        expect(after.dx, closeTo(focal.dx + 2 * (before.dx - focal.dx), 50));
+        expect(after.dy, closeTo(focal.dy + 2 * (before.dy - focal.dy), 50));
+        expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox());
         await tester.pump(const Duration(milliseconds: 100));
-      });
-      final now = DateTime.now();
-      await db.into(db.people).insert(PeopleCompanion.insert(
-        id: 'zoom-test', name: 'Contatozoom', latitude: const Value(-3.1022),
-        longitude: const Value(-67.9397), firstContactAt: now, createdAt: now, updatedAt: now,
-      ));
-      await tester.pumpWidget(ProviderScope(
-        overrides: [databaseProvider.overrideWithValue(db)],
-        child: const MaterialApp(home: ContactsMapScreen()),
-      ));
-      await tester.pumpAndSettle();
-      expect(find.byType(CachedTileWidget).evaluate().length, lessThan(300));
-      await tester.drag(find.byType(InteractiveViewer), const Offset(150, 0));
-      await tester.pumpAndSettle();
-      final before = tester.getCenter(find.text('Contatozoom').first);
-      final focal = tester.getCenter(find.byType(InteractiveViewer));
-      await tester.tap(find.byTooltip('Aproximar Zoom'));
-      await tester.pumpAndSettle();
-      final after = tester.getCenter(find.text('Contatozoom').first);
-      expect(after.dx, closeTo(focal.dx + 2 * (before.dx - focal.dx), 50));
-      expect(after.dy, closeTo(focal.dy + 2 * (before.dy - focal.dy), 50));
-      expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox());
-      await tester.pump(const Duration(milliseconds: 100));
-    });
+      },
+    );
 
     testWidgets(
       'ContactsMapScreen auto-geocodes highlighted contact without GPS coordinates',
@@ -373,7 +387,9 @@ void main() {
       },
     );
 
-    testWidgets('Busca aproximada não grava coordenadas sem confirmação', (tester) async {
+    testWidgets('Busca aproximada não grava coordenadas sem confirmação', (
+      tester,
+    ) async {
       tester.view.physicalSize = const Size(1024, 768);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -381,26 +397,51 @@ void main() {
       final db = AppDatabase.forTesting(NativeDatabase.memory());
       addTearDown(db.close);
       final now = DateTime.now();
-      await db.into(db.people).insert(PeopleCompanion.insert(
-        id: 'review_geo', name: 'Pessoa', address: const Value('Endereço aproximado'),
-        firstContactAt: now, createdAt: now, updatedAt: now,
-      ));
-      await tester.pumpWidget(ProviderScope(
-        overrides: [databaseProvider.overrideWithValue(db)],
-        child: MaterialApp(home: ContactsMapScreen(highlightPersonId: 'review_geo',
-          geocodeAddress: (_) async => const ReverseGeocodingResult(latitude: -3.1, longitude: -67.9))),
-      ));
+      await db
+          .into(db.people)
+          .insert(
+            PeopleCompanion.insert(
+              id: 'review_geo',
+              name: 'Pessoa',
+              address: const Value('Endereço aproximado'),
+              firstContactAt: now,
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [databaseProvider.overrideWithValue(db)],
+          child: MaterialApp(
+            home: ContactsMapScreen(
+              highlightPersonId: 'review_geo',
+              geocodeAddress: (_) async => const ReverseGeocodingResult(
+                latitude: -3.1,
+                longitude: -67.9,
+              ),
+            ),
+          ),
+        ),
+      );
       for (var i = 0; i < 15; i++) {
         await tester.pump(const Duration(milliseconds: 100));
       }
       expect(find.text('Localização aproximada'), findsOneWidget);
-      final person = await tester.runAsync(() => (db.select(db.people)..where((t) => t.id.equals('review_geo'))).getSingle());
+      final person = await tester.runAsync(
+        () => (db.select(
+          db.people,
+        )..where((t) => t.id.equals('review_geo'))).getSingle(),
+      );
       expect(person!.latitude, isNull);
       expect(person.longitude, isNull);
       await tester.tap(find.text('Agora não'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
-      final after = await tester.runAsync(() => (db.select(db.people)..where((t) => t.id.equals('review_geo'))).getSingle());
+      final after = await tester.runAsync(
+        () => (db.select(
+          db.people,
+        )..where((t) => t.id.equals('review_geo'))).getSingle(),
+      );
       expect(after!.latitude, isNull);
       expect(after.longitude, isNull);
       await tester.pumpWidget(const SizedBox());

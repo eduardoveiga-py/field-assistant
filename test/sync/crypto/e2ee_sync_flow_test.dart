@@ -302,14 +302,18 @@ void main() {
         isEmpty,
       );
 
-      // Verifica Storage criptografado (manifest + chunk, zero bytes em claro)
+      // Verifica Storage criptografado (manifest + chunk versionado, zero bytes em claro)
       expect(
         cloud.storageObjects.keys,
         contains('voice_notes/$testOwner/e2ee/vn_e2ee_1/manifest.enc'),
       );
       expect(
-        cloud.storageObjects.keys,
-        contains('voice_notes/$testOwner/e2ee/vn_e2ee_1/chunk_0.enc'),
+        cloud.storageObjects.keys.any(
+          (k) =>
+              k.startsWith('voice_notes/$testOwner/e2ee/vn_e2ee_1/') &&
+              k.endsWith('chunk_0.enc'),
+        ),
+        isTrue,
       );
       for (final rawObj in cloud.storageObjects.values) {
         final asText = utf8.decode(rawObj, allowMalformed: true);

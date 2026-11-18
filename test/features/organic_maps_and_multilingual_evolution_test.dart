@@ -37,12 +37,18 @@ void main() {
       // Padrão OSM
       tileService.setLayerStyle(MapLayerStyle.standard);
       expect(tileService.activeStyle, equals(MapLayerStyle.standard));
-      expect(tileService.getTileUrl(10, 300, 400), contains('openstreetmap.org/10/300/400.png'));
+      expect(
+        tileService.getTileUrl(10, 300, 400),
+        contains('openstreetmap.org/10/300/400.png'),
+      );
 
       // Satélite Esri
       tileService.setLayerStyle(MapLayerStyle.satellite);
       expect(tileService.activeStyle, equals(MapLayerStyle.satellite));
-      expect(tileService.getTileUrl(10, 300, 400), contains('arcgisonline.com'));
+      expect(
+        tileService.getTileUrl(10, 300, 400),
+        contains('arcgisonline.com'),
+      );
       expect(tileService.getTileUrl(10, 300, 400), contains('World_Imagery'));
 
       // Topográfico OpenTopoMap
@@ -53,7 +59,10 @@ void main() {
       // Modo Noturno Carto Dark
       tileService.setLayerStyle(MapLayerStyle.dark);
       expect(tileService.activeStyle, equals(MapLayerStyle.dark));
-      expect(tileService.getTileUrl(10, 300, 400), contains('cartocdn.com/dark_all'));
+      expect(
+        tileService.getTileUrl(10, 300, 400),
+        contains('cartocdn.com/dark_all'),
+      );
 
       // Retorna para standard
       tileService.setLayerStyle(MapLayerStyle.standard);
@@ -110,27 +119,33 @@ void main() {
       expect(tca.symbol, equals('🏹'));
     });
 
-    test('ActiveLanguageNotifier persiste idioma selecionado no AppKvStore', () async {
-      final container = ProviderContainer(
-        overrides: [
-          databaseProvider.overrideWithValue(db),
-        ],
-      );
-      addTearDown(container.dispose);
+    test(
+      'ActiveLanguageNotifier persiste idioma selecionado no AppKvStore',
+      () async {
+        final container = ProviderContainer(
+          overrides: [databaseProvider.overrideWithValue(db)],
+        );
+        addTearDown(container.dispose);
 
-      // Aguarda inicialização do banco
-      await db.customSelect('SELECT 1').get();
+        // Aguarda inicialização do banco
+        await db.customSelect('SELECT 1').get();
 
-      final languages = await (db.select(db.appLanguages)).get();
-      final gub = languages.firstWhere((l) => l.id == 'gub');
+        final languages = await (db.select(db.appLanguages)).get();
+        final gub = languages.firstWhere((l) => l.id == 'gub');
 
-      await container.read(activeLanguageProvider.notifier).selectLanguage(gub);
-      expect(container.read(activeLanguageProvider)?.id, equals('gub'));
+        await container
+            .read(activeLanguageProvider.notifier)
+            .selectLanguage(gub);
+        expect(container.read(activeLanguageProvider)?.id, equals('gub'));
 
-      // Verifica persistência na tabela AppKvStore
-      final row = await (db.select(db.appKvStore)..where((t) => t.key.equals('active_language_code'))).getSingleOrNull();
-      expect(row, isNotNull);
-      expect(row!.value, equals('gub'));
-    });
+        // Verifica persistência na tabela AppKvStore
+        final row =
+            await (db.select(db.appKvStore)
+                  ..where((t) => t.key.equals('active_language_code')))
+                .getSingleOrNull();
+        expect(row, isNotNull);
+        expect(row!.value, equals('gub'));
+      },
+    );
   });
 }

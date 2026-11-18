@@ -13,7 +13,7 @@ import 'recovery_vault_verifier.dart';
 /// Armazena exclusivamente a chave derivada (SecretKey), nunca a frase em texto claro.
 class RecoveryKeyStore {
   RecoveryKeyStore({FlutterSecureStorage? storage})
-      : _storage = storage ?? const FlutterSecureStorage();
+    : _storage = storage ?? const FlutterSecureStorage();
 
   final FlutterSecureStorage _storage;
   static Future<void> _tail = Future<void>.value();
@@ -32,12 +32,14 @@ class RecoveryKeyStore {
   }
 
   static String _storageKey(String owner) {
-    if (owner.isEmpty || owner.trim() != owner) throw ArgumentError('Conta inválida.');
+    if (owner.isEmpty || owner.trim() != owner)
+      throw ArgumentError('Conta inválida.');
     return 'e2ee_root_v1_${digest.sha256.convert(utf8.encode(owner))}';
   }
 
   static List<int> _decode(String value) {
-    if (!value.startsWith('v1:')) throw const FormatException('Chave local inválida.');
+    if (!value.startsWith('v1:'))
+      throw const FormatException('Chave local inválida.');
     final raw = value.substring(3);
     if (raw.length != 44) throw const FormatException('Chave local inválida.');
     final bytes = base64Decode(raw);
@@ -66,7 +68,10 @@ class RecoveryKeyStore {
   });
 
   /// Copia a chave de recuperação entre contas (ex: local_user para usuário autenticado)
-  Future<void> copyOwnerKey({required String fromOwner, required String toOwner}) => _serialized(() async {
+  Future<void> copyOwnerKey({
+    required String fromOwner,
+    required String toOwner,
+  }) => _serialized(() async {
     if (fromOwner == toOwner) return;
     if (kIsWeb) {
       final k = _webMemoryKeys[fromOwner];
@@ -88,7 +93,11 @@ class RecoveryKeyStore {
     required String expectedVaultId,
   }) async {
     final key = await RecoveryCrypto.keyFromPhrase(phrase);
-    final id = await RecoveryVaultVerifier.verify(root: key, owner: owner, marker: marker);
+    final id = await RecoveryVaultVerifier.verify(
+      root: key,
+      owner: owner,
+      marker: marker,
+    );
     if (id != expectedVaultId) {
       throw StateError('Identidade do cofre não confere; chave não instalada.');
     }
@@ -102,14 +111,19 @@ class RecoveryKeyStore {
     required String confirmation,
   }) => _serialized(() async {
     final storageKey = _storageKey(owner);
-    final proposed = await (await RecoveryCrypto.keyFromPhrase(phrase)).extractBytes();
-    final confirmed = await (await RecoveryCrypto.keyFromPhrase(confirmation)).extractBytes();
-    if (!_equal(proposed, confirmed)) throw const FormatException('A confirmação da frase não confere.');
+    final proposed = await (await RecoveryCrypto.keyFromPhrase(phrase))
+        .extractBytes();
+    final confirmed = await (await RecoveryCrypto.keyFromPhrase(confirmation))
+        .extractBytes();
+    if (!_equal(proposed, confirmed))
+      throw const FormatException('A confirmação da frase não confere.');
 
     if (kIsWeb) {
       final current = _webMemoryKeys[owner];
       if (current != null && !_equal(_decode(current), proposed)) {
-        throw StateError('Já existe outra chave local para esta conta; ela não foi substituída.');
+        throw StateError(
+          'Já existe outra chave local para esta conta; ela não foi substituída.',
+        );
       }
       final serialized = 'v1:${base64Encode(proposed)}';
       _webMemoryKeys[owner] = serialized;
@@ -119,7 +133,9 @@ class RecoveryKeyStore {
     final current = await _storage.read(key: storageKey);
     if (current != null) {
       if (!_equal(_decode(current), proposed)) {
-        throw StateError('Já existe outra chave local para esta conta; ela não foi substituída.');
+        throw StateError(
+          'Já existe outra chave local para esta conta; ela não foi substituída.',
+        );
       }
       return;
     }

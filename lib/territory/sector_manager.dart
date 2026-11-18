@@ -79,14 +79,14 @@ class SectorManager {
   Future<TerritorySector> addSector(String name, {String? description}) async {
     final trimmed = name.trim();
     final now = DateTime.now();
-    final cleanDesc =
-        description != null && description.trim().isNotEmpty
-            ? description.trim()
-            : null;
+    final cleanDesc = description != null && description.trim().isNotEmpty
+        ? description.trim()
+        : null;
 
-    final existingActive = await (db.select(db.territorySectors)
-          ..where((t) => t.name.equals(trimmed) & t.deletedAt.isNull()))
-        .getSingleOrNull();
+    final existingActive =
+        await (db.select(db.territorySectors)
+              ..where((t) => t.name.equals(trimmed) & t.deletedAt.isNull()))
+            .getSingleOrNull();
     if (existingActive != null) {
       return TerritorySector.fromEntry(existingActive);
     }
@@ -104,17 +104,21 @@ class SectorManager {
 
     await db.transaction(() async {
       await db.into(db.territorySectors).insert(entry);
-      await db.into(db.syncQueue).insert(
-        SyncQueueCompanion.insert(
-          id: _uuid.v4(),
-          entityType: 'territory_sectors',
-          entityId: id,
-          operation: 'INSERT',
-          payload: jsonEncode(SyncTimestamp.normalizeMapDates(entry.toJson())),
-          createdAt: now,
-          status: const Value('pending'),
-        ),
-      );
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: _uuid.v4(),
+              entityType: 'territory_sectors',
+              entityId: id,
+              operation: 'INSERT',
+              payload: jsonEncode(
+                SyncTimestamp.normalizeMapDates(entry.toJson()),
+              ),
+              createdAt: now,
+              status: const Value('pending'),
+            ),
+          );
     });
 
     return TerritorySector.fromEntry(entry);
@@ -128,9 +132,9 @@ class SectorManager {
   }) async {
     final trimmed = newName.trim();
     final now = DateTime.now();
-    final existing = await (db.select(db.territorySectors)
-          ..where((t) => t.id.equals(id)))
-        .getSingleOrNull();
+    final existing = await (db.select(
+      db.territorySectors,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
     if (existing == null) return;
     final oldName = existing.name;
 
@@ -148,17 +152,19 @@ class SectorManager {
       await db.update(db.territorySectors).replace(updated);
       final payload = SyncTimestamp.normalizeMapDates(updated.toJson());
       payload['_base'] = SyncTimestamp.normalizeMapDates(existing.toJson());
-      await db.into(db.syncQueue).insert(
-        SyncQueueCompanion.insert(
-          id: _uuid.v4(),
-          entityType: 'territory_sectors',
-          entityId: id,
-          operation: 'UPDATE',
-          payload: jsonEncode(payload),
-          createdAt: now,
-          status: const Value('pending'),
-        ),
-      );
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: _uuid.v4(),
+              entityType: 'territory_sectors',
+              entityId: id,
+              operation: 'UPDATE',
+              payload: jsonEncode(payload),
+              createdAt: now,
+              status: const Value('pending'),
+            ),
+          );
     });
 
     if (repo != null && oldName != trimmed) {
@@ -175,37 +181,40 @@ class SectorManager {
 
   Future<void> deleteSector(String id) async {
     final now = DateTime.now();
-    final existing = await (db.select(db.territorySectors)
-          ..where((t) => t.id.equals(id)))
-        .getSingleOrNull();
+    final existing = await (db.select(
+      db.territorySectors,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
     if (existing == null) return;
 
     final nextRev = existing.revision + 1;
     await db.transaction(() async {
-      await (db.update(db.territorySectors)..where((t) => t.id.equals(id)))
-          .write(
+      await (db.update(
+        db.territorySectors,
+      )..where((t) => t.id.equals(id))).write(
         TerritorySectorsCompanion(
           deletedAt: Value(now),
           updatedAt: Value(now),
           revision: Value(nextRev),
         ),
       );
-      await db.into(db.syncQueue).insert(
-        SyncQueueCompanion.insert(
-          id: _uuid.v4(),
-          entityType: 'territory_sectors',
-          entityId: id,
-          operation: 'DELETE',
-          payload: jsonEncode({
-            'id': id,
-            'deleted_at': now.toUtc().toIso8601String(),
-            'updated_at': now.toUtc().toIso8601String(),
-            'revision': nextRev,
-          }),
-          createdAt: now,
-          status: const Value('pending'),
-        ),
-      );
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: _uuid.v4(),
+              entityType: 'territory_sectors',
+              entityId: id,
+              operation: 'DELETE',
+              payload: jsonEncode({
+                'id': id,
+                'deleted_at': now.toUtc().toIso8601String(),
+                'updated_at': now.toUtc().toIso8601String(),
+                'revision': nextRev,
+              }),
+              createdAt: now,
+              status: const Value('pending'),
+            ),
+          );
     });
   }
 }

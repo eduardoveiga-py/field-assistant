@@ -47,13 +47,18 @@ abstract class AudioRecordingService {
 
   Future<bool> hasPermission();
   Future<bool> requestPermission();
-  Future<String> startRecording({String? customPath, int maxDurationSeconds = 30});
+  Future<String> startRecording({
+    String? customPath,
+    int maxDurationSeconds = 30,
+  });
   Future<RecordingResult?> stopRecording();
   Future<void> cancelRecording();
   void dispose();
 
   /// Retorna a implementação recomendada para a plataforma atual.
-  static AudioRecordingService platform({AudioRecordingService? overrideService}) {
+  static AudioRecordingService platform({
+    AudioRecordingService? overrideService,
+  }) {
     if (overrideService != null) return overrideService;
     return RealAudioRecordingService();
   }
@@ -66,6 +71,7 @@ class RealAudioRecordingService implements AudioRecordingService {
   final Uuid _uuid = const Uuid();
   bool _isRecording = false;
   Timer? _timer;
+  StreamSubscription<RecordState>? _recordStateSub;
   int _elapsedSeconds = 0;
   DateTime? _startedAt;
   String? _currentFilePath;
@@ -102,7 +108,10 @@ class RealAudioRecordingService implements AudioRecordingService {
   }
 
   @override
-  Future<String> startRecording({String? customPath, int maxDurationSeconds = 30}) async {
+  Future<String> startRecording({
+    String? customPath,
+    int maxDurationSeconds = 30,
+  }) async {
     _maxDurationSeconds = maxDurationSeconds;
     if (_isRecording) {
       await cancelRecording();
@@ -135,7 +144,11 @@ class RealAudioRecordingService implements AudioRecordingService {
           }
           _currentFilePath = '${voiceDir.path}/$fileName';
         } catch (e, st) {
-          AppLogger.warning('Falha ao criar diretório voice_notes; usando nome relativo', e, st);
+          AppLogger.warning(
+            'Falha ao criar diretório voice_notes; usando nome relativo',
+            e,
+            st,
+          );
           _currentFilePath = fileName;
         }
       }
@@ -163,11 +176,19 @@ class RealAudioRecordingService implements AudioRecordingService {
       config = const RecordConfig(encoder: AudioEncoder.aacLc);
     }
 
-    await _audioRecorder.start(
-      config,
-      path: _currentFilePath!,
-    );
+    await _audioRecorder.start(config, path: _currentFilePath!);
     _isRecording = true;
+
+    // Trata interrupção de áudio pelo sistema operacional (ex.: chamada recebida no iOS via AVAudioSession)
+    _recordStateSub?.cancel();
+    _recordStateSub = _audioRecorder.onStateChanged().listen((state) {
+      if (state == RecordState.stop && _isRecording) {
+        AppLogger.info(
+          'Interrupção de áudio detectada pelo sistema operacional. Finalizando gravação com integridade.',
+        );
+        unawaited(stopRecording());
+      }
+    });
 
     _durationController.add(0);
     _timer?.cancel();
@@ -196,6 +217,8 @@ class RealAudioRecordingService implements AudioRecordingService {
 
     _timer?.cancel();
     _timer = null;
+    _recordStateSub?.cancel();
+    _recordStateSub = null;
     _isRecording = false;
 
     String? path;
@@ -218,7 +241,11 @@ class RealAudioRecordingService implements AudioRecordingService {
           size = await file.length();
         }
       } catch (e, st) {
-        AppLogger.warning('Falha ao medir tamanho do áudio gravado ($path)', e, st);
+        AppLogger.warning(
+          'Falha ao medir tamanho do áudio gravado ($path)',
+          e,
+          st,
+        );
         size = 0;
       }
     } else {
@@ -233,7 +260,10 @@ class RealAudioRecordingService implements AudioRecordingService {
             size = response.bodyBytes.length;
           }
         } catch (e, st) {
-          AppLogger.debug('Falha ao medir tamanho do áudio Web ($path): $e', st);
+          AppLogger.debug(
+            'Falha ao medir tamanho do áudio Web ($path): $e',
+            st,
+          );
           size = 0;
         }
       }
@@ -252,6 +282,8 @@ class RealAudioRecordingService implements AudioRecordingService {
   Future<void> cancelRecording() async {
     _timer?.cancel();
     _timer = null;
+    _recordStateSub?.cancel();
+    _recordStateSub = null;
     _isRecording = false;
     _elapsedSeconds = 0;
 
@@ -268,7 +300,10 @@ class RealAudioRecordingService implements AudioRecordingService {
           await file.delete();
         }
       } catch (e, st) {
-        AppLogger.debug('Falha ao remover arquivo temporário cancelado ($_currentFilePath): $e', st);
+        AppLogger.debug(
+          'Falha ao remover arquivo temporário cancelado ($_currentFilePath): $e',
+          st,
+        );
       }
     }
     _currentFilePath = null;
@@ -279,6 +314,8 @@ class RealAudioRecordingService implements AudioRecordingService {
   void dispose() {
     _timer?.cancel();
     _timer = null;
+    _recordStateSub?.cancel();
+    _recordStateSub = null;
     _durationController.close();
     try {
       _audioRecorder.dispose();
@@ -299,6 +336,7 @@ class LocalAudioRecordingService implements AudioRecordingService {
   int _maxDurationSeconds = 30;
   bool _isRecording = false;
   Timer? _timer;
+  StreamSubscription<RecordState>? _recordStateSub;
   int _elapsedSeconds = 0;
   DateTime? _startedAt;
   String? _currentFilePath;
@@ -339,7 +377,10 @@ class LocalAudioRecordingService implements AudioRecordingService {
   }
 
   @override
-  Future<String> startRecording({String? customPath, int maxDurationSeconds = 30}) async {
+  Future<String> startRecording({
+    String? customPath,
+    int maxDurationSeconds = 30,
+  }) async {
     _maxDurationSeconds = maxDurationSeconds;
     if (_isRecording) {
       await cancelRecording();
@@ -375,7 +416,11 @@ class LocalAudioRecordingService implements AudioRecordingService {
           }
           _currentFilePath = '${voiceDir.path}/$fileName';
         } catch (e, st) {
-          AppLogger.warning('Falha ao criar diretório voice_notes; usando nome relativo', e, st);
+          AppLogger.warning(
+            'Falha ao criar diretório voice_notes; usando nome relativo',
+            e,
+            st,
+          );
           _currentFilePath = fileName;
         }
       }
@@ -422,7 +467,10 @@ class LocalAudioRecordingService implements AudioRecordingService {
           size = file.lengthSync();
         }
       } catch (e, st) {
-        AppLogger.debug('Falha ao inspecionar tamanho do arquivo local ($path): $e', st);
+        AppLogger.debug(
+          'Falha ao inspecionar tamanho do arquivo local ($path): $e',
+          st,
+        );
         size = 0;
       }
     }
@@ -440,6 +488,8 @@ class LocalAudioRecordingService implements AudioRecordingService {
   Future<void> cancelRecording() async {
     _timer?.cancel();
     _timer = null;
+    _recordStateSub?.cancel();
+    _recordStateSub = null;
     _isRecording = false;
     _elapsedSeconds = 0;
 
@@ -452,7 +502,10 @@ class LocalAudioRecordingService implements AudioRecordingService {
           await file.delete();
         }
       } catch (e, st) {
-        AppLogger.debug('Falha ao limpar arquivo temporário local ($_currentFilePath): $e', st);
+        AppLogger.debug(
+          'Falha ao limpar arquivo temporário local ($_currentFilePath): $e',
+          st,
+        );
       }
     }
     _currentFilePath = null;

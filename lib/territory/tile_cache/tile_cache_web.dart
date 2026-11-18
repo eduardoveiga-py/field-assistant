@@ -39,7 +39,8 @@ class TileCacheWeb implements TileCacheBackend {
     if (bytes.length < 500) {
       try {
         final text = String.fromCharCodes(bytes);
-        if (text.contains('Access blocked') || text.contains('osm.wiki/Blocked')) {
+        if (text.contains('Access blocked') ||
+            text.contains('osm.wiki/Blocked')) {
           return true;
         }
       } catch (e, st) {
@@ -53,7 +54,12 @@ class TileCacheWeb implements TileCacheBackend {
   bool isBlockedTile(Uint8List bytes) => _isBlockedTile(bytes);
 
   @override
-  Future<Uint8List?> getTile(int z, int x, int y, [MapLayerStyle? style]) async {
+  Future<Uint8List?> getTile(
+    int z,
+    int x,
+    int y, [
+    MapLayerStyle? style,
+  ]) async {
     final s = style ?? TileCacheService.instance.activeStyle;
     final key = '${s.id}/$z/$x/$y';
     final legacyKey = '$z/$x/$y';
@@ -78,20 +84,24 @@ class TileCacheWeb implements TileCacheBackend {
       // 1ª Tentativa: Provedor de azulejos oficial com estilo selecionado
       final uri = Uri.parse(TileCacheService.instance.getTileUrl(z, x, y, s));
       try {
-        final res = await client.get(
-          uri,
-          headers: {
-            'User-Agent': _userAgent,
-            'Accept': 'image/png,image/*',
-          },
-        ).timeout(const Duration(seconds: 5));
+        final res = await client
+            .get(
+              uri,
+              headers: {
+                'User-Agent': _userAgent,
+                'Accept': 'image/png,image/*',
+              },
+            )
+            .timeout(const Duration(seconds: 5));
 
         final etag = res.headers['etag']?.toLowerCase() ?? '';
-        final isWatermarked = etag.contains('wm-') ||
+        final isWatermarked =
+            etag.contains('wm-') ||
             res.bodyBytes.length == 2049 ||
             res.bodyBytes.length == 2513;
 
-        final isOsmBlocked = res.headers.containsKey('x-blocked') ||
+        final isOsmBlocked =
+            res.headers.containsKey('x-blocked') ||
             isWatermarked ||
             res.bodyBytes.length == _blockedTileByteLength ||
             _isBlockedTile(res.bodyBytes);
@@ -109,20 +119,24 @@ class TileCacheWeb implements TileCacheBackend {
         'https://a.tile.openstreetmap.fr/osmfr/$z/$x/$y.png',
       );
       try {
-        final resFallback = await client.get(
-          fallbackUri,
-          headers: {
-            'User-Agent': _userAgent,
-            'Accept': 'image/png,image/*',
-          },
-        ).timeout(const Duration(seconds: 6));
+        final resFallback = await client
+            .get(
+              fallbackUri,
+              headers: {
+                'User-Agent': _userAgent,
+                'Accept': 'image/png,image/*',
+              },
+            )
+            .timeout(const Duration(seconds: 6));
 
         final fallbackEtag = resFallback.headers['etag']?.toLowerCase() ?? '';
-        final isFallbackWatermarked = fallbackEtag.contains('wm-') ||
+        final isFallbackWatermarked =
+            fallbackEtag.contains('wm-') ||
             resFallback.bodyBytes.length == 2049 ||
             resFallback.bodyBytes.length == 2513;
 
-        final isFallbackBlocked = resFallback.headers.containsKey('x-blocked') ||
+        final isFallbackBlocked =
+            resFallback.headers.containsKey('x-blocked') ||
             isFallbackWatermarked ||
             resFallback.bodyBytes.length == _blockedTileByteLength ||
             _isBlockedTile(resFallback.bodyBytes);
@@ -141,7 +155,13 @@ class TileCacheWeb implements TileCacheBackend {
   }
 
   @override
-  Future<void> saveTile(int z, int x, int y, Uint8List bytes, [MapLayerStyle? style]) async {
+  Future<void> saveTile(
+    int z,
+    int x,
+    int y,
+    Uint8List bytes, [
+    MapLayerStyle? style,
+  ]) async {
     final s = style ?? TileCacheService.instance.activeStyle;
     final key = '${s.id}/$z/$x/$y';
     if (_isBlockedTile(bytes)) {
@@ -156,7 +176,8 @@ class TileCacheWeb implements TileCacheBackend {
     final s = style ?? TileCacheService.instance.activeStyle;
     final key = '${s.id}/$z/$x/$y';
     final legacyKey = '$z/$x/$y';
-    final bytes = _cache[key] ?? (s == MapLayerStyle.standard ? _cache[legacyKey] : null);
+    final bytes =
+        _cache[key] ?? (s == MapLayerStyle.standard ? _cache[legacyKey] : null);
     if (bytes == null || _isBlockedTile(bytes)) {
       _cache.remove(key);
       if (s == MapLayerStyle.standard) _cache.remove(legacyKey);

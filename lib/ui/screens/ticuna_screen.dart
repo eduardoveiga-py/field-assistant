@@ -98,7 +98,8 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
             w.translation.toLowerCase().contains(searchQuery) ||
             (w.phonetics?.toLowerCase().contains(searchQuery) ?? false) ||
             (w.exampleSentence?.toLowerCase().contains(searchQuery) ?? false) ||
-            (w.exampleTranslation?.toLowerCase().contains(searchQuery) ?? false) ||
+            (w.exampleTranslation?.toLowerCase().contains(searchQuery) ??
+                false) ||
             (w.notes?.toLowerCase().contains(searchQuery) ?? false);
       }
       return true;
@@ -129,12 +130,14 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
     return Scaffold(
       appBar: AppBar(
         title: InkWell(
-          onTap: () => _showLanguageSelectorModal(context, allLanguages, activeLang),
+          onTap: () =>
+              _showLanguageSelectorModal(context, allLanguages, activeLang),
           borderRadius: BorderRadius.circular(20),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: const Color(0xFF0D9488).withValues(alpha: isDark ? 0.22 : 0.12),
+              color: const Color(0xFF0D9488)
+                  .withValues(alpha: isDark ? 0.22 : 0.12),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
                 color: const Color(0xFF0D9488).withValues(alpha: 0.35),
@@ -143,10 +146,7 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  activeLang.symbol,
-                  style: const TextStyle(fontSize: 18),
-                ),
+                Text(activeLang.symbol, style: const TextStyle(fontSize: 18)),
                 const SizedBox(width: 6),
                 Flexible(
                   child: Column(
@@ -158,7 +158,9 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                         children: [
                           Flexible(
                             child: Text(
-                              activeLang.id == 'tca' ? 'Língua Ticuna' : activeLang.name,
+                              activeLang.id == 'tca'
+                                  ? 'Língua Ticuna'
+                                  : activeLang.name,
                               style: const TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.bold,
@@ -178,7 +180,9 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                         'Dicionário & Frases de Campo',
                         style: TextStyle(
                           fontSize: 10,
-                          color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                          color: isDark
+                              ? Colors.grey.shade400
+                              : Colors.grey.shade600,
                         ),
                       ),
                     ],
@@ -193,7 +197,8 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
           IconButton(
             tooltip: 'Gerenciar Idiomas & + Novo Idioma',
             icon: const Icon(Icons.language_rounded, color: Color(0xFF0D9488)),
-            onPressed: () => _showLanguageSelectorModal(context, allLanguages, activeLang),
+            onPressed: () =>
+                _showLanguageSelectorModal(context, allLanguages, activeLang),
           ),
           // Botão Frases Situacionais & Comparador Multilíngue
           IconButton(
@@ -209,7 +214,9 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
               if (langWords.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('Cadastre palavras em ${activeLang.name} para treinar!'),
+                    content: Text(
+                      'Cadastre palavras em ${activeLang.name} para treinar!',
+                    ),
                   ),
                 );
                 return;
@@ -234,7 +241,9 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
           controller: _tabController,
           indicatorColor: const Color(0xFF0D9488),
           labelColor: const Color(0xFF0D9488),
-          unselectedLabelColor: isDark ? Colors.grey.shade400 : Colors.grey.shade700,
+          unselectedLabelColor: isDark
+              ? Colors.grey.shade400
+              : Colors.grey.shade700,
           tabs: [
             Tab(
               child: Row(
@@ -366,7 +375,9 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                         size: 20,
                         color: _showSearchDiacritics
                             ? const Color(0xFF0D9488)
-                            : (isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                            : (isDark
+                                  ? Colors.grey.shade400
+                                  : Colors.grey.shade600),
                       ),
                       tooltip: activeLang.id == 'tca'
                           ? 'Teclado Especial Ticuna'
@@ -379,7 +390,10 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                     ),
                 ],
               ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 10,
+              ),
               filled: true,
               fillColor: isDark ? const Color(0xFF0F172A) : Colors.white,
               border: OutlineInputBorder(
@@ -419,8 +433,10 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    const Color(0xFF0D9488).withValues(alpha: isDark ? 0.25 : 0.12),
-                    const Color(0xFF059669).withValues(alpha: isDark ? 0.20 : 0.08),
+                    const Color(0xFF0D9488)
+                        .withValues(alpha: isDark ? 0.25 : 0.12),
+                    const Color(0xFF059669)
+                        .withValues(alpha: isDark ? 0.20 : 0.08),
                   ],
                 ),
                 borderRadius: BorderRadius.circular(8),
@@ -442,7 +458,11 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                       ),
                     ),
                   ),
-                  Icon(Icons.arrow_forward_ios, size: 12, color: Color(0xFF0D9488)),
+                  Icon(
+                    Icons.arrow_forward_ios,
+                    size: 12,
+                    color: Color(0xFF0D9488),
+                  ),
                 ],
               ),
             ),
@@ -487,7 +507,8 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                     child: FilterChip(
                       label: Text(tag.name),
                       selected: isSelected,
-                      selectedColor: const Color(0xFF0D9488).withValues(alpha: 0.2),
+                      selectedColor: const Color(0xFF0D9488)
+                          .withValues(alpha: 0.2),
                       checkmarkColor: const Color(0xFF0D9488),
                       onSelected: (val) {
                         setState(() {
@@ -557,9 +578,7 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: isDark ? Colors.white10 : Colors.grey.shade200,
-        ),
+        side: BorderSide(color: isDark ? Colors.white10 : Colors.grey.shade200),
       ),
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -595,7 +614,9 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                               Clipboard.setData(ClipboardData(text: item.word));
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text('Termo "${item.word}" copiado!'),
+                                  content: Text(
+                                    'Termo "${item.word}" copiado!',
+                                  ),
                                   duration: const Duration(seconds: 1),
                                 ),
                               );
@@ -611,7 +632,9 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                             style: TicunaUnicodeHelper.textStyle(
                               fontSize: 12,
                               fontStyle: FontStyle.italic,
-                              color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                              color: isDark
+                                  ? Colors.grey.shade400
+                                  : Colors.grey.shade600,
                             ),
                           ),
                         ),
@@ -621,7 +644,10 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                 if (item.grammaticalClass != null &&
                     item.grammaticalClass!.isNotEmpty)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF0D9488).withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(6),
@@ -705,13 +731,16 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
             ),
 
             // Exemplo de frase
-            if (item.exampleSentence != null && item.exampleSentence!.isNotEmpty) ...[
+            if (item.exampleSentence != null &&
+                item.exampleSentence!.isNotEmpty) ...[
               const SizedBox(height: 8),
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                  color: isDark
+                      ? const Color(0xFF0F172A)
+                      : const Color(0xFFF1F5F9),
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(
                     color: isDark ? Colors.white10 : Colors.grey.shade300,
@@ -735,7 +764,9 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                         '→ ${item.exampleTranslation}',
                         style: TextStyle(
                           fontSize: 11.5,
-                          color: isDark ? Colors.grey.shade400 : Colors.grey.shade700,
+                          color: isDark
+                              ? Colors.grey.shade400
+                              : Colors.grey.shade700,
                         ),
                       ),
                     ],
@@ -768,16 +799,23 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                     runSpacing: 4,
                     children: item.tags.map((t) {
                       return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                          color: isDark
+                              ? const Color(0xFF334155)
+                              : const Color(0xFFE2E8F0),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           t,
                           style: TextStyle(
                             fontSize: 10,
-                            color: isDark ? Colors.grey.shade300 : Colors.grey.shade700,
+                            color: isDark
+                                ? Colors.grey.shade300
+                                : Colors.grey.shade700,
                           ),
                         ),
                       );
@@ -896,9 +934,7 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: isDark ? Colors.white10 : Colors.grey.shade200,
-        ),
+        side: BorderSide(color: isDark ? Colors.white10 : Colors.grey.shade200),
       ),
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -910,7 +946,10 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
               children: [
                 if (item.category != null && item.category!.isNotEmpty)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF0D9488).withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(6),
@@ -932,7 +971,9 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                     Clipboard.setData(ClipboardData(text: item.phrase));
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('Frase copiada para a área de transferência!'),
+                        content: Text(
+                          'Frase copiada para a área de transferência!',
+                        ),
                         duration: Duration(seconds: 1),
                       ),
                     );
@@ -1048,16 +1089,23 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                 runSpacing: 4,
                 children: item.tags.map((t) {
                   return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                      color: isDark
+                          ? const Color(0xFF334155)
+                          : const Color(0xFFE2E8F0),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
                       t,
                       style: TextStyle(
                         fontSize: 10,
-                        color: isDark ? Colors.grey.shade300 : Colors.grey.shade700,
+                        color: isDark
+                            ? Colors.grey.shade300
+                            : Colors.grey.shade700,
                       ),
                     ),
                   );
@@ -1083,7 +1131,8 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
   }) {
     final AppLanguageEntry lang =
         activeLang ?? ref.read(currentActiveLanguageProvider);
-    final diacritics = activeDiacritics ?? parseLanguageDiacritics(lang.diacritics);
+    final diacritics =
+        activeDiacritics ?? parseLanguageDiacritics(lang.diacritics);
 
     String selectedClass = wordToEdit?.grammaticalClass ?? 'Substantivo';
     final selectedTags = List<String>.from(wordToEdit?.tags ?? []);
@@ -1123,8 +1172,12 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                     const SizedBox(width: 8),
                     Text(
                       wordToEdit != null
-                          ? (lang.id == 'tca' ? 'Editar Termo Ticuna' : 'Editar Termo (${lang.name})')
-                          : (lang.id == 'tca' ? 'Novo Termo Ticuna' : 'Novo Termo (${lang.name})'),
+                          ? (lang.id == 'tca'
+                                ? 'Editar Termo Ticuna'
+                                : 'Editar Termo (${lang.name})')
+                          : (lang.id == 'tca'
+                                ? 'Novo Termo Ticuna'
+                                : 'Novo Termo (${lang.name})'),
                     ),
                   ],
                 ),
@@ -1160,7 +1213,8 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                                 : 'Palavra ou Termo (${lang.name}) *',
                             hintText: 'Ex: Taemãẽ, Tamaü, Tupana, Duü̃...',
                           ),
-                          onTap: () => setDialogState(() => activeFieldIndex = 0),
+                          onTap: () =>
+                              setDialogState(() => activeFieldIndex = 0),
                         ),
                         const SizedBox(height: 10),
 
@@ -1192,9 +1246,8 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                                   labelText: 'Pronúncia / Tons (Opcional)',
                                   hintText: 'Ex: ta-e-mã-ẽ [tom alto]',
                                 ),
-                                onTap: () => setDialogState(
-                                  () => activeFieldIndex = 2,
-                                ),
+                                onTap: () =>
+                                    setDialogState(() => activeFieldIndex = 2),
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -1206,18 +1259,22 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                                 decoration: const InputDecoration(
                                   labelText: 'Classe',
                                 ),
-                                items: const [
-                                  'Substantivo',
-                                  'Verbo',
-                                  'Adjetivo',
-                                  'Advérbio',
-                                  'Pronome',
-                                  'Saudação',
-                                  'Interjeição',
-                                  'Outro',
-                                ].map((c) {
-                                  return DropdownMenuItem(value: c, child: Text(c));
-                                }).toList(),
+                                items:
+                                    const [
+                                      'Substantivo',
+                                      'Verbo',
+                                      'Adjetivo',
+                                      'Advérbio',
+                                      'Pronome',
+                                      'Saudação',
+                                      'Interjeição',
+                                      'Outro',
+                                    ].map((c) {
+                                      return DropdownMenuItem(
+                                        value: c,
+                                        child: Text(c),
+                                      );
+                                    }).toList(),
                                 onChanged: (val) {
                                   if (val != null) {
                                     setDialogState(() => selectedClass = val);
@@ -1253,9 +1310,8 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                             labelText: 'Tradução da Frase de Exemplo',
                             hintText: 'Ex: Muito obrigado a Deus',
                           ),
-                          onTap: () => setDialogState(
-                            () => activeFieldIndex = 4,
-                          ),
+                          onTap: () =>
+                              setDialogState(() => activeFieldIndex = 4),
                         ),
                         const SizedBox(height: 10),
 
@@ -1270,137 +1326,145 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                           onTap: () =>
                               setDialogState(() => activeFieldIndex = 5),
                         ),
-                    const SizedBox(height: 12),
+                        const SizedBox(height: 12),
 
-                    // Pronúncia em Áudio Ticuna
-                    const Text(
-                      'Pronúncia em Áudio (Opcional):',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 6),
-                    TicunaAudioPlayerWidget(
-                      id: targetId,
-                      title: wordController.text.isNotEmpty
-                          ? wordController.text
-                          : 'Termo Ticuna',
-                      audioPath: formAudioPath,
-                      audioDurationSeconds: formAudioDuration,
-                      isPhrase: false,
-                      compact: false,
-                      onAudioUpdated: (newPath, durationSeconds) {
-                        setDialogState(() {
-                          formAudioPath = newPath;
-                          formAudioDuration = durationSeconds;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Seleção de Tags
-                    const Text(
-                      'Tags / Categorias:',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      children: allTags.map((t) {
-                        final isChosen = selectedTags.contains(t.name);
-                        return FilterChip(
-                          label: Text(t.name),
-                          selected: isChosen,
-                          selectedColor:
-                              const Color(0xFF0D9488).withValues(alpha: 0.2),
-                          checkmarkColor: const Color(0xFF0D9488),
-                          onSelected: (val) {
+                        // Pronúncia em Áudio Ticuna
+                        const Text(
+                          'Pronúncia em Áudio (Opcional):',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        TicunaAudioPlayerWidget(
+                          id: targetId,
+                          title: wordController.text.isNotEmpty
+                              ? wordController.text
+                              : 'Termo Ticuna',
+                          audioPath: formAudioPath,
+                          audioDurationSeconds: formAudioDuration,
+                          isPhrase: false,
+                          compact: false,
+                          onAudioUpdated: (newPath, durationSeconds) {
                             setDialogState(() {
-                              if (val) {
-                                selectedTags.add(t.name);
-                              } else {
-                                selectedTags.remove(t.name);
-                              }
+                              formAudioPath = newPath;
+                              formAudioDuration = durationSeconds;
                             });
                           },
-                        );
-                      }).toList(),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogCtx),
-                child: const Text('Cancelar'),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0D9488),
-                  foregroundColor: Colors.white,
-                ),
-                onPressed: () async {
-                  final word = wordController.text.trim();
-                  final translation = translationController.text.trim();
-                  if (word.isEmpty || translation.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Preencha ao menos o termo em Ticuna e a tradução.',
                         ),
-                      ),
-                    );
-                    return;
-                  }
+                        const SizedBox(height: 12),
 
-                  final repo = ref.read(ticunaRepositoryProvider);
-                  if (wordToEdit == null) {
-                    await repo.addWord(
-                      word: word,
-                      translation: translation,
-                      phonetics: phoneticsController.text.trim(),
-                      grammaticalClass: selectedClass,
-                      exampleSentence: exampleController.text.trim(),
-                      exampleTranslation: exampleTransController.text.trim(),
-                      notes: notesController.text.trim(),
-                      tags: selectedTags,
-                      audioPath: formAudioPath,
-                      audioDurationSeconds: formAudioDuration,
-                      languageId: lang.id,
-                    );
-                  } else {
-                    await repo.updateWord(
-                      wordToEdit.copyWith(
-                        word: word,
-                        translation: translation,
-                        phonetics: phoneticsController.text.trim(),
-                        grammaticalClass: selectedClass,
-                        exampleSentence: exampleController.text.trim(),
-                        exampleTranslation: exampleTransController.text.trim(),
-                        notes: notesController.text.trim(),
-                        tags: selectedTags,
-                        audioPath: formAudioPath,
-                        audioDurationSeconds: formAudioDuration,
-                        updatedAt: DateTime.now(),
-                      ),
-                    );
-                  }
+                        // Seleção de Tags
+                        const Text(
+                          'Tags / Categorias:',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          children: allTags.map((t) {
+                            final isChosen = selectedTags.contains(t.name);
+                            return FilterChip(
+                              label: Text(t.name),
+                              selected: isChosen,
+                              selectedColor: const Color(0xFF0D9488)
+                                  .withValues(alpha: 0.2),
+                              checkmarkColor: const Color(0xFF0D9488),
+                              onSelected: (val) {
+                                setDialogState(() {
+                                  if (val) {
+                                    selectedTags.add(t.name);
+                                  } else {
+                                    selectedTags.remove(t.name);
+                                  }
+                                });
+                              },
+                            );
+                          }).toList(),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogCtx),
+                    child: const Text('Cancelar'),
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0D9488),
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: () async {
+                      final word = wordController.text.trim();
+                      final translation = translationController.text.trim();
+                      if (word.isEmpty || translation.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Preencha ao menos o termo em Ticuna e a tradução.',
+                            ),
+                          ),
+                        );
+                        return;
+                      }
 
-                  if (dialogCtx.mounted) Navigator.pop(dialogCtx);
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Termo "$word" salvo com sucesso!'),
-                      ),
-                    );
-                  }
-                },
-                child: const Text('Salvar'),
-              ),
-            ],
+                      final repo = ref.read(ticunaRepositoryProvider);
+                      if (wordToEdit == null) {
+                        await repo.addWord(
+                          word: word,
+                          translation: translation,
+                          phonetics: phoneticsController.text.trim(),
+                          grammaticalClass: selectedClass,
+                          exampleSentence: exampleController.text.trim(),
+                          exampleTranslation: exampleTransController.text
+                              .trim(),
+                          notes: notesController.text.trim(),
+                          tags: selectedTags,
+                          audioPath: formAudioPath,
+                          audioDurationSeconds: formAudioDuration,
+                          languageId: lang.id,
+                        );
+                      } else {
+                        await repo.updateWord(
+                          wordToEdit.copyWith(
+                            word: word,
+                            translation: translation,
+                            phonetics: phoneticsController.text.trim(),
+                            grammaticalClass: selectedClass,
+                            exampleSentence: exampleController.text.trim(),
+                            exampleTranslation: exampleTransController.text
+                                .trim(),
+                            notes: notesController.text.trim(),
+                            tags: selectedTags,
+                            audioPath: formAudioPath,
+                            audioDurationSeconds: formAudioDuration,
+                            updatedAt: DateTime.now(),
+                          ),
+                        );
+                      }
+
+                      if (dialogCtx.mounted) Navigator.pop(dialogCtx);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Termo "$word" salvo com sucesso!'),
+                          ),
+                        );
+                      }
+                    },
+                    child: const Text('Salvar'),
+                  ),
+                ],
+              );
+            },
           );
-        },
-      );
         },
       ),
     );
@@ -1419,9 +1483,11 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
   }) {
     final AppLanguageEntry lang =
         activeLang ?? ref.read(currentActiveLanguageProvider);
-    final diacritics = activeDiacritics ?? parseLanguageDiacritics(lang.diacritics);
+    final diacritics =
+        activeDiacritics ?? parseLanguageDiacritics(lang.diacritics);
 
-    String selectedCategory = phraseToEdit?.category ?? 'Ministério de Casa em Casa';
+    String selectedCategory =
+        phraseToEdit?.category ?? 'Ministério de Casa em Casa';
     final selectedTags = List<String>.from(phraseToEdit?.tags ?? []);
     final String targetId =
         phraseToEdit?.id ?? 'phrase_${DateTime.now().millisecondsSinceEpoch}';
@@ -1455,8 +1521,12 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                     const SizedBox(width: 8),
                     Text(
                       phraseToEdit != null
-                          ? (lang.id == 'tca' ? 'Editar Frase Útil Ticuna' : 'Editar Frase Útil (${lang.name})')
-                          : (lang.id == 'tca' ? 'Nova Frase Útil Ticuna' : 'Nova Frase Útil (${lang.name})'),
+                          ? (lang.id == 'tca'
+                                ? 'Editar Frase Útil Ticuna'
+                                : 'Editar Frase Útil (${lang.name})')
+                          : (lang.id == 'tca'
+                                ? 'Nova Frase Útil Ticuna'
+                                : 'Nova Frase Útil (${lang.name})'),
                     ),
                   ],
                 ),
@@ -1506,9 +1576,8 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                             labelText: 'Tradução em Português *',
                             hintText: 'Ex: Olá! Você está bem?',
                           ),
-                          onTap: () => setDialogState(
-                            () => activeFieldIndex = 1,
-                          ),
+                          onTap: () =>
+                              setDialogState(() => activeFieldIndex = 1),
                         ),
                         const SizedBox(height: 10),
 
@@ -1519,18 +1588,22 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                           decoration: const InputDecoration(
                             labelText: 'Tópico / Categoria de Ministério',
                           ),
-                          items: const [
-                            'Saudação & Conversa',
-                            'Ministério de Casa em Casa',
-                            'Leitura Bíblica',
-                            'Perguntas de Ponto de Vista',
-                            'Oferecer Estudo',
-                            'Revisita',
-                            'Despedida & Gratidão',
-                            'Outra',
-                          ].map((c) {
-                            return DropdownMenuItem(value: c, child: Text(c));
-                          }).toList(),
+                          items:
+                              const [
+                                'Saudação & Conversa',
+                                'Ministério de Casa em Casa',
+                                'Leitura Bíblica',
+                                'Perguntas de Ponto de Vista',
+                                'Oferecer Estudo',
+                                'Revisita',
+                                'Despedida & Gratidão',
+                                'Outra',
+                              ].map((c) {
+                                return DropdownMenuItem(
+                                  value: c,
+                                  child: Text(c),
+                                );
+                              }).toList(),
                           onChanged: (val) {
                             if (val != null) {
                               setDialogState(() => selectedCategory = val);
@@ -1551,9 +1624,8 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                             labelText: 'Pronúncia / Guia de Tons (Opcional)',
                             hintText: 'Ex: ta-ma-ü! ku me-ã pe-ĩ?',
                           ),
-                          onTap: () => setDialogState(
-                            () => activeFieldIndex = 2,
-                          ),
+                          onTap: () =>
+                              setDialogState(() => activeFieldIndex = 2),
                         ),
                         const SizedBox(height: 10),
 
@@ -1561,137 +1633,144 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                         TextField(
                           controller: notesController,
                           decoration: const InputDecoration(
-                            labelText: 'Observação / Texto Bíblico de Referência',
+                            labelText:
+                                'Observação / Texto Bíblico de Referência',
                             hintText: 'Ex: Usar com Salmo 37:29...',
                           ),
                           onTap: () =>
                               setDialogState(() => activeFieldIndex = 3),
                         ),
-                    const SizedBox(height: 12),
+                        const SizedBox(height: 12),
 
-                    // Pronúncia em Áudio Ticuna
-                    const Text(
-                      'Pronúncia em Áudio (Opcional):',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 6),
-                    TicunaAudioPlayerWidget(
-                      id: targetId,
-                      title: phraseController.text.isNotEmpty
-                          ? phraseController.text
-                          : 'Frase Ticuna',
-                      audioPath: formAudioPath,
-                      audioDurationSeconds: formAudioDuration,
-                      isPhrase: true,
-                      compact: false,
-                      onAudioUpdated: (newPath, durationSeconds) {
-                        setDialogState(() {
-                          formAudioPath = newPath;
-                          formAudioDuration = durationSeconds;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Tags
-                    const Text(
-                      'Tags / Marcadores:',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      children: allTags.map((t) {
-                        final isChosen = selectedTags.contains(t.name);
-                        return FilterChip(
-                          label: Text(t.name),
-                          selected: isChosen,
-                          selectedColor:
-                              const Color(0xFF0D9488).withValues(alpha: 0.2),
-                          checkmarkColor: const Color(0xFF0D9488),
-                          onSelected: (val) {
+                        // Pronúncia em Áudio Ticuna
+                        const Text(
+                          'Pronúncia em Áudio (Opcional):',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        TicunaAudioPlayerWidget(
+                          id: targetId,
+                          title: phraseController.text.isNotEmpty
+                              ? phraseController.text
+                              : 'Frase Ticuna',
+                          audioPath: formAudioPath,
+                          audioDurationSeconds: formAudioDuration,
+                          isPhrase: true,
+                          compact: false,
+                          onAudioUpdated: (newPath, durationSeconds) {
                             setDialogState(() {
-                              if (val) {
-                                selectedTags.add(t.name);
-                              } else {
-                                selectedTags.remove(t.name);
-                              }
+                              formAudioPath = newPath;
+                              formAudioDuration = durationSeconds;
                             });
                           },
-                        );
-                      }).toList(),
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Tags
+                        const Text(
+                          'Tags / Marcadores:',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          children: allTags.map((t) {
+                            final isChosen = selectedTags.contains(t.name);
+                            return FilterChip(
+                              label: Text(t.name),
+                              selected: isChosen,
+                              selectedColor: const Color(0xFF0D9488)
+                                  .withValues(alpha: 0.2),
+                              checkmarkColor: const Color(0xFF0D9488),
+                              onSelected: (val) {
+                                setDialogState(() {
+                                  if (val) {
+                                    selectedTags.add(t.name);
+                                  } else {
+                                    selectedTags.remove(t.name);
+                                  }
+                                });
+                              },
+                            );
+                          }).toList(),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogCtx),
-                child: const Text('Cancelar'),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0D9488),
-                  foregroundColor: Colors.white,
-                ),
-                onPressed: () async {
-                  final phrase = phraseController.text.trim();
-                  final translation = translationController.text.trim();
-                  if (phrase.isEmpty || translation.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Preencha a frase e sua tradução.'),
-                      ),
-                    );
-                    return;
-                  }
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogCtx),
+                    child: const Text('Cancelar'),
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0D9488),
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: () async {
+                      final phrase = phraseController.text.trim();
+                      final translation = translationController.text.trim();
+                      if (phrase.isEmpty || translation.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Preencha a frase e sua tradução.'),
+                          ),
+                        );
+                        return;
+                      }
 
-                  final repo = ref.read(ticunaRepositoryProvider);
-                  if (phraseToEdit == null) {
-                    await repo.addPhrase(
-                      phrase: phrase,
-                      translation: translation,
-                      category: selectedCategory,
-                      phonetics: phoneticsController.text.trim(),
-                      notes: notesController.text.trim(),
-                      tags: selectedTags,
-                      audioPath: formAudioPath,
-                      audioDurationSeconds: formAudioDuration,
-                      languageId: lang.id,
-                    );
-                  } else {
-                    await repo.updatePhrase(
-                      phraseToEdit.copyWith(
-                        phrase: phrase,
-                        translation: translation,
-                        category: selectedCategory,
-                        phonetics: phoneticsController.text.trim(),
-                        notes: notesController.text.trim(),
-                        tags: selectedTags,
-                        audioPath: formAudioPath,
-                        audioDurationSeconds: formAudioDuration,
-                        updatedAt: DateTime.now(),
-                      ),
-                    );
-                  }
+                      final repo = ref.read(ticunaRepositoryProvider);
+                      if (phraseToEdit == null) {
+                        await repo.addPhrase(
+                          phrase: phrase,
+                          translation: translation,
+                          category: selectedCategory,
+                          phonetics: phoneticsController.text.trim(),
+                          notes: notesController.text.trim(),
+                          tags: selectedTags,
+                          audioPath: formAudioPath,
+                          audioDurationSeconds: formAudioDuration,
+                          languageId: lang.id,
+                        );
+                      } else {
+                        await repo.updatePhrase(
+                          phraseToEdit.copyWith(
+                            phrase: phrase,
+                            translation: translation,
+                            category: selectedCategory,
+                            phonetics: phoneticsController.text.trim(),
+                            notes: notesController.text.trim(),
+                            tags: selectedTags,
+                            audioPath: formAudioPath,
+                            audioDurationSeconds: formAudioDuration,
+                            updatedAt: DateTime.now(),
+                          ),
+                        );
+                      }
 
-                  if (dialogCtx.mounted) Navigator.pop(dialogCtx);
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Frase salva com sucesso!'),
-                      ),
-                    );
-                  }
-                },
-                child: const Text('Salvar'),
-              ),
-            ],
+                      if (dialogCtx.mounted) Navigator.pop(dialogCtx);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Frase salva com sucesso!'),
+                          ),
+                        );
+                      }
+                    },
+                    child: const Text('Salvar'),
+                  ),
+                ],
+              );
+            },
           );
-        },
-      );
         },
       ),
     );
@@ -1772,7 +1851,9 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                   children: [
                     const Icon(Icons.school, color: Color(0xFF0D9488)),
                     const SizedBox(width: 8),
-                    Text('Cartão ${currentIndex + 1} de ${wordsToStudy.length}'),
+                    Text(
+                      'Cartão ${currentIndex + 1} de ${wordsToStudy.length}',
+                    ),
                   ],
                 ),
                 IconButton(
@@ -1800,7 +1881,9 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                       width: double.infinity,
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                        color: isDark
+                            ? const Color(0xFF0F172A)
+                            : const Color(0xFFF1F5F9),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: const Color(0xFF0D9488).withValues(alpha: 0.3),
@@ -1818,7 +1901,8 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                               color: const Color(0xFF0D9488),
                             ),
                           ),
-                          if (word.audioPath != null && word.audioPath!.isNotEmpty) ...[
+                          if (word.audioPath != null &&
+                              word.audioPath!.isNotEmpty) ...[
                             const SizedBox(height: 10),
                             TicunaAudioPlayerWidget(
                               id: word.id,
@@ -1828,14 +1912,17 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                               compact: true,
                             ),
                           ],
-                          if (word.phonetics != null && word.phonetics!.isNotEmpty) ...[
+                          if (word.phonetics != null &&
+                              word.phonetics!.isNotEmpty) ...[
                             const SizedBox(height: 6),
                             Text(
                               '[ ${word.phonetics} ]',
                               style: TicunaUnicodeHelper.textStyle(
                                 fontSize: 14,
                                 fontStyle: FontStyle.italic,
-                                color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                                color: isDark
+                                    ? Colors.grey.shade400
+                                    : Colors.grey.shade600,
                               ),
                             ),
                           ],
@@ -1848,7 +1935,8 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                                 vertical: 2,
                               ),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF0D9488).withValues(alpha: 0.1),
+                                color: const Color(0xFF0D9488)
+                                    .withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
@@ -1901,9 +1989,7 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                               ? const Color(0xFF1E293B)
                               : Colors.amber.shade50.withValues(alpha: 0.6),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Colors.amber.shade300,
-                          ),
+                          border: Border.all(color: Colors.amber.shade300),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1944,7 +2030,8 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                                   style: const TextStyle(fontSize: 12),
                                 ),
                             ],
-                            if (word.notes != null && word.notes!.isNotEmpty) ...[
+                            if (word.notes != null &&
+                                word.notes!.isNotEmpty) ...[
                               const SizedBox(height: 6),
                               Text(
                                 'Nota: ${word.notes}',
@@ -1961,7 +2048,10 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
 
                       const Text(
                         'Como foi sua lembrança? (Avaliação Anki)',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 10),
 
@@ -1973,7 +2063,9 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: Colors.red,
                                 side: const BorderSide(color: Colors.red),
-                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 10,
+                                ),
                               ),
                               onPressed: () async {
                                 await repo.recordWordReview(word.id, 1);
@@ -1987,9 +2079,14 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                                 children: [
                                   Text(
                                     'Errei',
-                                    style: TextStyle(fontWeight: FontWeight.bold),
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
-                                  Text('De novo', style: TextStyle(fontSize: 10)),
+                                  Text(
+                                    'De novo',
+                                    style: TextStyle(fontSize: 10),
+                                  ),
                                 ],
                               ),
                             ),
@@ -2000,7 +2097,9 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF0D9488),
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 10,
+                                ),
                               ),
                               onPressed: () async {
                                 await repo.recordWordReview(word.id, 2);
@@ -2014,9 +2113,14 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                                 children: [
                                   Text(
                                     'Bom',
-                                    style: TextStyle(fontWeight: FontWeight.bold),
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
-                                  Text('+1 nível', style: TextStyle(fontSize: 10)),
+                                  Text(
+                                    '+1 nível',
+                                    style: TextStyle(fontSize: 10),
+                                  ),
                                 ],
                               ),
                             ),
@@ -2027,7 +2131,9 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: Colors.green,
                                 side: const BorderSide(color: Colors.green),
-                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 10,
+                                ),
                               ),
                               onPressed: () async {
                                 await repo.recordWordReview(word.id, 3);
@@ -2041,9 +2147,14 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                                 children: [
                                   Text(
                                     'Fácil',
-                                    style: TextStyle(fontWeight: FontWeight.bold),
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
-                                  Text('+2 níveis', style: TextStyle(fontSize: 10)),
+                                  Text(
+                                    '+2 níveis',
+                                    style: TextStyle(fontSize: 10),
+                                  ),
                                 ],
                               ),
                             ),
@@ -2081,203 +2192,230 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
           final jsonController = ctrls[0];
           return SafeArea(
             child: StatefulBuilder(
-          builder: (ctx, setSheetState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 20,
-                bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              builder: (ctx, setSheetState) {
+                return Padding(
+                  padding: EdgeInsets.only(
+                    left: 20,
+                    right: 20,
+                    top: 20,
+                    bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+                  ),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Row(
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Icon(Icons.import_export, color: Color(0xFF0D9488)),
-                            SizedBox(width: 8),
-                            Text(
-                              'Importar / Exportar Ticuna',
-                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                            const Row(
+                              children: [
+                                Icon(
+                                  Icons.import_export,
+                                  color: Color(0xFF0D9488),
+                                ),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Importar / Exportar Ticuna',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.close),
+                              onPressed: () => Navigator.pop(sheetCtx),
                             ),
                           ],
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.close),
-                          onPressed: () => Navigator.pop(sheetCtx),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
+                        const SizedBox(height: 12),
 
-                    // SEÇÃO DE EXPORTAÇÃO
-                    const Text(
-                      'Exportar Banco de Dados:',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
+                        // SEÇÃO DE EXPORTAÇÃO
+                        const Text(
+                          'Exportar Banco de Dados:',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF0D9488),
+                                  foregroundColor: Colors.white,
+                                ),
+                                icon: const Icon(Icons.copy, size: 16),
+                                label: const Text('Exportar JSON Completo'),
+                                onPressed: () async {
+                                  final jsonStr = await repo.exportToJson();
+                                  await Clipboard.setData(
+                                    ClipboardData(text: jsonStr),
+                                  );
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Banco Ticuna copiado em formato JSON para a área de transferência!',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                icon: const Icon(Icons.table_chart, size: 16),
+                                label: const Text('Copiar CSV Dicionário'),
+                                onPressed: () async {
+                                  final csv = await repo.exportToCsv(
+                                    TicunaEntryType.word,
+                                  );
+                                  await Clipboard.setData(
+                                    ClipboardData(text: csv),
+                                  );
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'CSV do Dicionário copiado!',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                icon: const Icon(Icons.table_chart, size: 16),
+                                label: const Text('Copiar CSV Frases'),
+                                onPressed: () async {
+                                  final csv = await repo.exportToCsv(
+                                    TicunaEntryType.phrase,
+                                  );
+                                  await Clipboard.setData(
+                                    ClipboardData(text: csv),
+                                  );
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('CSV de Frases copiado!'),
+                                      ),
+                                    );
+                                  }
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const Divider(height: 28),
+
+                        // SEÇÃO DE IMPORTAÇÃO
+                        const Text(
+                          'Importar Banco de Dados (JSON / Backup ou CSV):',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: jsonController,
+                          maxLines: 4,
+                          decoration: const InputDecoration(
+                            hintText: 'Cole aqui o conteúdo JSON de backup ou linhas em CSV (palavras/frases)...',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        CheckboxListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text(
+                            'Substituir dados atuais (se desmarcado, mescla)',
+                            style: TextStyle(fontSize: 12.5),
+                          ),
+                          value: replaceExisting,
+                          onChanged: (val) {
+                            setSheetState(() => replaceExisting = val ?? false);
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
                           child: ElevatedButton.icon(
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF0D9488),
                               foregroundColor: Colors.white,
                             ),
-                            icon: const Icon(Icons.copy, size: 16),
-                            label: const Text('Exportar JSON Completo'),
+                            icon: const Icon(Icons.file_download),
+                            label: const Text('Importar Agora'),
                             onPressed: () async {
-                              final jsonStr = await repo.exportToJson();
-                              await Clipboard.setData(ClipboardData(text: jsonStr));
-                              if (context.mounted) {
+                              final text = jsonController.text.trim();
+                              if (text.isEmpty) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
                                     content: Text(
-                                      'Banco Ticuna copiado em formato JSON para a área de transferência!',
+                                      'Cole o JSON ou CSV para importar.',
                                     ),
                                   ),
                                 );
+                                return;
+                              }
+
+                              final result = await repo.importAuto(
+                                text,
+                                replace: replaceExisting,
+                                defaultType: _tabController.index == 0
+                                    ? TicunaEntryType.word
+                                    : TicunaEntryType.phrase,
+                              );
+
+                              if (result.success) {
+                                if (sheetCtx.mounted) Navigator.pop(sheetCtx);
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        'Sucesso! Importados: ${result.wordsCount} palavras, ${result.phrasesCount} frases e ${result.tagsCount} tags.',
+                                      ),
+                                    ),
+                                  );
+                                }
+                              } else {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      backgroundColor: Colors.red,
+                                      content: Text(
+                                        'Erro ao importar: ${result.errorMessage}',
+                                      ),
+                                    ),
+                                  );
+                                }
                               }
                             },
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            icon: const Icon(Icons.table_chart, size: 16),
-                            label: const Text('Copiar CSV Dicionário'),
-                            onPressed: () async {
-                              final csv = await repo.exportToCsv(TicunaEntryType.word);
-                              await Clipboard.setData(ClipboardData(text: csv));
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('CSV do Dicionário copiado!'),
-                                  ),
-                                );
-                              }
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            icon: const Icon(Icons.table_chart, size: 16),
-                            label: const Text('Copiar CSV Frases'),
-                            onPressed: () async {
-                              final csv = await repo.exportToCsv(TicunaEntryType.phrase);
-                              await Clipboard.setData(ClipboardData(text: csv));
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('CSV de Frases copiado!'),
-                                  ),
-                                );
-                              }
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const Divider(height: 28),
-
-                    // SEÇÃO DE IMPORTAÇÃO
-                    const Text(
-                      'Importar Banco de Dados (JSON / Backup ou CSV):',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: jsonController,
-                      maxLines: 4,
-                      decoration: const InputDecoration(
-                        hintText:
-                            'Cole aqui o conteúdo JSON de backup ou linhas em CSV (palavras/frases)...',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    CheckboxListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text(
-                        'Substituir dados atuais (se desmarcado, mescla)',
-                        style: TextStyle(fontSize: 12.5),
-                      ),
-                      value: replaceExisting,
-                      onChanged: (val) {
-                        setSheetState(() => replaceExisting = val ?? false);
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0D9488),
-                          foregroundColor: Colors.white,
-                        ),
-                        icon: const Icon(Icons.file_download),
-                        label: const Text('Importar Agora'),
-                        onPressed: () async {
-                          final text = jsonController.text.trim();
-                          if (text.isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Cole o JSON ou CSV para importar.'),
-                              ),
-                            );
-                            return;
-                          }
-
-                          final result = await repo.importAuto(
-                            text,
-                            replace: replaceExisting,
-                            defaultType: _tabController.index == 0
-                                ? TicunaEntryType.word
-                                : TicunaEntryType.phrase,
-                          );
-
-                          if (result.success) {
-                            if (sheetCtx.mounted) Navigator.pop(sheetCtx);
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    'Sucesso! Importados: ${result.wordsCount} palavras, ${result.phrasesCount} frases e ${result.tagsCount} tags.',
-                                  ),
-                                ),
-                              );
-                            }
-                          } else {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  backgroundColor: Colors.red,
-                                  content: Text('Erro ao importar: ${result.errorMessage}'),
-                                ),
-                              );
-                            }
-                          }
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        ),
-      );
+                  ),
+                );
+              },
+            ),
+          );
         },
       ),
     );
@@ -2338,7 +2476,11 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                                   if (tagCtx.mounted) Navigator.pop(tagCtx);
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('Tag "$name" adicionada!')),
+                                      SnackBar(
+                                        content: Text(
+                                          'Tag "$name" adicionada!',
+                                        ),
+                                      ),
                                     );
                                   }
                                 }
@@ -2351,7 +2493,10 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                         const Divider(),
                         const Text(
                           'Tags Cadastradas:',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         const SizedBox(height: 8),
                         ...tags.map((t) {
@@ -2365,13 +2510,21 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                             ),
                             title: Text(t.name),
                             trailing: IconButton(
-                              icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                              icon: const Icon(
+                                Icons.delete_outline,
+                                size: 18,
+                                color: Colors.red,
+                              ),
                               onPressed: () async {
                                 await repo.deleteTag(t.id);
                                 if (tagCtx.mounted) Navigator.pop(tagCtx);
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('Tag "${t.name}" removida!')),
+                                    SnackBar(
+                                      content: Text(
+                                        'Tag "${t.name}" removida!',
+                                      ),
+                                    ),
                                   );
                                 }
                               },
@@ -2488,7 +2641,9 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF0D9488),
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
                 icon: const Icon(Icons.add_circle_outline),
@@ -2510,8 +2665,11 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                 margin: const EdgeInsets.symmetric(vertical: 4),
                 decoration: BoxDecoration(
                   color: isCurrent
-                      ? const Color(0xFF0D9488).withValues(alpha: isDark ? 0.2 : 0.1)
-                      : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
+                      ? const Color(0xFF0D9488)
+                            .withValues(alpha: isDark ? 0.2 : 0.1)
+                      : (isDark
+                            ? const Color(0xFF0F172A)
+                            : const Color(0xFFF8FAFC)),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: isCurrent
@@ -2522,7 +2680,8 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                 ),
                 child: ListTile(
                   leading: CircleAvatar(
-                    backgroundColor: const Color(0xFF0D9488).withValues(alpha: 0.15),
+                    backgroundColor: const Color(0xFF0D9488)
+                        .withValues(alpha: 0.15),
                     child: Text(
                       lang.symbol,
                       style: const TextStyle(fontSize: 20),
@@ -2533,13 +2692,18 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                       Text(
                         lang.name,
                         style: TextStyle(
-                          fontWeight: isCurrent ? FontWeight.bold : FontWeight.w600,
+                          fontWeight: isCurrent
+                              ? FontWeight.bold
+                              : FontWeight.w600,
                         ),
                       ),
                       if (lang.isDefault) ...[
                         const SizedBox(width: 6),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.amber.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(6),
@@ -2560,7 +2724,9 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                     '${lang.code.toUpperCase()} • ${diacriticsList.isNotEmpty ? "${diacriticsList.length} caracteres especiais" : "Sem diacríticos"}',
                     style: TextStyle(
                       fontSize: 12,
-                      color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                      color: isDark
+                          ? Colors.grey.shade400
+                          : Colors.grey.shade600,
                     ),
                   ),
                   trailing: Row(
@@ -2574,18 +2740,27 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                         ),
                       if (!lang.isDefault && !isCurrent)
                         IconButton(
-                          icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                          icon: const Icon(
+                            Icons.delete_outline,
+                            color: Colors.red,
+                            size: 20,
+                          ),
                           tooltip: 'Excluir idioma',
-                          onPressed: () => _confirmDeleteLanguage(context, lang),
+                          onPressed: () =>
+                              _confirmDeleteLanguage(context, lang),
                         ),
                     ],
                   ),
                   onTap: () {
-                    ref.read(activeLanguageProvider.notifier).selectLanguage(lang);
+                    ref
+                        .read(activeLanguageProvider.notifier)
+                        .selectLanguage(lang);
                     Navigator.pop(ctx);
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Idioma ativo: ${lang.symbol} ${lang.name}'),
+                        content: Text(
+                          'Idioma ativo: ${lang.symbol} ${lang.name}',
+                        ),
                         duration: const Duration(seconds: 2),
                       ),
                     );
@@ -2638,7 +2813,10 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                       children: [
                         const Text(
                           'Atalhos Pré-Catalogados (1-Toque):',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         const SizedBox(height: 6),
                         Wrap(
@@ -2648,12 +2826,14 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                             ActionChip(
                               avatar: const Text('🌿'),
                               label: const Text('Guajajara (Tenetehara)'),
-                              onPressed: () => applyPreset(LanguageRegistry.guajajara),
+                              onPressed: () =>
+                                  applyPreset(LanguageRegistry.guajajara),
                             ),
                             ActionChip(
                               avatar: const Text('🌳'),
                               label: const Text('Yanomami (Yanomamõ)'),
-                              onPressed: () => applyPreset(LanguageRegistry.yanomami),
+                              onPressed: () =>
+                                  applyPreset(LanguageRegistry.yanomami),
                             ),
                           ],
                         ),
@@ -2716,13 +2896,17 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                     onPressed: () async {
                       final name = nameCtrl.text.trim();
                       final code = codeCtrl.text.trim().toLowerCase();
-                      final symbol = symbolCtrl.text.trim().isEmpty ? '🌐' : symbolCtrl.text.trim();
+                      final symbol = symbolCtrl.text.trim().isEmpty
+                          ? '🌐'
+                          : symbolCtrl.text.trim();
                       final diacriticsText = diacriticsCtrl.text.trim();
 
                       if (name.isEmpty || code.isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Preencha o nome e o código do idioma.'),
+                            content: Text(
+                              'Preencha o nome e o código do idioma.',
+                            ),
                           ),
                         );
                         return;
@@ -2736,7 +2920,9 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                         name: name,
                         code: code,
                         symbol: symbol,
-                        diacritics: diacriticsText.isNotEmpty ? diacriticsText : null,
+                        diacritics: diacriticsText.isNotEmpty
+                            ? diacriticsText
+                            : null,
                         isDefault: false,
                       );
 
@@ -2750,12 +2936,16 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
                         createdAt: DateTime.now(),
                         updatedAt: DateTime.now(),
                       );
-                      await ref.read(activeLanguageProvider.notifier).selectLanguage(newEntry);
+                      await ref
+                          .read(activeLanguageProvider.notifier)
+                          .selectLanguage(newEntry);
 
                       dialogNav.pop();
                       messenger.showSnackBar(
                         SnackBar(
-                          content: Text('Idioma "$symbol $name" criado e ativado com sucesso!'),
+                          content: Text(
+                            'Idioma "$symbol $name" criado e ativado com sucesso!',
+                          ),
                         ),
                       );
                     },
@@ -2782,7 +2972,10 @@ class _TicunaScreenState extends ConsumerState<TicunaScreen>
             child: const Text('Cancelar'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
             onPressed: () async {
               final messenger = ScaffoldMessenger.of(context);
               final dialogNav = Navigator.of(ctx);

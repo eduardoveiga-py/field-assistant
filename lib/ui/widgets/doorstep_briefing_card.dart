@@ -71,9 +71,7 @@ class _DoorstepBriefingCardState extends State<DoorstepBriefingCard> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Não foi possível reproduzir o áudio: $e'),
-          ),
+          SnackBar(content: Text('Não foi possível reproduzir o áudio: $e')),
         );
       }
     }
@@ -377,7 +375,9 @@ class _DoorstepBriefingCardState extends State<DoorstepBriefingCard> {
                     fontWeight: FontWeight.w700,
                     color: isSunMode
                         ? Colors.black
-                        : (isDark ? const Color(0xFF6EE7B7) : const Color(0xFF047857)),
+                        : (isDark
+                              ? const Color(0xFF6EE7B7)
+                              : const Color(0xFF047857)),
                   ),
                 ),
               ],
@@ -723,7 +723,9 @@ class _DoorstepBriefingCardState extends State<DoorstepBriefingCard> {
                         fontWeight: FontWeight.w700,
                         color: isSunMode
                             ? Colors.black
-                            : (isDark ? const Color(0xFF6EE7B7) : const Color(0xFF047857)),
+                            : (isDark
+                                  ? const Color(0xFF6EE7B7)
+                                  : const Color(0xFF047857)),
                       ),
                     ),
                   ],

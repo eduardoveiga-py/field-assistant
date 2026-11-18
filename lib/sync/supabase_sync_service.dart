@@ -46,6 +46,29 @@ class SyncProcessResult {
   bool get success => failureCount == 0 && conflictCount == 0 && errors.isEmpty;
 }
 
+class EncryptedMediaUploadResult {
+  final bool success;
+  final String? bucket;
+  final String? mediaId;
+  final String? newVersionId;
+  final String? previousVersionId;
+
+  const EncryptedMediaUploadResult({
+    required this.success,
+    this.bucket,
+    this.mediaId,
+    this.newVersionId,
+    this.previousVersionId,
+  });
+
+  static const EncryptedMediaUploadResult failure = EncryptedMediaUploadResult(
+    success: false,
+  );
+  static const EncryptedMediaUploadResult none = EncryptedMediaUploadResult(
+    success: true,
+  );
+}
+
 typedef SyncResult = SyncProcessResult;
 
 /// Serviço de sincronização offline-first integrado com Supabase e fila persistente SQLite (Drift).
@@ -3105,6 +3128,28 @@ class SupabaseSyncService {
                     'Falha ao verificar conflito de domínio de agenda para ${map['id']}: $e',
                   );
                 }
+              } else if (table == 'bible_studies' && map['id'] != null) {
+                try {
+                  await BibleStudyDomainConflictDetector.detectAndRecordConflicts(
+                    db,
+                    studyId: map['id'].toString(),
+                  );
+                } catch (e) {
+                  AppLogger.warning(
+                    'Falha ao verificar conflito de domínio de estudo bíblico para ${map['id']}: $e',
+                  );
+                }
+              } else if (table == 'tasks' && map['id'] != null) {
+                try {
+                  await TaskDomainConflictDetector.detectAndRecordConflicts(
+                    db,
+                    taskId: map['id'].toString(),
+                  );
+                } catch (e) {
+                  AppLogger.warning(
+                    'Falha ao verificar conflito de domínio de tarefa para ${map['id']}: $e',
+                  );
+                }
               }
               if (newestUpdatedAt == null || dt.isAfter(newestUpdatedAt)) {
                 newestUpdatedAt = dt;
@@ -3996,7 +4041,36 @@ class SupabaseSyncService {
     return EncryptedMediaTransfer(client: client, owner: ownerId, key: key);
   }
 
-  Future<bool> _uploadEncryptedMediaIfApplicable({
+  Future<String?> _getActiveMediaVersion(
+    String tableName,
+    String entityId,
+  ) async {
+    final row =
+        await (db.select(db.appKvStore)..where(
+              (t) =>
+                  t.key.equals('active_media_version_${tableName}_$entityId'),
+            ))
+            .getSingleOrNull();
+    return row?.value;
+  }
+
+  Future<void> _setActiveMediaVersion(
+    String tableName,
+    String entityId,
+    String versionId,
+  ) async {
+    await db
+        .into(db.appKvStore)
+        .insertOnConflictUpdate(
+          AppKvStoreCompanion.insert(
+            key: 'active_media_version_${tableName}_$entityId',
+            value: versionId,
+            updatedAt: drift.Value(DateTime.now().toUtc()),
+          ),
+        );
+  }
+
+  Future<EncryptedMediaUploadResult> _uploadEncryptedMediaIfApplicable({
     required String tableName,
     required String entityId,
     required Map<String, dynamic> cleanPayload,
@@ -4012,23 +4086,40 @@ class SupabaseSyncService {
           errors.add(
             'Nota de voz local ausente ($entityId); upload E2EE abortado.',
           );
-          return false;
+          return EncryptedMediaUploadResult.failure;
         }
         if (vn.audioFilePath != null && vn.audioFilePath!.isNotEmpty) {
           final bytes = await readMediaBytes(vn.audioFilePath!);
           if (bytes == null || bytes.isEmpty) {
             errors.add('Arquivo de áudio local ausente ou vazio ($entityId).');
-            return false;
+            return EncryptedMediaUploadResult.failure;
           }
+          final newVersionId = DateTime.now()
+              .toUtc()
+              .microsecondsSinceEpoch
+              .toString();
+          final prevVersionId =
+              cleanPayload['e2ee_media_version']?.toString() ??
+              await _getActiveMediaVersion(tableName, entityId);
+
           await transfer.uploadEncrypted(
             bucket: 'voice_notes',
             mediaId: entityId,
             plaintextBytes: bytes,
+            versionId: newVersionId,
           );
           cleanPayload['e2ee_media_bucket'] = 'voice_notes';
           cleanPayload['e2ee_media_id'] = entityId;
+          cleanPayload['e2ee_media_version'] = newVersionId;
+          return EncryptedMediaUploadResult(
+            success: true,
+            bucket: 'voice_notes',
+            mediaId: entityId,
+            newVersionId: newVersionId,
+            previousVersionId: prevVersionId,
+          );
         }
-        return true;
+        return EncryptedMediaUploadResult.none;
       }
 
       if (tableName == 'ticuna_words' || tableName == 'ticuna_phrases') {
@@ -4044,18 +4135,35 @@ class SupabaseSyncService {
             errors.add(
               'Arquivo de áudio Ticuna local ausente ou vazio ($entityId).',
             );
-            return false;
+            return EncryptedMediaUploadResult.failure;
           }
           final mediaId = '${tableName}_$entityId';
+          final newVersionId = DateTime.now()
+              .toUtc()
+              .microsecondsSinceEpoch
+              .toString();
+          final prevVersionId =
+              cleanPayload['e2ee_media_version']?.toString() ??
+              await _getActiveMediaVersion(tableName, entityId);
+
           await transfer.uploadEncrypted(
             bucket: 'ticuna_audio',
             mediaId: mediaId,
             plaintextBytes: bytes,
+            versionId: newVersionId,
           );
           cleanPayload['audio_path'] = 'e2ee://ticuna_audio/$mediaId';
           cleanPayload['audioPath'] = 'e2ee://ticuna_audio/$mediaId';
+          cleanPayload['e2ee_media_version'] = newVersionId;
+          return EncryptedMediaUploadResult(
+            success: true,
+            bucket: 'ticuna_audio',
+            mediaId: mediaId,
+            newVersionId: newVersionId,
+            previousVersionId: prevVersionId,
+          );
         }
-        return true;
+        return EncryptedMediaUploadResult.none;
       }
 
       if (tableName == 'knowledge_documents') {
@@ -4066,7 +4174,7 @@ class SupabaseSyncService {
           errors.add(
             'Documento local ausente ($entityId); upload E2EE abortado.',
           );
-          return false;
+          return EncryptedMediaUploadResult.failure;
         }
         Uint8List? bytes;
         if (doc.filePath.isNotEmpty && !doc.filePath.startsWith('e2ee://')) {
@@ -4085,15 +4193,31 @@ class SupabaseSyncService {
           errors.add(
             'Binário do documento ausente ou vazio ($entityId); upload E2EE abortado.',
           );
-          return false;
+          return EncryptedMediaUploadResult.failure;
         }
+        final newVersionId = DateTime.now()
+            .toUtc()
+            .microsecondsSinceEpoch
+            .toString();
+        final prevVersionId =
+            cleanPayload['e2ee_media_version']?.toString() ??
+            await _getActiveMediaVersion(tableName, entityId);
+
         await transfer.uploadEncrypted(
           bucket: 'knowledge_vault',
           mediaId: entityId,
           plaintextBytes: bytes,
+          versionId: newVersionId,
         );
         cleanPayload['filePath'] = 'e2ee://knowledge_vault/$entityId';
-        return true;
+        cleanPayload['e2ee_media_version'] = newVersionId;
+        return EncryptedMediaUploadResult(
+          success: true,
+          bucket: 'knowledge_vault',
+          mediaId: entityId,
+          newVersionId: newVersionId,
+          previousVersionId: prevVersionId,
+        );
       }
 
       if (tableName == 'person_photos') {
@@ -4102,7 +4226,7 @@ class SupabaseSyncService {
         )..where((t) => t.id.equals(entityId))).getSingleOrNull();
         if (photo == null) {
           errors.add('Foto local ausente ($entityId); upload E2EE abortado.');
-          return false;
+          return EncryptedMediaUploadResult.failure;
         }
         Uint8List? bytes;
         final fp = photo.filePath;
@@ -4122,18 +4246,35 @@ class SupabaseSyncService {
           }
         }
         if (bytes != null && bytes.isNotEmpty) {
+          final newVersionId = DateTime.now()
+              .toUtc()
+              .microsecondsSinceEpoch
+              .toString();
+          final prevVersionId =
+              cleanPayload['e2ee_media_version']?.toString() ??
+              await _getActiveMediaVersion(tableName, entityId);
+
           await transfer.uploadEncrypted(
             bucket: 'person_photos',
             mediaId: entityId,
             plaintextBytes: bytes,
+            versionId: newVersionId,
           );
           cleanPayload['filePath'] = 'e2ee://person_photos/$entityId';
           cleanPayload['imageData'] = '';
+          cleanPayload['e2ee_media_version'] = newVersionId;
+          return EncryptedMediaUploadResult(
+            success: true,
+            bucket: 'person_photos',
+            mediaId: entityId,
+            newVersionId: newVersionId,
+            previousVersionId: prevVersionId,
+          );
         }
-        return true;
+        return EncryptedMediaUploadResult.none;
       }
 
-      return true;
+      return EncryptedMediaUploadResult.none;
     } catch (e, st) {
       AppLogger.warning(
         'Falha na criptografia/upload de mídia E2EE ($tableName/$entityId)',
@@ -4141,7 +4282,7 @@ class SupabaseSyncService {
         st,
       );
       errors.add('Falha no upload cifrado de mídia ($tableName/$entityId): $e');
-      return false;
+      return EncryptedMediaUploadResult.failure;
     }
   }
 
@@ -4484,6 +4625,28 @@ class SupabaseSyncService {
                   'Falha ao verificar conflito de domínio de agenda para $appliedId: $e',
                 );
               }
+            } else if (appliedTable == 'bible_studies' && appliedId != null) {
+              try {
+                await BibleStudyDomainConflictDetector.detectAndRecordConflicts(
+                  db,
+                  studyId: appliedId!,
+                );
+              } catch (e) {
+                AppLogger.warning(
+                  'Falha ao verificar conflito de domínio de estudo bíblico para $appliedId: $e',
+                );
+              }
+            } else if (appliedTable == 'tasks' && appliedId != null) {
+              try {
+                await TaskDomainConflictDetector.detectAndRecordConflicts(
+                  db,
+                  taskId: appliedId!,
+                );
+              } catch (e) {
+                AppLogger.warning(
+                  'Falha ao verificar conflito de domínio de tarefa para $appliedId: $e',
+                );
+              }
             }
             if (hasEncryptedMediaRef &&
                 appliedTable != null &&
@@ -4675,14 +4838,14 @@ class SupabaseSyncService {
         }
 
         if (operation == 'INSERT' || operation == 'UPDATE') {
-          final mediaOk = await _uploadEncryptedMediaIfApplicable(
+          final mediaResult = await _uploadEncryptedMediaIfApplicable(
             tableName: tableName,
             entityId: op.entityId,
             cleanPayload: cleanPayload,
             transfer: mediaTransfer,
             errors: errors,
           );
-          if (!mediaOk) {
+          if (!mediaResult.success) {
             failure++;
             await repository.markSyncOperationFailed(
               op.id,
@@ -4703,6 +4866,27 @@ class SupabaseSyncService {
           );
 
           if (!sealedWrite.result.success) {
+            // Em caso de conflito CAS no banco, descarta os blocos da nova versão
+            // rejeitada sem afetar a versão previamente ativa (rollback seguro).
+            if (mediaResult.newVersionId != null &&
+                mediaResult.bucket != null &&
+                mediaResult.mediaId != null) {
+              try {
+                await mediaTransfer.rollbackToVersion(
+                  bucket: mediaResult.bucket!,
+                  mediaId: mediaResult.mediaId!,
+                  rejectedVersionId: mediaResult.newVersionId!,
+                  previousVersionId: mediaResult.previousVersionId,
+                );
+              } catch (e, st) {
+                AppLogger.warning(
+                  'Falha ao efetuar rollback de mídia rejeitada por CAS (${mediaResult.bucket}/${mediaResult.mediaId}): $e',
+                  e,
+                  st,
+                );
+              }
+            }
+
             conflicts++;
             _setStatus(SyncStatus.conflict);
             Map<String, dynamic>? remoteData;
@@ -4727,6 +4911,36 @@ class SupabaseSyncService {
               remoteData: remoteData,
             );
             continue;
+          }
+
+          // Commit CAS concluído no banco de dados com sucesso!
+          if (mediaResult.newVersionId != null) {
+            await _setActiveMediaVersion(
+              tableName,
+              op.entityId,
+              mediaResult.newVersionId!,
+            );
+            // Expurgo seguro da versão obsoleta após confirmação do commit
+            if (mediaResult.previousVersionId != null &&
+                mediaResult.previousVersionId!.isNotEmpty &&
+                mediaResult.previousVersionId != mediaResult.newVersionId &&
+                mediaResult.bucket != null &&
+                mediaResult.mediaId != null) {
+              unawaited(
+                mediaTransfer
+                    .purgeObsoleteVersion(
+                      bucket: mediaResult.bucket!,
+                      mediaId: mediaResult.mediaId!,
+                      versionId: mediaResult.previousVersionId!,
+                    )
+                    .catchError((e, st) {
+                      AppLogger.debug(
+                        'Falha ao expurgar versão obsoleta pós-commit: $e',
+                        st,
+                      );
+                    }),
+              );
+            }
           }
 
           await db.transaction(() async {

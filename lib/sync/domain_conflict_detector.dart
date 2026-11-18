@@ -201,3 +201,374 @@ class AppointmentDomainConflictDetector {
     )..where((t) => t.key.equals('$kvKeyPrefix$appointmentId'))).go();
   }
 }
+
+/// Representa um conflito de domínio em Estudos Bíblicos detectado após pull:
+/// mesmo estudante primário alocado a dois estudos ativos ou sobreposição de sessão agendada.
+class BibleStudyDomainConflict {
+  final String incomingStudyId;
+  final String incomingTitle;
+  final String conflictingStudyId;
+  final String conflictingTitle;
+  final String reason;
+  final String? studentPersonId;
+  final DateTime detectedAt;
+
+  const BibleStudyDomainConflict({
+    required this.incomingStudyId,
+    required this.incomingTitle,
+    required this.conflictingStudyId,
+    required this.conflictingTitle,
+    required this.reason,
+    this.studentPersonId,
+    required this.detectedAt,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'incomingStudyId': incomingStudyId,
+    'incomingTitle': incomingTitle,
+    'conflictingStudyId': conflictingStudyId,
+    'conflictingTitle': conflictingTitle,
+    'reason': reason,
+    'studentPersonId': studentPersonId,
+    'detectedAt': detectedAt.toUtc().toIso8601String(),
+  };
+
+  factory BibleStudyDomainConflict.fromJson(Map<String, dynamic> json) {
+    return BibleStudyDomainConflict(
+      incomingStudyId: json['incomingStudyId'] as String,
+      incomingTitle: json['incomingTitle'] as String? ?? '',
+      conflictingStudyId: json['conflictingStudyId'] as String,
+      conflictingTitle: json['conflictingTitle'] as String? ?? '',
+      reason: json['reason'] as String? ?? 'duplicate_primary_student',
+      studentPersonId: json['studentPersonId'] as String?,
+      detectedAt: DateTime.parse(json['detectedAt'] as String).toUtc(),
+    );
+  }
+}
+
+/// Detector de conflitos de domínio em Estudos Bíblicos após sincronização (FA-SYNC-02 / P1-03).
+class BibleStudyDomainConflictDetector {
+  BibleStudyDomainConflictDetector._();
+
+  static const String kvKeyPrefix = 'domain_conflict_biblestudy_';
+
+  static const Set<String> inactiveStatuses = {'concluido', 'encerrado'};
+
+  static Future<List<BibleStudyDomainConflict>> detectAndRecordConflicts(
+    AppDatabase db, {
+    required String studyId,
+    DateTime? now,
+  }) async {
+    final incoming = await (db.select(
+      db.bibleStudies,
+    )..where((t) => t.id.equals(studyId))).getSingleOrNull();
+    if (incoming == null || incoming.deletedAt != null) {
+      return const [];
+    }
+    if (inactiveStatuses.contains(incoming.status.trim().toLowerCase())) {
+      return const [];
+    }
+
+    final detectedAt = (now ?? DateTime.now()).toUtc();
+    final conflicts = <BibleStudyDomainConflict>[];
+
+    // 1. Obtém participantes do estudo recebido
+    final incomingParticipants = await (db.select(
+      db.studyParticipants,
+    )..where((t) => t.studyId.equals(studyId) & t.deletedAt.isNull())).get();
+
+    final primaryParticipant =
+        incomingParticipants.where((p) => p.isPrimary).firstOrNull ??
+        incomingParticipants.firstOrNull;
+
+    if (primaryParticipant != null) {
+      final otherParticipations =
+          await (db.select(db.studyParticipants)..where(
+                (t) =>
+                    t.personId.equals(primaryParticipant.personId) &
+                    t.studyId.isNotValue(studyId) &
+                    t.deletedAt.isNull() &
+                    t.isPrimary.equals(true),
+              ))
+              .get();
+
+      for (final otherPart in otherParticipations) {
+        final otherStudy =
+            await (db.select(db.bibleStudies)..where(
+                  (t) => t.id.equals(otherPart.studyId) & t.deletedAt.isNull(),
+                ))
+                .getSingleOrNull();
+
+        if (otherStudy != null &&
+            !inactiveStatuses.contains(
+              otherStudy.status.trim().toLowerCase(),
+            )) {
+          conflicts.add(
+            BibleStudyDomainConflict(
+              incomingStudyId: incoming.id,
+              incomingTitle: incoming.title,
+              conflictingStudyId: otherStudy.id,
+              conflictingTitle: otherStudy.title,
+              reason: 'duplicate_primary_student',
+              studentPersonId: primaryParticipant.personId,
+              detectedAt: detectedAt,
+            ),
+          );
+        }
+      }
+    }
+
+    // 2. Se houver sobreposição em nextPlannedAt com outro estudo ativo
+    if (incoming.nextPlannedAt != null) {
+      final othersWithSameNextDate =
+          await (db.select(db.bibleStudies)..where(
+                (t) =>
+                    t.id.isNotValue(studyId) &
+                    t.deletedAt.isNull() &
+                    t.nextPlannedAt.equals(incoming.nextPlannedAt!),
+              ))
+              .get();
+
+      for (final other in othersWithSameNextDate) {
+        if (inactiveStatuses.contains(other.status.trim().toLowerCase())) {
+          continue;
+        }
+        if (!conflicts.any((c) => c.conflictingStudyId == other.id)) {
+          conflicts.add(
+            BibleStudyDomainConflict(
+              incomingStudyId: incoming.id,
+              incomingTitle: incoming.title,
+              conflictingStudyId: other.id,
+              conflictingTitle: other.title,
+              reason: 'overlapping_planned_session',
+              studentPersonId: primaryParticipant?.personId,
+              detectedAt: detectedAt,
+            ),
+          );
+        }
+      }
+    }
+
+    if (conflicts.isEmpty) {
+      return const [];
+    }
+
+    await (db.update(db.bibleStudies)..where((t) => t.id.equals(studyId)))
+        .write(const BibleStudiesCompanion(status: drift.Value('conflito')));
+
+    await db
+        .into(db.appKvStore)
+        .insertOnConflictUpdate(
+          AppKvStoreCompanion.insert(
+            key: '$kvKeyPrefix$studyId',
+            value: jsonEncode({
+              'studyId': studyId,
+              'detectedAt': detectedAt.toIso8601String(),
+              'conflicts': conflicts.map((c) => c.toJson()).toList(),
+            }),
+            updatedAt: drift.Value(detectedAt),
+          ),
+        );
+
+    return conflicts;
+  }
+
+  static Future<List<BibleStudyDomainConflict>> getActiveConflicts(
+    AppDatabase db,
+  ) async {
+    final rows = await (db.select(
+      db.appKvStore,
+    )..where((t) => t.key.like('$kvKeyPrefix%'))).get();
+
+    final result = <BibleStudyDomainConflict>[];
+    for (final row in rows) {
+      try {
+        final decoded = jsonDecode(row.value) as Map<String, dynamic>;
+        final list = (decoded['conflicts'] as List<dynamic>? ?? const []);
+        for (final item in list) {
+          if (item is Map) {
+            result.add(
+              BibleStudyDomainConflict.fromJson(
+                Map<String, dynamic>.from(item),
+              ),
+            );
+          }
+        }
+      } catch (_) {}
+    }
+    return result;
+  }
+
+  static Future<void> clearConflict(AppDatabase db, String studyId) async {
+    await (db.delete(
+      db.appKvStore,
+    )..where((t) => t.key.equals('$kvKeyPrefix$studyId'))).go();
+  }
+}
+
+/// Representa um conflito de domínio em Tarefas detectado após pull.
+class TaskDomainConflict {
+  final String incomingTaskId;
+  final String incomingTitle;
+  final String conflictingTaskId;
+  final String conflictingTitle;
+  final String reason;
+  final DateTime detectedAt;
+
+  const TaskDomainConflict({
+    required this.incomingTaskId,
+    required this.incomingTitle,
+    required this.conflictingTaskId,
+    required this.conflictingTitle,
+    required this.reason,
+    required this.detectedAt,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'incomingTaskId': incomingTaskId,
+    'incomingTitle': incomingTitle,
+    'conflictingTaskId': conflictingTaskId,
+    'conflictingTitle': conflictingTitle,
+    'reason': reason,
+    'detectedAt': detectedAt.toUtc().toIso8601String(),
+  };
+
+  factory TaskDomainConflict.fromJson(Map<String, dynamic> json) {
+    return TaskDomainConflict(
+      incomingTaskId: json['incomingTaskId'] as String,
+      incomingTitle: json['incomingTitle'] as String? ?? '',
+      conflictingTaskId: json['conflictingTaskId'] as String,
+      conflictingTitle: json['conflictingTitle'] as String? ?? '',
+      reason: json['reason'] as String? ?? 'duplicate_active_task',
+      detectedAt: DateTime.parse(json['detectedAt'] as String).toUtc(),
+    );
+  }
+}
+
+/// Detector de conflitos de domínio em Tarefas após sincronização (FA-SYNC-02 / P1-03).
+class TaskDomainConflictDetector {
+  TaskDomainConflictDetector._();
+
+  static const String kvKeyPrefix = 'domain_conflict_task_';
+
+  static const Set<String> inactiveStatuses = {
+    'completed',
+    'cancelled',
+    'archived',
+  };
+
+  static Future<List<TaskDomainConflict>> detectAndRecordConflicts(
+    AppDatabase db, {
+    required String taskId,
+    DateTime? now,
+  }) async {
+    final incoming = await (db.select(
+      db.tasks,
+    )..where((t) => t.id.equals(taskId))).getSingleOrNull();
+    if (incoming == null || incoming.deletedAt != null) {
+      return const [];
+    }
+    if (inactiveStatuses.contains(incoming.status.trim().toLowerCase())) {
+      return const [];
+    }
+
+    final detectedAt = (now ?? DateTime.now()).toUtc();
+    final conflicts = <TaskDomainConflict>[];
+
+    final others =
+        await (db.select(db.tasks)..where(
+              (t) =>
+                  t.id.isNotValue(taskId) &
+                  t.deletedAt.isNull() &
+                  t.title.equals(incoming.title),
+            ))
+            .get();
+
+    for (final other in others) {
+      if (inactiveStatuses.contains(other.status.trim().toLowerCase())) {
+        continue;
+      }
+
+      final samePerson =
+          incoming.personId != null &&
+          other.personId != null &&
+          incoming.personId == other.personId;
+      final sameProject =
+          incoming.projectId != null &&
+          other.projectId != null &&
+          incoming.projectId == other.projectId;
+      final bothStandAlone =
+          incoming.personId == null &&
+          incoming.projectId == null &&
+          other.personId == null &&
+          other.projectId == null;
+
+      if (samePerson || sameProject || bothStandAlone) {
+        conflicts.add(
+          TaskDomainConflict(
+            incomingTaskId: incoming.id,
+            incomingTitle: incoming.title,
+            conflictingTaskId: other.id,
+            conflictingTitle: other.title,
+            reason: 'duplicate_active_task',
+            detectedAt: detectedAt,
+          ),
+        );
+      }
+    }
+
+    if (conflicts.isEmpty) {
+      return const [];
+    }
+
+    await (db.update(db.tasks)..where((t) => t.id.equals(taskId))).write(
+      const TasksCompanion(status: drift.Value('conflito')),
+    );
+
+    await db
+        .into(db.appKvStore)
+        .insertOnConflictUpdate(
+          AppKvStoreCompanion.insert(
+            key: '$kvKeyPrefix$taskId',
+            value: jsonEncode({
+              'taskId': taskId,
+              'detectedAt': detectedAt.toIso8601String(),
+              'conflicts': conflicts.map((c) => c.toJson()).toList(),
+            }),
+            updatedAt: drift.Value(detectedAt),
+          ),
+        );
+
+    return conflicts;
+  }
+
+  static Future<List<TaskDomainConflict>> getActiveConflicts(
+    AppDatabase db,
+  ) async {
+    final rows = await (db.select(
+      db.appKvStore,
+    )..where((t) => t.key.like('$kvKeyPrefix%'))).get();
+
+    final result = <TaskDomainConflict>[];
+    for (final row in rows) {
+      try {
+        final decoded = jsonDecode(row.value) as Map<String, dynamic>;
+        final list = (decoded['conflicts'] as List<dynamic>? ?? const []);
+        for (final item in list) {
+          if (item is Map) {
+            result.add(
+              TaskDomainConflict.fromJson(Map<String, dynamic>.from(item)),
+            );
+          }
+        }
+      } catch (_) {}
+    }
+    return result;
+  }
+
+  static Future<void> clearConflict(AppDatabase db, String taskId) async {
+    await (db.delete(
+      db.appKvStore,
+    )..where((t) => t.key.equals('$kvKeyPrefix$taskId'))).go();
+  }
+}

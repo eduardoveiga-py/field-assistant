@@ -41,26 +41,39 @@ void main() {
 
           // Insert a person with unique index-specific ID
           final personId = 'person_concurrent_$index';
-          await ctx.db.into(ctx.db.people).insert(
-            PeopleCompanion.insert(
-              id: personId,
-              name: 'Concurrent Publisher $index',
-              firstContactAt: DateTime.now(),
-              createdAt: DateTime.now(),
-              updatedAt: DateTime.now(),
-            ),
-          );
+          await ctx.db
+              .into(ctx.db.people)
+              .insert(
+                PeopleCompanion.insert(
+                  id: personId,
+                  name: 'Concurrent Publisher $index',
+                  firstContactAt: DateTime.now(),
+                  createdAt: DateTime.now(),
+                  updatedAt: DateTime.now(),
+                ),
+              );
 
           // Verify table isolation: each database must contain ONLY its own record
           final peopleInDb = await ctx.db.select(ctx.db.people).get();
-          expect(peopleInDb.length, equals(1),
-              reason: 'Database in context $index was not isolated; found ${peopleInDb.length} records.');
+          expect(
+            peopleInDb.length,
+            equals(1),
+            reason:
+                'Database in context $index was not isolated; found ${peopleInDb.length} records.',
+          );
           expect(peopleInDb.first.id, equals(personId));
 
           // Create an isolated temp file in its temp directory
-          final tempFile = await ctx.createTempFile('data_$index.bin', [index, index + 1, index + 2]);
+          final tempFile = await ctx.createTempFile('data_$index.bin', [
+            index,
+            index + 1,
+            index + 2,
+          ]);
           expect(await tempFile.exists(), isTrue);
-          expect(await tempFile.readAsBytes(), equals([index, index + 1, index + 2]));
+          expect(
+            await tempFile.readAsBytes(),
+            equals([index, index + 1, index + 2]),
+          );
         }),
       );
 
@@ -74,7 +87,8 @@ void main() {
         expect(
           exists,
           isFalse,
-          reason: 'Temp directory at $path was not cleaned up after dispose() for context $i',
+          reason:
+              'Temp directory at $path was not cleaned up after dispose() for context $i',
         );
       }
     });
@@ -86,60 +100,81 @@ void main() {
 
       Object? thrownError;
       try {
-        await ctx.db.into(ctx.db.visits).insert(
-          VisitsCompanion.insert(
-            id: 'orphan_visit_strict_fk',
-            personId: 'non_existent_person_xyz',
-            dateTimeField: DateTime.now(),
-            contactType: 'revisita',
-            result: 'conversa_produtiva',
-            createdAt: DateTime.now(),
-            updatedAt: DateTime.now(),
-          ),
-        );
+        await ctx.db
+            .into(ctx.db.visits)
+            .insert(
+              VisitsCompanion.insert(
+                id: 'orphan_visit_strict_fk',
+                personId: 'non_existent_person_xyz',
+                dateTimeField: DateTime.now(),
+                contactType: 'revisita',
+                result: 'conversa_produtiva',
+                createdAt: DateTime.now(),
+                updatedAt: DateTime.now(),
+              ),
+            );
       } catch (e) {
         thrownError = e;
       }
 
       await ctx.dispose();
 
-      expect(thrownError, isNotNull, reason: 'Expected foreign key constraint violation to throw.');
+      expect(
+        thrownError,
+        isNotNull,
+        reason: 'Expected foreign key constraint violation to throw.',
+      );
 
       // Check whether it is a SqliteException or wraps one
       final isDirectSqliteException = thrownError is SqliteException;
-      final isWrappedSqliteException = thrownError.toString().contains('SqliteException') ||
+      final isWrappedSqliteException =
+          thrownError.toString().contains('SqliteException') ||
           thrownError.toString().contains('FOREIGN KEY constraint failed');
 
       expect(
         isDirectSqliteException || isWrappedSqliteException,
         isTrue,
-        reason: 'Error should be or contain SqliteException (FOREIGN KEY constraint failed). Thrown: $thrownError (${thrownError.runtimeType})',
+        reason:
+            'Error should be or contain SqliteException (FOREIGN KEY constraint failed). Thrown: $thrownError (${thrownError.runtimeType})',
       );
 
       if (thrownError is SqliteException) {
         // SQLite error code 787 is SQLITE_CONSTRAINT_FOREIGNKEY, primary code 19 is SQLITE_CONSTRAINT
-        expect(thrownError.extendedResultCode == 787 || thrownError.resultCode == 19, isTrue);
+        expect(
+          thrownError.extendedResultCode == 787 || thrownError.resultCode == 19,
+          isTrue,
+        );
       }
     });
 
-    test('orphan study participant insertion strictly violates foreign key', () async {
-      final ctx = await E2ETestContext.create();
+    test(
+      'orphan study participant insertion strictly violates foreign key',
+      () async {
+        final ctx = await E2ETestContext.create();
 
-      expect(
-        () async => ctx.db.into(ctx.db.studyParticipants).insert(
-          StudyParticipantsCompanion.insert(
-            id: 'orphan_part_1',
-            studyId: 'non_existent_study_id',
-            personId: 'non_existent_person_id',
-            createdAt: DateTime.now(),
-            updatedAt: DateTime.now(),
+        expect(
+          () async => ctx.db
+              .into(ctx.db.studyParticipants)
+              .insert(
+                StudyParticipantsCompanion.insert(
+                  id: 'orphan_part_1',
+                  studyId: 'non_existent_study_id',
+                  personId: 'non_existent_person_id',
+                  createdAt: DateTime.now(),
+                  updatedAt: DateTime.now(),
+                ),
+              ),
+          throwsA(
+            anyOf(
+              isA<SqliteException>(),
+              predicate((e) => e.toString().contains('FOREIGN KEY')),
+            ),
           ),
-        ),
-        throwsA(anyOf(isA<SqliteException>(), predicate((e) => e.toString().contains('FOREIGN KEY')))),
-      );
+        );
 
-      await ctx.dispose();
-    });
+        await ctx.dispose();
+      },
+    );
   });
 
   group('Challenge 3: Assertion Boundary Conditions', () {
@@ -149,38 +184,77 @@ void main() {
       const tol = 0.005;
 
       test('exact center matches', () {
-        expect({'latitude': targetLat, 'longitude': targetLng}, isSantoAntonioDoIcaCoordinate(tolerance: tol));
+        expect({
+          'latitude': targetLat,
+          'longitude': targetLng,
+        }, isSantoAntonioDoIcaCoordinate(tolerance: tol));
       });
 
       test('exact boundary (+tol) matches', () {
         // latDiff == 0.005, lngDiff == 0.0
-        final atLatBoundary = {'latitude': targetLat + tol, 'longitude': targetLng};
+        final atLatBoundary = {
+          'latitude': targetLat + tol,
+          'longitude': targetLng,
+        };
         expect(atLatBoundary, isSantoAntonioDoIcaCoordinate(tolerance: tol));
 
         // latDiff == 0.0, lngDiff == 0.005
-        final atLngBoundary = {'latitude': targetLat, 'longitude': targetLng + tol};
+        final atLngBoundary = {
+          'latitude': targetLat,
+          'longitude': targetLng + tol,
+        };
         expect(atLngBoundary, isSantoAntonioDoIcaCoordinate(tolerance: tol));
 
         // negative boundary
-        final atNegBoundary = {'latitude': targetLat - tol, 'longitude': targetLng - tol};
+        final atNegBoundary = {
+          'latitude': targetLat - tol,
+          'longitude': targetLng - tol,
+        };
         expect(atNegBoundary, isSantoAntonioDoIcaCoordinate(tolerance: tol));
       });
 
       test('just outside boundary (+tol + 0.0001) fails', () {
-        final outsideLat = {'latitude': targetLat + tol + 0.0001, 'longitude': targetLng};
-        expect(outsideLat, isNot(isSantoAntonioDoIcaCoordinate(tolerance: tol)));
+        final outsideLat = {
+          'latitude': targetLat + tol + 0.0001,
+          'longitude': targetLng,
+        };
+        expect(
+          outsideLat,
+          isNot(isSantoAntonioDoIcaCoordinate(tolerance: tol)),
+        );
 
-        final outsideLng = {'latitude': targetLat, 'longitude': targetLng + tol + 0.0001};
-        expect(outsideLng, isNot(isSantoAntonioDoIcaCoordinate(tolerance: tol)));
+        final outsideLng = {
+          'latitude': targetLat,
+          'longitude': targetLng + tol + 0.0001,
+        };
+        expect(
+          outsideLng,
+          isNot(isSantoAntonioDoIcaCoordinate(tolerance: tol)),
+        );
 
-        final outsideBoth = {'latitude': targetLat - tol - 0.0001, 'longitude': targetLng - tol - 0.0001};
-        expect(outsideBoth, isNot(isSantoAntonioDoIcaCoordinate(tolerance: tol)));
+        final outsideBoth = {
+          'latitude': targetLat - tol - 0.0001,
+          'longitude': targetLng - tol - 0.0001,
+        };
+        expect(
+          outsideBoth,
+          isNot(isSantoAntonioDoIcaCoordinate(tolerance: tol)),
+        );
       });
 
       test('record patterns with lat/lng keys match', () {
-        expect((latitude: targetLat, longitude: targetLng), isSantoAntonioDoIcaCoordinate());
-        expect((lat: targetLat, lng: targetLng), isSantoAntonioDoIcaCoordinate());
-        expect({'lat': targetLat, 'lng': targetLng}, isSantoAntonioDoIcaCoordinate());
+        expect((
+          latitude: targetLat,
+          longitude: targetLng,
+        ), isSantoAntonioDoIcaCoordinate());
+        expect((
+          lat: targetLat,
+          lng: targetLng,
+        ), isSantoAntonioDoIcaCoordinate());
+        expect({
+          'lat': targetLat,
+          'lng': targetLng,
+        }, isSantoAntonioDoIcaCoordinate());
       });
 
       test('non-coordinate item or null safely fails', () {
@@ -197,7 +271,9 @@ void main() {
       });
 
       test('valid WAV written to file passes', () async {
-        final tempFile = File('${Directory.systemTemp.path}/boundary_valid_audio.wav');
+        final tempFile = File(
+          '${Directory.systemTemp.path}/boundary_valid_audio.wav',
+        );
         await tempFile.writeAsBytes(MockFixtures.validWavAudioBytes());
         try {
           expect(tempFile, isValidAudioBytes());
@@ -222,15 +298,22 @@ void main() {
         final exact64 = MockFixtures.validWavAudioBytes().sublist(0, 64);
         expect(exact64.length, equals(64));
         expect(exact64.any((b) => b != 0), isTrue);
-        expect(exact64, isNot(isValidAudioBytes()),
-            reason: '64 bytes must be rejected as boundary requires strictly > 64 bytes');
+        expect(
+          exact64,
+          isNot(isValidAudioBytes()),
+          reason: '64 bytes must be rejected as boundary requires strictly > 64 bytes',
+        );
       });
 
       test('65 bytes with non-zero samples passes boundary', () {
         final exact65 = MockFixtures.validWavAudioBytes().sublist(0, 65);
         expect(exact65.length, equals(65));
         expect(exact65.any((b) => b != 0), isTrue);
-        expect(exact65, isValidAudioBytes(), reason: '65 bytes with non-zero sample should pass');
+        expect(
+          exact65,
+          isValidAudioBytes(),
+          reason: '65 bytes with non-zero sample should pass',
+        );
       });
 
       test('65 bytes of all zeros fails boundary (non-zero requirement)', () {
@@ -243,12 +326,18 @@ void main() {
         final zeros128 = MockFixtures.dummyZerosAudio(size: 128);
         expect(zeros128.length, equals(128));
         expect(zeros128.every((b) => b == 0), isTrue);
-        expect(zeros128, isNot(isValidAudioBytes()),
-            reason: '128-byte all-zero array must be rejected as fake/dummy audio');
+        expect(
+          zeros128,
+          isNot(isValidAudioBytes()),
+          reason:
+              '128-byte all-zero array must be rejected as fake/dummy audio',
+        );
       });
 
       test('non-existent file fails', () {
-        final nonExistent = File('${Directory.systemTemp.path}/definitely_non_existent_audio_xyz.wav');
+        final nonExistent = File(
+          '${Directory.systemTemp.path}/definitely_non_existent_audio_xyz.wav',
+        );
         expect(nonExistent, isNot(isValidAudioBytes()));
       });
 
@@ -277,7 +366,10 @@ void main() {
           'corpo.anciaos@jw.org',
           'secretaria@hub.jw.org',
         ]) {
-          expect('Prefix text $seed suffix text', isNot(containsNoTheocraticSeeds()));
+          expect(
+            'Prefix text $seed suffix text',
+            isNot(containsNoTheocraticSeeds()),
+          );
         }
       });
 
@@ -285,9 +377,9 @@ void main() {
         final nestedData = {
           'level1': {
             'level2': [
-              {'notes': 'Encontro marcado na Padaria Betânia pela manhã'}
-            ]
-          }
+              {'notes': 'Encontro marcado na Padaria Betânia pela manhã'},
+            ],
+          },
         };
         expect(nestedData, isNot(containsNoTheocraticSeeds()));
       });
@@ -349,7 +441,10 @@ void main() {
 
       test('rejects case-insensitive seeds and RIFF/WAVE header with zeroed PCM payload', () {
         expect('PADARIA CENTRAL BETÂNIA', isNot(containsNoTheocraticSeeds()));
-        expect('seed_hub_letter_01'.toUpperCase(), isNot(containsNoTheocraticSeeds()));
+        expect(
+          'seed_hub_letter_01'.toUpperCase(),
+          isNot(containsNoTheocraticSeeds()),
+        );
 
         final header = MockFixtures.validWavAudioBytes().sublist(0, 44);
         final zeroPcmWav = Uint8List(128)..setRange(0, 44, header);

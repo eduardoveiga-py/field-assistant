@@ -235,7 +235,7 @@ void main() {
       });
 
       final customSync = SupabaseSyncService(
-          allowLegacySyncForTesting: true,
+        allowLegacySyncForTesting: true,
         db: db,
         repository: repo,
         clientOverride: SupabaseClient(
@@ -323,7 +323,7 @@ void main() {
       });
 
       final customSync = SupabaseSyncService(
-          allowLegacySyncForTesting: true,
+        allowLegacySyncForTesting: true,
         db: db,
         repository: repo,
         clientOverride: SupabaseClient(
@@ -391,7 +391,7 @@ void main() {
       });
 
       final customSync = SupabaseSyncService(
-          allowLegacySyncForTesting: true,
+        allowLegacySyncForTesting: true,
         db: db,
         repository: repo,
         clientOverride: SupabaseClient(
@@ -437,7 +437,7 @@ void main() {
       });
 
       final customSync = SupabaseSyncService(
-          allowLegacySyncForTesting: true,
+        allowLegacySyncForTesting: true,
         db: db,
         repository: repo,
         clientOverride: SupabaseClient(
@@ -494,7 +494,7 @@ void main() {
       });
 
       final customSync = SupabaseSyncService(
-          allowLegacySyncForTesting: true,
+        allowLegacySyncForTesting: true,
         db: db,
         repository: repo,
         clientOverride: SupabaseClient(
@@ -569,7 +569,10 @@ void main() {
       bool storageDownloadCalled = false;
 
       final mockClient = MockClient((request) async {
-        if (request.method == 'POST' && request.url.path.endsWith('/rest/v1/rpc/sync_upsert_if_unchanged')) {
+        if (request.method == 'POST' &&
+            request.url.path.endsWith(
+              '/rest/v1/rpc/sync_upsert_if_unchanged',
+            )) {
           return mockJsonResponse(request, {'success': true});
         }
         final path = request.url.path;
@@ -613,7 +616,7 @@ void main() {
       });
 
       final customSync = SupabaseSyncService(
-          allowLegacySyncForTesting: true,
+        allowLegacySyncForTesting: true,
         db: db,
         repository: repo,
         clientOverride: SupabaseClient(
@@ -686,7 +689,7 @@ void main() {
       });
 
       final customSync = SupabaseSyncService(
-          allowLegacySyncForTesting: true,
+        allowLegacySyncForTesting: true,
         db: db,
         repository: repo,
         clientOverride: SupabaseClient(
@@ -754,7 +757,10 @@ void main() {
           );
 
       final mockClient = MockClient((request) async {
-        if (request.method == 'POST' && request.url.path.endsWith('/rest/v1/rpc/sync_upsert_if_unchanged')) {
+        if (request.method == 'POST' &&
+            request.url.path.endsWith(
+              '/rest/v1/rpc/sync_upsert_if_unchanged',
+            )) {
           return mockJsonResponse(request, {'success': true});
         }
         final path = request.url.path;
@@ -770,7 +776,7 @@ void main() {
       });
 
       final customSync = SupabaseSyncService(
-          allowLegacySyncForTesting: true,
+        allowLegacySyncForTesting: true,
         db: db,
         repository: repo,
         clientOverride: SupabaseClient(
@@ -796,18 +802,21 @@ void main() {
       )..where((t) => t.id.equals('q_vn_fail_upload'))).getSingle();
       expect(opAfterFirstTry.status, equals('pending'));
       expect(opAfterFirstTry.attempts, equals(1));
-      expect(opAfterFirstTry.lastError, contains('Falha no upload do arquivo binário'));
+      expect(
+        opAfterFirstTry.lastError,
+        contains('Falha no upload do arquivo binário'),
+      );
 
       for (int i = 0; i < 4; i++) {
-        await (db.update(db.syncQueue)
-              ..where((t) => t.id.equals('q_vn_fail_upload')))
-            .write(
-              SyncQueueCompanion(
-                lastAttemptAt: drift.Value(
-                  DateTime.now().subtract(const Duration(minutes: 10)),
-                ),
-              ),
-            );
+        await (db.update(
+          db.syncQueue,
+        )..where((t) => t.id.equals('q_vn_fail_upload'))).write(
+          SyncQueueCompanion(
+            lastAttemptAt: drift.Value(
+              DateTime.now().subtract(const Duration(minutes: 10)),
+            ),
+          ),
+        );
         await customSync.processQueue();
       }
 
@@ -822,16 +831,33 @@ void main() {
       final now = DateTime.now().toUtc();
       final person = await repo.createPerson(name: 'Áudio ausente');
       await db.delete(db.syncQueue).go();
-      await db.into(db.voiceNotes).insert(VoiceNotesCompanion.insert(
-        id: 'note_missing', personId: person.id, transcription: 'Teste',
-        audioFilePath: drift.Value(p.join(tempDir.path, 'missing.m4a')),
-        createdAt: now, updatedAt: now,
-      ));
-      await db.into(db.syncQueue).insert(SyncQueueCompanion.insert(
-        id: 'q_missing', entityType: 'voice_notes', entityId: 'note_missing',
-        operation: 'INSERT', payload: jsonEncode({'id': 'note_missing', 'personId': person.id}),
-        createdAt: now,
-      ));
+      await db
+          .into(db.voiceNotes)
+          .insert(
+            VoiceNotesCompanion.insert(
+              id: 'note_missing',
+              personId: person.id,
+              transcription: 'Teste',
+              audioFilePath: drift.Value(p.join(tempDir.path, 'missing.m4a')),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: 'q_missing',
+              entityType: 'voice_notes',
+              entityId: 'note_missing',
+              operation: 'INSERT',
+              payload: jsonEncode({
+                'id': 'note_missing',
+                'personId': person.id,
+              }),
+              createdAt: now,
+            ),
+          );
       var uploaded = false;
       final mock = MockClient((request) async {
         if (request.url.path.contains('/storage/v1/')) uploaded = true;
@@ -840,14 +866,24 @@ void main() {
         }
         return mockJsonResponse(request, []);
       });
-      final sync = SupabaseSyncService(allowLegacySyncForTesting: true, db: db, repository: repo,
-        clientOverride: SupabaseClient('https://mock.supabase.co', 'dummy-key', httpClient: mock));
+      final sync = SupabaseSyncService(
+        allowLegacySyncForTesting: true,
+        db: db,
+        repository: repo,
+        clientOverride: SupabaseClient(
+          'https://mock.supabase.co',
+          'dummy-key',
+          httpClient: mock,
+        ),
+      );
       addTearDown(sync.dispose);
       final result = await sync.processQueue();
       expect(result.success, isFalse);
       expect(result.failureCount, 1);
       expect(uploaded, isFalse);
-      final op = await (db.select(db.syncQueue)..where((t) => t.id.equals('q_missing'))).getSingle();
+      final op = await (db.select(
+        db.syncQueue,
+      )..where((t) => t.id.equals('q_missing'))).getSingle();
       expect(op.status, 'pending');
     });
 
@@ -887,7 +923,7 @@ void main() {
       });
 
       final customSync = SupabaseSyncService(
-          allowLegacySyncForTesting: true,
+        allowLegacySyncForTesting: true,
         db: db,
         repository: repo,
         clientOverride: SupabaseClient(
@@ -937,7 +973,9 @@ void main() {
     });
 
     test('8. Download de áudio Ticuna falha, registra pendência e retryPendingMediaDownloads recupera com sucesso', () async {
-      final tempDir = Directory.systemTemp.createTempSync('ticuna_pending_test_');
+      final tempDir = Directory.systemTemp.createTempSync(
+        'ticuna_pending_test_',
+      );
       addTearDown(() => tempDir.deleteSync(recursive: true));
 
       bool allowDownload = false;
@@ -945,7 +983,8 @@ void main() {
 
       final mockClient = MockClient((request) async {
         final path = request.url.path;
-        if (path.contains('/storage/v1/object/ticuna_audio') || path.contains('/storage/v1/object/voice_notes')) {
+        if (path.contains('/storage/v1/object/ticuna_audio') ||
+            path.contains('/storage/v1/object/voice_notes')) {
           if (request.method == 'DELETE') {
             deleteCalled = true;
             return mockJsonResponse(request, {'message': 'Deleted'});
@@ -970,14 +1009,14 @@ void main() {
               'translation': 'Pessoa',
               'created_at': DateTime.now().toIso8601String(),
               'updated_at': DateTime.now().toIso8601String(),
-            }
+            },
           ], contentRange: '0-0/1');
         }
         return mockJsonResponse(request, []);
       });
 
       final customSync = SupabaseSyncService(
-          allowLegacySyncForTesting: true,
+        allowLegacySyncForTesting: true,
         db: db,
         repository: repo,
         clientOverride: SupabaseClient(
@@ -989,15 +1028,21 @@ void main() {
       );
 
       final ticunaRepo = TicunaRepository(db);
-      await ticunaRepo.getAllWords(); // Garante inicialização das tabelas no SQLite
+      await ticunaRepo
+          .getAllWords(); // Garante inicialização das tabelas no SQLite
 
       // 1. Pull inicial: metadado da palavra chega, mas download de áudio falha com 503
       final pullRes = await customSync.fetchRemoteChanges();
       expect(pullRes.successCount, greaterThanOrEqualTo(1));
 
       // Verifica pendência registrada no AppKvStore
-      final pendingKey = await (db.select(db.appKvStore)
-        ..where((t) => t.key.equals('pending_ticuna_audio_download_ticuna_words_word_ticuna_dl_1'))).getSingleOrNull();
+      final pendingKey =
+          await (db.select(db.appKvStore)..where(
+                (t) => t.key.equals(
+                  'pending_ticuna_audio_download_ticuna_words_word_ticuna_dl_1',
+                ),
+              ))
+              .getSingleOrNull();
       expect(pendingKey, isNotNull);
 
       // 2. Conexão restabelecida: autoriza download e recupera via retryPendingMediaDownloads
@@ -1006,8 +1051,13 @@ void main() {
       expect(recovered, equals(1));
 
       // Pendência deve ter sido consumida
-      final pendingAfter = await (db.select(db.appKvStore)
-        ..where((t) => t.key.equals('pending_ticuna_audio_download_ticuna_words_word_ticuna_dl_1'))).getSingleOrNull();
+      final pendingAfter =
+          await (db.select(db.appKvStore)..where(
+                (t) => t.key.equals(
+                  'pending_ticuna_audio_download_ticuna_words_word_ticuna_dl_1',
+                ),
+              ))
+              .getSingleOrNull();
       expect(pendingAfter, isNull);
 
       // 3. Testa deleção de áudio com user folder prefix
@@ -1024,27 +1074,41 @@ void main() {
       bool downloadCalled = false;
 
       final mockClient = MockClient((request) async {
-        if (request.method == 'POST' && request.url.path.endsWith('/rest/v1/rpc/sync_upsert_if_unchanged')) {
+        if (request.method == 'POST' &&
+            request.url.path.endsWith(
+              '/rest/v1/rpc/sync_upsert_if_unchanged',
+            )) {
           return mockJsonResponse(request, {'success': true});
         }
         final uri = request.url.toString();
 
-        if (uri.contains('/storage/v1/object/knowledge_vault') || uri.contains('knowledge_vault')) {
+        if (uri.contains('/storage/v1/object/knowledge_vault') ||
+            uri.contains('knowledge_vault')) {
           if (request.method == 'POST' || request.method == 'PUT') {
             uploadCalled = true;
-            return http.Response(jsonEncode({'Key': 'knowledge_vault/test_doc.pdf'}), 200, headers: {'content-type': 'application/json'});
+            return http.Response(
+              jsonEncode({'Key': 'knowledge_vault/test_doc.pdf'}),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
           }
           if (request.method == 'GET') {
             downloadCalled = true;
-            return http.Response.bytes(utf8.encode('%PDF-1.4 Mock Content'), 200, headers: {'content-type': 'application/pdf'});
+            return http.Response.bytes(
+              utf8.encode('%PDF-1.4 Mock Content'),
+              200,
+              headers: {'content-type': 'application/pdf'},
+            );
           }
         }
 
-        if (request.method == 'POST' && uri.contains('/rest/v1/knowledge_documents')) {
+        if (request.method == 'POST' &&
+            uri.contains('/rest/v1/knowledge_documents')) {
           return mockJsonResponse(request, []);
         }
 
-        if (request.method == 'GET' && uri.contains('/rest/v1/knowledge_documents')) {
+        if (request.method == 'GET' &&
+            uri.contains('/rest/v1/knowledge_documents')) {
           if (uri.contains('id=eq.')) {
             return mockJsonResponse(request, []);
           }
@@ -1060,14 +1124,14 @@ void main() {
               'tags': '[]',
               'created_at': DateTime.now().toIso8601String(),
               'updated_at': DateTime.now().toIso8601String(),
-            }
+            },
           ], contentRange: '0-0/1');
         }
         return mockJsonResponse(request, []);
       });
 
       final customSync = SupabaseSyncService(
-          allowLegacySyncForTesting: true,
+        allowLegacySyncForTesting: true,
         db: db,
         repository: repo,
         clientOverride: SupabaseClient(
@@ -1082,40 +1146,44 @@ void main() {
       final localFile = File('${tempDir.path}/local_test.pdf');
       localFile.writeAsStringSync('Local PDF bytes');
 
-      await db.into(db.knowledgeDocuments).insert(
-        KnowledgeDocumentsCompanion.insert(
-          id: 'local_doc_1',
-          title: 'Meu Estudo',
-          fileName: 'local_test.pdf',
-          fileType: 'pdf',
-          fileSize: 100,
-          filePath: localFile.path,
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        ),
-      );
+      await db
+          .into(db.knowledgeDocuments)
+          .insert(
+            KnowledgeDocumentsCompanion.insert(
+              id: 'local_doc_1',
+              title: 'Meu Estudo',
+              fileName: 'local_test.pdf',
+              fileType: 'pdf',
+              fileSize: 100,
+              filePath: localFile.path,
+              createdAt: DateTime.now(),
+              updatedAt: DateTime.now(),
+            ),
+          );
 
-      await db.into(db.syncQueue).insert(
-        SyncQueueCompanion.insert(
-          id: 'op_doc_1',
-          entityType: 'knowledge_documents',
-          entityId: 'local_doc_1',
-          operation: 'INSERT',
-          payload: jsonEncode({
-            'id': 'local_doc_1',
-            'title': 'Meu Estudo',
-            'file_name': 'local_test.pdf',
-            'file_type': 'pdf',
-            'file_size': 100,
-            'file_path': localFile.path,
-            'category': 'general',
-            'tags': '[]',
-            'created_at': DateTime.now().toIso8601String(),
-            'updated_at': DateTime.now().toIso8601String(),
-          }),
-          createdAt: DateTime.now(),
-        ),
-      );
+      await db
+          .into(db.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: 'op_doc_1',
+              entityType: 'knowledge_documents',
+              entityId: 'local_doc_1',
+              operation: 'INSERT',
+              payload: jsonEncode({
+                'id': 'local_doc_1',
+                'title': 'Meu Estudo',
+                'file_name': 'local_test.pdf',
+                'file_type': 'pdf',
+                'file_size': 100,
+                'file_path': localFile.path,
+                'category': 'general',
+                'tags': '[]',
+                'created_at': DateTime.now().toIso8601String(),
+                'updated_at': DateTime.now().toIso8601String(),
+              }),
+              createdAt: DateTime.now(),
+            ),
+          );
 
       final pushRes = await customSync.processQueue();
       expect(pushRes.successCount, equals(1));
@@ -1127,7 +1195,9 @@ void main() {
       expect(downloadCalled, isTrue);
 
       // Verifica que o arquivo baixado foi gravado no diretório de documentos local
-      final downloadedDoc = await (db.select(db.knowledgeDocuments)..where((t) => t.id.equals('remote_doc_1'))).getSingle();
+      final downloadedDoc = await (db.select(
+        db.knowledgeDocuments,
+      )..where((t) => t.id.equals('remote_doc_1'))).getSingle();
       expect(File(downloadedDoc.filePath).existsSync(), isTrue);
     });
   });

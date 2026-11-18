@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+
 import '../database/app_database.dart';
 
 /// Modalidade de deslocamento no território para cálculo de rotas e segurança
@@ -80,20 +81,26 @@ class DoorstepProximityEngine {
     final now = referenceNow ?? DateTime.now();
     final recommendations = <DoorstepSlotRecommendation>[];
     final peopleMap = {for (final p in allPeople) p.id: p};
-    final bufferMinutes = customBufferMinutes ?? travelMode.defaultBufferMinutes;
+    final bufferMinutes =
+        customBufferMinutes ?? travelMode.defaultBufferMinutes;
 
     // 1. Procura compromissos nos próximos 7 dias que tenham pessoas geograficamente próximas ou no mesmo endereço
-    final upcomingAppts = existingAppointments
-        .where((a) =>
-            a.deletedAt == null &&
-            a.status != 'cancelado' &&
-            a.startTime.isAfter(now) &&
-            a.startTime.isBefore(now.add(const Duration(days: 7))))
-        .toList()
-      ..sort((a, b) => a.startTime.compareTo(b.startTime));
+    final upcomingAppts =
+        existingAppointments
+            .where(
+              (a) =>
+                  a.deletedAt == null &&
+                  a.status != 'cancelado' &&
+                  a.startTime.isAfter(now) &&
+                  a.startTime.isBefore(now.add(const Duration(days: 7))),
+            )
+            .toList()
+          ..sort((a, b) => a.startTime.compareTo(b.startTime));
 
     for (final appt in upcomingAppts) {
-      final otherPerson = appt.personId != null ? peopleMap[appt.personId] : null;
+      final otherPerson = appt.personId != null
+          ? peopleMap[appt.personId]
+          : null;
       if (otherPerson == null) continue;
       if (otherPerson.id == targetPerson.id) continue;
 
@@ -116,19 +123,31 @@ class DoorstepProximityEngine {
       if (dist != null) {
         isWithinReach = dist <= travelMode.maxRadiusMeters;
       } else {
-        isWithinReach = _isSameNeighborhood(targetPerson.address, otherPerson.address);
+        isWithinReach = _isSameNeighborhood(
+          targetPerson.address,
+          otherPerson.address,
+        );
       }
 
       if (isWithinReach) {
         final int estMinutes = dist != null
-            ? ((dist / 1000.0) / travelMode.averageSpeedKmh * 60.0).ceil().clamp(5, 120)
+            ? ((dist / 1000.0) / travelMode.averageSpeedKmh * 60.0)
+                  .ceil()
+                  .clamp(5, 120)
             : bufferMinutes;
 
         // Sugere o horário após o término do compromisso anterior respeitando o buffer de deslocamento
-        final candidateStart = appt.endTime.add(Duration(minutes: bufferMinutes));
+        final candidateStart = appt.endTime.add(
+          Duration(minutes: bufferMinutes),
+        );
         final candidateEnd = candidateStart.add(const Duration(minutes: 30));
 
-        final conflict = _checkConflict(candidateStart, candidateEnd, existingAppointments, externalEvents);
+        final conflict = _checkConflict(
+          candidateStart,
+          candidateEnd,
+          existingAppointments,
+          externalEvents,
+        );
 
         if (!_hasSlotOverlap(candidateStart, candidateEnd, recommendations)) {
           final String reason;
@@ -136,9 +155,11 @@ class DoorstepProximityEngine {
             final distStr = dist < 1000
                 ? '${dist.toStringAsFixed(0)}m'
                 : '${(dist / 1000).toStringAsFixed(1)}km';
-            reason = 'Próximo de ${otherPerson.name} ($distStr • ${travelMode.label})';
+            reason =
+                'Próximo de ${otherPerson.name} ($distStr • ${travelMode.label})';
           } else {
-            reason = 'Mesmo setor/endereço que ${otherPerson.name} (${otherPerson.address ?? "conhecido"})';
+            reason =
+                'Mesmo setor/endereço que ${otherPerson.name} (${otherPerson.address ?? "conhecido"})';
           }
 
           recommendations.add(
@@ -162,14 +183,29 @@ class DoorstepProximityEngine {
     }
 
     // 2. Recomendação baseada na preferência do morador (preferredSchedule)
-    final prefSlot = _suggestFromPreference(targetPerson, now, existingAppointments, externalEvents);
-    if (prefSlot != null && !_hasSlotOverlap(prefSlot.startTime, prefSlot.endTime, recommendations)) {
+    final prefSlot = _suggestFromPreference(
+      targetPerson,
+      now,
+      existingAppointments,
+      externalEvents,
+    );
+    if (prefSlot != null &&
+        !_hasSlotOverlap(
+          prefSlot.startTime,
+          prefSlot.endTime,
+          recommendations,
+        )) {
       recommendations.add(prefSlot);
     }
 
     // 3. Fallbacks canônicos sem duplicações: Sábado 10:00, Terça 15:30, Domingo 10:00, Quinta 18:00, Sábado 14:30
     final fallbackCandidates = [
-      (DateTime.saturday, 10, 0, 'Sábado pela manhã (Horário Nobre do Ministério)'),
+      (
+        DateTime.saturday,
+        10,
+        0,
+        'Sábado pela manhã (Horário Nobre do Ministério)',
+      ),
       (DateTime.tuesday, 15, 30, 'Meio de semana à tarde'),
       (DateTime.sunday, 10, 0, 'Domingo pela manhã'),
       (DateTime.thursday, 18, 0, 'Quinta-feira ao final do dia'),
@@ -188,7 +224,8 @@ class DoorstepProximityEngine {
         externalEvents: externalEvents,
         reason: candidate.$4,
       );
-      if (slot != null && !_hasSlotOverlap(slot.startTime, slot.endTime, recommendations)) {
+      if (slot != null &&
+          !_hasSlotOverlap(slot.startTime, slot.endTime, recommendations)) {
         recommendations.add(slot);
       }
     }
@@ -203,7 +240,8 @@ class DoorstepProximityEngine {
   ) {
     for (final rec in existingRecs) {
       if (rec.startTime == start) return true;
-      if (start.isBefore(rec.endTime) && end.isAfter(rec.startTime)) return true;
+      if (start.isBefore(rec.endTime) && end.isAfter(rec.startTime))
+        return true;
     }
     return false;
   }
@@ -236,11 +274,19 @@ class DoorstepProximityEngine {
       targetDay = DateTime.friday;
     }
 
-    if (pref.contains('manha') || pref.contains('manhã') || pref.contains('09') || pref.contains('10')) {
+    if (pref.contains('manha') ||
+        pref.contains('manhã') ||
+        pref.contains('09') ||
+        pref.contains('10')) {
       hour = 10;
-    } else if (pref.contains('tarde') || pref.contains('14') || pref.contains('15') || pref.contains('16')) {
+    } else if (pref.contains('tarde') ||
+        pref.contains('14') ||
+        pref.contains('15') ||
+        pref.contains('16')) {
       hour = 15;
-    } else if (pref.contains('noite') || pref.contains('18') || pref.contains('19')) {
+    } else if (pref.contains('noite') ||
+        pref.contains('18') ||
+        pref.contains('19')) {
       hour = 18;
     }
 
@@ -270,7 +316,13 @@ class DoorstepProximityEngine {
     if (daysToAdd <= 0) daysToAdd += 7;
 
     final candidateDate = now.add(Duration(days: daysToAdd));
-    final start = DateTime(candidateDate.year, candidateDate.month, candidateDate.day, hour, minute);
+    final start = DateTime(
+      candidateDate.year,
+      candidateDate.month,
+      candidateDate.day,
+      hour,
+      minute,
+    );
     final end = start.add(const Duration(minutes: 30));
 
     final conflict = _checkConflict(start, end, existingAppts, externalEvents);
@@ -301,7 +353,10 @@ class DoorstepProximityEngine {
 
     // Checa eventos externos do Google / Apple Calendar
     for (final ext in externalEvents) {
-      if (ext.deletedAt != null || ext.isDeletedExternal || ext.externalStatus == 'cancelled') continue;
+      if (ext.deletedAt != null ||
+          ext.isDeletedExternal ||
+          ext.externalStatus == 'cancelled')
+        continue;
       if (ext.startTime.isBefore(end) && ext.endTime.isAfter(start)) {
         return 'Conflito com calendário externo: "${ext.title}"';
       }
@@ -317,15 +372,38 @@ class DoorstepProximityEngine {
     if (a1.isEmpty || a2.isEmpty) return false;
     if (a1 == a2) return true;
 
-    final parts1 = a1.split(RegExp(r'[,-]')).map((p) => p.trim()).where((p) => p.length >= 3);
+    final parts1 = a1
+        .split(RegExp(r'[,-]'))
+        .map((p) => p.trim())
+        .where((p) => p.length >= 3);
     for (final p in parts1) {
       if (a2.contains(p)) return true;
     }
 
     const stopWords = {
-      'rua', 'avenida', 'av', 'travessa', 'trav', 'alameda', 'beco', 'bairro',
-      'comunidade', 'ramal', 'rio', 'igarapé', 'igarape', 'sitio', 'sítio',
-      'vila', 'estrada', 'km', 'nº', 'no', 'casa', 'ap', 'apto'
+      'rua',
+      'avenida',
+      'av',
+      'travessa',
+      'trav',
+      'alameda',
+      'beco',
+      'bairro',
+      'comunidade',
+      'ramal',
+      'rio',
+      'igarapé',
+      'igarape',
+      'sitio',
+      'sítio',
+      'vila',
+      'estrada',
+      'km',
+      'nº',
+      'no',
+      'casa',
+      'ap',
+      'apto',
     };
     final tokens1 = a1
         .split(RegExp(r'[\s,.-]+'))
@@ -339,12 +417,18 @@ class DoorstepProximityEngine {
     return tokens1.intersection(tokens2).isNotEmpty;
   }
 
-  static double _haversineMeters(double lat1, double lon1, double lat2, double lon2) {
+  static double _haversineMeters(
+    double lat1,
+    double lon1,
+    double lat2,
+    double lon2,
+  ) {
     const double r = 6371000.0;
     final dLat = (lat2 - lat1) * (math.pi / 180.0);
     final dLon = (lon2 - lon1) * (math.pi / 180.0);
 
-    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+    final a =
+        math.sin(dLat / 2) * math.sin(dLat / 2) +
         math.cos(lat1 * (math.pi / 180.0)) *
             math.cos(lat2 * (math.pi / 180.0)) *
             math.sin(dLon / 2) *
