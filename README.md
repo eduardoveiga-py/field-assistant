@@ -3,11 +3,11 @@
 # 📖 Ministério Pessoal
 ### *Gestão Eficiente, Discreta e Offline-First do Ministério de Campo*
 
-[![Versão](https://img.shields.io/badge/Versão-1.3.3%20(Build%2010)-blue?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/eduardoveiga-py/field-assistant/releases/latest)
+[![Versão](https://img.shields.io/badge/Versão-2.0.0_(Build_11)-blue?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/eduardoveiga-py/field-assistant/releases/latest)
 [![Flutter](https://img.shields.io/badge/Flutter-3.27+-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-3.5+-0175C2?style=for-the-badge&logo=dart&logoColor=white)](https://dart.dev)
 [![Offline First](https://img.shields.io/badge/Arquitetura-Offline--First-success?style=for-the-badge&logo=sqlite&logoColor=white)](https://drift.simonbinder.eu/)
-[![Testes](https://img.shields.io/badge/Testes-744%20Passando%20(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](https://github.com/eduardoveiga-py/field-assistant/actions)
+[![Testes](https://img.shields.io/badge/Testes-762_Passando_(100%25)-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white)](https://github.com/eduardoveiga-py/field-assistant/actions)
 [![Plataformas](https://img.shields.io/badge/Plataformas-Android%20%7C%20iOS%20%7C%20Web%20%7C%20Windows%20%7C%20Linux%20%7C%20macOS-orange?style=for-the-badge)](https://github.com/eduardoveiga-py/field-assistant/releases)
 
 <p align="center">
@@ -497,6 +497,49 @@ flowchart LR
 - Integração da publicação *Seja Feliz para Sempre!* com links profundos para o JW Library.
 - Ditado rápido de notas de voz com extração inteligente de dados da visita.
 
+### 📦 Versão 2.0.0 — 18/11/2026
+
+**Programa de Estabilização e Evolução — FAES Master Program**
+
+**🗺️ Mapas Nativo (MapLibre Level 2)**
+- Integração completa do MapLibre Native (`maplibre_gl: 0.28.0`) com renderização via Metal (iOS), Vulkan/OpenGL (Android) e WebGL (Web).
+- Leitor PMTiles v3 nativo com busca binária Hilbert, resolução de diretórios folha e header de 127 bytes.
+- Servidor HTTP loopback RFC 7233 (`OfflineTileServer`) para servir tiles, fontes SDF e sprites sem internet.
+- Fontes Protobuf SDF autênticas (`0-255.pbf`, 76 KB, 195 glifos) e sprite RGBA real gerados localmente.
+- Geocodificação reversa offline com cache Drift de 30 dias e limitador de 1 req/s.
+- Fallback automático para mapa raster (DynamicTileLayer) em Desktop e ambientes sem suporte a GL.
+
+**🔒 Criptografia Fail-Closed (Banco de Dados Local)**
+- Máquina de estados explícita com 5 estados: `encrypted`, `migration_required`, `encryption_unavailable`, `migration_failed`, `recovery_required`.
+- Nunca abre banco plaintext silenciosamente. Falha é informada ao usuário com opções de recuperação.
+- Proteção de arquivos iOS Classe B (`NSFileProtectionCompleteUntilFirstUserAuthentication`) auditada e documentada.
+- 11 cenários de falha cobertos por testes automatizados.
+
+**🛡️ Integridade de Mídias E2EE (Versionamento Imutável)**
+- Chunks com identificador de versão exclusivo (`v_$versionId/chunk_$index.enc`) — sem sobrescrita parcial.
+- Publicação de manifesto somente após verificação completa dos chunks (CAS atômico).
+- 3 detectores de conflito de domínio: estudos bíblicos, notas de voz e agendamentos.
+- Correção crítica de ressurreição/soft-delete no Supabase (`handle_soft_delete_and_resurrection_guard`).
+
+**🎙️ Gravação de Áudio — Segurança contra Interrupções iOS**
+- Tratamento de `AVAudioSession` via `audio_session` para chamadas telefônicas e alarmes.
+- Interrupções preservam o áudio gravado (`stopRecording()`), sem descartes acidentais.
+
+**📱 iPad & Acessibilidade**
+- Split View Master-Detail adaptativo em 900px, multitasking em 678px sem overflow.
+- Conformidade semântica completa para Apple VoiceOver e TalkBack (todos os botões ≥ 48×48 dp).
+- `Semantics(container: true, excludeSemantics: true)` em todos os botões de ação customizados.
+
+**🏗️ Arquitetura Modular**
+- 5 telas monolíticas decompostas: `appointments/`, `contacts_map/`, `person_detail/`, `settings/`, `studies/`.
+
+**✅ CI/CD & Cobertura**
+- Gate de cobertura criptográfica: mínimo 90% (atual: 93,21% em 52 testes).
+- `dart analyze --fatal-warnings` obrigatório no pipeline — 0 erros, 0 warnings.
+- `dart format` limpo em todos os 366 arquivos.
+
+---
+
 ### 📦 Versão 1.0.0 — 01/11/2026
 - Lançamento inicial oficial do Ministério Pessoal com arquitetura 100% Offline-First.
 - Gestão de contatos, estudos bíblicos, agenda ministerial e contagem rigorosa de relatórios.
@@ -534,7 +577,7 @@ flutter run -d <device-id> # Dispositivo Android / iOS
 ### Qualidade de Código e Testes
 ```bash
 # Análise estática obrigatória (zero warnings/erros)
-dart analyze lib test --fatal-infos
+dart analyze lib test integration_test --fatal-warnings
 
 # Suíte completa de testes automatizados com cobertura
 flutter test --coverage
@@ -573,4 +616,34 @@ lib/
 
 ## 📄 Licença
 
-Desenvolvido para apoiar de forma pessoal, gratuita e voluntária o serviço de pregação cristão. Uso pessoal e comunitário incentivado.
+Distribuído sob a **[Licença MIT](LICENSE)** — uso pessoal, comunitário, fork e contribuições são bem-vindos.
+
+> Este projeto é desenvolvido de forma voluntária e gratuita para apoiar a organização do serviço cristão de pregação. Não possui afiliação oficial com nenhuma organização religiosa.
+
+---
+
+## 🧪 Testes do Banco de Dados Supabase (pgTAP)
+
+As políticas de segurança RLS, as RPCs E2EE e os buckets de Storage são validados via **pgTAP** diretamente no Supabase:
+
+```bash
+# Pré-requisito: Supabase CLI instalado e linkado ao projeto
+supabase login
+supabase link --project-ref SEU_PROJECT_REF
+
+# Executar suíte de testes (24 asserções de segurança)
+supabase test db
+
+# Ou contra banco local (docker):
+supabase start
+supabase test db
+```
+
+Os testes ficam em `supabase/tests/01_rls_e2ee_storage_security.sql` e validam:
+- Isolamento de contas (user_a não enxerga dados de user_b)
+- Bloqueio total do role `anon`
+- Acesso exclusivo via RPC CAS (sem INSERT direto)
+- Detecção de conflito em revisão obsoleta
+- Privacidade dos 4 buckets de Storage (`voice_notes`, `ticuna_audio`, `knowledge_vault`, `person_photos`)
+
+
