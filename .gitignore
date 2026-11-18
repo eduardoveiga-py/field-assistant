@@ -59,7 +59,9 @@ app.*.map.json
 # Widget Preview related
 .widget_preview/
 
-.agents/
+.agents/*
+!.agents/skills/
+!.agents/skills/**
 android/local.properties
 **/GeneratedPluginRegistrant.java
 

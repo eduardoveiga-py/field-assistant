@@ -1,0 +1,76 @@
+name: Security & Supply Chain Checks
+
+on:
+  push:
+    branches: [ main, master, 'stabilization/**' ]
+  pull_request:
+    branches: [ main, master ]
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  codeql_actions_js:
+    name: CodeQL Static Analysis (Actions & JS/SQL Tests)
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'actions', 'javascript-typescript' ]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@9418214df1f2c4b8128c770156c409013b07d6b9 # v3
+        with:
+          languages: ${{ matrix.language }}
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@9418214df1f2c4b8128c770156c409013b07d6b9 # v3
+
+  secret_and_sbom_check:
+    name: Secret Pattern Audit & SBOM Generation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Audit tracked files for leaked private keys or service_role secrets
+        run: |
+          python3 - <<'PY'
+          import re, subprocess, sys
+          from pathlib import Path
+
+          tracked = subprocess.check_output(['git', 'ls-files'], text=True).splitlines()
+          patterns = [
+              ('PEM private key', re.compile(r'-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----')),
+              ('Supabase service_role key', re.compile(r'service_role[\s"\':=]+eyJ[A-Za-z0-9_-]{20,}')),
+              ('AWS secret key', re.compile(r'AKIA[0-9A-Z]{16}')),
+          ]
+          violations = []
+          for rel in tracked:
+              p = Path(rel)
+              if not p.is_file() or p.suffix in {'.png', '.jpg', '.m4a', '.mbtiles', '.zip', '.pdf', '.ttf', '.otf', '.wasm'}:
+                  continue
+              text = p.read_text(encoding='utf-8', errors='ignore')
+              for label, rx in patterns:
+                  if rx.search(text):
+                      violations.append(f'{rel}: matched {label}')
+          if violations:
+              for v in violations:
+                  print(f'::error::{v}')
+              sys.exit(1)
+          print(f'Secret audit passed across {len(tracked)} tracked files.')
+          PY
+      - name: Generate SBOM (CycloneDX JSON from pubspec.lock)
+        run: python3 tool/generate_sbom.py pubspec.lock sbom-cyclonedx.json
+      - name: Upload SBOM Artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: field-assistant-sbom
+          path: sbom-cyclonedx.json

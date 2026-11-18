@@ -1,77 +1,21 @@
-# REGISTRO DE TRANSIÇÃO DE SESSÃO (SESSION HANDOFF)
+# Field Assistant — Session Handoff (FAES Master Program)
 
-## 1. Identificação da Sessão
-- **Data:** 01 de Novembro de 2026
-- **Branch Ativa:** `master`
-- **Último Commit:** `971ceec` (`docs(engineering): adicao da memoria tecnica operacional e relatorio de auditoria da Fase 1`)
-- **Fase Executada:** **FASE 1 — INVENTÁRIO INTEGRAL, AUDITORIA CRUZADA, REVALIDAÇÃO TÉCNICA E MEMÓRIA DE ENGENHARIA**
+- **Data:** 2026-11-17
+- **Branch ativa:** `stabilization/faes-master-program` (base `master` @ `47cc87d`)
+- **Fase atual:** Fase 0 Concluída (`FA-GOV-01`, `FA-CI-01`) -> Iniciando Fase 1 (Bloqueadores P0 de Segurança, E2EE, Isolamento de Contas, Path Traversal e Backup Restore)
 
----
+## Baseline Revalidado em `47cc87d`
+- `flutter test --reporter compact`: **960 passed, 1 skipped, 0 failed**
+- `dart analyze lib test`: **0 errors, 0 warnings, 2 infos**
+- PGlite SQL tests (`sync_compare_and_swap_test.mjs`, `experimental_encrypted_records_test.mjs`, `experimental_recovery_vault_test.mjs`, `production_e2ee_test.mjs`): **4/4 PASS**
 
-## 2. O Que Foi Realizado Nesta Sessão
-1. **Auditoria Integral da Arquitetura e Código:**
-   - Inspeção de todos os 17 submódulos em `lib/`, banco local Drift, sincronização Supabase, calendários, backup, mídias e telas UI.
-   - Análise estática com verificação em tempo real: `dart analyze lib test --fatal-infos` finalizado com **0 issues**.
-   - Execução integral da bateria de testes: `flutter test` executou todos os **508 testes automatizados com 100% de sucesso**.
-   - Verificação de compilação web e configurações de build iOS (`Info.plist`, `ci.yml`, `project.pbxproj`).
+## Concluído na Fase 0
+- `FA-GOV-01`: Instalados `AGENTS.md` e `.agents/skills/field-assistant-engineering-standard/SKILL.md`; consolidados os 3 logs de ADRs em `docs/engineering/DECISIONS.md`; criados `PRODUCT_AND_SYSTEM_MAP.md`, `MASTER_BACKLOG.md` e `impact-assessments/FA-PHASE-0-1-SECURITY-HARDENING.md`.
+- `FA-CI-01`: Endurecido `.github/workflows/ci.yml` (`permissions: contents: read` global, `contents: write` isolado em `publish_release`, 100% Actions pinadas por SHA completo, job `sql_safety` PGlite em `master`/PRs/`stabilization/**`, check `dart format`, relatório real de cobertura via `tool/ci_coverage_check.py`), endurecido `validation.yml`, adicionados `.github/dependabot.yml`, `.github/workflows/security-scan.yml` (CodeQL + secret scan + SBOM) e `tool/generate_sbom.py`.
 
-2. **Revalidação Empírica dos Problemas P0 / P1 / P2:**
-   - **P0-01 Confirmado:** `lib/main.dart` não inicializa o Supabase.
-   - **P0-02 Confirmado:** `supabase/migrations/20261026000000_initial_schema.sql` omite as tabelas `voice_notes`, `phone_contacts`, `territory_landmarks` e o bucket de Storage `voice_notes`.
-   - **P0-03 Confirmado:** `String.fromEnvironment` não lê arquivos `.env` sem flags explícitas no build.
-   - **P1-01 Confirmado:** `lib/voice_notes/audio_recording_service.dart` cancela o timer aos 30s mas não interrompe o hardware do gravador.
-   - **P1-02 Confirmado:** `lib/database/app_database.dart` silencia erros de DDL com `catch (_) {}`.
-   - **P1-03 Confirmado:** Reservas simultâneas de horários em dois dispositivos offline geram sobreposição silenciosa pós-sincronização.
-   - **P1-04 Confirmado:** Ditado declarado como "offline-first" depende de recursos do sistema operacional que podem exigir conexão ativa.
-   - **P2-01 Confirmado:** Telas monolíticas identificadas (`person_detail_screen.dart` com 7.346 linhas, `appointments_screen.dart` com 4.379 linhas, etc.).
-   - **P2-02 Confirmado:** Divergências no `README.md` (citando 32 e 412 testes em vez dos 508 reais).
-
-3. **Geração da Memória Técnica Persistente em `docs/engineering/`:**
-   - Criados e consolidados:
-     - `MASTER_CONTEXT.md`
-     - `IMPLEMENTATION_STATUS.md`
-     - `PRODUCTION_READINESS.md`
-     - `DECISION_LOG.md`
-     - `SESSION_HANDOFF.md`
-     - `REGRESSION_GUARDRAILS.md`
-     - `INITIAL_AUDIT.md`
-
----
-
-## 3. Estado dos Testes e Ambiente
-- **Testes Unitários, Widget e Integração:** 508 aprovados, 0 falhas (`flutter test`).
-- **Análise Estática:** 0 issues (`dart analyze lib test --fatal-infos`).
-- **Formatação:** 100% aprovada (`dart format --output=none --set-exit-if-changed lib test`).
-- **Build Web Release:** 100% concluído (`flutter build web --release`).
-
----
-
-## 4. Próxima Tarefa Exata
-Aguardar autorização formal do usuário/coordenador para iniciar a **FASE 2: CORREÇÕES CONTROLADAS**.
-
-Quando autorizado, a ordem de execução deve ser:
-1. **Unidade 1 (P0):** Inicialização robusta e tolerante a falhas do Supabase em `lib/main.dart` com fallback para modo puramente local quando desconfigurado ou offline.
-2. **Unidade 2 (P0):** Criação de nova migração versionada `supabase/migrations/20261102000000_complete_sync_tables_and_storage.sql` com as tabelas `voice_notes`, `phone_contacts`, `territory_landmarks`, bucket `voice_notes` e políticas RLS de usuário.
-3. **Unidade 3 (P0):** Padronização da injeção de configuração de ambiente (`.env` via `--dart-define-from-file=.env` ou helper de configuração validado com mensagens de erro claras).
-4. **Unidade 4 (P1):** Correção do desligamento automático do gravador de áudio aos 30 segundos em `lib/voice_notes/audio_recording_service.dart`.
-5. **Unidade 5 (P1):** Eliminação de blocos `catch (_) {}` nas migrações do Drift em `lib/database/app_database.dart`, tornando falhas de DDL rastreáveis e transacionais.
-6. **Unidade 6 (P1):** Implementação de detecção e sinalização visual de sobreposições de horários provisórios/remotos na Agenda em `lib/appointments/`.
-7. **Unidade 7 (P1):** Correção da documentação e tratamento de disponibilidade de transcrição offline em `lib/voice_notes/voice_dictation_service.dart`.
-8. **Unidade 8 (P2):** Atualização dos números e requisitos no `README.md`.
-
----
-
-## 5. Comandos para Retomada Imediata
-```powershell
-# 1. Verificar integridade da árvore de trabalho
-git status
-
-# 2. Executar análise estática
-dart analyze lib test --fatal-infos
-
-# 3. Executar suíte de testes
-flutter test
-
-# 4. Compilar versão web para validação de integridade multiplataforma
-flutter build web --release
-```
+## Próxima Ação Exata
+Executar Fase 1 (P0 blockers):
+1. `FA-SEC-09`: Hardening contra path traversal + escrita atômica em `lib/sync/media_bytes_io.dart` + testes.
+2. `FA-SEC-04`: `SyncOwnerGuard` centralizado + remoção do espelhamento de chaves via `local_user` em `E2eeService` + correção de `restoreVault` + correção de `AuthSplashScreen` e `MainNavigationShell`.
+3. `FA-BAK-01`: Proteção de chaves críticas de `app_kv_store` e remoção da reinjeção cega de `sync_queue` no `BackupService`.
+4. `FA-SEC-01` + `FA-SEC-02` + `FA-SEC-03`: Eliminar fail-open E2EE, implementar pull paginado por `server_seq`, `EncryptedRecordCheckpoint`, tombstones cifrados no `DELETE`, criptografia dos 4 buckets com `EncryptedMedia` e testes end-to-end reais (sem falsos positivos).
