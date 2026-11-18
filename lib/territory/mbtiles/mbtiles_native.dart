@@ -14,7 +14,7 @@ MBTilesBackend getMBTilesBackend() => MBTilesNative();
 
 /// Implementação nativa de backend MBTiles baseada em dart:io e SQLite3.
 class MBTilesNative implements MBTilesBackend {
-  final Directory? _customDir;
+  final Directory? customDir;
   final Map<String, sql.Database> _openDbs = {};
   Directory? _mbtilesDir;
   bool _initialized = false;
@@ -22,7 +22,7 @@ class MBTilesNative implements MBTilesBackend {
   final Set<String> _xyzDatabases = {};
   _TileReader? _reader;
 
-  MBTilesNative({Directory? customDir}) : _customDir = customDir;
+  MBTilesNative({this.customDir});
 
   @override
   Future<void> init() {
@@ -31,8 +31,8 @@ class MBTilesNative implements MBTilesBackend {
   }
 
   Future<void> _initialize() async {
-    if (_customDir != null) {
-      _mbtilesDir = _customDir;
+    if (customDir != null) {
+      _mbtilesDir = customDir;
     } else {
       final docs = await getApplicationDocumentsDirectory();
       _mbtilesDir = Directory('${docs.path}/mbtiles');

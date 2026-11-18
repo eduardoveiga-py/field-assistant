@@ -76,6 +76,10 @@ class TodayScreen extends ConsumerWidget {
         return 9;
       case AppFeature.territoryMaps:
         return 1;
+      case AppFeature.inbox:
+      case AppFeature.tasksProjects:
+      case AppFeature.knowledge:
+        return 0;
     }
   }
 

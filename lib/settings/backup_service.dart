@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -304,7 +305,24 @@ class BackupService {
     );
   }
 
-  /// Derivação de chave PBKDF2-HMAC-SHA256 padrão (100.000 iterações por padrão)
+  static const int defaultV3Iterations = 600000;
+
+  /// Derivação de chave PBKDF2-HMAC-SHA256 executada em isolate no nativo
+  /// para não bloquear a UI thread (FA-SEC-07).
+  static Future<Uint8List> _deriveKeyPbkdf2Async(
+    String password,
+    Uint8List salt, {
+    int iterations = defaultV3Iterations,
+  }) async {
+    if (kIsWeb) {
+      return _deriveKeyPbkdf2(password, salt, iterations: iterations);
+    }
+    return Isolate.run(
+      () => _deriveKeyPbkdf2(password, salt, iterations: iterations),
+    );
+  }
+
+  /// Derivação de chave PBKDF2-HMAC-SHA256 padrão
   static Uint8List _deriveKeyPbkdf2(
     String password,
     Uint8List salt, {
@@ -336,11 +354,38 @@ class BackupService {
     return enc.Key(Uint8List.fromList(digest.bytes));
   }
 
-  /// Exporta todos os registros em JSON criptografado com PBKDF2-HMAC-SHA256 e AES-256-GCM (Versão 2)
+  /// Exporta backup criptografado Versão 3 (OWASP PBKDF2-HMAC-SHA256 >= 600.000 iterações em isolate + AES-256-GCM).
+  Future<String> exportEncryptedBackupV3(
+    String password, {
+    int iterations = defaultV3Iterations,
+  }) async {
+    if (iterations < defaultV3Iterations) {
+      throw ArgumentError.value(
+        iterations,
+        'iterations',
+        'Backup v3 exige no mínimo $defaultV3Iterations iterações PBKDF2-HMAC-SHA256.',
+      );
+    }
+    return exportEncryptedBackup(
+      password,
+      iterations: iterations,
+      formatVersion: 3,
+    );
+  }
+
+  /// Exporta todos os registros em JSON criptografado com PBKDF2-HMAC-SHA256 (em isolate) e AES-256-GCM.
   Future<String> exportEncryptedBackup(
     String password, {
     int iterations = 100000,
+    int formatVersion = 2,
   }) async {
+    if (formatVersion != 2 && formatVersion != 3) {
+      throw ArgumentError.value(
+        formatVersion,
+        'formatVersion',
+        'Versão de formato suportada: 2 ou 3.',
+      );
+    }
     final db = repository.db;
 
     final people = await db.select(db.people).get();
@@ -601,8 +646,8 @@ class BackupService {
     final saltBytes = _generateSecureRandom(16);
     final saltBase64 = base64Encode(saltBytes);
 
-    // Derivação de chave AES-256 via PBKDF2-HMAC-SHA256
-    final keyBytes = _deriveKeyPbkdf2(
+    // Derivação de chave AES-256 via PBKDF2-HMAC-SHA256 executada em isolate (não bloqueia UI)
+    final keyBytes = await _deriveKeyPbkdf2Async(
       password,
       saltBytes,
       iterations: iterations,
@@ -613,7 +658,7 @@ class BackupService {
     final iv = enc.IV.fromSecureRandom(16);
 
     final backupEnvelope = {
-      'version': 2,
+      'version': formatVersion,
       'exported_at': DateTime.now().toIso8601String(),
       'checksum': checksum,
       'iterations': iterations,
@@ -627,7 +672,8 @@ class BackupService {
     final encrypted = encrypter.encrypt(envelopeJson, iv: iv);
 
     final result = {
-      'version': 2,
+      'version': formatVersion,
+      if (formatVersion >= 3) 'kdf': 'PBKDF2-HMAC-SHA256',
       'salt': saltBase64,
       'iterations': iterations,
       'iv': iv.base64,
@@ -649,14 +695,15 @@ class BackupService {
     String decryptedEnvelopeJson;
 
     try {
-      if (containerVersion == 2) {
+      if (containerVersion == 2 || containerVersion == 3) {
         final saltBase64 = container['salt'] as String;
         final saltBytes = base64Decode(saltBase64);
-        final iterations = (container['iterations'] as num?)?.toInt() ?? 100000;
+        final defaultIter = containerVersion == 3 ? defaultV3Iterations : 100000;
+        final iterations = (container['iterations'] as num?)?.toInt() ?? defaultIter;
         final iv = enc.IV.fromBase64(container['iv'] as String);
         final ciphertext = container['ciphertext'] as String;
 
-        final keyBytes = _deriveKeyPbkdf2(
+        final keyBytes = await _deriveKeyPbkdf2Async(
           password,
           saltBytes,
           iterations: iterations,
@@ -665,7 +712,7 @@ class BackupService {
         final encrypter = enc.Encrypter(enc.AES(key, mode: enc.AESMode.gcm));
 
         decryptedEnvelopeJson = encrypter.decrypt64(ciphertext, iv: iv);
-      } else {
+      } else if (containerVersion == 1) {
         if (!allowLegacyV1) {
           throw const LegacyBackupNotAllowedException();
         }
@@ -676,6 +723,10 @@ class BackupService {
         final encrypter = enc.Encrypter(enc.AES(key));
 
         decryptedEnvelopeJson = encrypter.decrypt64(ciphertext, iv: iv);
+      } else {
+        throw FormatException(
+          'Versão de container de backup ($containerVersion) não suportada.',
+        );
       }
     } on LegacyBackupNotAllowedException {
       rethrow;
@@ -688,9 +739,9 @@ class BackupService {
 
     final envelope = jsonDecode(decryptedEnvelopeJson) as Map<String, dynamic>;
     final version = envelope['version'] as int;
-    if (version > 2) {
+    if (version > 3) {
       throw FormatException(
-        'Versão de backup ($version) mais recente que a versão suportada pelo app (2).',
+        'Versão de backup ($version) mais recente que a versão suportada pelo app (3).',
       );
     }
 
@@ -2484,6 +2535,7 @@ class BackupService {
     'pending_doc_download_',
     'pending_photo_download_',
     'app_pin_',
+    'app_security_',
     'biometric_',
     'runtime_supabase_',
   ];

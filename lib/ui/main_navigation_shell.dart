@@ -23,6 +23,9 @@ import 'screens/research_screen.dart';
 import 'screens/ticuna_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/contacts_map_screen.dart';
+import 'screens/inbox_screen.dart';
+import 'screens/tasks_screen.dart';
+import 'screens/knowledge_base_screen.dart';
 
 class MainNavigationShell extends ConsumerStatefulWidget {
   const MainNavigationShell({super.key});
@@ -195,6 +198,12 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
         return const TicunaScreen();
       case AppFeature.territoryMaps:
         return const ContactsMapScreen();
+      case AppFeature.inbox:
+        return const InboxScreen();
+      case AppFeature.tasksProjects:
+        return const TasksScreen();
+      case AppFeature.knowledge:
+        return const KnowledgeBaseScreen();
     }
   }
 
@@ -360,6 +369,12 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
         return strings.navLanguages.split(' ').first;
       case AppFeature.territoryMaps:
         return strings.navTerritoryMaps.split(' ').first;
+      case AppFeature.inbox:
+        return 'Inbox';
+      case AppFeature.tasksProjects:
+        return 'Tarefas';
+      case AppFeature.knowledge:
+        return 'Conhecimento';
     }
   }
 
@@ -404,14 +419,21 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
         AppFeature.experiences,
         AppFeature.notesResearch,
         AppFeature.ticuna,
+        AppFeature.territoryMaps,
       ];
 
       for (final f in railCandidates) {
         if (!activeFeatures.contains(f)) continue;
+        final railIcon = f == AppFeature.territoryMaps
+            ? Icons.explore_outlined
+            : f.icon;
+        final selectedRailIcon = f == AppFeature.territoryMaps
+            ? Icons.explore
+            : f.icon;
         railDestinations.add(
           NavigationRailDestination(
-            icon: Icon(f.icon),
-            selectedIcon: Icon(f.icon),
+            icon: Icon(railIcon),
+            selectedIcon: Icon(selectedRailIcon),
             label: Text(
               _getFeatureLabel(f, strings),
             ),

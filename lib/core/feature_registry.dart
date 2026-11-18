@@ -94,6 +94,30 @@ enum AppFeature {
     icon: Icons.map_outlined,
     category: FeatureCategory.tools,
     isEssential: false,
+  ),
+  inbox(
+    id: 'inbox',
+    title: 'Inbox & E-mail',
+    description: 'Captura universal, e-mail JW e sincronização experimental Exchange',
+    icon: Icons.inbox_outlined,
+    category: FeatureCategory.organization,
+    isEssential: false,
+  ),
+  tasksProjects(
+    id: 'tasks_projects',
+    title: 'Tarefas & Projetos',
+    description: 'Acompanhamento de tarefas ministeriais e projetos vinculados',
+    icon: Icons.task_alt_outlined,
+    category: FeatureCategory.organization,
+    isEssential: false,
+  ),
+  knowledge(
+    id: 'knowledge',
+    title: 'Base de Conhecimento',
+    description: 'Notas estruturadas, perguntas bíblicas, documentos e recursos pessoais',
+    icon: Icons.menu_book_outlined,
+    category: FeatureCategory.tools,
+    isEssential: false,
   );
 
   final String id;

@@ -8,11 +8,16 @@ import '../core/app_logger.dart';
 
 /// Contrato desacoplado para serviço de reconhecimento e ditado de voz.
 abstract class VoiceDictationService {
+  /// Reconhecimento de fala on-device para língua Ticuna NÃO é suportado pelos sistemas operacionais móveis atuais.
+  static const bool supportsTicunaOnDevice = false;
+
   bool get isListening;
   Future<bool> isAvailable();
   Future<void> startListening({
     required ValueChanged<String> onResult,
     ValueChanged<String>? onError,
+    bool preferOnDevice = true,
+    String localeId = 'pt_BR',
   });
   Future<void> stopListening();
   void dispose();
@@ -58,6 +63,8 @@ class UnsupportedVoiceDictationService implements VoiceDictationService {
   Future<void> startListening({
     required ValueChanged<String> onResult,
     ValueChanged<String>? onError,
+    bool preferOnDevice = true,
+    String localeId = 'pt_BR',
   }) async {
     onError?.call(
       'Ditado por voz indisponível nesta plataforma. Digite o resumo manualmente.',
@@ -111,7 +118,15 @@ class RealVoiceDictationService implements VoiceDictationService {
   Future<void> startListening({
     required ValueChanged<String> onResult,
     ValueChanged<String>? onError,
+    bool preferOnDevice = true,
+    String localeId = 'pt_BR',
   }) async {
+    if (localeId.toLowerCase().startsWith('tca')) {
+      onError?.call(
+        'Ditado automático em Ticuna não é suportado pelo sistema operacional. Grave o áudio ou digite manualmente.',
+      );
+      return;
+    }
     try {
       final available = await isAvailable();
       if (!available) {
@@ -119,6 +134,26 @@ class RealVoiceDictationService implements VoiceDictationService {
           'Reconhecimento de fala indisponível no dispositivo. Digite o resumo manualmente.',
         );
         return;
+      }
+
+      if (preferOnDevice) {
+        try {
+          final locales = await _speech.locales();
+          if (locales.isNotEmpty) {
+            final normalizedTarget = localeId.toLowerCase().replaceAll('-', '_');
+            final hasLocale = locales.any(
+              (l) => l.localeId.toLowerCase().replaceAll('-', '_') == normalizedTarget,
+            );
+            if (!hasLocale) {
+              onError?.call(
+                'Pacote de idioma $localeId não encontrado no dispositivo para ditado offline. Instale o idioma nas configurações do sistema ou digite manualmente.',
+              );
+              return;
+            }
+          }
+        } catch (e, st) {
+          AppLogger.debug('Falha ao consultar idiomas locais de ditado: $e', st);
+        }
       }
 
       _isListening = true;
@@ -129,7 +164,8 @@ class RealVoiceDictationService implements VoiceDictationService {
         listenOptions: stt.SpeechListenOptions(
           partialResults: true,
           listenMode: stt.ListenMode.dictation,
-          localeId: 'pt_BR',
+          localeId: localeId,
+          onDevice: preferOnDevice,
         ),
       );
     } on MissingPluginException catch (e) {
@@ -183,7 +219,15 @@ class LocalVoiceDictationService implements VoiceDictationService {
   Future<void> startListening({
     required ValueChanged<String> onResult,
     ValueChanged<String>? onError,
+    bool preferOnDevice = true,
+    String localeId = 'pt_BR',
   }) async {
+    if (localeId.toLowerCase().startsWith('tca')) {
+      onError?.call(
+        'Ditado automático em Ticuna não é suportado pelo sistema operacional. Grave o áudio ou digite manualmente.',
+      );
+      return;
+    }
     _isListening = true;
     _onResult = onResult;
     _currentTranscription = '';
