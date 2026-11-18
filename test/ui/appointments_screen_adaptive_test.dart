@@ -330,7 +330,12 @@ void main() {
       testWidgets(
         'TC-APPTS-07: AppointmentsControlsBar does not overflow at 768px (iPad portrait) and 1024px (iPad landscape) under 2.0x and 2.5x text scaling across all view modes',
         (tester) async {
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
           final viewports = [
+            const Size(375, 800),
             const Size(768, 1024),
             const Size(1024, 768),
           ];
@@ -343,11 +348,6 @@ void main() {
                 tester.view.physicalSize = viewport;
                 tester.view.devicePixelRatio = 1.0;
                 tester.platformDispatcher.textScaleFactorTestValue = scale;
-                addTearDown(tester.view.resetPhysicalSize);
-                addTearDown(tester.view.resetDevicePixelRatio);
-                addTearDown(
-                  tester.platformDispatcher.clearTextScaleFactorTestValue,
-                );
 
                 String currentMode = mode;
                 bool todayPressed = false;
@@ -398,8 +398,12 @@ void main() {
       );
 
       testWidgets(
-        'TC-APPTS-08: Month view cells with 2+ appointments do not overflow vertically under 2.0x and 2.5x text scaling',
+        'TC-APPTS-08: Month view cells with 2+ appointments do not overflow vertically under 2.0x and 2.5x text scaling across mobile and tablet viewports',
         (tester) async {
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
           final db = AppDatabase.forTesting(NativeDatabase.memory());
           addTearDown(db.close);
           final repo = AppRepository(db);
@@ -427,8 +431,10 @@ void main() {
           );
 
           final viewports = [
+            const Size(320, 568),
             const Size(375, 800),
             const Size(768, 1024),
+            const Size(1024, 768),
           ];
           final textScales = [2.0, 2.5];
 
@@ -437,11 +443,6 @@ void main() {
               tester.view.physicalSize = viewport;
               tester.view.devicePixelRatio = 1.0;
               tester.platformDispatcher.textScaleFactorTestValue = scale;
-              addTearDown(tester.view.resetPhysicalSize);
-              addTearDown(tester.view.resetDevicePixelRatio);
-              addTearDown(
-                tester.platformDispatcher.clearTextScaleFactorTestValue,
-              );
 
               await tester.pumpWidget(
                 ProviderScope(
@@ -452,10 +453,6 @@ void main() {
                   child: const MaterialApp(home: AppointmentsScreen()),
                 ),
               );
-              await tester.pumpAndSettle();
-
-              // Certificar que está no modo Mês
-              await tester.tap(find.text('Mês').first);
               await tester.pumpAndSettle();
 
               // Sem exceção de RenderFlex vertical overflow nas células mensais
