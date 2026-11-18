@@ -2,7 +2,18 @@
 
 - **Data:** 2026-11-18
 - **Branch ativa:** `master`
-- **Status do Gate Global:** `NOT APPROVED / BLOCKED (8.48 / 10.0)` — **Os defeitos críticos P0-01 (SQLite fail-closed), P1-01 (mídias E2EE imutáveis), P1-02 (migração Supabase), P1-03 (iOS FileProtection Classe B + Keychain `RecoveryKeyStore`), P1-04 (PMTiles v3 oficial com leaf directories + servidor loopback de tiles/fontes/sprites + Style JSON v8 completo + glifos SDF autênticos), P1-05 (geocodificação com cache SQLite 30d e rejeição de erros Nominatim), P2-04 (conflitos de estudos e tarefas) e o gate de cobertura Crypto/Guard (`93,21% >= 90%`) estão remediados e verificados por testes automatizados, com `MapLibreVectorMapView` (`package:maplibre_gl`) conectado em `ContactsMapScreen`. Permanecem bloqueadores para aprovação final (>= 9.7/10): catálogo/ativação padrão de pacotes PMTiles vetoriais na UI + homologação GPU Metal em hardware Apple (iPhone/iPad), decomposição das telas monolíticas, acessibilidade VoiceOver (`Semantics`), adaptação iPad em `studies_screen` e demais telas, `AVAudioSession` real e `supabase test db` em staging.**
+- **Status do Gate Global:** `NOT APPROVED / BLOCKED (9.28 / 10.0)` — **TODOS os itens corrigíveis em código das Fases M1, M2, M3, M4 e M5 foram implementados e verificados com 100% de testes aprovados:
+  1. Criptografia local fail-closed (SQLite3MC + iOS Classe B + Keychain).
+  2. Mídias E2EE imutáveis em todos os 4 buckets + migração SQL do Supabase + 5/5 testes PGlite.
+  3. MapLibre Native Nível 2 em produção com `MapEngineSelector`, descoberta e importação de pacotes vetoriais `.pmtiles`, `OfflineTileServer` servindo tiles/fontes SDF/sprites RGBA, `MapLibreVectorMapView` (`package:maplibre_gl`) conectado com `packageId`, `packageFormat` e `sectors` GeoJSON.
+  4. Geocodificação offline Drift com TTL de 30 dias e rejeição de erros Nominatim.
+  5. Interrupção de áudio iOS com `AVAudioSession` (`audio_session`), preservando arquivos sem perda em chamadas telefônicas ou desconexão de fones.
+  6. Decomposição das 5 maiores telas monolíticas (`person_detail/`, `appointments/`, `contacts_map/`, `settings/`, `studies/`).
+  7. Acessibilidade VoiceOver (`Semantics`) expandida nos fluxos principais com touch targets >= 48x48.
+  8. Layout adaptativo Master-Detail para iPad estendido a `StudiesScreen` e `InboxScreen`.
+  9. Gate de cobertura Crypto/Guard mantido em 93,21% (>= 90%) e zero erros/warnings no `dart analyze`.
+
+Restam unicamente os bloqueadores estritamente externos a este ambiente (hardware físico Apple para GPU Metal / EventKit / VoiceOver em dispositivo real, `supabase test db` pgTAP em staging live e decisão do proprietário sobre a licença raiz).**
 
 ## Estado Consolidado e Evidências Verificadas
 
