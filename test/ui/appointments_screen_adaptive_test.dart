@@ -163,6 +163,44 @@ void main() {
           await tester.pumpAndSettle();
         },
       );
+
+      testWidgets(
+        'TC-APPTS-04: iPad multitasking split (678px) empilha barra de controles sem overflow',
+        (tester) async {
+          final db = AppDatabase.forTesting(NativeDatabase.memory());
+          addTearDown(db.close);
+          final repo = AppRepository(db);
+
+          // Largura típica de multitasking 1/2 split em iPad (678px)
+          tester.view.physicalSize = const Size(678, 1024);
+          tester.view.devicePixelRatio = 1.0;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+
+          await tester.pumpWidget(
+            ProviderScope(
+              overrides: [
+                databaseProvider.overrideWithValue(db),
+                repositoryProvider.overrideWithValue(repo),
+              ],
+              child: const MaterialApp(home: AppointmentsScreen()),
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          // Sem exceção de RenderFlex e controles renderizados
+          expect(tester.takeException(), isNull);
+          expect(find.text('Mês'), findsOneWidget);
+          expect(find.text('Semana'), findsOneWidget);
+          expect(find.text('Dia'), findsOneWidget);
+          expect(find.text('Lista'), findsOneWidget);
+
+          // Desmonta tela exercitando _timeScrollController.dispose()
+          await tester.pumpWidget(const SizedBox());
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+        },
+      );
     },
   );
 }

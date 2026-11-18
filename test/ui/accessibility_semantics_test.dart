@@ -10,7 +10,9 @@ import 'package:ministerio_pessoal/ui/screens/appointments_screen.dart';
 import 'package:ministerio_pessoal/ui/screens/contacts_map_screen.dart';
 import 'package:ministerio_pessoal/ui/screens/settings_screen.dart';
 import 'package:ministerio_pessoal/ui/screens/studies_screen.dart';
+import 'package:ministerio_pessoal/ui/widgets/appointments/appointment_detail_pane.dart';
 import 'package:ministerio_pessoal/ui/widgets/quick_voice_note_dialog.dart';
+import 'package:ministerio_pessoal/ui/widgets/studies/study_detail_pane.dart';
 import 'package:ministerio_pessoal/voice_notes/audio_recording_service.dart';
 import 'package:ministerio_pessoal/voice_notes/voice_dictation_service.dart';
 
@@ -544,6 +546,157 @@ void main() {
 
         await tester.pumpWidget(const SizedBox());
         await tester.pump(const Duration(milliseconds: 50));
+      },
+    );
+
+    testWidgets(
+      'TC-SEM-06: Detail panes action buttons configure container: true and excludeSemantics: true',
+      (tester) async {
+        final handle = tester.ensureSemantics();
+        try {
+          final db = AppDatabase.forTesting(NativeDatabase.memory());
+          addTearDown(db.close);
+          final repo = AppRepository(db);
+
+          final now = DateTime.now();
+          final testAppt = await repo.createAppointment(
+            title: 'Revisita Teste',
+            startTime: now,
+            endTime: now.add(const Duration(hours: 1)),
+            durationMinutes: 60,
+          );
+
+          await tester.pumpWidget(
+            MaterialApp(
+              home: Scaffold(
+                body: AppointmentDetailPane(
+                  appt: testAppt,
+                  person: null,
+                  onReschedule: () {},
+                  onMarkDone: () {},
+                  onCancelPlanB: () {},
+                  onOpenPersonProfile: null,
+                  onAddToGoogleCalendar: () {},
+                  onDelete: () {},
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          // Verificar outer Semantics wrappers em AppointmentDetailPane
+          final apptSemantics = tester.widgetList<Semantics>(
+            find.byType(Semantics),
+          );
+          final apptCustomButtons = apptSemantics
+              .where(
+                (s) =>
+                    s.properties.button == true &&
+                    (s.properties.label?.contains('Marcar compromisso') ==
+                            true ||
+                        s.properties.label?.contains('Reagendar compromisso') ==
+                            true ||
+                        s.properties.label?.contains('Estudante desmarcou') ==
+                            true ||
+                        s.properties.label?.contains('Google Agenda') == true ||
+                        s.properties.label?.contains('Excluir compromisso') ==
+                            true),
+              )
+              .toList();
+
+          expect(apptCustomButtons.length, equals(5));
+          for (final s in apptCustomButtons) {
+            expect(
+              s.container,
+              isTrue,
+              reason: 'Outer Semantics button must be a semantic container',
+            );
+            expect(
+              s.excludeSemantics,
+              isTrue,
+              reason: 'Outer Semantics button must exclude inner semantics',
+            );
+          }
+
+          // Acessibilidade sem nós redundantes de botões internos
+          expect(
+            find.bySemanticsLabel('Marcar compromisso como realizado'),
+            findsOneWidget,
+          );
+          expect(
+            find.bySemanticsLabel('Reagendar compromisso mantendo histórico'),
+            findsOneWidget,
+          );
+
+          final testStudy = await repo.createStudy(
+            title: 'Estudo Teste',
+            publicationId: 'lff',
+            participantPersonIds: const [],
+            currentLesson: 5,
+          );
+
+          await tester.pumpWidget(
+            MaterialApp(
+              home: Scaffold(
+                body: StudyDetailPane(
+                  study: testStudy,
+                  primaryPerson: null,
+                  sessions: const [],
+                  onRecordSession: () {},
+                  onEditStudy: () {},
+                  onOpenPublication: () {},
+                  onOpenStudentProfile: null,
+                  onEndOrReactivateStudy: () {},
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          // Verificar outer Semantics wrappers em StudyDetailPane
+          final studySemantics = tester.widgetList<Semantics>(
+            find.byType(Semantics),
+          );
+          final studyCustomButtons = studySemantics
+              .where(
+                (s) =>
+                    s.properties.button == true &&
+                    (s.properties.label?.contains('Registrar nova sessão') ==
+                            true ||
+                        s.properties.label?.contains(
+                              'Editar dados do estudo',
+                            ) ==
+                            true ||
+                        s.properties.label?.contains('JW Library') == true ||
+                        s.properties.label?.contains('Encerrar estudo') ==
+                            true),
+              )
+              .toList();
+
+          expect(studyCustomButtons.length, equals(4));
+          for (final s in studyCustomButtons) {
+            expect(
+              s.container,
+              isTrue,
+              reason: 'Outer Semantics button must be a semantic container',
+            );
+            expect(
+              s.excludeSemantics,
+              isTrue,
+              reason: 'Outer Semantics button must exclude inner semantics',
+            );
+          }
+
+          expect(
+            find.bySemanticsLabel(RegExp('Registrar nova sessão do estudo')),
+            findsOneWidget,
+          );
+
+          await tester.pumpWidget(const SizedBox());
+          await tester.pump(const Duration(milliseconds: 50));
+        } finally {
+          handle.dispose();
+        }
       },
     );
   });

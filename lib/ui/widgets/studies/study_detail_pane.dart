@@ -112,15 +112,22 @@ class StudyDetailPane extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        'Progresso do Estudo',
-                        style: TextStyle(fontWeight: FontWeight.bold),
+                      Flexible(
+                        child: Text(
+                          'Progresso do Estudo',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                      Text(
-                        'Lição $currentLesson de $totalLessons',
-                        style: const TextStyle(
-                          color: AppTheme.primaryBlue,
-                          fontWeight: FontWeight.bold,
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          'Lição $currentLesson de $totalLessons',
+                          style: const TextStyle(
+                            color: AppTheme.primaryBlue,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
@@ -177,6 +184,8 @@ class StudyDetailPane extends StatelessWidget {
             runSpacing: 10,
             children: [
               Semantics(
+                container: true,
+                excludeSemantics: true,
                 button: true,
                 label: 'Registrar nova sessão do estudo ${study.title}',
                 child: ElevatedButton.icon(
@@ -186,6 +195,8 @@ class StudyDetailPane extends StatelessWidget {
                 ),
               ),
               Semantics(
+                container: true,
+                excludeSemantics: true,
                 button: true,
                 label: 'Editar dados do estudo ${study.title}',
                 child: OutlinedButton.icon(
@@ -195,6 +206,8 @@ class StudyDetailPane extends StatelessWidget {
                 ),
               ),
               Semantics(
+                container: true,
+                excludeSemantics: true,
                 button: true,
                 label: 'Abrir publicação no JW Library',
                 child: OutlinedButton.icon(
@@ -205,6 +218,8 @@ class StudyDetailPane extends StatelessWidget {
               ),
               if (onOpenStudentProfile != null)
                 Semantics(
+                  container: true,
+                  excludeSemantics: true,
                   button: true,
                   label:
                       'Abrir cadastro de ${primaryPerson?.name ?? study.title}',
@@ -219,6 +234,8 @@ class StudyDetailPane extends StatelessWidget {
                   ),
                 ),
               Semantics(
+                container: true,
+                excludeSemantics: true,
                 button: true,
                 label: isActive
                     ? 'Encerrar estudo ${study.title}'

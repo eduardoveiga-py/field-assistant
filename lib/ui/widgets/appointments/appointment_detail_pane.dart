@@ -181,6 +181,8 @@ class AppointmentDetailPane extends StatelessWidget {
                         ),
                         if (onOpenPersonProfile != null)
                           Semantics(
+                            container: true,
+                            excludeSemantics: true,
                             button: true,
                             label: 'Ver perfil de ${person!.name}',
                             hint: 'Abre a ficha completa do contato',
@@ -224,6 +226,8 @@ class AppointmentDetailPane extends StatelessWidget {
             children: [
               if (!isDone)
                 Semantics(
+                  container: true,
+                  excludeSemantics: true,
                   button: true,
                   label: 'Marcar compromisso como realizado',
                   child: ElevatedButton.icon(
@@ -242,6 +246,8 @@ class AppointmentDetailPane extends StatelessWidget {
                   ),
                 ),
               Semantics(
+                container: true,
+                excludeSemantics: true,
                 button: true,
                 label: 'Reagendar compromisso mantendo histórico',
                 hint: 'Altera a data ou horário do compromisso',
@@ -260,6 +266,8 @@ class AppointmentDetailPane extends StatelessWidget {
               ),
               if (!isCancelled)
                 Semantics(
+                  container: true,
+                  excludeSemantics: true,
                   button: true,
                   label: 'Estudante desmarcou, abrir recomendações do Plano B',
                   hint: 'Encontra visitas alternativas para o horário vago',
@@ -278,6 +286,8 @@ class AppointmentDetailPane extends StatelessWidget {
                   ),
                 ),
               Semantics(
+                container: true,
+                excludeSemantics: true,
                 button: true,
                 label: 'Adicionar compromisso ao Google Agenda',
                 child: OutlinedButton.icon(
@@ -294,6 +304,8 @@ class AppointmentDetailPane extends StatelessWidget {
                 ),
               ),
               Semantics(
+                container: true,
+                excludeSemantics: true,
                 button: true,
                 label: 'Excluir compromisso',
                 hint: 'Remove o agendamento da agenda',

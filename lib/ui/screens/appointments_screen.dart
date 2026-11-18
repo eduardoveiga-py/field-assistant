@@ -66,6 +66,12 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
   String? _selectedAppointmentId;
   final ScrollController _timeScrollController = ScrollController();
 
+  @override
+  void dispose() {
+    _timeScrollController.dispose();
+    super.dispose();
+  }
+
   static bool isMinistryAppointment(AppointmentEntry appt) {
     if (appt.id.startsWith('task:') || appt.id.startsWith('project:')) {
       return false;
@@ -542,7 +548,7 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen> {
                 constraints: const BoxConstraints(maxWidth: 860),
                 child: LayoutBuilder(
                   builder: (context, constraints) {
-                    final isNarrow = constraints.maxWidth < 460;
+                    final isNarrow = constraints.maxWidth < 700;
                     final navRow = Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [

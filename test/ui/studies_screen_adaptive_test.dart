@@ -166,5 +166,56 @@ void main() {
         await tester.pumpAndSettle();
       },
     );
+
+    testWidgets(
+      'TC-STUDIES-04: Limite exato de 900px renderiza StudyDetailPane sem RenderFlex overflow',
+      (tester) async {
+        final db = AppDatabase.forTesting(NativeDatabase.memory());
+        addTearDown(db.close);
+        final repo = AppRepository(db);
+
+        final person = await repo.createPerson(
+          name: 'Ana Pereira',
+          status: 'estudo',
+          firstContactAt: now,
+        );
+
+        await repo.createStudy(
+          title: 'Estudo Bíblico com Ana',
+          publicationId: 'lff',
+          participantPersonIds: [person.id],
+          currentLesson: 3,
+        );
+
+        // Limite exato de 900px (onde ocorria o overflow de 57px no right pane)
+        tester.view.physicalSize = const Size(900, 768);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              databaseProvider.overrideWithValue(db),
+              repositoryProvider.overrideWithValue(repo),
+            ],
+            child: const MaterialApp(home: StudiesScreen()),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Tocar no card do estudo
+        await tester.tap(find.text('Estudo Bíblico com Ana'));
+        await tester.pumpAndSettle();
+
+        // Sem exceção de RenderFlex e painel renderizado
+        expect(tester.takeException(), isNull);
+        expect(find.byType(StudyDetailPane), findsOneWidget);
+        expect(find.text('Progresso do Estudo'), findsOneWidget);
+
+        await tester.pumpWidget(const SizedBox());
+        await tester.pumpAndSettle();
+      },
+    );
   });
 }
