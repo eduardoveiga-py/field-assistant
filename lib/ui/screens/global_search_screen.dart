@@ -1,9 +1,13 @@
+import 'package:drift/drift.dart'
+    show BooleanExpressionOperators, StringExpressionOperators;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_logger.dart';
 import '../../core/app_theme.dart';
 import '../../core/feature_registry.dart';
+import '../../database/app_database.dart';
+import '../../database/repository.dart';
 import '../providers.dart';
 import 'person_detail_screen.dart';
 import 'phone_contacts_screen.dart';
@@ -138,9 +142,18 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
     final isPhonesEnabled = ref.watch(
       isFeatureEnabledProvider(AppFeature.phones),
     );
+    final isInboxEnabled = ref.watch(
+      isFeatureEnabledProvider(AppFeature.inbox),
+    );
+    final isTasksProjectsEnabled = ref.watch(
+      isFeatureEnabledProvider(AppFeature.tasksProjects),
+    );
+    final isKnowledgeEnabled = ref.watch(
+      isFeatureEnabledProvider(AppFeature.knowledge),
+    );
 
     final signature =
-        '$cleanQuery|$isStudiesEnabled|$isAgendaEnabled|$isResearchEnabled|$isPhonesEnabled';
+        '$cleanQuery|$isStudiesEnabled|$isAgendaEnabled|$isResearchEnabled|$isPhonesEnabled|$isInboxEnabled|$isTasksProjectsEnabled|$isKnowledgeEnabled';
     if (_lastSearchSignature != signature || _cachedSearchFuture == null) {
       _lastSearchSignature = signature;
       _cachedSearchFuture = _performSearch(
@@ -152,6 +165,9 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
         isAgendaEnabled: isAgendaEnabled,
         isResearchEnabled: isResearchEnabled,
         isPhonesEnabled: isPhonesEnabled,
+        isInboxEnabled: isInboxEnabled,
+        isTasksProjectsEnabled: isTasksProjectsEnabled,
+        isKnowledgeEnabled: isKnowledgeEnabled,
       );
     }
 
@@ -259,14 +275,17 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
   }
 
   Future<List<GlobalSearchResultItem>> _performSearch({
-    required dynamic db,
-    required dynamic repo,
+    required AppDatabase db,
+    required AppRepository repo,
     required String query,
     required BuildContext context,
     required bool isStudiesEnabled,
     required bool isAgendaEnabled,
     required bool isResearchEnabled,
     required bool isPhonesEnabled,
+    required bool isInboxEnabled,
+    required bool isTasksProjectsEnabled,
+    required bool isKnowledgeEnabled,
   }) async {
     final results = <GlobalSearchResultItem>[];
 
@@ -277,7 +296,7 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
         if (p.deletedAt != null) continue;
         final nameMatch = p.name.toLowerCase().contains(query);
         final addrMatch = p.address?.toLowerCase().contains(query) ?? false;
-        final noteMatch = p.notes?.toLowerCase().contains(query) ?? false;
+        final noteMatch = p.generalNotes?.toLowerCase().contains(query) ?? false;
         final nextMatch =
             p.nextActionNote?.toLowerCase().contains(query) ?? false;
 
@@ -288,7 +307,7 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
               title: p.name,
               subtitle: p.address ?? 'Sem endereço cadastrado',
               snippet: noteMatch
-                  ? p.notes
+                  ? p.generalNotes
                   : (nextMatch ? p.nextActionNote : null),
               type: GlobalSearchResultType.person,
               onTap: () {
@@ -310,7 +329,7 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
     // 2. Telefones (se módulo ativo)
     if (isPhonesEnabled) {
       try {
-        final phones = await repo.getAllPhoneContacts();
+        final phones = await db.select(db.phoneContacts).get();
         for (final ph in phones) {
           if (ph.deletedAt != null) continue;
           final nameMatch = ph.name.toLowerCase().contains(query);
@@ -384,18 +403,17 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
         for (final a in articles) {
           if (a.deletedAt != null) continue;
           final titleMatch = a.title.toLowerCase().contains(query);
-          final scriptMatch =
-              a.scriptures?.toLowerCase().contains(query) ?? false;
-          final notesMatch = a.notes?.toLowerCase().contains(query) ?? false;
+          final summaryMatch = a.summary.toLowerCase().contains(query);
+          final contentMatch = a.content.toLowerCase().contains(query);
 
-          if (titleMatch || scriptMatch || notesMatch) {
+          if (titleMatch || summaryMatch || contentMatch) {
             results.add(
               GlobalSearchResultItem(
                 id: a.id,
                 title: a.title,
                 subtitle:
-                    'Categoria: ${a.category} • Textos: ${a.scriptures ?? ""}',
-                snippet: notesMatch ? a.notes : null,
+                    'Pesquisa • Status: ${a.status}${a.summary.isNotEmpty ? ' • ${a.summary}' : ''}',
+                snippet: contentMatch ? a.content : (summaryMatch ? a.summary : null),
                 type: GlobalSearchResultType.research,
                 onTap: () {
                   Navigator.push(
@@ -482,87 +500,92 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
       }
     }
 
-    // 7. Tarefas
-    try {
-      final tasks = await (db.select(db.tasks)..where((t) => (t.title.like('%$query%') | t.description.like('%$query%')) & t.deletedAt.isNull())).get();
-      for (final t in tasks) {
-        results.add(
-          GlobalSearchResultItem(
-            id: t.id,
-            title: t.title,
-            subtitle: 'Prioridade: ${t.priority} • Categoria: ${t.category}',
-            snippet: t.description,
-            type: GlobalSearchResultType.task,
-            onTap: () {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const TasksScreen()));
-            },
-          ),
-        );
+    // 7. Tarefas e 8. Projetos (governados por tasksProjects — FA-FUNC-01)
+    if (isTasksProjectsEnabled) {
+      try {
+        final tasks = await (db.select(db.tasks)..where((t) => (t.title.like('%$query%') | t.description.like('%$query%')) & t.deletedAt.isNull())).get();
+        for (final t in tasks) {
+          results.add(
+            GlobalSearchResultItem(
+              id: t.id,
+              title: t.title,
+              subtitle: 'Prioridade: ${t.priority} • Categoria: ${t.category}',
+              snippet: t.description,
+              type: GlobalSearchResultType.task,
+              onTap: () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const TasksScreen()));
+              },
+            ),
+          );
+        }
+      } catch (e, st) {
+        AppLogger.warning('Falha na busca global (Tarefas)', e, st);
       }
-    } catch (e, st) {
-      AppLogger.warning('Falha na busca global (Tarefas)', e, st);
+
+      try {
+        final projs = await (db.select(db.projects)..where((t) => (t.name.like('%$query%') | t.objective.like('%$query%')) & t.deletedAt.isNull())).get();
+        for (final pr in projs) {
+          results.add(
+            GlobalSearchResultItem(
+              id: pr.id,
+              title: pr.name,
+              subtitle: 'Status: ${pr.status} • Categoria: ${pr.category}',
+              snippet: pr.objective,
+              type: GlobalSearchResultType.project,
+              onTap: () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => ProjectDetailScreen(projectId: pr.id)));
+              },
+            ),
+          );
+        }
+      } catch (e, st) {
+        AppLogger.warning('Falha na busca global (Projetos)', e, st);
+      }
     }
 
-    // 8. Projetos
-    try {
-      final projs = await (db.select(db.projects)..where((t) => (t.name.like('%$query%') | t.objective.like('%$query%')) & t.deletedAt.isNull())).get();
-      for (final pr in projs) {
-        results.add(
-          GlobalSearchResultItem(
-            id: pr.id,
-            title: pr.name,
-            subtitle: 'Status: ${pr.status} • Categoria: ${pr.category}',
-            snippet: pr.objective,
-            type: GlobalSearchResultType.project,
-            onTap: () {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => ProjectDetailScreen(projectId: pr.id)));
-            },
-          ),
-        );
+    // 9. Base de Conhecimento (Notas — governada por knowledge — FA-FUNC-01)
+    if (isKnowledgeEnabled) {
+      try {
+        final notes = await (db.select(db.knowledgeNotes)..where((t) => (t.title.like('%$query%') | t.content.like('%$query%')) & t.deletedAt.isNull())).get();
+        for (final n in notes) {
+          results.add(
+            GlobalSearchResultItem(
+              id: n.id,
+              title: n.title,
+              subtitle: 'Nota • Categoria: ${n.category}',
+              snippet: n.content,
+              type: GlobalSearchResultType.knowledge,
+              onTap: () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const KnowledgeBaseScreen()));
+              },
+            ),
+          );
+        }
+      } catch (e, st) {
+        AppLogger.warning('Falha na busca global (Conhecimento)', e, st);
       }
-    } catch (e, st) {
-      AppLogger.warning('Falha na busca global (Projetos)', e, st);
     }
 
-    // 9. Base de Conhecimento (Notas)
-    try {
-      final notes = await (db.select(db.knowledgeNotes)..where((t) => (t.title.like('%$query%') | t.content.like('%$query%')) & t.deletedAt.isNull())).get();
-      for (final n in notes) {
-        results.add(
-          GlobalSearchResultItem(
-            id: n.id,
-            title: n.title,
-            subtitle: 'Nota • Categoria: ${n.category}',
-            snippet: n.content,
-            type: GlobalSearchResultType.knowledge,
-            onTap: () {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const KnowledgeBaseScreen()));
-            },
-          ),
-        );
+    // 10. Inbox Universal (governada por inbox — FA-FUNC-01)
+    if (isInboxEnabled) {
+      try {
+        final inboxEntries = await (db.select(db.inboxEntries)..where((t) => t.content.like('%$query%') & t.deletedAt.isNull())).get();
+        for (final inb in inboxEntries) {
+          results.add(
+            GlobalSearchResultItem(
+              id: inb.id,
+              title: inb.content.length > 50 ? '${inb.content.substring(0, 50)}...' : inb.content,
+              subtitle: 'Inbox • Status: ${inb.status}',
+              type: GlobalSearchResultType.inbox,
+              onTap: () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const InboxScreen()));
+              },
+            ),
+          );
+        }
+      } catch (e, st) {
+        AppLogger.warning('Falha na busca global (Inbox)', e, st);
       }
-    } catch (e, st) {
-      AppLogger.warning('Falha na busca global (Conhecimento)', e, st);
-    }
-
-    // 10. Inbox Universal
-    try {
-      final inboxEntries = await (db.select(db.inboxEntries)..where((t) => t.content.like('%$query%') & t.deletedAt.isNull())).get();
-      for (final inb in inboxEntries) {
-        results.add(
-          GlobalSearchResultItem(
-            id: inb.id,
-            title: inb.content.length > 50 ? '${inb.content.substring(0, 50)}...' : inb.content,
-            subtitle: 'Inbox • Status: ${inb.status}',
-            type: GlobalSearchResultType.inbox,
-            onTap: () {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const InboxScreen()));
-            },
-          ),
-        );
-      }
-    } catch (e, st) {
-      AppLogger.warning('Falha na busca global (Inbox)', e, st);
     }
 
     return results;

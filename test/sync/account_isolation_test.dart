@@ -233,7 +233,10 @@ void main() {
       expect(pullA2.success, isTrue);
       final recoveredPeople = await device2Repo.getAllPeople();
       expect(recoveredPeople.map((p) => p.id), contains(personA.id));
-      expect(recoveredPeople.map((p) => p.name), contains('Segredo da Conta A'));
+      expect(
+        recoveredPeople.map((p) => p.name),
+        contains('Segredo da Conta A'),
+      );
       expect(
         recoveredPeople.map((p) => p.name),
         isNot(contains('Contato Exclusivo da Conta B')),
@@ -259,19 +262,24 @@ void main() {
       expect(await e2ee.isKeyInstalled(accountA), isFalse);
     });
 
-    test('demo_mode bloqueia sincronização centralmente no SyncOwnerGuard', () async {
-      final db = AppDatabase.forTesting(NativeDatabase.memory());
-      addTearDown(db.close);
-      await db.into(db.appKvStore).insert(
-        AppKvStoreCompanion.insert(key: 'demo_mode', value: 'true'),
-      );
-      final decision = await SyncOwnerGuard.evaluate(
-        db: db,
-        authenticatedUserId: accountA,
-      );
-      expect(decision.status, SyncOwnerGuardStatus.demoModeActive);
-      expect(decision.isAllowed, isFalse);
-    });
+    test(
+      'demo_mode bloqueia sincronização centralmente no SyncOwnerGuard',
+      () async {
+        final db = AppDatabase.forTesting(NativeDatabase.memory());
+        addTearDown(db.close);
+        await db
+            .into(db.appKvStore)
+            .insert(
+              AppKvStoreCompanion.insert(key: 'demo_mode', value: 'true'),
+            );
+        final decision = await SyncOwnerGuard.evaluate(
+          db: db,
+          authenticatedUserId: accountA,
+        );
+        expect(decision.status, SyncOwnerGuardStatus.demoModeActive);
+        expect(decision.isAllowed, isFalse);
+      },
+    );
 
     test('migração local_user -> conta exige confirmação explícita', () async {
       final db = AppDatabase.forTesting(NativeDatabase.memory());

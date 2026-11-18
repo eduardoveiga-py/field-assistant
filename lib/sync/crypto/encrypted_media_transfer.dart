@@ -165,7 +165,8 @@ class EncryptedMediaTransfer {
     return builder.takeBytes();
   }
 
-  /// Remove manifesto e eventuais blocos conhecidos no Storage (limpeza de órfãos/exclusão).
+  /// Remove manifesto e todos os blocos autenticados no Storage (inclusive mídias > 4 MiB).
+  /// Caso o manifesto já esteja ausente ou ilegível, recorre à sondagem de [maxChunkProbe] blocos.
   Future<void> deleteEncrypted({
     required String bucket,
     required String mediaId,
@@ -173,9 +174,30 @@ class EncryptedMediaTransfer {
   }) async {
     _checkBucketAndOwner(bucket);
     final safeId = _sanitizeMediaId(mediaId);
+    var chunkCount = maxChunkProbe;
+    try {
+      final rawManifest = await client.storage
+          .from(bucket)
+          .download(manifestPath(safeId));
+      final decodedManifest = jsonDecode(utf8.decode(rawManifest));
+      if (decodedManifest is Map) {
+        final exactCount = await EncryptedMedia.inspectChunkCount(
+          key: key,
+          owner: owner,
+          mediaId: '$bucket:$safeId',
+          manifestEnvelope: Map<String, dynamic>.from(decodedManifest),
+        );
+        if (exactCount > chunkCount) {
+          chunkCount = exactCount;
+        }
+      }
+    } catch (_) {
+      // Manifesto ausente ou corrompido: segue com limpeza best-effort de maxChunkProbe blocos.
+    }
+
     final targets = <String>[
       manifestPath(safeId),
-      for (var i = 0; i < maxChunkProbe; i++) _chunkPath(safeId, i),
+      for (var i = 0; i < chunkCount; i++) _chunkPath(safeId, i),
     ];
     await client.storage.from(bucket).remove(targets);
   }

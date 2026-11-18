@@ -14,6 +14,7 @@ import '../../core/app_theme.dart';
 import '../../core/app_version.dart';
 import '../../database/app_database.dart';
 import '../../sync/supabase_sync_service.dart';
+import '../../sync/sync_owner_guard.dart';
 import '../../sync/native_auth_callback.dart';
 import '../main_navigation_shell.dart';
 import '../providers.dart';
@@ -278,8 +279,64 @@ class _AuthGateShellState extends ConsumerState<AuthGateShell>
       case _AuthGateState.unauthenticated:
         return SupabaseAuthScreen(
           onAuthenticated: () async {
+            final db = ref.read(databaseProvider);
+            String? currentUserId;
             try {
-              final db = ref.read(databaseProvider);
+              if (Supabase.instance.isInitialized) {
+                currentUserId = Supabase.instance.client.auth.currentUser?.id;
+              }
+            } catch (_) {}
+
+            if (currentUserId != null && currentUserId.isNotEmpty) {
+              var prep =
+                  await SyncOwnerGuard.prepareWorkspaceForAuthenticatedAccount(
+                db: db,
+                authenticatedUserId: currentUserId,
+              );
+              if (prep.status ==
+                      AccountWorkspacePreparationStatus
+                          .requiresConfirmationDueToUnsyncedData &&
+                  context.mounted) {
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (dialogCtx) => AlertDialog(
+                    title: const Text('Troca de Conta Detectada'),
+                    content: Text(
+                      'Este dispositivo contém ${prep.pendingUnsyncedCount} alteração(ões) local(is) pendente(s) de outra conta. '
+                      'Para proteger o isolamento entre contas, entrar agora limpará os dados locais da conta anterior neste dispositivo '
+                      '(os dados já sincronizados na nuvem da outra conta permanecem preservados).',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(dialogCtx).pop(false),
+                        child: const Text('Cancelar'),
+                      ),
+                      FilledButton(
+                        onPressed: () => Navigator.of(dialogCtx).pop(true),
+                        child: const Text('Limpar Local e Entrar'),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirmed != true) {
+                  try {
+                    await Supabase.instance.client.auth.signOut(
+                      scope: SignOutScope.local,
+                    );
+                  } catch (_) {}
+                  return;
+                }
+                prep =
+                    await SyncOwnerGuard.prepareWorkspaceForAuthenticatedAccount(
+                  db: db,
+                  authenticatedUserId: currentUserId,
+                  discardUnsyncedIfSwitching: true,
+                );
+              }
+            }
+
+            try {
               await (db.delete(db.appKvStore)
                     ..where((t) => t.key.equals('offline_mode_enabled')))
                   .go();

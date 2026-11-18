@@ -17,6 +17,7 @@ import '../../inbox/jw_email_service.dart';
 import '../../settings/backup_service.dart';
 import '../../sync/supabase_config.dart';
 import '../../sync/supabase_sync_service.dart';
+import '../../sync/sync_owner_guard.dart';
 import '../widgets/managed_text_controllers.dart';
 import '../widgets/pin_auth_dialog.dart';
 import '../widgets/e2ee_setup_dialog.dart';
@@ -1992,7 +1993,74 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             Navigator.of(context).push(
                               MaterialPageRoute(
                                 builder: (authContext) => SupabaseAuthScreen(
-                                  onAuthenticated: () {
+                                  onAuthenticated: () async {
+                                    final db = ref.read(databaseProvider);
+                                    String? currentUserId;
+                                    try {
+                                      if (Supabase.instance.isInitialized) {
+                                        currentUserId = Supabase
+                                            .instance.client.auth.currentUser?.id;
+                                      }
+                                    } catch (_) {}
+                                    if (currentUserId != null &&
+                                        currentUserId.isNotEmpty) {
+                                      final prep = await SyncOwnerGuard
+                                          .prepareWorkspaceForAuthenticatedAccount(
+                                        db: db,
+                                        authenticatedUserId: currentUserId,
+                                      );
+                                      if (prep.status ==
+                                              AccountWorkspacePreparationStatus
+                                                  .requiresConfirmationDueToUnsyncedData &&
+                                          authContext.mounted) {
+                                        final confirmed =
+                                            await showDialog<bool>(
+                                          context: authContext,
+                                          barrierDismissible: false,
+                                          builder: (dialogCtx) => AlertDialog(
+                                            title: const Text(
+                                              'Troca de Conta Detectada',
+                                            ),
+                                            content: Text(
+                                              'Este dispositivo contém ${prep.pendingUnsyncedCount} alteração(ões) local(is) pendente(s) de outra conta. '
+                                              'Confirmar limpará os dados locais da conta anterior para manter isolamento total entre contas.',
+                                            ),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () => Navigator.of(
+                                                  dialogCtx,
+                                                ).pop(false),
+                                                child: const Text('Cancelar'),
+                                              ),
+                                              FilledButton(
+                                                onPressed: () => Navigator.of(
+                                                  dialogCtx,
+                                                ).pop(true),
+                                                child: const Text(
+                                                  'Limpar Local e Entrar',
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                        if (confirmed != true) {
+                                          try {
+                                            await Supabase
+                                                .instance.client.auth
+                                                .signOut(
+                                              scope: SignOutScope.local,
+                                            );
+                                          } catch (_) {}
+                                          return;
+                                        }
+                                        await SyncOwnerGuard
+                                            .prepareWorkspaceForAuthenticatedAccount(
+                                          db: db,
+                                          authenticatedUserId: currentUserId,
+                                          discardUnsyncedIfSwitching: true,
+                                        );
+                                      }
+                                    }
                                     if (!mounted || !authContext.mounted) return;
                                     Navigator.of(authContext).pop();
                                     setState(() {});
@@ -3210,7 +3278,7 @@ class _ExportBackupDialogState extends State<_ExportBackupDialog> {
     });
 
     try {
-      final encryptedData = await widget.backupService.exportEncryptedBackup(
+      final encryptedData = await widget.backupService.exportEncryptedBackupV3(
         password,
       );
       widget.onExported();

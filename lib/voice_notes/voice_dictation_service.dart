@@ -121,7 +121,8 @@ class RealVoiceDictationService implements VoiceDictationService {
     bool preferOnDevice = true,
     String localeId = 'pt_BR',
   }) async {
-    if (localeId.toLowerCase().startsWith('tca')) {
+    final normalizedLocale = localeId.trim().toLowerCase();
+    if (normalizedLocale.startsWith('tca') || normalizedLocale.contains('ticuna')) {
       onError?.call(
         'Ditado automático em Ticuna não é suportado pelo sistema operacional. Grave o áudio ou digite manualmente.',
       );
@@ -222,7 +223,8 @@ class LocalVoiceDictationService implements VoiceDictationService {
     bool preferOnDevice = true,
     String localeId = 'pt_BR',
   }) async {
-    if (localeId.toLowerCase().startsWith('tca')) {
+    final normalizedLocale = localeId.trim().toLowerCase();
+    if (normalizedLocale.startsWith('tca') || normalizedLocale.contains('ticuna')) {
       onError?.call(
         'Ditado automático em Ticuna não é suportado pelo sistema operacional. Grave o áudio ou digite manualmente.',
       );

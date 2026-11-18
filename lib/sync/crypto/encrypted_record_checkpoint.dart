@@ -7,6 +7,11 @@ import '../../database/app_database.dart';
 import 'encrypted_record.dart';
 import 'encrypted_record_sync.dart';
 
+/// Resultado explícito da aplicação de um registro cifrado remoto.
+/// Separa o pulo idempotente (`alreadyApplied`) de uma rejeição/conflito (`rejected`)
+/// para que o cursor `server_seq` nunca avance sobre registros não aplicados.
+enum EncryptedApplyOutcome { applied, alreadyApplied, rejected }
+
 /// Aplicação transacional de registros cifrados e checkpoints anti-rollback
 /// na mesma transação SQLite/Drift (FA-SEC-02).
 class EncryptedRecordCheckpoint {
@@ -87,7 +92,7 @@ class EncryptedRecordCheckpoint {
 
   /// Aplica um registro cifrado já obtido via `pullSince`, autenticando AAD,
   /// vínculo de rota e monotonicidade na mesma transação Drift.
-  Future<bool> applyRemoteRecord({
+  Future<EncryptedApplyOutcome> applyRemoteRecord({
     required EncryptedRemoteRecord remote,
     required Future<bool> Function(
       String entityType,
@@ -135,7 +140,7 @@ class EncryptedRecordCheckpoint {
       }
       if (remote.revision < knownRevision) {
         throw StateError(
-          'Rollback de revisão remota detectado ($remote.revision < $knownRevision); dados locais preservados.',
+          'Rollback de revisão remota detectado (${remote.revision} < $knownRevision); dados locais preservados.',
         );
       }
       final fingerprint = _fingerprint(remote.envelope);
@@ -144,7 +149,9 @@ class EncryptedRecordCheckpoint {
           'Conteúdo mudou sem nova revisão; dados locais preservados.',
         );
       }
-      if (remote.revision == knownRevision) return false;
+      if (remote.revision == knownRevision) {
+        return EncryptedApplyOutcome.alreadyApplied;
+      }
 
       final applied = await apply(
         entityType,
@@ -152,7 +159,7 @@ class EncryptedRecordCheckpoint {
         Map<String, dynamic>.from(payload['data'] as Map),
         remote.revision,
       );
-      if (!applied) return false;
+      if (!applied) return EncryptedApplyOutcome.rejected;
 
       await db
           .into(db.appKvStore)
@@ -166,7 +173,7 @@ class EncryptedRecordCheckpoint {
               updatedAt: drift.Value(DateTime.now()),
             ),
           );
-      return true;
+      return EncryptedApplyOutcome.applied;
     });
   }
 

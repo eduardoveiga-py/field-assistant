@@ -9,6 +9,28 @@ enum SyncOwnerGuardStatus {
   ownerMismatch,
 }
 
+enum AccountWorkspacePreparationStatus {
+  ready,
+  switchedCleanly,
+  requiresConfirmationDueToUnsyncedData,
+}
+
+class AccountWorkspacePreparationResult {
+  final AccountWorkspacePreparationStatus status;
+  final String? previousOwnerId;
+  final int pendingUnsyncedCount;
+
+  const AccountWorkspacePreparationResult({
+    required this.status,
+    this.previousOwnerId,
+    this.pendingUnsyncedCount = 0,
+  });
+
+  bool get isReady =>
+      status == AccountWorkspacePreparationStatus.ready ||
+      status == AccountWorkspacePreparationStatus.switchedCleanly;
+}
+
 class SyncOwnerGuardDecision {
   final SyncOwnerGuardStatus status;
   final String? activeUserId;
@@ -164,6 +186,62 @@ class SyncOwnerGuard {
       activeUserId: cleanUid,
       boundOwnerId: boundOwner ?? cleanUid,
       message: 'Proprietário verificado.',
+    );
+  }
+
+  /// Prepara o workspace SQLite local para [authenticatedUserId] ao concluir login
+  /// (FA-SEC-04). Se o dispositivo pertencia a outra conta:
+  /// - Quando não há operações locais não sincronizadas (ou [discardUnsyncedIfSwitching] == true),
+  ///   isola atomicamente o workspace para a nova conta.
+  /// - Quando há alterações não sincronizadas da conta anterior e não houve confirmação explícita,
+  ///   falha fechado retornando [AccountWorkspacePreparationStatus.requiresConfirmationDueToUnsyncedData]
+  ///   para nunca descartar silenciosamente dados pendentes do usuário anterior.
+  static Future<AccountWorkspacePreparationResult>
+  prepareWorkspaceForAuthenticatedAccount({
+    required AppDatabase db,
+    required String authenticatedUserId,
+    bool discardUnsyncedIfSwitching = false,
+  }) async {
+    final cleanUid = authenticatedUserId.trim();
+    if (cleanUid.isEmpty) {
+      throw ArgumentError.value(
+        authenticatedUserId,
+        'authenticatedUserId',
+        'authenticatedUserId vazio.',
+      );
+    }
+
+    final boundOwner = await getBoundOwnerId(db);
+    if (boundOwner == null || boundOwner == cleanUid) {
+      return const AccountWorkspacePreparationResult(
+        status: AccountWorkspacePreparationStatus.ready,
+      );
+    }
+
+    final unsyncedOps =
+        await (db.select(db.syncQueue)..where(
+              (t) =>
+                  t.status.equals('pending') |
+                  t.status.equals('in_progress') |
+                  t.status.equals('conflict') |
+                  t.status.equals('failed'),
+            ))
+            .get();
+
+    if (unsyncedOps.isNotEmpty && !discardUnsyncedIfSwitching) {
+      return AccountWorkspacePreparationResult(
+        status: AccountWorkspacePreparationStatus
+            .requiresConfirmationDueToUnsyncedData,
+        previousOwnerId: boundOwner,
+        pendingUnsyncedCount: unsyncedOps.length,
+      );
+    }
+
+    await resetLocalWorkspaceForAccountSwitch(db: db, newOwnerId: cleanUid);
+    return AccountWorkspacePreparationResult(
+      status: AccountWorkspacePreparationStatus.switchedCleanly,
+      previousOwnerId: boundOwner,
+      pendingUnsyncedCount: unsyncedOps.length,
     );
   }
 

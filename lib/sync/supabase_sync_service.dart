@@ -21,6 +21,8 @@ import 'sync_privacy_policy.dart';
 import 'supabase_config.dart';
 import 'crypto/e2ee_service.dart';
 import 'crypto/encrypted_media_transfer.dart';
+import 'crypto/encrypted_record.dart';
+import 'crypto/encrypted_record_checkpoint.dart';
 import 'crypto/encrypted_record_sync.dart';
 
 class SyncProcessResult {
@@ -2345,7 +2347,32 @@ class SupabaseSyncService {
       }
 
       if (pendingOp != null) {
-        if (pendingOp.operation.toUpperCase() == 'INSERT') {
+        final isRemoteTombstone =
+            remoteRecord['_tombstone'] == true ||
+            normalized['deletedAt'] != null ||
+            normalized['deleted_at'] != null;
+        final pendingOpName = pendingOp.operation.toUpperCase();
+        if (isRemoteTombstone) {
+          if (pendingOpName == 'DELETE' || pendingOpName == 'HARD_DELETE') {
+            await _softDeleteLocalEntry(
+              table,
+              id,
+              normalized['deletedAt'] ?? normalized['deleted_at'],
+            );
+            return true;
+          }
+          final message =
+              'Conflito delete-vs-update em $table ($id): registro excluído remotamente enquanto possui alteração local pendente.';
+          errors.add(message);
+          await repository.markSyncOperationConflict(
+            pendingOp.id,
+            message,
+            remoteData: normalized,
+          );
+          _setStatus(SyncStatus.conflict);
+          return false;
+        }
+        if (pendingOpName == 'INSERT') {
           if (_recordsDifferNonAudit(localMap, normalized)) {
             final message = 'Inserção local coincide com registro remoto diferente em $table ($id).';
             errors.add(message);
@@ -2725,44 +2752,111 @@ class SupabaseSyncService {
       AppLogger.debug('Payload sem _remote JSON no conflito (${op.id}): $e', st);
     }
 
-    if (remoteMap == null && isConfigured) {
+    EncryptedRemoteRecord? authoritativeE2eeRemote;
+    EncryptedRecordCheckpoint? e2eeCheckpoint;
+
+    if (!_legacyTestMode && activeOwnerId != null) {
+      final recordSync = await e2eeService.getRecordSync(activeOwnerId);
+      e2eeCheckpoint = await e2eeService.getCheckpoint(activeOwnerId);
+      if (recordSync == null || e2eeCheckpoint == null) return false;
       try {
-        if (!_legacyTestMode && activeOwnerId != null) {
-          final recordSync = await e2eeService.getRecordSync(activeOwnerId);
-          final remoteRead = await recordSync?.read(
+        final route = await EncryptedRecord.route(
+          key: recordSync.key,
+          owner: recordSync.owner,
+          entityType: tableName,
+          entityId: op.entityId,
+        );
+        final remoteRecord = await recordSync.transport.fetch(route);
+        if (remoteRecord != null) {
+          final knownRevision = await e2eeCheckpoint.getKnownRevision(
             entityType: tableName,
             entityId: op.entityId,
           );
-          if (remoteRead != null && remoteRead['data'] is Map) {
-            remoteMap = normalizeRemotePayload(
-              Map<String, dynamic>.from(remoteRead['data'] as Map),
+          if (remoteRecord.revision < knownRevision) {
+            AppLogger.warning(
+              'Rollback remoto detectado durante resolveConflictAcceptRemote ($tableName/${op.entityId})',
             );
+            return false;
           }
-        } else {
-          final legacyClient = clientOverride ?? Supabase.instance.client;
-          final rows = await legacyClient
-              .from(tableName)
-              .select()
-              .eq('id', op.entityId)
-              .limit(1);
-          if (rows.isNotEmpty) {
-            remoteMap = normalizeRemotePayload(rows.first);
+          final opened = await EncryptedRecord.open(
+            key: recordSync.key,
+            owner: recordSync.owner,
+            routeId: route,
+            revision: remoteRecord.revision,
+            envelope: remoteRecord.envelope,
+          );
+          if (opened['entityType'] != tableName ||
+              opened['entityId'] != op.entityId) {
+            return false;
+          }
+          if (opened['data'] is Map) {
+            remoteMap = normalizeRemotePayload(
+              Map<String, dynamic>.from(opened['data'] as Map),
+            );
+            remoteMap['id'] ??= op.entityId;
+            remoteMap['revision'] = remoteRecord.revision;
+            authoritativeE2eeRemote = remoteRecord;
           }
         }
       } catch (e, st) {
-        AppLogger.warning('Falha ao buscar registro remoto para resolução de conflito', e, st);
+        AppLogger.warning(
+          'Falha ao buscar registro cifrado remoto para resolução de conflito',
+          e,
+          st,
+        );
+        return false;
+      }
+    } else if (remoteMap == null && isConfigured) {
+      try {
+        final legacyClient = clientOverride ?? Supabase.instance.client;
+        final rows = await legacyClient
+            .from(tableName)
+            .select()
+            .eq('id', op.entityId)
+            .limit(1);
+        if (rows.isNotEmpty) {
+          remoteMap = normalizeRemotePayload(rows.first);
+        }
+      } catch (e, st) {
+        AppLogger.warning(
+          'Falha ao buscar registro remoto para resolução de conflito',
+          e,
+          st,
+        );
       }
     }
 
     if (remoteMap == null) return false;
 
-    final localExisting = await _getLocalMap(tableName, op.entityId);
-    if (localExisting == null) {
-      await _insertLocalEntry(tableName, remoteMap);
-    } else {
-      await _updateLocalEntry(tableName, remoteMap);
-    }
-    await repository.markSyncOperationSuccess(op.id);
+    final resolvedRemote = remoteMap;
+    await db.transaction(() async {
+      final isRemoteDeleted =
+          resolvedRemote['_tombstone'] == true ||
+          resolvedRemote['deletedAt'] != null ||
+          resolvedRemote['deleted_at'] != null;
+      final localExisting = await _getLocalMap(tableName, op.entityId);
+      if (isRemoteDeleted) {
+        if (localExisting != null) {
+          await _softDeleteLocalEntry(
+            tableName,
+            op.entityId,
+            resolvedRemote['deletedAt'] ?? resolvedRemote['deleted_at'],
+          );
+        }
+      } else if (localExisting == null) {
+        await _insertLocalEntry(tableName, resolvedRemote);
+      } else {
+        await _updateLocalEntry(tableName, resolvedRemote);
+      }
+      if (authoritativeE2eeRemote != null && e2eeCheckpoint != null) {
+        await e2eeCheckpoint.recordPushedEnvelope(
+          route: authoritativeE2eeRemote.route,
+          revision: authoritativeE2eeRemote.revision,
+          envelope: authoritativeE2eeRemote.envelope,
+        );
+      }
+      await repository.markSyncOperationSuccess(op.id);
+    });
     return true;
   }
 
@@ -3459,6 +3553,48 @@ class SupabaseSyncService {
     }
   }
 
+  static String? _pendingMediaKvKey(String tableName, String entityId) {
+    switch (tableName) {
+      case 'voice_notes':
+        return 'pending_audio_download_$entityId';
+      case 'ticuna_words':
+      case 'ticuna_phrases':
+        return 'pending_ticuna_audio_download_${tableName}_$entityId';
+      case 'knowledge_documents':
+        return 'pending_doc_download_$entityId';
+      case 'person_photos':
+        return 'pending_photo_download_$entityId';
+      default:
+        return null;
+    }
+  }
+
+  Future<void> _markPendingMediaDownload(
+    String tableName,
+    String entityId,
+  ) async {
+    final key = _pendingMediaKvKey(tableName, entityId);
+    if (key == null) return;
+    await db
+        .into(db.appKvStore)
+        .insertOnConflictUpdate(
+          AppKvStoreCompanion.insert(
+            key: key,
+            value: DateTime.now().toUtc().toIso8601String(),
+            updatedAt: drift.Value(DateTime.now()),
+          ),
+        );
+  }
+
+  Future<void> _clearPendingMediaDownload(
+    String tableName,
+    String entityId,
+  ) async {
+    final key = _pendingMediaKvKey(tableName, entityId);
+    if (key == null) return;
+    await (db.delete(db.appKvStore)..where((t) => t.key.equals(key))).go();
+  }
+
   Future<bool> _downloadEncryptedMediaForTable({
     required String tableName,
     required String entityId,
@@ -3483,6 +3619,7 @@ class SupabaseSyncService {
           await (db.update(db.voiceNotes)..where((t) => t.id.equals(entityId)))
               .write(VoiceNotesCompanion(audioFilePath: drift.Value(localPath)));
         }
+        await _clearPendingMediaDownload(tableName, entityId);
         return true;
       }
 
@@ -3509,6 +3646,7 @@ class SupabaseSyncService {
             ],
           );
         }
+        await _clearPendingMediaDownload(tableName, entityId);
         return true;
       }
 
@@ -3536,6 +3674,7 @@ class SupabaseSyncService {
                 .write(KnowledgeDocumentsCompanion(filePath: drift.Value(localPath)));
           }
         }
+        await _clearPendingMediaDownload(tableName, entityId);
         return true;
       }
 
@@ -3562,15 +3701,19 @@ class SupabaseSyncService {
             );
           }
         }
+        await _clearPendingMediaDownload(tableName, entityId);
         return true;
       }
       return true;
     } catch (e, st) {
       AppLogger.warning(
-        'Download de mídia E2EE adiado ($tableName/$entityId)',
+        'Download de mídia E2EE adiado ($tableName/$entityId); marcado para retentativa',
         e,
         st,
       );
+      try {
+        await _markPendingMediaDownload(tableName, entityId);
+      } catch (_) {}
       return false;
     }
   }
@@ -3615,101 +3758,157 @@ class SupabaseSyncService {
     final pendingMediaDownloads = <({String table, String id})>[];
 
     const pageSize = 100;
+    const maxPagesPerCycle = 20;
     try {
-      while (true) {
+      // 1. Coleta páginas ordenadas por server_seq validando monotonicidade estrita.
+      // A ordenação posterior por dependência de tabela (syncTables) evita deadlocks
+      // de chave estrangeira quando um registro pai foi atualizado após um filho.
+      final fetchedBatch = <EncryptedRemoteRecord>[];
+      var fetchCursor = currentCursor;
+      var fetchHadError = false;
+
+      for (var pageIndex = 0; pageIndex < maxPagesPerCycle; pageIndex++) {
         final page = await transport.pullSince(
-          sinceSeq: currentCursor,
+          sinceSeq: fetchCursor,
           limit: pageSize,
         );
         if (page.isEmpty) break;
 
-        var pageHadFailure = false;
-        var highestAppliedSeq = currentCursor;
-
         for (final remote in page) {
-          totalProcessed++;
-          if (remote.serverSeq <= currentCursor && remote.serverSeq != 0) {
-            pageHadFailure = true;
+          if (remote.serverSeq <= 0 || remote.serverSeq <= fetchCursor) {
+            fetchHadError = true;
             failureCount++;
             errors.add(
-              'Cursor server_seq não monotônico detectado (${remote.serverSeq} <= $currentCursor).',
+              'Cursor server_seq inválido ou não monotônico detectado (${remote.serverSeq} <= $fetchCursor).',
             );
             break;
           }
-          try {
-            String? appliedTable;
-            String? appliedId;
-            var hasEncryptedMediaRef = false;
-            final applied = await checkpoint.applyRemoteRecord(
-              remote: remote,
-              apply: (entityType, entityId, data, revision) async {
-                final table = mapEntityToRemoteTable(entityType);
-                appliedTable = table;
-                appliedId = entityId;
-                final recordMap = Map<String, dynamic>.from(data);
-                recordMap['id'] ??= entityId;
-                recordMap['revision'] = revision;
-                if (recordMap['_tombstone'] == true) {
-                  recordMap['deletedAt'] ??=
-                      DateTime.now().toUtc().toIso8601String();
-                  final localExisting = await _getLocalMap(table, entityId);
-                  if (localExisting == null) return true;
-                  return _applyRemoteRecord(
-                    table: table,
-                    remoteRecord: recordMap,
-                    client: null,
-                    errors: errors,
-                  );
-                }
-                hasEncryptedMediaRef =
-                    recordMap['e2ee_media_bucket'] != null ||
-                    recordMap['filePath']?.toString().startsWith('e2ee://') ==
-                        true ||
-                    recordMap['audioPath']?.toString().startsWith('e2ee://') ==
-                        true ||
-                    recordMap['audio_path']?.toString().startsWith('e2ee://') ==
-                        true;
+          fetchCursor = remote.serverSeq;
+          fetchedBatch.add(remote);
+        }
+        if (fetchHadError || page.length < pageSize) break;
+      }
+
+      // 2. Autentica/ordena lote em ordem pai-antes-de-filho (syncTables)
+      final orderedBatch =
+          <({EncryptedRemoteRecord remote, int tableOrder})>[];
+      var batchHadFailure = fetchHadError;
+
+      for (final remote in fetchedBatch) {
+        try {
+          final peek = await EncryptedRecord.open(
+            key: recordSync.key,
+            owner: recordSync.owner,
+            routeId: remote.route,
+            revision: remote.revision,
+            envelope: remote.envelope,
+          );
+          final entityType = peek['entityType'] as String;
+          final table = mapEntityToRemoteTable(entityType);
+          final idx = syncTables.indexOf(table);
+          orderedBatch.add((
+            remote: remote,
+            tableOrder: idx >= 0 ? idx : syncTables.length,
+          ));
+        } catch (e) {
+          batchHadFailure = true;
+          totalProcessed++;
+          failureCount++;
+          errors.add(
+            'Falha ao autenticar registro cifrado (${remote.route}): $e',
+          );
+        }
+      }
+
+      orderedBatch.sort((a, b) {
+        final byTable = a.tableOrder.compareTo(b.tableOrder);
+        if (byTable != 0) return byTable;
+        return a.remote.serverSeq.compareTo(b.remote.serverSeq);
+      });
+
+      var highestBatchSeq = currentCursor;
+      for (final entry in orderedBatch) {
+        final remote = entry.remote;
+        totalProcessed++;
+        try {
+          String? appliedTable;
+          String? appliedId;
+          var hasEncryptedMediaRef = false;
+          final outcome = await checkpoint.applyRemoteRecord(
+            remote: remote,
+            apply: (entityType, entityId, data, revision) async {
+              final table = mapEntityToRemoteTable(entityType);
+              appliedTable = table;
+              appliedId = entityId;
+              final recordMap = Map<String, dynamic>.from(data);
+              recordMap['id'] ??= entityId;
+              recordMap['revision'] = revision;
+              if (recordMap['_tombstone'] == true) {
+                recordMap['deletedAt'] ??=
+                    DateTime.now().toUtc().toIso8601String();
+                final localExisting = await _getLocalMap(table, entityId);
+                if (localExisting == null) return true;
                 return _applyRemoteRecord(
                   table: table,
                   remoteRecord: recordMap,
                   client: null,
                   errors: errors,
                 );
-              },
-            );
-            if (applied) {
-              successCount++;
-              if (hasEncryptedMediaRef &&
-                  appliedTable != null &&
-                  appliedId != null) {
-                pendingMediaDownloads.add((table: appliedTable!, id: appliedId!));
               }
+              hasEncryptedMediaRef =
+                  recordMap['e2ee_media_bucket'] != null ||
+                  recordMap['filePath']?.toString().startsWith('e2ee://') ==
+                      true ||
+                  recordMap['audioPath']?.toString().startsWith('e2ee://') ==
+                      true ||
+                  recordMap['audio_path']?.toString().startsWith('e2ee://') ==
+                      true;
+              return _applyRemoteRecord(
+                table: table,
+                remoteRecord: recordMap,
+                client: null,
+                errors: errors,
+              );
+            },
+          );
+          if (outcome == EncryptedApplyOutcome.applied) {
+            successCount++;
+            if (hasEncryptedMediaRef &&
+                appliedTable != null &&
+                appliedId != null) {
+              pendingMediaDownloads.add((table: appliedTable!, id: appliedId!));
             }
-            if (!pageHadFailure && remote.serverSeq > highestAppliedSeq) {
-              highestAppliedSeq = remote.serverSeq;
-            }
-          } catch (e) {
-            pageHadFailure = true;
+          } else if (outcome == EncryptedApplyOutcome.rejected) {
+            batchHadFailure = true;
             if (_currentStatus == SyncStatus.conflict) {
               conflictCount++;
             } else {
               failureCount++;
             }
-            errors.add('Falha ao aplicar registro cifrado (${remote.route}): $e');
           }
+          if (remote.serverSeq > highestBatchSeq) {
+            highestBatchSeq = remote.serverSeq;
+          }
+        } catch (e) {
+          batchHadFailure = true;
+          if (_currentStatus == SyncStatus.conflict) {
+            conflictCount++;
+          } else {
+            failureCount++;
+          }
+          errors.add('Falha ao aplicar registro cifrado (${remote.route}): $e');
         }
+      }
 
-        if (!pageHadFailure && highestAppliedSeq > currentCursor) {
-          currentCursor = highestAppliedSeq;
-          await db.into(db.appKvStore).insertOnConflictUpdate(
-            AppKvStoreCompanion.insert(
-              key: cursorKey,
-              value: currentCursor.toString(),
-              updatedAt: drift.Value(DateTime.now()),
-            ),
-          );
-        }
-        if (pageHadFailure || page.length < pageSize) break;
+      if (!batchHadFailure && highestBatchSeq > currentCursor) {
+        currentCursor = highestBatchSeq;
+        await db.into(db.appKvStore).insertOnConflictUpdate(
+          AppKvStoreCompanion.insert(
+            key: cursorKey,
+            value: currentCursor.toString(),
+            updatedAt: drift.Value(DateTime.now()),
+          ),
+        );
       }
     } catch (e) {
       failureCount++;
@@ -3954,10 +4153,27 @@ class SupabaseSyncService {
           if (!sealedWrite.result.success) {
             conflicts++;
             _setStatus(SyncStatus.conflict);
+            Map<String, dynamic>? remoteData;
+            try {
+              final remoteRead = await recordSync.read(
+                entityType: tableName,
+                entityId: op.entityId,
+                minimumRevision: expectedRevision,
+              );
+              if (remoteRead != null && remoteRead['data'] is Map) {
+                remoteData = Map<String, dynamic>.from(
+                  remoteRead['data'] as Map,
+                );
+              }
+            } catch (_) {}
             final err =
                 'Conflito CAS E2EE ao sincronizar exclusão de $tableName (${op.entityId}).';
             errors.add(err);
-            await repository.markSyncOperationConflict(op.id, err);
+            await repository.markSyncOperationConflict(
+              op.id,
+              err,
+              remoteData: remoteData,
+            );
             continue;
           }
           await db.transaction(() async {

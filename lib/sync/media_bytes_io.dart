@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 final RegExp _controlCharsPattern = RegExp(r'[\x00-\x1F\x7F]');
+final RegExp _illegalFileNameChars = RegExp(r'[<>:"|?*]');
 final RegExp _windowsReservedDeviceNames = RegExp(
   r'^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\..*)?$',
   caseSensitive: false,
@@ -19,7 +20,7 @@ List<String> _validateAndSplitSubDir(String subDir) {
     throw ArgumentError.value(subDir, 'subDir', 'Subdiretório de mídia vazio.');
   }
   if (_controlCharsPattern.hasMatch(trimmed) ||
-      trimmed.contains(':') ||
+      _illegalFileNameChars.hasMatch(trimmed) ||
       p.isAbsolute(trimmed) ||
       trimmed.startsWith('/') ||
       trimmed.startsWith('\\')) {
@@ -35,6 +36,8 @@ List<String> _validateAndSplitSubDir(String subDir) {
         seg == '.' ||
         seg == '..' ||
         seg.contains('..') ||
+        seg.endsWith('.') ||
+        seg.endsWith(' ') ||
         _windowsReservedDeviceNames.hasMatch(seg)) {
       throw ArgumentError.value(
         subDir,
@@ -60,7 +63,8 @@ String _validateMediaFileName(String fileName) {
       trimmed.contains('..') ||
       trimmed.contains('/') ||
       trimmed.contains('\\') ||
-      trimmed.contains(':') ||
+      trimmed.endsWith('.') ||
+      _illegalFileNameChars.hasMatch(trimmed) ||
       _controlCharsPattern.hasMatch(trimmed) ||
       p.isAbsolute(trimmed) ||
       p.basename(trimmed) != trimmed ||
@@ -128,16 +132,35 @@ Future<String?> saveMediaBytes({
     );
   }
 
+  final baseDirectory = Directory(canonicalBase);
+  if (!await baseDirectory.exists()) {
+    await baseDirectory.create(recursive: true);
+  }
+  final resolvedBase = p.canonicalize(
+    await baseDirectory.resolveSymbolicLinks(),
+  );
+
   final dir = Directory(targetDirPath);
   if (!await dir.exists()) {
     await dir.create(recursive: true);
   }
 
-  final resolvedDir = await dir.resolveSymbolicLinks();
+  final resolvedDir = p.canonicalize(await dir.resolveSymbolicLinks());
+  if (!p.isWithin(resolvedBase, resolvedDir)) {
+    throw ArgumentError(
+      'Subdiretório resolvido escapa do diretório base permitido (symlink bloqueado).',
+    );
+  }
+
   final resolvedTarget = p.canonicalize(p.join(resolvedDir, safeFileName));
   if (!p.isWithin(resolvedDir, resolvedTarget)) {
     throw ArgumentError(
       'Destino resolvido escapa do diretório de mídia permitido.',
+    );
+  }
+  if (await FileSystemEntity.isLink(resolvedTarget)) {
+    throw ArgumentError(
+      'Destino de mídia é um link simbólico e foi bloqueado por segurança.',
     );
   }
 

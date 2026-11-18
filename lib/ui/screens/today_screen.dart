@@ -823,6 +823,10 @@ class TodayScreen extends ConsumerWidget {
           ),
           Consumer(
             builder: (ctx, ref, _) {
+              final inboxEnabled = ref.watch(
+                isFeatureEnabledProvider(AppFeature.inbox),
+              );
+              if (!inboxEnabled) return const SizedBox.shrink();
               final countAsync = ref.watch(unprocessedInboxCountProvider);
               final count = countAsync.value ?? 0;
               return IconButton(
@@ -1864,127 +1868,88 @@ class TodayScreen extends ConsumerWidget {
       onTap: () => _showAddForeignContactDialog(context, ref),
     );
 
+    final studiesEnabled = ref.watch(isFeatureEnabledProvider(AppFeature.studies));
+    final mapsEnabled = ref.watch(isFeatureEnabledProvider(AppFeature.territoryMaps));
+    final inboxEnabled = ref.watch(isFeatureEnabledProvider(AppFeature.inbox));
+    final tasksEnabled = ref.watch(isFeatureEnabledProvider(AppFeature.tasksProjects));
+    final knowledgeEnabled = ref.watch(isFeatureEnabledProvider(AppFeature.knowledge));
+    final phonesEnabled = ref.watch(isFeatureEnabledProvider(AppFeature.phones));
+    final experiencesEnabled = ref.watch(isFeatureEnabledProvider(AppFeature.experiences));
+    final notesEnabled = ref.watch(isFeatureEnabledProvider(AppFeature.notesResearch));
+    final dashboardEnabled = ref.watch(isFeatureEnabledProvider(AppFeature.dashboard));
+
+    Widget buildGridRows(List<Widget> items) {
+      if (items.isEmpty) return const SizedBox.shrink();
+      final rows = <Widget>[];
+      for (var i = 0; i < items.length; i += 4) {
+        final slice = items.sublist(i, i + 4 > items.length ? items.length : i + 4);
+        if (rows.isNotEmpty) rows.add(const SizedBox(height: 8));
+        rows.add(
+          Row(
+            children: [
+              for (var j = 0; j < slice.length; j++) ...[
+                if (j > 0) const SizedBox(width: 8),
+                Expanded(child: slice[j]),
+              ],
+              if (slice.length < 4) Spacer(flex: 4 - slice.length),
+            ],
+          ),
+        );
+      }
+      return Column(children: rows);
+    }
+
     if (category == 'ministerio') {
-      return Column(
-        children: [
-          Row(
-            children: [
-              Expanded(child: btnNovaPessoa),
-              const SizedBox(width: 8),
-              Expanded(child: btnRevisitas),
-              const SizedBox(width: 8),
-              Expanded(child: btnEstudos),
-              const SizedBox(width: 8),
-              Expanded(child: btnAtividade),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(child: btnMapa),
-              const SizedBox(width: 8),
-              Expanded(child: btnEstrangeiro),
-              const SizedBox(width: 8),
-              Expanded(child: btnTelefones),
-              const SizedBox(width: 8),
-              Expanded(child: btnExperiencias),
-            ],
-          ),
-        ],
-      );
+      return buildGridRows([
+        btnNovaPessoa,
+        btnRevisitas,
+        if (studiesEnabled) btnEstudos,
+        btnAtividade,
+        if (mapsEnabled) btnMapa,
+        btnEstrangeiro,
+        if (phonesEnabled) btnTelefones,
+        if (experiencesEnabled) btnExperiencias,
+      ]);
     }
 
     if (category == 'produtividade') {
-      return Row(
-        children: [
-          Expanded(child: btnInbox),
-          const SizedBox(width: 8),
-          Expanded(child: btnTarefas),
-          const SizedBox(width: 8),
-          Expanded(child: btnConhecimento),
-          const SizedBox(width: 8),
-          Expanded(child: btnAnotacoes),
-        ],
-      );
+      return buildGridRows([
+        if (inboxEnabled) btnInbox,
+        if (tasksEnabled) btnTarefas,
+        if (knowledgeEnabled) btnConhecimento,
+        if (notesEnabled) btnAnotacoes,
+      ]);
     }
 
     if (category == 'todos') {
-      return Column(
-        children: [
-          Row(
-            children: [
-              Expanded(child: btnNovaPessoa),
-              const SizedBox(width: 8),
-              Expanded(child: btnRevisitas),
-              const SizedBox(width: 8),
-              Expanded(child: btnEstudos),
-              const SizedBox(width: 8),
-              Expanded(child: btnAtividade),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(child: btnMapa),
-              const SizedBox(width: 8),
-              Expanded(child: btnInbox),
-              const SizedBox(width: 8),
-              Expanded(child: btnTarefas),
-              const SizedBox(width: 8),
-              Expanded(child: btnConhecimento),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(child: btnTelefones),
-              const SizedBox(width: 8),
-              Expanded(child: btnExperiencias),
-              const SizedBox(width: 8),
-              Expanded(child: btnAnotacoes),
-              const SizedBox(width: 8),
-              Expanded(child: btnEstatisticas),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(child: btnEstrangeiro),
-              const Spacer(flex: 3),
-            ],
-          ),
-        ],
-      );
+      return buildGridRows([
+        btnNovaPessoa,
+        btnRevisitas,
+        if (studiesEnabled) btnEstudos,
+        btnAtividade,
+        if (mapsEnabled) btnMapa,
+        if (inboxEnabled) btnInbox,
+        if (tasksEnabled) btnTarefas,
+        if (knowledgeEnabled) btnConhecimento,
+        if (phonesEnabled) btnTelefones,
+        if (experiencesEnabled) btnExperiencias,
+        if (notesEnabled) btnAnotacoes,
+        if (dashboardEnabled) btnEstatisticas,
+        btnEstrangeiro,
+      ]);
     }
 
     // Padrão: 'principais' (2 linhas compactas que economizam 60% da tela vertical)
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(child: btnNovaPessoa),
-            const SizedBox(width: 8),
-            Expanded(child: btnRevisitas),
-            const SizedBox(width: 8),
-            Expanded(child: btnEstudos),
-            const SizedBox(width: 8),
-            Expanded(child: btnMapa),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(child: btnInbox),
-            const SizedBox(width: 8),
-            Expanded(child: btnTarefas),
-            const SizedBox(width: 8),
-            Expanded(child: btnConhecimento),
-            const SizedBox(width: 8),
-            Expanded(child: btnAtividade),
-          ],
-        ),
-      ],
-    );
+    return buildGridRows([
+      btnNovaPessoa,
+      btnRevisitas,
+      if (studiesEnabled) btnEstudos,
+      if (mapsEnabled) btnMapa,
+      if (inboxEnabled) btnInbox,
+      if (tasksEnabled) btnTarefas,
+      if (knowledgeEnabled) btnConhecimento,
+      btnAtividade,
+    ]);
   }
 }
 

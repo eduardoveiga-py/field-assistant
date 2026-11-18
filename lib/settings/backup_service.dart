@@ -5,6 +5,7 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/widgets.dart' show WidgetsBinding;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:crypto/crypto.dart';
@@ -306,6 +307,8 @@ class BackupService {
   }
 
   static const int defaultV3Iterations = 600000;
+  static const int minAllowedKdfIterations = 1000;
+  static const int maxAllowedKdfIterations = 5000000;
 
   /// Derivação de chave PBKDF2-HMAC-SHA256 executada em isolate no nativo
   /// para não bloquear a UI thread (FA-SEC-07).
@@ -314,7 +317,15 @@ class BackupService {
     Uint8List salt, {
     int iterations = defaultV3Iterations,
   }) async {
-    if (kIsWeb) {
+    var isWidgetTestBinding = false;
+    try {
+      isWidgetTestBinding = WidgetsBinding.instance.runtimeType
+          .toString()
+          .contains('TestWidgetsFlutterBinding');
+    } catch (_) {
+      isWidgetTestBinding = false;
+    }
+    if (kIsWeb || isWidgetTestBinding) {
       return _deriveKeyPbkdf2(password, salt, iterations: iterations);
     }
     return Isolate.run(
@@ -711,7 +722,16 @@ class BackupService {
         final saltBase64 = container['salt'] as String;
         final saltBytes = base64Decode(saltBase64);
         final defaultIter = containerVersion == 3 ? defaultV3Iterations : 100000;
-        final iterations = (container['iterations'] as num?)?.toInt() ?? defaultIter;
+        final rawIterations = container['iterations'];
+        final iterations = rawIterations is num ? rawIterations.toInt() : defaultIter;
+        final minIter = containerVersion == 3
+            ? defaultV3Iterations
+            : minAllowedKdfIterations;
+        if (iterations < minIter || iterations > maxAllowedKdfIterations) {
+          throw FormatException(
+            'Número de iterações PBKDF2 fora da faixa segura ($iterations).',
+          );
+        }
         final iv = enc.IV.fromBase64(container['iv'] as String);
         final ciphertext = container['ciphertext'] as String;
 

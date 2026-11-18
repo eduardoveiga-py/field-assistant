@@ -84,10 +84,9 @@ class _SpyRecordTransport implements PaginatedEncryptedRecordTransport {
     required int sinceSeq,
     int limit = 100,
   }) async {
-    final rows = cloud.records.values
-        .where((r) => r.serverSeq > sinceSeq)
-        .toList()
-      ..sort((a, b) => a.serverSeq.compareTo(b.serverSeq));
+    final rows =
+        cloud.records.values.where((r) => r.serverSeq > sinceSeq).toList()
+          ..sort((a, b) => a.serverSeq.compareTo(b.serverSeq));
     return rows.take(limit).toList();
   }
 }
@@ -107,7 +106,8 @@ Uint8List _extractMultipartOrRawBody(http.Request request) {
     final sep = part.indexOf('\r\n\r\n');
     if (sep == -1) continue;
     final headers = part.substring(0, sep);
-    if (!headers.contains('filename=') && !headers.contains('application/octet-stream')) {
+    if (!headers.contains('filename=') &&
+        !headers.contains('application/octet-stream')) {
       continue;
     }
     var body = part.substring(sep + 4);
@@ -147,7 +147,9 @@ SupabaseClient _buildSpySupabaseClient(_WireSpyCloud cloud) {
 
     // Qualquer chamada a PostgREST plaintext (sync_upsert_if_unchanged ou tabelas)
     // DEVE falhar explicitamente se alcançada pelo modo E2EE.
-    fail('Chamada PostgREST plaintext inesperada no modo E2EE: ${request.method} $path');
+    fail(
+      'Chamada PostgREST plaintext inesperada no modo E2EE: ${request.method} $path',
+    );
   });
 
   return SupabaseClient(
@@ -216,60 +218,68 @@ void main() {
         address: 'Rua Secreta 42',
       );
       final nowUtc = DateTime.now().toUtc();
-      await db1.into(db1.inboxEntries).insert(
-        InboxEntriesCompanion.insert(
-          id: 'email_jw_1',
-          content: 'Carta JW Confidencial — corpo privado não pode vazar em texto claro',
-          sourceType: const drift.Value('jw_email'),
-          capturedAt: nowUtc,
-          createdAt: nowUtc,
-          updatedAt: nowUtc,
-        ),
-      );
-      await db1.into(db1.syncQueue).insert(
-        SyncQueueCompanion.insert(
-          id: 'sq_email_jw_1',
-          entityType: 'inbox_entries',
-          entityId: 'email_jw_1',
-          operation: 'INSERT',
-          payload: jsonEncode({
-            'id': 'email_jw_1',
-            'content': 'Carta JW Confidencial — corpo privado não pode vazar em texto claro',
-            'sourceType': 'jw_email',
-            'capturedAt': nowUtc.toIso8601String(),
-            'createdAt': nowUtc.toIso8601String(),
-            'updatedAt': nowUtc.toIso8601String(),
-          }),
-          createdAt: nowUtc,
-        ),
-      );
+      await db1
+          .into(db1.inboxEntries)
+          .insert(
+            InboxEntriesCompanion.insert(
+              id: 'email_jw_1',
+              content: 'Carta JW Confidencial — corpo privado não pode vazar em texto claro',
+              sourceType: const drift.Value('jw_email'),
+              capturedAt: nowUtc,
+              createdAt: nowUtc,
+              updatedAt: nowUtc,
+            ),
+          );
+      await db1
+          .into(db1.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: 'sq_email_jw_1',
+              entityType: 'inbox_entries',
+              entityId: 'email_jw_1',
+              operation: 'INSERT',
+              payload: jsonEncode({
+                'id': 'email_jw_1',
+                'content': 'Carta JW Confidencial — corpo privado não pode vazar em texto claro',
+                'sourceType': 'jw_email',
+                'capturedAt': nowUtc.toIso8601String(),
+                'createdAt': nowUtc.toIso8601String(),
+                'updatedAt': nowUtc.toIso8601String(),
+              }),
+              createdAt: nowUtc,
+            ),
+          );
 
       final audioSecretBytes = Uint8List.fromList(
         utf8.encode('RAW_VOICE_NOTE_SECRET_AUDIO_BYTES_12345'),
       );
       final audioFile = File(p.join(dir1.path, 'vn_e2ee_1.m4a'));
       await audioFile.writeAsBytes(audioSecretBytes);
-      await db1.into(db1.voiceNotes).insert(
-        VoiceNotesCompanion.insert(
-          id: 'vn_e2ee_1',
-          personId: person.id,
-          audioFilePath: drift.Value(audioFile.path),
-          audioDurationSeconds: const drift.Value(12),
-          transcription: 'Transcrição confidencial do campo',
-          createdAt: nowUtc,
-          updatedAt: nowUtc,
-        ),
-      );
-      await db1.into(db1.syncQueue).insert(
-        SyncQueueCompanion.insert(
-          id: 'sq_vn_e2ee_1',
-          entityType: 'voice_notes',
-          entityId: 'vn_e2ee_1',
-          operation: 'INSERT',
-          payload: jsonEncode({'id': 'vn_e2ee_1'}),
-          createdAt: nowUtc,
-        ),
-      );
+      await db1
+          .into(db1.voiceNotes)
+          .insert(
+            VoiceNotesCompanion.insert(
+              id: 'vn_e2ee_1',
+              personId: person.id,
+              audioFilePath: drift.Value(audioFile.path),
+              audioDurationSeconds: const drift.Value(12),
+              transcription: 'Transcrição confidencial do campo',
+              createdAt: nowUtc,
+              updatedAt: nowUtc,
+            ),
+          );
+      await db1
+          .into(db1.syncQueue)
+          .insert(
+            SyncQueueCompanion.insert(
+              id: 'sq_vn_e2ee_1',
+              entityType: 'voice_notes',
+              entityId: 'vn_e2ee_1',
+              operation: 'INSERT',
+              payload: jsonEncode({'id': 'vn_e2ee_1'}),
+              createdAt: nowUtc,
+            ),
+          );
 
       // 2. Push real E2EE no Dispositivo 1
       final pushRes = await sync1.processQueue();
@@ -286,7 +296,9 @@ void main() {
       expect(wireRecordsDump, isNot(contains('Carta JW Confidencial')));
       expect(wireRecordsDump, isNot(contains('Transcrição confidencial')));
       expect(
-        cloud.httpRequestLog.where((l) => l.contains('sync_upsert_if_unchanged')),
+        cloud.httpRequestLog.where(
+          (l) => l.contains('sync_upsert_if_unchanged'),
+        ),
         isEmpty,
       );
 
@@ -301,7 +313,10 @@ void main() {
       );
       for (final rawObj in cloud.storageObjects.values) {
         final asText = utf8.decode(rawObj, allowMalformed: true);
-        expect(asText, isNot(contains('RAW_VOICE_NOTE_SECRET_AUDIO_BYTES_12345')));
+        expect(
+          asText,
+          isNot(contains('RAW_VOICE_NOTE_SECRET_AUDIO_BYTES_12345')),
+        );
       }
 
       // 4. Dispositivo 2 restaura cofre com a frase e faz PULL paginado (server_seq)
@@ -485,7 +500,8 @@ void main() {
 
         // Adulteração de 1 byte no chunk é rejeitada pela tag GCM/digest do manifesto
         final tampered = Uint8List.fromList(cloud.storageObjects[chunkKey]!);
-        final parsed = jsonDecode(utf8.decode(tampered)) as Map<String, dynamic>;
+        final parsed =
+            jsonDecode(utf8.decode(tampered)) as Map<String, dynamic>;
         final ct = parsed['ciphertext'] as String;
         parsed['ciphertext'] = '${ct[0] == 'A' ? 'B' : 'A'}${ct.substring(1)}';
         cloud.storageObjects[chunkKey] = Uint8List.fromList(

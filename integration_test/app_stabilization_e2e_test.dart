@@ -180,7 +180,9 @@ void main() {
     final pushRes = await sync1.sync();
     expect(pushRes.success, isTrue, reason: pushRes.errors.join('; '));
     expect(
-      jsonEncode(cloud.recordsByOwner[ownerA]!.values.map((e) => e.envelope).toList()),
+      jsonEncode(
+        cloud.recordsByOwner[ownerA]!.values.map((e) => e.envelope).toList(),
+      ),
       isNot(contains('Lucas Amazonas')),
     );
 
@@ -208,16 +210,28 @@ void main() {
     expect(pullRes.success, isTrue, reason: pullRes.errors.join('; '));
     expect((await repo2.getAllPeople()).single.name, 'Lucas Amazonas');
     expect((await repo2.getAllStudies()).single.title, 'Estudo com Lucas');
-    expect((await repo2.getAllAppointments()).single.title, 'Estudo Bíblico Lucas');
+    expect(
+      (await repo2.getAllAppointments()).single.title,
+      'Estudo Bíblico Lucas',
+    );
 
-    // 4. Backup & Restore preserva owner da Conta A
-    final backup = BackupService(repo2, documentsDirectoryProvider: () async => dir2);
-    final encryptedBak = await backup.exportEncryptedBackup('IntPass#2026', iterations: 1000);
+    // 4. Backup & Restore real (preview + commitRestore) preserva owner da Conta A
+    final backup = BackupService(
+      repo2,
+      documentsDirectoryProvider: () async => dir2,
+    );
+    final encryptedBak = await backup.exportEncryptedBackup(
+      'IntPass#2026',
+      iterations: 1000,
+    );
     final preview = await backup.previewBackup(
       encryptedDataString: encryptedBak,
       password: 'IntPass#2026',
     );
     expect(preview.isIntegral, isTrue);
+    final restoreRes = await backup.commitRestore(preview);
+    expect(restoreRes.isIntegral, isTrue);
+    expect(await SyncOwnerGuard.getBoundOwnerId(db2), equals(ownerA));
 
     // 5. Conta B entra no Dispositivo 2 -> bloqueada pelo SyncOwnerGuard
     final decisionB = await SyncOwnerGuard.evaluate(

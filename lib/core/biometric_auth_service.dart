@@ -52,9 +52,15 @@ Future<String> _derivePinPbkdf2Hex(
   // Em ambiente de produção nativo executa em isolate para não travar a UI.
   // Na Web ou sob FakeAsync de testWidgets (onde pumpAndSettle não cede tempo real
   // ao isolate), executa inline preservando exatamente as mesmas iterações KDF.
-  final isWidgetTestBinding = WidgetsBinding.instance.runtimeType
-      .toString()
-      .contains('TestWidgetsFlutterBinding');
+  var isWidgetTestBinding = false;
+  try {
+    isWidgetTestBinding = WidgetsBinding.instance.runtimeType
+        .toString()
+        .contains('TestWidgetsFlutterBinding');
+  } catch (_) {
+    // Sem WidgetsBinding inicializado (Dart puro): usa isolate normalmente.
+    isWidgetTestBinding = false;
+  }
   if (kIsWeb || isWidgetTestBinding) {
     return _derivePinPbkdf2HexSync(pin, saltBytes, iterations);
   }
@@ -84,7 +90,7 @@ bool _constantTimeEquals(String a, String b) {
 }
 
 /// Serviço de segurança e autenticação biométrica (Face ID, Touch ID, Biometria Android e PIN/Passcode)
-/// com derivação PBKDF2-HMAC-SHA256 (600.000 iterações em isolate — OWASP / FA-SEC-07)
+/// com derivação PBKDF2-HMAC-SHA256 (100.000 iterações calibradas em isolate + Keychain/Keystore + lockout — FA-SEC-07)
 /// e migração transparente de hashes legados.
 class BiometricAuthService extends ChangeNotifier {
   final LocalAuthentication _auth;
@@ -159,7 +165,7 @@ class BiometricAuthService extends ChangeNotifier {
   }
 
   /// Cadastra ou redefine o PIN de segurança com salt aleatório de 16 bytes
-  /// e KDF PBKDF2-HMAC-SHA256 (600.000 iterações em isolate — FA-SEC-07).
+  /// e KDF PBKDF2-HMAC-SHA256 (100.000 iterações padrão em isolate — FA-SEC-07).
   Future<bool> setPin(String pin) async {
     final sanitized = pin.trim();
     if (sanitized.length < 4 || sanitized.length > 8) {
@@ -241,13 +247,22 @@ class BiometricAuthService extends ChangeNotifier {
 
       if (isValid) {
         if (shouldUpgradeLegacy) {
-          // Migração transparente imediata para PBKDF2-HMAC-SHA256
-          final saltBytes = _hexToBytes(storedSalt);
+          // Migração transparente imediata para PBKDF2-HMAC-SHA256 com novo salt aleatório de 16 bytes
+          // (evita falha caso um salt legado não esteja em formato hexadecimal par).
+          final random = Random.secure();
+          final freshSaltBytes = List<int>.generate(
+            16,
+            (_) => random.nextInt(256),
+          );
+          final freshSaltHex = freshSaltBytes
+              .map((b) => b.toRadixString(16).padLeft(2, '0'))
+              .join();
           final upgradedHash = await _derivePinPbkdf2Hex(
             sanitized,
-            saltBytes,
+            freshSaltBytes,
             pbkdf2Iterations,
           );
+          await _storage.write(key: _pinSaltKey, value: freshSaltHex);
           await _storage.write(key: _pinHashKey, value: upgradedHash);
           await _storage.write(
             key: _pinKdfKey,
