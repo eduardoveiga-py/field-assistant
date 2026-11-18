@@ -21,17 +21,34 @@
    - **Path traversal bloqueado (`FA-SEC-09`):** `saveMediaBytes` em `lib/sync/media_bytes_io.dart` valida segmentos/nomes, aplica contenção canônica (`p.canonicalize` + `p.isWithin`) e grava atomicamente.
    - **Restore consciente da conta (`FA-BAK-01`):** `BackupService` protege chaves de identidade, segurança, cursores e checkpoints no `app_kv_store` e não reinjeta operações antigas da `sync_queue`.
 
-3. **Fase 2 & Correções P1 de Alto Impacto (`FA-SEC-06` parcial, `FA-SEC-07`, `FA-UX-01` parcial, `FA-IOS-02` parcial, `FA-FUNC-01` parcial, `FA-MAP-01/02` base, `FA-TEST-01` parcial):**
-   - **PIN KDF forte (`FA-SEC-07`):** `BiometricAuthService` migrado de SHA-256 1 rodada para PBKDF2-HMAC-SHA256 (100.000 iterações em isolate fora de testWidgets) com comparação constant-time e upgrade transparente de hashes legados.
-   - **Backup v3 em Isolate (`FA-SEC-07`):** `BackupService.exportEncryptedBackupV3` com >= 600.000 iterações PBKDF2-HMAC-SHA256 em `Isolate.run` + AES-256-GCM, mantendo leitura de v2 e v1 opt-in.
-   - **Proteção Android em repouso (`FA-SEC-06`):** `android:allowBackup="false"`, `data_extraction_rules.xml` e `backup_rules.xml`.
-   - **iPad/Desktop `NavigationRail` (`FA-UX-01`):** `AppFeature.territoryMaps` restaurado no `NavigationRail`.
-   - **Ditado offline honesto (`FA-IOS-02`):** `SpeechListenOptions(onDevice: preferOnDevice)`, verificação de locales instalados e `supportsTicunaOnDevice => false`.
-   - **`FeatureRegistry` unificado (`FA-FUNC-01`):** adicionados `inbox`, `tasksProjects` e `knowledge` com preservação integral de dados.
-   - **Arquitetura Map Engine Nível 2 (`FA-MAP-01/02`):** `docs/engineering/MAP_ENGINE_ARCHITECTURE.md` (comparação MapLibre Native vs `flutter_map` vs Organic Maps) e `lib/territory/map_engine_adapter.dart` (`OfflineMapPackageManifest` imutável com SHA-256/ODbL).
-   - **Pirâmide de Testes (`FA-TEST-01`):** `integration_test/app_stabilization_e2e_test.dart`, `test/e2e/stabilization_master_e2e_test.dart` e zero issues no `dart analyze lib test integration_test`.
+3. **Fase 2 — Criptografia em Repouso, Backup v3 & iOS Data Protection (`FA-SEC-06`, `FA-SEC-07`, `FA-SEC-08`, `FA-BAK-01`, `FA-IOS-02`) — Commits `7eda064`, `fe78264`, `6cb9a20`, `279c060`:**
+   - **PIN KDF forte & Backup v3 (`FA-SEC-07`):** PBKDF2-HMAC-SHA256 (100k iterações) no PIN e >=600.000 iterações em isolate com salt aleatório no backup v3.
+   - **SQLite em repouso (`FA-SEC-06`):** `sqlite3mc` (SQLite3MultipleCiphers) via build hooks do Dart, migração não-destrutiva de banco plaintext WAL/SHM com backup `.pre_enc.bak` e rollback automático.
+   - **iOS Data Protection (`FA-SEC-06`):** `Runner.entitlements` com `NSFileProtectionCompleteUntilFirstUserAuthentication` (ADR-015) e `isExcludedFromBackup = true` em `AppDelegate.swift` para SQLite e anexos.
+   - **Zero credenciais hardcoded (`FA-SEC-08`):** remoção de `defaultUrl` e `defaultAnonKey` de `SupabaseSyncService`; modo offline-first limpo.
+   - **Atomicidade de e-mail (`FA-SEC-08`):** `JwEmailService` transacional com `_base` e incremento de `revision`.
+   - **Suíte adversarial de backup (`FA-BAK-01`):** `test/backup/backup_adversarial_test.dart` comprovando rejeição de senha errada, bit-flip em GCM, arquivo corrompido, mídia ausente e rollback seguro.
 
-4. **Revisão Independente Adversarial & Correção de Bugs Críticos Pós-Fase 1/2:**
+4. **Fase 3 — Reconciliação Drift vs Supabase & Conflitos de Domínio (`FA-SYNC-01`, `FA-SYNC-02`, `FA-SEC-08`) — Commit `8e9b524`:**
+   - **Revogação de RPC legada (`FA-SEC-08`):** Migration `20261118000000_revoke_legacy_sync_upsert.sql` revogando `EXECUTE` de `public.sync_upsert(TEXT, JSONB)` para `PUBLIC, anon, authenticated` (testada via PGlite).
+   - **Suíte pgTAP (`FA-SEC-08`):** Arquivo `supabase/tests/01_rls_e2ee_storage_security.sql` com 24 asserções de RLS, E2EE e 4 buckets de Storage.
+   - **Mapeamento Drift vs Supabase (`FA-SYNC-01`):** `mapEntityToRemoteTable` cobre todas as 26 tabelas sincronizadas em snake_case, camelCase, PascalCase, singular e plural.
+   - **Detecção de conflitos de agenda (`FA-SYNC-02`):** `AppointmentDomainConflictDetector` detecta sobreposição temporal entre compromissos distintos após pull, marca `status = 'conflito'` sem sobrescrever ou apagar nenhum registro, e grava auditoria no `app_kv_store`.
+
+5. **Fase 4 — Map Engine Nível 2 & Experiência Cartográfica (`FA-MAP-01`, `FA-MAP-02`) — Commit `adf93ed`:**
+   - **Eliminação de URLs 404 (`FA-MAP-02`):** Remoção do fallback `mbtiles-v1/$id.mbtiles`; status explícito de pacote (`isAvailableForDownload` vs `Em preparação`); botão inteligente em `download_maps_screen.dart` que direciona pacotes sem mirror para URL personalizada / importação local sem crash.
+   - **Eliminação de corte diagonal no mapa (`FA-MAP-01`):** Expansão do canvas lógico (`gridHalfSize >= 16`) e buffer de tiles (`tileBuffer = 3`) cobrindo 100% da viewport sob rotação máxima sem triângulos pretos diagonais ou limitação de altura.
+   - **Rotação fluida e bússola:** Suporte a rotação por mouse com botão direito e Shift-drag no desktop/web; toque na bússola (`Icons.navigation_rounded`) reseta suavemente para o Norte (0°).
+
+6. **Fase 6 — Notificações Locais & Linguística Ticuna (`FA-FUNC-01`, `FA-FUNC-02`) — Commit `e7e3930`:**
+   - **Lembretes locais nativos (`FA-FUNC-01`):** Criação de `LocalReminderService` com agendamento persistente no SQLite/KV, cálculo de antecedência (lead time) e sincronização automática a partir de compromissos futuros da agenda ministerial.
+   - **Língua Ticuna (`FA-FUNC-02`):** `test/ticuna/ticuna_unicode_audio_test.dart` cobrindo os 12 glifos canônicos (`ĩ, ü̃, ü̃́, ũ, ã́, ẽ` e maiúsculas), normalização e preservação fonética de `Duü̃`.
+
+7. **Fase 9 — Performance & Otimização de Índices (`FA-PERF-01`) — Commit `22ec46c`:**
+   - **Índices de alta performance no Drift SQLite:** Adicionados índices condicionais `idx_people_coords` (`latitude, longitude`), `idx_appointments_start_time`, `idx_appointments_person_id` e `idx_visits_person_id` garantidos em `_ensurePerformanceIndexes()`, mantendo 100% de compatibilidade retroativa com migrações desde a v1.
+   - **Benchmark de dataset sintético:** Suíte automatizada `test/perf/synthetic_dataset_benchmark_test.dart` comprovando inserção em lote de 5.000 contatos, busca indexada por nome e filtro espacial por bounding box respondendo em milissegundos.
+
+8. **Revisão Independente Adversarial & Correção de Bugs Críticos:**
    - **Pull E2EE (`supabase_sync_service.dart`, `encrypted_record_checkpoint.dart`):** substituído retorno booleano ambíguo por `EncryptedApplyOutcome` (`applied`/`alreadyApplied`/`rejected`) impedindo o cursor `server_seq` de pular conflitos; ordenada a aplicação em lote em ordem pai-antes-de-filho (`syncTables`) evitando deadlock de FK quando um pai é atualizado após um filho; rejeitado `serverSeq <= 0`.
    - **Conflito delete-vs-update & resolução E2EE (`supabase_sync_service.dart`):** tombstone remoto contra edição local pendente agora gera conflito explícito sem corromper colunas `NOT NULL`; `resolveConflictAcceptRemote` agora atualiza atomicamente o `EncryptedRecordCheckpoint` com a revisão/envelope remoto autoritativo evitando loop infinito de conflito CAS.
    - **Mídias E2EE (`supabase_sync_service.dart`, `encrypted_media.dart`, `encrypted_media_transfer.dart`):** falhas transitórias de download agora gravam marcadores `pending_*_download_*` recuperados e limpos por `retryPendingMediaDownloads()`; `deleteEncrypted` agora inspeciona o manifesto autenticado (`EncryptedMedia.inspectChunkCount`) para remover todos os blocos em arquivos > 4 MiB (> 16 chunks) sem órfãos.
